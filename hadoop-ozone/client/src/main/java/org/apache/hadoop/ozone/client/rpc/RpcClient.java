@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -85,6 +86,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
@@ -128,6 +130,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,7 +146,7 @@ public class RpcClient implements ClientProtocol {
 
   private final ConfigurationSource conf;
   private final OzoneManagerProtocol ozoneManagerClient;
-  private final XceiverClientManager xceiverClientManager;
+  private final XceiverClientFactory xceiverClientManager;
   private final int chunkSize;
   private final UserGroupInformation ugi;
   private final ACLType userRights;
@@ -176,7 +179,7 @@ public class RpcClient implements ClientProtocol {
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
-    OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
+    OmTransport omTransport = createOmTransport(omServiceId);
 
     this.ozoneManagerClient = TracingUtil.createProxy(
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
@@ -197,9 +200,8 @@ public class RpcClient implements ClientProtocol {
       x509Certificates = OzoneSecurityUtil.convertToX509(caCertPems);
     }
 
-    this.xceiverClientManager = new XceiverClientManager(conf,
-        conf.getObject(XceiverClientManager.ScmClientConfig.class),
-        x509Certificates);
+    this.xceiverClientManager =
+        createXceiverClientFactory(x509Certificates);
 
     int configuredChunkSize = (int) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
@@ -246,6 +248,21 @@ public class RpcClient implements ClientProtocol {
             }
           }
         }).build();
+  }
+
+  @NotNull
+  @VisibleForTesting
+  protected XceiverClientFactory createXceiverClientFactory(
+      List<X509Certificate> x509Certificates) throws IOException {
+    return new XceiverClientManager(conf,
+        conf.getObject(XceiverClientManager.ScmClientConfig.class),
+        x509Certificates);
+  }
+
+  @VisibleForTesting
+  protected OmTransport createOmTransport(String omServiceId)
+      throws IOException {
+    return OmTransportFactory.create(conf, ugi, omServiceId);
   }
 
   @Override
@@ -589,6 +606,17 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.getS3Secret(kerberosID);
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void revokeS3Secret(String kerberosID) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
+            "kerberosID cannot be null or empty.");
+
+    ozoneManagerClient.revokeS3Secret(kerberosID);
+  }
+
   @Override
   public void setBucketVersioning(
       String volumeName, String bucketName, Boolean versioning)
@@ -896,9 +924,15 @@ public class RpcClient implements ClientProtocol {
     OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
 
     List<OzoneKeyLocation> ozoneKeyLocations = new ArrayList<>();
-    keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().forEach(
-        (a) -> ozoneKeyLocations.add(new OzoneKeyLocation(a.getContainerID(),
-            a.getLocalID(), a.getLength(), a.getOffset())));
+    long lastKeyOffset = 0L;
+    List<OmKeyLocationInfo> omKeyLocationInfos = keyInfo
+        .getLatestVersionLocations().getBlocksLatestVersionOnly();
+    for (OmKeyLocationInfo info: omKeyLocationInfos) {
+      ozoneKeyLocations.add(new OzoneKeyLocation(info.getContainerID(),
+          info.getLocalID(), info.getLength(), info.getOffset(),
+          lastKeyOffset));
+      lastKeyOffset += info.getLength();
+    }
     return new OzoneKeyDetails(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), ozoneKeyLocations, ReplicationType

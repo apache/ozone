@@ -94,7 +94,9 @@ enum Type {
   ListTrash = 91;
   RecoverTrash = 92;
 
-  PurgePaths = 93;
+  RevokeS3Secret = 93;
+
+  PurgePaths = 94;
 }
 
 message OMRequest {
@@ -168,7 +170,9 @@ message OMRequest {
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 
-  optional PurgePathsRequest                purgePathsRequest              = 93;
+  optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
+
+  optional PurgePathsRequest                purgePathsRequest              = 94;
 }
 
 message OMResponse {
@@ -1232,6 +1236,10 @@ message GetS3SecretRequest {
 
 message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
+}
+
+message RevokeS3SecretRequest {
+    required string kerberosID = 1;
 }
 
 /**

@@ -48,6 +48,7 @@ execute_robot_test scm om-ratis
 execute_robot_test scm freon
 
 execute_robot_test scm cli
+execute_robot_test scm admincli
 
 
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-simple-ofs-bucket ozonefs/ozonefs.robot

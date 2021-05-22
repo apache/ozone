@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +26,11 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -45,10 +49,39 @@ public class TestSCMContainerPlacementCapacity {
     //given
     ConfigurationSource conf = new OzoneConfiguration();
 
-    List<DatanodeDetails> datanodes = new ArrayList<>();
+    List<DatanodeInfo> datanodes = new ArrayList<>();
     for (int i = 0; i < 7; i++) {
-      datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          MockDatanodeDetails.randomDatanodeDetails(),
+          NodeStatus.inServiceHealthy());
+
+      StorageReportProto storage1 = TestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          100L, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+
+      datanodes.add(datanodeInfo);
     }
+
+    StorageReportProto storage2 = TestUtils.createStorageReport(
+        datanodes.get(2).getUuid(),
+        "/data1-" + datanodes.get(2).getUuidString(),
+        100L, 90L, 10L, null);
+    datanodes.get(2).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage2)));
+    StorageReportProto storage3 = TestUtils.createStorageReport(
+        datanodes.get(3).getUuid(),
+        "/data1-" + datanodes.get(3).getUuidString(),
+        100L, 80L, 20L, null);
+    datanodes.get(3).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage3)));
+    StorageReportProto storage4 = TestUtils.createStorageReport(
+        datanodes.get(4).getUuid(),
+        "/data1-" + datanodes.get(4).getUuidString(),
+        100L, 70L, 30L, null);
+    datanodes.get(4).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage4)));
 
     NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))

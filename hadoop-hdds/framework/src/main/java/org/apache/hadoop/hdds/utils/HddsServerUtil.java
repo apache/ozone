@@ -69,7 +69,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.getSingleSCMAddress;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_WARN_DEFAULT;
@@ -81,10 +81,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
 
 import org.rocksdb.RocksDBException;
@@ -113,37 +113,6 @@ public final class HddsServerUtil {
       BlockingService service, RPC.Server server) throws IOException {
     RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
     server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
-  }
-
-  /**
-   * Retrieve the socket address that should be used by DataNodes to connect
-   * to the SCM.
-   *
-   * @param conf
-   * @return Target {@code InetSocketAddress} for the SCM service endpoint.
-   */
-  public static InetSocketAddress getScmAddressForDataNodes(
-      ConfigurationSource conf) {
-    // We try the following settings in decreasing priority to retrieve the
-    // target host.
-    // - OZONE_SCM_DATANODE_ADDRESS_KEY
-    // - OZONE_SCM_CLIENT_ADDRESS_KEY
-    // - OZONE_SCM_NAMES
-    //
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
   }
 
   /**
@@ -229,7 +198,8 @@ public final class HddsServerUtil {
 
     return NetUtils.createSocketAddr(
         host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
+            port.orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
 
@@ -467,10 +437,9 @@ public final class HddsServerUtil {
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
     long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
         OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
-    SCMClientConfig scmClientConfig =
-        conf.getObject(SCMClientConfig.class);
+    SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     int retryCount =
-        (int) (duration / (scmClientConfig.getRetryInterval()/1000));
+        (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
 
     // If duration is set to lesser value, fall back to actual default
     // retry count.

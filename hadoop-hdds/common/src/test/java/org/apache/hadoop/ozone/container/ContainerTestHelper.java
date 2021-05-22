@@ -23,7 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -34,23 +34,17 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto.Builder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +55,6 @@ import org.slf4j.LoggerFactory;
 public final class ContainerTestHelper {
   private static final Logger LOG = LoggerFactory.getLogger(
       ContainerTestHelper.class);
-  private static Random r = new Random();
 
   public static final long CONTAINER_MAX_SIZE =
       (long) StorageUnit.GB.toBytes(1);
@@ -95,7 +88,7 @@ public final class ContainerTestHelper {
    */
   public static ChunkBuffer getData(int len) {
     byte[] data = new byte[len];
-    r.nextBytes(data);
+    ThreadLocalRandom.current().nextBytes(data);
     return ChunkBuffer.wrap(ByteBuffer.wrap(data));
   }
 
@@ -304,7 +297,7 @@ public final class ContainerTestHelper {
    * @return ContainerCommandRequestProto.
    */
   public static ContainerCommandRequestProto getCreateContainerRequest(
-      long containerID, Pipeline pipeline, Token token) throws IOException {
+      long containerID, Pipeline pipeline, Token<?> token) throws IOException {
     LOG.trace("addContainer: {}", containerID);
     return getContainerCommandRequestBuilder(containerID, pipeline)
         .setEncodedToken(token.encodeToUrlString())
@@ -331,8 +324,7 @@ public final class ContainerTestHelper {
    * @return ContainerCommandRequestProto.
    */
   public static ContainerCommandRequestProto getCreateContainerSecureRequest(
-      long containerID, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token) throws IOException {
+      long containerID, Pipeline pipeline, Token<?> token) throws IOException {
     LOG.trace("addContainer: {}", containerID);
 
     Builder request = getContainerCommandRequestBuilder(containerID, pipeline);
@@ -579,34 +571,5 @@ public final class ContainerTestHelper {
 
   public static String getFixedLengthString(String string, int length) {
     return String.format("%1$" + length + "s", string);
-  }
-
-  private static RaftServer.Division getRaftServerDivision(
-      HddsDatanodeService dn, Pipeline pipeline) throws Exception {
-    if (!pipeline.getNodes().contains(dn.getDatanodeDetails())) {
-      throw new IllegalArgumentException("Pipeline:" + pipeline.getId() +
-          " not exist in datanode:" + dn.getDatanodeDetails().getUuid());
-    }
-
-    XceiverServerRatis server =
-        (XceiverServerRatis) (dn.getDatanodeStateMachine().
-        getContainer().getWriteChannel());
-    return server.getServerDivision(
-        RatisHelper.newRaftGroup(pipeline).getGroupId());
-  }
-
-  public static StateMachine getStateMachine(HddsDatanodeService dn,
-      Pipeline pipeline) throws Exception {
-    return getRaftServerDivision(dn, pipeline).getStateMachine();
-  }
-
-  public static boolean isRatisLeader(HddsDatanodeService dn, Pipeline pipeline)
-      throws Exception {
-    return getRaftServerDivision(dn, pipeline).getInfo().isLeader();
-  }
-
-  public static boolean isRatisFollower(HddsDatanodeService dn,
-      Pipeline pipeline) throws Exception {
-    return getRaftServerDivision(dn, pipeline).getInfo().isFollower();
   }
 }

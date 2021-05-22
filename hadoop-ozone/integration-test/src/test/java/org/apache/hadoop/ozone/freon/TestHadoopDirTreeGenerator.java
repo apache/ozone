@@ -56,7 +56,7 @@ public class TestHadoopDirTreeGenerator {
   @Before
   public void setup() {
     path = GenericTestUtils
-            .getTempPath(TestOzoneClientKeyGenerator.class.getSimpleName());
+            .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
     File baseDir = new File(path);

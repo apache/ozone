@@ -28,6 +28,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -125,7 +126,18 @@ public final class MockSCMHAManager implements SCMHAManager {
   }
 
   @Override
-  public TermIndex installSnapshotFromLeader(String leaderId) {
+  public DBCheckpoint downloadCheckpointFromLeader(String leaderId) {
+    return null;
+  }
+
+  @Override
+  public TermIndex verifyCheckpointFromLeader(String leaderId,
+                                              DBCheckpoint checkpoint) {
+    return null;
+  }
+
+  @Override
+  public TermIndex installCheckpoint(DBCheckpoint dbCheckpoint) {
     return null;
   }
 
@@ -212,7 +224,7 @@ public final class MockSCMHAManager implements SCMHAManager {
     @Override
     public List<String> getRatisRoles() {
       return Arrays
-          .asList("180.3.14.5:9865", "180.3.14.21:9865", "180.3.14.145:9865");
+          .asList("180.3.14.5:9894", "180.3.14.21:9894", "180.3.14.145:9894");
     }
 
     @Override
