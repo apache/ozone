@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -47,7 +48,7 @@ public final class SCMContext {
   public static final long INVALID_TERM = -1;
 
   private static final SCMContext EMPTY_CONTEXT
-      = new SCMContext.Builder().build();
+      = new SCMContext.Builder().buildMaybeInvalid();
 
   /**
    * Used by non-HA mode SCM, Recon and Unit Tests.
@@ -173,7 +174,6 @@ public final class SCMContext {
    * @return StorageContainerManager
    */
   public StorageContainerManager getScm() {
-    Preconditions.checkNotNull(scm, "scm == null");
     return scm;
   }
 
@@ -214,6 +214,15 @@ public final class SCMContext {
     }
 
     public SCMContext build() {
+      Preconditions.checkNotNull(scm, "scm == null");
+      return buildMaybeInvalid();
+    }
+
+    /**
+     * Allows {@code null} SCM.  Only for tests.
+     */
+    @VisibleForTesting
+    SCMContext buildMaybeInvalid() {
       return new SCMContext(
           isLeader,
           term,
