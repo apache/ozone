@@ -578,7 +578,8 @@ public class BasicRootedOzoneClientAdapterImpl
     List<FileStatus> ret = new ArrayList<>();
     try {
       Iterator<? extends OzoneVolume> iterVol;
-      String username = UserGroupInformation.getCurrentUser().getUserName();
+      final String username =
+              UserGroupInformation.getCurrentUser().getShortUserName();
       if (allUsers) {
         iterVol = objectStore.listVolumes("");
       } else {
