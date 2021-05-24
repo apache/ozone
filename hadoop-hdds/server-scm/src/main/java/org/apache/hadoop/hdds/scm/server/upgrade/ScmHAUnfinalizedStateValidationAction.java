@@ -22,26 +22,49 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.SCM_HA;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
+import java.io.IOException;
+
+/**
+ * Checks that SCM HA cannot be used in a pre-finalized cluster, unless it
+ * was already being used before this action was run.
+ */
 @UpgradeActionHdds(feature = SCM_HA, component = SCM,
     type = VALIDATE_IN_PREFINALIZE)
 public class ScmHAUnfinalizedStateValidationAction
     implements HDDSUpgradeAction<StorageContainerManager> {
 
   @Override
-  public void execute(StorageContainerManager scm) throws Exception {
-    boolean isHAEnabled =
-        scm.getConfiguration().getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+  public void execute(StorageContainerManager scm) throws IOException {
+    checkScmHA(scm.getConfiguration(), scm.getScmStorageConfig());
+  }
 
-    if (isHAEnabled) {
+  /**
+   * Allows checking that SCM HA is not enabled while pre-finalized in both
+   * scm init and the upgrade action run on start.
+   */
+  public static void checkScmHA(OzoneConfiguration conf,
+      SCMStorageConfig storageConf) throws IOException {
+
+    // Since this action may need to be called outside the upgrade framework
+    // during init, it needs to check for pre-finalized state.
+    HDDSLayoutVersionManager versionManager =
+        new HDDSLayoutVersionManager(storageConf.getLayoutVersion());
+
+    if (versionManager.needsFinalization() &&
+        SCMHAUtils.isSCMHAEnabled(conf) &&
+        !storageConf.isSCMHAEnabled()) {
       throw new UpgradeException(String.format("Configuration %s cannot be " +
-          "used until SCM upgrade has been finalized",
+              "used until SCM upgrade has been finalized",
           ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
           UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
     }

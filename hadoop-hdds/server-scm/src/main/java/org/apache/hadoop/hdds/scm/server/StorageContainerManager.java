@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
@@ -962,6 +963,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         return false;
       }
     } else {
+      // If SCM HA was not being used before pre-finalize, and is being used
+      // when the cluster is pre-finalized for the SCM HA feature, init
+      // should fail.
+      ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig);
+
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
@@ -1158,6 +1164,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void start() throws IOException {
+    upgradeFinalizer.runPrefinalizeStateActions(scmStorageConfig, this);
+
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
           "StorageContainerLocationProtocol RPC server",
@@ -1168,8 +1176,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
-
-    upgradeFinalizer.runPrefinalizeStateActions(scmStorageConfig, this);
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
