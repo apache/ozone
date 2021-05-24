@@ -75,19 +75,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   /**
-   * Calls prepare on all OMs when they have no transaction information.
-   * Checks that they are brought into prepare mode successfully.
-   */
-  @Ignore("Absorbed into testPrepareWithTransactions test to save on CI time!")
-  @Test
-  public void testPrepareWithoutTransactions() throws Exception {
-    setup();
-    long prepareIndex = submitPrepareRequest();
-    assertClusterPrepared(prepareIndex);
-    assertRatisLogsCleared();
-  }
-
-  /**
    * Writes data to the cluster via the leader OM, and then prepares it.
    * Checks that every OM is prepared successfully.
    */
@@ -181,6 +168,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
+  @Ignore("Flaky test tracked in HDDS-5109")
   @Test
   public void testPrepareWithRestart() throws Exception {
     setup();

@@ -103,7 +103,9 @@ public class TestOMVersionManager {
     verify(omMock, times(UpgradeActionType.values().length)).getVersion();
   }
 
-  @Ignore
+  @Ignore("Since there is no longer a need to enforce the getRequestType " +
+      "method in OM request classes, disabling the " +
+      "test. Potentially revisit later.")
   @Test
   public void testAllOMRequestClassesHaveRequestType()
       throws InvocationTargetException, IllegalAccessException {

@@ -40,7 +40,8 @@ import org.reflections.Reflections;
 /**
  * Test OmVersionFactory.
  */
-@Ignore
+@Ignore("Ignored since this is incompatible with HDDS-2939 work. Potentially " +
+    "revisit later.")
 public class TestOmVersionManagerRequestFactory {
 
   private static OMLayoutVersionManager omVersionManager;
