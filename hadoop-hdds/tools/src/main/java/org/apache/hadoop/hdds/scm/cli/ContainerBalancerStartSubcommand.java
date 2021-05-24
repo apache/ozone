@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -38,9 +39,22 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerStartSubcommand.class);
 
+  @CommandLine.Option(names = {"-t", "--threshold"},
+      description = "Threshold target whether the cluster is balanced",
+      defaultValue = "0.1", showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private double threshold;
+
+  @CommandLine.Option(names = {"-i", "--idleiterations"},
+      description = "Maximum consecutive idle iterations",
+      defaultValue = "-1", showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private int iCount;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     scmClient.startContainerBalancer();
     LOG.info("Starting ContainerBalancer...");
+    //remove these in later implementation
+    LOG.info("threshold: {}", threshold);
+    LOG.info("idleiterations: {}", iCount);
   }
 }
