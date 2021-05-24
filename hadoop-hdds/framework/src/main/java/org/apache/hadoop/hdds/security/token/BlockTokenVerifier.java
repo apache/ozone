@@ -23,17 +23,15 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetSmallFile;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutBlock;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutSmallFile;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.WriteChunk;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.DeleteBlock;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.DeleteChunk;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 
@@ -68,7 +66,7 @@ public class BlockTokenVerifier extends
   }
 
   @Override
-  protected Object getService(ContainerCommandRequestProto cmd) {
+  protected Object getService(ContainerCommandRequestProtoOrBuilder cmd) {
     BlockID blockID = HddsUtils.getBlockID(cmd);
     Preconditions.checkNotNull(blockID,
         "no blockID in %s command", cmd.getCmdType());
@@ -77,21 +75,20 @@ public class BlockTokenVerifier extends
 
   @Override
   protected void verify(OzoneBlockTokenIdentifier tokenId,
-      ContainerCommandRequestProto cmd) throws SCMSecurityException {
+      ContainerCommandRequestProtoOrBuilder cmd) throws SCMSecurityException {
 
-    ContainerProtos.Type type = cmd.getCmdType();
-    if (type == ReadChunk || type == GetBlock || type == GetSmallFile) {
-      if (!tokenId.getAccessModes().contains(READ)) {
-        throw new BlockTokenException("Block token with " + tokenId.getService()
-            + " doesn't have READ permission");
-      }
-    } else if (type == WriteChunk || type == PutBlock || type == PutSmallFile) {
-      if (!tokenId.getAccessModes().contains(WRITE)) {
-        throw new BlockTokenException("Block token with " + tokenId.getService()
-            + " doesn't have WRITE permission");
-      }
+    HddsProtos.BlockTokenSecretProto.AccessModeProto accessMode;
+    if (HddsUtils.isReadOnly(cmd)) {
+      accessMode = READ;
+    } else if (cmd.getCmdType() == DeleteBlock ||
+        cmd.getCmdType() == DeleteChunk) {
+      accessMode = DELETE;
     } else {
-      throw new BlockTokenException("Block token does not support " + cmd);
+      accessMode = WRITE;
+    }
+    if (!tokenId.getAccessModes().contains(accessMode)) {
+      throw new BlockTokenException("Block token with " + tokenId.getService()
+          + " doesn't have " + accessMode + " permission");
     }
   }
 }

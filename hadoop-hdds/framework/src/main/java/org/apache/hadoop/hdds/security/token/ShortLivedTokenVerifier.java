@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.security.token;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -58,17 +58,18 @@ public abstract class
   protected abstract T createTokenIdentifier();
 
   /** Extract info on "service" being accessed by {@code cmd}. */
-  protected abstract Object getService(ContainerCommandRequestProto cmd);
+  protected abstract Object getService(
+      ContainerCommandRequestProtoOrBuilder cmd);
 
   /** Hook for further verification. */
-  protected void verify(T tokenId, ContainerCommandRequestProto cmd)
+  protected void verify(T tokenId, ContainerCommandRequestProtoOrBuilder cmd)
       throws SCMSecurityException {
     // NOP
   }
 
   @Override
   public void verify(String user, Token<?> token,
-      ContainerCommandRequestProto cmd) throws SCMSecurityException {
+      ContainerCommandRequestProtoOrBuilder cmd) throws SCMSecurityException {
 
     if (!isTokenRequired(cmd.getCmdType())) {
       return;
