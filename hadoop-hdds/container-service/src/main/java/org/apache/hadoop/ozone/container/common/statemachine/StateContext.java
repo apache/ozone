@@ -118,6 +118,7 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
+
   /**
    * term of latest leader SCM, extract from SCMCommand.
    *
