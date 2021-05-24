@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto.Builder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -135,6 +136,17 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getWriteChunkRequest(
       Pipeline pipeline, BlockID blockID, int datalen, int seq, String token)
       throws IOException {
+    Builder builder = newWriteChunkRequestBuilder(pipeline, blockID, datalen,
+        seq);
+    if (!Strings.isNullOrEmpty(token)) {
+      builder.setEncodedToken(token);
+    }
+    return builder.build();
+  }
+
+  public static Builder newWriteChunkRequestBuilder(
+      Pipeline pipeline, BlockID blockID, int datalen, int seq)
+      throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
     ContainerProtos.WriteChunkRequestProto.Builder writeRequest =
@@ -156,11 +168,8 @@ public final class ContainerTestHelper {
     request.setContainerID(blockID.getContainerID());
     request.setWriteChunk(writeRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    if (!Strings.isNullOrEmpty(token)) {
-      request.setEncodedToken(token);
-    }
 
-    return request.build();
+    return request;
   }
 
   /**
@@ -225,19 +234,25 @@ public final class ContainerTestHelper {
    * Returns a read Request.
    *
    * @param pipeline pipeline.
-   * @param request writeChunkRequest.
+   * @param writeChunk writeChunkRequest.
    * @return Request.
    */
   public static ContainerCommandRequestProto getReadChunkRequest(
-      Pipeline pipeline, ContainerProtos.WriteChunkRequestProto request)
+      Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeChunk)
+      throws IOException {
+    return newReadChunkRequestBuilder(pipeline, writeChunk).build();
+  }
+
+  public static Builder newReadChunkRequestBuilder(Pipeline pipeline,
+      ContainerProtos.WriteChunkRequestProtoOrBuilder writeChunk)
       throws IOException {
     LOG.trace("readChunk blockID={} from pipeline={}",
-        request.getBlockID(), pipeline);
+        writeChunk.getBlockID(), pipeline);
 
     ContainerProtos.ReadChunkRequestProto.Builder readRequest =
         ContainerProtos.ReadChunkRequestProto.newBuilder();
-    readRequest.setBlockID(request.getBlockID());
-    readRequest.setChunkData(request.getChunkData());
+    readRequest.setBlockID(writeChunk.getBlockID());
+    readRequest.setChunkData(writeChunk.getChunkData());
     readRequest.setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
 
     Builder newRequest =
@@ -246,7 +261,7 @@ public final class ContainerTestHelper {
     newRequest.setContainerID(readRequest.getBlockID().getContainerID());
     newRequest.setReadChunk(readRequest);
     newRequest.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return newRequest.build();
+    return newRequest;
   }
 
   /**
@@ -258,6 +273,12 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getDeleteChunkRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
+      throws IOException {
+    return newDeleteChunkRequestBuilder(pipeline, writeRequest).build();
+  }
+
+  public static Builder newDeleteChunkRequestBuilder(Pipeline pipeline,
+      ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest)
       throws IOException {
     LOG.trace("deleteChunk blockID={} from pipeline={}",
         writeRequest.getBlockID(), pipeline);
@@ -275,7 +296,7 @@ public final class ContainerTestHelper {
     request.setContainerID(writeRequest.getBlockID().getContainerID());
     request.setDeleteChunk(deleteRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request.build();
+    return request;
   }
 
   /**
@@ -404,8 +425,18 @@ public final class ContainerTestHelper {
       Pipeline pipeline, String token,
       ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    LOG.trace("putBlock: {} to pipeline={} with token {}",
-        writeRequest.getBlockID(), pipeline, token);
+    Builder builder = newPutBlockRequestBuilder(pipeline, writeRequest);
+    if (!Strings.isNullOrEmpty(token)) {
+      builder.setEncodedToken(token);
+    }
+    return builder.build();
+  }
+
+  public static Builder newPutBlockRequestBuilder(Pipeline pipeline,
+      ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest)
+      throws IOException {
+    LOG.trace("putBlock: {} to pipeline={}",
+        writeRequest.getBlockID(), pipeline);
 
     ContainerProtos.PutBlockRequestProto.Builder putRequest =
         ContainerProtos.PutBlockRequestProto.newBuilder();
@@ -424,10 +455,7 @@ public final class ContainerTestHelper {
     request.setContainerID(blockData.getContainerID());
     request.setPutBlock(putRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    if (!Strings.isNullOrEmpty(token)) {
-      request.setEncodedToken(token);
-    }
-    return request.build();
+    return request;
   }
 
   /**
@@ -440,9 +468,13 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getBlockRequest(
       Pipeline pipeline, ContainerProtos.PutBlockRequestProto putBlockRequest)
       throws IOException {
-    ContainerProtos.DatanodeBlockID blockID =
-        putBlockRequest.getBlockData().getBlockID();
-    LOG.trace("getKey: blockID={}", blockID);
+    return newGetBlockRequestBuilder(pipeline, putBlockRequest).build();
+  }
+
+  public static Builder newGetBlockRequestBuilder(
+      Pipeline pipeline, ContainerProtos.PutBlockRequestProtoOrBuilder putBlock)
+      throws IOException {
+    DatanodeBlockID blockID = putBlock.getBlockData().getBlockID();
 
     ContainerProtos.GetBlockRequestProto.Builder getRequest =
         ContainerProtos.GetBlockRequestProto.newBuilder();
@@ -454,7 +486,7 @@ public final class ContainerTestHelper {
     request.setContainerID(blockID.getContainerID());
     request.setGetBlock(getRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request.build();
+    return request;
   }
 
   /**
@@ -478,8 +510,13 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getDeleteBlockRequest(
       Pipeline pipeline, ContainerProtos.PutBlockRequestProto putBlockRequest)
       throws IOException {
-    ContainerProtos.DatanodeBlockID blockID = putBlockRequest.getBlockData()
-        .getBlockID();
+    return newDeleteBlockRequestBuilder(pipeline, putBlockRequest).build();
+  }
+
+  public static Builder newDeleteBlockRequestBuilder(Pipeline pipeline,
+      ContainerProtos.PutBlockRequestProtoOrBuilder putBlockRequest)
+      throws IOException {
+    DatanodeBlockID blockID = putBlockRequest.getBlockData().getBlockID();
     LOG.trace("deleteBlock: name={}", blockID);
     ContainerProtos.DeleteBlockRequestProto.Builder delRequest =
         ContainerProtos.DeleteBlockRequestProto.newBuilder();
@@ -490,7 +527,23 @@ public final class ContainerTestHelper {
     request.setContainerID(blockID.getContainerID());
     request.setDeleteBlock(delRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request.build();
+    return request;
+  }
+
+  public static Builder newGetCommittedBlockLengthBuilder(Pipeline pipeline,
+      ContainerProtos.PutBlockRequestProtoOrBuilder putBlock)
+      throws IOException {
+    DatanodeBlockID blockID = putBlock.getBlockData().getBlockID();
+
+    ContainerProtos.GetCommittedBlockLengthRequestProto.Builder req =
+        ContainerProtos.GetCommittedBlockLengthRequestProto.newBuilder()
+            .setBlockID(blockID);
+
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.GetCommittedBlockLength)
+        .setContainerID(blockID.getContainerID())
+        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
+        .setGetCommittedBlockLength(req);
   }
 
   /**

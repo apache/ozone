@@ -72,22 +72,28 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsUtils.isReadOnly;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerRequest;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteBlockRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteChunkRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newGetBlockRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newGetCommittedBlockLengthBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newReadChunkRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.ratis.rpc.RpcType;
+
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.After;
@@ -96,6 +102,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -253,45 +261,72 @@ public class TestSecureContainerServer {
       ContainerProtocolCalls.createContainer(client, containerID,
           getToken(ContainerID.valueOf(containerID)));
 
-      // Test 1: Test putBlock failure without block token.
-      assertFailsTokenVerification(client, getPutBlockRequest(pipeline, null,
-          getWriteChunkRequest(pipeline, blockID, 1024, null).getWriteChunk()));
-
-      // Test 2: Test putBlock succeeded with valid block token.
       Token<OzoneBlockTokenIdentifier> token =
           blockTokenSecretManager.generateToken(blockID,
-          EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
+              EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
+      String encodedToken = token.encodeToUrlString();
 
-      ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-          pipeline, blockID, 1024, token.encodeToUrlString());
-      assertSucceeds(client, writeChunkRequest);
+      ContainerCommandRequestProto.Builder writeChunk =
+          newWriteChunkRequestBuilder(pipeline, blockID, 1024, 0);
+      assertRequiresToken(client, encodedToken, writeChunk);
 
-      assertSucceeds(client, getPutBlockRequest(pipeline,
-          token.encodeToUrlString(), writeChunkRequest.getWriteChunk()));
+      ContainerCommandRequestProto.Builder putBlock =
+          newPutBlockRequestBuilder(pipeline, writeChunk.getWriteChunk());
+      assertRequiresToken(client, encodedToken, putBlock);
+
+      ContainerCommandRequestProto.Builder readChunk =
+          newReadChunkRequestBuilder(pipeline, writeChunk.getWriteChunk());
+      assertRequiresToken(client, encodedToken, readChunk);
+
+      ContainerCommandRequestProto.Builder getBlock =
+          newGetBlockRequestBuilder(pipeline, putBlock.getPutBlock());
+      assertRequiresToken(client, encodedToken, getBlock);
+
+      ContainerCommandRequestProto.Builder getCommittedBlockLength =
+          newGetCommittedBlockLengthBuilder(pipeline, putBlock.getPutBlock());
+      assertRequiresToken(client, encodedToken, getCommittedBlockLength);
+
+      ContainerCommandRequestProto.Builder deleteChunk =
+          newDeleteChunkRequestBuilder(pipeline, writeChunk.getWriteChunk());
+      assertRequiresToken(client, encodedToken, deleteChunk);
+
+      ContainerCommandRequestProto.Builder deleteBlock =
+          newDeleteBlockRequestBuilder(pipeline, putBlock.getPutBlock());
+      assertRequiresToken(client, encodedToken, deleteBlock);
     } finally {
       stopServer.accept(pipeline);
       servers.forEach(XceiverServerSpi::stop);
     }
   }
 
-  private static ContainerCommandRequestProto assertSucceeds(
+  private static void assertRequiresToken(XceiverClientSpi client,
+      String encodedToken, ContainerCommandRequestProto.Builder requestBuilder)
+      throws Exception {
+
+    requestBuilder.setEncodedToken("");
+    assertFailsTokenVerification(client, requestBuilder.build());
+
+    requestBuilder.setEncodedToken(encodedToken);
+    assertSucceeds(client, requestBuilder.build());
+  }
+
+  private static void assertSucceeds(
       XceiverClientSpi client, ContainerCommandRequestProto req)
       throws IOException {
     ContainerCommandResponseProto response = client.sendCommand(req);
     assertEquals(SUCCESS, response.getResult());
-    return req;
   }
 
   private static void assertFailsTokenVerification(XceiverClientSpi client,
       ContainerCommandRequestProto request) throws Exception {
-    if (client instanceof XceiverClientGrpc) {
+    if (client instanceof XceiverClientGrpc || isReadOnly(request)) {
       ContainerCommandResponseProto response = client.sendCommand(request);
       assertNotEquals(response.getResult(), ContainerProtos.Result.SUCCESS);
       String msg = response.getMessage();
       assertTrue(msg, msg.contains("token verification failed"));
     } else {
       assertRootCauseMessage("token verification failed",
-          LambdaTestUtils.intercept(IOException.class, () ->
+          Assert.assertThrows(IOException.class, () ->
               client.sendCommand(request)));
     }
   }
