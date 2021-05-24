@@ -41,12 +41,14 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(names = {"-t", "--threshold"},
       description = "Threshold target whether the cluster is balanced",
-      defaultValue = "0.1", showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+      defaultValue = "0.1",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private double threshold;
 
   @CommandLine.Option(names = {"-i", "--idleiterations"},
       description = "Maximum consecutive idle iterations",
-      defaultValue = "-1", showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+      defaultValue = "-1",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private int iCount;
 
   @Override
