@@ -211,14 +211,28 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         trx.getStateMachineLogEntry().getLogData());
     OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
 
-    // In prepare mode, only prepare and cancel requests are allowed to go
-    // through.
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
-    if (prepareState.requestAllowed(cmdType)) {
-      if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
+
+    if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
+      // Must authenticate prepare requests here, since we must determine
+      // whether or not to apply the prepare gate before proceeding with the
+      // prepare request.
+      String username = request.getUserInfo().getUserName();
+      if (!ozoneManager.isAdmin(username)) {
+        String message = "Access denied for user " + username + ". " +
+            "Superuser privilege is required to prepare ozone managers.";
+        OMException cause =
+            new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
+        // Leader should not step down because of this failure.
+        throw new StateMachineException(message, cause, false);
+      } else {
         prepareState.enablePrepareGate();
       }
-      // TODO: Add cancel prepare here after it is implemented.
+    }
+
+    // In prepare mode, only prepare and cancel requests are allowed to go
+    // through.
+    if (prepareState.requestAllowed(cmdType)) {
       return trx;
     } else {
       String message = "Cannot apply write request " +
