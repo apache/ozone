@@ -33,10 +33,6 @@ execute_robot_test ${SCM} basic/links.robot
 execute_robot_test ${SCM} s3
 execute_robot_test ${SCM} freon
 
-# prepare test should be the last test to run, until a cancel prepare test is
-# added. (TODO)
-execute_robot_test ${SCM} omha/om-prepare.robot
-
 stop_docker_env
 
 generate_report
