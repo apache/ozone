@@ -40,6 +40,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 
+import static org.apache.hadoop.test.GenericTestUtils.getTempPath;
+
 /**
  * Test for HadoopNestedDirGenerator.
  */
@@ -54,8 +56,7 @@ public class TestHadoopNestedDirGenerator {
           LoggerFactory.getLogger(TestHadoopNestedDirGenerator.class);
   @Before
     public void setup() {
-    path = GenericTestUtils
-                .getTempPath(TestOzoneClientKeyGenerator.class.getSimpleName());
+    path = getTempPath(TestHadoopNestedDirGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
     File baseDir = new File(path);

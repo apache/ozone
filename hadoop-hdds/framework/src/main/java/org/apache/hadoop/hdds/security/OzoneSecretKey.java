@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.security;
+package org.apache.hadoop.hdds.security;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SecretKeyProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.SecretKeyProto;
 
 /**
  * Wrapper class for Ozone/Hdds secret keys. Used in delegation tokens and block

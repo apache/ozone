@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -48,6 +49,9 @@ import org.slf4j.LoggerFactory;
 
 
 import com.google.common.annotations.VisibleForTesting;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
@@ -64,6 +68,7 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+  private final boolean containerTokenEnabled;
 
   public XceiverClientManager getXceiverClientManager() {
     return xceiverClientManager;
@@ -86,6 +91,8 @@ public class ContainerOperationClient implements ScmClient {
       replicationFactor = HddsProtos.ReplicationFactor.ONE;
       replicationType = HddsProtos.ReplicationType.STAND_ALONE;
     }
+    containerTokenEnabled = conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
+        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
   }
 
   @VisibleForTesting
@@ -150,7 +157,9 @@ public class ContainerOperationClient implements ScmClient {
    */
   public void createContainer(XceiverClientSpi client,
       long containerId) throws IOException {
-    ContainerProtocolCalls.createContainer(client, containerId, null);
+    String encodedToken = getEncodedContainerToken(containerId);
+
+    ContainerProtocolCalls.createContainer(client, containerId, encodedToken);
 
     // Let us log this info after we let SCM know that we have completed the
     // creation state.
@@ -158,6 +167,15 @@ public class ContainerOperationClient implements ScmClient {
       LOG.debug("Created container " + containerId
           + " machines:" + client.getPipeline().getNodes());
     }
+  }
+
+  private String getEncodedContainerToken(long containerId) throws IOException {
+    if (!containerTokenEnabled) {
+      return "";
+    }
+    ContainerID containerID = ContainerID.valueOf(containerId);
+    return storageContainerLocationClient.getContainerToken(containerID)
+        .encodeToUrlString();
   }
 
   /**
@@ -334,9 +352,11 @@ public class ContainerOperationClient implements ScmClient {
       boolean force) throws IOException {
     XceiverClientSpi client = null;
     try {
+      String encodedToken = getEncodedContainerToken(containerId);
+
       client = xceiverClientManager.acquireClient(pipeline);
       ContainerProtocolCalls
-          .deleteContainer(client, containerId, force, null);
+          .deleteContainer(client, containerId, force, encodedToken);
       storageContainerLocationClient
           .deleteContainer(containerId);
       if (LOG.isDebugEnabled()) {
@@ -389,11 +409,13 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public ContainerDataProto readContainer(long containerID,
       Pipeline pipeline) throws IOException {
+    String encodedToken = getEncodedContainerToken(containerID);
+
     XceiverClientSpi client = null;
     try {
       client = xceiverClientManager.acquireClientForReadData(pipeline);
-      ReadContainerResponseProto response =
-          ContainerProtocolCalls.readContainer(client, containerID, null);
+      ReadContainerResponseProto response = ContainerProtocolCalls
+          .readContainer(client, containerID, encodedToken);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Read container {}, machines: {} ", containerID,
             pipeline.getNodes());

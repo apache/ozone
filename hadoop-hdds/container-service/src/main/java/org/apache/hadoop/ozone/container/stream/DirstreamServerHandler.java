@@ -101,7 +101,8 @@ public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
       if (currentIndex == entriesToWrite.size() - 1) {
         nextFuture.addListener(a ->
             ctx.writeAndFlush(
-                Unpooled.wrappedBuffer(END_MARKER.getBytes(StandardCharsets.UTF_8)))
+                Unpooled.wrappedBuffer(
+                    END_MARKER.getBytes(StandardCharsets.UTF_8)))
                 .addListener(b -> {
                   ctx.channel().close();
                 }));

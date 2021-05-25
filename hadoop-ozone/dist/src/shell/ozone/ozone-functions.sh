@@ -2722,7 +2722,8 @@ function ozone_deprecate_envvar
   local oldvar=$1
   local newvar=$2
 
-  if ozone_set_var_for_compatibility "$newvar" "$oldvar"; then
+  if ozone_set_var_for_compatibility "$newvar" "$oldvar" && \
+    [[ "${OZONE_DEPRECATION_WARNING:-true}" != "false" ]]; then
     ozone_error "WARNING: ${oldvar} has been deprecated by ${newvar}."
   fi
 }

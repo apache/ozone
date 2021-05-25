@@ -128,6 +128,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -848,7 +849,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .getGetS3SecretResponse();
 
     return S3SecretValue.fromProtobuf(resp.getS3Secret());
+  }
 
+  @Override
+  public void revokeS3Secret(String kerberosID) throws IOException {
+    RevokeS3SecretRequest request = RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(kerberosID)
+            .build();
+    OMRequest omRequest = createOMRequest(Type.RevokeS3Secret)
+            .setRevokeS3SecretRequest(request)
+            .build();
+    handleError(submitRequest(omRequest));
   }
 
   /**
