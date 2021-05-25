@@ -17,9 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.junit.Assert;
@@ -29,6 +31,24 @@ import org.junit.Test;
  * Test replicationConfig.
  */
 public class TestReplicationConfig {
+
+  @Test
+  public void deserializeEC() {
+    final ReplicationConfig replicationConfig = ReplicationConfig
+        .fromProto(ReplicationType.EC, ReplicationFactor.THREE,
+            HddsProtos.ECReplicationConfig.newBuilder()
+                .setParity(2)
+                .setData(3)
+                .build());
+
+    Assert
+        .assertEquals(ECReplicationConfig.class, replicationConfig.getClass());
+
+    ECReplicationConfig ecConfig = (ECReplicationConfig) replicationConfig;
+    Assert.assertEquals(ReplicationType.EC, ecConfig.getReplicationType());
+    Assert.assertEquals(3, ecConfig.getData());
+    Assert.assertEquals(2, ecConfig.getParity());
+  }
 
   @Test
   public void deserializeRatis() {
