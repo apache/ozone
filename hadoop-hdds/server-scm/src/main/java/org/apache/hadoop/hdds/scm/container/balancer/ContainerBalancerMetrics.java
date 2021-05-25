@@ -29,99 +29,99 @@ public final class ContainerBalancerMetrics {
 
   @Metric(about = "The total amount of used space in GigaBytes that needs to " +
       "be balanced.")
-  private LongMetric totalSizeToBalanceGB;
+  private LongMetric dataSizeToBalanceGB;
 
   @Metric(about = "The amount of Giga Bytes that have been moved to achieve " +
       "balance.")
-  private LongMetric gigaBytesMoved;
+  private LongMetric dataSizeBalancedGB;
 
   @Metric(about = "Number of containers that Container Balancer has moved" +
       " until now.")
-  private LongMetric numContainersMoved;
+  private LongMetric movedContainersNum;
 
   @Metric(about = "The total number of datanodes that need to be balanced.")
-  private LongMetric totalNumDatanodesToBalance;
+  private LongMetric datanodesNumToBalance;
 
   @Metric(about = "Number of datanodes that Container Balancer has balanced " +
       "until now.")
-  private LongMetric numDatanodesBalanced;
+  private LongMetric datanodesNumBalanced;
 
   @Metric(about = "Utilisation value of the current maximum utilised datanode.")
-  private double maxUtilizedDatanodeRatio;
+  private double maxDatanodeUtilizedRatio;
 
   /**
    * Initialise metrics for ContainerBalancer.
    */
   public ContainerBalancerMetrics() {
-    totalSizeToBalanceGB = new LongMetric(0L);
-    gigaBytesMoved = new LongMetric(0L);
-    numContainersMoved = new LongMetric(0L);
-    totalNumDatanodesToBalance = new LongMetric(0L);
-    numDatanodesBalanced = new LongMetric(0L);
-    maxUtilizedDatanodeRatio = 0D;
+    dataSizeToBalanceGB = new LongMetric(0L);
+    dataSizeBalancedGB = new LongMetric(0L);
+    movedContainersNum = new LongMetric(0L);
+    datanodesNumToBalance = new LongMetric(0L);
+    datanodesNumBalanced = new LongMetric(0L);
+    maxDatanodeUtilizedRatio = 0D;
   }
 
-  public LongMetric getTotalSizeToBalanceGB() {
-    return totalSizeToBalanceGB;
+  public LongMetric getDataSizeToBalanceGB() {
+    return dataSizeToBalanceGB;
   }
 
-  public void setTotalSizeToBalanceGB(long size) {
-    this.totalSizeToBalanceGB = new LongMetric(size);
+  public void setDataSizeToBalanceGB(long size) {
+    this.dataSizeToBalanceGB = new LongMetric(size);
   }
 
-  public LongMetric getGigaBytesMoved() {
-    return gigaBytesMoved;
+  public LongMetric getDataSizeBalancedGB() {
+    return dataSizeBalancedGB;
   }
 
-  public void setGigaBytesMoved(
-      LongMetric gigaBytesMoved) {
-    this.gigaBytesMoved = gigaBytesMoved;
+  public void setDataSizeBalancedGB(
+      LongMetric dataSizeBalancedGB) {
+    this.dataSizeBalancedGB = dataSizeBalancedGB;
   }
 
-  public LongMetric getNumContainersMoved() {
-    return numContainersMoved;
+  public LongMetric getMovedContainersNum() {
+    return movedContainersNum;
   }
 
-  public void setNumContainersMoved(
-      LongMetric numContainersMoved) {
-    this.numContainersMoved = numContainersMoved;
+  public void setMovedContainersNum(
+      LongMetric movedContainersNum) {
+    this.movedContainersNum = movedContainersNum;
   }
 
-  public LongMetric getTotalNumDatanodesToBalance() {
-    return totalNumDatanodesToBalance;
+  public LongMetric getDatanodesNumToBalance() {
+    return datanodesNumToBalance;
   }
 
-  public void setTotalNumDatanodesToBalance(
-      LongMetric totalNumDatanodesToBalance) {
-    this.totalNumDatanodesToBalance = totalNumDatanodesToBalance;
+  public void setDatanodesNumToBalance(
+      LongMetric datanodesNumToBalance) {
+    this.datanodesNumToBalance = datanodesNumToBalance;
   }
 
-  public LongMetric getNumDatanodesBalanced() {
-    return numDatanodesBalanced;
+  public LongMetric getDatanodesNumBalanced() {
+    return datanodesNumBalanced;
   }
 
-  public void setNumDatanodesBalanced(
-      LongMetric numDatanodesBalanced) {
-    this.numDatanodesBalanced = numDatanodesBalanced;
+  public void setDatanodesNumBalanced(
+      LongMetric datanodesNumBalanced) {
+    this.datanodesNumBalanced = datanodesNumBalanced;
   }
 
   /**
-   * Add specified valueToAdd to NumDatanodesBalanced.
+   * Add specified valueToAdd to datanodesNumBalanced.
    *
    * @param valueToAdd The value to add.
    * @return The result after addition.
    */
-  public long incrementNumDatanodesBalanced(long valueToAdd) {
-    numDatanodesBalanced.add(valueToAdd);
-    return numDatanodesBalanced.get();
+  public long incrementDatanodesNumBalanced(long valueToAdd) {
+    datanodesNumBalanced.add(valueToAdd);
+    return datanodesNumBalanced.get();
   }
 
-  public double getMaxUtilizedDatanodeRatio() {
-    return maxUtilizedDatanodeRatio;
+  public double getMaxDatanodeUtilizedRatio() {
+    return maxDatanodeUtilizedRatio;
   }
 
-  public void setMaxUtilizedDatanodeRatio(
-      double maxUtilizedDatanodeRatio) {
-    this.maxUtilizedDatanodeRatio = maxUtilizedDatanodeRatio;
+  public void setMaxDatanodeUtilizedRatio(
+      double maxDatanodeUtilizedRatio) {
+    this.maxDatanodeUtilizedRatio = maxDatanodeUtilizedRatio;
   }
 }

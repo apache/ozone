@@ -166,7 +166,7 @@ public class ContainerBalancer {
     LOG.info("Lower limit for utilization is {} and Upper limit for " +
         "utilization is {}", lowerLimit, upperLimit);
 
-    long numDatanodesToBalance = 0L;
+    long countDatanodesToBalance = 0L;
     double overLoadedBytes = 0D, underLoadedBytes = 0D;
 
     // find over and under utilized nodes
@@ -174,7 +174,7 @@ public class ContainerBalancer {
       double utilization = calculateUtilization(datanodeUsageInfo);
       if (utilization > upperLimit) {
         overUtilizedNodes.add(datanodeUsageInfo);
-        numDatanodesToBalance += 1;
+        countDatanodesToBalance += 1;
 
         // amount of bytes greater than upper limit in this node
         overLoadedBytes += ratioToBytes(
@@ -184,7 +184,7 @@ public class ContainerBalancer {
             upperLimit);
       } else if (utilization < lowerLimit) {
         underUtilizedNodes.add(datanodeUsageInfo);
-        numDatanodesToBalance += 1;
+        countDatanodesToBalance += 1;
 
         // amount of bytes lesser than lower limit in this node
         underLoadedBytes += ratioToBytes(
@@ -198,22 +198,23 @@ public class ContainerBalancer {
     }
     Collections.reverse(underUtilizedNodes);
 
-    long numDatanodesBalanced = 0;
+    long countDatanodesBalanced = 0;
     // count number of nodes that were balanced in previous iteration
     for (DatanodeUsageInfo node : unBalancedNodes) {
       if (!containsNode(overUtilizedNodes, node) &&
           !containsNode(underUtilizedNodes, node)) {
-        numDatanodesBalanced += 1;
+        countDatanodesBalanced += 1;
       }
     }
     // calculate total number of nodes that have been balanced so far
-    numDatanodesBalanced =
-        metrics.incrementNumDatanodesBalanced(numDatanodesBalanced);
+    countDatanodesBalanced =
+        metrics.incrementDatanodesNumBalanced(countDatanodesBalanced);
 
     unBalancedNodes = new ArrayList<>(
         overUtilizedNodes.size() + underUtilizedNodes.size());
 
-    if (numDatanodesBalanced + numDatanodesToBalance > maxDatanodesToBalance) {
+    if (countDatanodesBalanced + countDatanodesToBalance >
+        maxDatanodesToBalance) {
       LOG.info("Approaching Max Datanodes To Balance limit in Container " +
           "Balancer. Stopping Balancer.");
       stop();
@@ -248,9 +249,13 @@ public class ContainerBalancer {
     int index = 0;
     Comparator<DatanodeUsageInfo> comparator =
         DatanodeUsageInfo.getMostUsedByRemainingRatio();
+    int size = listToSearch.size();
+    if (size == 0) {
+      return false;
+    }
 
     if (comparator.compare(listToSearch.get(0),
-        listToSearch.get(listToSearch.size() - 1)) < 0) {
+        listToSearch.get(size - 1)) < 0) {
       index =
           Collections.binarySearch(listToSearch, node, comparator.reversed());
     } else {
@@ -271,15 +276,18 @@ public class ContainerBalancer {
   }
 
   /**
-   * Calculates the average datanode utilization for the specified nodes.
+   * Calculates the average utilization for the specified nodes.
    * Utilization is used space divided by capacity.
    *
    * @param nodes List of DatanodeUsageInfo to find the average utilization for
    * @return Average utilization value
-   * @throws ArithmeticException Division by zero
    */
-  private double calculateAvgUtilization(List<DatanodeUsageInfo> nodes)
-      throws ArithmeticException {
+  private double calculateAvgUtilization(List<DatanodeUsageInfo> nodes) {
+    if (nodes.size() == 0) {
+      LOG.warn("No nodes to calculate average utilization for in " +
+          "ContainerBalancer.");
+      return 0;
+    }
     SCMNodeStat aggregatedStats = new SCMNodeStat(
         0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
@@ -289,13 +297,7 @@ public class ContainerBalancer {
     clusterUsed = aggregatedStats.getScmUsed().get();
     clusterRemaining = aggregatedStats.getRemaining().get();
 
-    try {
-      return clusterUsed / (double) clusterCapacity;
-    } catch (ArithmeticException e) {
-      LOG.warn("Division by zero while calculating average utilization of the" +
-          " cluster in ContainerBalancer.");
-      throw e;
-    }
+    return clusterUsed / (double) clusterCapacity;
   }
 
   /**
@@ -305,7 +307,8 @@ public class ContainerBalancer {
    * @param datanodeUsageInfo DatanodeUsageInfo to calculate utilization for
    * @return Utilization value
    */
-  private double calculateUtilization(DatanodeUsageInfo datanodeUsageInfo) {
+  public static double calculateUtilization(
+      DatanodeUsageInfo datanodeUsageInfo) {
     SCMNodeStat stat = datanodeUsageInfo.getScmNodeStat();
 
     return stat.getScmUsed().get().doubleValue() /
@@ -316,7 +319,6 @@ public class ContainerBalancer {
    * Stops ContainerBalancer.
    */
   public void stop() {
-    LOG.info("Stopping Container Balancer...");
     balancerRunning.set(false);
     LOG.info("Container Balancer stopped.");
   }
