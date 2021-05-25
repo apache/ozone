@@ -237,7 +237,7 @@ public class BlockOutputStreamEntryPool {
    */
   private void allocateNewBlock() throws IOException {
     if (!excludeList.isEmpty()) {
-      LOG.info("Allocating block with {}", excludeList);
+      LOG.debug("Allocating block with {}", excludeList);
     }
     OmKeyLocationInfo subKeyInfo =
         omClient.allocateBlock(keyArgs, openID, excludeList);

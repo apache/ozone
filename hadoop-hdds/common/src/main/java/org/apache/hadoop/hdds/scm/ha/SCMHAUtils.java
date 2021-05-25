@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RemoteException;
@@ -63,6 +64,13 @@ public final class SCMHAUtils {
           .add(ReconfigurationInProgressException.class)
           .add(ReconfigurationTimeoutException.class)
           .add(ResourceUnavailableException.class)
+          .build();
+
+  private static final List<Class<? extends Exception>>
+      NON_RETRIABLE_EXCEPTION_LIST =
+      ImmutableList.<Class<? extends Exception>>builder()
+          .add(SCMException.class)
+          .add(NonRetriableException.class)
           .build();
 
   private SCMHAUtils() {
@@ -206,13 +214,14 @@ public final class SCMHAUtils {
     return getSCMNodeIds(configuration, scmServiceId);
   }
 
-  private static Throwable unwrapException(Exception e) {
-    IOException ioException = null;
+  public static Throwable unwrapException(Exception e) {
     Throwable cause = e.getCause();
-    if (cause instanceof RemoteException) {
-      ioException = ((RemoteException) cause).unwrapRemoteException();
+    if (e instanceof RemoteException) {
+      return ((RemoteException) e).unwrapRemoteException();
+    } else if (cause instanceof RemoteException) {
+      return ((RemoteException) cause).unwrapRemoteException();
     }
-    return ioException == null ? e : ioException;
+    return e;
   }
 
   /**
@@ -231,7 +240,12 @@ public final class SCMHAUtils {
    */
   public static boolean checkNonRetriableException(Exception e) {
     Throwable t = unwrapException(e);
-    return NonRetriableException.class.isInstance(t);
+    for (Class<? extends Exception> clazz : NON_RETRIABLE_EXCEPTION_LIST) {
+      if (clazz.isInstance(t)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // This will return the underlying exception after unwrapping

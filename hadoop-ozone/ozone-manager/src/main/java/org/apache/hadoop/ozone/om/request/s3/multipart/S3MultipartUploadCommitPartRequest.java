@@ -199,7 +199,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           ozoneManager.isRatisEnabled());
 
       // OldPartKeyInfo will be deleted. Its updateID will be set in
-      // S3MultipartUplodaCommitPartResponse before being added to
+      // S3MultipartUploadCommitPartResponse before being added to
       // DeletedKeyTable.
 
       // Add to cache.

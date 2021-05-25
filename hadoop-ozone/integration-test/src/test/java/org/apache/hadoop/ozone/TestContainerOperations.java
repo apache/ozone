@@ -25,10 +25,13 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 import static org.junit.Assert.assertEquals;
@@ -80,4 +83,20 @@ public class TestContainerOperations {
         .getContainerID());
   }
 
+  /**
+   * A simple test to get Pipeline with {@link ContainerOperationClient}.
+   * @throws Exception
+   */
+  @Test
+  public void testGetPipeline() throws Exception {
+    try {
+      storageClient.getPipeline(PipelineID.randomId().getProtobuf());
+      Assert.fail("Get Pipeline should fail");
+    } catch (Exception e) {
+      Assert.assertTrue(
+          SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException);
+    }
+
+    Assert.assertFalse(storageClient.listPipelines().isEmpty());
+  }
 }

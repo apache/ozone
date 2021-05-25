@@ -16,17 +16,22 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -37,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
@@ -46,11 +52,14 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.KerberosInfo;
 
+import org.apache.hadoop.security.UserGroupInformation;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -331,6 +340,28 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   @Override
   public long getLatestCrlId() {
     return scmCertificateServer.getLatestCrlId();
+  }
+
+  @Override
+  public long revokeCertificates(List<String> certIds, int reason,
+      long revocationTime) throws IOException {
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser());
+
+    Future<Optional<Long>> revoked = scmCertificateServer.revokeCertificates(
+        certIds.stream().map(id -> new BigInteger(id))
+            .collect(Collectors.toList()), CRLReason.lookup(reason),
+        new Date(revocationTime));
+    try {
+      return revoked.get().get().longValue();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new SCMException("Fail to revoke certs",
+          SCMException.ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
+    }
+  }
+
+  @VisibleForTesting
+  public UserGroupInformation getRpcRemoteUser() {
+    return Server.getRemoteUser();
   }
 
   public RPC.Server getRpcServer() {

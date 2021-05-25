@@ -42,8 +42,10 @@ import picocli.CommandLine.Option;
         RandomKeyGenerator.class,
         OzoneClientKeyGenerator.class,
         OzoneClientKeyValidator.class,
+        OzoneClientKeyRemover.class,
         OmKeyGenerator.class,
         OmBucketGenerator.class,
+        OmBucketRemover.class,
         HadoopFsGenerator.class,
         HadoopNestedDirGenerator.class,
         HadoopDirTreeGenerator.class,
@@ -59,7 +61,8 @@ import picocli.CommandLine.Option;
         GeneratorOm.class,
         GeneratorScm.class,
         GeneratorDatanode.class,
-        ClosedContainerReplicator.class},
+        ClosedContainerReplicator.class,
+        StreamingGenerator.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {

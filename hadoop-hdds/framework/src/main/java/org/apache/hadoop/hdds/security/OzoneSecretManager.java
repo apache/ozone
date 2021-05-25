@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.security;
+package org.apache.hadoop.hdds.security;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
