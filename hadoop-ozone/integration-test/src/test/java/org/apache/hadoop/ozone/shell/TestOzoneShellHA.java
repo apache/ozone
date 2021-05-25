@@ -574,6 +574,7 @@ public class TestOzoneShellHA {
       }
     } finally {
       shell.close();
+      fs.close();
     }
   }
 
@@ -650,6 +651,7 @@ public class TestOzoneShellHA {
 
     } finally {
       shell.close();
+      fs.close();
     }
 
   }
