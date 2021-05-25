@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -58,8 +57,6 @@ import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.SCM_NOT_INITIALIZED;
 
 /**
  * The SCMStateMachine is the state machine for SCMRatisServer. It is
@@ -84,20 +81,16 @@ public class SCMStateMachine extends BaseStateMachine {
   private DBCheckpoint installingDBCheckpoint = null;
 
   public SCMStateMachine(final StorageContainerManager scm,
-      final SCMRatisServer ratisServer, SCMHADBTransactionBuffer buffer)
-      throws SCMException {
+      SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
-    if (!latestTrxInfo.isDefault() &&
-        !updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
-            latestTrxInfo.getTransactionIndex())) {
-      throw new SCMException(
-          String.format("Failed to update LastAppliedTermIndex " +
-                  "in StateMachine to term:{} index:{}",
-              latestTrxInfo.getTerm(), latestTrxInfo.getTransactionIndex()
-          ), SCM_NOT_INITIALIZED);
+    if (!latestTrxInfo.isDefault()) {
+      updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
+          latestTrxInfo.getTransactionIndex());
+      LOG.info("Updated lastAppliedTermIndex {} with transactionInfo term and" +
+          "Index", latestTrxInfo);
     }
     this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
     isInitialized = true;

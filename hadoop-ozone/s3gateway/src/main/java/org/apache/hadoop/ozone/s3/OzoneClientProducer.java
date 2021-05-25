@@ -21,6 +21,7 @@ import javax.annotation.PreDestroy;
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
@@ -78,7 +79,8 @@ public class OzoneClientProducer {
   private ContainerRequestContext context;
 
   @Produces
-  public OzoneClient createClient() throws OS3Exception, IOException {
+  public OzoneClient createClient() throws WebApplicationException,
+      IOException {
     client = getClient(ozoneConfiguration);
     return client;
   }
@@ -97,7 +99,7 @@ public class OzoneClientProducer {
   }
 
   private OzoneClient getClient(OzoneConfiguration config)
-      throws OS3Exception {
+      throws WebApplicationException {
     OzoneClient ozoneClient = null;
     try {
       SignatureInfo signatureInfo = signatureProcessor.parseSignature();
@@ -144,14 +146,14 @@ public class OzoneClientProducer {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Error during Client Creation: ", ex);
       }
-      throw ex;
+      throw wrapOS3Exception(ex);
     } catch (Throwable t) {
       // For any other critical errors during object creation throw Internal
       // error.
       if (LOG.isDebugEnabled()) {
         LOG.debug("Error during Client Creation: ", t);
       }
-      throw INTERNAL_ERROR;
+      throw wrapOS3Exception(INTERNAL_ERROR);
     }
     return ozoneClient;
   }
@@ -172,7 +174,7 @@ public class OzoneClientProducer {
   private void validateAccessId(String awsAccessId) throws Exception {
     if (awsAccessId == null || awsAccessId.equals("")) {
       LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
-      throw MALFORMED_HEADER;
+      throw wrapOS3Exception(MALFORMED_HEADER);
     }
   }
 
@@ -183,5 +185,10 @@ public class OzoneClientProducer {
   @VisibleForTesting
   public void setSignatureParser(SignatureProcessor awsSignatureProcessor) {
     this.signatureProcessor = awsSignatureProcessor;
+  }
+
+  private WebApplicationException wrapOS3Exception(OS3Exception os3Exception) {
+    return new WebApplicationException(os3Exception,
+        os3Exception.getHttpCode());
   }
 }

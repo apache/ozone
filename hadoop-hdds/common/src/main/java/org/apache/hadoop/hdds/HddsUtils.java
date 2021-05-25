@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -354,7 +354,7 @@ public final class HddsUtils {
    * @return True if its readOnly , false otherwise.
    */
   public static boolean isReadOnly(
-      ContainerProtos.ContainerCommandRequestProto proto) {
+      ContainerCommandRequestProtoOrBuilder proto) {
     switch (proto.getCmdType()) {
     case ReadContainer:
     case ReadChunk:
@@ -394,12 +394,15 @@ public final class HddsUtils {
   public static boolean requireBlockToken(
       ContainerProtos.Type cmdType) {
     switch (cmdType) {
-    case ReadChunk:
+    case DeleteBlock:
+    case DeleteChunk:
     case GetBlock:
-    case WriteChunk:
+    case GetCommittedBlockLength:
+    case GetSmallFile:
     case PutBlock:
     case PutSmallFile:
-    case GetSmallFile:
+    case ReadChunk:
+    case WriteChunk:
       return true;
     default:
       return false;
@@ -412,7 +415,6 @@ public final class HddsUtils {
     case CloseContainer:
     case CreateContainer:
     case DeleteContainer:
-    case ListContainer:
     case ReadContainer:
     case UpdateContainer:
       return true;
@@ -426,44 +428,66 @@ public final class HddsUtils {
    * @param msg container command
    * @return block ID.
    */
-  public static BlockID getBlockID(ContainerCommandRequestProto msg) {
+  public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) {
+    ContainerProtos.DatanodeBlockID blockID = null;
     switch (msg.getCmdType()) {
-    case ReadChunk:
-      if (msg.hasReadChunk()) {
-        return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());
+    case DeleteBlock:
+      if (msg.hasDeleteBlock()) {
+        blockID = msg.getDeleteBlock().getBlockID();
       }
-      return null;
+      break;
+    case DeleteChunk:
+      if (msg.hasDeleteChunk()) {
+        blockID = msg.getDeleteChunk().getBlockID();
+      }
+      break;
     case GetBlock:
       if (msg.hasGetBlock()) {
-        return BlockID.getFromProtobuf(msg.getGetBlock().getBlockID());
+        blockID = msg.getGetBlock().getBlockID();
       }
-      return null;
-    case WriteChunk:
-      if (msg.hasWriteChunk()) {
-        return BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      break;
+    case GetCommittedBlockLength:
+      if (msg.hasGetCommittedBlockLength()) {
+        blockID = msg.getGetCommittedBlockLength().getBlockID();
       }
-      return null;
-    case PutBlock:
-      if (msg.hasPutBlock()) {
-        return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
-            .getBlockID());
-      }
-      return null;
-    case PutSmallFile:
-      if (msg.hasPutSmallFile()) {
-        return BlockID.getFromProtobuf(msg.getPutSmallFile().getBlock()
-            .getBlockData().getBlockID());
-      }
-      return null;
+      break;
     case GetSmallFile:
       if (msg.hasGetSmallFile()) {
-        return BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock()
-            .getBlockID());
+        blockID = msg.getGetSmallFile().getBlock().getBlockID();
       }
-      return null;
+      break;
+    case ListChunk:
+      if (msg.hasListChunk()) {
+        blockID = msg.getListChunk().getBlockID();
+      }
+      break;
+    case PutBlock:
+      if (msg.hasPutBlock()) {
+        blockID = msg.getPutBlock().getBlockData().getBlockID();
+      }
+      break;
+    case PutSmallFile:
+      if (msg.hasPutSmallFile()) {
+        blockID = msg.getPutSmallFile().getBlock().getBlockData().getBlockID();
+      }
+      break;
+    case ReadChunk:
+      if (msg.hasReadChunk()) {
+        blockID = msg.getReadChunk().getBlockID();
+      }
+      break;
+    case WriteChunk:
+      if (msg.hasWriteChunk()) {
+        blockID = msg.getWriteChunk().getBlockID();
+      }
+      break;
     default:
-      return null;
+      break;
     }
+
+    return blockID != null
+        ? BlockID.getFromProtobuf(blockID)
+        : null;
   }
 
   /**
