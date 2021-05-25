@@ -28,7 +28,7 @@ public class ContainerReplicaNotFoundException extends ContainerException {
    * as its error detail message.
    */
   public ContainerReplicaNotFoundException() {
-    super();
+    super(ResultCodes.CONTAINER_REPLICA_NOT_FOUND);
   }
 
   /**
@@ -40,6 +40,6 @@ public class ContainerReplicaNotFoundException extends ContainerException {
    *        by the {@link #getMessage()} method)
    */
   public ContainerReplicaNotFoundException(String message) {
-    super(message);
+    super(message, ResultCodes.CONTAINER_REPLICA_NOT_FOUND);
   }
 }

@@ -125,7 +125,8 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager);
+    chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
+        volSet);
     try {
       volumeChoosingPolicy = conf.getClass(
           HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
@@ -252,6 +253,8 @@ public class KeyValueHandler extends Handler {
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
+    newContainerData.setReplicaIndex(request.getCreateContainer()
+        .getReplicaIndex());
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
     KeyValueContainer newContainer = new KeyValueContainer(

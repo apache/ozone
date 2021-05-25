@@ -42,7 +42,7 @@ Incomplete command
                         Should contain   ${output}   exit
                         Should contain   ${output}   wait
 
-Check safemode on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose safemode status --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#Check safemode on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose safemode status --scm unknown-host
+#                        Should contain   ${output}   Invalid host name
 

@@ -156,6 +156,10 @@ public class ObjectStore {
     return proxy.getS3Secret(kerberosID);
   }
 
+  public void revokeS3Secret(String kerberosID) throws IOException {
+    proxy.revokeS3Secret(kerberosID);
+  }
+
   /**
    * Returns Iterator to iterate over all the volumes in object store.
    * The result can be restricted using volume prefix, will return all

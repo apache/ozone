@@ -126,7 +126,10 @@ public final class OzoneConsts {
    */
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
+  public static final String CRL_DB_SUFFIX = "crl.db";
   public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
+  public static final String DN_CRL_DB = "dn-"+ CRL_DB_SUFFIX;
+  public static final String CRL_DB_DIRECTORY_NAME = "crl";
   public static final String OM_DB_NAME = "om.db";
   public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
@@ -257,6 +260,7 @@ public final class OzoneConsts {
   public static final String ORIGIN_PIPELINE_ID = "originPipelineId";
   public static final String ORIGIN_NODE_ID = "originNodeId";
   public static final String SCHEMA_VERSION = "schemaVersion";
+  public static final String REPLICA_INDEX = "replicaIndex";
 
   // Supported .container datanode schema versions.
   // Since containers in older schema versions are currently not reformatted to
@@ -320,6 +324,7 @@ public final class OzoneConsts {
   public static final String MAX_PARTS = "maxParts";
   public static final String S3_BUCKET = "s3Bucket";
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
+  public static final String S3_REVOKESECRET_USER = "S3RevokeSecretUser";
   public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
   public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
@@ -430,4 +435,12 @@ public final class OzoneConsts {
 
   public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
   public static final String SCM_ROOT_CA_PREFIX = "scm@";
+
+  // Kerberos constants
+  public static final String KERBEROS_CONFIG_VALUE = "kerberos";
+  public static final String HTTP_AUTH_TYPE_SUFFIX = "http.auth.type";
+  public static final String OZONE_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_FILTER_INITIALIZERS_SECURE =
+      "org.apache.hadoop.security.AuthenticationFilterInitializer";
 }

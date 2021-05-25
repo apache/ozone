@@ -301,8 +301,7 @@ public class DefaultCAServer implements CertificateServer {
   public Future<Optional<Long>> revokeCertificates(
       List<BigInteger> certificates,
       CRLReason reason,
-      Date revocationTime,
-      SecurityConfig securityConfig) {
+      Date revocationTime) {
     CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
     if (CollectionUtils.isEmpty(certificates)) {
       revoked.completeExceptionally(new SCMSecurityException(

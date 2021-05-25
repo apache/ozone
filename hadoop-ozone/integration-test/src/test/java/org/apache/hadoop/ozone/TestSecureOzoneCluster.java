@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
@@ -116,6 +118,7 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -322,6 +325,40 @@ public final class TestSecureOzoneCluster {
           finalScmSecurityProtocolClient::getCACertificate);
       LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
           () -> finalScmSecurityProtocolClient.getCertificate("1"));
+    } finally {
+      if (scm != null) {
+        scm.stop();
+      }
+    }
+  }
+
+  @Test
+  public void testAdminAccessControlException() throws Exception {
+    initSCM();
+    scm = TestUtils.getScmSimple(conf);
+    //Reads the SCM Info from SCM instance
+    try {
+      scm.start();
+
+      //case 1: Run admin command with non-admin user.
+      UserGroupInformation ugi =
+          UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+          testUserPrincipal, testUserKeytab.getCanonicalPath());
+      StorageContainerLocationProtocol scmRpcClient =
+          HAUtils.getScmContainerClient(conf, ugi);
+      LambdaTestUtils.intercept(IOException.class, "Access denied",
+          scmRpcClient::forceExitSafeMode);
+
+
+      // Case 2: User without Kerberos credentials should fail.
+      ugi = UserGroupInformation.createRemoteUser("test");
+      ugi.setAuthenticationMethod(AuthMethod.TOKEN);
+      scmRpcClient =
+          HAUtils.getScmContainerClient(conf, ugi);
+
+      String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
+      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+          scmRpcClient::forceExitSafeMode);
     } finally {
       if (scm != null) {
         scm.stop();
@@ -579,7 +616,7 @@ public final class TestSecureOzoneCluster {
   }
 
   @Test
-  public void testGetS3Secret() throws Exception {
+  public void testGetS3SecretAndRevokeS3Secret() throws Exception {
 
     // Setup secure OM for start
     setupOm(conf);
@@ -607,13 +644,48 @@ public final class TestSecureOzoneCluster {
       //access key fetched on both attempts must be same
       assertEquals(attempt1.getAwsAccessKey(), attempt2.getAwsAccessKey());
 
+      // Revoke the existing secret
+      omClient.revokeS3Secret(username);
+
+      // Get a new secret
+      S3SecretValue attempt3 = omClient.getS3Secret(username);
+
+      // secret should differ because it has been revoked previously
+      assertNotEquals(attempt3.getAwsSecret(), attempt2.getAwsSecret());
+
+      // accessKey is still the same because it is derived from username
+      assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
+
+      // Admin can get and revoke other users' secrets
+      // omClient's ugi is current user, which is added as an OM admin
+      omClient.getS3Secret("HADOOP/ALICE");
+      omClient.revokeS3Secret("HADOOP/ALICE");
+
+      // testUser is not an admin
+      final UserGroupInformation ugiNonAdmin =
+          UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+              testUserPrincipal, testUserKeytab.getCanonicalPath());
+      final OzoneManagerProtocolClientSideTranslatorPB omClientNonAdmin =
+          new OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(conf, ugiNonAdmin, null),
+          RandomStringUtils.randomAscii(5));
 
       try {
-        omClient.getS3Secret("HADOOP/JOHNDOE");
-        fail("testGetS3Secret failed");
+        omClientNonAdmin.getS3Secret("HADOOP/JOHN");
+        // Expected to fail because current ugi isn't an admin
+        fail("non-admin getS3Secret didn't fail as intended");
       } catch (IOException ex) {
         GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
       }
+
+      try {
+        omClientNonAdmin.revokeS3Secret("HADOOP/DOE");
+        // Expected to fail because current ugi isn't an admin
+        fail("non-admin revokeS3Secret didn't fail as intended");
+      } catch (IOException ex) {
+        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
+      }
+
     } finally {
       IOUtils.closeQuietly(om);
     }

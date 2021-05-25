@@ -62,16 +62,6 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>signature-check</id>
-            <phase></phase>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 

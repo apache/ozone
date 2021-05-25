@@ -82,7 +82,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       final StorageContainerManager scm, final SCMHADBTransactionBuffer buffer)
       throws IOException {
     this.scm = scm;
-    this.stateMachine = new SCMStateMachine(scm, this, buffer);
     final RaftGroupId groupId = buildRaftGroupId(scm.getClusterId());
     LOG.info("starting Raft server for scm:{}", scm.getScmId());
     // During SCM startup, the bootstrapped node will be started just with
@@ -100,9 +99,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     Parameters parameters = createSCMServerTlsParameters(grpcTlsConfig);
 
     this.server = newRaftServer(scm.getScmId(), conf)
-        .setStateMachine(stateMachine)
+        .setStateMachineRegistry((gId) -> new SCMStateMachine(scm, buffer))
         .setGroup(RaftGroup.valueOf(groupId))
         .setParameters(parameters).build();
+
+    this.stateMachine =
+        (SCMStateMachine) server.getDivision(groupId).getStateMachine();
+
     this.division = server.getDivision(groupId);
   }
 
@@ -111,7 +114,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftGroup group = buildRaftGroup(details, scmId, clusterId);
     RaftServer server = null;
     try {
-      server = newRaftServer(scmId, conf).setGroup(group).build();
+      server = newRaftServer(scmId, conf).setGroup(group)
+              .setStateMachineRegistry((groupId -> new SCMStateMachine()))
+              .build();
       server.start();
       waitForLeaderToBeReady(server, conf, group);
     } finally {
@@ -158,8 +163,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftProperties serverProperties =
         RatisUtil.newRaftProperties(haConf, conf);
     return RaftServer.newBuilder().setServerId(RaftPeerId.getRaftPeerId(scmId))
-        .setProperties(serverProperties)
-        .setStateMachine(new SCMStateMachine());
+        .setProperties(serverProperties);
   }
 
   @Override
@@ -230,15 +234,22 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     List<String> ratisRoles = new ArrayList<>();
     for (RaftPeer peer : peers) {
-      InetAddress peerInetAddress = InetAddress.getByName(
-              HddsUtils.getHostName(peer.getAddress()).get());
-      boolean isLocal = NetUtils.isLocalAddress(peerInetAddress);
+      InetAddress peerInetAddress = null;
+      try {
+        peerInetAddress = InetAddress.getByName(
+            HddsUtils.getHostName(peer.getAddress()).get());
+      } catch (IOException ex) {
+        LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
+            peer.getAddress());
+      }
+      boolean isLocal = false;
+      if (peerInetAddress != null) {
+        isLocal = NetUtils.isLocalAddress(peerInetAddress);
+      }
       ratisRoles.add((peer.getAddress() == null ? "" :
               peer.getAddress().concat(isLocal ?
-                      ":".concat(RaftProtos.RaftPeerRole.LEADER
-                              .toString()) :
-                      ":".concat(RaftProtos.RaftPeerRole.FOLLOWER
-                              .toString()))));
+                  ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
+                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))));
     }
     return ratisRoles;
   }
