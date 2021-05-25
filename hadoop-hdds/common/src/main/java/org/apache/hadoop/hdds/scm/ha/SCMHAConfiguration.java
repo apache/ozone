@@ -54,11 +54,11 @@ public class SCMHAConfiguration {
 
   @Config(key = "ratis.bind.port",
       type = ConfigType.INT,
-      defaultValue = "9865",
+      defaultValue = "9894",
       tags = {OZONE, SCM, HA, RATIS},
       description = "Port used by SCM for Ratis Server."
   )
-  private int ratisBindPort = 9865;
+  private int ratisBindPort = 9894;
 
 
   @Config(key = "ratis.rpc.type",

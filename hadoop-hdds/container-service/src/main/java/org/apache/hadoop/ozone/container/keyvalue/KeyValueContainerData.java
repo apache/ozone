@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -81,6 +82,8 @@ public class KeyValueContainerData extends ContainerData {
   private long deleteTransactionId;
 
   private long blockCommitSequenceId;
+
+  private int replicaIndex;
 
   static {
     // Initialize YAML fields
@@ -251,6 +254,7 @@ public class KeyValueContainerData extends ContainerData {
    * @return Protocol Buffer Message
    */
   @Override
+  @JsonIgnore
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());
@@ -300,5 +304,13 @@ public class KeyValueContainerData extends ContainerData {
             (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
   }
 }

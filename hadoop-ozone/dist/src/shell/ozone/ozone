@@ -46,7 +46,6 @@ function ozone_usage
   ozone_add_subcommand "genesis" client "runs a collection of ozone benchmarks to help with tuning."
   ozone_add_subcommand "getconf" client "get ozone config values from configuration"
   ozone_add_subcommand "jmxget" admin "get JMX exported values from NameNode or DataNode."
-  ozone_add_subcommand "noz" client "ozone debug tool, convert ozone metadata into relational data"
   ozone_add_subcommand "om" daemon "Ozone Manager"
   ozone_add_subcommand "scm" daemon "run the Storage Container Manager service"
   ozone_add_subcommand "s3g" daemon "run the S3 compatible REST gateway"
@@ -132,7 +131,6 @@ function ozonecmd_case
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS}"
-      OZONE_OPTS="${OZONE_OPTS} ${OZONE_FREON_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     genesis)
@@ -168,7 +166,6 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
       OZONE_SH_OPTS="${OZONE_SH_OPTS} -Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j}"
-      OZONE_OPTS="${OZONE_OPTS} ${OZONE_SH_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     s3)
@@ -292,14 +289,14 @@ ozone_assemble_classpath
 
 ozone_add_client_opts
 
-ozone_add_default_gc_opts
-
 if [[ ${OZONE_WORKER_MODE} = true ]]; then
   ozone_worker_mode_execute "${OZONE_HOME}/bin/ozone" "${OZONE_USER_PARAMS[@]}"
   exit $?
 fi
 
 ozone_subcommand_opts "${OZONE_SHELL_EXECNAME}" "${OZONE_SUBCMD}"
+
+ozone_add_default_gc_opts
 
 # everything is in globals at this point, so call the generic handler
 ozone_generic_java_subcmd_handler

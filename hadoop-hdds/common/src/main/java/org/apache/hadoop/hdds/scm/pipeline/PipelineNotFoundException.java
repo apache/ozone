@@ -18,18 +18,18 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import java.io.IOException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
 /**
  * Signals that a pipeline is missing from PipelineManager.
  */
-public class PipelineNotFoundException extends IOException{
+public class PipelineNotFoundException extends SCMException {
   /**
    * Constructs an {@code PipelineNotFoundException} with {@code null}
    * as its error detail message.
    */
   public PipelineNotFoundException() {
-    super();
+    super(ResultCodes.PIPELINE_NOT_FOUND);
   }
 
   /**
@@ -41,6 +41,6 @@ public class PipelineNotFoundException extends IOException{
    *        by the {@link #getMessage()} method)
    */
   public PipelineNotFoundException(String message) {
-    super(message);
+    super(message, ResultCodes.PIPELINE_NOT_FOUND);
   }
 }

@@ -179,4 +179,23 @@ public class TestRandomKeyGenerator {
     Assert.assertEquals(10, randomKeyGenerator.getThreadPoolSize());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
   }
+
+  @Test
+  public void cleanObjectsTest() throws Exception {
+    RandomKeyGenerator randomKeyGenerator =
+        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+    randomKeyGenerator.setNumOfVolumes(2);
+    randomKeyGenerator.setNumOfBuckets(5);
+    randomKeyGenerator.setNumOfKeys(10);
+    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
+    randomKeyGenerator.setType(ReplicationType.RATIS);
+    randomKeyGenerator.setNumOfThreads(10);
+    randomKeyGenerator.setCleanObjects(true);
+    randomKeyGenerator.call();
+    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCleaned());
+    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCleaned());
+  }
 }

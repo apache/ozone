@@ -56,7 +56,7 @@ services:
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -77,7 +77,7 @@ services:
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -98,7 +98,7 @@ services:
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -114,7 +114,7 @@ services:
       - 9890:9872
       #- 18001:18001
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
@@ -138,7 +138,7 @@ services:
       - 9892:9872
       #- 18002:18002
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
@@ -162,7 +162,7 @@ services:
       - 9894:9872
       #- 18003:18003
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
@@ -229,7 +229,7 @@ services:
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm1.org:9865
+      WAITFOR: scm1.org:9894
       KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
@@ -256,7 +256,7 @@ services:
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm2.org:9865
+      WAITFOR: scm2.org:9894
       KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"

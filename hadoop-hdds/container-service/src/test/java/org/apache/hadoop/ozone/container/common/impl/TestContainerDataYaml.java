@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
@@ -27,12 +28,14 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -73,7 +76,8 @@ public class TestContainerDataYaml {
    * Creates a .container file. cleanup() should be called at the end of the
    * test when container file is created.
    */
-  private File createContainerFile(long containerID) throws IOException {
+  private File createContainerFile(long containerID, int replicaIndex)
+      throws IOException {
     new File(testRoot).mkdirs();
 
     String containerPath = containerID + ".container";
@@ -87,6 +91,7 @@ public class TestContainerDataYaml {
     keyValueContainerData.setChunksPath(testRoot);
     keyValueContainerData.updateDataScanTime(SCAN_TIME);
     keyValueContainerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
+    keyValueContainerData.setReplicaIndex(replicaIndex);
 
     File containerFile = new File(testRoot, containerPath);
 
@@ -108,7 +113,7 @@ public class TestContainerDataYaml {
   public void testCreateContainerFile() throws IOException {
     long containerID = testContainerID++;
 
-    File containerFile = createContainerFile(containerID);
+    File containerFile = createContainerFile(containerID, 7);
 
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
@@ -131,7 +136,8 @@ public class TestContainerDataYaml {
     assertEquals(SCAN_TIME.toEpochMilli(),
                  kvData.getDataScanTimestamp().longValue());
     assertEquals(OzoneConsts.SCHEMA_LATEST,
-            kvData.getSchemaVersion());
+        kvData.getSchemaVersion());
+    assertEquals(7, kvData.getReplicaIndex());
 
     // Update ContainerData.
     kvData.addMetadata(OzoneConsts.VOLUME, VOLUME_OWNER);
@@ -169,7 +175,22 @@ public class TestContainerDataYaml {
   }
 
   @Test
-  public void testIncorrectContainerFile() throws IOException{
+  public void testCreateContainerFileWithoutReplicaIndex() throws IOException {
+    long containerID = testContainerID++;
+
+    File containerFile = createContainerFile(containerID, 0);
+
+    final String content =
+        FileUtils.readFileToString(containerFile, Charset.defaultCharset());
+
+    Assert.assertFalse("ReplicaIndex shouldn't be persisted if zero",
+        content.contains("replicaIndex"));
+    cleanup();
+  }
+
+
+  @Test
+  public void testIncorrectContainerFile() throws IOException {
     try {
       String containerFile = "incorrect.container";
       //Get file from resources folder
@@ -228,7 +249,24 @@ public class TestContainerDataYaml {
   public void testChecksumInContainerFile() throws IOException {
     long containerID = testContainerID++;
 
-    File containerFile = createContainerFile(containerID);
+    File containerFile = createContainerFile(containerID, 0);
+
+    // Read from .container file, and verify data.
+    KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
+        .readContainerFile(containerFile);
+    ContainerUtils.verifyChecksum(kvData);
+
+    cleanup();
+  }
+
+  /**
+   * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
+   */
+  @Test
+  public void testChecksumInContainerFileWithReplicaIndex() throws IOException {
+    long containerID = testContainerID++;
+
+    File containerFile = createContainerFile(containerID, 10);
 
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
