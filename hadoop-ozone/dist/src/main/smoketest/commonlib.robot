@@ -35,3 +35,14 @@ Kinit test user
     ${hostname} =       Execute                    hostname
     Set Suite Variable  ${TEST_USER}               ${user}/${hostname}@EXAMPLE.COM
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k ${user}/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/${keytab}
+
+Access should be denied
+    [arguments]    ${command}
+    ${output} =         Execute And Ignore Error     ${command}
+                        Should contain   ${output}   Access denied
+
+Requires admin privilege
+    [arguments]    ${command}
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip privilege check in unsecure cluster
+    Kinit test user     testuser2     testuser2.keytab
+    Access should be denied    ${command}

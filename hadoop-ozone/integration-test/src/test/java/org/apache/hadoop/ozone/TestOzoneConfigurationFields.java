@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -48,7 +49,9 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
-            SCMHTTPServerConfig.class
+            SCMHTTPServerConfig.class,
+            SCMHTTPServerConfig.ConfigStrings.class,
+            ScmConfig.ConfigStrings.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
@@ -86,8 +89,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        OMConfigKeys.OZONE_OM_HA_PREFIX,
-        ScmConfigKeys.OZONE_SCM_HA_SECURITY_SUPPORTED
+        OMConfigKeys.OZONE_OM_HA_PREFIX
         // TODO HDDS-2856
     ));
   }

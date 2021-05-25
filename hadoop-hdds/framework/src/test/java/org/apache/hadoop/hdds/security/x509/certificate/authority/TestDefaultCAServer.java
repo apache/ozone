@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -49,6 +50,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -273,8 +276,7 @@ public class TestDefaultCAServer {
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
-        CRLReason.lookup(CRLReason.keyCompromise), now,
-        new SecurityConfig(conf));
+        CRLReason.lookup(CRLReason.keyCompromise), now);
 
     // Revoking a valid certificate complete successfully without errors.
     assertTrue(revoked.isDone());
@@ -285,8 +287,7 @@ public class TestDefaultCAServer {
         () -> {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
-              CRLReason.lookup(CRLReason.keyCompromise), now,
-                  new SecurityConfig(conf));
+              CRLReason.lookup(CRLReason.keyCompromise), now);
           result.isDone();
           result.get();
         });
@@ -345,6 +346,8 @@ public class TestDefaultCAServer {
   @Test
   public void testIntermediaryCA() throws Exception {
 
+    conf.set(HddsConfigKeys.HDDS_X509_MAX_DURATION, "P3650D");
+
     String clusterId = RandomStringUtils.randomAlphanumeric(4);
     String scmId = RandomStringUtils.randomAlphanumeric(4);
 
@@ -378,7 +381,12 @@ public class TestDefaultCAServer {
     Assert.assertTrue(holder.isDone());
 
     X509CertificateHolder certificateHolder = holder.get();
+
+
     Assert.assertNotNull(certificateHolder);
+    Assert.assertEquals(10, certificateHolder.getNotAfter().toInstant()
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate().compareTo(LocalDate.now()));
 
     X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 

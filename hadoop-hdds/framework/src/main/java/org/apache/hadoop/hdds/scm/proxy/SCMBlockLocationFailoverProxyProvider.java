@@ -22,13 +22,14 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -40,9 +41,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 
@@ -58,20 +61,27 @@ public class SCMBlockLocationFailoverProxyProvider implements
   private Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIds;
 
-  private String currentProxySCMNodeId;
-  private int currentProxyIndex;
+  // As SCM Client is shared across threads, performFailOver()
+  // updates the currentProxySCMNodeId based on the updateLeaderNodeId which is
+  // updated in shouldRetry(). When 2 or more threads run in parallel, the
+  // RetryInvocationHandler will check the expectedFailOverCount
+  // and not execute performFailOver() for one of them. So the other thread(s)
+  // shall not call performFailOver(), it will call getProxy() which uses
+  // currentProxySCMNodeId and returns the proxy.
+  private volatile String currentProxySCMNodeId;
+  private volatile int currentProxyIndex;
 
   private final ConfigurationSource conf;
   private final long scmVersion;
 
   private String scmServiceId;
 
-  private String lastAttemptedLeader;
-
   private final int maxRetryCount;
   private final long retryInterval;
 
   private final UserGroupInformation ugi;
+
+  private String updatedLeaderNodeID = null;
 
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
@@ -102,7 +112,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     this.retryInterval = config.getRetryInterval();
   }
 
-  private void loadConfigs() {
+  private synchronized void loadConfigs() {
 
     scmNodeIds = new ArrayList<>();
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
@@ -121,42 +131,65 @@ public class SCMBlockLocationFailoverProxyProvider implements
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(
             scmNodeInfo.getServiceId(), scmNodeInfo.getNodeId(),
             scmBlockClientAddress);
-        ProxyInfo<ScmBlockLocationProtocolPB> proxy
-            = new ProxyInfo<>(null, scmProxyInfo.toString());
-        scmProxies.put(scmNodeId, proxy);
         scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
       }
     }
   }
 
   @VisibleForTesting
-  public synchronized String getCurrentProxyOMNodeId() {
+  public synchronized void changeCurrentProxy(String nodeId) {
+    currentProxyIndex = scmNodeIds.indexOf(nodeId);
+    currentProxySCMNodeId = nodeId;
+    nextProxyIndex();
+  }
+
+  @VisibleForTesting
+  public synchronized String getCurrentProxySCMNodeId() {
     return currentProxySCMNodeId;
   }
 
   @Override
-  public synchronized ProxyInfo getProxy() {
-    ProxyInfo currentProxyInfo = scmProxies.get(currentProxySCMNodeId);
-    createSCMProxyIfNeeded(currentProxyInfo, currentProxySCMNodeId);
+  public synchronized ProxyInfo<ScmBlockLocationProtocolPB> getProxy() {
+    String currentProxyNodeId = getCurrentProxySCMNodeId();
+    ProxyInfo currentProxyInfo = scmProxies.get(currentProxyNodeId);
+    if (currentProxyInfo == null) {
+      currentProxyInfo = createSCMProxy(currentProxyNodeId);
+    }
     return currentProxyInfo;
   }
 
   @Override
-  public void performFailover(ScmBlockLocationProtocolPB newLeader) {
-    // Should do nothing here.
-    LOG.debug("Failing over to next proxy. {}", getCurrentProxyOMNodeId());
+  public synchronized void performFailover(
+      ScmBlockLocationProtocolPB newLeader) {
+    //If leader node id is set, use that or else move to next proxy index.
+    if (updatedLeaderNodeID != null) {
+      currentProxySCMNodeId = updatedLeaderNodeID;
+    } else {
+      nextProxyIndex();
+    }
+
   }
 
-  public void performFailoverToAssignedLeader(String newLeader) {
-    if (newLeader == null) {
-      // If newLeader is not assigned, it will fail over to next proxy.
-      nextProxyIndex();
-    } else {
-      if (!assignLeaderToNode(newLeader)) {
-        LOG.debug("Failing over SCM proxy to nodeId: {}", newLeader);
-        nextProxyIndex();
+  public synchronized void performFailoverToAssignedLeader(String newLeader,
+      Exception e) {
+    ServerNotLeaderException snle =
+        (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
+    if (snle != null && snle.getSuggestedLeader() != null) {
+      Optional<SCMProxyInfo> matchedProxyInfo =
+          scmProxyInfoMap.values().stream().filter(
+              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+                  .equals(snle.getSuggestedLeader())).findFirst();
+      if (matchedProxyInfo.isPresent()) {
+        newLeader = matchedProxyInfo.get().getNodeId();
+        LOG.debug("Performing failover to suggested leader {}, nodeId {}",
+            snle.getSuggestedLeader(), newLeader);
+      } else {
+        LOG.debug("Suggested leader {} does not match with any of the " +
+                "proxyInfo adress {}", snle.getSuggestedLeader(),
+            Arrays.toString(scmProxyInfoMap.values().toArray()));
       }
     }
+    assignLeaderToNode(newLeader);
   }
 
   @Override
@@ -174,63 +207,46 @@ public class SCMBlockLocationFailoverProxyProvider implements
     }
   }
 
-  public RetryAction getRetryAction(int failovers) {
-    if (failovers < maxRetryCount) {
-      return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
-          getRetryInterval());
-    } else {
-      return RetryAction.FAIL;
-    }
-  }
-
   private synchronized long getRetryInterval() {
     // TODO add exponential backup
     return retryInterval;
   }
 
-  private synchronized int nextProxyIndex() {
-    lastAttemptedLeader = currentProxySCMNodeId;
-
+  private synchronized void nextProxyIndex() {
     // round robin the next proxy
-    currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
+
+    currentProxyIndex = (getCurrentProxyIndex() + 1) % scmProxyInfoMap.size();
     currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
-    return currentProxyIndex;
   }
 
-  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
+  private synchronized void assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
-      if (scmProxies.containsKey(newLeaderNodeId)) {
-        lastAttemptedLeader = currentProxySCMNodeId;
-        currentProxySCMNodeId = newLeaderNodeId;
-        currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
-        return true;
+      if (scmProxyInfoMap.containsKey(newLeaderNodeId)) {
+        updatedLeaderNodeID = newLeaderNodeId;
+        LOG.debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
+      } else {
+        updatedLeaderNodeID = null;
       }
-    } else {
-      lastAttemptedLeader = currentProxySCMNodeId;
     }
-    return false;
   }
 
   /**
-   * Creates proxy object if it does not already exist.
+   * Creates proxy object.
    */
-  private void createSCMProxyIfNeeded(ProxyInfo proxyInfo,
-                                     String nodeId) {
-    if (proxyInfo.proxy == null) {
-      InetSocketAddress address = scmProxyInfoMap.get(nodeId).getAddress();
-      try {
-        ScmBlockLocationProtocolPB proxy = createSCMProxy(address);
-        try {
-          proxyInfo.proxy = proxy;
-        } catch (IllegalAccessError iae) {
-          scmProxies.put(nodeId,
-              new ProxyInfo<>(proxy, proxyInfo.proxyInfo));
-        }
-      } catch (IOException ioe) {
-        LOG.error("{} Failed to create RPC proxy to SCM at {}",
-            this.getClass().getSimpleName(), address, ioe);
-        throw new RuntimeException(ioe);
-      }
+  private ProxyInfo createSCMProxy(String nodeId) {
+    ProxyInfo proxyInfo;
+    SCMProxyInfo scmProxyInfo = scmProxyInfoMap.get(nodeId);
+    InetSocketAddress address = scmProxyInfo.getAddress();
+    try {
+      ScmBlockLocationProtocolPB scmProxy = createSCMProxy(address);
+      // Create proxyInfo here, to make it work with all Hadoop versions.
+      proxyInfo = new ProxyInfo<>(scmProxy, scmProxyInfo.toString());
+      scmProxies.put(nodeId, proxyInfo);
+      return proxyInfo;
+    } catch (IOException ioe) {
+      LOG.error("{} Failed to create RPC proxy to SCM at {}",
+          this.getClass().getSimpleName(), address, ioe);
+      throw new RuntimeException(ioe);
     }
   }
 
@@ -257,11 +273,24 @@ public class SCMBlockLocationFailoverProxyProvider implements
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        performFailoverToAssignedLeader(newLeader);
-        return getRetryAction(failover);
+        if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+          setUpdatedLeaderNodeID();
+        } else {
+          performFailoverToAssignedLeader(null, e);
+        }
+        return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
+            getRetryInterval());
       }
     };
     return retryPolicy;
+  }
+
+  public synchronized int getCurrentProxyIndex() {
+    return currentProxyIndex;
+  }
+
+  public synchronized void setUpdatedLeaderNodeID() {
+    this.updatedLeaderNodeID = getCurrentProxySCMNodeId();
   }
 }
 

@@ -372,14 +372,15 @@ public class KeyManagerImpl implements KeyManager {
       throw ex;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
+      BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
-          .setBlockID(new BlockID(allocatedBlock.getBlockID()))
+          .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
           .setPipeline(allocatedBlock.getPipeline());
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager
-            .generateToken(remoteUser, allocatedBlock.getBlockID().toString(),
+            .generateToken(remoteUser, blockID,
                 EnumSet.of(READ, WRITE), scmBlockSize));
       }
       locationInfos.add(builder.build());
@@ -698,8 +699,7 @@ public class KeyManagerImpl implements KeyManager {
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
-          k.setToken(secretManager.generateToken(remoteUser,
-              k.getBlockID().getContainerBlockID().toString(),
+          k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
               EnumSet.of(READ), k.getLength()));
         });
       }

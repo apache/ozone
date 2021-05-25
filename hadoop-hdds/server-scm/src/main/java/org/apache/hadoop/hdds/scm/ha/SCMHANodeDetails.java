@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,12 +200,15 @@ public class SCMHANodeDetails {
 
         String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
             serviceId, nodeId);
-        int ratisPort = conf.getInt(ratisPortKey, OZONE_SCM_RATIS_PORT_DEFAULT);
+        int ratisPort = conf.getInt(ratisPortKey,
+            conf.getInt(OZONE_SCM_RATIS_PORT_KEY,
+                OZONE_SCM_RATIS_PORT_DEFAULT));
 
         String grpcPortKey = ConfUtils
             .addKeySuffixes(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, serviceId,
                 nodeId);
-        int grpcPort = conf.getInt(grpcPortKey, OZONE_SCM_GRPC_PORT_DEFAULT);
+        int grpcPort = conf.getInt(grpcPortKey,
+            conf.getInt(OZONE_SCM_GRPC_PORT_KEY, OZONE_SCM_GRPC_PORT_DEFAULT));
 
         InetSocketAddress addr = null;
         try {
@@ -305,6 +307,6 @@ public class SCMHANodeDetails {
       throws IllegalArgumentException {
     String exceptionMsg = String.format(message, arguments);
     LOG.error(exceptionMsg);
-    throw new OzoneIllegalArgumentException(exceptionMsg);
+    throw new IllegalArgumentException(exceptionMsg);
   }
 }

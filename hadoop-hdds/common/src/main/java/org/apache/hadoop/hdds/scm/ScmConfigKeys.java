@@ -431,11 +431,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT
-      = 9865;
+      = 9894;
   public static final String OZONE_SCM_GRPC_PORT_KEY
       = "ozone.scm.grpc.port";
   public static final int OZONE_SCM_GRPC_PORT_DEFAULT
-      = 9866;
+      = 9895;
   public static final String OZONE_SCM_RATIS_RPC_TYPE_KEY
       = "ozone.scm.ratis.rpc.type";
   public static final String OZONE_SCM_RATIS_RPC_TYPE_DEFAULT
@@ -519,18 +519,14 @@ public final class ScmConfigKeys {
   public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
       true;
 
-
-  // Temporary config which will be used only for test only purposes until
-  // SCM HA Security work is completed. This config should not be modified by
-  // users.
-  public static final String OZONE_SCM_HA_SECURITY_SUPPORTED =
-      "hdds.scm.ha.security.enable";
-  public static final boolean OZONE_SCM_HA_SECURITY_SUPPORTED_DEFAULT = false;
-
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";
   public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
       10 * 60;
+
+  public static final String OZONE_SCM_CA_LIST_RETRY_INTERVAL =
+      "ozone.scm.ca.list.retry.interval";
+  public static final long OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT = 10;
 
   /**
    * Never constructed.

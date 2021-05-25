@@ -16,6 +16,11 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+source "${DIR}/_lib.sh"
+
+install_virtualenv
+install_robot
+
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/acceptance"}
 
 OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)

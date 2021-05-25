@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import java.io.IOException;
@@ -69,10 +70,28 @@ public interface SCMHAManager {
   boolean addSCM(AddSCMRequest request) throws IOException;
 
   /**
-   * Download the SCM DB checkpoint from leader and reload the SCM state from
-   * it.
-   * @param leaderId leader id.
-   * @return
+   * Download the latest checkpoint from leader SCM.
+   *
+   * @param leaderId peerNodeID of the leader SCM
+   * @return If checkpoint is installed successfully, return the
+   *         corresponding termIndex. Otherwise, return null.
    */
-  TermIndex installSnapshotFromLeader(String leaderId);
+  DBCheckpoint downloadCheckpointFromLeader(String leaderId);
+
+  /**
+   * Verify the SCM DB checkpoint downloaded from leader.
+   *
+   * @param leaderId : leaderId
+   * @param checkpoint : checkpoint downloaded from leader.
+   * @return If the checkpoints snapshot index is greater than SCM's
+   *         last applied transaction index, return the termIndex of
+   *         the checkpoint, otherwise return null.
+   */
+  TermIndex verifyCheckpointFromLeader(String leaderId,
+                                       DBCheckpoint checkpoint);
+
+  /**
+   * Re-initialize the SCM state via this checkpoint.
+   */
+  TermIndex installCheckpoint(DBCheckpoint dbCheckpoint) throws Exception;
 }

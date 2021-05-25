@@ -33,6 +33,12 @@ execute_robot_test ${SCM} freon
 
 execute_robot_test ${SCM} basic/links.robot
 
+execute_robot_test ${SCM} s3
+
+execute_robot_test ${SCM} admincli
+
+export SCM=scm2.org
+execute_robot_test ${SCM} admincli
 stop_docker_env
 
 generate_report

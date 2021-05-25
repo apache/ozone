@@ -22,13 +22,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -40,11 +40,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY;
+import java.util.Optional;
 
 /**
  * Failover proxy provider for SCMSecurityProtocol server.
@@ -64,8 +64,16 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
   private List<String> scmNodeIds;
 
-  private String currentProxySCMNodeId;
-  private int currentProxyIndex;
+  // As SCM Client is shared across threads, performFailOver()
+  // updates the currentProxySCMNodeId based on the updateLeaderNodeId which is
+  // updated in shouldRetry(). When 2 or more threads run in parallel, the
+  // RetryInvocationHandler will check the expectedFailOverCount
+  // and not execute performFailOver() for one of them. So the other thread(s)
+  // shall not call performFailOver(), it will call getProxy() which uses
+  // currentProxySCMNodeId and returns the proxy.
+  private volatile String currentProxySCMNodeId;
+  private volatile int currentProxyIndex;
+
 
   private final ConfigurationSource conf;
   private final SCMClientConfig scmClientConfig;
@@ -77,6 +85,8 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
   private final long retryInterval;
 
   private final UserGroupInformation ugi;
+
+  private String updatedLeaderNodeID = null;
 
   /**
    * Construct fail-over proxy provider for SCMSecurityProtocol Server.
@@ -101,7 +111,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     this.retryInterval = scmClientConfig.getRetryInterval();
   }
 
-  protected void loadConfigs() {
+  protected synchronized void loadConfigs() {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
     scmNodeIds = new ArrayList<>();
 
@@ -175,22 +185,46 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
 
   @Override
-  public void performFailover(SCMSecurityProtocolPB currentProxy) {
-    if (LOG.isDebugEnabled()) {
-      int currentIndex = getCurrentProxyIndex();
-      LOG.debug("Failing over SCM Security proxy to index: {}, nodeId: {}",
-          currentIndex, scmNodeIds.get(currentIndex));
+  public synchronized void performFailover(SCMSecurityProtocolPB currentProxy) {
+    if (updatedLeaderNodeID != null) {
+      currentProxySCMNodeId = updatedLeaderNodeID;
+    } else {
+      nextProxyIndex();
     }
+    LOG.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
-  /**
-   * Performs fail-over to the next proxy.
-   */
-  public void performFailoverToNextProxy() {
-    int newProxyIndex = incrementProxyIndex();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Incrementing SCM Security proxy index to {}, nodeId: {}",
-          newProxyIndex, scmNodeIds.get(newProxyIndex));
+  public synchronized void performFailoverToAssignedLeader(String newLeader,
+      Exception e) {
+    ServerNotLeaderException snle =
+        (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
+    if (snle != null && snle.getSuggestedLeader() != null) {
+      Optional< SCMProxyInfo > matchedProxyInfo =
+          scmProxyInfoMap.values().stream().filter(
+              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
+                  .equals(snle.getSuggestedLeader())).findFirst();
+      if (matchedProxyInfo.isPresent()) {
+        newLeader = matchedProxyInfo.get().getNodeId();
+        LOG.debug("Performing failover to suggested leader {}, nodeId {}",
+            snle.getSuggestedLeader(), newLeader);
+      } else {
+        LOG.debug("Suggested leader {} does not match with any of the " +
+                "proxyInfo adress {}", snle.getSuggestedLeader(),
+            Arrays.toString(scmProxyInfoMap.values().toArray()));
+      }
+    }
+    assignLeaderToNode(newLeader);
+  }
+
+
+  private synchronized void assignLeaderToNode(String newLeaderNodeId) {
+    if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
+      if (scmProxyInfoMap.containsKey(newLeaderNodeId)) {
+        updatedLeaderNodeID = newLeaderNodeId;
+        LOG.debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
+      } else {
+        updatedLeaderNodeID = null;
+      }
     }
   }
 
@@ -198,10 +232,10 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
    * Update the proxy index to the next proxy in the list.
    * @return the new proxy index
    */
-  private synchronized int incrementProxyIndex() {
-    currentProxyIndex = (currentProxyIndex + 1) % scmProxyInfoMap.size();
-    currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
-    return currentProxyIndex;
+  private synchronized void nextProxyIndex() {
+    // round robin the next proxy
+    currentProxyIndex = (getCurrentProxyIndex() + 1) % scmProxyInfoMap.size();
+    currentProxySCMNodeId =  scmNodeIds.get(currentProxyIndex);
   }
 
   public RetryPolicy getRetryPolicy() {
@@ -225,31 +259,23 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
           }
         }
 
-        // For AccessControl Exception where Client is not authentica
-        if (HAUtils.isAccessControlException(exception)) {
-          return RetryAction.FAIL;
-        }
-
-        // Perform fail over to next proxy, as right now we don't have any
-        // suggested leader ID from server, we fail over to next one.
-        // TODO: Act based on server response if leader id is passed.
-        performFailoverToNextProxy();
-        return getRetryAction(FAILOVER_AND_RETRY, failovers);
-      }
-
-      private RetryAction getRetryAction(RetryDecision fallbackAction,
-          int failovers) {
-        if (failovers < maxRetryCount) {
-          return new RetryAction(fallbackAction, getRetryInterval());
+        if (SCMHAUtils.checkRetriableWithNoFailoverException(exception)) {
+          setUpdatedLeaderNodeID();
         } else {
-          return RetryAction.FAIL;
+          performFailoverToAssignedLeader(null, exception);
         }
+        return SCMHAUtils
+            .getRetryAction(failovers, retries, exception, maxRetryCount,
+                getRetryInterval());
       }
     };
 
     return retryPolicy;
   }
 
+  public synchronized void setUpdatedLeaderNodeID() {
+    this.updatedLeaderNodeID = getCurrentProxySCMNodeId();
+  }
 
   @Override
   public Class< SCMSecurityProtocolPB > getInterface() {
@@ -257,7 +283,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     for (Map.Entry<String, ProxyInfo<SCMSecurityProtocolPB>> proxy :
         scmProxies.entrySet()) {
       if (proxy.getValue() != null) {

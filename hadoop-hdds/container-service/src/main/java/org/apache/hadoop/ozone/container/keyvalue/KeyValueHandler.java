@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
@@ -124,7 +125,8 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager);
+    chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
+        volSet);
     try {
       volumeChoosingPolicy = conf.getClass(
           HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
@@ -307,14 +309,6 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    // The container can become unhealthy after the lock is released.
-    // The operation will likely fail/timeout in that happens.
-    try {
-      checkContainerIsHealthy(kvContainer);
-    } catch (StorageContainerException sce) {
-      return ContainerUtils.logAndReturnError(LOG, sce, request);
-    }
-
     KeyValueContainerData containerData = kvContainer.getContainerData();
     return getReadContainerResponse(
         request, containerData.getProtoBufMessage());
@@ -472,18 +466,11 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    // The container can become unhealthy after the lock is released.
-    // The operation will likely fail/timeout in that happens.
-    try {
-      checkContainerIsHealthy(kvContainer);
-    } catch (StorageContainerException sce) {
-      return ContainerUtils.logAndReturnError(LOG, sce, request);
-    }
-
     ContainerProtos.BlockData responseData;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
+      checkContainerIsHealthy(kvContainer, blockID, Type.GetBlock);
       responseData = blockManager.getBlock(kvContainer, blockID)
           .getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
@@ -514,18 +501,13 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    // The container can become unhealthy after the lock is released.
-    // The operation will likely fail/timeout in that happens.
-    try {
-      checkContainerIsHealthy(kvContainer);
-    } catch (StorageContainerException sce) {
-      return ContainerUtils.logAndReturnError(LOG, sce, request);
-    }
-
     long blockLength;
     try {
       BlockID blockID = BlockID
           .getFromProtobuf(request.getGetCommittedBlockLength().getBlockID());
+      checkContainerIsHealthy(kvContainer, blockID,
+          Type.GetCommittedBlockLength);
+      BlockUtils.verifyBCSId(kvContainer, blockID);
       blockLength = blockManager.getCommittedBlockLength(kvContainer, blockID);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -585,14 +567,6 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    // The container can become unhealthy after the lock is released.
-    // The operation will likely fail/timeout if that happens.
-    try {
-      checkContainerIsHealthy(kvContainer);
-    } catch (StorageContainerException sce) {
-      return ContainerUtils.logAndReturnError(LOG, sce, request);
-    }
-
     ChunkBuffer data;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
@@ -601,6 +575,8 @@ public class KeyValueHandler extends Handler {
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
 
+      checkContainerIsHealthy(kvContainer, blockID, Type.ReadChunk);
+      BlockUtils.verifyBCSId(kvContainer, blockID);
       if (dispatcherContext == null) {
         dispatcherContext = new DispatcherContext.Builder().build();
       }
@@ -635,17 +611,15 @@ public class KeyValueHandler extends Handler {
    * Throw an exception if the container is unhealthy.
    *
    * @throws StorageContainerException if the container is unhealthy.
-   * @param kvContainer
    */
   @VisibleForTesting
-  void checkContainerIsHealthy(KeyValueContainer kvContainer)
-      throws StorageContainerException {
+  void checkContainerIsHealthy(KeyValueContainer kvContainer, BlockID blockID,
+      Type cmd) {
     kvContainer.readLock();
     try {
       if (kvContainer.getContainerData().getState() == State.UNHEALTHY) {
-        throw new StorageContainerException(
-            "The container(" + kvContainer.getContainerData().getContainerID() +
-            ") replica is unhealthy.", CONTAINER_UNHEALTHY);
+        LOG.warn("{} request {} for UNHEALTHY container {} replica", cmd,
+            blockID, kvContainer.getContainerData().getContainerID());
       }
     } finally {
       kvContainer.readUnlock();
@@ -823,19 +797,12 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    // The container can become unhealthy after the lock is released.
-    // The operation will likely fail/timeout in that happens.
-    try {
-      checkContainerIsHealthy(kvContainer);
-    } catch (StorageContainerException sce) {
-      return ContainerUtils.logAndReturnError(LOG, sce, request);
-    }
-
     GetSmallFileRequestProto getSmallFileReq = request.getGetSmallFile();
 
     try {
       BlockID blockID = BlockID.getFromProtobuf(getSmallFileReq.getBlock()
           .getBlockID());
+      checkContainerIsHealthy(kvContainer, blockID, Type.GetSmallFile);
       BlockData responseData = blockManager.getBlock(kvContainer, blockID);
 
       ContainerProtos.ChunkInfo chunkInfoProto = null;

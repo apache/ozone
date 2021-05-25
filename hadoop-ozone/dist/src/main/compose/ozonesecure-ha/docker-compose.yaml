@@ -52,10 +52,11 @@ services:
       - "scm1.org: 172.25.0.116"
       - "scm2.org: 172.25.0.117"
       - "scm3.org: 172.25.0.118"
+      - "recon: 172.25.0.115"
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -72,10 +73,11 @@ services:
       - "scm1.org: 172.25.0.116"
       - "scm2.org: 172.25.0.117"
       - "scm3.org: 172.25.0.118"
+      - "recon: 172.25.0.115"
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -92,10 +94,11 @@ services:
       - "scm1.org: 172.25.0.116"
       - "scm2.org: 172.25.0.117"
       - "scm3.org: 172.25.0.118"
+      - "recon: 172.25.0.115"
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       KERBEROS_KEYTABS: dn HTTP
       OZONE_OPTS:
     networks:
@@ -111,7 +114,7 @@ services:
       - 9890:9872
       #- 18001:18001
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
@@ -135,7 +138,7 @@ services:
       - 9892:9872
       #- 18002:18002
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
@@ -159,7 +162,7 @@ services:
       - 9894:9872
       #- 18003:18003
     environment:
-      WAITFOR: scm3.org:9865
+      WAITFOR: scm3.org:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
       OZONE_OPTS:
@@ -226,7 +229,7 @@ services:
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm1.org:9865
+      WAITFOR: scm1.org:9894
       KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
@@ -253,7 +256,7 @@ services:
     env_file:
       - docker-config
     environment:
-      WAITFOR: scm2.org:9865
+      WAITFOR: scm2.org:9894
       KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
@@ -269,6 +272,29 @@ services:
     networks:
       ozone_net:
         ipv4_address: 172.25.0.118
+  recon:
+    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    hostname: recon
+    volumes:
+      - ../..:/opt/hadoop
+    ports:
+      - 9888:9888
+    env_file:
+      - ./docker-config
+    environment:
+      KERBEROS_KEYTABS: recon HTTP
+      OZONE_OPTS:
+    command: ["/opt/hadoop/bin/ozone","recon"]
+    extra_hosts:
+      - "om1: 172.25.0.111"
+      - "om2: 172.25.0.112"
+      - "om3: 172.25.0.113"
+      - "scm1.org: 172.25.0.116"
+      - "scm2.org: 172.25.0.117"
+      - "scm3.org: 172.25.0.118"
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.115
 networks:
   ozone_net:
     ipam:
