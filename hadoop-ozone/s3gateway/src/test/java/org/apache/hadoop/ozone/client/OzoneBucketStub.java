@@ -34,7 +34,10 @@ import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts.PartInfo;
@@ -57,6 +60,8 @@ public class OzoneBucketStub extends OzoneBucket {
 
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
+  private ArrayList<OzoneAcl> aclList = new ArrayList<>();
+
   /**
    * Constructs OzoneBucket instance.
    *
@@ -73,8 +78,7 @@ public class OzoneBucketStub extends OzoneBucket {
       long creationTime) {
     super(volumeName,
         bucketName,
-        ReplicationFactor.ONE,
-        ReplicationType.STAND_ALONE,
+        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
         storageType,
         versioning,
         creationTime);
@@ -291,7 +295,27 @@ public class OzoneBucketStub extends OzoneBucket {
       return ozoneMultipartUploadPartListParts;
 
     }
+  }
 
+  @Override
+  public List<OzoneAcl> getAcls() throws IOException {
+    return (List<OzoneAcl>)aclList.clone();
+  }
+
+  @Override
+  public boolean removeAcl(OzoneAcl removeAcl) throws IOException {
+    return aclList.remove(removeAcl);
+  }
+
+  @Override
+  public boolean addAcl(OzoneAcl addAcl) throws IOException {
+    return aclList.add(addAcl);
+  }
+
+  @Override
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    aclList.clear();
+    return aclList.addAll(acls);
   }
 
   /**

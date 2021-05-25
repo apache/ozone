@@ -656,7 +656,7 @@ public abstract class TestOzoneRpcClientAbstract {
     acls.add(new OzoneAcl(USER, "test", ACLType.ALL, ACCESS));
     OzoneBucket bucket = volume.getBucket(bucketName);
     for (OzoneAcl acl : acls) {
-      assertTrue(bucket.addAcls(acl));
+      assertTrue(bucket.addAcl(acl));
     }
     OzoneBucket newBucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, newBucket.getName());
@@ -679,7 +679,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     for (OzoneAcl acl : acls) {
-      assertTrue(bucket.removeAcls(acl));
+      assertTrue(bucket.removeAcl(acl));
     }
     OzoneBucket newBucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, newBucket.getName());
@@ -1845,15 +1845,15 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testListVolume() throws IOException {
-    String volBase = "vol-" + RandomStringUtils.randomNumeric(3);
-    //Create 10 volume vol-<random>-a-0-<random> to vol-<random>-a-9-<random>
-    String volBaseNameA = volBase + "-a-";
+    String volBase = "vol-list-";
+    //Create 10 volume vol-list-a-0-<random> to vol-list-a-9-<random>
+    String volBaseNameA = volBase + "a-";
     for(int i = 0; i < 10; i++) {
       store.createVolume(
           volBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5));
     }
-    //Create 10 volume vol-<random>-b-0-<random> to vol-<random>-b-9-<random>
-    String volBaseNameB = volBase + "-b-";
+    //Create 10 volume vol-list-b-0-<random> to vol-list-b-9-<random>
+    String volBaseNameB = volBase + "b-";
     for(int i = 0; i < 10; i++) {
       store.createVolume(
           volBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
@@ -1964,7 +1964,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testListBucketsOnEmptyVolume()
       throws IOException {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String volume = "vol-empty";
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     Iterator<? extends OzoneBucket> buckets = vol.listBuckets("");
@@ -2367,10 +2367,10 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneAcl acl2 = new OzoneAcl(USER, "Friday", ACLType.ALL, DEFAULT);
     OzoneAcl acl3 = new OzoneAcl(USER, "Jan", ACLType.ALL, ACCESS);
     OzoneAcl acl4 = new OzoneAcl(USER, "Feb", ACLType.ALL, ACCESS);
-    bucket.addAcls(acl1);
-    bucket.addAcls(acl2);
-    bucket.addAcls(acl3);
-    bucket.addAcls(acl4);
+    bucket.addAcl(acl1);
+    bucket.addAcl(acl2);
+    bucket.addAcl(acl3);
+    bucket.addAcl(acl4);
 
     doMultipartUpload(bucket, keyName, (byte)98);
     OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder()

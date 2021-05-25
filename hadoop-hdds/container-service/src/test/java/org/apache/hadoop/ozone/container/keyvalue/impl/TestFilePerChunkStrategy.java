@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -114,7 +113,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
         container.getContainerData(), blockID, chunkInfo);
     ChunkUtils.writeData(file,
         ChunkBuffer.wrap(getData()), offset, chunkInfo.getLen(),
-        new VolumeIOStats(), true);
+        null, true);
     checkChunkFileCount(1);
     assertTrue(file.exists());
     assertEquals(offset + chunkInfo.getLen(), file.length());

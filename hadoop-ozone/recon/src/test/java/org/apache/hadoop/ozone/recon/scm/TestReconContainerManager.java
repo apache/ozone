@@ -28,6 +28,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -63,8 +65,7 @@ public class TestReconContainerManager
     assertFalse(containerManager.containerExist(containerID));
     assertFalse(getContainerTable().isExist(containerID));
 
-    containerManager.addNewContainer(
-        containerID.getId(), containerWithPipeline);
+    containerManager.addNewContainer(containerWithPipeline);
 
     assertTrue(containerManager.containerExist(containerID));
 
@@ -95,8 +96,7 @@ public class TestReconContainerManager
     assertFalse(containerManager.containerExist(containerID));
     assertFalse(getContainerTable().isExist(containerID));
 
-    containerManager.addNewContainer(
-        containerID.getId(), containerWithPipeline);
+    containerManager.addNewContainer(containerWithPipeline);
 
     assertTrue(containerManager.containerExist(containerID));
 
@@ -110,7 +110,7 @@ public class TestReconContainerManager
   }
 
   @Test
-  public void testCheckAndAddNewContainer() throws IOException {
+  public void testCheckAndAddNewContainer() throws Exception {
     ContainerID containerID = ContainerID.valueOf(100L);
     ReconContainerManager containerManager = getContainerManager();
     assertFalse(containerManager.containerExist(containerID));
@@ -128,16 +128,46 @@ public class TestReconContainerManager
   }
 
   @Test
-  public void testUpdateContainerStateFromOpen() throws IOException {
+  public void testCheckAndAddNewContainerBatch() throws IOException {
+    List<ContainerReplicaProto> containerReplicaProtoList = new LinkedList<>();
+    ReconContainerManager containerManager = getContainerManager();
+    State[] stateTypes = State.values();
+    LifeCycleState[] lifeCycleStateTypes = LifeCycleState.values();
+    int lifeCycleStateCount = lifeCycleStateTypes.length;
+    for (int i = 200; i < 300; i++) {
+      assertFalse(containerManager.containerExist(ContainerID.valueOf(i)));
+      ContainerReplicaProto.Builder ciBuilder =
+          ContainerReplicaProto.newBuilder();
+      ContainerReplicaProto crp = ciBuilder.
+          setContainerID(i).
+          setState(stateTypes[i % lifeCycleStateCount]).build();
+      containerReplicaProtoList.add(crp);
+    }
+
+    containerManager.checkAndAddNewContainerBatch(containerReplicaProtoList);
+    for (long i = 200L; i < 300L; i++) {
+      assertTrue(containerManager.containerExist(ContainerID.valueOf(i)));
+    }
+
+    // Doing it one more time should not change any state.
+    containerManager.checkAndAddNewContainerBatch(containerReplicaProtoList);
+    for (int i = 200; i < 300; i++) {
+      assertTrue(containerManager.containerExist(ContainerID.valueOf(i)));
+      assertEquals(lifeCycleStateTypes[i % lifeCycleStateCount],
+          getContainerManager().
+            getContainer(ContainerID.valueOf(i)).getState());
+    }
+  }
+
+  @Test
+  public void testUpdateContainerStateFromOpen() throws Exception {
     ContainerWithPipeline containerWithPipeline =
         getTestContainer(LifeCycleState.OPEN);
-
-    long id = containerWithPipeline.getContainerInfo().getContainerID();
     ContainerID containerID =
         containerWithPipeline.getContainerInfo().containerID();
 
     // Adding container #100.
-    getContainerManager().addNewContainer(id, containerWithPipeline);
+    getContainerManager().addNewContainer(containerWithPipeline);
     assertEquals(LifeCycleState.OPEN,
         getContainerManager().getContainer(containerID).getState());
 
@@ -190,7 +220,7 @@ public class TestReconContainerManager
     getPipelineManager().addPipeline(pipeline);
     for (int i = 1; i <= 10; i++) {
       final ContainerInfo info = newContainerInfo(i, pipeline);
-      containerManager.addNewContainer(i,
+      containerManager.addNewContainer(
           new ContainerWithPipeline(info, pipeline));
     }
 

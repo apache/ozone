@@ -30,7 +30,8 @@ import picocli.CommandLine.Command;
 @Command(name = "ozone s3",
     description = "Shell for S3 specific operations",
     subcommands = {
-        GetS3SecretHandler.class
+        GetS3SecretHandler.class,
+        RevokeS3SecretHandler.class
     })
 public class S3Shell extends Shell {
 

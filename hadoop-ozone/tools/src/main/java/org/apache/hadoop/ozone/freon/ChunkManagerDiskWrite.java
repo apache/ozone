@@ -135,7 +135,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       data = randomAscii(chunkSize).getBytes(UTF_8);
 
       chunkManager = ChunkManagerFactory.createChunkManager(ozoneConfiguration,
-          null);
+          null, null);
 
       timer = getMetrics().timer("chunk-write");
 

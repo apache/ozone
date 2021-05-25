@@ -33,7 +33,8 @@ public class ServerNotLeaderException extends IOException {
   private static final Pattern CURRENT_PEER_ID_PATTERN =
       Pattern.compile("Server:(.*) is not the leader[.]+.*", Pattern.DOTALL);
   private static final Pattern SUGGESTED_LEADER_PATTERN =
-      Pattern.compile(".*Suggested leader is Server:([^.]*).*", Pattern.DOTALL);
+      Pattern.compile(".*Suggested leader is Server:([^:]*)(:[0-9]+).*",
+          Pattern.DOTALL);
 
   public ServerNotLeaderException(RaftPeerId currentPeerId) {
     super("Server:" + currentPeerId + " is not the leader. Could not " +
@@ -60,7 +61,17 @@ public class ServerNotLeaderException extends IOException {
       Matcher suggestedLeaderMatcher =
           SUGGESTED_LEADER_PATTERN.matcher(message);
       if (suggestedLeaderMatcher.matches()) {
-        this.leader = suggestedLeaderMatcher.group(1);
+        if (suggestedLeaderMatcher.groupCount() == 2) {
+          if (suggestedLeaderMatcher.group(1).isEmpty()
+              || suggestedLeaderMatcher.group(2).isEmpty()) {
+            this.leader = null;
+          } else {
+            this.leader = suggestedLeaderMatcher.group(1) +
+                suggestedLeaderMatcher.group(2);
+          }
+        } else {
+          this.leader = null;
+        }
       } else {
         this.leader = null;
       }
