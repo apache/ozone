@@ -1866,6 +1866,12 @@
     <description>True if block tokens are enabled, else false.</description>
   </property>
   <property>
+    <name>hdds.container.token.enabled</name>
+    <value>false</value>
+    <tag>OZONE, HDDS, SECURITY, TOKEN</tag>
+    <description>True if container tokens are enabled, else false.</description>
+  </property>
+  <property>
     <name>hdds.x509.file.name</name>
     <value>certificate.crt</value>
     <tag>OZONE, HDDS, SECURITY</tag>
@@ -2023,7 +2029,7 @@
 
   <property>
     <name>ozone.scm.ratis.port</name>
-    <value>9865</value>
+    <value>9894</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>
       The port number of the SCM's Ratis server.
@@ -2032,7 +2038,7 @@
 
   <property>
     <name>ozone.scm.grpc.port</name>
-    <value>9866</value>
+    <value>9895</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>
       The port number of the SCM's grpc server.
@@ -2403,12 +2409,14 @@
   </property>
   <property>
     <name>ozone.client.failover.max.attempts</name>
-    <value>15</value>
+    <value>500</value>
     <description>
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving up.
+      represents the number of times the client will failover before giving
+      up. This value is kept high so that client does not give up trying to
+      connect to OMs easily.
     </description>
   </property>
   <property>
@@ -2830,6 +2838,20 @@
     <value>10m</value>
     <description> Maximum amount of duration OM/SCM waits to get Scm Info/Scm
       signed cert during OzoneManager init/SCM bootstrap.
+    </description>
+  </property>
+
+
+  <property>
+    <name>ozone.scm.ca.list.retry.interval</name>
+    <tag>OZONE, SCM, OM, DATANODE</tag>
+    <value>10s</value>
+    <description>SCM client wait duration between each retry to get Scm CA
+      list. OM/Datanode obtain CA list during startup, and wait
+      for the CA List size to be matched with SCM node count size plus
+      1. (Additional one certificate is root CA certificate). If the received
+      CA list size is not matching with expected count, this is the duration
+      used to wait before making next attempt to get CA list.
     </description>
   </property>
 
