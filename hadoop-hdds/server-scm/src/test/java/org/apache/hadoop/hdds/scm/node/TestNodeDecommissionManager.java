@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
-import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -178,22 +177,6 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
-  public void testDeadNodeDecommissionsImmediately()
-      throws NodeNotFoundException, InvalidNodeStateException {
-    List<DatanodeDetails> dns = generateDatanodes();
-    DatanodeDetails dn = dns.get(1);
-
-    SimpleMockNodeManager mockNM = new SimpleMockNodeManager();
-    mockNM.register(dn, NodeStatus.inServiceDead());
-    NodeDecommissionManager decomMgr = new NodeDecommissionManager(conf, mockNM,
-        null, SCMContext.emptyContext(), new EventQueue(), null);
-
-    decomMgr.startDecommission(dns.get(1));
-    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
-        mockNM.getNodeStatus(dns.get(1)).getOperationalState());
-  }
-
-  @Test
   public void testNodesCanBePutIntoMaintenanceAndRecommissioned()
       throws InvalidHostStringException, NodeNotFoundException {
     List<DatanodeDetails> dns = generateDatanodes();
@@ -234,22 +217,6 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(10)).getOperationalState());
-  }
-
-  @Test
-  public void testDeadNodeGoesToMaintenanceImmediately()
-      throws NodeNotFoundException, InvalidNodeStateException {
-    List<DatanodeDetails> dns = generateDatanodes();
-    DatanodeDetails dn = dns.get(1);
-
-    SimpleMockNodeManager mockNM = new SimpleMockNodeManager();
-    mockNM.register(dn, NodeStatus.inServiceDead());
-    NodeDecommissionManager decomMgr = new NodeDecommissionManager(conf, mockNM,
-        null, SCMContext.emptyContext(), new EventQueue(), null);
-
-    decomMgr.startMaintenance(dns.get(1), 0);
-    assertEquals(HddsProtos.NodeOperationalState.IN_MAINTENANCE,
-        mockNM.getNodeStatus(dns.get(1)).getOperationalState());
   }
 
   @Test
