@@ -22,12 +22,14 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 
@@ -165,9 +167,15 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    */
   public boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
       long sizeRequired) {
-    SCMNodeMetric nodeMetric = nodeManager.getNodeStat(datanodeDetails);
-    return (nodeMetric != null) && (nodeMetric.get() != null)
-        && nodeMetric.get().getRemaining().hasResources(sizeRequired);
+    Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
+
+    DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
+    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
+      if (reportProto.getRemaining() > sizeRequired) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

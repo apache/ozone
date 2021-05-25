@@ -23,9 +23,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotProvider;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -121,7 +121,6 @@ public class TestSCMInstallSnapshot {
   public void testInstallCheckPoint() throws Exception {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    SCMHAManagerImpl scmhaManager = (SCMHAManagerImpl)scm.getScmHAManager();
     DBStore db = HAUtils
         .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
             checkpoint.getCheckpointLocation().getFileName().toString(),
@@ -132,7 +131,7 @@ public class TestSCMInstallSnapshot {
     Assert.assertNotNull(db);
     HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
         .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
-            .setCurrentTerm(1).setTransactionIndex(100).build());
+            .setCurrentTerm(10).setTransactionIndex(100).build());
     db.close();
     ContainerID cid =
         scm.getContainerManager().getContainers().get(0).containerID();
@@ -143,7 +142,12 @@ public class TestSCMInstallSnapshot {
     Assert.assertNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
     Assert.assertFalse(scm.getContainerManager().containerExist(cid));
-    scmhaManager.installCheckpoint("scm1", checkpoint);
+
+    SCMStateMachine sm =
+        scm.getScmHAManager().getRatisServer().getSCMStateMachine();
+    sm.pause();
+    sm.setInstallingDBCheckpoint(checkpoint);
+    sm.reinitialize();
 
     Assert.assertNotNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));

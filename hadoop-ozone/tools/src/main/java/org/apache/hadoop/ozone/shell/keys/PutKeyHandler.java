@@ -27,7 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -59,9 +59,11 @@ public class PutKeyHandler extends KeyHandler {
   private String fileName;
 
   @Option(names = {"-r", "--replication"},
-      description = "Replication factor of the new key. (use ONE or THREE) "
-          + "Default is specified in the cluster-wide config.")
-  private ReplicationFactor replicationFactor;
+      description =
+          "Replication configuration of the new key. (this is replication "
+              + "specific. for RATIS/STANDALONE you can use ONE or THREE) "
+              + "Default is specified in the cluster-wide config.")
+  private String replication;
 
   @Option(names = {"-t", "--type"},
       description = "Replication type of the new key. (use RATIS or " +
@@ -85,16 +87,19 @@ public class PutKeyHandler extends KeyHandler {
       }
     }
 
-    if (replicationFactor == null) {
-      replicationFactor = ReplicationFactor.valueOf(
-          getConf().getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
-    }
-
     if (replicationType == null) {
       replicationType = ReplicationType.valueOf(
           getConf()
               .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
     }
+
+    if (replication == null) {
+      replication = getConf().get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
+    }
+
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromTypeAndString(replicationType, replication);
+
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
 
@@ -107,8 +112,8 @@ public class PutKeyHandler extends KeyHandler {
     int chunkSize = (int) getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     try (InputStream input = new FileInputStream(dataFile);
-         OutputStream output = bucket.createKey(keyName, dataFile.length(),
-             replicationType, replicationFactor, keyMetadata)) {
+        OutputStream output = bucket.createKey(keyName, dataFile.length(),
+            replicationConfig, keyMetadata)) {
       IOUtils.copyBytes(input, output, chunkSize);
     }
   }

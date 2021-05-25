@@ -296,6 +296,22 @@ message ContainerBlockID {
     required int64 localID = 2;
 }
 
+message SecretKeyProto {
+    required uint32 keyId = 1;
+    required uint64 expiryDate = 2;
+    required bytes privateKeyBytes = 3;
+    required bytes publicKeyBytes = 4;
+}
+
+/**
+ * Security token identifier
+ */
+message TokenProto {
+  required bytes identifier = 1;
+  required bytes password = 2;
+  required string kind = 3;
+  required string service = 4;
+}
 
 /**
  * Information for the Hdds block token.

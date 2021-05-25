@@ -374,6 +374,13 @@ public class BaseFreonGenerator {
   }
 
   /**
+   * Generate a bucket name based on the prefix and counter.
+   */
+  public String generateBucketName(long counter) {
+    return getPrefix() + counter;
+  }
+
+  /**
    * Create missing target volume/bucket.
    */
   public void ensureVolumeAndBucketExist(OzoneClient rpcClient,
