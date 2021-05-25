@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -40,6 +41,7 @@ import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.jvm.hotspot.debugger.posix.elf.ELFSectionHeader;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -87,14 +89,11 @@ public class OMPrepareRequest extends OMClientRequest {
 
     try {
       // Create response.
-      // DB snapshot for prepare will include the transaction to commit it,
-      // making the prepare index one more than this txn's log index.
-      long prepareIndex = transactionLogIndex + 1;
       PrepareResponse omResponse = PrepareResponse.newBuilder()
-              .setTxnID(prepareIndex)
+              .setTxnID(transactionLogIndex)
               .build();
       responseBuilder.setPrepareResponse(omResponse);
-      response = new OMPrepareResponse(responseBuilder.build(), prepareIndex);
+      response = new OMPrepareResponse(responseBuilder.build(), transactionLogIndex);
 
       // Add response to double buffer before clearing logs.
       // This guarantees the log index of this request will be the same as
@@ -112,24 +111,18 @@ public class OMPrepareRequest extends OMClientRequest {
       // Since the response for this request was added to the double buffer
       // already, once this index reaches the state machine, we know all
       // transactions have been flushed.
-      waitForLogIndex(transactionLogIndex,
-          ozoneManager.getMetadataManager(), division,
+      waitForLogIndex(transactionLogIndex, ozoneManager, division,
           flushTimeout, flushCheckInterval);
+      takeSnapshotAndPurgeLogs(division);
 
-      long snapshotIndex = takeSnapshotAndPurgeLogs(division);
-      if (snapshotIndex != prepareIndex) {
-        LOG.warn("Snapshot index {} does not " +
-            "match expected prepare index {}.", snapshotIndex, prepareIndex);
-      }
-
-      // Save transaction log index to a marker file, so if the OM restarts,
-      // it will remain in prepare mode on that index as long as the file
-      // exists.
-      ozoneManager.getPrepareState().finishPrepare(prepareIndex);
+      // Save prepare index to a marker file, so if the OM restarts,
+      // it will remain in prepare mode as long as the file exists and its
+      // log indices are >= the one in the file.
+      ozoneManager.getPrepareState().finishPrepare(transactionLogIndex);
 
       LOG.info("OM {} prepared at log index {}. Returning response {} with " +
-          "log index {}", ozoneManager.getOMNodeId(), prepareIndex, omResponse,
-          omResponse.getTxnID());
+          "log index {}", ozoneManager.getOMNodeId(), transactionLogIndex,
+          omResponse, omResponse.getTxnID());
     } catch (OMException e) {
       LOG.error("Prepare Request Apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);
@@ -150,40 +143,47 @@ public class OMPrepareRequest extends OMClientRequest {
 
   /**
    * Waits for the specified index to be flushed to the state machine on
-   * disk, and to be updated in memory in Ratis.
+   * disk, and to be applied to Ratis's state machine.
    */
-  private static void waitForLogIndex(long indexToWaitFor,
-      OMMetadataManager metadataManager, RaftServer.Division division,
+  private static void waitForLogIndex(long minOMDBFlushIndex,
+      OzoneManager om, RaftServer.Division division,
       Duration flushTimeout, Duration flushCheckInterval)
       throws InterruptedException, IOException {
 
     long endTime = System.currentTimeMillis() + flushTimeout.toMillis();
-    boolean success = false;
 
-    while (!success && System.currentTimeMillis() < endTime) {
-      // If no transactions have been persisted to the DB, transaction info
-      // will be null, not zero, causing a null pointer exception within
-      // ozoneManager#getRatisSnaphotIndex.
-      // Get the transaction directly instead to handle the case when it is
-      // null.
-      TransactionInfo dbTxnInfo = metadataManager
-          .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-      long ratisTxnIndex =
+    boolean omDBFlushed = false;
+    boolean ratisStateMachineApplied = false;
+
+    // Wait for Ratis commit index after the specified index to be applied to
+    // Ratis' state machine. This index will not appear in the OM DB until a
+    // snapshot is taken.
+    // If we purge logs without waiting for this index, it may not make it to
+    // the RocksDB snapshot, and then the log entry is lost on this OM.
+    long minRatisStateMachineIndex = minOMDBFlushIndex + 1;
+    long lastRatisCommitIndex = RaftLog.INVALID_LOG_INDEX;
+    long lastOMDBFlushIndex = RaftLog.INVALID_LOG_INDEX;
+
+    LOG.info("{} waiting for index {} to flush to OM DB and index {} to flush" +
+            " to Ratis state machine.", om.getOMNodeId(), minOMDBFlushIndex,
+        minRatisStateMachineIndex);
+    while (!(omDBFlushed && ratisStateMachineApplied) &&
+        System.currentTimeMillis() < endTime) {
+      // Check OM DB.
+      lastOMDBFlushIndex = om.getRatisSnapshotIndex();
+      omDBFlushed = (lastOMDBFlushIndex >= minOMDBFlushIndex);
+      LOG.debug("{} Current DB transaction index {}.", om.getOMNodeId(),
+          lastOMDBFlushIndex);
+
+      // Check ratis state machine.
+      lastRatisCommitIndex =
           division.getStateMachine().getLastAppliedTermIndex().getIndex();
+      ratisStateMachineApplied = (lastRatisCommitIndex >=
+          minRatisStateMachineIndex);
+      LOG.debug("{} Current Ratis state machine transaction index {}.",
+          om.getOMNodeId(), lastRatisCommitIndex);
 
-      // Ratis may apply meta transactions after the prepare request, causing
-      // its in memory index to always be greater than the DB index.
-      if (dbTxnInfo == null) {
-        // If there are no transactions in the DB, we are prepared to log
-        // index 0 only.
-        success = (indexToWaitFor == 0)
-            && (ratisTxnIndex == indexToWaitFor + 1);
-      } else {
-        success = (dbTxnInfo.getTransactionIndex() == indexToWaitFor)
-            && (ratisTxnIndex >= indexToWaitFor + 1);
-      }
-
-      if (!success) {
+      if (!omDBFlushed) {
         Thread.sleep(flushCheckInterval.toMillis());
       }
     }
@@ -191,52 +191,51 @@ public class OMPrepareRequest extends OMClientRequest {
     // If the timeout waiting for all transactions to reach the state machine
     // is exceeded, the exception is propagated, resulting in an error response
     // to the client. They can retry the prepare request.
-    if (!success) {
+    if (!omDBFlushed) {
       throw new IOException(String.format("After waiting for %d seconds, " +
-              "State Machine has not applied  all the transactions.",
-          flushTimeout.getSeconds()));
+              "OM database flushed index %d which is less than the minimum " +
+              "required index %d.",
+          flushTimeout.getSeconds(), lastOMDBFlushIndex, minOMDBFlushIndex));
+    } else if (!ratisStateMachineApplied) {
+      throw new IOException(String.format("After waiting for %d seconds, " +
+              "Ratis state machine applied index %d which is less than" +
+              " the minimum required index %d.",
+          flushTimeout.getSeconds(), lastRatisCommitIndex,
+          minRatisStateMachineIndex));
     }
   }
 
   /**
-   * Take a snapshot of the state machine at the last index, and purge ALL logs.
-   * @param division Raft server division.
-   * @return The index the snapshot was taken on.
-   * @throws IOException on Error.
+   * Take a snapshot of the state machine at the last index, and purge at
+   * least all logs before the suggested index.
+   * If there is another prepare request or cancle prepare request,
+   * this one will end up purging that request since it was allowed through
+   * the pre-append prepare gate.
+   * This means that an OM cannot support 2 prepare requests in the
+   * transaction pipeline (un-applied) at the same time.
    */
-  public static long takeSnapshotAndPurgeLogs(RaftServer.Division division)
+  public static void takeSnapshotAndPurgeLogs(RaftServer.Division division)
       throws IOException {
-
     StateMachine stateMachine = division.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
-    RaftLog raftLog = division.getRaftLog();
-    long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
-
-    // We can have a case where the log has a meta transaction after the
-    // prepare request or another prepare request. If there is another
-    // prepare request, this one will end up purging that request.
-    // This means that an OM cannot support 2 prepare requests in the
-    // transaction pipeline (un-applied) at the same time.
-    if (raftLogIndex > snapshotIndex) {
-      LOG.warn("Snapshot index {} does not " +
-          "match last log index {}.", snapshotIndex, raftLogIndex);
-      snapshotIndex = raftLogIndex;
-    }
 
     CompletableFuture<Long> purgeFuture =
-        raftLog.onSnapshotInstalled(snapshotIndex);
+        division.getRaftLog().onSnapshotInstalled(snapshotIndex);
 
     try {
-      Long purgeIndex = purgeFuture.get();
-      if (purgeIndex != snapshotIndex) {
-        throw new IOException("Purge index " + purgeIndex +
-            " does not match last index " + snapshotIndex);
+      long actualPurgeIndex = purgeFuture.get();
+      if (actualPurgeIndex < snapshotIndex) {
+        throw new IOException(String.format("Actual purge index %d is less " +
+            "than specified purge index %d. Some required logs may not have" +
+                "been removed.", actualPurgeIndex, snapshotIndex));
+      } else if (actualPurgeIndex != snapshotIndex) {
+        LOG.warn("Actual purge index {} does not " +
+            "match specified purge index {}. ", actualPurgeIndex,
+            snapshotIndex);
       }
     } catch (Exception e) {
       throw new IOException("Unable to purge logs.", e);
     }
-
-    return snapshotIndex;
   }
 
   public static String getRequestType() {

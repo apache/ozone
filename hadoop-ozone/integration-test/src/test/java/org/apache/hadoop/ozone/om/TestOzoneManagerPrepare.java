@@ -156,6 +156,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     runningOms.add(shutdownOMIndex, downedOM);
 
     // Make sure all OMs are prepared and still have data.
+    // TODO: downed om is not prepared
     assertClusterPrepared(prepareIndex, runningOms);
     assertKeysWritten(volumeName1, writtenKeysBeforeOmShutDown, runningOms);
     assertKeysWritten(volumeName2, writtenKeysAfterOmShutDown, runningOms);
@@ -421,11 +422,11 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     clientProtocol.getOzoneManagerClient().cancelOzoneManagerPrepare();
   }
 
-  private void assertClusterPrepared(long preparedIndex) throws Exception {
-    assertClusterPrepared(preparedIndex, cluster.getOzoneManagersList());
+  private void assertClusterPrepared(long expectedPreparedIndex) throws Exception {
+    assertClusterPrepared(expectedPreparedIndex, cluster.getOzoneManagersList());
   }
 
-  private void assertClusterPrepared(long preparedIndex,
+  private void assertClusterPrepared(long expectedPreparedIndex,
       List<OzoneManager> ozoneManagers) throws Exception {
 
     for (OzoneManager om : ozoneManagers) {
@@ -434,21 +435,27 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS,
           1000, () -> {
           if (!om.isRunning()) {
+            LOG.info("{} is not yet started.", om.getOMNodeId());
             return false;
           } else {
             boolean preparedAtIndex = false;
             OzoneManagerPrepareState.State state =
                 om.getPrepareState().getState();
 
+            LOG.info("{} has prepare status: {} index: {}.",
+                om.getOMNodeId(), state.getStatus(), state.getIndex());
+
             if (state.getStatus() == PrepareStatus.PREPARE_COMPLETED) {
-              if (state.getIndex() == preparedIndex) {
+              if (state.getIndex() >= expectedPreparedIndex) {
                 preparedAtIndex = true;
               } else {
                 // State will not change if we are prepared at the wrong index.
                 // Break out of wait.
-                throw new Exception("OM " + om.getOMNodeId() + " prepared " +
-                    "but prepare index " + state.getIndex() + " does not " +
-                    "match expected prepare index " + preparedIndex);
+                throw new LambdaTestUtils.FailFastException(
+                    String.format("OM %s prepared but prepare index %d is " +
+                            "less than the expected prepare index %d.",
+                        om.getOMNodeId(), state.getIndex(),
+                        expectedPreparedIndex));
               }
             }
             return preparedAtIndex;

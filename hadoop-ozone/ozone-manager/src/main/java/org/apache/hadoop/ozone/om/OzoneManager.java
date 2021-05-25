@@ -1386,10 +1386,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omRatisSnapshotInfo;
   }
 
-  @VisibleForTesting
   public long getRatisSnapshotIndex() throws IOException {
-    return TransactionInfo.readTransactionInfo(metadataManager)
-        .getTransactionIndex();
+    TransactionInfo dbTxnInfo =
+        TransactionInfo.readTransactionInfo(metadataManager);
+    if (dbTxnInfo == null) {
+      // If there are no transactions in the database, it has applied index 0
+      // only.
+      return 0;
+    } else {
+      return dbTxnInfo.getTransactionIndex();
+    }
   }
 
   /**

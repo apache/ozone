@@ -124,7 +124,11 @@ public class TestOzoneManagerPrepareState {
   @Test
   public void testRestoreIncorrectIndex() throws Exception {
     writePrepareMarkerFile(TEST_INDEX);
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX + 1);
+    // Ratis is allowed to apply transactions after prepare, like commit and
+    // conf entries, but OM write requests are not allowed.
+    // Therefore prepare restoration should only fail if the marker file index
+    // is less than the OM's prepare index.
+    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX - 1);
     Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
 
     assertPrepareNotStarted();

@@ -85,8 +85,7 @@ public final class OzoneManagerPrepareState {
    * @throws IOException If the prepare marker file exists but cannot be
    * deleted.
    */
-  public synchronized void cancelPrepare()
-      throws IOException {
+  public synchronized void cancelPrepare() throws IOException {
     deletePrepareMarkerFile();
     prepareIndex = NO_PREPARE_INDEX;
     prepareGateEnabled = false;
@@ -165,20 +164,22 @@ public final class OzoneManagerPrepareState {
 
     boolean prepareRestored = false;
     if (prepareIndexRead) {
-      if (prepareMarkerIndex != expectedPrepareIndex) {
-        LOG.error("Failed to restore OM prepare state, because the expected " +
-            "prepare index {} does not match the index {} written to the " +
-            "marker file.", expectedPrepareIndex, prepareMarkerIndex);
+      if (prepareMarkerIndex > expectedPrepareIndex) {
+        LOG.error("Failed to restore OM prepare state, because the index " +
+            "written to the marker file {} is larger than the expected " +
+            "prepare index {}.", prepareMarkerIndex, expectedPrepareIndex);
       } else {
-        // Prepare state can only be restored if we read the expected index
-        // from the marker file.
+        // Prepare state can only be restored if the index in the marker file
+        // was at least equal to the expected prepare index.
+        // Ratis conf entries or other internal Ratis transactions may have
+        // been applied after the prepare.
         prepareRestored = true;
       }
     }
 
     if (prepareRestored) {
       // Do not rewrite the marker file, since we verified it already exists.
-      finishPrepare(prepareMarkerIndex, false);
+      finishPrepare(expectedPrepareIndex, false);
     } else {
       // If the potentially faulty marker file cannot be deleted,
       // propagate the IOException.
@@ -241,7 +242,7 @@ public final class OzoneManagerPrepareState {
       Files.delete(markerFile.toPath());
       LOG.info("Deleted prepare marker file: {}", markerFile.getAbsolutePath());
     } else {
-      LOG.info("Request to delete prepare marker file that does not exist: {}",
+      LOG.debug("Request to delete prepare marker file that does not exist: {}",
           markerFile.getAbsolutePath());
     }
   }
