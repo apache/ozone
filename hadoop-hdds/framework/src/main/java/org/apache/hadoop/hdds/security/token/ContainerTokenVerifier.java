@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.security.token;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -45,7 +45,7 @@ public class ContainerTokenVerifier extends
   }
 
   @Override
-  protected Object getService(ContainerCommandRequestProto cmd) {
+  protected Object getService(ContainerCommandRequestProtoOrBuilder cmd) {
     return ContainerID.valueOf(cmd.getContainerID());
   }
 }
