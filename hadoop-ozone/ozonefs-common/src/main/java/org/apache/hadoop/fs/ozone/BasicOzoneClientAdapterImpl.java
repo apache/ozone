@@ -31,8 +31,8 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -78,7 +78,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private ObjectStore objectStore;
   private OzoneVolume volume;
   private OzoneBucket bucket;
-  private ReplicationConfig replicationConfig;
+  private ReplicationType replicationType;
+  private ReplicationFactor replicationFactor;
   private boolean securityEnabled;
   private int configuredDnPort;
 
@@ -134,7 +135,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.securityEnabled = true;
     }
 
-    replicationConfig = ReplicationConfig.getDefault(conf);
+    String replicationTypeConf =
+        conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+            OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT);
+
+    int replicationCountConf = conf.getInt(OzoneConfigKeys.OZONE_REPLICATION,
+        OzoneConfigKeys.OZONE_REPLICATION_DEFAULT);
 
     if (OmUtils.isOmHAServiceId(conf, omHost)) {
       // omHost is listed as one of the service ids in the config,
@@ -151,6 +157,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
+    this.replicationType = ReplicationType.valueOf(replicationTypeConf);
+    this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
@@ -158,7 +166,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public short getDefaultReplication() {
-    return (short) replicationConfig.getRequiredNodes();
+    return (short) replicationFactor.getValue();
   }
 
   @Override
@@ -194,17 +202,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       OzoneOutputStream ozoneOutputStream = null;
       if (replication == ReplicationFactor.ONE.getValue()
           || replication == ReplicationFactor.THREE.getValue()) {
-
-        ReplicationConfig customReplicationConfig =
-            ReplicationConfig.adjustReplication(
-                replicationConfig, replication
-            );
-        ozoneOutputStream =
-            bucket.createFile(key, 0, customReplicationConfig, overWrite,
-                recursive);
+        ReplicationFactor clientReplication = ReplicationFactor
+            .valueOf(replication);
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            clientReplication, overWrite, recursive);
       } else {
-        ozoneOutputStream =
-            bucket.createFile(key, 0, replicationConfig, overWrite, recursive);
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            replicationFactor, overWrite, recursive);
       }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
