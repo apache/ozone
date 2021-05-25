@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -50,21 +51,26 @@ public class TestSimplePipelineProvider {
   @Test
   public void testCreatePipelineWithFactor() throws IOException {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
-    Pipeline pipeline = provider.create(factor);
+    Pipeline pipeline =
+        provider.create(new StandaloneReplicationConfig(factor));
     stateManager.addPipeline(pipeline);
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline.getFactor(), factor);
+    Assert.assertEquals(pipeline.getReplicationConfig().getRequiredNodes(),
+        factor.getNumber());
     Assert.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
     Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
 
     factor = HddsProtos.ReplicationFactor.ONE;
-    Pipeline pipeline1 = provider.create(factor);
+    Pipeline pipeline1 =
+        provider.create(new StandaloneReplicationConfig(factor));
     stateManager.addPipeline(pipeline1);
     Assert.assertEquals(pipeline1.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline1.getFactor(), factor);
+    Assert.assertEquals(
+        ((StandaloneReplicationConfig) pipeline1.getReplicationConfig())
+            .getReplicationFactor(), factor);
     Assert.assertEquals(pipeline1.getPipelineState(),
         Pipeline.PipelineState.OPEN);
     Assert.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
@@ -82,19 +88,25 @@ public class TestSimplePipelineProvider {
   public void testCreatePipelineWithNodes() throws IOException {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
-        provider.create(factor, createListOfNodes(factor.getNumber()));
+        provider.create(new StandaloneReplicationConfig(factor),
+            createListOfNodes(factor.getNumber()));
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline.getFactor(), factor);
+    Assert.assertEquals(
+        ((StandaloneReplicationConfig) pipeline.getReplicationConfig())
+            .getReplicationFactor(), factor);
     Assert.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
     Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
 
     factor = HddsProtos.ReplicationFactor.ONE;
-    pipeline = provider.create(factor, createListOfNodes(factor.getNumber()));
+    pipeline = provider.create(new StandaloneReplicationConfig(factor),
+        createListOfNodes(factor.getNumber()));
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline.getFactor(), factor);
+    Assert.assertEquals(
+        ((StandaloneReplicationConfig) pipeline.getReplicationConfig())
+            .getReplicationFactor(), factor);
     Assert.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
     Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());

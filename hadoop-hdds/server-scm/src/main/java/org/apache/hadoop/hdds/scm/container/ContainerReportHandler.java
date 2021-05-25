@@ -114,31 +114,36 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     }
     final ContainerReportsProto containerReport =
         reportFromDatanode.getReport();
-
     try {
-      final List<ContainerReplicaProto> replicas =
-          containerReport.getReportsList();
-      final Set<ContainerID> containersInSCM =
-          nodeManager.getContainers(datanodeDetails);
+      // HDDS-5249 - we must ensure that an ICR and FCR for the same datanode
+      // do not run at the same time or it can result in a data consistency
+      // issue between the container list in NodeManager and the replicas in
+      // ContainerManager.
+      synchronized (datanodeDetails) {
+        final List<ContainerReplicaProto> replicas =
+            containerReport.getReportsList();
+        final Set<ContainerID> containersInSCM =
+            nodeManager.getContainers(datanodeDetails);
 
-      final Set<ContainerID> containersInDn = replicas.parallelStream()
-          .map(ContainerReplicaProto::getContainerID)
-          .map(ContainerID::valueOf).collect(Collectors.toSet());
+        final Set<ContainerID> containersInDn = replicas.parallelStream()
+            .map(ContainerReplicaProto::getContainerID)
+            .map(ContainerID::valueOf).collect(Collectors.toSet());
 
-      final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
-      missingReplicas.removeAll(containersInDn);
+        final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
+        missingReplicas.removeAll(containersInDn);
 
-      processContainerReplicas(datanodeDetails, replicas, publisher);
-      processMissingReplicas(datanodeDetails, missingReplicas);
-      updateDeleteTransaction(datanodeDetails, replicas, publisher);
+        processContainerReplicas(datanodeDetails, replicas, publisher);
+        processMissingReplicas(datanodeDetails, missingReplicas);
+        updateDeleteTransaction(datanodeDetails, replicas, publisher);
 
-      /*
-       * Update the latest set of containers for this datanode in
-       * NodeManager
-       */
-      nodeManager.setContainers(datanodeDetails, containersInDn);
+        /*
+         * Update the latest set of containers for this datanode in
+         * NodeManager
+         */
+        nodeManager.setContainers(datanodeDetails, containersInDn);
 
-      containerManager.notifyContainerReportProcessing(true, true);
+        containerManager.notifyContainerReportProcessing(true, true);
+      }
     } catch (NodeNotFoundException ex) {
       containerManager.notifyContainerReportProcessing(true, false);
       LOG.error("Received container report from unknown datanode {}.",

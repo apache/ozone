@@ -249,6 +249,14 @@ public class TestSchemaOneBackwardsCompatibility {
 
     runBlockDeletingService(keyValueHandler);
 
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return (newKvData().getBytesUsed() != initialTotalSpace);
+      } catch (IOException ex) {
+      }
+      return false;
+    }, 100, 3000);
+
     long currentTotalSpace = newKvData().getBytesUsed();
     long numberOfBlocksDeleted =
         (initialTotalSpace - currentTotalSpace) / blockSpace;
@@ -264,6 +272,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
     try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
       // Test results via block iteration.
+
       assertEquals(expectedDeletingBlocks,
               countDeletingBlocks(refCountedDB));
       assertEquals(expectedDeletedBlocks,
@@ -327,6 +336,14 @@ public class TestSchemaOneBackwardsCompatibility {
       long blockSpace = initialTotalSpace / TestDB.KEY_COUNT;
 
       runBlockDeletingService(keyValueHandler);
+
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return (newKvData().getBytesUsed() != initialTotalSpace);
+        } catch (IOException ex) {
+        }
+        return false;
+      }, 100, 3000);
 
       long currentTotalSpace = newKvData().getBytesUsed();
 
@@ -494,6 +511,7 @@ public class TestSchemaOneBackwardsCompatibility {
     service.runDeletingTasks();
     GenericTestUtils
         .waitFor(() -> service.getTimesOfProcessed() == 1, 100, 3000);
+
   }
 
   private ContainerSet makeContainerSet() throws Exception {

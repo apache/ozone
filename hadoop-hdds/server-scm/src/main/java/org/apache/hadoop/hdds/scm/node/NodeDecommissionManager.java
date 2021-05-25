@@ -20,11 +20,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -52,6 +54,7 @@ public class NodeDecommissionManager {
 
   private NodeManager nodeManager;
   //private ContainerManagerV2 containerManager;
+  private SCMContext scmContext;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
@@ -171,11 +174,12 @@ public class NodeDecommissionManager {
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
-      ContainerManagerV2 containerManager,
+      ContainerManagerV2 containerManager, SCMContext scmContext,
       EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
     //this.containerManager = containerManager;
+    this.scmContext = scmContext;
     this.eventQueue = eventQueue;
     this.replicationManager = rm;
 
@@ -248,10 +252,15 @@ public class NodeDecommissionManager {
    */
   public synchronized void continueAdminForNode(DatanodeDetails dn)
       throws NodeNotFoundException {
+    if (!scmContext.isLeader()) {
+      LOG.info("follower SCM ignored continue admin for datanode {}", dn);
+      return;
+    }
     NodeOperationalState opState = getNodeStatus(dn).getOperationalState();
     if (opState == NodeOperationalState.DECOMMISSIONING
         || opState == NodeOperationalState.ENTERING_MAINTENANCE
         || opState == NodeOperationalState.IN_MAINTENANCE) {
+      LOG.info("Continue admin for datanode {}", dn);
       monitor.startMonitoring(dn);
     }
   }
@@ -260,11 +269,18 @@ public class NodeDecommissionManager {
       throws NodeNotFoundException, InvalidNodeStateException {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
+    HddsProtos.NodeState health = nodeStatus.getHealth();
     if (opState == NodeOperationalState.IN_SERVICE) {
-      LOG.info("Starting Decommission for node {}", dn);
-      nodeManager.setNodeOperationalState(
-          dn, NodeOperationalState.DECOMMISSIONING);
-      monitor.startMonitoring(dn);
+      if (health != HddsProtos.NodeState.DEAD) {
+        LOG.info("Starting Decommission for node {}", dn);
+        nodeManager.setNodeOperationalState(
+            dn, NodeOperationalState.DECOMMISSIONING);
+        monitor.startMonitoring(dn);
+      } else {
+        LOG.info("{} is dead. Moving to decommissioned immediately", dn);
+        nodeManager.setNodeOperationalState(
+            dn, NodeOperationalState.DECOMMISSIONED);
+      }
     } else if (nodeStatus.isDecommission()) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
           "do.", dn, opState);
@@ -346,11 +362,18 @@ public class NodeDecommissionManager {
       maintenanceEnd =
           (System.currentTimeMillis() / 1000L) + (endInHours * 60L * 60L);
     }
+    HddsProtos.NodeState health = nodeStatus.getHealth();
     if (opState == NodeOperationalState.IN_SERVICE) {
-      nodeManager.setNodeOperationalState(
-          dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
-      monitor.startMonitoring(dn);
-      LOG.info("Starting Maintenance for node {}", dn);
+      if (health != HddsProtos.NodeState.DEAD) {
+        nodeManager.setNodeOperationalState(
+            dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
+        monitor.startMonitoring(dn);
+        LOG.info("Starting Maintenance for node {}", dn);
+      }  else {
+        LOG.info("{} is dead. Moving to maintenance immediately", dn);
+        nodeManager.setNodeOperationalState(
+            dn, NodeOperationalState.IN_MAINTENANCE);
+      }
     } else if (nodeStatus.isMaintenance()) {
       LOG.info("Starting Maintenance called on node {} with state {}. "+
           "Nothing to do.", dn, opState);
@@ -375,4 +398,20 @@ public class NodeDecommissionManager {
     return nodeManager.getNodeStatus(dn);
   }
 
+  /**
+   * Called in SCMStateMachine#notifyLeaderChanged when current SCM becomes
+   *  leader.
+   */
+  public void onBecomeLeader() {
+    nodeManager.getAllNodes().forEach(datanodeDetails -> {
+      try {
+        continueAdminForNode(datanodeDetails);
+      } catch (NodeNotFoundException e) {
+        // Should not happen, as the node has just registered to call this event
+        // handler.
+        LOG.warn("NodeNotFound when adding the node to the decommissionManager",
+            e);
+      }
+    });
+  }
 }

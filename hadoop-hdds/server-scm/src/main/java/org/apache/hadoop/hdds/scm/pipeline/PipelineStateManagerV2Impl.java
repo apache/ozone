@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
@@ -137,11 +138,13 @@ public class PipelineStateManagerV2Impl implements StateManager {
     }
   }
 
+
   @Override
-  public List<Pipeline> getPipelines(HddsProtos.ReplicationType type) {
+  public List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig) {
     lock.readLock().lock();
     try {
-      return pipelineStateMap.getPipelines(type);
+      return pipelineStateMap.getPipelines(replicationConfig);
     } finally {
       lock.readLock().unlock();
     }
@@ -149,10 +152,11 @@ public class PipelineStateManagerV2Impl implements StateManager {
 
   @Override
   public List<Pipeline> getPipelines(
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor) {
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state) {
     lock.readLock().lock();
     try {
-      return pipelineStateMap.getPipelines(type, factor);
+      return pipelineStateMap.getPipelines(replicationConfig, state);
     } finally {
       lock.readLock().unlock();
     }
@@ -160,36 +164,13 @@ public class PipelineStateManagerV2Impl implements StateManager {
 
   @Override
   public List<Pipeline> getPipelines(
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-                              Pipeline.PipelineState state) {
-    lock.readLock().lock();
-    try {
-      return pipelineStateMap.getPipelines(type, factor, state);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
+      ReplicationConfig replicationConfig,
       Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
     lock.readLock().lock();
     try {
       return pipelineStateMap
-          .getPipelines(type, factor, state, excludeDns, excludePipelines);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(HddsProtos.ReplicationType type,
-                                     Pipeline.PipelineState... states) {
-    lock.readLock().lock();
-    try {
-      return pipelineStateMap.getPipelines(type, states);
+          .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
     } finally {
       lock.readLock().unlock();
     }

@@ -30,6 +30,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -290,8 +291,9 @@ public class SCMContainerManager implements ContainerManager {
       ContainerInfo containerInfo = null;
       try {
         containerInfo =
-            containerStateManager.allocateContainer(pipelineManager, type,
-              replicationFactor, owner);
+            containerStateManager.allocateContainer(pipelineManager,
+                ReplicationConfig.fromTypeAndFactor(type, replicationFactor),
+                owner);
       } catch (IOException ex) {
         scmContainerManagerMetrics.incNumFailureCreateContainers();
         throw ex;
