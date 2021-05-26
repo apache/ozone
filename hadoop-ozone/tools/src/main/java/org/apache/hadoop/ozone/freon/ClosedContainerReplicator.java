@@ -116,7 +116,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               datanodesWithContainer));
         }
       }
-
+      if (replicationTasks.size() > getTestNo()) {
+        break;
+      }
     }
 
     //important: override the max number of tasks.
