@@ -116,7 +116,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               datanodesWithContainer));
         }
       }
-      if (replicationTasks.size() > getTestNo()) {
+      if (replicationTasks.size() >= getTestNo()) {
         break;
       }
     }
