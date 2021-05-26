@@ -22,6 +22,9 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compile:
     runs-on: ubuntu-18.04
