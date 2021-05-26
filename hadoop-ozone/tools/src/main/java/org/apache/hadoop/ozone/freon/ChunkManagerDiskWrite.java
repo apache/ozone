@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -102,7 +103,8 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
       VolumeSet volumeSet =
-          new MutableVolumeSet("dnid", "clusterid", ozoneConfiguration, null);
+          new MutableVolumeSet("dnid", "clusterid", ozoneConfiguration, null,
+              StorageVolume.VolumeType.DATA_VOLUME, null);
 
       Random random = new Random();
 
