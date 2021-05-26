@@ -449,6 +449,11 @@ public final class OzoneConfigKeys {
   public static final long OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
       TimeUnit.DAYS.toMillis(10); // 10 days
 
+  public static final String OZONE_CLIENT_KEY_FULL_LOCATION_VERSION =
+      "ozone.client.key.full.location.version";
+  public static final boolean OZONE_CLIENT_KEY_FULL_LOCATION_VERSION_DEFAULT =
+      false;
+
   /**
    * There is no need to instantiate this class.
    */

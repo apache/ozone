@@ -48,6 +48,7 @@ public final class OmKeyArgs implements Auditable {
   private boolean refreshPipeline;
   private boolean sortDatanodesInPipeline;
   private List<OzoneAcl> acls;
+  private boolean fullLocationVersion;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
@@ -55,7 +56,8 @@ public final class OmKeyArgs implements Auditable {
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
-      List<OzoneAcl> acls, boolean sortDatanode) {
+      List<OzoneAcl> acls, boolean sortDatanode,
+      boolean fullLocationVersion) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -70,6 +72,7 @@ public final class OmKeyArgs implements Auditable {
     this.refreshPipeline = refreshPipeline;
     this.acls = acls;
     this.sortDatanodesInPipeline = sortDatanode;
+    this.fullLocationVersion = fullLocationVersion;
   }
 
   public boolean getIsMultipartKey() {
@@ -140,6 +143,10 @@ public final class OmKeyArgs implements Auditable {
     return sortDatanodesInPipeline;
   }
 
+  public boolean getFullLocationVersion() {
+    return fullLocationVersion;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -177,6 +184,7 @@ public final class OmKeyArgs implements Auditable {
         .addAllMetadata(metadata)
         .setRefreshPipeline(refreshPipeline)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
+        .setFullLocationVersion(fullLocationVersion)
         .setAcls(acls);
   }
 
@@ -197,6 +205,7 @@ public final class OmKeyArgs implements Auditable {
     private Map<String, String> metadata = new HashMap<>();
     private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
+    private boolean fullLocationVersion;
     private List<OzoneAcl> acls;
 
     public Builder setVolumeName(String volume) {
@@ -274,11 +283,16 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setFullLocationVersion(boolean full) {
+      this.fullLocationVersion = full;
+      return this;
+    }
+
     public OmKeyArgs build() {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize, type,
           factor, locationInfoList, isMultipartKey, multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline);
+          sortDatanodesInPipeline, fullLocationVersion);
     }
 
   }
