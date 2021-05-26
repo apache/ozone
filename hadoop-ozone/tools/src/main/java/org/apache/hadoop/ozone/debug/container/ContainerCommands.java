@@ -114,7 +114,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
     String clusterId = getClusterId(firstStorageDir);
 
-    volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    volumeSet = new MutableVolumeSet(datanodeUuid, conf, null);
 
     Map<ContainerProtos.ContainerType, Handler> handlers = new HashMap<>();
 
