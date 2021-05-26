@@ -586,4 +586,21 @@ public final class HddsUtils {
     }
     return password;
   }
+
+  /**
+   * Utility string formatter method to display SCM roles.
+   *
+   * @param nodes
+   * @return
+   */
+  public static String format(List<String> nodes) {
+    StringBuilder sb = new StringBuilder();
+    for (String node : nodes) {
+      String[] x = node.split(":");
+      sb.append(String
+          .format("{ HostName : %s, Ratis Port : %s, Role : %s } ", x[0], x[1],
+              x[2]));
+    }
+    return sb.toString();
+  }
 }
