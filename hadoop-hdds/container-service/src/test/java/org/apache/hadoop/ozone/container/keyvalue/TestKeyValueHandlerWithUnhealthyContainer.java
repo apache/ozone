@@ -37,6 +37,8 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
@@ -62,7 +64,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         handler.handleReadContainer(
             getDummyCommandRequestProto(ContainerProtos.Type.ReadContainer),
             container);
-    assertThat(response.getResult(), is(CONTAINER_UNHEALTHY));
+    assertThat(response.getResult(), is(SUCCESS));
   }
 
   @Test
@@ -74,7 +76,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         handler.handleGetBlock(
             getDummyCommandRequestProto(ContainerProtos.Type.GetBlock),
             container);
-    assertThat(response.getResult(), is(CONTAINER_UNHEALTHY));
+    assertThat(response.getResult(), is(UNKNOWN_BCSID));
   }
 
   @Test
@@ -87,7 +89,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
             getDummyCommandRequestProto(
                 ContainerProtos.Type.GetCommittedBlockLength),
             container);
-    assertThat(response.getResult(), is(CONTAINER_UNHEALTHY));
+    assertThat(response.getResult(), is(UNKNOWN_BCSID));
   }
 
   @Test
@@ -100,7 +102,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
             getDummyCommandRequestProto(
                 ContainerProtos.Type.ReadChunk),
             container, null);
-    assertThat(response.getResult(), is(CONTAINER_UNHEALTHY));
+    assertThat(response.getResult(), is(UNKNOWN_BCSID));
   }
 
   @Test
@@ -126,7 +128,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
             getDummyCommandRequestProto(
                 ContainerProtos.Type.GetSmallFile),
             container);
-    assertThat(response.getResult(), is(CONTAINER_UNHEALTHY));
+    assertThat(response.getResult(), is(UNKNOWN_BCSID));
   }
 
   // -- Helper methods below.
@@ -152,6 +154,9 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     KeyValueContainerData containerData = mock(KeyValueContainerData.class);
     when(containerData.getState()).thenReturn(
         ContainerProtos.ContainerDataProto.State.UNHEALTHY);
+    when(containerData.getBlockCommitSequenceId()).thenReturn(100L);
+    when(containerData.getProtoBufMessage()).thenReturn(ContainerProtos
+        .ContainerDataProto.newBuilder().setContainerID(1).build());
     return new KeyValueContainer(containerData, new OzoneConfiguration());
   }
 
@@ -173,7 +178,8 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
 
     final ContainerProtos.DatanodeBlockID fakeBlockId =
         ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1).build();
+            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1)
+            .setBlockCommitSequenceId(101).build();
 
     final ContainerProtos.ChunkInfo fakeChunkInfo =
         ContainerProtos.ChunkInfo.newBuilder()

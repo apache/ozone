@@ -23,10 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -94,13 +93,9 @@ public interface ContainerManagerV2 extends Closeable {
   /**
    * Allocates a new container for a given keyName and replication factor.
    *
-   * @param replicationFactor - replication factor of the container.
-   * @param owner
-   * @return - ContainerInfo.
    * @throws IOException
    */
-  ContainerInfo allocateContainer(ReplicationType type,
-                                  ReplicationFactor replicationFactor,
+  ContainerInfo allocateContainer(ReplicationConfig replicationConfig,
                                   String owner) throws IOException;
 
   /**

@@ -29,7 +29,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -357,7 +356,7 @@ public class BaseFreonGenerator {
                   + pipelineId));
     } else {
       pipeline = pipelines.stream()
-          .filter(p -> p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+          .filter(p -> p.getReplicationConfig().getRequiredNodes() == 3)
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException(
               "Pipeline ID is NOT defined, and no pipeline " +
@@ -372,6 +371,13 @@ public class BaseFreonGenerator {
    */
   public String generateObjectName(long counter) {
     return pathSchema.getPath(counter);
+  }
+
+  /**
+   * Generate a bucket name based on the prefix and counter.
+   */
+  public String generateBucketName(long counter) {
+    return getPrefix() + counter;
   }
 
   /**

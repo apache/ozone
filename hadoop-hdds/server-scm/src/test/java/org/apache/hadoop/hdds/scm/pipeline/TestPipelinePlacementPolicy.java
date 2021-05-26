@@ -25,10 +25,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -56,6 +58,7 @@ import java.io.IOException;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -172,6 +175,30 @@ public class TestPipelinePlacementPolicy {
     Assert.assertNotEquals(results.get(1).getNetworkLocation(),
         results.get(2).getNetworkLocation());
   }
+
+  @Test
+  public void testChooseNodeNotEnoughSpace() throws SCMException {
+    // A huge container size
+    conf.set(OZONE_SCM_CONTAINER_SIZE, "10TB");
+
+    // There is only one node on 3 racks altogether.
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    for (Node node : SINGLE_NODE_RACK) {
+      DatanodeDetails datanode = overwriteLocationInNode(
+          MockDatanodeDetails.randomDatanodeDetails(), node);
+      datanodes.add(datanode);
+    }
+    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+        datanodes, false, datanodes.size());
+    PipelinePlacementPolicy localPlacementPolicy = new PipelinePlacementPolicy(
+        localNodeManager, new PipelineStateManager(), conf);
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
+
+    thrownExp.expect(SCMException.class);
+    thrownExp.expectMessage("enough space for even a single container");
+    localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+        new ArrayList<>(datanodes.size()), nodesRequired, 0);
+  }
   
   @Test
   public void testPickLowestLoadAnchor() throws IOException{
@@ -188,8 +215,8 @@ public class TestPipelinePlacementPolicy {
         Pipeline pipeline = Pipeline.newBuilder()
             .setId(PipelineID.randomId())
             .setState(Pipeline.PipelineState.ALLOCATED)
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .setReplicationConfig(new RatisReplicationConfig(
+                ReplicationFactor.THREE))
             .setNodes(nodes)
             .build();
         nodeManager.addPipeline(pipeline);
@@ -210,7 +237,9 @@ public class TestPipelinePlacementPolicy {
     
     // Should max out pipeline usage.
     Assert.assertEquals(maxPipelineCount,
-        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS).size());
+        stateManager
+            .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+            .size());
   }
 
   @Test

@@ -27,6 +27,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +38,10 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -56,6 +58,9 @@ import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
@@ -95,52 +100,57 @@ public final class HddsUtils {
    *
    * @return Target {@code InetSocketAddress} for the SCM client endpoint.
    */
-  public static InetSocketAddress getScmAddressForClients(
+  public static Collection<InetSocketAddress> getScmAddressForClients(
       ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
+    if (SCMHAUtils.getScmServiceId(conf) != null) {
+      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+      Collection<InetSocketAddress> scmAddressList =
+          new HashSet<>(scmNodeInfoList.size());
+      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+        if (scmNodeInfo.getScmClientAddress() == null) {
+          throw new ConfigurationException("Ozone scm client address is not " +
+              "set for SCM service-id " + scmNodeInfo.getServiceId() +
+              "node-id" + scmNodeInfo.getNodeId());
+        }
+        scmAddressList.add(
+            NetUtils.createSocketAddr(scmNodeInfo.getScmClientAddress()));
+      }
+      return scmAddressList;
+    } else {
+      String address = conf.getTrimmed(OZONE_SCM_CLIENT_ADDRESS_KEY);
+      int port = -1;
+
+      if (address == null) {
+        // fall back to ozone.scm.names for non-ha
+        Collection<String> scmAddresses =
+            conf.getTrimmedStringCollection(OZONE_SCM_NAMES);
+
+        if (scmAddresses.isEmpty()) {
+          throw new ConfigurationException("Ozone scm client address is not " +
+              "set. Configure one of these config " +
+              OZONE_SCM_CLIENT_ADDRESS_KEY + ", " + OZONE_SCM_NAMES);
+        }
+
+        if (scmAddresses.size() > 1) {
+          throw new ConfigurationException("For non-HA SCM " + OZONE_SCM_NAMES
+              + " should be set with single address");
+        }
+
+        address = scmAddresses.iterator().next();
+
+        port = conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+            OZONE_SCM_CLIENT_PORT_DEFAULT);
+      } else {
+        port = getHostPort(address)
+            .orElse(conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+                OZONE_SCM_CLIENT_PORT_DEFAULT));
+      }
+
+      return Collections.singletonList(
+          NetUtils.createSocketAddr(getHostName(address).get() + ":" + port));
     }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
   }
-
-  /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to the SCM for block service. If
-   * {@link ScmConfigKeys#OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY} is not defined
-   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
-   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
-   *
-   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
-   * @throws IllegalArgumentException if configuration is not defined.
-   */
-  public static InetSocketAddress getScmAddressForBlockClients(
-      ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
-  }
-
-
 
   /**
    * Retrieve the hostname, trying the supplied config keys in order.
@@ -231,7 +241,7 @@ public final class HddsUtils {
    * @return A collection of SCM addresses
    * @throws IllegalArgumentException If the configuration is invalid
    */
-  public static Collection<InetSocketAddress> getSCMAddresses(
+  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
       ConfigurationSource conf) {
 
     // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
@@ -301,22 +311,6 @@ public final class HddsUtils {
   }
 
   /**
-   * Retrieve the address of the only SCM (as currently multiple ones are not
-   * supported).
-   *
-   * @return SCM address
-   * @throws IllegalArgumentException if {@code conf} has more than one SCM
-   *         address or it has none
-   */
-  public static InetSocketAddress getSingleSCMAddress(
-      ConfigurationSource conf) {
-    Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
-   // Preconditions.checkArgument(singleton.size() == 1,
-    //    MULTIPLE_SCM_NOT_YET_SUPPORTED);
-    return singleton.iterator().next();
-  }
-
-  /**
    * Returns the hostname for this datanode. If the hostname is not
    * explicitly configured in the given config, then it is determined
    * via the DNS class.
@@ -360,7 +354,7 @@ public final class HddsUtils {
    * @return True if its readOnly , false otherwise.
    */
   public static boolean isReadOnly(
-      ContainerProtos.ContainerCommandRequestProto proto) {
+      ContainerCommandRequestProtoOrBuilder proto) {
     switch (proto.getCmdType()) {
     case ReadContainer:
     case ReadChunk:
@@ -400,12 +394,29 @@ public final class HddsUtils {
   public static boolean requireBlockToken(
       ContainerProtos.Type cmdType) {
     switch (cmdType) {
-    case ReadChunk:
+    case DeleteBlock:
+    case DeleteChunk:
     case GetBlock:
-    case WriteChunk:
+    case GetCommittedBlockLength:
+    case GetSmallFile:
     case PutBlock:
     case PutSmallFile:
-    case GetSmallFile:
+    case ReadChunk:
+    case WriteChunk:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  public static boolean requireContainerToken(
+      ContainerProtos.Type cmdType) {
+    switch (cmdType) {
+    case CloseContainer:
+    case CreateContainer:
+    case DeleteContainer:
+    case ReadContainer:
+    case UpdateContainer:
       return true;
     default:
       return false;
@@ -417,44 +428,66 @@ public final class HddsUtils {
    * @param msg container command
    * @return block ID.
    */
-  public static BlockID getBlockID(ContainerCommandRequestProto msg) {
+  public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) {
+    ContainerProtos.DatanodeBlockID blockID = null;
     switch (msg.getCmdType()) {
-    case ReadChunk:
-      if (msg.hasReadChunk()) {
-        return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());
+    case DeleteBlock:
+      if (msg.hasDeleteBlock()) {
+        blockID = msg.getDeleteBlock().getBlockID();
       }
-      return null;
+      break;
+    case DeleteChunk:
+      if (msg.hasDeleteChunk()) {
+        blockID = msg.getDeleteChunk().getBlockID();
+      }
+      break;
     case GetBlock:
       if (msg.hasGetBlock()) {
-        return BlockID.getFromProtobuf(msg.getGetBlock().getBlockID());
+        blockID = msg.getGetBlock().getBlockID();
       }
-      return null;
-    case WriteChunk:
-      if (msg.hasWriteChunk()) {
-        return BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      break;
+    case GetCommittedBlockLength:
+      if (msg.hasGetCommittedBlockLength()) {
+        blockID = msg.getGetCommittedBlockLength().getBlockID();
       }
-      return null;
-    case PutBlock:
-      if (msg.hasPutBlock()) {
-        return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
-            .getBlockID());
-      }
-      return null;
-    case PutSmallFile:
-      if (msg.hasPutSmallFile()) {
-        return BlockID.getFromProtobuf(msg.getPutSmallFile().getBlock()
-            .getBlockData().getBlockID());
-      }
-      return null;
+      break;
     case GetSmallFile:
       if (msg.hasGetSmallFile()) {
-        return BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock()
-            .getBlockID());
+        blockID = msg.getGetSmallFile().getBlock().getBlockID();
       }
-      return null;
+      break;
+    case ListChunk:
+      if (msg.hasListChunk()) {
+        blockID = msg.getListChunk().getBlockID();
+      }
+      break;
+    case PutBlock:
+      if (msg.hasPutBlock()) {
+        blockID = msg.getPutBlock().getBlockData().getBlockID();
+      }
+      break;
+    case PutSmallFile:
+      if (msg.hasPutSmallFile()) {
+        blockID = msg.getPutSmallFile().getBlock().getBlockData().getBlockID();
+      }
+      break;
+    case ReadChunk:
+      if (msg.hasReadChunk()) {
+        blockID = msg.getReadChunk().getBlockID();
+      }
+      break;
+    case WriteChunk:
+      if (msg.hasWriteChunk()) {
+        blockID = msg.getWriteChunk().getBlockID();
+      }
+      break;
     default:
-      return null;
+      break;
     }
+
+    return blockID != null
+        ? BlockID.getFromProtobuf(blockID)
+        : null;
   }
 
   /**
@@ -552,5 +585,22 @@ public final class HddsUtils {
       password = null;
     }
     return password;
+  }
+
+  /**
+   * Utility string formatter method to display SCM roles.
+   *
+   * @param nodes
+   * @return
+   */
+  public static String format(List<String> nodes) {
+    StringBuilder sb = new StringBuilder();
+    for (String node : nodes) {
+      String[] x = node.split(":");
+      sb.append(String
+          .format("{ HostName : %s, Ratis Port : %s, Role : %s } ", x[0], x[1],
+              x[2]));
+    }
+    return sb.toString();
   }
 }

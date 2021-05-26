@@ -67,6 +67,8 @@ message ScmContainerLocationRequest {
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
   optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
+  optional GetExistContainerWithPipelinesInBatchRequestProto getExistContainerWithPipelinesInBatchRequest = 31;
+  optional GetContainerTokenRequestProto containerTokenRequest = 32;
 }
 
 message ScmContainerLocationResponse {
@@ -105,6 +107,9 @@ message ScmContainerLocationResponse {
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
   optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
+  optional GetExistContainerWithPipelinesInBatchResponseProto getExistContainerWithPipelinesInBatchResponse = 31;
+  optional GetContainerTokenResponseProto containerTokenResponse = 32;
+
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -140,6 +145,8 @@ enum Type {
   RecommissionNodes = 23;
   StartMaintenanceNodes = 24;
   DatanodeUsageInfo = 25;
+  GetExistContainerWithPipelinesInBatch = 26;
+  GetContainerToken = 27;
 }
 
 /**
@@ -193,6 +200,11 @@ message GetContainerWithPipelineBatchRequestProto {
   optional string traceID = 2;
 }
 
+message GetExistContainerWithPipelinesInBatchRequestProto {
+  repeated int64 containerIDs = 1;
+  optional string traceID = 2;
+}
+
 message GetSafeModeRuleStatusesRequestProto {
 }
 
@@ -207,6 +219,10 @@ message GetSafeModeRuleStatusesResponseProto {
 }
 
 message GetContainerWithPipelineBatchResponseProto {
+  repeated ContainerWithPipeline containerWithPipelines = 1;
+}
+
+message GetExistContainerWithPipelinesInBatchResponseProto {
   repeated ContainerWithPipeline containerWithPipelines = 1;
 }
 
@@ -412,6 +428,21 @@ message ReplicationManagerStatusRequestProto {
 
 message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message ContainerTokenSecretProto {
+    required string ownerId = 1;
+    required ContainerID containerId = 2;
+    required uint64 expiryDate = 3;
+    required string certSerialId = 4;
+}
+
+message GetContainerTokenRequestProto {
+  required ContainerID containerID = 1;
+}
+
+message GetContainerTokenResponseProto {
+  required TokenProto token = 1;
 }
 
 /**

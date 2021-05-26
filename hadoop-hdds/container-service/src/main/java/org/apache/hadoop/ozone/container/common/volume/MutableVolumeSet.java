@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume.VolumeState;
 import org.apache.hadoop.util.DiskChecker;
@@ -88,8 +90,6 @@ public class MutableVolumeSet implements VolumeSet {
   private final ScheduledFuture<?> periodicDiskChecker;
   private final SpaceUsageCheckFactory usageCheckFactory;
 
-  private static final long DISK_CHECK_INTERVAL_MINUTES = 15;
-
   /**
    * A Reentrant Read Write Lock to synchronize volume operations in VolumeSet.
    * Any update to {@link #volumeMap}, {@link #failedVolumeMap}, or
@@ -103,15 +103,17 @@ public class MutableVolumeSet implements VolumeSet {
   private Runnable shutdownHook;
   private final HddsVolumeChecker volumeChecker;
   private Runnable failedVolumeListener;
+  private StateContext context;
 
-  public MutableVolumeSet(String dnUuid, ConfigurationSource conf)
-      throws IOException {
-    this(dnUuid, null, conf);
+  public MutableVolumeSet(String dnUuid, ConfigurationSource conf,
+      StateContext context) throws IOException {
+    this(dnUuid, null, conf, context);
   }
 
   public MutableVolumeSet(String dnUuid, String clusterID,
-      ConfigurationSource conf)
+      ConfigurationSource conf, StateContext context)
       throws IOException {
+    this.context = context;
     this.datanodeUuid = dnUuid;
     this.clusterID = clusterID;
     this.conf = conf;
@@ -123,6 +125,11 @@ public class MutableVolumeSet implements VolumeSet {
             t.setDaemon(true);
             return t;
         });
+
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    long periodicDiskCheckIntervalMinutes =
+        dnConf.getPeriodicDiskCheckIntervalMinutes();
     this.periodicDiskChecker =
       diskCheckerservice.scheduleWithFixedDelay(() -> {
         try {
@@ -130,7 +137,7 @@ public class MutableVolumeSet implements VolumeSet {
         } catch (IOException e) {
           LOG.warn("Exception while checking disks", e);
         }
-      }, DISK_CHECK_INTERVAL_MINUTES, DISK_CHECK_INTERVAL_MINUTES,
+      }, periodicDiskCheckIntervalMinutes, periodicDiskCheckIntervalMinutes,
         TimeUnit.MINUTES);
 
     usageCheckFactory = SpaceUsageCheckFactory.create(conf);
@@ -161,7 +168,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   @VisibleForTesting
-  HddsVolumeChecker getVolumeChecker() {
+  public HddsVolumeChecker getVolumeChecker() {
     return volumeChecker;
   }
 
@@ -263,13 +270,29 @@ public class MutableVolumeSet implements VolumeSet {
    * Handle one or more failed volumes.
    * @param failedVolumes
    */
-  private void handleVolumeFailures(Set<HddsVolume> failedVolumes) {
+  private void handleVolumeFailures(Set<HddsVolume> failedVolumes)
+      throws IOException {
     this.writeLock();
     try {
       for (HddsVolume v : failedVolumes) {
         // Immediately mark the volume as failed so it is unavailable
         // for new containers.
         failVolume(v.getHddsRootDir().getPath());
+      }
+
+      // check failed volume tolerated
+      if (!hasEnoughVolumes()) {
+        // on startup, we could not try to stop uninitialized services
+        if (shutdownHook == null) {
+          DatanodeConfiguration dnConf =
+              conf.getObject(DatanodeConfiguration.class);
+          throw new IOException("Don't have enough good volumes on startup,"
+              + " bad volumes detected: " + failedVolumes.size()
+              + " max tolerated: " + dnConf.getFailedVolumesTolerated());
+        }
+        if (context != null) {
+          context.getParent().handleFatalVolumeFailures();
+        }
       }
     } finally {
       this.writeUnlock();
@@ -282,6 +305,19 @@ public class MutableVolumeSet implements VolumeSet {
     // 1. Consider stopping IO on open containers and tearing down
     //    active pipelines.
     // 2. Handle Ratis log disk failure.
+  }
+
+  public void checkVolumeAsync(HddsVolume volume) {
+    volumeChecker.checkVolume(
+        volume, (healthyVolumes, failedVolumes) -> {
+          if (failedVolumes.size() > 0) {
+            LOG.warn("checkVolumeAsync callback got {} failed volumes: {}",
+                failedVolumes.size(), failedVolumes);
+          } else {
+            LOG.debug("checkVolumeAsync: no volume failures detected");
+          }
+          handleVolumeFailures(failedVolumes);
+        });
   }
 
   /**
@@ -349,7 +385,8 @@ public class MutableVolumeSet implements VolumeSet {
         .datanodeUuid(datanodeUuid)
         .clusterID(clusterID)
         .usageCheckFactory(usageCheckFactory)
-        .storageType(storageType);
+        .storageType(storageType)
+        .volumeSet(this);
     return volumeBuilder.build();
   }
 
@@ -502,6 +539,19 @@ public class MutableVolumeSet implements VolumeSet {
   @VisibleForTesting
   public Map<StorageType, List<HddsVolume>> getVolumeStateMap() {
     return ImmutableMap.copyOf(volumeStateMap);
+  }
+
+  public boolean hasEnoughVolumes() {
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    int maxVolumeFailuresTolerated = dnConf.getFailedVolumesTolerated();
+
+    // Max number of bad volumes allowed, should have at least 1 good volume
+    if (maxVolumeFailuresTolerated ==
+        HddsVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
+      return getVolumesList().size() >= 1;
+    } else {
+      return getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
+    }
   }
 
   public StorageLocationReport[] getStorageReport()

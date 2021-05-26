@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
@@ -339,7 +340,7 @@ public class ObjectEndpoint extends EndpointBase {
       ResponseBuilder responseBuilder, OzoneKeyDetails key) {
 
     ZonedDateTime lastModificationTime = key.getModificationTime()
-        .atZone(ZoneId.of("GMT"));
+        .atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE));
 
     responseBuilder
         .header(LAST_MODIFIED,

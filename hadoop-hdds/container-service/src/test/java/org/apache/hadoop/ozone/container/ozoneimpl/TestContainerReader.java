@@ -256,6 +256,7 @@ public class TestContainerReader {
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
     Assert.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
+
   @Test
   public void testMultipleContainerReader() throws Exception {
     final int volumeNum = 10;
@@ -268,7 +269,7 @@ public class TestContainerReader {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         datanodeDirs.toString());
     MutableVolumeSet volumeSets =
-        new MutableVolumeSet(datanodeId.toString(), clusterId, conf);
+        new MutableVolumeSet(datanodeId.toString(), clusterId, conf, null);
     ContainerCache cache = ContainerCache.getInstance(conf);
     cache.clear();
 

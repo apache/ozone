@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 import java.io.File;
@@ -32,6 +31,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -131,7 +132,8 @@ public class TestDeadNodeHandler {
         .concat("/" + datanode1.getUuidString());
 
     StorageReportProto storageOne = TestUtils.createStorageReport(
-        datanode1.getUuid(), storagePath, 100, 10, 90, null);
+        datanode1.getUuid(), storagePath, 100 * OzoneConsts.TB,
+        10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
 
     // Exit safemode, as otherwise the safemode precheck will prevent pipelines
     // from getting created. Due to how this test is wired up, safemode will
@@ -164,9 +166,8 @@ public class TestDeadNodeHandler {
 
     LambdaTestUtils.await(120000, 1000,
         () -> {
-          System.out.println(pipelineManager.getPipelines(RATIS, THREE).size());
-          System.out.println(pipelineManager.getPipelines(RATIS, ONE).size());
-          return pipelineManager.getPipelines(RATIS, THREE).size() > 3;
+          return pipelineManager.getPipelines(new RatisReplicationConfig(THREE))
+              .size() > 3;
         });
     TestUtils.openAllRatisPipelines(pipelineManager);
 

@@ -46,7 +46,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
@@ -68,6 +68,9 @@ import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateExcepti
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CRYPTO_SIGNATURE_VERIFICATION_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CRYPTO_SIGN_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
+
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 
@@ -284,6 +287,33 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return this.getCertificateFromScm(certId);
   }
 
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    try {
+      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
+          securityConfig.getConfiguration());
+      return scmSecurityProtocolClient.getCrls(crlIds);
+    } catch (Exception e) {
+      getLogger().error("Error while getting CRL with " +
+          "CRL ids:{} from scm.", crlIds, e);
+      throw new CertificateException("Error while getting CRL with " +
+          "CRL ids:" + crlIds, e);
+    }
+  }
+
+  @Override
+  public long getLatestCrlId() throws IOException {
+    try {
+      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
+          securityConfig.getConfiguration());
+      return scmSecurityProtocolClient.getLatestCrlId();
+    } catch (Exception e) {
+      getLogger().error("Error while getting latest CRL id from scm.", e);
+      throw new CertificateException("Error while getting latest CRL id from" +
+          " scm.", e);
+    }
+  }
+
   /**
    * Get certificate from SCM and store it in local file system.
    * @param certId
@@ -296,7 +326,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         certId);
     try {
       SCMSecurityProtocol scmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(
+          getScmSecurityClientWithMaxRetry(
           (OzoneConfiguration) securityConfig.getConfiguration());
       String pemEncodedCert =
           scmSecurityProtocolClient.getCertificate(certId);
@@ -899,8 +929,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     lock.lock();
     try {
       SCMSecurityProtocol scmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(
-              securityConfig.getConfiguration());
+          getScmSecurityClientWithMaxRetry(
+              (OzoneConfiguration) securityConfig.getConfiguration());
       pemEncodedCACerts =
           scmSecurityProtocolClient.listCACertificate();
       return pemEncodedCACerts;

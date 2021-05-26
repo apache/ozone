@@ -172,7 +172,7 @@ public class DatanodeStateMachine implements Closeable {
     int totalServerCount = reconServerCount;
 
     try {
-      totalServerCount += HddsUtils.getSCMAddresses(conf).size();
+      totalServerCount += HddsUtils.getSCMAddressForDatanodes(conf).size();
     } catch (Exception e) {
       LOG.error("Fail to get scm addresses", e);
     }
@@ -260,6 +260,12 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("DatanodeStateMachine Shutdown due to an critical error");
       hddsDatanodeStopService.stopService();
     }
+  }
+
+  public void handleFatalVolumeFailures() {
+    LOG.error("DatanodeStateMachine Shutdown due to too many bad volumes, "
+        + "check " + DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_KEY);
+    hddsDatanodeStopService.stopService();
   }
 
   /**

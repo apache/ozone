@@ -22,8 +22,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -75,8 +76,8 @@ public class OneReplicaPipelineSafeModeRule extends
 
     this.pipelineManager = pipelineManager;
     oldPipelineIDSet = pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        new RatisReplicationConfig(ReplicationFactor.THREE),
+        Pipeline.PipelineState.OPEN)
         .stream().map(p -> p.getId()).collect(Collectors.toSet());
     int totalPipelineCount = oldPipelineIDSet.size();
 
@@ -107,17 +108,18 @@ public class OneReplicaPipelineSafeModeRule extends
       Pipeline pipeline;
       try {
         pipeline = pipelineManager.getPipeline(
-                PipelineID.getFromProtobuf(report1.getPipelineID()));
+            PipelineID.getFromProtobuf(report1.getPipelineID()));
       } catch (PipelineNotFoundException pnfe) {
         continue;
       }
-      if (pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-              pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE &&
-              pipeline.isOpen() &&
-              !reportedPipelineIDSet.contains(pipeline.getId())) {
+
+      if (RatisReplicationConfig
+          .hasFactor(pipeline.getReplicationConfig(), ReplicationFactor.THREE)
+          && pipeline.isOpen() &&
+          !reportedPipelineIDSet.contains(pipeline.getId())) {
         if (oldPipelineIDSet.contains(pipeline.getId())) {
           getSafeModeMetrics().
-                incCurrentHealthyPipelinesWithAtleastOneReplicaReportedCount();
+              incCurrentHealthyPipelinesWithAtleastOneReplicaReportedCount();
           currentReportedPipelineCount++;
           reportedPipelineIDSet.add(pipeline.getId());
         }

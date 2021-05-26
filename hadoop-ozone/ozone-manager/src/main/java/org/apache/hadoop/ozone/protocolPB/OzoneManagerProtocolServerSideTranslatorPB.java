@@ -193,22 +193,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     }
   }
 
-  private ServiceException createNotLeaderException() {
-    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
-
-    OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(notLeaderException.getMessage());
-    }
-
-    return new ServiceException(notLeaderException);
-  }
-
   private ServiceException createLeaderErrorException(
       RaftServerStatus raftServerStatus) {
     if (raftServerStatus == NOT_LEADER) {
@@ -218,13 +202,28 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     }
   }
 
+  private ServiceException createNotLeaderException() {
+    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
+
+    // TODO: Set suggest leaderID. Right now, client is not using suggest
+    // leaderID. Need to fix this.
+
+    OMNotLeaderException notLeaderException =
+        new OMNotLeaderException(raftPeerId);
+
+    LOG.debug(notLeaderException.getMessage());
+
+    return new ServiceException(notLeaderException);
+  }
 
   private ServiceException createLeaderNotReadyException() {
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
 
     OMLeaderNotReadyException leaderNotReadyException =
         new OMLeaderNotReadyException(raftPeerId.toString() + " is Leader " +
-            "but not ready to process request");
+            "but not ready to process request yet.");
+
+    LOG.debug(leaderNotReadyException.getMessage());
 
     return new ServiceException(leaderNotReadyException);
   }

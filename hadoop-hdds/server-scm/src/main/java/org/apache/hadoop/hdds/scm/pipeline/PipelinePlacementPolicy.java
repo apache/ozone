@@ -20,9 +20,12 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -43,9 +46,10 @@ import java.util.stream.Collectors;
  * and network topology to supply pipeline creation.
  * <p>
  * 1. get a list of healthy nodes
- * 2. filter out nodes that are not too heavily engaged in other pipelines
- * 3. Choose an anchor node among the viable nodes.
- * 4. Choose other nodes around the anchor node based on network topology
+ * 2. filter out nodes that have space less than container size.
+ * 3. filter out nodes that are not too heavily engaged in other pipelines
+ * 4. Choose an anchor node among the viable nodes.
+ * 5. Choose other nodes around the anchor node based on network topology
  */
 public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @VisibleForTesting
@@ -98,12 +102,16 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         continue;
       }
       if (pipeline != null &&
-            // single node pipeline are not accounted for while determining
-            // the pipeline limit for dn
-            pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-            (pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE ||
-          pipeline.getFactor().getNumber() == nodesRequired &&
-          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED)) {
+          // single node pipeline are not accounted for while determining
+          // the pipeline limit for dn
+          pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
+          (RatisReplicationConfig
+              .hasFactor(pipeline.getReplicationConfig(), ReplicationFactor.ONE)
+              ||
+              pipeline.getReplicationConfig().getRequiredNodes()
+                  == nodesRequired &&
+                  pipeline.getPipelineState()
+                      == Pipeline.PipelineState.CLOSED)) {
         pipelineNumDeductable++;
       }
     }
@@ -145,11 +153,30 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
+    long sizeRequired = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+
+    // filter nodes that don't even have space for one container
+    List<DatanodeDetails> canHoldList = healthyNodes.stream().filter(d ->
+        hasEnoughSpace(d, sizeRequired)).collect(Collectors.toList());
+
+    if (canHoldList.size() < nodesRequired) {
+      msg = String.format("Pipeline creation failed due to no sufficient" +
+          " healthy datanodes with enough space for even a single container." +
+          " Required %d. Found %d. Container size %d.",
+          nodesRequired, canHoldList.size(), sizeRequired);
+      LOG.warn(msg);
+      throw new SCMException(msg,
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+
     // filter nodes that meet the size and pipeline engagement criteria.
     // Pipeline placement doesn't take node space left into account.
     // Sort the DNs by pipeline load.
     // TODO check if sorting could cause performance issue: HDDS-3466.
-    List<DatanodeDetails> healthyList = healthyNodes.stream()
+    List<DatanodeDetails> healthyList = canHoldList.stream()
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
         .filter(d ->

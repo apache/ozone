@@ -18,10 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -75,36 +74,27 @@ public class PipelineStateManager implements StateManager {
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationType type) {
-    return pipelineStateMap.getPipelines(type);
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-                                     ReplicationFactor factor) {
-    return pipelineStateMap.getPipelines(type, factor);
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-                                     ReplicationFactor factor,
-      PipelineState state) {
-    return pipelineStateMap.getPipelines(type, factor, state);
+  public List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig
+  ) {
+    return pipelineStateMap.getPipelines(replicationConfig);
   }
 
   @Override
   public List<Pipeline> getPipelines(
-      ReplicationType type, ReplicationFactor factor,
-      PipelineState state, Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines) {
-    return pipelineStateMap
-        .getPipelines(type, factor, state, excludeDns, excludePipelines);
+      ReplicationConfig replicationConfig,
+      PipelineState state
+  ) {
+    return pipelineStateMap.getPipelines(replicationConfig, state);
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationType type,
-                                     PipelineState... states) {
-    return pipelineStateMap.getPipelines(type, states);
+  public List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
+      PipelineState state, Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines) {
+    return pipelineStateMap
+        .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
   }
 
   @Override

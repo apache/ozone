@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -127,7 +128,6 @@ public class TestStorageContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
             TestStorageContainerManager.class);
-
   /**
    * Set the timeout for every test.
    */
@@ -180,8 +180,9 @@ public class TestStorageContainerManager {
 
       SCMClientProtocolServer mockClientServer = Mockito.spy(
           cluster.getStorageContainerManager().getClientProtocolServer());
-      when(mockClientServer.getRpcRemoteUsername())
-          .thenReturn(fakeRemoteUsername);
+
+      when(mockClientServer.getRemoteUser()).thenReturn(
+          UserGroupInformation.createRemoteUser(fakeRemoteUsername));
 
       try {
         mockClientServer.deleteContainer(
@@ -485,6 +486,7 @@ public class TestStorageContainerManager {
     StorageContainerManager.scmInit(conf, testClusterId);
     Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
     Assert.assertEquals(testClusterId, scmStore.getClusterID());
+    Assert.assertFalse(scmStore.isSCMHAEnabled());
   }
 
   @Test
@@ -499,6 +501,8 @@ public class TestStorageContainerManager {
     final UUID clusterId = UUID.randomUUID();
     // This will initialize SCM
     StorageContainerManager.scmInit(conf, clusterId.toString());
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    Assert.assertTrue(scmStore.isSCMHAEnabled());
     validateRatisGroupExists(conf, clusterId.toString());
   }
 
@@ -519,9 +523,35 @@ public class TestStorageContainerManager {
       StorageContainerManager.scmInit(conf, clusterId.toString());
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       Assert.assertNotEquals(clusterId.toString(), scmStore.getClusterID());
+      Assert.assertFalse(scmStore.isSCMHAEnabled());
     } finally {
       cluster.shutdown();
     }
+  }
+
+
+  @Test
+  public void testSCMReinitializationWithHAUpgrade() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    final String path = GenericTestUtils.getTempPath(
+        UUID.randomUUID().toString());
+    Path scmPath = Paths.get(path, "scm-meta");
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    //This will set the cluster id in the version file
+    final UUID clusterId = UUID.randomUUID();
+      // This will initialize SCM
+
+    StorageContainerManager.scmInit(conf, clusterId.toString());
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    Assert.assertEquals(clusterId.toString(), scmStore.getClusterID());
+    Assert.assertFalse(scmStore.isSCMHAEnabled());
+
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    StorageContainerManager.scmInit(conf, clusterId.toString());
+    scmStore = new SCMStorageConfig(conf);
+    Assert.assertTrue(scmStore.isSCMHAEnabled());
+    validateRatisGroupExists(conf, clusterId.toString());
+
   }
 
   @VisibleForTesting
@@ -591,6 +621,8 @@ public class TestStorageContainerManager {
       StorageContainerManager.scmInit(conf, clusterId);
       // Ratis group with cluster id exists now
       validateRatisGroupExists(conf, clusterId);
+      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+      Assert.assertTrue(scmStore.isSCMHAEnabled());
     } finally {
       cluster.shutdown();
     }

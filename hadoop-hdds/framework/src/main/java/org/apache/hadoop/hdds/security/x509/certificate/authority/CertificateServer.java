@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -110,15 +111,13 @@ public interface CertificateServer {
    *
    * @param serialIDs       - List of serial IDs of Certificates to be revoked.
    * @param reason          - Reason for revocation.
-   * @param securityConfig  - Security Configuration.
    * @param revocationTime  - Revocation time for the certificates.
    * @return Future that gives a list of certificates that were revoked.
    */
   Future<Optional<Long>> revokeCertificates(
       List<BigInteger> serialIDs,
       CRLReason reason,
-      Date revocationTime,
-      SecurityConfig securityConfig);
+      Date revocationTime);
 
   /**
    * List certificates.
@@ -137,6 +136,20 @@ public interface CertificateServer {
    * @param scmMetadataStore
    */
   void reinitialize(SCMMetadataStore scmMetadataStore);
+
+  /**
+   * Get the CRLInfo based on the CRL Ids.
+   * @param crlIds - list of crl ids
+   * @return CRLInfo
+   * @throws IOException
+   */
+  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
+
+  /**
+   * Get the latest CRL id.
+   * @return latest CRL id.
+   */
+  long getLatestCrlId();
 
   /**
    * Make it explicit what type of CertificateServer we are creating here.
