@@ -32,9 +32,9 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapErrorCode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.ErrorCode;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,14 +90,14 @@ public class OMInterServiceProtocolClientSideImpl implements
       OMNotLeaderException notLeaderException =
           OMFailoverProxyProvider.getNotLeaderException(e);
       if (notLeaderException != null) {
-        throwException(BootstrapErrorCode.LEADER_UNDETERMINED,
+        throwException(ErrorCode.LEADER_UNDETERMINED,
             notLeaderException.getMessage());
       }
 
       OMLeaderNotReadyException leaderNotReadyException =
           OMFailoverProxyProvider.getLeaderNotReadyException(e);
       if (leaderNotReadyException != null) {
-        throwException(BootstrapErrorCode.LEADER_NOT_READY,
+        throwException(ErrorCode.LEADER_NOT_READY,
             leaderNotReadyException.getMessage());
       }
       throw ProtobufHelper.getRemoteException(e);
@@ -108,7 +108,7 @@ public class OMInterServiceProtocolClientSideImpl implements
     }
   }
 
-  private void throwException(BootstrapErrorCode errorCode, String errorMsg)
+  private void throwException(ErrorCode errorCode, String errorMsg)
       throws IOException {
     throw new IOException("Failed to Bootstrap OM. Error Code: " + errorCode +
         ", Error Message: " + errorMsg);

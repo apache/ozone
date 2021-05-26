@@ -24,9 +24,9 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapErrorCode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.ErrorCode;
 
 public class OMInterServiceProtocolServerSideImpl implements
     OMInterServiceProtocolPB {
@@ -49,7 +49,7 @@ public class OMInterServiceProtocolServerSideImpl implements
     if (!isRatisEnabled) {
       return BootstrapOMResponse.newBuilder()
           .setSuccess(false)
-          .setErrorCode(BootstrapErrorCode.RATIS_NOT_ENABLED)
+          .setErrorCode(ErrorCode.RATIS_NOT_ENABLED)
           .setErrorMsg("New OM node cannot be bootstrapped as Ratis " +
               "is not enabled on existing OM")
           .build();
@@ -68,7 +68,7 @@ public class OMInterServiceProtocolServerSideImpl implements
     } catch (IOException ex) {
       return BootstrapOMResponse.newBuilder()
           .setSuccess(false)
-          .setErrorCode(BootstrapErrorCode.RATIS_BOOTSTRAP_ERROR)
+          .setErrorCode(ErrorCode.RATIS_BOOTSTRAP_ERROR)
           .setErrorMsg(ex.getMessage())
           .build();
     }

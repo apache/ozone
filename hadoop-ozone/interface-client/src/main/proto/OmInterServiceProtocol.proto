@@ -42,11 +42,11 @@ message BootstrapOMRequest {
 
 message BootstrapOMResponse {
     required bool success = 1;
-    optional BootstrapErrorCode errorCode = 2;
+    optional ErrorCode errorCode = 2;
     optional string errorMsg = 3;
 }
 
-enum BootstrapErrorCode {
+enum ErrorCode {
     RATIS_NOT_ENABLED = 1;
     LEADER_UNDETERMINED = 2;
     LEADER_NOT_READY = 3;
