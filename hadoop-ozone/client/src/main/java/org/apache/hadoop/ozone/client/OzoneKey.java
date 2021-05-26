@@ -81,7 +81,6 @@ public class OzoneKey {
    *
    */
   @SuppressWarnings("parameternumber")
-  @Deprecated
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig) {
