@@ -88,7 +88,7 @@ public class PipelineSyncTask extends ReconScmTask {
    * @throws NodeNotFoundException if node not found in Recon.
    */
   private void syncOperationalStateOnDeadNodes()
-      throws IOException, NodeNotFoundException {   
+      throws IOException, NodeNotFoundException {
     List<DatanodeDetails> deadNodesOnRecon = nodeManager.getNodes(null, DEAD);
 
     if (!deadNodesOnRecon.isEmpty()) {
