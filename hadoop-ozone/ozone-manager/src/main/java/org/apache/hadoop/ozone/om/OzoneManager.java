@@ -568,11 +568,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           updateLayoutVersionInDB(versionManager, metadataManager);
         }
       }
-    }
 
-    // Prepare state depends on the transaction ID of metadataManager after a
-    // restart.
-    instantiatePrepareState(withNewSnapshot);
+      instantiatePrepareStateAfterSnapshot();
+    } else {
+      // Prepare state depends on the transaction ID of metadataManager after a
+      // restart.
+      instantiatePrepareStateOnStartup();
+    }
 
     if (isAclEnabled) {
       accessAuthorizer = getACLAuthorizerInstance(configuration);
@@ -3862,45 +3864,126 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return prepareState;
   }
 
-  private void instantiatePrepareState(boolean withNewSnapshot)
-      throws IOException {
-    // If the prepare marker file is present and its index matches the last
-    // transaction index in the OM DB, turn on the in memory flag to
-    // put the ozone manager in prepare mode, disallowing write requests.
-    // This must be done after metadataManager is instantiated
-    // and before the RPC server is started.
+  /**
+   * Determines if the prepare gate should be enabled on this OM after OM
+   * state is reloaded.
+   * This must be done after metadataManager is instantiated
+   * and before the RPC server is started.
+   */
+//  private void instantiatePrepareState(boolean withNewSnapshot)
+//      throws IOException {
+//    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+//        .get(TRANSACTION_INFO_KEY);
+//    prepareState = new OzoneManagerPrepareState(configuration);
+//
+//    // First see if preparation needs to be restored based on marker file.
+//    // If we have no transaction info in the DB, then no prepare request
+//    // could have been received, since the request would update the txn
+//    // index in the DB.
+//    if (txnInfo != null) {
+//      if (prepareState.prepareMarkerFileExists()) {
+//        prepareState.restorePrepareFromFile(txnInfo.getTransactionIndex());
+//        LOG.info("Ozone Manager {} restarted in prepare mode.", getOMNodeId());
+//      } else if (withNewSnapshot) {
+//        // If a snapshot was installed, we need to check if a prepare request
+//        // came with it and needs to be processed.
+//        TransactionInfo dbPrepareIndex =
+//            metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
+//        if (dbPrepareIndex != null) {
+//          LOG.info("Prepare Index less than or equal to last applied index, " +
+//              "but the prepare marker file is not found. A snapshot is being " +
+//              "installed in this OM. Enabling prepare gate.");
+//          prepareState.restorePrepareFromIndex(
+//              dbPrepareIndex.getTransactionIndex(),
+//              txnInfo.getTransactionIndex());
+//        }
+//      } else {
+//        // Make sure OM prepare state is clean before proceeding.
+//        prepareState.cancelPrepare();
+//      }
+//    }
+//  }
+
+  private void instantiatePrepareStateOnStartup ()
+    throws IOException {
     TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
         .get(TRANSACTION_INFO_KEY);
-    prepareState = new OzoneManagerPrepareState(configuration);
-
-    // If we have no transaction info in the DB, then no prepare request
-    // could have been received, since the request would update the txn
-    // index in the DB.
-    if (txnInfo != null) {
-      // Only puts OM in prepare mode if a marker file matching the txn index
-      // is found.
-      PrepareStatus status =
-          prepareState.restorePrepare(txnInfo.getTransactionIndex());
-      if (status == PrepareStatus.PREPARE_COMPLETED) {
-        LOG.info("Ozone Manager {} restarted in prepare mode.",
-            getOMNodeId());
-      } else if (withNewSnapshot) {
-        TransactionInfo prepareInfo =
-            metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
-        if (prepareInfo != null &&
-            prepareInfo.getTransactionIndex() ==
-                txnInfo.getTransactionIndex()) {
-          LOG.info("Prepare Index matches last applied index, but the prepare" +
-              " marker file is not found. A snapshot is being installed in " +
-              " this OM. Enabling prepare gate.");
-          prepareState.finishPrepare(prepareInfo.getTransactionIndex());
-        } else {
-          prepareState.cancelPrepare();
-        }
-      }
+    if (txnInfo == null) {
+      // No prepare request could be received if there are not transactions.
+      prepareState = new OzoneManagerPrepareState(configuration);
     } else {
-      // Make sure OM prepare state is clean before proceeding.
-      prepareState.cancelPrepare();
+      prepareState = new OzoneManagerPrepareState(configuration,
+          txnInfo.getTransactionIndex());
+      TransactionInfo dbPrepareValue =
+          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
+
+      boolean hasMarkerFile =
+          (prepareState.getState().getStatus() ==
+              PrepareStatus.PREPARE_COMPLETED);
+      boolean hasDBMarker = (dbPrepareValue != null);
+
+      if (hasDBMarker) {
+        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
+
+        if (hasMarkerFile) {
+          long prepareFileIndex = prepareState.getState().getIndex();
+          // If marker and DB prepare index do not match, use the DB value
+          // since this is synced through Ratis, to avoid divergence.
+          if (prepareFileIndex != dbPrepareIndex) {
+            LOG.warn("Prepare marker file index {} does not match DB prepare " +
+                "index {}. Writing DB index to prepare file and maintaining " +
+                "prepared state.", prepareFileIndex, dbPrepareIndex);
+            prepareState.finishPrepare(dbPrepareIndex);
+          }
+          // Else, marker and DB are present and match, so OM is prepared.
+        } else {
+          // Prepare cancelled with startup flag to remove marker file.
+          // Persist this to the DB.
+          // If the startup flag is used it should be used on all OMs to avoid
+          // divergence.
+          metadataManager.getTransactionInfoTable().delete(PREPARE_MARKER_KEY);
+        }
+      } else if (hasMarkerFile) {
+        // Marker file present but no DB entry present.
+        // This should never happen. If a prepare request fails partway
+        // through, OM should replay it so both the DB and marker file exist.
+        // TODO: Check ordering of replay.
+        throw new OMException("Prepare marker file found on startup without a " +
+            "corresponding database entry. Corrupt prepare state.",
+            ResultCodes.PREPARE_FAILED);
+      }
+      // Else, no DB or marker file, OM is not prepared.
+    }
+  }
+
+  private void instantiatePrepareStateAfterSnapshot()
+    throws IOException {
+    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    if (txnInfo == null) {
+      // No prepare request could be received if there are not transactions.
+      prepareState = new OzoneManagerPrepareState(configuration);
+    } else {
+      prepareState = new OzoneManagerPrepareState(configuration,
+          txnInfo.getTransactionIndex());
+      TransactionInfo dbPrepareValue =
+          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
+
+      boolean hasDBMarker = (dbPrepareValue != null);
+
+      if (hasDBMarker) {
+        // Snapshot contained a prepare request to apply.
+        // Update the in memory prepare gate and marker file index.
+        // If we have already done this, the operation is idempotent.
+        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
+        prepareState.restorePrepareFromIndex(dbPrepareIndex,
+            txnInfo.getTransactionIndex());
+      } else {
+        // No DB marker.
+        // Deletes marker file if exists, otherwise does nothing if we were not
+        // already prepared.
+        prepareState.cancelPrepare();
+      }
     }
   }
 

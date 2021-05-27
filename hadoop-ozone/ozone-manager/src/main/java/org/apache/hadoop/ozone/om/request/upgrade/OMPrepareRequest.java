@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -33,7 +30,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import org.apache.ratis.server.RaftServer;
@@ -41,7 +37,6 @@ import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.jvm.hotspot.debugger.posix.elf.ELFSectionHeader;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -227,14 +222,16 @@ public class OMPrepareRequest extends OMClientRequest {
       if (actualPurgeIndex < snapshotIndex) {
         throw new IOException(String.format("Actual purge index %d is less " +
             "than specified purge index %d. Some required logs may not have" +
-                "been removed.", actualPurgeIndex, snapshotIndex));
+            "been removed.", actualPurgeIndex, snapshotIndex));
       } else if (actualPurgeIndex != snapshotIndex) {
         LOG.warn("Actual purge index {} does not " +
-            "match specified purge index {}. ", actualPurgeIndex,
+                "match specified purge index {}. ", actualPurgeIndex,
             snapshotIndex);
       }
     } catch (Exception e) {
-      throw new IOException("Unable to purge logs.", e);
+      // Ozone manager error handler does not respect exception chaining and
+      // only displays the message of the top level exception.
+      throw new IOException("Unable to purge logs: " + e.getMessage());
     }
   }
 

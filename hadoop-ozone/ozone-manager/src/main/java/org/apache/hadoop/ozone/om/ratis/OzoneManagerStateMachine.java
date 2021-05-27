@@ -218,7 +218,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
         prepareState.enablePrepareGate();
       }
-      // TODO: Add cancel prepare here after it is implemented.
       return trx;
     } else {
       String message = "Cannot apply write request " +

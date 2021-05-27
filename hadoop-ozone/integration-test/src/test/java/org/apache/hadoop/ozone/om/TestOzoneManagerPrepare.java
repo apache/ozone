@@ -490,7 +490,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
               return false;
             } else {
               return om.getPrepareState().getState().getStatus() ==
-                  PrepareStatus.PREPARE_NOT_STARTED;
+                  PrepareStatus.NOT_PREPARED;
             }
           });
     }
