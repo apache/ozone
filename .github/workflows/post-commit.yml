@@ -264,8 +264,8 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   coverage:
     runs-on: ubuntu-18.04
@@ -315,6 +315,6 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
