@@ -2855,7 +2855,7 @@
   </property>
 
   <property>
-    <name>ozone.client.key.full.location.version</name>
+    <name>ozone.client.key.latest.location.version</name>
     <tag>OZONE, CLIENT</tag>
     <value>true</value>
     <description>Ozone client get the latest location version.
