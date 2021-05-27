@@ -210,7 +210,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
