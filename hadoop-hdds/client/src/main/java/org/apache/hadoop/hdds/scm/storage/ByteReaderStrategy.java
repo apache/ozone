@@ -24,7 +24,7 @@ import java.io.InputStream;
 /**
  * A Reader interface to work with InputStream.
  */
-public interface ReaderStrategy {
+public interface ByteReaderStrategy {
   /**
    * Read from a block using the InputStream.
    * @param is

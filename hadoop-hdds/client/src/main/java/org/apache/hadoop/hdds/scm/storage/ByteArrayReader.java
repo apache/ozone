@@ -26,10 +26,11 @@ import java.io.InputStream;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
- * An {@link ReaderStrategy} implementation which supports byte[] as the input
+ * An {@link ByteReaderStrategy} implementation which supports byte[] as the
+ * input
  * read data buffer.
  */
-public class ByteArrayReader implements ReaderStrategy {
+public class ByteArrayReader implements ByteReaderStrategy {
   private final byte[] readBuf;
   private int offset;
   private int targetLen;

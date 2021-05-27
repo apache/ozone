@@ -185,7 +185,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
   }
 
   @Test
-  public void testReadChunk() throws Exception {
+  public void testReadChunkWithByteArray() throws Exception {
     String keyName = getNewKeyName();
 
     // write data spanning multiple blocks/chunks
@@ -203,6 +203,15 @@ public class TestKeyInputStream extends TestInputStreamBase {
         keyInputStream.seek(0);
       }
     }
+  }
+
+  @Test
+  public void testReadChunkWithByteBuffer() throws Exception {
+    String keyName = getNewKeyName();
+
+    // write data spanning multiple blocks/chunks
+    int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
+    byte[] data = writeRandomBytes(keyName, dataLength);
 
     // read chunk data using ByteBuffer
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {

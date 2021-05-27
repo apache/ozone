@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteArrayReader;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferReader;
-import org.apache.hadoop.hdds.scm.storage.ReaderStrategy;
+import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
@@ -222,7 +222,7 @@ public class KeyInputStream extends InputStream
    */
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ReaderStrategy strategy = new ByteArrayReader(b, off, len);
+    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
     int bufferLen = strategy.getTargetLength();
     if (bufferLen == 0) {
       return 0;
@@ -232,7 +232,7 @@ public class KeyInputStream extends InputStream
 
   @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ReaderStrategy strategy = new ByteBufferReader(byteBuffer);
+    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
     int bufferLen = strategy.getTargetLength();
     if (bufferLen == 0) {
       return 0;
@@ -240,7 +240,7 @@ public class KeyInputStream extends InputStream
     return readWithStrategy(strategy);
   }
 
-  synchronized int readWithStrategy(ReaderStrategy strategy) throws
+  synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
       IOException {
     Preconditions.checkArgument(strategy != null);
     checkOpen();

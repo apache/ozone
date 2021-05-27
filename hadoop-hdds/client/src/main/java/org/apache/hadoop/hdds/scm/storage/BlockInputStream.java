@@ -265,7 +265,7 @@ public class BlockInputStream extends InputStream
    */
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ReaderStrategy strategy = new ByteArrayReader(b, off, len);
+    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
     if (len == 0) {
       return 0;
     }
@@ -274,7 +274,7 @@ public class BlockInputStream extends InputStream
 
   @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ReaderStrategy strategy = new ByteBufferReader(byteBuffer);
+    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
     int len = strategy.getTargetLength();
     if (len == 0) {
       return 0;
@@ -282,7 +282,7 @@ public class BlockInputStream extends InputStream
     return readWithStrategy(strategy);
   }
 
-  synchronized int readWithStrategy(ReaderStrategy strategy) throws
+  synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
       IOException {
     Preconditions.checkArgument(strategy != null);
     if (!initialized) {

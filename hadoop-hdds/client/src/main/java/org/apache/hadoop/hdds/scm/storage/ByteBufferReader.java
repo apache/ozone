@@ -26,10 +26,10 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 /**
- * An {@link ReaderStrategy} implementation which supports ByteBuffer as the
+ * An {@link ByteReaderStrategy} implementation which supports ByteBuffer as the
  * input read data buffer.
  */
-public class ByteBufferReader implements ReaderStrategy {
+public class ByteBufferReader implements ByteReaderStrategy {
   private final ByteBuffer readBuf;
   private int targetLen;
 
