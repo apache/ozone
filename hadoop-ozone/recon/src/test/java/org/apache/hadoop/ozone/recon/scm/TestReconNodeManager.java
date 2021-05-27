@@ -190,6 +190,9 @@ public class TestReconNodeManager {
     reconNodeManager.updateNodeOperationalStateFromScm(node, datanodeDetails);
     assertEquals(DECOMMISSIONING, reconNodeManager
         .getNodeByUuid(datanodeDetails.getUuidString()).getPersistedOpState());
-
+    List<DatanodeDetails> nodes =
+        reconNodeManager.getNodes(DECOMMISSIONING, null);
+    assertEquals(1, nodes.size());
+    assertEquals(datanodeDetails.getUuid(), nodes.get(0).getUuid());
   }
 }
