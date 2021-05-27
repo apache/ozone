@@ -40,15 +40,11 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       LoggerFactory.getLogger(ContainerBalancerStartSubcommand.class);
 
   @CommandLine.Option(names = {"-t", "--threshold"},
-      description = "Threshold target whether the cluster is balanced",
-      defaultValue = "0.1",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+      description = "Threshold target whether the cluster is balanced")
   private double threshold;
 
   @CommandLine.Option(names = {"-i", "--idleiterations"},
-      description = "Maximum consecutive idle iterations",
-      defaultValue = "-1",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+      description = "Maximum consecutive idle iterations")
   private int iCount;
 
   @Override
