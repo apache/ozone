@@ -422,8 +422,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     clientProtocol.getOzoneManagerClient().cancelOzoneManagerPrepare();
   }
 
-  private void assertClusterPrepared(long expectedPreparedIndex) throws Exception {
-    assertClusterPrepared(expectedPreparedIndex, cluster.getOzoneManagersList());
+  private void assertClusterPrepared(long expectedPreparedIndex)
+      throws Exception {
+    assertClusterPrepared(expectedPreparedIndex,
+        cluster.getOzoneManagersList());
   }
 
   private void assertClusterPrepared(long expectedPreparedIndex,

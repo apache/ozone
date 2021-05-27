@@ -147,8 +147,8 @@ public final class OzoneManagerPrepareState {
       long currentIndex, boolean writeFile) throws IOException {
     if (restoredPrepareIndex <= currentIndex) {
       // Enabling the prepare gate is idempotent, and may have already been
-      // performed if we are the leader. If we are a follower, we must ensure this
-      // is run now in case we become the leader.
+      // performed if we are the leader. If we are a follower, we must ensure
+      // this is run now in case we become the leader.
       enablePrepareGate();
 
       if (writeFile) {
@@ -158,8 +158,8 @@ public final class OzoneManagerPrepareState {
       status = PrepareStatus.PREPARE_COMPLETED;
     } else {
       throwPrepareException("Failed to restore OM prepare " +
-              "state, because the existing prepare index %d is larger than the" +
-              "current index %d.", restoredPrepareIndex, currentIndex);
+              "state, because the existing prepare index %d is larger than" +
+              "the current index %d.", restoredPrepareIndex, currentIndex);
     }
   }
 

@@ -3866,46 +3866,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Determines if the prepare gate should be enabled on this OM after OM
-   * state is reloaded.
+   * is restarted.
    * This must be done after metadataManager is instantiated
    * and before the RPC server is started.
    */
-//  private void instantiatePrepareState(boolean withNewSnapshot)
-//      throws IOException {
-//    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
-//        .get(TRANSACTION_INFO_KEY);
-//    prepareState = new OzoneManagerPrepareState(configuration);
-//
-//    // First see if preparation needs to be restored based on marker file.
-//    // If we have no transaction info in the DB, then no prepare request
-//    // could have been received, since the request would update the txn
-//    // index in the DB.
-//    if (txnInfo != null) {
-//      if (prepareState.prepareMarkerFileExists()) {
-//        prepareState.restorePrepareFromFile(txnInfo.getTransactionIndex());
-//        LOG.info("Ozone Manager {} restarted in prepare mode.", getOMNodeId());
-//      } else if (withNewSnapshot) {
-//        // If a snapshot was installed, we need to check if a prepare request
-//        // came with it and needs to be processed.
-//        TransactionInfo dbPrepareIndex =
-//            metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
-//        if (dbPrepareIndex != null) {
-//          LOG.info("Prepare Index less than or equal to last applied index, " +
-//              "but the prepare marker file is not found. A snapshot is being " +
-//              "installed in this OM. Enabling prepare gate.");
-//          prepareState.restorePrepareFromIndex(
-//              dbPrepareIndex.getTransactionIndex(),
-//              txnInfo.getTransactionIndex());
-//        }
-//      } else {
-//        // Make sure OM prepare state is clean before proceeding.
-//        prepareState.cancelPrepare();
-//      }
-//    }
-//  }
-
-  private void instantiatePrepareStateOnStartup ()
-    throws IOException {
+  private void instantiatePrepareStateOnStartup()
+      throws IOException {
     TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
         .get(TRANSACTION_INFO_KEY);
     if (txnInfo == null) {
@@ -3947,17 +3913,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         // Marker file present but no DB entry present.
         // This should never happen. If a prepare request fails partway
         // through, OM should replay it so both the DB and marker file exist.
-        // TODO: Check ordering of replay.
-        throw new OMException("Prepare marker file found on startup without a " +
-            "corresponding database entry. Corrupt prepare state.",
+        throw new OMException("Prepare marker file found on startup without " +
+            "a corresponding database entry. Corrupt prepare state.",
             ResultCodes.PREPARE_FAILED);
       }
       // Else, no DB or marker file, OM is not prepared.
     }
   }
 
+  /**
+   * Determines if the prepare gate should be enabled on this OM after OM
+   * receives a snapshot.
+   */
   private void instantiatePrepareStateAfterSnapshot()
-    throws IOException {
+      throws IOException {
     TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
         .get(TRANSACTION_INFO_KEY);
     if (txnInfo == null) {

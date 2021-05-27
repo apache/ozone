@@ -34,6 +34,9 @@ Start the Ozone Manager using the --upgrade flag.
  
     ozone --deamon om start --upgrade
 
+**IMPORTANT** All OMs must be started with the --upgrade flag.
+    - If only some are started with the flag by mistake, run `ozone admin om -id=<om-sevice-id> cancelprepare`.
+
 ### Finalize SCM and OM individually.
  
     ozone admin scm finalizeupgrade
@@ -41,9 +44,11 @@ Start the Ozone Manager using the --upgrade flag.
     ozone admin om -id=<service-id> finalizeupgrade
 
 ### Downgrade (instead of finalizing)
+ - Prepare the ozone managers: `ozone admin om -id=<om-sevice-id> prepare`
  - Stop all components (OMs, SCMs & DNs) using an appropriate 'stop' command.
  - Replace artifacts of all components newer version.
  - Start the SCM and DNs in a regular way.
  - Start the Ozone Manager using the '--downgrade' flag.
+    - Same conditions apply to the --upgrde and --downgrade flags.
 
  

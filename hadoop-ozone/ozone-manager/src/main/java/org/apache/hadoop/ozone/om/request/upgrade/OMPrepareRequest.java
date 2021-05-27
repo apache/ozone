@@ -88,7 +88,8 @@ public class OMPrepareRequest extends OMClientRequest {
               .setTxnID(transactionLogIndex)
               .build();
       responseBuilder.setPrepareResponse(omResponse);
-      response = new OMPrepareResponse(responseBuilder.build(), transactionLogIndex);
+      response = new OMPrepareResponse(responseBuilder.build(),
+          transactionLogIndex);
 
       // Add response to double buffer before clearing logs.
       // This guarantees the log index of this request will be the same as
@@ -178,7 +179,7 @@ public class OMPrepareRequest extends OMClientRequest {
       LOG.debug("{} Current Ratis state machine transaction index {}.",
           om.getOMNodeId(), lastRatisCommitIndex);
 
-      if (!omDBFlushed) {
+      if (!(omDBFlushed && ratisStateMachineApplied)) {
         Thread.sleep(flushCheckInterval.toMillis());
       }
     }
@@ -202,8 +203,8 @@ public class OMPrepareRequest extends OMClientRequest {
 
   /**
    * Take a snapshot of the state machine at the last index, and purge at
-   * least all logs before the suggested index.
-   * If there is another prepare request or cancle prepare request,
+   * least all log with indices less than or equal to the snapshot index.
+   * If there is another prepare request or cancel prepare request,
    * this one will end up purging that request since it was allowed through
    * the pre-append prepare gate.
    * This means that an OM cannot support 2 prepare requests in the
