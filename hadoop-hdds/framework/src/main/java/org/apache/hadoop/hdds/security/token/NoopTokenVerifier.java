@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.security.token;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.security.token.Token;
 
 /** No-op verifier, used when block token is disabled in config. */
@@ -25,12 +25,12 @@ public class NoopTokenVerifier implements TokenVerifier {
 
   @Override
   public void verify(String user, Token<?> token,
-      ContainerCommandRequestProto cmd) {
+      ContainerCommandRequestProtoOrBuilder cmd) {
     // no-op
   }
 
   @Override // to avoid "failed to find token"
-  public void verify(ContainerCommandRequestProto cmd, String user,
+  public void verify(ContainerCommandRequestProtoOrBuilder cmd, String user,
       String encodedToken) {
     // no-op
   }

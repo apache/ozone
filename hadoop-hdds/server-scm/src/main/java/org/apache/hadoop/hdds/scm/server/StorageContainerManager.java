@@ -138,6 +138,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -412,7 +413,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
 
     containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration);
+        containerManager, replicationManager, configuration, scmContext);
     LOG.info(containerBalancer.toString());
 
     // Emit initial safe mode status, as now handlers are registered.
@@ -946,19 +947,36 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
 
-        if (SCMHAUtils.isSCMHAEnabled(conf)) {
-          SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
-              scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
-              conf);
-          scmStorageConfig.setSCMHAFlag(true);
-        }
 
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
           HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
               getScmAddress(haDetails, conf), true);
         }
+
+        // Ensure scmRatisServer#initialize() is called post scm storage
+        // config initialization.. If SCM version file is created,
+        // the subsequent scm init should use the clusterID from version file.
+        // So, scmStorageConfig#initialize() should happen before ratis server
+        // initialize. In this way,we do not leave ratis storage directory
+        // with multiple raft group directories in failure scenario.
+
+        // The order of init should be
+        // 1. SCM storage config initialize to create version file.
+        // 2. Initialize Ratis server.
+
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.initialize();
+
+        if (SCMHAUtils.isSCMHAEnabled(conf)) {
+          SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
+              scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
+              conf);
+          scmStorageConfig = new SCMStorageConfig(conf);
+          scmStorageConfig.setSCMHAFlag(true);
+          // Do force initialize to persist SCM_HA flag.
+          scmStorageConfig.forceInitialize();
+        }
+
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
@@ -971,6 +989,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
+
+      // Initialize security if security is enabled later.
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)
+          && scmStorageConfig.getScmCertSerialId() == null) {
+        HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
+            getScmAddress(haDetails, conf), true);
+        scmStorageConfig.forceInitialize();
+        LOG.info("SCM unsecure cluster is converted to secure cluster. " +
+                "Persisted SCM Certificate SerialID {}",
+            scmStorageConfig.getScmCertSerialId());
+      }
+
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
@@ -980,6 +1010,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmStorageConfig.forceInitialize();
         LOG.debug("Enabled SCM HA");
       }
+
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
               + ";cid={}; layoutVersion={}; HAEnabled={}",
           scmStorageConfig.getStorageDir(), clusterId,
@@ -1711,6 +1742,35 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   ContainerTokenSecretManager getContainerTokenSecretManager() {
     return containerTokenMgr;
+  }
+
+  @Override
+  public String getScmRatisRoles() throws IOException {
+    return HddsUtils.format(getScmHAManager().getRatisServer().getRatisRoles());
+  }
+
+  /**
+   * @return hostname of primordialNode
+   */
+  @Override
+  public String getPrimordialNode() {
+    if (SCMHAUtils.isSCMHAEnabled(configuration)) {
+      String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
+      // primordialNode can be nodeId too . If it is then return hostname.
+      if (SCMHAUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
+        List<SCMNodeDetails> localAndPeerNodes =
+            new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
+        localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());
+        for (SCMNodeDetails nodes : localAndPeerNodes) {
+          if (nodes.getNodeId().equals(primordialNode)) {
+            return nodes.getHostName();
+          }
+        }
+
+      }
+      return primordialNode;
+    }
+    return null;
   }
 
 }

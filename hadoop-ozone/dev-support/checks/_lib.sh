@@ -92,7 +92,7 @@ install_hugo() {
 }
 
 _install_hugo() {
-  : ${HUGO_VERSION:=0.81.0}
+  : ${HUGO_VERSION:=0.83.1}
 
   local os=$(uname -s)
   local arch=$(uname -m)

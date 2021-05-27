@@ -46,7 +46,6 @@ function ozone_usage
   ozone_add_subcommand "genesis" client "runs a collection of ozone benchmarks to help with tuning."
   ozone_add_subcommand "getconf" client "get ozone config values from configuration"
   ozone_add_subcommand "jmxget" admin "get JMX exported values from NameNode or DataNode."
-  ozone_add_subcommand "noz" client "ozone debug tool, convert ozone metadata into relational data"
   ozone_add_subcommand "om" daemon "Ozone Manager"
   ozone_add_subcommand "scm" daemon "run the Storage Container Manager service"
   ozone_add_subcommand "s3g" daemon "run the S3 compatible REST gateway"

@@ -150,8 +150,8 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT = 5000;
 
   public static final String OZONE_REPLICATION = "ozone.replication";
-  public static final int OZONE_REPLICATION_DEFAULT =
-      ReplicationFactor.THREE.getValue();
+  public static final String OZONE_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
 
   public static final String OZONE_REPLICATION_TYPE = "ozone.replication.type";
   public static final String OZONE_REPLICATION_TYPE_DEFAULT =
@@ -321,7 +321,7 @@ public final class OzoneConfigKeys {
   public static final String HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE =
       "hdds.datanode.metadata.rocksdb.cache.size";
   public static final String
-      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "64MB";
+      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "1GB";
 
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";

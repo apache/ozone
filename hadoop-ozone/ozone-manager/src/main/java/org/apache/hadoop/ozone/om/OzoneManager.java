@@ -201,6 +201,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -216,6 +217,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
@@ -274,6 +276,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
 
+  /**
+   * OM super user / admin list.
+   */
+  private final Collection<String> omAdminUsernames;
+
   private final OMMetrics metrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       omClientProtocolMetrics;
@@ -292,6 +299,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Runnable shutdownHook;
   private final File omMetaDir;
   private final boolean isAclEnabled;
+  private final boolean isSpnegoEnabled;
   private IAccessAuthorizer accessAuthorizer;
   private JvmPauseMonitor jvmPauseMonitor;
   private final SecurityConfig secConfig;
@@ -378,6 +386,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
+    this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
+        .equals("kerberos");
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     this.preallocateBlocksMax = conf.getInt(
@@ -436,6 +446,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (secConfig.isBlockTokenEnabled()) {
       blockTokenMgr = createBlockTokenSecretManager(configuration);
     }
+
+    // Get admin list
+    omAdminUsernames = getOzoneAdminsFromConfig(configuration);
 
     instantiateServices();
 
@@ -544,7 +557,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(getOzoneAdmins(configuration));
+        authorizer.setOzoneAdmins(omAdminUsernames);
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       }
     } else {
@@ -1782,6 +1795,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Return true if SPNEGO auth is enabled for OM HTTP server, otherwise false.
+   *
+   * @return boolean
+   */
+  public boolean isSpnegoEnabled() {
+    return isSpnegoEnabled;
+  }
+
+  /**
    * {@inheritDoc}
    */
   @Override
@@ -2686,6 +2708,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  /**
+   * {@inheritDoc}
+   */
+  public void revokeS3Secret(String kerberosID) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+            "this to be implemented. As write requests use a new approach");
+  }
+
+  @Override
   public OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws
       IOException {
 
@@ -3518,9 +3549,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return list of OzoneAdministrators.
+   * Return list of OzoneAdministrators from config.
    */
-  Collection<String> getOzoneAdmins(OzoneConfiguration conf)
+  Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf)
       throws IOException {
     Collection<String> ozAdmins =
         conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
@@ -3529,6 +3560,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ozAdmins.add(omSPN);
     }
     return ozAdmins;
+  }
+
+  /**
+   * Return the list of Ozone administrators in effect.
+   */
+  Collection<String> getOmAdminUsernames() {
+    return omAdminUsernames;
+  }
+
+  /**
+   * Return true if a UserGroupInformation is OM admin, false otherwise.
+   * @param callerUgi Caller UserGroupInformation
+   */
+  public boolean isAdmin(UserGroupInformation callerUgi) {
+    if (callerUgi == null || omAdminUsernames == null) {
+      return false;
+    }
+
+    return omAdminUsernames.contains(callerUgi.getShortUserName())
+        || omAdminUsernames.contains(callerUgi.getUserName())
+        || omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD);
   }
 
   /**
