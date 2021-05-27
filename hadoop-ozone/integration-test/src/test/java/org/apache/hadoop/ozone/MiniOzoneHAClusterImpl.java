@@ -73,8 +73,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
   private static final Random RANDOM = new Random();
-  private static final int RATIS_RPC_TIMEOUT = 1000; // 10 second
-  public static final int NODE_FAILURE_TIMEOUT = 2000; // 20 seconds
+  private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
+  private static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
    * Creates a new MiniOzoneCluster.
@@ -365,7 +365,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         numOfActiveOMs = numOfOMs;
       }
 
-      // If num of OMs it not set, set it to 1.
+      // If num of SCMs it not set, set it to 1.
       if (numOfSCMs == 0) {
         numOfSCMs = 1;
       }
@@ -703,12 +703,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             omNodeId, basePort);
 
         om = bootstrapNewOM(omNodeId);
-
-        // Get the CertClient from an existing OM and set for new OM
-        if (omhaService.getServiceByIndex(0).getCertificateClient() != null) {
-          om.setCertClient(
-              omhaService.getServiceByIndex(0).getCertificateClient());
-        }
 
         LOG.info("Bootstrapped OzoneManager {} RPC server at {}", omNodeId,
             om.getOmRpcServerAddr());

@@ -28,6 +28,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolPr
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.ErrorCode;
 
+/**
+ * This class is the server-side translator that forwards requests received on
+ * {@link OMInterServiceProtocolPB}
+ * to the OzoneManagerInterService server implementation.
+ */
 public class OMInterServiceProtocolServerSideImpl implements
     OMInterServiceProtocolPB {
 

@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -689,6 +690,21 @@ public final class OzoneManagerRatisServer {
           "whether it's leader. ", ioe);
     }
     return RaftServerStatus.NOT_LEADER;
+  }
+
+  @VisibleForTesting
+  public List<String> getCurrentPeersFromRaftConf() {
+    try {
+      Collection<RaftPeer> currentPeers =
+          server.getDivision(raftGroupId).getRaftConf().getCurrentPeers();
+      List<String> currentPeerList = new ArrayList<>();
+      currentPeers.forEach(e -> currentPeerList.add(e.getId().toString()));
+      return currentPeerList;
+    } catch (IOException e) {
+      // In this case we return not a leader.
+      LOG.error("Failed to get RaftServer information. ", e);
+    }
+    return null;
   }
 
   public int getServerPort() {
