@@ -107,7 +107,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.GrpcOzoneManagerServer;
 import org.apache.hadoop.ozone.om.GrpcOzoneManagerServer.GrpcOzoneManagerServerConfig;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;

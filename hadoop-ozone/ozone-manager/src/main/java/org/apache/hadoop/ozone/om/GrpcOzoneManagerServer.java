@@ -47,7 +47,7 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private OzoneManagerProtocolServerSideTranslatorPB omTranslator;
 
-  public OzoneManagerServiceGrpc(
+  OzoneManagerServiceGrpc(
       OzoneManagerProtocolServerSideTranslatorPB omTranslator) {
     this.omTranslator = omTranslator;
   }

@@ -67,7 +67,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty</artifactId>
-      <version>${grpc-compile.version}</version>
+      <version>${io.grpc.version}</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
