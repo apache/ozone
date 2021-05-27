@@ -413,7 +413,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
 
     containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration);
+        containerManager, replicationManager, configuration, scmContext);
     LOG.info(containerBalancer.toString());
 
     // Emit initial safe mode status, as now handlers are registered.
