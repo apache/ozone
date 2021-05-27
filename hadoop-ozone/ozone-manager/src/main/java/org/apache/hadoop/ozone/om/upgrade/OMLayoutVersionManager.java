@@ -88,7 +88,6 @@ public final class OMLayoutVersionManager
           NOT_SUPPORTED_OPERATION);
     }
     registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
-    registerOzoneManagerRequests(OM_REQUEST_CLASS_PACKAGE);
   }
 
   /**
