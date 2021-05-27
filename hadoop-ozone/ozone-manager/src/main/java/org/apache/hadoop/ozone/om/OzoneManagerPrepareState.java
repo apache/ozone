@@ -135,8 +135,6 @@ public final class OzoneManagerPrepareState {
    * currentIndex} is at least as large as {@code minIndex}. This is useful
    * if the current log index needs to be checked against a prepare index
    * saved to disk for validity.
-   *
-   * @return The current status of preparation after executing.
    */
   public synchronized void restorePrepareFromIndex(long restoredPrepareIndex,
       long currentIndex) throws IOException {
@@ -173,7 +171,6 @@ public final class OzoneManagerPrepareState {
    * {@link PrepareStatus#NOT_PREPARED} and any preparation steps will
    * be cancelled.
    *
-   * @return The status the OM is in after this method call.
    * @throws IOException If the marker file cannot be read, and it cannot be
    * deleted as part of moving to the
    * {@link PrepareStatus#NOT_PREPARED} state.
@@ -276,10 +273,6 @@ public final class OzoneManagerPrepareState {
       LOG.debug("Request to delete prepare marker file that does not exist: {}",
           markerFile.getAbsolutePath());
     }
-  }
-
-  public boolean prepareMarkerFileExists() {
-    return getPrepareMarkerFile().exists();
   }
 
   /**
