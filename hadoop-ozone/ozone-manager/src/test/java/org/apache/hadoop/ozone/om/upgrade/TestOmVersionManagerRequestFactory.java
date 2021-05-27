@@ -33,12 +33,15 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.reflections.Reflections;
 
 /**
  * Test OmVersionFactory.
  */
+@Ignore("Ignored since this is incompatible with HDDS-2939 work. Potentially " +
+    "revisit later.")
 public class TestOmVersionManagerRequestFactory {
 
   private static OMLayoutVersionManager omVersionManager;

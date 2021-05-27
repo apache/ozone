@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import java.io.IOException;
+
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
@@ -36,7 +38,7 @@ public class OMLayoutFeatureUtil {
    * "disallowed" by just adding the following annotation, thereby keeping the
    * method logic and upgrade logic separate.
    */
-  //@DisallowedUntilLayoutVersion(ERASURE_CODING)
+  @DisallowedUntilLayoutVersion(INITIAL_VERSION)
   public String ecMethod() {
     // Blah Blah EC Blah....
     return "ec";
@@ -54,11 +56,10 @@ public class OMLayoutFeatureUtil {
   // A method named 'getOmVersionManager' needed for the Aspect to get
   // instance of the layout version manager.
   public LayoutVersionManager getOmVersionManager() throws IOException {
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    Path tempDirWithPrefix = Files.createTempDirectory("TestAspect");
-    configuration.set("ozone.metadata.dirs",
-        tempDirWithPrefix.toAbsolutePath().toString());
-    return new OMLayoutVersionManager(0);
+    LayoutVersionManager mockLvm = mock(LayoutVersionManager.class);
+    when(mockLvm.isAllowed(anyString())).thenReturn(false).thenReturn(true);
+    when(mockLvm.getFeature(anyString())).thenReturn(INITIAL_VERSION);
+    return mockLvm;
   }
 
 }

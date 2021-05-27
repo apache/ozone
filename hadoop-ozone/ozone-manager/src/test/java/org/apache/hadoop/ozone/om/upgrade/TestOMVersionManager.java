@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -101,6 +103,9 @@ public class TestOMVersionManager {
     verify(omMock, times(UpgradeActionType.values().length)).getVersion();
   }
 
+  @Ignore("Since there is no longer a need to enforce the getRequestType " +
+      "method in OM request classes, disabling the " +
+      "test. Potentially revisit later.")
   @Test
   public void testAllOMRequestClassesHaveRequestType()
       throws InvocationTargetException, IllegalAccessException {
@@ -130,6 +135,26 @@ public class TestOMVersionManager {
             nsmEx.getMessage());
       }
     }
+  }
+
+  @Test
+  /*
+   * The OMLayoutFeatureAspect relies on the fact that the OM client
+   * request handler class has a preExecute method with first argument as
+   * 'OzoneManager'. If that is not true, please fix
+   * OMLayoutFeatureAspect#beforeRequestApplyTxn.
+   */
+  public void testOmClientRequestPreExecuteIsCompatibleWithAspect() {
+    Method[] methods = OMClientRequest.class.getMethods();
+
+    Optional<Method> preExecuteMethod = Arrays.stream(methods)
+            .filter(m -> m.getName().equals("preExecute"))
+            .findFirst();
+
+    assertTrue(preExecuteMethod.isPresent());
+    assertTrue(preExecuteMethod.get().getParameterCount() >= 1);
+    assertEquals(OzoneManager.class,
+        preExecuteMethod.get().getParameterTypes()[0]);
   }
 
   @Test

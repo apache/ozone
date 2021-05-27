@@ -45,6 +45,7 @@ import org.mockito.Mockito;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -63,6 +64,8 @@ public class TestOzoneManagerStateMachine {
     OzoneManagerRatisServer ozoneManagerRatisServer =
         Mockito.mock(OzoneManagerRatisServer.class);
     OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+    // Allow testing of prepare pre-append gate.
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
