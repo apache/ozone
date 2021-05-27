@@ -18,16 +18,20 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
-import static org.junit.Assert.assertEquals;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.junit.Assert;
+import org.apache.hadoop.test.LambdaTestUtils;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -54,18 +58,42 @@ public class TestOMLayoutFeatureAspect {
    * should fail, and the second one should pass.
    * @throws Exception
    */
-  @Ignore
   @Test
-  public void testCheckLayoutFeature() throws Exception {
+  public void testDisallowedUntilLayoutVersion() throws Throwable {
     OMLayoutFeatureUtil testObj = new OMLayoutFeatureUtil();
-    try {
-      String s = testObj.ecMethod();
-      Assert.fail();
-    } catch (Exception ex) {
-      OMException omEx = (OMException) ex;
-      assertEquals(NOT_SUPPORTED_OPERATION, omEx.getResult());
-    }
-    String s = testObj.basicMethod();
-    assertEquals("basic", s);
+    OMLayoutFeatureAspect aspect = new OMLayoutFeatureAspect();
+
+    JoinPoint joinPoint = mock(JoinPoint.class);
+    when(joinPoint.getTarget()).thenReturn(testObj);
+
+    MethodSignature methodSignature = mock(MethodSignature.class);
+    when(methodSignature.getMethod())
+        .thenReturn(OMLayoutFeatureUtil.class.getMethod("ecMethod"));
+    when(joinPoint.getSignature()).thenReturn(methodSignature);
+
+    LambdaTestUtils.intercept(OMException.class,
+        "cannot be invoked before finalization",
+        () -> aspect.checkLayoutFeature(joinPoint));
+  }
+
+  @Test
+  public void testPreExecuteLayoutCheck() throws Exception {
+
+    OzoneManager om = mock(OzoneManager.class);
+    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
+    when(lvm.isAllowed(anyString())).thenReturn(false);
+    when(lvm.getFeature(anyString())).thenReturn(INITIAL_VERSION);
+    when(om.getVersionManager()).thenReturn(lvm);
+
+    MockOmRequest mockOmRequest = new MockOmRequest();
+    OMLayoutFeatureAspect aspect = new OMLayoutFeatureAspect();
+
+    JoinPoint joinPoint = mock(JoinPoint.class);
+    when(joinPoint.getArgs()).thenReturn(new Object[]{om});
+    when(joinPoint.getTarget()).thenReturn(mockOmRequest);
+
+    LambdaTestUtils.intercept(OMException.class,
+        "cannot be invoked before finalization",
+        () -> aspect.beforeRequestApplyTxn(joinPoint));
   }
 }

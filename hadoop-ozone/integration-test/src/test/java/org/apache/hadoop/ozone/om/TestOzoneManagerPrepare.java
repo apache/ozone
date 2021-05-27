@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -74,28 +75,24 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   /**
-   * Calls prepare on all OMs when they have no transaction information.
-   * Checks that they are brought into prepare mode successfully.
-   */
-  @Test
-  public void testPrepareWithoutTransactions() throws Exception {
-    setup();
-    long prepareIndex = submitPrepareRequest();
-    assertClusterPrepared(prepareIndex);
-    assertRatisLogsCleared();
-  }
-
-  /**
    * Writes data to the cluster via the leader OM, and then prepares it.
    * Checks that every OM is prepared successfully.
    */
   @Test
   public void testPrepareWithTransactions() throws Exception {
     setup();
+
+    long prepareIndex = submitPrepareRequest();
+    assertClusterPrepared(prepareIndex);
+    assertRatisLogsCleared();
+
+    submitCancelPrepareRequest();
+    assertClusterNotPrepared();
+
     String volumeName = VOLUME + UUID.randomUUID().toString();
     Set<String> writtenKeys = writeKeysAndWaitForLogs(volumeName, 50,
         cluster.getOzoneManagersList());
-    long prepareIndex = submitPrepareRequest();
+    prepareIndex = submitPrepareRequest();
 
     // Make sure all OMs are prepared and all OMs still have their data.
     assertClusterPrepared(prepareIndex);
@@ -171,6 +168,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
+  @Ignore("Flaky test tracked in HDDS-5109")
   @Test
   public void testPrepareWithRestart() throws Exception {
     setup();
@@ -188,6 +186,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertClusterPrepared(prepareIndex);
   }
 
+  @Ignore("Saving on CI time since this is a pessimistic test. We should not " +
+      "be able to do anything with 2 OMs down.")
   @Test
   public void testPrepareFailsWhenTwoOmsAreDown() throws Exception {
 
