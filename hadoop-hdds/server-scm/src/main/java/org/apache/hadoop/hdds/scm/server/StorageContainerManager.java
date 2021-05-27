@@ -989,6 +989,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
+
+      // Initialize security if security is enabled later.
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)
+          && scmStorageConfig.getScmCertSerialId() == null) {
+        HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
+            getScmAddress(haDetails, conf), true);
+        scmStorageConfig.forceInitialize();
+        LOG.info("SCM unsecure cluster is converted to secure cluster. " +
+                "Persisted SCM Certificate SerialID {}",
+            scmStorageConfig.getScmCertSerialId());
+      }
+
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
@@ -998,6 +1010,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmStorageConfig.forceInitialize();
         LOG.debug("Enabled SCM HA");
       }
+
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
               + ";cid={}; layoutVersion={}; HAEnabled={}",
           scmStorageConfig.getStorageDir(), clusterId,
