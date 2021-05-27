@@ -814,10 +814,11 @@ public class TestKeyManagerImpl {
   }
 
   @Test
-  public void testFullLocationVersion() throws IOException {
+  public void testLatestLocationVersion() throws IOException {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
+        .setLatestLocationVersion(true)
         .build();
 
     // lookup for a non-existent key
@@ -862,51 +863,51 @@ public class TestKeyManagerImpl {
     keySession = keyManager.createFile(keyArgs, true, true);
     keyManager.commitKey(keyArgs, keySession.getId());
 
-    // Test lookupKey (fullLocationVersion == false)
+    // Test lookupKey (latestLocationVersion == true)
     key = keyManager.lookupKey(keyArgs, null);
     Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
 
-    // Test ListStatus (fullLocationVersion == false)
+    // Test ListStatus (latestLocationVersion == true)
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(keyArgs, false, "", 1);
     Assert.assertEquals(fileStatuses.size(), 1);
     Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
         .getKeyLocationVersions().size(), 1);
 
-    // Test GetFileStatus (fullLocationVersion == false)
+    // Test GetFileStatus (latestLocationVersion == true)
     OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
     Assert.assertEquals(ozoneFileStatus.getKeyInfo()
         .getKeyLocationVersions().size(), 1);
 
-    // Test LookupFile (fullLocationVersion == false)
+    // Test LookupFile (latestLocationVersion == true)
     key = keyManager.lookupFile(keyArgs, null);
     Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
 
     keyArgs = createBuilder()
         .setKeyName(keyName)
-        .setFullLocationVersion(true)
+        .setLatestLocationVersion(false)
         .build();
 
-    // Test lookupKey (fullLocationVersion == true)
+    // Test lookupKey (latestLocationVersion == false)
     key = keyManager.lookupKey(keyArgs, null);
     Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
 
-    // Test ListStatus (fullLocationVersion == true)
+    // Test ListStatus (latestLocationVersion == false)
     fileStatuses = keyManager.listStatus(keyArgs, false, "", 100);
     Assert.assertEquals(fileStatuses.size(), 1);
     Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
         .getKeyLocationVersions().size(), 2);
 
-    // Test GetFileStatus (fullLocationVersion == true)
+    // Test GetFileStatus (latestLocationVersion == false)
     ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
     Assert.assertEquals(ozoneFileStatus.getKeyInfo()
         .getKeyLocationVersions().size(), 2);
 
-    // Test LookupFile (fullLocationVersion == true)
+    // Test LookupFile (latestLocationVersion == false)
     key = keyManager.lookupFile(keyArgs, null);
     Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
 
-    // Test ListKeys (fullLocationVersion is always false for ListKeys)
+    // Test ListKeys (latestLocationVersion is always true for ListKeys)
     List<OmKeyInfo> keyInfos = keyManager.listKeys(keyArgs.getVolumeName(),
         keyArgs.getBucketName(), "", keyArgs.getKeyName(), 100);
     Assert.assertEquals(keyInfos.size(), 1);

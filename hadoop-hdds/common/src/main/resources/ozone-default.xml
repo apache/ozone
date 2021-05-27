@@ -2857,8 +2857,8 @@
   <property>
     <name>ozone.client.key.full.location.version</name>
     <tag>OZONE, CLIENT</tag>
-    <value>false</value>
-    <description>Ozone client get full location version.
+    <value>true</value>
+    <description>Ozone client get the latest location version.
     </description>
   </property>
 </configuration>
