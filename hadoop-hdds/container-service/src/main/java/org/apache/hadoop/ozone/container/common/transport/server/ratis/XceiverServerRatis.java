@@ -916,6 +916,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void sendPipelineReport() {
     if (context !=  null) {
+      // TODO: Send IncrementalPipelineReport instead of full PipelineReport
       context.addIncrementalReport(
           context.getParent().getContainer().getPipelineReport());
       context.getParent().triggerHeartbeat();

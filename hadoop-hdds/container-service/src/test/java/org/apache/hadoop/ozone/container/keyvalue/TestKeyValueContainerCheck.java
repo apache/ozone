@@ -97,7 +97,7 @@ import static org.junit.Assert.assertFalse;
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     chunkManagerTestInfo.updateConfig(conf);
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null);
     chunkManager = chunkManagerTestInfo.createChunkManager(true, null);
   }
 

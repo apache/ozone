@@ -159,7 +159,7 @@ public class GeneratorDatanode extends BaseGenerator {
     datanodeId = HddsVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
 
-    volumeSet = new MutableVolumeSet(datanodeId, clusterId, config);
+    volumeSet = new MutableVolumeSet(datanodeId, clusterId, config, null);
 
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
 

@@ -179,28 +179,45 @@ public final class DatanodeTestUtils {
   }
 
   /**
-   * Simulate a bad volume by removing write permission.
+   * Simulate a bad rootDir by removing write permission.
    * @see {@link org.apache.hadoop.ozone.container.common.volume
    * .HddsVolume#check(Boolean)}
-   * @param vol
+   * @param rootDir
    */
-  public static void simulateBadVolume(HddsVolume vol) {
-    File rootDir = vol.getHddsRootDir();
+  public static void simulateBadRootDir(File rootDir) {
     if (rootDir.exists()) {
       rootDir.setWritable(false);
     }
   }
 
   /**
+   * Simulate a bad volume by removing write permission.
+   * @see {@link org.apache.hadoop.ozone.container.common.volume
+   * .HddsVolume#check(Boolean)}
+   * @param vol
+   */
+  public static void simulateBadVolume(HddsVolume vol) {
+    simulateBadRootDir(vol.getHddsRootDir());
+  }
+
+  /**
    * Restore a simulated bad volume to normal.
+   * @see {@link #simulateBadVolume(HddsVolume)}
+   * @param rootDir
+   */
+  public static void restoreBadRootDir(File rootDir) {
+    if (rootDir.exists()) {
+      rootDir.setWritable(true);
+    }
+  }
+
+  /**
+   * Restore a simulated bad rootDir to normal.
    * @see {@link #simulateBadVolume(HddsVolume)}
    * @param vol
    */
   public static void restoreBadVolume(HddsVolume vol) {
-    File rootDir = vol.getHddsRootDir();
-    if (rootDir.exists()) {
-      rootDir.setWritable(true);
-    }
+    restoreBadRootDir(vol.getHddsRootDir());
   }
 
   /**

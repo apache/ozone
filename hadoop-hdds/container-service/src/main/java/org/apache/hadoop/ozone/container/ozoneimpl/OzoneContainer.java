@@ -92,6 +92,7 @@ public class OzoneContainer {
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
+  private StateContext context;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -113,7 +114,9 @@ public class OzoneContainer {
       throws IOException {
     config = conf;
     this.datanodeDetails = datanodeDetails;
-    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf);
+    this.context = context;
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+        context);
     volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
     containerSet = new ContainerSet();
     metadataScanner = null;
