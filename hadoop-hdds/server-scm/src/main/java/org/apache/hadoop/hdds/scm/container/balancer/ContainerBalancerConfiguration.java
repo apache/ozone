@@ -23,12 +23,18 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class contains configuration values for the ContainerBalancer.
  */
 @ConfigGroup(prefix = "hdds.container.balancer.")
 public final class ContainerBalancerConfiguration {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
+
   @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
       "0.1", tags = {ConfigTag.BALANCER},
       description = "Threshold is a fraction in the range of 0 to 1. A " +
@@ -36,7 +42,7 @@ public final class ContainerBalancerConfiguration {
           "utilization of the datanode (used space to capacity ratio) differs" +
           " from the utilization of the cluster (used space to capacity ratio" +
           " of the entire cluster) no more than the threshold value.")
-  private double threshold = 0.1;
+  private String threshold = "0.1";
 
   @Config(key = "datanodes.balanced.max", type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.BALANCER}, description = "The " +
@@ -44,31 +50,38 @@ public final class ContainerBalancerConfiguration {
       "Balancer will not balance more number of datanodes than this limit.")
   private int maxDatanodesToBalance = 5;
 
-  @Config(key = "size.moved.max", type = ConfigType.LONG,
-      defaultValue = "10737418240L", tags = {ConfigTag.BALANCER},
-      description = "The maximum size of data in Bytes that will be moved " +
-          "by the Container Balancer.")
-  private long maxSizeToMove = 10737418240L;
+  @Config(key = "size.moved.max", type = ConfigType.SIZE,
+      defaultValue = "10GB", tags = {ConfigTag.BALANCER},
+      description = "The maximum size of data in bytes that will be moved " +
+          "by Container Balancer.")
+  private long maxSizeToMove = 10 * OzoneConsts.GB;
 
   /**
-   * Get the threshold value for Container Balancer.
+   * Gets the threshold value for Container Balancer.
+   *
    * @return a fraction in the range 0 to 1
    */
   public double getThreshold() {
-    return threshold;
+    return Double.parseDouble(threshold);
   }
 
   /**
-   * Set the threshold value for Container Balancer.
+   * Sets the threshold value for Container Balancer.
+   *
    * @param threshold a fraction in the range 0 to 1
    */
   public void setThreshold(double threshold) {
-    this.threshold = threshold;
+    if (threshold < 0 || threshold > 1) {
+      throw new IllegalArgumentException(
+          "Threshold must be a fraction in the range 0 to 1.");
+    }
+    this.threshold = String.valueOf(threshold);
   }
 
   /**
-   * Get the value of maximum number of datanodes that will be balanced by
+   * Gets the value of maximum number of datanodes that will be balanced by
    * Container Balancer.
+   *
    * @return maximum number of datanodes
    */
   public int getMaxDatanodesToBalance() {
@@ -76,8 +89,9 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Set the value of maximum number of datanodes that will be balanced by
+   * Sets the value of maximum number of datanodes that will be balanced by
    * Container Balancer.
+   *
    * @param maxDatanodesToBalance maximum number of datanodes
    */
   public void setMaxDatanodesToBalance(int maxDatanodesToBalance) {
@@ -85,18 +99,18 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Get the value of maximum number of bytes that will be moved by the
-   * Container Balancer.
-   * @return maximum number of bytes
+   * Gets the maximum size that will be moved by Container Balancer.
+   *
+   * @return maximum size in Bytes
    */
   public long getMaxSizeToMove() {
     return maxSizeToMove;
   }
 
   /**
-   * Set the value of maximum number of bytes that will be moved by
-   * Container Balancer.
-   * @param maxSizeToMove maximum number of bytes
+   * Sets the value of maximum size that will be moved by Container Balancer.
+   *
+   * @param maxSizeToMove maximum number of Bytes
    */
   public void setMaxSizeToMove(long maxSizeToMove) {
     this.maxSizeToMove = maxSizeToMove;
@@ -106,7 +120,7 @@ public final class ContainerBalancerConfiguration {
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
             "%-30s %s%n" +
-            "%-30s %f%n" +
+            "%-30s %s%n" +
             "%-30s %d%n" +
             "%-30s %dB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Balance", maxDatanodesToBalance,
