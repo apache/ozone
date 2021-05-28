@@ -135,7 +135,7 @@ public class ContainerOperationClient implements ScmClient {
               allocateContainer(replicationType, replicationFactor, owner);
 
       Pipeline pipeline = containerWithPipeline.getPipeline();
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = getXceiverClientManager().acquireClient(pipeline);
 
       Preconditions.checkState(
           pipeline.isOpen(),
@@ -147,7 +147,7 @@ public class ContainerOperationClient implements ScmClient {
       return containerWithPipeline;
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        getXceiverClientManager().releaseClient(client, false);
       }
     }
   }
@@ -242,13 +242,13 @@ public class ContainerOperationClient implements ScmClient {
               owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = getXceiverClientManager().acquireClient(pipeline);
       createContainer(client,
           containerWithPipeline.getContainerInfo().getContainerID());
       return containerWithPipeline;
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        getXceiverClientManager().releaseClient(client, false);
       }
     }
   }
@@ -337,7 +337,12 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public void close() {
     try {
-      xceiverClientManager.close();
+      if (xceiverClientManager != null) {
+        xceiverClientManager.close();
+      }
+      if (storageContainerLocationClient != null) {
+        storageContainerLocationClient.close();
+      }
     } catch (Exception ex) {
       LOG.error("Can't close " + this.getClass().getSimpleName(), ex);
     }
@@ -358,7 +363,7 @@ public class ContainerOperationClient implements ScmClient {
     try {
       String encodedToken = getEncodedContainerToken(containerId);
 
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = getXceiverClientManager().acquireClient(pipeline);
       ContainerProtocolCalls
           .deleteContainer(client, containerId, force, encodedToken);
       storageContainerLocationClient
@@ -369,7 +374,7 @@ public class ContainerOperationClient implements ScmClient {
       }
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        getXceiverClientManager().releaseClient(client, false);
       }
     }
   }
@@ -417,7 +422,7 @@ public class ContainerOperationClient implements ScmClient {
 
     XceiverClientSpi client = null;
     try {
-      client = xceiverClientManager.acquireClientForReadData(pipeline);
+      client = getXceiverClientManager().acquireClientForReadData(pipeline);
       ReadContainerResponseProto response = ContainerProtocolCalls
           .readContainer(client, containerID, encodedToken);
       if (LOG.isDebugEnabled()) {
@@ -427,7 +432,7 @@ public class ContainerOperationClient implements ScmClient {
       return response.getContainerData();
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        getXceiverClientManager().releaseClient(client, false);
       }
     }
   }
