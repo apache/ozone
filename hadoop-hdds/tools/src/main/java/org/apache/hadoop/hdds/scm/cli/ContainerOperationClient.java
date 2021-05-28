@@ -69,16 +69,20 @@ public class ContainerOperationClient implements ScmClient {
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
   private final boolean containerTokenEnabled;
+  private final OzoneConfiguration configuration;
+  private XceiverClientManager xceiverClientManager;
 
-  public XceiverClientManager getXceiverClientManager() {
+  public synchronized XceiverClientManager getXceiverClientManager()
+      throws IOException {
+    if (this.xceiverClientManager == null) {
+      this.xceiverClientManager = newXCeiverClientManager(configuration);
+    }
     return xceiverClientManager;
   }
 
-  private final XceiverClientManager xceiverClientManager;
-
   public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
+    this.configuration = conf;
     storageContainerLocationClient = newContainerRpcClient(conf);
-    this.xceiverClientManager = newXCeiverClientManager(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
