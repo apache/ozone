@@ -152,6 +152,16 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   /**
+   * Returns the a certain node stats.
+   * @param datanodeDetails DatanodeDetails.
+   * @return the a certain node stats.
+   */
+  @Override
+  public SCMNodeStat getNodeStatInternal(DatanodeDetails datanodeDetails){
+    return  null;
+  }
+
+  /**
    * Return a map of node stats.
    *
    * @return a map of individual node stats (live/stale but not dead).

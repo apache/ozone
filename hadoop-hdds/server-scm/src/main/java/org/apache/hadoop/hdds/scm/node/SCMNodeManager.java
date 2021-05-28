@@ -607,7 +607,13 @@ public class SCMNodeManager implements NodeManager {
     return nodeStat != null ? new SCMNodeMetric(nodeStat) : null;
   }
 
-  private SCMNodeStat getNodeStatInternal(DatanodeDetails datanodeDetails) {
+  /**
+   * Returns the a certain node stats.
+   * @param datanodeDetails DatanodeDetails.
+   * @return the a certain node stats.
+   */
+  @Override
+  public SCMNodeStat getNodeStatInternal(DatanodeDetails datanodeDetails) {
     try {
       long capacity = 0L;
       long used = 0L;

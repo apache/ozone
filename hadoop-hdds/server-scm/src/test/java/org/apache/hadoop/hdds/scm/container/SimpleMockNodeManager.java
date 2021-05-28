@@ -208,6 +208,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public SCMNodeStat getNodeStatInternal(DatanodeDetails datanodeDetails){
+    return null;
+  }
+
+  @Override
   public Map<DatanodeDetails, SCMNodeStat> getNodeStats() {
     return null;
   }

@@ -97,6 +97,7 @@ public class MockNodeManager implements NodeManager {
   private final List<DatanodeDetails> deadNodes;
   private final Map<DatanodeDetails, SCMNodeStat> nodeMetricMap;
   private final SCMNodeStat aggregateStat;
+  private SCMNodeStat newStat;
   private boolean safemode;
   private final Map<UUID, List<SCMCommand>> commandMap;
   private Node2PipelineMap node2PipelineMap;
@@ -178,7 +179,7 @@ public class MockNodeManager implements NodeManager {
    * @param datanodeDetails - Datanode details
    */
   private void populateNodeMetric(DatanodeDetails datanodeDetails, int x) {
-    SCMNodeStat newStat = new SCMNodeStat();
+    newStat = new SCMNodeStat();
     long remaining =
         NODES[x % NODES.length].capacity - NODES[x % NODES.length].used;
     newStat.set(
@@ -305,6 +306,16 @@ public class MockNodeManager implements NodeManager {
   @Override
   public SCMNodeStat getStats() {
     return aggregateStat;
+  }
+
+  /**
+   * Returns the a certain node stats.
+   * @param datanodeDetails DatanodeDetails.
+   * @return the a certain node stats.
+   */
+  @Override
+  public SCMNodeStat getNodeStatInternal(DatanodeDetails datanodeDetails){
+    return newStat;
   }
 
   /**

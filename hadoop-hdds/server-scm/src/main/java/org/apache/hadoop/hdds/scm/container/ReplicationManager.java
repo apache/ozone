@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -827,12 +826,6 @@ public class ReplicationManager implements MetricsSource, SCMService {
 
       final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
 
-      // Iterate replicas in deterministic order to avoid potential data loss.
-      // See https://issues.apache.org/jira/browse/HDDS-4589.
-      // N.B., sort replicas by (containerID, datanodeDetails).
-      eligibleReplicas.sort(
-          Comparator.comparingLong(ContainerReplica::hashCode));
-
       final Map<UUID, ContainerReplica> uniqueReplicas =
           new LinkedHashMap<>();
 
@@ -878,6 +871,24 @@ public class ReplicationManager implements MetricsSource, SCMService {
         Set<ContainerReplica> eligibleSet = new HashSet<>(eligibleReplicas);
         ContainerPlacementStatus ps =
             getPlacementStatus(eligibleSet, replicationFactor);
+
+        // Iterate replicas in deterministic order to avoid potential data loss.
+        // See https://issues.apache.org/jira/browse/HDDS-4589.
+        // N.B., sort replicas by (containerID, datanodeDetails).
+        // what is more , for all the deletion candidate replicas,
+        // we always delete the one with highest storage.
+        // See https://issues.apache.org/jira/browse/HDDS-5278
+        eligibleReplicas.sort((r1, r2) -> {
+          int result = nodeManager.getNodeStatInternal(r1.getDatanodeDetails())
+              .compareByRemainingRatio(nodeManager.
+              getNodeStatInternal(r2.getDatanodeDetails()));
+          if (0 == result) {
+            return r1.hashCode() - r2.hashCode();
+          }
+          // we want is sorted by descending order
+          return -result;
+        });
+
         for (ContainerReplica r : eligibleReplicas) {
           if (excess <= 0) {
             break;
