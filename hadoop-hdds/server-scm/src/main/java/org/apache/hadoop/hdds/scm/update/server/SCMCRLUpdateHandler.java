@@ -87,7 +87,7 @@ public class SCMCRLUpdateHandler implements SCMUpdateHandler {
 
   @Override
   public void onUpdate() {
-    LOG.debug("Update due to certificate revoke");
+    LOG.debug("Update due to certificate revocation");
     // server crl id is usually > client crl id when this is invoked.
     clients.values().forEach(client -> {
       sendCrlUpdateToClient(client);
@@ -123,9 +123,9 @@ public class SCMCRLUpdateHandler implements SCMUpdateHandler {
       }
       sendCrlToClient(crlInfo, client.getUpdateClientInfo());
     } catch (Exception e) {
-      LOG.error("Fail handling client update.", e);
+      LOG.error("Failed to handle client update.", e);
       client.getUpdateClientInfo().getResponseObserver().onError(Status.INTERNAL
-          .withDescription("Fail to send crl" + nextCrlId +
+          .withDescription("Failed to send crl" + nextCrlId +
               " to client " + client.getUpdateClientInfo().getClientId())
           .asException());
     }

@@ -80,10 +80,10 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
 
   @Override
   public void handleServerUpdate(UpdateResponse updateResponse) {
-    SCMUpdateServiceProtos.CRLInfoProto crlIfo =
+    SCMUpdateServiceProtos.CRLInfoProto crlInfo =
         updateResponse.getCrlUpdateResponse().getCrlInfo();
 
-    long receivedCrlId = crlIfo.getCrlSequenceID();
+    long receivedCrlId = crlInfo.getCrlSequenceID();
     long localCrlId = clientStore.getLatestCrlId();
 
     LOG.debug("## Client: clientId {} clientCrlId {} receivedCrlId {}",
@@ -93,7 +93,7 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
     }
     // send a client update to refresh stale server
     if (localCrlId > receivedCrlId) {
-      LOG.warn("Receive stale crlId {} lower than client crlId {}",
+      LOG.warn("Received stale crlId {} lower than client crlId {}",
           receivedCrlId, localCrlId);
       sendClientUpdate();
       return;
@@ -101,7 +101,7 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
 
     CRLInfo crl;
     try {
-      crl = CRLInfo.fromCRLProto3(crlIfo);
+      crl = CRLInfo.fromCRLProto3(crlInfo);
     } catch (Exception e) {
       LOG.error("Can't parse server CRL update, skip...", e);
       return;
@@ -136,7 +136,7 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
 
           @Override
           public void onCompleted() {
-            LOG.debug("Receive server complete");
+            LOG.debug("Receive server completed");
           }
         });
     requestObserver.onNext(updateReq);
@@ -152,8 +152,8 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
     try {
       executorService.awaitTermination(10, TimeUnit.SECONDS);
     } catch (Exception e) {
-      LOG.error("Unexpected exception while waiting executor service" +
-          " shutdown", e);
+      LOG.error("Unexpected exception while waiting for executor service" +
+          " to shutdown", e);
     }
   }
 

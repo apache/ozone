@@ -56,7 +56,7 @@ public class SCMUpdateClientManager {
     return clientId;
   }
 
-  // this does not necessary produce a server response via responseObserver.
+  // this does not necessarily produce a server response via responseObserver.
   public void handleClientUpdate(UpdateRequest request,
       StreamObserver<UpdateResponse> responseObserver) {
     UUID clientId = SCMUpdateClientInfo.fromClientIdProto(
@@ -65,11 +65,12 @@ public class SCMUpdateClientManager {
     // Unknown client update
     if (!clients.containsKey(clientId)) {
       responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription("Client must subscribe before send/receive update")
+          .withDescription("Client must subscribe before it can " +
+              "send/receive updates")
           .asException());
     }
 
-    // record the the server to client chanel
+    // record the server to client channel
     SCMUpdateClientInfo clientInfo = clients.get(clientId);
     if (clientInfo.getResponseObserver() == null) {
       clientInfo.setResponseObserver(responseObserver);

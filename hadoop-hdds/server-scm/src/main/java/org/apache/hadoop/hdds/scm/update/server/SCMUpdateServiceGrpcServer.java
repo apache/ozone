@@ -62,7 +62,7 @@ public class SCMUpdateServiceGrpcServer {
         .build();
 
     if (!isStarted.compareAndSet(false, true)) {
-      LOG.info("Ignore. already started.");
+      LOG.info("Ignoring start() since {} has already started.", SERVICE_NAME);
       return;
     } else {
       server.start();
@@ -81,7 +81,7 @@ public class SCMUpdateServiceGrpcServer {
       } finally {
         server.shutdownNow();
       }
-      LOG.info("{}} stopped!", SERVICE_NAME);
+      LOG.info("{} stopped!", SERVICE_NAME);
       isStarted.set(false);
     }
   }

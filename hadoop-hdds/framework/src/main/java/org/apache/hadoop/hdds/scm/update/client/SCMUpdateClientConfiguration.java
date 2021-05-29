@@ -38,7 +38,7 @@ public class SCMUpdateClientConfiguration {
       defaultValue = "600s",
       tags = {SCM, OZONE, SECURITY},
       description = "The interval that the scm update service client use to" +
-          "check its pending revoked crl."
+          "check its pending CRLs."
   )
   private long clientCrlCheckIntervalInMs =
       Duration.ofMinutes(10).toMillis();
