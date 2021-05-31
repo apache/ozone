@@ -464,8 +464,9 @@ public class TestPipelineManagerImpl {
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(), null,
-            pipelineManager, new EventQueue(), serviceManager, scmContext);
+        new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
+            null, pipelineManager, new EventQueue(),
+            serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);

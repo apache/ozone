@@ -135,7 +135,8 @@ public class TestSCMSafeModeManager {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
     }
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, null,null, queue, serviceManager, scmContext);
+        config, containers, null, null, queue,
+        serviceManager, scmContext);
 
     assertTrue(scmSafeModeManager.getInSafeMode());
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
@@ -168,7 +169,8 @@ public class TestSCMSafeModeManager {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
     }
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, null,null, queue, serviceManager, scmContext);
+        config, containers, null, null, queue,
+        serviceManager, scmContext);
 
     long cutOff = (long) Math.ceil(numContainers * config.getDouble(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,

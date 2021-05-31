@@ -44,7 +44,7 @@ public class DataNodeSafeModeRule extends
   public DataNodeSafeModeRule(String ruleName, EventQueue eventQueue,
       ConfigurationSource conf,
       SCMSafeModeManager manager) {
-    super(manager, ruleName, eventQueue, conf);
+    super(manager, ruleName, eventQueue);
     requiredDns = conf.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);

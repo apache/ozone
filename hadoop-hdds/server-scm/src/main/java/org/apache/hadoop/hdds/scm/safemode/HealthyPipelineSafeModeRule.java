@@ -52,11 +52,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final double healthyPipelinesPercent;
   private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
   private final PipelineManager pipelineManager;
+  private final int minHealthyPipelines;
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
       SCMSafeModeManager manager, ConfigurationSource configuration) {
-    super(manager, ruleName, eventQueue, configuration);
+    super(manager, ruleName, eventQueue);
     this.pipelineManager = pipelineManager;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
@@ -65,7 +66,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT);
 
     // We only care about THREE replica pipeline
-    int minHealthyPipelines = getMinHealthyPipelines(configuration);
+    minHealthyPipelines = getMinHealthyPipelines(configuration);
 
     Preconditions.checkArgument(
         (healthyPipelinesPercent >= 0.0 && healthyPipelinesPercent <= 1.0),
@@ -132,7 +133,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   private synchronized void initializeRule() {
-    int minHealthyPipelines = getMinHealthyPipelines(conf);
     int pipelineCount = pipelineManager.getPipelines(
         new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
         Pipeline.PipelineState.OPEN).size();

@@ -62,7 +62,7 @@ public class OneReplicaPipelineSafeModeRule extends
   public OneReplicaPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
-    super(safeModeManager, ruleName, eventQueue, configuration);
+    super(safeModeManager, ruleName, eventQueue);
 
     pipelinePercent =
         configuration.getDouble(

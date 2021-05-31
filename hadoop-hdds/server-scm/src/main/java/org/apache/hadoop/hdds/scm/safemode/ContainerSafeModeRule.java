@@ -55,7 +55,7 @@ public class ContainerSafeModeRule extends
       ConfigurationSource conf,
       List<ContainerInfo> containers,
       ContainerManagerV2 containerManager, SCMSafeModeManager manager) {
-    super(manager, ruleName, eventQueue, conf);
+    super(manager, ruleName, eventQueue);
     this.containerManager = containerManager;
     safeModeCutoff = conf.getDouble(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,

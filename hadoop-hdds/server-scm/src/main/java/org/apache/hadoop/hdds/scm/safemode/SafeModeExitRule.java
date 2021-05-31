@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -39,14 +38,12 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
 
   private final SCMSafeModeManager safeModeManager;
   private final String ruleName;
-  protected final ConfigurationSource conf;
 
   public SafeModeExitRule(SCMSafeModeManager safeModeManager,
-      String ruleName, EventQueue eventQueue, ConfigurationSource config) {
+      String ruleName, EventQueue eventQueue) {
     this.safeModeManager = safeModeManager;
     this.ruleName = ruleName;
     eventQueue.addHandler(getEventType(), this);
-    this.conf = config;
   }
 
   /**
