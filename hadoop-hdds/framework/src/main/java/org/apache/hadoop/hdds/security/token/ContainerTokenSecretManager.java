@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,14 @@ public class ContainerTokenSecretManager
   }
 
   @Override
-  public String generateEncodedToken(String user, ContainerID containerID) {
+  public String generateEncodedToken(ContainerID containerID) {
+    String user;
+    try {
+      user = UserGroupInformation.getCurrentUser().getUserName();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to get current user", e);
+    }
+
     try {
       return generateToken(user, containerID).encodeToUrlString();
     } catch (IOException e) {

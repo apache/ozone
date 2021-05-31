@@ -104,8 +104,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
   private String getContainerToken(ContainerID containerID) {
     StorageContainerManager scm = scmContext.getScm();
     return scm != null
-        ? scm.getContainerTokenGenerator()
-            .generateEncodedToken(getClass().getSimpleName(), containerID)
+        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
         : ""; // unit test
   }
 

@@ -1019,9 +1019,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
   private String getContainerToken(ContainerID containerID) {
     StorageContainerManager scm = scmContext.getScm();
     return scm != null
-        ? scm.getContainerTokenGenerator()
-            .generateEncodedToken(getClass().getSimpleName(), containerID)
-        : "";
+        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
+        : ""; // unit test
   }
 
   /**

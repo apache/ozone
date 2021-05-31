@@ -28,10 +28,10 @@ import java.io.UncheckedIOException;
 public interface ContainerTokenGenerator {
 
   /**
-   * Shortcut for generating encoded token.
-   * @throws UncheckedIOException if URL-encoding fails
+   * Shortcut for generating encoded token for current user.
+   * @throws UncheckedIOException if user lookup or URL-encoding fails
    */
-  String generateEncodedToken(String user, ContainerID containerID);
+  String generateEncodedToken(ContainerID containerID);
 
   /**
    * Generate token for the container.
@@ -44,7 +44,7 @@ public interface ContainerTokenGenerator {
    */
   ContainerTokenGenerator DISABLED = new ContainerTokenGenerator() {
     @Override
-    public String generateEncodedToken(String user, ContainerID containerID) {
+    public String generateEncodedToken(ContainerID containerID) {
       return "";
     }
 
