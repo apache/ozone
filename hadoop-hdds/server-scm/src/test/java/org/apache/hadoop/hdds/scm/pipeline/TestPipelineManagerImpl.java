@@ -348,7 +348,7 @@ public class TestPipelineManagerImpl {
   public void testPipelineReport() throws Exception {
     PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
+        new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
             new EventQueue(), serviceManager, scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(new RatisReplicationConfig(ReplicationFactor.THREE));
@@ -464,7 +464,7 @@ public class TestPipelineManagerImpl {
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
+        new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(), null,
             pipelineManager, new EventQueue(), serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,

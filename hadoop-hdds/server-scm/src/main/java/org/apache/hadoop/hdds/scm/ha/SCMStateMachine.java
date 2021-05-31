@@ -132,6 +132,17 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
       applyTransactionFuture.complete(process(request));
+      // After restart ratis replay logs from last snapshot index.
+      // So if some transactions which need to be updated to DB will not be
+      // applied to DB. After a restart of SCM container/pipeline managers
+      // have setup the safemode rules with not to update DB. Due to this
+      // some time safemode rules are not validated and SCM does not exit
+      // safe mode. So, once after restart as transactions are applied, we
+      // check whether safe mode rules are validated to solve the issue of
+      // SCM not coming out of safemode.
+      if (scm.isInSafeMode()) {
+        scm.getScmSafeModeManager().refreshAndValidate();
+      }
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.builder()
           .setCurrentTerm(trx.getLogEntry().getTerm())
           .setTransactionIndex(trx.getLogEntry().getIndex())

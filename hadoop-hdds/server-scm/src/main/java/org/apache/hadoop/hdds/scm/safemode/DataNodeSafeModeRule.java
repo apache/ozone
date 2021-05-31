@@ -44,7 +44,7 @@ public class DataNodeSafeModeRule extends
   public DataNodeSafeModeRule(String ruleName, EventQueue eventQueue,
       ConfigurationSource conf,
       SCMSafeModeManager manager) {
-    super(manager, ruleName, eventQueue);
+    super(manager, ruleName, eventQueue, conf);
     requiredDns = conf.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
@@ -85,5 +85,13 @@ public class DataNodeSafeModeRule extends
     return String
         .format("registered datanodes (=%d) >= required datanodes (=%d)",
             this.registeredDns, this.requiredDns);
+  }
+
+
+  @Override
+  public void refresh() {
+    // Do nothing.
+    // As for this rule, there is nothing we read from SCM DB state and
+    // validate it.
   }
 }

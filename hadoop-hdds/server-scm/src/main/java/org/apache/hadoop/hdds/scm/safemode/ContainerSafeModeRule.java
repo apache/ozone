@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -48,11 +49,14 @@ public class ContainerSafeModeRule extends
   private double maxContainer;
 
   private AtomicLong containerWithMinReplicas = new AtomicLong(0);
+  private final ContainerManagerV2 containerManager;
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
       ConfigurationSource conf,
-      List<ContainerInfo> containers, SCMSafeModeManager manager) {
-    super(manager, ruleName, eventQueue);
+      List<ContainerInfo> containers,
+      ContainerManagerV2 containerManager, SCMSafeModeManager manager) {
+    super(manager, ruleName, eventQueue, conf);
+    this.containerManager = containerManager;
     safeModeCutoff = conf.getDouble(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT);
@@ -87,12 +91,12 @@ public class ContainerSafeModeRule extends
 
 
   @Override
-  protected boolean validate() {
+  protected synchronized boolean validate() {
     return getCurrentContainerThreshold() >= safeModeCutoff;
   }
 
   @VisibleForTesting
-  public double getCurrentContainerThreshold() {
+  public synchronized double getCurrentContainerThreshold() {
     if (maxContainer == 0) {
       return 1;
     }
@@ -100,7 +104,8 @@ public class ContainerSafeModeRule extends
   }
 
   @Override
-  protected void process(NodeRegistrationContainerReport reportsProto) {
+  protected synchronized void process(
+      NodeRegistrationContainerReport reportsProto) {
 
     reportsProto.getReport().getReportsList().forEach(c -> {
       if (containerMap.containsKey(c.getContainerID())) {
@@ -121,7 +126,7 @@ public class ContainerSafeModeRule extends
   }
 
   @Override
-  protected void cleanup() {
+  protected synchronized void cleanup() {
     containerMap.clear();
   }
 
@@ -132,6 +137,27 @@ public class ContainerSafeModeRule extends
             "%% of containers with at least one reported replica (=%1.2f) >= "
                 + "safeModeCutoff (=%1.2f)",
             getCurrentContainerThreshold(), this.safeModeCutoff);
+  }
+
+
+  @Override
+  public synchronized void refresh() {
+    containerMap.clear();
+    containerManager.getContainers().forEach(container -> {
+      // There can be containers in OPEN/CLOSING state which were never
+      // created by the client. We are not considering these containers for
+      // now. These containers can be handled by tracking pipelines.
+
+      Optional.ofNullable(container.getState())
+          .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
+              state == HddsProtos.LifeCycleState.CLOSED))
+          .ifPresent(s -> containerMap.put(container.getContainerID(),
+              container));
+    });
+
+    maxContainer = containerMap.size();
+    long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
+    getSafeModeMetrics().setNumContainerWithOneReplicaReportedThreshold(cutOff);
   }
 
 }
