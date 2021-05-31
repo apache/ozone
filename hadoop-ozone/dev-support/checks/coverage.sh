@@ -42,8 +42,7 @@ rm -rf target/coverage-classes || true
 mkdir -p target/coverage-classes
 
 #Unzip all the classes from the last build
-find hadoop-ozone/dist/target/*/share/ozone/lib -name "hadoop-*.jar" | \
-    grep -E 'hadoop-ozone-|hadoop-hdds-' | \
+find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'ozone-*.jar' | \
     grep -v -E 'shaded|hadoop2|hadoop3|tests' | \
     xargs -n1 unzip -o -q -d target/coverage-classes
 

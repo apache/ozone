@@ -64,10 +64,10 @@ ozone sh bucket create /volume/bucket
 你还需要将 ozone-filesystem.jar 文件加入 classpath：
 
 {{< highlight bash >}}
-export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
+export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
 {{< /highlight >}}
 
-(注意：当使用Hadoop 2.x时，应该在classpath上添加hadoop-ozone-filesystem-hadoop2-*.jar)
+(注意：当使用Hadoop 2.x时，应该在classpath上添加ozone-filesystem-hadoop2-*.jar)
 
 当配置了默认的文件系统之后，用户可以运行 ls、put、mkdir 等命令，比如：
 
@@ -137,10 +137,10 @@ hdfs dfs -ls o3fs://bucket.volume.om-host.example.com:6789/key
 你还需要将 ozone-filesystem.jar 文件加入 classpath：
 
 {{< highlight bash >}}
-export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
+export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
 {{< /highlight >}}
 
-(注意：当使用Hadoop 2.x时，应该在classpath上添加hadoop-ozone-filesystem-hadoop2-*.jar)
+(注意：当使用Hadoop 2.x时，应该在classpath上添加ozone-filesystem-hadoop2-*.jar)
 
 当配置了默认的文件系统之后，用户可以运行 ls、put、mkdir 等命令，比如：
 
