@@ -136,7 +136,7 @@ public class OneReplicaPipelineSafeModeRule extends
   }
 
   @VisibleForTesting
-  public int getCurrentReportedPipelineCount() {
+  public synchronized int getCurrentReportedPipelineCount() {
     return currentReportedPipelineCount;
   }
 
@@ -146,8 +146,8 @@ public class OneReplicaPipelineSafeModeRule extends
         .format(
             "reported Ratis/THREE pipelines with at least one datanode (=%d) "
                 + ">= threshold (=%d)",
-            this.currentReportedPipelineCount,
-            this.thresholdCount);
+            getCurrentReportedPipelineCount(),
+            getThresholdCount());
   }
 
   @Override

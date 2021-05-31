@@ -88,7 +88,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   @VisibleForTesting
-  public void setHealthyPipelineThresholdCount(int actualPipelineCount) {
+  public synchronized void setHealthyPipelineThresholdCount(int actualPipelineCount) {
     healthyPipelineThresholdCount =
         (int) Math.ceil(healthyPipelinesPercent * actualPipelineCount);
   }
@@ -167,7 +167,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   public String getStatusText() {
     return String.format("healthy Ratis/THREE pipelines (=%d) >= "
             + "healthyPipelineThresholdCount (=%d)",
-        this.currentHealthyPipelineCount,
-        this.healthyPipelineThresholdCount);
+        getCurrentHealthyPipelineCount(),
+        getHealthyPipelineThresholdCount());
   }
 }
