@@ -88,7 +88,8 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   @VisibleForTesting
-  public synchronized void setHealthyPipelineThresholdCount(int actualPipelineCount) {
+  public synchronized void setHealthyPipelineThresholdCount(
+      int actualPipelineCount) {
     healthyPipelineThresholdCount =
         (int) Math.ceil(healthyPipelinesPercent * actualPipelineCount);
   }
@@ -123,7 +124,8 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
       SCMSafeModeManager.getLogger().info(
           "SCM in safe mode. Healthy pipelines reported count is {}, " +
               "required healthy pipeline reported count is {}",
-          currentHealthyPipelineCount, healthyPipelineThresholdCount);
+          currentHealthyPipelineCount, getHealthyPipelineThresholdCount());
+
     }
   }
 
