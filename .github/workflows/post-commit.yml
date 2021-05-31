@@ -62,13 +62,13 @@ jobs:
         if: matrix.java == '8'
         with:
           name: ozone-bin
-          path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
+          path: hadoop-ozone/dist/target/ozone*.tar.gz
           retention-days: 1
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   basic:
     runs-on: ubuntu-18.04
@@ -113,8 +113,8 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   dependency:
     needs: compile
@@ -131,7 +131,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir dist
-          tar  -C dist --strip-components 1 -xzf hadoop-ozone*.tar.gz
+          tar  -C dist --strip-components 1 -xzf ozone*.tar.gz
       - name: Execute tests
         run: |
           export OZONE_DIST_DIR=`pwd`/dist
@@ -171,7 +171,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
           sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
       - name: Execute tests
         run: |
@@ -210,7 +210,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
@@ -264,8 +264,8 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   coverage:
     runs-on: ubuntu-18.04
@@ -294,7 +294,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p hadoop-ozone/dist/target
-          tar xzvf target/artifacts/ozone-bin/hadoop-ozone*.tar.gz -C hadoop-ozone/dist/target
+          tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Setup java 11
@@ -315,6 +315,6 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
