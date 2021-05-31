@@ -21,7 +21,7 @@ import java.io.File;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 
 import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
 import org.junit.Before;

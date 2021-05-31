@@ -22,7 +22,7 @@ package org.apache.hadoop.ozone.dn;
 import com.google.common.base.Supplier;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import java.io.File;
 import java.io.IOException;

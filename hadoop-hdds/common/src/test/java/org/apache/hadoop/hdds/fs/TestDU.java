@@ -24,7 +24,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
