@@ -256,6 +256,9 @@ public class PipelineStateManagerV2Impl implements StateManager {
         transactionBuffer
             .addToBuffer(pipelineStore, pipelineID, getPipeline(pipelineID));
       }
+    } catch (PipelineNotFoundException pnfe) {
+      LOG.info("Pipeline {} is not found in the pipeline Map. Pipeline"
+          + " may have been deleted already.", pipelineID);
     } catch (IOException ex) {
       LOG.warn("Pipeline {} state update failed", pipelineID);
       // revert back to old state in memory
