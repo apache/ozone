@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
@@ -1740,8 +1741,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  ContainerTokenSecretManager getContainerTokenSecretManager() {
-    return containerTokenMgr;
+  public ContainerTokenGenerator getContainerTokenGenerator() {
+    return containerTokenMgr != null
+        ? containerTokenMgr
+        : ContainerTokenGenerator.DISABLED;
   }
 
   @Override

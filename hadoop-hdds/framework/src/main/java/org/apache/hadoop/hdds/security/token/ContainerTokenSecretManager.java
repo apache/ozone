@@ -21,8 +21,13 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 
 /**
  * Secret manager for container tokens.
@@ -30,7 +35,8 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class ContainerTokenSecretManager
-    extends ShortLivedTokenSecretManager<ContainerTokenIdentifier> {
+    extends ShortLivedTokenSecretManager<ContainerTokenIdentifier>
+    implements ContainerTokenGenerator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerTokenSecretManager.class);
@@ -44,5 +50,27 @@ public class ContainerTokenSecretManager
       ContainerID containerID) {
     return new ContainerTokenIdentifier(user, containerID,
         getCertSerialId(), getTokenExpiryTime());
+  }
+
+  @Override
+  public String generateEncodedToken(ContainerID containerID) {
+    String user;
+    try {
+      user = UserGroupInformation.getCurrentUser().getUserName();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to get current user", e);
+    }
+
+    try {
+      return generateToken(user, containerID).encodeToUrlString();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to encode token", e);
+    }
+  }
+
+  @Override
+  public Token<ContainerTokenIdentifier> generateToken(String user,
+      ContainerID containerID) {
+    return generateToken(createIdentifier(user, containerID));
   }
 }
