@@ -35,6 +35,21 @@ public class RatisReplicationConfig
     this.replicationFactor = replicationFactor;
   }
 
+  public RatisReplicationConfig(String factorString) {
+    ReplicationFactor factor = null;
+    try {
+      factor = ReplicationFactor.valueOf(Integer.parseInt(factorString));
+    } catch (NumberFormatException ex) {
+      try {
+        factor = ReplicationFactor.valueOf(factorString);
+      } catch (IllegalArgumentException x) {
+        throw new IllegalArgumentException("Invalid RatisReplicationFactor '" +
+                factorString + "'. Please use ONE or THREE!");
+      }
+    }
+    this.replicationFactor = factor;
+  }
+
   public static boolean hasFactor(ReplicationConfig replicationConfig,
       ReplicationFactor factor) {
     if (replicationConfig instanceof RatisReplicationConfig) {

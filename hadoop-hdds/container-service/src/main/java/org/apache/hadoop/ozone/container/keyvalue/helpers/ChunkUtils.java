@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -54,6 +54,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.onFailure;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,27 +94,27 @@ public final class ChunkUtils {
    * @param data - The data buffer.
    * @param offset
    * @param len
-   * @param volumeIOStats statistics collector
+   * @param volume for statistics and checker
    * @param sync whether to do fsync or not
    */
   public static void writeData(File file, ChunkBuffer data,
-      long offset, long len, VolumeIOStats volumeIOStats, boolean sync)
+      long offset, long len, HddsVolume volume, boolean sync)
       throws StorageContainerException {
 
-    writeData(data, file.getName(), offset, len, volumeIOStats,
+    writeData(data, file.getName(), offset, len, volume,
         d -> writeDataToFile(file, d, offset, sync));
   }
 
   public static void writeData(FileChannel file, String filename,
-      ChunkBuffer data, long offset, long len, VolumeIOStats volumeIOStats
-  ) throws StorageContainerException {
+      ChunkBuffer data, long offset, long len, HddsVolume volume)
+      throws StorageContainerException {
 
-    writeData(data, filename, offset, len, volumeIOStats,
+    writeData(data, filename, offset, len, volume,
         d -> writeDataToChannel(file, d, offset));
   }
 
   private static void writeData(ChunkBuffer data, String filename,
-      long offset, long len, VolumeIOStats volumeIOStats,
+      long offset, long len, HddsVolume volume,
       ToLongFunction<ChunkBuffer> writer) throws StorageContainerException {
 
     validateBufferSize(len, data.remaining());
@@ -122,14 +124,17 @@ public final class ChunkUtils {
     try {
       bytesWritten = writer.applyAsLong(data);
     } catch (UncheckedIOException e) {
+      onFailure(volume);
       throw wrapInStorageContainerException(e.getCause());
     }
 
     final long endTime = Time.monotonicNow();
     long elapsed = endTime - startTime;
-    volumeIOStats.incWriteTime(elapsed);
-    volumeIOStats.incWriteOpCount();
-    volumeIOStats.incWriteBytes(bytesWritten);
+    if (volume != null) {
+      volume.getVolumeIOStats().incWriteTime(elapsed);
+      volume.getVolumeIOStats().incWriteOpCount();
+      volume.getVolumeIOStats().incWriteBytes(bytesWritten);
+    }
 
     LOG.debug("Written {} bytes at offset {} to {} in {} ms",
         bytesWritten, offset, filename, elapsed);
@@ -170,9 +175,13 @@ public final class ChunkUtils {
    * Reads data from an existing chunk file into a list of ByteBuffers.
    *
    * @param file file where data lives
+   * @param buffers
+   * @param offset
+   * @param len
+   * @param volume for statistics and checker
    */
   public static void readData(File file, ByteBuffer[] buffers,
-      long offset, long len, VolumeIOStats volumeIOStats)
+      long offset, long len, HddsVolume volume)
       throws StorageContainerException {
 
     final Path path = file.toPath();
@@ -186,18 +195,22 @@ public final class ChunkUtils {
 
           return channel.position(offset).read(buffers);
         } catch (IOException e) {
+          onFailure(volume);
           throw new UncheckedIOException(e);
         }
       });
     } catch (UncheckedIOException e) {
+      onFailure(volume);
       throw wrapInStorageContainerException(e.getCause());
     }
 
     // Increment volumeIO stats here.
     long endTime = Time.monotonicNow();
-    volumeIOStats.incReadTime(endTime - startTime);
-    volumeIOStats.incReadOpCount();
-    volumeIOStats.incReadBytes(bytesRead);
+    if (volume != null) {
+      volume.getVolumeIOStats().incReadTime(endTime - startTime);
+      volume.getVolumeIOStats().incReadOpCount();
+      volume.getVolumeIOStats().incReadBytes(bytesRead);
+    }
 
     LOG.debug("Read {} bytes starting at offset {} from {}",
         bytesRead, offset, file);
@@ -324,6 +337,17 @@ public final class ChunkUtils {
           of, expected, actual);
       LOG.error(err);
       throw new StorageContainerException(err, code);
+    }
+  }
+
+  public static void limitReadSize(long len)
+      throws StorageContainerException {
+    if (len > OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE) {
+      String err = String.format(
+          "Oversize read. max: %d, actual: %d",
+          OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE, len);
+      LOG.error(err);
+      throw new StorageContainerException(err, UNSUPPORTED_REQUEST);
     }
   }
 

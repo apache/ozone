@@ -36,17 +36,20 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
@@ -74,6 +77,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -86,6 +90,7 @@ import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.security.token.Token;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -94,7 +99,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
@@ -271,6 +275,47 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       cps.add(ContainerWithPipeline.fromProtobuf(cp));
     }
 
+    return cps;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
+      List<Long> containerIDs) {
+    for (Long containerID: containerIDs) {
+      Preconditions.checkState(containerID >= 0,
+          "Container ID cannot be negative");
+    }
+
+    GetExistContainerWithPipelinesInBatchRequestProto request =
+        GetExistContainerWithPipelinesInBatchRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .addAllContainerIDs(containerIDs)
+            .build();
+    ScmContainerLocationResponse response = null;
+    List<ContainerWithPipeline> cps = new ArrayList<>();
+    try {
+      response = submitRequest(Type.GetExistContainerWithPipelinesInBatch,
+          (builder) -> builder
+              .setGetExistContainerWithPipelinesInBatchRequest(request));
+    } catch (IOException ex){
+      return cps;
+    }
+
+    List<HddsProtos.ContainerWithPipeline> protoCps = response
+        .getGetExistContainerWithPipelinesInBatchResponse()
+        .getContainerWithPipelinesList();
+
+    for (HddsProtos.ContainerWithPipeline cp : protoCps) {
+      try {
+        cps.add(ContainerWithPipeline.fromProtobuf(cp));
+      } catch (IOException uex) {
+          // "fromProtobuf" may throw an exception
+          // do nothing , just go ahead
+      }
+    }
     return cps;
   }
 
@@ -766,6 +811,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return new StatusAndMessages(
         UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
+  }
+
+  public Token<?> getContainerToken(
+      ContainerID containerID) throws IOException {
+    GetContainerTokenRequestProto request =
+        GetContainerTokenRequestProto.newBuilder()
+            .setContainerID(containerID.getProtobuf())
+        .build();
+
+    GetContainerTokenResponseProto response =
+        submitRequest(Type.GetContainerToken,
+            builder -> builder.setContainerTokenRequest(request))
+        .getContainerTokenResponse();
+    return OzonePBHelper.tokenFromProto(response.getToken());
   }
 
   @Override

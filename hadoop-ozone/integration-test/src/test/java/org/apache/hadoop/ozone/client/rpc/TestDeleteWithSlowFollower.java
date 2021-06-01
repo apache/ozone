@@ -43,12 +43,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -227,16 +227,16 @@ public class TestDeleteWithSlowFollower {
     Assert.assertTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
-      if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
+      if (RatisTestHelper.isRatisFollower(dn, pipeline)) {
         follower = dn;
-      } else if (ContainerTestHelper.isRatisLeader(dn, pipeline)) {
+      } else if (RatisTestHelper.isRatisLeader(dn, pipeline)) {
         leader = dn;
       }
     }
     Assert.assertNotNull(follower);
     Assert.assertNotNull(leader);
     //ensure that the chosen follower is still a follower
-    Assert.assertTrue(ContainerTestHelper.isRatisFollower(follower, pipeline));
+    Assert.assertTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
     // shutdown the  follower node
     cluster.shutdownHddsDatanode(follower.getDatanodeDetails());
     key.write(testData);
@@ -255,7 +255,7 @@ public class TestDeleteWithSlowFollower {
     xceiverClient.sendCommand(request.build());
 
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper
+        (ContainerStateMachine) RatisTestHelper
             .getStateMachine(leader, pipeline);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)

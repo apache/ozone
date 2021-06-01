@@ -65,6 +65,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_DB_SYNC;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.onFailure;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -227,6 +229,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
     } catch (IOException ex) {
+      onFailure(containerData.getVolume());
       throw new StorageContainerException("Error while creating/ updating " +
           ".container file. ContainerID: " + containerId, ex,
           CONTAINER_FILES_CREATE_ERROR);
@@ -261,6 +264,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } catch (IOException ex) {
       // TODO : An I/O error during delete can leave partial artifacts on the
       // disk. We will need the cleaner thread to cleanup this information.
+      onFailure(containerData.getVolume());
       String errMsg = String.format("Failed to cleanup container. ID: %d",
           containerId);
       LOG.error(errMsg, ex);
@@ -379,6 +383,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB compaction while closing container", ex);
+      onFailure(containerData.getVolume());
       throw new StorageContainerException(ex, ERROR_IN_COMPACT_DB);
     }
   }
@@ -395,6 +400,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB sync while closing container", ex);
+      onFailure(containerData.getVolume());
       throw new StorageContainerException(ex, ERROR_IN_DB_SYNC);
     }
   }

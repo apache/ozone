@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -28,7 +29,7 @@ import java.util.concurrent.CompletableFuture;
  * any chosen protocol(for now its Grpc).
  * images.
  */
-public interface SCMSnapshotDownloader {
+public interface SCMSnapshotDownloader extends Closeable {
 
   /**
    * Downloads the contents to the target file path.
@@ -38,6 +39,4 @@ public interface SCMSnapshotDownloader {
    * @throws IOException
    */
   CompletableFuture<Path> download(Path destination) throws IOException;
-
-  void close();
 }

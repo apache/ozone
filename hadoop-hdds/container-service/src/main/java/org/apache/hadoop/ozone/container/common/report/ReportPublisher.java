@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -67,9 +67,9 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
 
   @Override
   public void run() {
-    publishReport();
     if (!executor.isShutdown() &&
         (context.getState() != DatanodeStates.SHUTDOWN)) {
+      publishReport();
       executor.schedule(this,
           getReportFrequency(), TimeUnit.MILLISECONDS);
     }

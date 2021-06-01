@@ -341,7 +341,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         address);
 
     SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf);
+        new SCMContainerLocationFailoverProxyProvider(conf, null);
 
     return new StorageContainerLocationProtocolClientSideTranslatorPB(
         proxyProvider);

@@ -125,8 +125,7 @@ public class TestReconIncrementalContainerReportHandler
           containerWithPipeline.getContainerInfo().containerID();
 
       ReconContainerManager containerManager = getContainerManager();
-      containerManager.addNewContainer(containerID.getId(),
-          containerWithPipeline);
+      containerManager.addNewContainer(containerWithPipeline);
 
       DatanodeDetails datanodeDetails =
           containerWithPipeline.getPipeline().getFirstNode();

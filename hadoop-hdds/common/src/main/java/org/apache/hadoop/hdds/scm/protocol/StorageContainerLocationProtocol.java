@@ -23,10 +23,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.security.KerberosInfo;
+import org.apache.hadoop.security.token.Token;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -103,6 +105,16 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   List<ContainerWithPipeline> getContainerWithPipelineBatch(
       List<Long> containerIDs) throws IOException;
+
+  /**
+   * Ask SCM which containers of the given list exist.
+   *
+   * @param containerIDs - IDs of a batch of containers.
+   * @return List of ContainerWithPipeline that exist in SCM
+   * - the container info with the pipeline.
+   */
+  List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
+      List<Long> containerIDs);
 
   /**
    * Ask SCM a list of containers with a range of container names
@@ -306,4 +318,9 @@ public interface StorageContainerLocationProtocol extends Closeable {
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
+  /**
+   * Obtain a token which can be used to let datanodes verify authentication of
+   * commands operating on {@code containerID}.
+   */
+  Token<?> getContainerToken(ContainerID containerID) throws IOException;
 }
