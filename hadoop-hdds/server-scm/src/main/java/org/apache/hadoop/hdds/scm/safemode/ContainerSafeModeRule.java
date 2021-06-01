@@ -158,7 +158,8 @@ public class ContainerSafeModeRule extends
 
       maxContainer = containerMap.size();
       long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
-      getSafeModeMetrics().setNumContainerWithOneReplicaReportedThreshold(cutOff);
+      getSafeModeMetrics()
+          .setNumContainerWithOneReplicaReportedThreshold(cutOff);
     }
   }
 
