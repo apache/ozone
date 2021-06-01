@@ -290,6 +290,10 @@ public class HeartbeatEndpointTask
         if (commandResponseProto.hasTerm()) {
           closeContainer.setTerm(commandResponseProto.getTerm());
         }
+        if (commandResponseProto.hasEncodedToken()) {
+          closeContainer.setEncodedToken(
+              commandResponseProto.getEncodedToken());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container close request for container {}",
               closeContainer.getContainerID());
