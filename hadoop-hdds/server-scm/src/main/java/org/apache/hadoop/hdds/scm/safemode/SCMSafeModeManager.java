@@ -259,13 +259,15 @@ public class SCMSafeModeManager implements SafeModeManager {
    * Refresh Rule state and validate safe mode rule.
    */
   public void refreshAndValidate() {
-    exitRules.values().forEach(rule -> {
-      rule.refresh();
-      if (rule.validate()) {
-        validateSafeModeExitRules(rule.getRuleName(), eventPublisher);
-        rule.cleanup();
-      }
-    });
+    if (inSafeMode.get()) {
+      exitRules.values().forEach(rule -> {
+        rule.refresh();
+        if (rule.validate() && inSafeMode.get()) {
+          validateSafeModeExitRules(rule.getRuleName(), eventPublisher);
+          rule.cleanup();
+        }
+      });
+    }
   }
 
   @Override

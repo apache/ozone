@@ -105,7 +105,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   @Override
-  protected void process(Pipeline pipeline) {
+  protected synchronized void process(Pipeline pipeline) {
 
     // When SCM is in safe mode for long time, already registered
     // datanode can send pipeline report again, or SCMPipelineManager will
@@ -131,7 +131,9 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
 
   public synchronized void refresh() {
-    initializeRule();
+    if (!validate()) {
+      initializeRule();
+    }
   }
 
   private synchronized void initializeRule() {
@@ -156,7 +158,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   @VisibleForTesting
-  public int getCurrentHealthyPipelineCount() {
+  public synchronized int getCurrentHealthyPipelineCount() {
     return currentHealthyPipelineCount;
   }
 

@@ -437,7 +437,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void setPendingRequestsLimits(RaftProperties properties) {
 
-    final int pendingRequestsByteLimit = (int)conf.getStorageSize(
+    final long pendingRequestsByteLimit = (long)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
