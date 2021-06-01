@@ -108,7 +108,8 @@ public final class SCMContext {
         return true;
       }
 
-      return isLeader;
+      return isLeader && scm.getScmHAManager().getRatisServer()
+          .getDivision().getInfo().isLeaderReady();
     } finally {
       lock.readLock().unlock();
     }
