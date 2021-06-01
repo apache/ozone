@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -35,9 +33,6 @@ import java.io.IOException;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStartSubcommand extends ScmSubcommand {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerBalancerStartSubcommand.class);
 
   @CommandLine.Option(names = {"-t", "--threshold"},
       description = "Threshold target whether the cluster is balanced")
@@ -57,10 +52,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    LOG.info("threshold: {}, idleiterations: {}, " +
-        "maxDatanodesToBalance: {}, maxSizeToMove: {}",
-        threshold, idleiterations, maxDatanodesToBalance, maxSizeToMove);
-    LOG.info("Starting ContainerBalancer...");
+    System.out.println("Starting ContainerBalancer...");
     scmClient.startContainerBalancer(threshold, idleiterations,
         maxDatanodesToBalance, maxSizeToMove);
   }

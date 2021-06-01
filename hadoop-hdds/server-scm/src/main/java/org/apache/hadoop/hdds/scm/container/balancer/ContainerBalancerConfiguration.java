@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
 
 /**
  * This class contains configuration values for the ContainerBalancer.

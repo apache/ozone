@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -35,18 +33,13 @@ import java.io.IOException;
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerBalancerStatusSubcommand.class);
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean execReturn = scmClient.getContainerBalancerStatus();
-
-    // Output data list
     if(execReturn){
-      LOG.info("ContainerBalancer is Running.");
+      System.out.println("ContainerBalancer is Running.");
     } else {
-      LOG.info("ContainerBalancer is Not Running.");
+      System.out.println("ContainerBalancer is Not Running.");
     }
   }
 }

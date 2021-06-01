@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -34,15 +32,9 @@ import java.io.IOException;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStopSubcommand extends ScmSubcommand {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerBalancerStopSubcommand.class);
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     scmClient.stopContainerBalancer();
-    LOG.info("Stopping ContainerBalancer...");
-    LOG.info("Requested SCM to stop ContainerBalancer, " +
-        "it might take sometime for the ContainerBalancer to stop.");
+    System.out.println("Stopping ContainerBalancer...");
   }
 }
