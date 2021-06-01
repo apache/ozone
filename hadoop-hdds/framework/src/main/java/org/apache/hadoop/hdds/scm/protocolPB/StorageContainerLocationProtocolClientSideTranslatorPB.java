@@ -717,7 +717,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void startContainerBalancer() throws IOException {
+  public void startContainerBalancer(double threshold, int idleiterations,
+         int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
 
     StartContainerBalancerRequestProto request =
         StartContainerBalancerRequestProto.getDefaultInstance();

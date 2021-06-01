@@ -48,6 +48,7 @@ public class ContainerBalancer {
   private double threshold;
   private int maxDatanodesToBalance;
   private long maxSizeToMove;
+  private int idleIteration;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
@@ -106,11 +107,11 @@ public class ContainerBalancer {
 
     ozoneConfiguration = new OzoneConfiguration();
     this.config = balancerConfiguration;
+    this.idleIteration = config.getIdleIteration();
     this.threshold = config.getThreshold();
     this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
     this.maxSizeToMove = config.getMaxSizeToMove();
     this.unBalancedNodes = new ArrayList<>();
-
     LOG.info("Starting Container Balancer...{}", this);
     balance();
     return true;

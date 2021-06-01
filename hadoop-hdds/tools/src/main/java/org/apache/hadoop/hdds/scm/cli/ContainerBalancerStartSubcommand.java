@@ -45,14 +45,23 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(names = {"-i", "--idleiterations"},
       description = "Maximum consecutive idle iterations")
-  private int iCount;
+  private int idleiterations;
+
+  @CommandLine.Option(names = {"-d", "--maxDatanodesToBalance"},
+      description = "Maximum datanodes to move")
+  private int maxDatanodesToBalance;
+
+  @CommandLine.Option(names = {"-s", "--maxSizeToMove"},
+      description = "Maximum size to move")
+  private long maxSizeToMove;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    scmClient.startContainerBalancer();
+    LOG.info("threshold: {}, idleiterations: {}, " +
+        "maxDatanodesToBalance: {}, maxSizeToMove: {}",
+        threshold, idleiterations, maxDatanodesToBalance, maxSizeToMove);
     LOG.info("Starting ContainerBalancer...");
-    //remove these in later implementation
-    LOG.info("threshold: {}", threshold);
-    LOG.info("idleiterations: {}", iCount);
+    scmClient.startContainerBalancer(threshold, idleiterations,
+        maxDatanodesToBalance, maxSizeToMove);
   }
 }

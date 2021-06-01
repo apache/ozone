@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -674,11 +675,17 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void startContainerBalancer() throws IOException {
+  public void startContainerBalancer(double threshold, int idleiterations,
+       int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_CONTAINER_BALANCER, null));
-    scm.getContainerBalancer().start();
+    ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
+    cbc.setThreshold(threshold);
+    cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
+    cbc.setMaxSizeToMove(maxSizeToMove);
+    cbc.setIdleIteration(idleiterations);
+    scm.getContainerBalancer().start(cbc);
   }
 
   @Override
@@ -693,7 +700,7 @@ public class SCMClientProtocolServer implements
   public boolean getContainerBalancerStatus() {
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_CONTAINER_BALANCER_STATUS, null));
-    return scm.getContainerBalancer().isRunning();
+    return scm.getContainerBalancer().isBalancerRunning();
   }
 
   /**
