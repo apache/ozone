@@ -196,11 +196,13 @@ public class SCMSafeModeManager implements SafeModeManager {
       EventPublisher eventQueue) {
 
     if (exitRules.get(ruleName) != null) {
-      validatedRules.add(ruleName);
+      boolean added = validatedRules.add(ruleName);
       if (preCheckRules.contains(ruleName)) {
         validatedPreCheckRules.add(ruleName);
       }
-      LOG.info("{} rule is successfully validated", ruleName);
+      if (added) {
+        LOG.info("{} rule is successfully validated", ruleName);
+      }
     } else {
       // This should never happen
       LOG.error("No Such Exit rule {}", ruleName);
