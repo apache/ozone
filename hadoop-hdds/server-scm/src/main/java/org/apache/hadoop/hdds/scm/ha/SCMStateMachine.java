@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.hadoop.util.Time;
@@ -79,6 +80,8 @@ public class SCMStateMachine extends BaseStateMachine {
   // ensures serializable between notifyInstallSnapshotFromLeader()
   // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
+
+  private Daemon leaderReady;
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
@@ -182,8 +185,19 @@ public class SCMStateMachine extends BaseStateMachine {
     }
     LOG.info("current leader SCM steps down.");
 
+    if (leaderReady != null) {
+      try {
+
+        leaderReady.join();
+      } catch (InterruptedException ex) {
+        LOG.error("Interrupted while waiting for daemon to exit.", ex);
+      }
+    }
+
+    leaderReady = null;
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
+
   }
 
   /**
@@ -245,6 +259,24 @@ public class SCMStateMachine extends BaseStateMachine {
       return;
     }
 
+    leaderReady = new Daemon(() -> {
+      RaftServer.Division division =
+          scm.getScmHAManager().getRatisServer().getDivision();
+      while (!division.getInfo().isLeaderReady()) {
+        try {
+          Thread.sleep(300);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+        }
+      }
+      if (division.getInfo().isLeaderReady()) {
+        scm.getScmContext().updateLeader(true);
+        scm.getSCMServiceManager().notifyStatusChanged();
+        return;
+      }
+    });
+
+    leaderReady.start();
     long term = scm.getScmHAManager()
         .getRatisServer()
         .getDivision()
@@ -253,8 +285,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
     LOG.info("current SCM becomes leader of term {}.", term);
 
-    scm.getScmContext().updateLeaderAndTerm(true, term);
-    scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getScmContext().updateTerm(term);
     scm.getSequenceIdGen().invalidateBatch();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
@@ -262,7 +293,6 @@ public class SCMStateMachine extends BaseStateMachine {
     Preconditions.checkArgument(
         deletedBlockLog instanceof DeletedBlockLogImplV2);
     ((DeletedBlockLogImplV2) deletedBlockLog).onBecomeLeader();
-
     scm.getScmDecommissionManager().onBecomeLeader();
   }
 

@@ -96,6 +96,30 @@ public final class SCMContext {
     }
   }
 
+  public void updateLeader(boolean leader) {
+    lock.writeLock().lock();
+    try {
+      LOG.info("update <isLeader> from <{}> to <{}>",
+          isLeader, leader);
+
+      isLeader = leader;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  public void updateTerm(long newTerm) {
+    lock.writeLock().lock();
+    try {
+      LOG.info("update <term> from <{}> to <{}>",
+          term, newTerm);
+
+      term = newTerm;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
   /**
    * Check whether current SCM is leader or not.
    *
