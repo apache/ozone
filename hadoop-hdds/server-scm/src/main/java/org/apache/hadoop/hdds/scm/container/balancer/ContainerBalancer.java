@@ -60,6 +60,7 @@ public class ContainerBalancer {
   private long clusterRemaining;
   private double clusterAvgUtilisation;
   private final AtomicBoolean balancerRunning = new AtomicBoolean(false);
+  private Thread currentBalancingThread;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
@@ -113,7 +114,13 @@ public class ContainerBalancer {
     this.maxSizeToMove = config.getMaxSizeToMove();
     this.unBalancedNodes = new ArrayList<>();
     LOG.info("Starting Container Balancer...{}", this);
-    balance();
+
+    //this is a temp implementation
+    //modify this later
+    currentBalancingThread = new Thread(() -> balance());
+    currentBalancingThread.start();
+    ////////////////////////
+
     return true;
   }
 
@@ -225,6 +232,16 @@ public class ContainerBalancer {
 
       if (unBalancedNodes.isEmpty()) {
         LOG.info("Did not find any unbalanced Datanodes.");
+
+        //sleep to simulate balancer running
+        //remove these later
+        try {
+          Thread.sleep(50000);
+        } catch (Exception e) {
+          LOG.info("sleep Error");
+        }
+        ////////////////////////////////////
+
         stop();
         return false;
       } else {
@@ -319,7 +336,13 @@ public class ContainerBalancer {
    * Stops ContainerBalancer.
    */
   public void stop() {
-    balancerRunning.set(false);
+    //this is a temp implementation
+    //modify this later
+    if(currentBalancingThread.isAlive()) {
+      currentBalancingThread.stop();
+    }
+    ///////////////////////////
+    balancerRunning.compareAndSet(true, false);
     LOG.info("Container Balancer stopped.");
   }
 

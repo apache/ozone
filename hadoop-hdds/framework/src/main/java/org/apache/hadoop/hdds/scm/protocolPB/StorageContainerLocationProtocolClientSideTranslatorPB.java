@@ -721,7 +721,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
          int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
 
     StartContainerBalancerRequestProto request =
-        StartContainerBalancerRequestProto.getDefaultInstance();
+        StartContainerBalancerRequestProto.newBuilder()
+            .setIdleiterations(idleiterations)
+            .setMaxDatanodesToBalance(maxDatanodesToBalance)
+            .setMaxSizeToMove(maxSizeToMove)
+            .setThreshold(threshold).build();
     submitRequest(Type.StartContainerBalancer,
         builder -> builder.setStartContainerBalancerRequest(request));
 
