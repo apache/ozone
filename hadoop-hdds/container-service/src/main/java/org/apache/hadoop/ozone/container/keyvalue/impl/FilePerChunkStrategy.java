@@ -56,6 +56,7 @@ import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 
 /**
  * This class is for performing chunk related operations.
@@ -208,6 +209,7 @@ public class FilePerChunkStrategy implements ChunkManager {
       throws StorageContainerException {
 
     checkLayoutVersion(container);
+    limitReadSize(info.getLen());
 
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = kvContainer.getContainerData();

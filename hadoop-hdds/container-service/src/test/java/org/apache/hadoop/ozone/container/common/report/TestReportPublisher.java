@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -107,6 +107,9 @@ public class TestReportPublisher {
     Thread.sleep(100);
     Assert.assertEquals(2, ((DummyReportPublisher) publisher).getReportCount);
     executorService.shutdown();
+    // After executor shutdown, no new reports should be published
+    Thread.sleep(100);
+    Assert.assertEquals(2, ((DummyReportPublisher) publisher).getReportCount);
   }
 
   @Test
@@ -122,7 +125,9 @@ public class TestReportPublisher {
     executorService.shutdown();
     Assert.assertEquals(1, ((DummyReportPublisher) publisher).getReportCount);
     verify(dummyContext, times(1)).addReport(null);
-
+    // After executor shutdown, no new reports should be published
+    Thread.sleep(100);
+    Assert.assertEquals(1, ((DummyReportPublisher) publisher).getReportCount);
   }
 
   @Test
