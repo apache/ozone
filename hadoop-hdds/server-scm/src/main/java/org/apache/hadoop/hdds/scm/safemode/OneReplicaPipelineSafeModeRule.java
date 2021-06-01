@@ -77,7 +77,7 @@ public class OneReplicaPipelineSafeModeRule extends
             " value should be >= 0.0 and <= 1.0");
 
     this.pipelineManager = pipelineManager;
-    initializeRule();
+    initializeRule(false);
 
   }
 
@@ -153,11 +153,11 @@ public class OneReplicaPipelineSafeModeRule extends
   @Override
   public synchronized void refresh() {
     if (!validate()) {
-      initializeRule();
+      initializeRule(true);
     }
   }
 
-  private synchronized void initializeRule() {
+  private synchronized void initializeRule(boolean refresh) {
 
     oldPipelineIDSet = pipelineManager.getPipelines(
         new RatisReplicationConfig(ReplicationFactor.THREE),
@@ -168,9 +168,15 @@ public class OneReplicaPipelineSafeModeRule extends
 
     thresholdCount = (int) Math.ceil(pipelinePercent * totalPipelineCount);
 
-    LOG.info("Total pipeline count is {}, pipeline's with at least one " +
-            "datanode reported threshold count is {}", totalPipelineCount,
-        thresholdCount);
+    if (refresh) {
+      LOG.info("Total pipeline count is {}, pipeline's with at least one " +
+              "datanode reported threshold count is {}", totalPipelineCount,
+          thresholdCount);
+    } else {
+      LOG.info("Refreshed total pipeline count is {}, pipeline's with at " +
+              "least one datanode reported threshold count is {}",
+          totalPipelineCount, thresholdCount);
+    }
 
     getSafeModeMetrics().setNumPipelinesWithAtleastOneReplicaReportedThreshold(
         thresholdCount);

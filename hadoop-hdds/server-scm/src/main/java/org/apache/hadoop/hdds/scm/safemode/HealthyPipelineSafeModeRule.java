@@ -74,7 +74,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
             HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT
             + " value should be >= 0.0 and <= 1.0");
 
-    initializeRule();
+    initializeRule(false);
   }
 
   private int getMinHealthyPipelines(ConfigurationSource config) {
@@ -132,11 +132,11 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   public synchronized void refresh() {
     if (!validate()) {
-      initializeRule();
+      initializeRule(true);
     }
   }
 
-  private synchronized void initializeRule() {
+  private synchronized void initializeRule(boolean refresh) {
     int pipelineCount = pipelineManager.getPipelines(
         new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
         Pipeline.PipelineState.OPEN).size();
@@ -144,8 +144,15 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
         (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
 
-    LOG.info("Total pipeline count is {}, healthy pipeline " +
-        "threshold count is {}", pipelineCount, healthyPipelineThresholdCount);
+    if (refresh) {
+      LOG.info("Refreshed total pipeline count is {}, healthy pipeline " +
+          "threshold count is {}", pipelineCount,
+          healthyPipelineThresholdCount);
+    } else {
+      LOG.info("Total pipeline count is {}, healthy pipeline " +
+          "threshold count is {}", pipelineCount,
+          healthyPipelineThresholdCount);
+    }
 
     getSafeModeMetrics().setNumHealthyPipelinesThreshold(
         healthyPipelineThresholdCount);

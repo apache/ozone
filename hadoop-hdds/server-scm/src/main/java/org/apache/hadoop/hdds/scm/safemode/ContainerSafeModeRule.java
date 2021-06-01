@@ -35,6 +35,8 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class defining Safe mode exit criteria for Containers.
@@ -42,6 +44,8 @@ import com.google.common.base.Preconditions;
 public class ContainerSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport>{
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ContainerSafeModeRule.class);
   // Required cutoff % for containers with at least 1 reported replica.
   private double safeModeCutoff;
   // Containers read from scm db (excluding containers in ALLOCATED state).
@@ -81,6 +85,8 @@ public class ContainerSafeModeRule extends
     maxContainer = containerMap.size();
     long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
     getSafeModeMetrics().setNumContainerWithOneReplicaReportedThreshold(cutOff);
+
+    LOG.info("containers with one replica threshold count {}", cutOff);
   }
 
 
@@ -158,6 +164,9 @@ public class ContainerSafeModeRule extends
 
       maxContainer = containerMap.size();
       long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
+
+      LOG.info("Refreshed one replica container threshold {}, " +
+              "currentThreshold {}", cutOff, containerWithMinReplicas.get());
       getSafeModeMetrics()
           .setNumContainerWithOneReplicaReportedThreshold(cutOff);
     }
