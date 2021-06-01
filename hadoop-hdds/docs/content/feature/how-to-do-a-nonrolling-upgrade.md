@@ -32,7 +32,7 @@ Replace artifacts of all components newer version.
 Start the SCM and DNs in a regular way.
 Start the Ozone Manager using the --upgrade flag.
  
-    ozone --deamon om start --upgrade
+    ozone --daemon om start --upgrade
 
 **IMPORTANT** All OMs must be started with the --upgrade flag.
     - If only some are started with the flag by mistake, run `ozone admin om -id=<om-sevice-id> cancelprepare`.
@@ -49,6 +49,6 @@ Start the Ozone Manager using the --upgrade flag.
  - Replace artifacts of all components newer version.
  - Start the SCM and DNs in a regular way.
  - Start the Ozone Manager using the '--downgrade' flag.
-    - Same conditions apply to the --upgrde and --downgrade flags.
+    - Same conditions apply to the --upgrade and --downgrade flags.
 
  

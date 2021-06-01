@@ -153,7 +153,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     runningOms.add(shutdownOMIndex, downedOM);
 
     // Make sure all OMs are prepared and still have data.
-    // TODO: downed om is not prepared
     assertClusterPrepared(prepareIndex, runningOms);
     assertKeysWritten(volumeName1, writtenKeysBeforeOmShutDown, runningOms);
     assertKeysWritten(volumeName2, writtenKeysAfterOmShutDown, runningOms);
@@ -174,7 +173,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
-  @Ignore("Flaky test tracked in HDDS-5109")
   @Test
   public void testPrepareWithRestart() throws Exception {
     setup();
@@ -440,27 +438,14 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
             LOG.info("{} is not yet started.", om.getOMNodeId());
             return false;
           } else {
-            boolean preparedAtIndex = false;
             OzoneManagerPrepareState.State state =
                 om.getPrepareState().getState();
 
-            LOG.info("{} has prepare status: {} index: {}.",
+            LOG.info("{} has prepare status: {} prepare index: {}.",
                 om.getOMNodeId(), state.getStatus(), state.getIndex());
 
-            if (state.getStatus() == PrepareStatus.PREPARE_COMPLETED) {
-              if (state.getIndex() >= expectedPreparedIndex) {
-                preparedAtIndex = true;
-              } else {
-                // State will not change if we are prepared at the wrong index.
-                // Break out of wait.
-                throw new LambdaTestUtils.FailFastException(
-                    String.format("OM %s prepared but prepare index %d is " +
-                            "less than the expected prepare index %d.",
-                        om.getOMNodeId(), state.getIndex(),
-                        expectedPreparedIndex));
-              }
-            }
-            return preparedAtIndex;
+            return (state.getStatus() == PrepareStatus.PREPARE_COMPLETED) &&
+                (state.getIndex() >= expectedPreparedIndex);
           }
         });
     }
