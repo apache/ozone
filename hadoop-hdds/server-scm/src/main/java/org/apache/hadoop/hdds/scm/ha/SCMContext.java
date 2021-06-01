@@ -96,6 +96,10 @@ public final class SCMContext {
     }
   }
 
+  /**
+   * Update isLeader flag.
+   * @param leader
+   */
   public void updateLeader(boolean leader) {
     lock.writeLock().lock();
     try {
@@ -108,6 +112,10 @@ public final class SCMContext {
     }
   }
 
+  /**
+   * Update term with new term.
+   * @param newTerm
+   */
   public void updateTerm(long newTerm) {
     lock.writeLock().lock();
     try {
