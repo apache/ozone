@@ -98,6 +98,8 @@ enum Type {
 
   ListTrash = 91;
   RecoverTrash = 92;
+
+  RevokeS3Secret = 93;
 }
 
 message OMRequest {
@@ -176,6 +178,8 @@ message OMRequest {
 
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+
+  optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 }
 
 message OMResponse {
@@ -1278,7 +1282,11 @@ message GetS3SecretResponse {
 }
 
 message LayoutVersion {
-    required uint64 version = 1;
+  required uint64 version = 1;
+}
+
+message RevokeS3SecretRequest {
+    required string kerberosID = 1;
 }
 
 /**

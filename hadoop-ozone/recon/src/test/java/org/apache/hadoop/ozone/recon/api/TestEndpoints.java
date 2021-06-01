@@ -112,6 +112,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -180,6 +181,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         pipeline.getId().getProtobuf())).thenReturn(pipeline);
     when(mockScmServiceProvider.getContainerWithPipeline(containerId))
         .thenReturn(containerWithPipeline);
+    List<Long> containerIDs = new LinkedList<>();
+    containerIDs.add(containerId);
+    List<ContainerWithPipeline> cpw = new LinkedList<>();
+    cpw.add(containerWithPipeline);
+    when(mockScmServiceProvider
+        .getExistContainerWithPipelinesInBatch(containerIDs))
+        .thenReturn(cpw);
 
     InputStream inputStream =
         Thread.currentThread().getContextClassLoader().getResourceAsStream(

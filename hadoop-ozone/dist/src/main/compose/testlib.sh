@@ -76,7 +76,7 @@ wait_for_safemode_exit(){
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
          status=$(docker-compose exec -T ${SCM} bash -c "$command")
      fi
@@ -112,7 +112,7 @@ wait_for_om_leader() {
   while [[ $SECONDS -lt 120 ]]; do
     local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
       status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
     fi
@@ -329,7 +329,7 @@ run_test_script() {
   #required to read the .env file from the right location
   cd "${d}" || return
 
-  ret=0
+  local ret=0
   if ! "$test_script"; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
@@ -341,7 +341,7 @@ run_test_script() {
 }
 
 run_test_scripts() {
-  ret=0
+  local ret=0
 
   for t in "$@"; do
     d="$(dirname "${t}")"

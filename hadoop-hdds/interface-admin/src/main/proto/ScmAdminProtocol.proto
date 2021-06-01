@@ -67,9 +67,11 @@ message ScmContainerLocationRequest {
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
   optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
-  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 31;
+  optional GetExistContainerWithPipelinesInBatchRequestProto getExistContainerWithPipelinesInBatchRequest = 31;
+  optional GetContainerTokenRequestProto containerTokenRequest = 32;
+  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 33;
   optional QueryUpgradeFinalizationProgressRequestProto
-  queryUpgradeFinalizationProgressRequest = 32;
+  queryUpgradeFinalizationProgressRequest = 34;
 }
 
 message ScmContainerLocationResponse {
@@ -108,9 +110,12 @@ message ScmContainerLocationResponse {
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
   optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
-  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 31;
+  optional GetExistContainerWithPipelinesInBatchResponseProto getExistContainerWithPipelinesInBatchResponse = 31;
+  optional GetContainerTokenResponseProto containerTokenResponse = 32;
+  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 33;
   optional QueryUpgradeFinalizationProgressResponseProto
-  queryUpgradeFinalizationProgressResponse = 32;
+  queryUpgradeFinalizationProgressResponse = 34;
+
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -145,9 +150,11 @@ enum Type {
   DecommissionNodes = 22;
   RecommissionNodes = 23;
   StartMaintenanceNodes = 24;
-  FinalizeScmUpgrade = 25;
-  QueryUpgradeFinalizationProgress = 26;
-  DatanodeUsageInfo = 27;
+  DatanodeUsageInfo = 25;
+  GetExistContainerWithPipelinesInBatch = 26;
+  GetContainerToken = 27;
+  FinalizeScmUpgrade = 28;
+  QueryUpgradeFinalizationProgress = 29;
 }
 
 /**
@@ -201,6 +208,11 @@ message GetContainerWithPipelineBatchRequestProto {
   optional string traceID = 2;
 }
 
+message GetExistContainerWithPipelinesInBatchRequestProto {
+  repeated int64 containerIDs = 1;
+  optional string traceID = 2;
+}
+
 message GetSafeModeRuleStatusesRequestProto {
 }
 
@@ -215,6 +227,10 @@ message GetSafeModeRuleStatusesResponseProto {
 }
 
 message GetContainerWithPipelineBatchResponseProto {
+  repeated ContainerWithPipeline containerWithPipelines = 1;
+}
+
+message GetExistContainerWithPipelinesInBatchResponseProto {
   repeated ContainerWithPipeline containerWithPipelines = 1;
 }
 
@@ -435,6 +451,21 @@ message QueryUpgradeFinalizationProgressRequestProto {
 }
 message QueryUpgradeFinalizationProgressResponseProto {
   required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+message ContainerTokenSecretProto {
+    required string ownerId = 1;
+    required ContainerID containerId = 2;
+    required uint64 expiryDate = 3;
+    required string certSerialId = 4;
+}
+
+message GetContainerTokenRequestProto {
+  required ContainerID containerID = 1;
+}
+
+message GetContainerTokenResponseProto {
+  required TokenProto token = 1;
 }
 
 /**

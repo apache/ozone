@@ -46,7 +46,7 @@ import java.util.concurrent.TimeUnit;
  * Grpc client to download a Rocks db checkpoint from leader node
  * in SCM HA ring.
  */
-public class InterSCMGrpcClient implements SCMSnapshotDownloader{
+public class InterSCMGrpcClient implements SCMSnapshotDownloader {
   private static final Logger LOG =
       LoggerFactory.getLogger(InterSCMGrpcClient.class);
 

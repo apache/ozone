@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -57,6 +59,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -157,10 +160,37 @@ public class AbstractReconContainerManagerTest {
             .build();
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
+
+    List<Long> containerList = new LinkedList<>();
+    List<ContainerWithPipeline> verifiedContainerPipeline =
+        new LinkedList<>();
+    LifeCycleState[] stateTypes = LifeCycleState.values();
+    int stateTypeCount = stateTypes.length;
+    for (int i = 200; i < 300; i++) {
+      containerList.add((long)i);
+      ContainerID cID = ContainerID.valueOf(i);
+      ContainerInfo cInfo =
+          new ContainerInfo.Builder()
+              .setContainerID(cID.getId())
+              .setNumberOfKeys(10)
+              .setPipelineID(pipeline.getId())
+              .setReplicationFactor(ONE)
+              .setOwner("test")
+              //add containers in all kinds of state
+              .setState(stateTypes[i % stateTypeCount])
+              .setReplicationType(STAND_ALONE)
+              .build();
+      verifiedContainerPipeline.add(
+          new ContainerWithPipeline(cInfo, pipeline));
+    }
+
     StorageContainerServiceProvider scmServiceProviderMock = mock(
         StorageContainerServiceProvider.class);
     when(scmServiceProviderMock.getContainerWithPipeline(100L))
         .thenReturn(containerWithPipeline);
+    when(scmServiceProviderMock
+        .getExistContainerWithPipelinesInBatch(containerList))
+        .thenReturn(verifiedContainerPipeline);
     return scmServiceProviderMock;
   }
 

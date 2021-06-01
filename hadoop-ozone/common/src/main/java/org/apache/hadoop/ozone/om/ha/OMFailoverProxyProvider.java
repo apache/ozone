@@ -89,8 +89,6 @@ public class OMFailoverProxyProvider implements
 
   private final String omServiceId;
 
-  private List<String> retryExceptions = new ArrayList<>();
-
   // OMFailoverProxyProvider, on encountering certain exception, tries each OM
   // once in a round robin fashion. After that it waits for configured time
   // before attempting to contact all the OMs again. For other exceptions
@@ -237,17 +235,18 @@ public class OMFailoverProxyProvider implements
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
 
+        String omNodeId = getCurrentProxyOMNodeId();
+
         if (LOG.isDebugEnabled()) {
           if (exception.getCause() != null) {
-            LOG.debug("RetryProxy: OM {}: {}: {}", getCurrentProxyOMNodeId(),
+            LOG.debug("RetryProxy: OM {}: {}: {}", omNodeId,
                 exception.getCause().getClass().getSimpleName(),
                 exception.getCause().getMessage());
           } else {
-            LOG.debug("RetryProxy: OM {}: {}", getCurrentProxyOMNodeId(),
+            LOG.debug("RetryProxy: OM {}: {}", omNodeId,
                 exception.getMessage());
           }
         }
-        retryExceptions.add(getExceptionMsg(exception, failovers));
 
         if (exception instanceof ServiceException) {
           OMNotLeaderException notLeaderException =
@@ -269,7 +268,7 @@ public class OMFailoverProxyProvider implements
             // Retry on same OM again as leader OM is not ready.
             // Failing over to same OM so that wait time between retries is
             // incremented
-            performFailoverIfRequired(getCurrentProxyOMNodeId());
+            performFailoverIfRequired(omNodeId);
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
@@ -289,15 +288,8 @@ public class OMFailoverProxyProvider implements
         if (failovers < maxFailovers) {
           return new RetryAction(fallbackAction, getWaitTime());
         } else {
-          StringBuilder allRetryExceptions = new StringBuilder();
-          allRetryExceptions.append("\n");
-          retryExceptions.stream().forEach(e -> allRetryExceptions.append(e)
-              .append("\n"));
-          LOG.error("Failed to connect to OMs: {}. Attempted {} failovers. " +
-                  "Got following exceptions during retries: {}",
-              getOMProxyInfos(), maxFailovers,
-              allRetryExceptions.toString());
-          retryExceptions.clear();
+          LOG.error("Failed to connect to OMs: {}. Attempted {} failovers.",
+              getOMProxyInfos(), maxFailovers);
           return RetryAction.FAIL;
         }
       }
@@ -511,23 +503,6 @@ public class OMFailoverProxyProvider implements
   @VisibleForTesting
   public List<OMProxyInfo> getOMProxyInfos() {
     return new ArrayList<OMProxyInfo>(omProxyInfos.values());
-  }
-
-  private static String getExceptionMsg(Exception e, int retryAttempt) {
-    StringBuilder exceptionMsg = new StringBuilder()
-        .append("Retry Attempt ")
-        .append(retryAttempt)
-        .append(" Exception - ");
-    if (e.getCause() == null) {
-      exceptionMsg.append(e.getClass().getCanonicalName())
-          .append(": ")
-          .append(e.getMessage());
-    } else {
-      exceptionMsg.append(e.getCause().getClass().getCanonicalName())
-          .append(": ")
-          .append(e.getCause().getMessage());
-    }
-    return exceptionMsg.toString();
   }
 
   /**

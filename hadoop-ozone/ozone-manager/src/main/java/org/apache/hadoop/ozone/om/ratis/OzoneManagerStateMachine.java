@@ -218,7 +218,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // whether or not to apply the prepare gate before proceeding with the
       // prepare request.
       String username = request.getUserInfo().getUserName();
-      if (!ozoneManager.isAdmin(username)) {
+      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(username)) {
         String message = "Access denied for user " + username + ". " +
             "Superuser privilege is required to prepare ozone managers.";
         OMException cause =
