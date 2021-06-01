@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -96,6 +97,11 @@ public class TestDatanodeHddsVolumeFailureDetection {
     ozoneConfig.setTimeDuration(
         DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY, 5,
         TimeUnit.SECONDS);
+    // set tolerated = 1
+    DatanodeConfiguration dnConf =
+        ozoneConfig.getObject(DatanodeConfiguration.class);
+    dnConf.setFailedVolumesTolerated(1);
+    ozoneConfig.setFromObject(dnConf);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
         .setNumDataVolumes(1)

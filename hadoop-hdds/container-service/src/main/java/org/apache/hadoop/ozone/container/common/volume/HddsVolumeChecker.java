@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 
@@ -106,13 +108,12 @@ public class HddsVolumeChecker {
 
     this.timer = timer;
 
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     /**
      * Maximum number of volume failures that can be tolerated without
      * declaring a fatal error.
      */
-    int maxVolumeFailuresTolerated = conf.getInt(
-        DFSConfigKeysLegacy.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY,
-        DFSConfigKeysLegacy.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT);
+    int maxVolumeFailuresTolerated = dnConf.getFailedVolumesTolerated();
 
     minDiskCheckGapMs = conf.getTimeDuration(
         DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY,
@@ -140,7 +141,7 @@ public class HddsVolumeChecker {
 
     if (maxVolumeFailuresTolerated < MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
       throw new DiskErrorException("Invalid value configured for "
-          + DFSConfigKeysLegacy.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY
+          + DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_KEY
           + " - "
           + maxVolumeFailuresTolerated + " "
           + DataNode.MAX_VOLUME_FAILURES_TOLERATED_MSG);
@@ -239,7 +240,7 @@ public class HddsVolumeChecker {
      * @param failedVolumes  set of volumes that failed disk checks.
      */
     void call(Set<HddsVolume> healthyVolumes,
-        Set<HddsVolume> failedVolumes);
+        Set<HddsVolume> failedVolumes) throws IOException;
   }
 
   /**

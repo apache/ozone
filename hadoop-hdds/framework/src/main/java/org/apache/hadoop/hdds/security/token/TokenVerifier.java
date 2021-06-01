@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.security.token;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -47,12 +47,13 @@ public interface TokenVerifier {
    * @param cmd container command
    * @throws SCMSecurityException if token verification fails.
    */
-  void verify(String user, Token<?> token, ContainerCommandRequestProto cmd)
+  void verify(String user, Token<?> token,
+      ContainerCommandRequestProtoOrBuilder cmd)
       throws SCMSecurityException;
 
-  /** Same as {@link #verify(String, Token, ContainerCommandRequestProto)}, but
-   * with encoded token. */
-  default void verify(ContainerCommandRequestProto cmd, String user,
+  /** Same as {@link #verify(String, Token,
+   * ContainerCommandRequestProtoOrBuilder)}, but with encoded token. */
+  default void verify(ContainerCommandRequestProtoOrBuilder cmd, String user,
       String encodedToken) throws SCMSecurityException {
 
     if (Strings.isNullOrEmpty(encodedToken)) {

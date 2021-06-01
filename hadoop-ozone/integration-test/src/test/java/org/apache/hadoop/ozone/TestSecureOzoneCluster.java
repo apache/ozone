@@ -656,12 +656,36 @@ public final class TestSecureOzoneCluster {
       // accessKey is still the same because it is derived from username
       assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
 
+      // Admin can get and revoke other users' secrets
+      // omClient's ugi is current user, which is added as an OM admin
+      omClient.getS3Secret("HADOOP/ALICE");
+      omClient.revokeS3Secret("HADOOP/ALICE");
+
+      // testUser is not an admin
+      final UserGroupInformation ugiNonAdmin =
+          UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+              testUserPrincipal, testUserKeytab.getCanonicalPath());
+      final OzoneManagerProtocolClientSideTranslatorPB omClientNonAdmin =
+          new OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(conf, ugiNonAdmin, null),
+          RandomStringUtils.randomAscii(5));
+
       try {
-        omClient.getS3Secret("HADOOP/JOHNDOE");
-        fail("testGetS3Secret failed");
+        omClientNonAdmin.getS3Secret("HADOOP/JOHN");
+        // Expected to fail because current ugi isn't an admin
+        fail("non-admin getS3Secret didn't fail as intended");
       } catch (IOException ex) {
         GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
       }
+
+      try {
+        omClientNonAdmin.revokeS3Secret("HADOOP/DOE");
+        // Expected to fail because current ugi isn't an admin
+        fail("non-admin revokeS3Secret didn't fail as intended");
+      } catch (IOException ex) {
+        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
+      }
+
     } finally {
       IOUtils.closeQuietly(om);
     }
