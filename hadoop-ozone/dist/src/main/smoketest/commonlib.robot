@@ -27,14 +27,14 @@ ${OM_SERVICE_ID}     om
 
 *** Keywords ***
 Kinit HTTP user
-    ${hostname} =       Execute                    hostname
+    ${hostname} =       Execute                    hostname | sed 's/scm[0-9].org/scm/'
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k HTTP/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab
 
 Kinit test user
     [arguments]                      ${user}       ${keytab}
-    ${hostname} =       Execute                    hostname
-    Set Suite Variable  ${TEST_USER}               ${user}/${hostname}@EXAMPLE.COM
-    Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k ${user}/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/${keytab}
+    ${instance} =       Execute                    hostname | sed 's/scm[0-9].org/scm/'
+    Set Suite Variable  ${TEST_USER}               ${user}/${instance}@EXAMPLE.COM
+    Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k ${user}/${instance}@EXAMPLE.COM -t /etc/security/keytabs/${keytab}
 
 Access should be denied
     [arguments]    ${command}

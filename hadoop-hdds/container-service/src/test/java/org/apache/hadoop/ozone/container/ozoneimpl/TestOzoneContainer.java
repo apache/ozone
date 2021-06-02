@@ -104,7 +104,8 @@ public class TestOzoneContainer {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
     commitSpaceMap = new HashMap<String, Long>();
-    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf);
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+        null);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 

@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -84,8 +83,6 @@ import java.util.TreeSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
@@ -106,13 +103,10 @@ public class SCMClientProtocolServer implements
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
-  private final boolean containerTokenEnabled;
 
   public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
-    containerTokenEnabled = conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
-        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
             OZONE_SCM_HANDLER_COUNT_DEFAULT);
@@ -789,15 +783,8 @@ public class SCMClientProtocolServer implements
     UserGroupInformation remoteUser = getRemoteUser();
     getScm().checkAdminAccess(remoteUser);
 
-    if (!containerTokenEnabled) {
-      return new Token<>();
-    }
-
-    ContainerTokenSecretManager secretManager =
-        scm.getContainerTokenSecretManager();
-
-    return secretManager.generateToken(
-        secretManager.createIdentifier(remoteUser.getUserName(), containerID));
+    return scm.getContainerTokenGenerator()
+        .generateToken(remoteUser.getUserName(), containerID);
   }
 
   /**
