@@ -155,9 +155,12 @@ public class ContainerHealthTask extends ReconScmTask {
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
           if (ContainerHealthRecords
-              .retainOrUpdateRecord(currentContainer, rec) &&
-              !containerDeletedInSCM(currentContainer.getContainer())
-          ) {
+              .retainOrUpdateRecord(currentContainer, rec)) {
+            // Check if the missing container is deleted in SCM
+            if (currentContainer.isMissing() &&
+                containerDeletedInSCM(currentContainer.getContainer())) {
+              rec.delete();
+            }
             existingRecords.add(rec.getContainerState());
             if (rec.changed()) {
               rec.update();
@@ -189,7 +192,7 @@ public class ContainerHealthTask extends ReconScmTask {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
-      if (containerDeletedInSCM(container)) {
+      if (h.isMissing() && containerDeletedInSCM(container)) {
         return;
       }
       containerHealthSchemaManager.insertUnhealthyContainerRecords(
