@@ -167,14 +167,14 @@ public class StorageContainerManagerStarter extends GenericCli {
       StorageContainerManager stm = StorageContainerManager.createSCM(conf);
       stm.start();
 
-      ShutdownHookManager.get().addShutdownHook(new Thread(() -> {
+      ShutdownHookManager.get().addShutdownHook(() -> {
         try {
           stm.stop();
           stm.join();
         } catch (Exception e) {
           LOG.error("Error during stop StorageContainerManager server", e);
         }
-      }), SHUTDOWN_HOOK_PRIORITY);
+      }, SHUTDOWN_HOOK_PRIORITY);
     }
 
     @Override
