@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -115,11 +117,16 @@ import static org.mockito.Mockito.when;
 
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test the SCM Node Manager class.
  */
 public class TestSCMNodeManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestSCMNodeManager.class);
 
   private File testDir;
   private StorageContainerManager scm;
@@ -239,12 +246,11 @@ public class TestSCMNodeManager {
         1, TimeUnit.DAYS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      Assert.assertTrue(scm.checkLeader());
       // Register 2 nodes correctly.
       // These will be used with a faulty node to test pipeline creation.
-      DatanodeDetails goodNode1 =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
-      DatanodeDetails goodNode2 =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+      DatanodeDetails goodNode1 = registerWithCapacity(nodeManager);
+      DatanodeDetails goodNode2 = registerWithCapacity(nodeManager);
 
       scm.exitSafeMode();
 
@@ -257,6 +263,39 @@ public class TestSCMNodeManager {
       assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
           nodeManager, LARGER_SLV_LAYOUT_PROTO);
     }
+  }
+
+  /**
+   * Create {@link DatanodeDetails} to register with {@code nodeManager}, and
+   * provide the datanode maximum capacity so that space used does not block
+   * pipeline creation.
+   * @return The created {@link DatanodeDetails}.
+   */
+  private DatanodeDetails registerWithCapacity(SCMNodeManager nodeManager) {
+    return registerWithCapacity(nodeManager,
+        UpgradeUtils.defaultLayoutVersionProto(), success);
+  }
+
+  /**
+   * Create {@link DatanodeDetails} to register with {@code nodeManager}, and
+   * provide the datanode maximum capacity so that space used does not block
+   * pipeline creation. Also check that the result of registering matched
+   * {@code expectedResult}.
+   * @return The created {@link DatanodeDetails}.
+   */
+  private DatanodeDetails registerWithCapacity(SCMNodeManager nodeManager,
+      LayoutVersionProto layout, ErrorCode expectedResult) {
+    DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
+    StorageReportProto storageReport =
+        TestUtils.createStorageReport(details.getUuid(),
+            details.getNetworkFullPath(), Long.MAX_VALUE);
+    RegisteredCommand cmd = nodeManager.register(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        TestUtils.createNodeReport(storageReport),
+        getRandomPipelineReports(), layout);
+
+    Assert.assertEquals(expectedResult, cmd.getError());
+    return cmd.getDatanode();
   }
 
   private void assertPipelineClosedAfterLayoutHeartbeat(
@@ -279,8 +318,7 @@ public class TestSCMNodeManager {
     assertPipelineCreationFailsWithNotEnoughNodes(2);
 
     // Register a new node correctly.
-    DatanodeDetails node = TestUtils
-        .createRandomDatanodeAndRegister(nodeManager);
+    DatanodeDetails node = registerWithCapacity(nodeManager);
 
     List<DatanodeDetails> allNodes = new ArrayList<>(originalNodes);
     allNodes.add(node);
@@ -321,22 +359,23 @@ public class TestSCMNodeManager {
         1, TimeUnit.DAYS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      Assert.assertTrue(scm.checkLeader());
       // Nodes with mismatched SLV cannot join the cluster.
-      assertRegister(nodeManager,
+      registerWithCapacity(nodeManager,
           LARGER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
-      assertRegister(nodeManager,
+      registerWithCapacity(nodeManager,
           SMALLER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
-      assertRegister(nodeManager,
+      registerWithCapacity(nodeManager,
           LARGER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
       // Nodes with mismatched MLV can join, but should not be allowed in
       // pipelines.
-      DatanodeDetails badMlvNode1 = assertRegister(nodeManager,
+      DatanodeDetails badMlvNode1 = registerWithCapacity(nodeManager,
           SMALLER_MLV_LAYOUT_PROTO, success);
-      DatanodeDetails badMlvNode2 = assertRegister(nodeManager,
+      DatanodeDetails badMlvNode2 = registerWithCapacity(nodeManager,
           SMALLER_MLV_LAYOUT_PROTO, success);
       // This node has correct MLV and SLV, so it can join and be used in
       // pipelines.
-      DatanodeDetails goodNode = assertRegister(nodeManager,
+      DatanodeDetails goodNode = registerWithCapacity(nodeManager,
           CORRECT_LAYOUT_PROTO, success);
 
       Assert.assertEquals(3, nodeManager.getAllNodes().size());
@@ -373,16 +412,6 @@ public class TestSCMNodeManager {
     }
   }
 
-  private DatanodeDetails assertRegister(SCMNodeManager manager,
-      LayoutVersionProto layout, ErrorCode expectedResult) {
-    RegisteredCommand cmd = manager.register(
-        MockDatanodeDetails.randomDatanodeDetails(), null,
-        getRandomPipelineReports(), layout);
-
-    Assert.assertEquals(expectedResult, cmd.getError());
-    return cmd.getDatanode();
-  }
-
   private void assertPipelineCreationFailsWithNotEnoughNodes(
       int actualNodeCount) throws Exception {
     try {
@@ -405,12 +434,9 @@ public class TestSCMNodeManager {
         .map(DatanodeDetails::getUuidString)
         .collect(Collectors.toSet());
 
+    RatisReplicationConfig replConfig = new RatisReplicationConfig(factor);
+
     LambdaTestUtils.await(10000, 1000, () -> {
-
-      ReplicationConfig replConfig =
-          ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-              factor);
-
       // Make sure that none of these pipelines use nodes outside of allowedDNs.
       List<Pipeline> pipelines = scm.getPipelineManager()
           .getPipelines(replConfig);
@@ -431,6 +457,10 @@ public class TestSCMNodeManager {
       }
 
       // Wait for the expected number of pipelines using allowed DNs.
+      String message = String.format("Found %d pipelines of type %s" +
+          " and factor %s.", pipelines.size(),
+          replConfig.getReplicationType(), replConfig.getReplicationFactor());
+      LOG.info(message);
       return countCheck.test(pipelines.size());
     });
   }

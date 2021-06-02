@@ -105,18 +105,21 @@ public class SCMUpgradeFinalizer extends
       ReplicationConfig ratisThree =
           ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
-      int pipelineCount = pipelineManager.getPipelines(ratisThree).size();
+      int pipelineCount =
+          pipelineManager.getPipelines(ratisThree, Pipeline.PipelineState.OPEN)
+              .size();
 
       hasPipeline = (pipelineCount >= 1);
       if (!hasPipeline) {
-        LOG.info("Waiting for at least one pipeline after SCM finalization.");
+        LOG.info("Waiting for at least one open pipeline after SCM " +
+            "finalization.");
         try {
           Thread.sleep(5000);
         } catch (InterruptedException e) {
           // Try again on next loop iteration.
         }
       } else {
-        LOG.info("Pipeline found after SCM finalization");
+        LOG.info("Open pipeline found after SCM finalization");
       }
     }
     emitFinishedMsg();
