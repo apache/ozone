@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Test;
 
 import java.util.HashMap;

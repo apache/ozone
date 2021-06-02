@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

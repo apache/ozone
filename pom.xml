@@ -1945,7 +1945,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <properties>
             <property>
               <name>listener</name>
-              <value>org.apache.hadoop.test.TimedOutTestsListener</value>
+              <value>org.apache.ozone.test.TimedOutTestsListener</value>
             </property>
           </properties>
           <includes>

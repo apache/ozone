@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.tracing;
 import io.jaegertracing.internal.JaegerSpanContext;
 import io.jaegertracing.internal.exceptions.EmptyTracerStateStringException;
 import io.jaegertracing.internal.exceptions.MalformedTracerStateStringException;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;

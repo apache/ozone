@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 
 import org.apache.commons.lang3.RandomStringUtils;
