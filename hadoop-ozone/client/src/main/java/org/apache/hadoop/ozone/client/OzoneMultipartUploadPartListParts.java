@@ -91,6 +91,10 @@ public class OzoneMultipartUploadPartListParts {
             .fromProto(ReplicationConfig.getLegacyFactor(replicationConfig));
   }
 
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
+  }
+
   /**
    * Class that represents each Part information of a multipart upload part.
    */
