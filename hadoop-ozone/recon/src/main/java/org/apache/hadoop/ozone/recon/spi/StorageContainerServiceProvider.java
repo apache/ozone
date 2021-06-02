@@ -52,4 +52,9 @@ public interface StorageContainerServiceProvider {
    */
   ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException;
+
+  /**
+   * Returns list of nodes from SCM.
+   */
+  List<HddsProtos.Node> getNodes() throws IOException;
 }
