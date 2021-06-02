@@ -20,6 +20,9 @@ package org.apache.hadoop.hdds.scm.ha.io;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+/**
+ * Codec interface to marshall/unmarshall data to/from {@link ByteString}.
+ */
 public interface Codec {
 
   ByteString serialize(Object object) throws InvalidProtocolBufferException;

@@ -127,6 +127,9 @@ public class TestBlockDeletingService {
         .collect(toList());
   }
 
+  /**
+   * Bundles test parameters for TestBlockDeletingService.
+   */
   public static class LayoutInfo {
     private final String schemaVersion;
     private final ChunkLayOutVersion layout;

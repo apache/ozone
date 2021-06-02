@@ -29,8 +29,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 
-
 // TODO: define a generic interface for this
+/**
+ * TODO: javadoc.
+ */
 public class SCMDBCheckpointProvider {
 
   private static final Logger LOG =

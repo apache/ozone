@@ -29,6 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Maps types to the corresponding {@link Codec} implementation.
+ */
 public final class CodecFactory {
 
   private static Map<Class<?>, Codec> codecs = new HashMap<>();

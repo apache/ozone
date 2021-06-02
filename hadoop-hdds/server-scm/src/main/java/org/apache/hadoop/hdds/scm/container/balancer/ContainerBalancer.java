@@ -35,6 +35,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Container balancer is a service in SCM to move containers between over- and
+ * under-utilized datanodes.
+ */
 public class ContainerBalancer {
 
   private static final Logger LOG =
