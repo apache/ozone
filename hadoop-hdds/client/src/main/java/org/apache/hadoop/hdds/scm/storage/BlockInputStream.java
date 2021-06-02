@@ -21,12 +21,15 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -57,7 +60,7 @@ import org.slf4j.LoggerFactory;
  * through the sequence of chunks through {@link ChunkInputStream}.
  */
 public class BlockInputStream extends InputStream
-    implements Seekable, CanUnbuffer {
+    implements Seekable, CanUnbuffer, ByteBufferReadable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockInputStream.class);
@@ -267,22 +270,33 @@ public class BlockInputStream extends InputStream
    */
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    if (b == null) {
-      throw new NullPointerException();
-    }
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    }
+    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
     if (len == 0) {
       return 0;
     }
+    return readWithStrategy(strategy);
+  }
 
+  @Override
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
+    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
+    int len = strategy.getTargetLength();
+    if (len == 0) {
+      return 0;
+    }
+    return readWithStrategy(strategy);
+  }
+
+  synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
+      IOException {
+    Preconditions.checkArgument(strategy != null);
     if (!initialized) {
       initialize();
     }
 
     checkOpen();
     int totalReadLen = 0;
+    int len = strategy.getTargetLength();
     while (len > 0) {
       // if we are at the last chunk and have read the entire chunk, return
       if (chunkStreams.size() == 0 ||
@@ -297,7 +311,7 @@ public class BlockInputStream extends InputStream
       int numBytesToRead = Math.min(len, (int)current.getRemaining());
       int numBytesRead;
       try {
-        numBytesRead = current.read(b, off, numBytesToRead);
+        numBytesRead = strategy.readFromBlock(current, numBytesToRead);
         retries = 0; // reset retries after successful read
       } catch (StorageContainerException e) {
         if (shouldRetryRead(e)) {
@@ -318,7 +332,6 @@ public class BlockInputStream extends InputStream
             numBytesToRead, numBytesRead));
       }
       totalReadLen += numBytesRead;
-      off += numBytesRead;
       len -= numBytesRead;
       if (current.getRemaining() <= 0 &&
           ((chunkIndex + 1) < chunkStreams.size())) {
