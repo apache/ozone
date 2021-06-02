@@ -676,6 +676,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setKeyCount(containerData.getKeyCount())
         .setUsed(containerData.getBytesUsed())
         .setState(getHddsState())
+        .setReplicaIndex(containerData.getReplicaIndex())
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
         .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
         .setOriginNodeId(containerData.getOriginNodeId());

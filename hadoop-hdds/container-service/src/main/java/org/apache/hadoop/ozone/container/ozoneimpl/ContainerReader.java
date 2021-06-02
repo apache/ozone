@@ -239,9 +239,9 @@ public class ContainerReader implements Runnable {
     kvContainerData.setChunksPath(
         findNormalizedPath(storageLoc,
             kvContainerData.getChunksPath()));
-
     Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-        kvContainerData.getContainerType());
+        kvContainerData.getContainerType(),
+        kvContainerData.getReplicaIndex() > 0);
     kvContainerData.computeAndSetChecksum(yaml);
 
     KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
