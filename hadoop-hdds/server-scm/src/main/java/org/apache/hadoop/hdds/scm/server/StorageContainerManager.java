@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -196,6 +197,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private BlockManager scmBlockManager;
   private final SCMStorageConfig scmStorageConfig;
   private NodeDecommissionManager scmDecommissionManager;
+  private WritableContainerFactory writableContainerFactory;
 
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
@@ -550,6 +552,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
+    if (configurator.getWritableContainerFactory() != null) {
+      writableContainerFactory = configurator.getWritableContainerFactory();
+    } else {
+      writableContainerFactory = new WritableContainerFactory(this);
+    }
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
@@ -1443,6 +1450,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public SCMHAManager getScmHAManager() {
     return scmHAManager;
+  }
+
+  /**
+   * Returns the Writable Container Factory.
+   *
+   * @return The WritableContainerFactory instance used by SCM.
+   */
+  public WritableContainerFactory getWritableContainerFactory() {
+    return writableContainerFactory;
   }
 
   /**
