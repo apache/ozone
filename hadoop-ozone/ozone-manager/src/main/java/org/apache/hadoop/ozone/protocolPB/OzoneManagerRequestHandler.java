@@ -361,7 +361,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
-        .setLatestLocationVersion(keyArgs.getLatestLocationVersion())
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .build();
     OmKeyInfo keyInfo = impl.lookupKey(omKeyArgs);
     resp.setKeyInfo(keyInfo.getProtobuf(false, clientVersion));
@@ -559,7 +559,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
-        .setLatestLocationVersion(keyArgs.getLatestLocationVersion())
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .build();
     return LookupFileResponse.newBuilder()
         .setKeyInfo(impl.lookupFile(omKeyArgs).getProtobuf(clientVersion))

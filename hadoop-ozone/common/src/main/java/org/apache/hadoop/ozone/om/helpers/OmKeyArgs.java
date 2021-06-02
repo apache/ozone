@@ -48,7 +48,7 @@ public final class OmKeyArgs implements Auditable {
   private boolean refreshPipeline;
   private boolean sortDatanodesInPipeline;
   private List<OzoneAcl> acls;
-  private boolean latestLocationVersion;
+  private boolean latestVersionLocation;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
@@ -57,7 +57,7 @@ public final class OmKeyArgs implements Auditable {
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
       List<OzoneAcl> acls, boolean sortDatanode,
-      boolean latestLocationVersion) {
+      boolean latestVersionLocation) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -72,7 +72,7 @@ public final class OmKeyArgs implements Auditable {
     this.refreshPipeline = refreshPipeline;
     this.acls = acls;
     this.sortDatanodesInPipeline = sortDatanode;
-    this.latestLocationVersion = latestLocationVersion;
+    this.latestVersionLocation = latestVersionLocation;
   }
 
   public boolean getIsMultipartKey() {
@@ -143,8 +143,8 @@ public final class OmKeyArgs implements Auditable {
     return sortDatanodesInPipeline;
   }
 
-  public boolean getLatestLocationVersion() {
-    return latestLocationVersion;
+  public boolean getLatestVersionLocation() {
+    return latestVersionLocation;
   }
 
   @Override
@@ -184,7 +184,7 @@ public final class OmKeyArgs implements Auditable {
         .addAllMetadata(metadata)
         .setRefreshPipeline(refreshPipeline)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
-        .setLatestLocationVersion(latestLocationVersion)
+        .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls);
   }
 
@@ -205,7 +205,7 @@ public final class OmKeyArgs implements Auditable {
     private Map<String, String> metadata = new HashMap<>();
     private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
-    private boolean latestLocationVersion;
+    private boolean latestVersionLocation;
     private List<OzoneAcl> acls;
 
     public Builder setVolumeName(String volume) {
@@ -283,8 +283,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setLatestLocationVersion(boolean latest) {
-      this.latestLocationVersion = latest;
+    public Builder setLatestVersionLocation(boolean latest) {
+      this.latestVersionLocation = latest;
       return this;
     }
 
@@ -292,7 +292,7 @@ public final class OmKeyArgs implements Auditable {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize, type,
           factor, locationInfoList, isMultipartKey, multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline, latestLocationVersion);
+          sortDatanodesInPipeline, latestVersionLocation);
     }
 
   }

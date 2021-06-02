@@ -2855,10 +2855,10 @@
   </property>
 
   <property>
-    <name>ozone.client.key.latest.location.version</name>
+    <name>ozone.client.key.latest.version.location</name>
     <tag>OZONE, CLIENT</tag>
     <value>true</value>
-    <description>Ozone client get the latest location version.
+    <description>Ozone client gets the latest version location.
     </description>
   </property>
 </configuration>

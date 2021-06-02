@@ -679,7 +679,7 @@ public class KeyManagerImpl implements KeyManager {
       throw new OMException("Key not found", KEY_NOT_FOUND);
     }
 
-    if (args.getLatestLocationVersion()) {
+    if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
 
@@ -1785,7 +1785,7 @@ public class KeyManagerImpl implements KeyManager {
 
     return getOzoneFileStatus(volumeName, bucketName, keyName,
         args.getRefreshPipeline(), args.getSortDatanodes(),
-        args.getLatestLocationVersion(), clientAddress);
+        args.getLatestVersionLocation(), clientAddress);
   }
 
   private OzoneFileStatus getOzoneFileStatus(String volumeName,
@@ -1996,7 +1996,7 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus = getOzoneFileStatus(volumeName, bucketName,
         keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
-        args.getLatestLocationVersion(), clientAddress);
+        args.getLatestVersionLocation(), clientAddress);
       //if key is not of type file or if key is not found we throw an exception
     if (fileStatus.isFile()) {
       // add block token for read.
@@ -2223,7 +2223,7 @@ public class KeyManagerImpl implements KeyManager {
     for (OzoneFileStatus fileStatus : fileStatusList) {
       keyInfoList.add(fileStatus.getKeyInfo());
     }
-    if (args.getLatestLocationVersion()) {
+    if (args.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
     refreshPipeline(keyInfoList);

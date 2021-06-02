@@ -818,7 +818,7 @@ public class TestKeyManagerImpl {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
-        .setLatestLocationVersion(true)
+        .setLatestVersionLocation(true)
         .build();
 
     // lookup for a non-existent key
@@ -885,7 +885,7 @@ public class TestKeyManagerImpl {
 
     keyArgs = createBuilder()
         .setKeyName(keyName)
-        .setLatestLocationVersion(false)
+        .setLatestVersionLocation(false)
         .build();
 
     // Test lookupKey (latestLocationVersion == false)
