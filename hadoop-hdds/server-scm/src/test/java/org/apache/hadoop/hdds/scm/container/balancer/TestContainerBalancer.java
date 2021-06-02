@@ -39,6 +39,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Tests for {@link ContainerBalancer}.
+ */
 public class TestContainerBalancer {
 
   private static final Logger LOG =

@@ -47,6 +47,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 
+/**
+ * Test for SCM HA-related configuration.
+ */
 public class TestSCMHAConfiguration {
   private OzoneConfiguration conf;
 

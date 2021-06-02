@@ -117,6 +117,9 @@ public class ReplicationSupervisor {
     return containersInFlight.size();
   }
 
+  /**
+   * An executable form of a replication task with status handling.
+   */
   public final class TaskRunner implements Runnable {
     private final ReplicationTask task;
 

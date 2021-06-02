@@ -68,10 +68,10 @@ This will make this bucket to be the default Hadoop compatible file system and r
 You also need to add the ozone-filesystem-hadoop3.jar file to the classpath:
 
 {{< highlight bash >}}
-export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
+export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
 {{< /highlight >}}
 
-(Note: with Hadoop 2.x, use the `hadoop-ozone-filesystem-hadoop2-*.jar`)
+(Note: with Hadoop 2.x, use the `ozone-filesystem-hadoop2-*.jar`)
 
 Once the default Filesystem has been setup, users can run commands like ls, put, mkdir, etc.
 For example,

@@ -68,6 +68,9 @@ public class BenchMarkCRCStreaming {
 
   private static int dataSize = 64 * 1024 * 1024;
 
+  /**
+   * Benchmark state.
+   */
   @State(Scope.Thread)
   public static class BenchmarkState {
 
