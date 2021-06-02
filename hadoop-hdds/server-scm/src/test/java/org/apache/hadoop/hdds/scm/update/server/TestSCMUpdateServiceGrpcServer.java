@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.scm.update.client.ClientCRLStore;
 import org.apache.hadoop.hdds.scm.update.client.SCMUpdateClientConfiguration;
 import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
