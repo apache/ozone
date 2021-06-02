@@ -46,6 +46,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Tests for SCM update Service.
+ */
 public class TestSCMUpdateServiceGrpcServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSCMUpdateServiceGrpcServer.class);

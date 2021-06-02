@@ -22,6 +22,9 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 
 import java.io.IOException;
 
+/**
+ * CRL Store interface.
+ */
 public interface CRLStore {
 
   long getLatestCrlId();

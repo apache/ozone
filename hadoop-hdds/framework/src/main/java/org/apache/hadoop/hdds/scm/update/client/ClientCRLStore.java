@@ -29,7 +29,9 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
-// In memory Client CRL store, need to integrate with Client Table.
+/**
+ * In memory Client CRL store, need to integrate with Client Table.
+ */
 public class ClientCRLStore implements CRLStore {
   private PriorityQueue<CRLInfo> pendingCrls;
   private List<Long> revokedCerts;

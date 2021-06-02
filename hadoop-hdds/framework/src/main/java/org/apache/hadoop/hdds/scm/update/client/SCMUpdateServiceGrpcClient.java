@@ -40,6 +40,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Class for SCM Update Service Grpc Client.
+ */
 public class SCMUpdateServiceGrpcClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMUpdateServiceGrpcClient.class);

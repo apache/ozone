@@ -26,6 +26,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Class for SCM CRL store.
+ */
 public class SCMCRLStore implements CRLStore {
 
   private final CertificateServer certServer;

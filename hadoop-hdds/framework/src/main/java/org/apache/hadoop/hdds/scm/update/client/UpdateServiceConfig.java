@@ -21,6 +21,9 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 
+/**
+ * Update service configuration.
+ */
 @ConfigGroup(prefix = "ozone.scm.update.service")
 public final class UpdateServiceConfig {
 
