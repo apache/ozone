@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.ozone.common.StorageInfo;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -51,6 +52,7 @@ public class StorageContainerManagerStarter extends GenericCli {
   private SCMStarterInterface receiver;
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageContainerManagerStarter.class);
+  private static int SHUTDOWN_HOOK_PRIORITY = 10;
 
   public static void main(String[] args) {
     new StorageContainerManagerStarter(
@@ -164,7 +166,15 @@ public class StorageContainerManagerStarter extends GenericCli {
     public void start(OzoneConfiguration conf) throws Exception {
       StorageContainerManager stm = StorageContainerManager.createSCM(conf);
       stm.start();
-      stm.join();
+
+      ShutdownHookManager.get().addShutdownHook(new Thread(() -> {
+        try {
+          stm.stop();
+          stm.join();
+        } catch (Exception e) {
+          LOG.error("Error during stop StorageContainerManager server", e);
+        }
+      }), SHUTDOWN_HOOK_PRIORITY);
     }
 
     @Override
