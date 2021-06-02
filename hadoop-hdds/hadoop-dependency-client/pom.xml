@@ -269,10 +269,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>leveldbjni-all</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.fusesource.leveldbjni</groupId>
-          <artifactId>leveldbjni-all</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.fasterxml.jackson.core</groupId>
           <artifactId>jackson-databind</artifactId>
         </exclusion>
