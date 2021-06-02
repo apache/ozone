@@ -50,6 +50,9 @@ import org.apache.hadoop.util.Time;
 import com.codahale.metrics.Timer;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -63,6 +66,8 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 public class GeneratorOm extends BaseGenerator implements
     Callable<Void> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(GeneratorOm.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -75,6 +80,8 @@ public class GeneratorOm extends BaseGenerator implements
           + " created if missing.",
       defaultValue = "bucket1")
   private String bucketName;
+
+  private String keyNamePrefix;
 
   private DBStore omDb;
 
@@ -128,7 +135,15 @@ public class GeneratorOm extends BaseGenerator implements
       BatchOperation omKeyTableBatchOperation = omDb.initBatchOperation();
       for (long localId = 0; localId < keyPerContainer; localId++) {
         BlockID blockId = new BlockID(containerId, localId);
-        writeOmData(localId, blockId, omKeyTableBatchOperation);
+        long keyId = localId + keyPerContainer * (containerId-1);
+        boolean forceCreateDirectory = false;
+        if (index == 0 && localId == 0 && getContainerIdOffset() > 1) {
+          // if the offset isn't one, always create directory when the data
+          // generator starts,
+          // otherwise it may skip intermediate directories.
+          forceCreateDirectory = true;
+        }
+        writeOmData(keyId, blockId, omKeyTableBatchOperation, forceCreateDirectory);
       }
       commitAndResetOMKeyTableBatchOperation(omKeyTableBatchOperation);
       return null;
@@ -192,7 +207,9 @@ public class GeneratorOm extends BaseGenerator implements
     OmBucketInfo omBucketInfo = new OmBucketInfo.Builder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName).build();
-    bucketTable.put("/" + volumeName + "/" + bucketName, omBucketInfo);
+
+    keyNamePrefix = "/" + volumeName + "/" + bucketName;
+    bucketTable.put(keyNamePrefix, omBucketInfo);
   }
 
   private void addDirectoryKey(
@@ -209,13 +226,14 @@ public class GeneratorOm extends BaseGenerator implements
         .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.ONE))
         .build();
     omKeyTable.putWithBatch(omKeyTableBatchOperation,
-        "/" + volumeName + "/" + bucketName + "/" + keyName, l3DirInfo);
+        keyNamePrefix + "/" + keyName, l3DirInfo);
   }
 
   private void writeOmData(
       long l,
       BlockID blockId,
-      BatchOperation omKeyTableBatchOperation
+      BatchOperation omKeyTableBatchOperation,
+      boolean forceCreateDirectory
   ) throws IOException {
 
     List<OmKeyLocationInfo> omkl = new ArrayList<>();
@@ -236,24 +254,24 @@ public class GeneratorOm extends BaseGenerator implements
     String level2 = "L2-" + l2n;
     String level1 = "L1-" + l1n;
 
-    if (l2n == 0 && l3n == 0 && l4n == 0) {
+    if (forceCreateDirectory || (l2n == 0 && l3n == 0 && l4n == 0)) {
       // create l1 directory
       addDirectoryKey(level1 + "/", omKeyTableBatchOperation);
     }
 
-    if (l3n == 0 && l4n == 0) {
+    if (forceCreateDirectory || (l3n == 0 && l4n == 0)) {
       // create l2 directory
       addDirectoryKey(level1 + "/" + level2 + "/", omKeyTableBatchOperation);
     }
 
-    if (l4n == 0) {
+    if (forceCreateDirectory || (l4n == 0)) {
       // create l3 directory
       addDirectoryKey(level1 + "/" + level2 + "/" + level3 + "/",
           omKeyTableBatchOperation);
     }
 
     String keyName =
-        "/vol1/bucket1/" + level1 + "/" + level2 + "/" + level3 + "/key" + l;
+        keyNamePrefix + "/" + level1 + "/" + level2 + "/" + level3 + "/key" + l;
 
     OmKeyInfo keyInfo = new Builder()
         .setVolumeName(volumeName)

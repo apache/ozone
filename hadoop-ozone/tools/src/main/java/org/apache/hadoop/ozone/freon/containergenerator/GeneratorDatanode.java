@@ -30,6 +30,7 @@ import java.util.Properties;
 import java.util.SplittableRandom;
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -60,6 +61,9 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 
 import com.codahale.metrics.Timer;
+import org.apache.hadoop.ozone.freon.BaseFreonGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -78,7 +82,8 @@ import picocli.CommandLine.Option;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 public class GeneratorDatanode extends BaseGenerator {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(GeneratorDatanode.class);
   @Option(names = {"--datanodes"},
       description = "Number of datanodes (to generate only a subset of the "
           + "required containers).",
@@ -122,7 +127,7 @@ public class GeneratorDatanode extends BaseGenerator {
     numberOfPipelines = datanodes / 3;
 
     //generate only containers for one datanodes
-    setTestNo(getTestNo() / numberOfPipelines);
+    //setTestNo(getTestNo() / numberOfPipelines);
 
     currentPipeline = (datanodeIndex - 1) % numberOfPipelines;
 
@@ -194,17 +199,21 @@ public class GeneratorDatanode extends BaseGenerator {
   }
 
   private void generateData(long index) throws Exception {
-
     timer.time((Callable<Void>) () -> {
 
       long containerId =
           getContainerIdOffset() + index * numberOfPipelines + currentPipeline;
-
       SplittableRandom random = new SplittableRandom(containerId);
 
       int keyPerContainer = getKeysPerContainer(config);
 
-      final KeyValueContainer container = createContainer(containerId);
+      KeyValueContainer container;
+      try {
+        container = createContainer(containerId);
+      } catch (FileAlreadyExistsException e) {
+        LOG.warn("encountered error. Skip this container", e);
+        return null;
+      }
 
       int chunkSize = 4096 * 1024;
 
