@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -13,21 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Cancelling
-on:
-  workflow_run:
-    workflows: ['build-branch']
-    types: ['requested']
-
-jobs:
-  cancel:
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: potiuk/cancel-workflow-runs@a81b3c4d59c61e27484cfacdc13897dd908419c9
-        name: "Cancel failing PR builds"
-        with:
-          cancelMode: failedJobs
-          token: ${{ secrets.GITHUB_TOKEN }}
-          skipEventTypes: '["push", "schedule"]'
-          jobNameRegexps: '["^.*$"]'
-          workflowFileName: post-commit.yml
+#suite:failing

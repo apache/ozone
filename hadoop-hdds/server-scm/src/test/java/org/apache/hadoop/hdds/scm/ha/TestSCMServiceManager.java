@@ -24,6 +24,9 @@ import org.junit.Test;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * Tests for {@link SCMServiceManager}.
+ */
 public class TestSCMServiceManager {
   @Test
   public void testServiceRunWhenLeader() {
@@ -32,7 +35,7 @@ public class TestSCMServiceManager {
         .setTerm(1)
         .setIsInSafeMode(true)
         .setIsPreCheckComplete(false)
-        .build();
+        .buildMaybeInvalid();
 
     // A service runs when it is leader.
     SCMService serviceRunWhenLeader = new SCMService() {
@@ -102,7 +105,7 @@ public class TestSCMServiceManager {
         .setTerm(1)
         .setIsInSafeMode(true)
         .setIsPreCheckComplete(false)
-        .build();
+        .buildMaybeInvalid();
 
     // A service runs when it is leader and out of safe mode.
     SCMService serviceRunWhenLeaderAndOutOfSafeMode = new SCMService() {

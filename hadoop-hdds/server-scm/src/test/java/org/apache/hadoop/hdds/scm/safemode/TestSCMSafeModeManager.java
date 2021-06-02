@@ -90,7 +90,7 @@ public class TestSCMSafeModeManager {
   @Before
   public void setUp() {
     queue = new EventQueue();
-    scmContext = new SCMContext.Builder().build();
+    scmContext = SCMContext.emptyContext();
     serviceManager = new SCMServiceManager();
     config = new OzoneConfiguration();
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
