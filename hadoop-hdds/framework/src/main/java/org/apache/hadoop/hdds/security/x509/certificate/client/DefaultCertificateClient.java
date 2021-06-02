@@ -37,6 +37,7 @@ import java.security.SignatureException;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -71,6 +72,7 @@ import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateExcepti
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 
+import org.apache.ratis.util.FileUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 
@@ -96,6 +98,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
+  private long localCrlId;
   private String component;
   private List<String> pemEncodedCACerts = null;
   private final Lock lock;
@@ -941,5 +944,67 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     } finally {
       lock.unlock();
     }
+  }
+
+  @Override
+  public boolean processCrl(CRLInfo crl){
+    List<String> certIds2Remove = new ArrayList();
+    crl.getX509CRL().getRevokedCertificates().forEach(
+        cert -> certIds2Remove.add(cert.getSerialNumber().toString()));
+    boolean reinitCert = removeCertificates(certIds2Remove);
+    setLocalCrlId(crl.getCrlSequenceID());
+    return reinitCert;
+  }
+
+
+  private boolean removeCertificates(List<String> certIds){
+    lock.lock();
+    boolean reInitCert = false;
+    try {
+      // For now, remove self cert and ca cert is not implemented
+      // both requires a restart of the service.
+      if ((certSerialId!=null && certIds.contains(certSerialId)) ||
+          (caCertId!=null && certIds.contains(caCertId)) ||
+          (rootCaCertId!=null && certIds.contains(rootCaCertId))) {
+        reInitCert = true;
+      }
+
+      Path basePath = securityConfig.getCertificateLocation(component);
+      for (String certId : certIds) {
+        if (certificateMap.containsKey(certId)) {
+          // remove on disk
+          String certName = String.format(CERT_FILE_NAME_FORMAT, certId);
+
+          if (certId.equals(caCertId)) {
+            certName = CA_CERT_PREFIX + certName;
+          }
+
+          if (certId.equals(rootCaCertId)) {
+            certName = ROOT_CA_CERT_PREFIX + certName;
+          }
+
+          FileUtils.deleteFileQuietly(basePath.resolve(certName).toFile());
+          // remove in memory
+          certificateMap.remove(certId);
+
+          // TODO: reset certSerialId, caCertId or rootCaCertId
+        }
+      }
+    } finally {
+      lock.unlock();
+    }
+    return reInitCert;
+  }
+
+  public long getLocalCrlId() {
+    return this.localCrlId;
+  }
+
+  /**
+   * Set Local CRL id.
+   * @param crlId
+   */
+  public void setLocalCrlId(long crlId){
+    this.localCrlId = crlId;
   }
 }
