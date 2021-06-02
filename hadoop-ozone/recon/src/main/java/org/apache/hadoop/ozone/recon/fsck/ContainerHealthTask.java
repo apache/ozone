@@ -188,7 +188,7 @@ public class ContainerHealthTask extends ReconScmTask {
           containerManager.getContainerReplicas(container.containerID());
       ContainerHealthStatus h = new ContainerHealthStatus(
           container, containerReplicas, placementPolicy);
-      if (h.isHealthy()) {
+      if (h.isHealthy() || h.isDeleted()) {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
