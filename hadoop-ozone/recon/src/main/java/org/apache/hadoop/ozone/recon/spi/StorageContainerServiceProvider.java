@@ -60,4 +60,10 @@ public interface StorageContainerServiceProvider {
    */
   List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
       List<Long> containerIDs);
+
+  /**
+   * Returns list of nodes from SCM.
+   */
+  List<HddsProtos.Node> getNodes() throws IOException;
+
 }
