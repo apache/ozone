@@ -34,11 +34,13 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.ShutdownHookManager;
+import org.apache.hadoop.util.Timer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -415,15 +417,17 @@ public class MutableVolumeSet implements VolumeSet {
    * This method, call shutdown on each volume to shutdown volume usage
    * thread and write scmUsed on each volume.
    */
-  private void saveVolumeSetUsed() {
-    for (StorageVolume volume : volumeMap.values()) {
+
+  private synchronized void saveVolumeSetUsed() {
+    for (StorageVolume hddsVolume : volumeMap.values()) {
       try {
-        volume.shutdown();
+        hddsVolume.shutdown();
       } catch (Exception ex) {
-        LOG.error("Failed to shutdown volume : " + volume.getStorageDir(),
+        LOG.error("Failed to shutdown volume : " + hddsVolume.getStorageDir(),
             ex);
       }
     }
+    volumeMap.clear();
   }
 
   /**
@@ -431,9 +435,6 @@ public class MutableVolumeSet implements VolumeSet {
    */
   public void shutdown() {
     saveVolumeSetUsed();
-    if (shutdownHook != null) {
-      ShutdownHookManager.get().removeShutdownHook(shutdownHook);
-    }
   }
 
   @Override

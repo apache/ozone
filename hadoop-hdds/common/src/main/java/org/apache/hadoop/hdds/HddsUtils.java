@@ -64,6 +64,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.SERVICE_SHUTDOWN_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.SERVICE_SHUTDOWN_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.SERVICE_SHUTDOWN_TIME_UNIT_DEFAULT;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -602,5 +605,15 @@ public final class HddsUtils {
               x[2]));
     }
     return sb.toString();
+  }
+
+  /**
+   * Return Ozone service shutdown time out.
+   * @param conf
+   */
+  public static long getShutDownTimeOut(ConfigurationSource conf) {
+    return conf.getTimeDuration(
+        SERVICE_SHUTDOWN_TIMEOUT, SERVICE_SHUTDOWN_TIMEOUT_DEFAULT,
+        SERVICE_SHUTDOWN_TIME_UNIT_DEFAULT);
   }
 }

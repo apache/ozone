@@ -164,6 +164,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -173,7 +174,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.KMSUtil;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.Time;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -663,8 +663,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void saveOmMetrics() {
     try {
       boolean success;
-      Files.createDirectories(
-          getTempMetricsStorageFile().getParentFile().toPath());
+      File parent = getTempMetricsStorageFile().getParentFile();
+      if (!parent.exists()) {
+        Files.createDirectories(parent.toPath());
+      }
       try (BufferedWriter writer = new BufferedWriter(
           new OutputStreamWriter(new FileOutputStream(
               getTempMetricsStorageFile()), StandardCharsets.UTF_8))) {

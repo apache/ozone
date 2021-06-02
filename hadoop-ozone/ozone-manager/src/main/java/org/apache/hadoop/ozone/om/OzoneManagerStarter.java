@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,7 @@ public class OzoneManagerStarter extends GenericCli {
   private OMStarterInterface receiver;
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStarter.class);
+  private static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
   public static void main(String[] args) throws Exception {
     new OzoneManagerStarter(
@@ -124,7 +126,14 @@ public class OzoneManagerStarter extends GenericCli {
         AuthenticationException {
       OzoneManager om = OzoneManager.createOm(conf);
       om.start();
-      om.join();
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          om.stop();
+          om.join();
+        } catch (Exception e) {
+          LOG.error("Error during stop OzoneManager.", e);
+        }
+      }, SHUTDOWN_HOOK_PRIORITY);
     }
 
     @Override
