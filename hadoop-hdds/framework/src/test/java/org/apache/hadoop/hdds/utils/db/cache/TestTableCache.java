@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

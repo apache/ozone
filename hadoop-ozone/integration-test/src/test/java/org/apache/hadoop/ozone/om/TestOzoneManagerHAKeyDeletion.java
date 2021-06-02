@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Test;
 
 import java.util.ArrayList;

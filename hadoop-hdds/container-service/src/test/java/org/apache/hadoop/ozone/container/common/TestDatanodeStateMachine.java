@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManage
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import com.google.common.collect.Maps;

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.test;
+package org.apache.ozone.test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
