@@ -30,6 +30,10 @@ import java.util.zip.CRC32;
 
 import static junit.framework.TestCase.assertEquals;
 
+/**
+ * Tests to verify that different checksum implementations compute the same
+ * results.
+ */
 public class TestChecksumImplsComputeSameValues {
 
   private int dataSize = 1024 * 1024 * 64;

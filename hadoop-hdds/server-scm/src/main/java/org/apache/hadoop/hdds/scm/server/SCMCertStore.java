@@ -301,6 +301,9 @@ public final class SCMCertStore implements CertificateStore {
     this.scmMetadataStore = metadataStore;
   }
 
+  /**
+   * Builder for SCMCertStore.
+   */
   public static class Builder {
 
     private SCMMetadataStore metadataStore;

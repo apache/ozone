@@ -26,6 +26,9 @@ import org.junit.Test;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 
+/**
+ * Tests for {@link SequenceIdGenerator}.
+ */
 public class TestSequenceIDGenerator {
   @Test
   public void testSequenceIDGenUponNonRatis() throws Exception {
