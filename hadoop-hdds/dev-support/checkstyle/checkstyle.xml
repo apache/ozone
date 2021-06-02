@@ -127,6 +127,7 @@
         <module name="IllegalImport">
           <property name="regexp" value="true"/>
           <property name="illegalPkgs" value="^sun\..*, ^.*\.relocated\..*, ^.*\.shaded\..*"/>
+          <property name="illegalClasses" value="^org.apache.hadoop.test.(GenericTestUtils|LambdaTestUtils|TimedOutTestsListener)"/>
         </module>
         <module name="RedundantImport"/>
         <module name="UnusedImports"/>
