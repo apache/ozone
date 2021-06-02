@@ -227,6 +227,15 @@ public final class TestUtils {
   }
 
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
+      long capacity) {
+    return createStorageReport(nodeId, path,
+        capacity,
+        0,
+        capacity,
+        StorageTypeProto.DISK);
+  }
+
+  public static StorageReportProto createStorageReport(UUID nodeId, String path,
        long capacity, long used, long remaining, StorageTypeProto type) {
     return createStorageReport(nodeId, path, capacity, used, remaining,
             type, false);
