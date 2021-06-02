@@ -18,17 +18,26 @@
 package org.apache.hadoop.ozone.container.common.report;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.Descriptors;
 import com.google.protobuf.GeneratedMessage;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -162,6 +171,44 @@ public class TestReportPublisher {
     Assert.assertEquals("Should publish report with 2 status objects", 1,
         ((CommandStatusReportPublisher) publisher).getReport()
             .getCmdStatusCount());
+    executorService.shutdown();
+  }
+
+  @Test
+  public void testCRLStatusReportPublisher() throws IOException {
+    StateContext dummyContext = Mockito.mock(StateContext.class);
+    DatanodeStateMachine dummyStateMachine =
+        Mockito.mock(DatanodeStateMachine.class);
+    ReportPublisher publisher = new CRLStatusReportPublisher();
+    DatanodeCRLStore dnCrlStore = Mockito.mock(DatanodeCRLStore.class);
+    when(dnCrlStore.getLatestCRLSequenceID()).thenReturn(3L);
+    List<CRLInfo> pendingCRLs = new ArrayList<>();
+    pendingCRLs.add(new CRLInfo.Builder()
+        .setCrlSequenceID(100L)
+        .build());
+    pendingCRLs.add(new CRLInfo.Builder()
+        .setCrlSequenceID(101L)
+        .build());
+    when(dnCrlStore.getPendingCRLs()).thenReturn(pendingCRLs);
+    when(dummyStateMachine.getDnCRLStore()).thenReturn(dnCrlStore);
+    when(dummyContext.getParent()).thenReturn(dummyStateMachine);
+    publisher.setConf(config);
+
+    ScheduledExecutorService executorService = HadoopExecutors
+        .newScheduledThreadPool(1,
+            new ThreadFactoryBuilder().setDaemon(true)
+                .setNameFormat("Unit test ReportManager Thread - %d").build());
+    publisher.init(dummyContext, executorService);
+    GeneratedMessage report =
+        ((CRLStatusReportPublisher) publisher).getReport();
+    Assert.assertNotNull(report);
+    for(Descriptors.FieldDescriptor descriptor :
+        report.getDescriptorForType().getFields()) {
+      if (descriptor.getNumber() ==
+          CRLStatusReport.RECEIVEDCRLID_FIELD_NUMBER) {
+        Assert.assertEquals(3L, report.getField(descriptor));
+      }
+    }
     executorService.shutdown();
   }
 
