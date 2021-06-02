@@ -52,7 +52,7 @@ public class StorageContainerManagerStarter extends GenericCli {
   private SCMStarterInterface receiver;
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageContainerManagerStarter.class);
-  private static int SHUTDOWN_HOOK_PRIORITY = 10;
+  private static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
   public static void main(String[] args) {
     new StorageContainerManagerStarter(
