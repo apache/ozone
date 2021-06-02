@@ -238,7 +238,7 @@ public class TestSchemaOneBackwardsCompatibility {
     final long numBlocksToDelete = TestDB.NUM_PENDING_DELETION_BLOCKS;
     String datanodeUuid = UUID.randomUUID().toString();
     ContainerSet containerSet = makeContainerSet();
-    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
@@ -305,7 +305,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testReadDeletedBlockChunkInfo() throws Exception {
     String datanodeUuid = UUID.randomUUID().toString();
     ContainerSet containerSet = makeContainerSet();
-    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,

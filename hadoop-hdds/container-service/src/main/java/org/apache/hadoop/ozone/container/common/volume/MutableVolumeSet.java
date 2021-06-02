@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume.VolumeState;
 import org.apache.hadoop.util.DiskChecker;
@@ -102,15 +103,17 @@ public class MutableVolumeSet implements VolumeSet {
   private Runnable shutdownHook;
   private final HddsVolumeChecker volumeChecker;
   private Runnable failedVolumeListener;
+  private StateContext context;
 
-  public MutableVolumeSet(String dnUuid, ConfigurationSource conf)
-      throws IOException {
-    this(dnUuid, null, conf);
+  public MutableVolumeSet(String dnUuid, ConfigurationSource conf,
+      StateContext context) throws IOException {
+    this(dnUuid, null, conf, context);
   }
 
   public MutableVolumeSet(String dnUuid, String clusterID,
-      ConfigurationSource conf)
+      ConfigurationSource conf, StateContext context)
       throws IOException {
+    this.context = context;
     this.datanodeUuid = dnUuid;
     this.clusterID = clusterID;
     this.conf = conf;
@@ -267,13 +270,29 @@ public class MutableVolumeSet implements VolumeSet {
    * Handle one or more failed volumes.
    * @param failedVolumes
    */
-  private void handleVolumeFailures(Set<HddsVolume> failedVolumes) {
+  private void handleVolumeFailures(Set<HddsVolume> failedVolumes)
+      throws IOException {
     this.writeLock();
     try {
       for (HddsVolume v : failedVolumes) {
         // Immediately mark the volume as failed so it is unavailable
         // for new containers.
         failVolume(v.getHddsRootDir().getPath());
+      }
+
+      // check failed volume tolerated
+      if (!hasEnoughVolumes()) {
+        // on startup, we could not try to stop uninitialized services
+        if (shutdownHook == null) {
+          DatanodeConfiguration dnConf =
+              conf.getObject(DatanodeConfiguration.class);
+          throw new IOException("Don't have enough good volumes on startup,"
+              + " bad volumes detected: " + failedVolumes.size()
+              + " max tolerated: " + dnConf.getFailedVolumesTolerated());
+        }
+        if (context != null) {
+          context.getParent().handleFatalVolumeFailures();
+        }
       }
     } finally {
       this.writeUnlock();
@@ -520,6 +539,19 @@ public class MutableVolumeSet implements VolumeSet {
   @VisibleForTesting
   public Map<StorageType, List<HddsVolume>> getVolumeStateMap() {
     return ImmutableMap.copyOf(volumeStateMap);
+  }
+
+  public boolean hasEnoughVolumes() {
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    int maxVolumeFailuresTolerated = dnConf.getFailedVolumesTolerated();
+
+    // Max number of bad volumes allowed, should have at least 1 good volume
+    if (maxVolumeFailuresTolerated ==
+        HddsVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
+      return getVolumesList().size() >= 1;
+    } else {
+      return getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
+    }
   }
 
   public StorageLocationReport[] getStorageReport()
