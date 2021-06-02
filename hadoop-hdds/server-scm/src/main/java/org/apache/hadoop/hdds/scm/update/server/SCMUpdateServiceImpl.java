@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos.UpdateRe
 import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos.UnsubscribeRequest;
 import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos.UnsubscribeResponse;
 
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.update.client.CRLStore;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -56,7 +57,14 @@ public class SCMUpdateServiceImpl extends
   @Override
   public void subscribe(SubscribeRequest request,
       StreamObserver<SubscribeResponse> responseObserver) {
-    UUID clientId = clientManager.addClient();
+    UUID clientId;
+    try {
+      clientId  = clientManager.addClient();
+    } catch (SCMException ex) {
+      LOG.error("Fail to subscribe for Client.", ex);
+      responseObserver.onError(ex);
+      return;
+    }
     responseObserver.onNext(SubscribeResponse.newBuilder()
         .setClientId(SCMUpdateClientInfo.toClientIdProto(clientId))
         .build());

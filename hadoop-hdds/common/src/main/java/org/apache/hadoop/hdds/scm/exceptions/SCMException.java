@@ -132,5 +132,6 @@ public class SCMException extends IOException {
     CONTAINER_NOT_FOUND,
     CONTAINER_REPLICA_NOT_FOUND,
     FAILED_TO_CONNECT_TO_CRL_SERVICE,
+    FAILED_TO_ADD_CRL_CLIENT,
   }
 }

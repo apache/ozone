@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.update.server;
 
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos.Type;
@@ -30,6 +31,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Class that manages SCM update clients.
+ */
 public class SCMUpdateClientManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMUpdateClientManager.class);
@@ -49,8 +53,19 @@ public class SCMUpdateClientManager {
     handlers.remove(type);
   }
 
-  public UUID addClient() {
+  public UUID addClient() throws SCMException {
     UUID clientId = UUID.randomUUID();
+    int retryCount = 5;
+    while (clients.containsKey(clientId)) {
+      if (retryCount > 0) {
+        clientId = UUID.randomUUID();
+        retryCount--;
+      } else {
+        throw new SCMException("Failed to add CRL client with random clientId" +
+            " collision", SCMException.ResultCodes.FAILED_TO_ADD_CRL_CLIENT);
+      }
+    }
+
     SCMUpdateClientInfo clientInfo = new SCMUpdateClientInfo(clientId);
     clients.put(clientId, clientInfo);
     return clientId;
