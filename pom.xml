@@ -47,7 +47,20 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <name>${distMgmtSnapshotsName}</name>
       <url>${distMgmtSnapshotsUrl}</url>
     </repository>
+    <repository>
+      <id>hadoop-rc</id>
+      <name>Hadoop 3.3.1 RC3</name>
+      <url>https://repository.apache.org/content/repositories/orgapachehadoop-1320</url>
+    </repository>
   </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>hadoop-rc</id>
+      <name>Hadoop 3.3.1 RC3</name>
+      <url>https://repository.apache.org/content/repositories/orgapachehadoop-1320</url>
+    </pluginRepository>
+  </pluginRepositories>
 
   <licenses>
     <license>
