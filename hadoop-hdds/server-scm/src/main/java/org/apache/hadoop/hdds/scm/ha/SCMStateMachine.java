@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.hadoop.util.Time;
