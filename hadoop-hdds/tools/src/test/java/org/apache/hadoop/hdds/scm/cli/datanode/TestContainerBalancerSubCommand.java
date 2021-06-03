@@ -35,7 +35,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -112,12 +111,29 @@ public class TestContainerBalancerSubCommand {
   }
 
   @Test
-  public void testContainerBalancerStartSubcommand() throws IOException  {
+  public void testContainerBalancerStartSubcommandWhenBalancerIsNotRunning()
+      throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    doNothing().when(scmClient).startContainerBalancer(0.1, 1, 2, 3L);
+    Mockito.when(scmClient.startContainerBalancer(0, 0, 0, 0))
+        .thenAnswer(invocation -> true);
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Starting\\sContainerBalancer...");
+    Pattern p = Pattern.compile("^Starting\\sContainerBalancer" +
+        "\\sSuccessfully.");
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+  }
+
+  @Test
+  public void testContainerBalancerStartSubcommandWhenBalancerIsRunning()
+      throws IOException  {
+    ScmClient scmClient = mock(ScmClient.class);
+    Mockito.when(scmClient.startContainerBalancer(0, 0, 0, 0))
+        .thenAnswer(invocation -> false);
+    startCmd.execute(scmClient);
+
+    Pattern p = Pattern.compile("^ContainerBalancer\\shas\\sbeen" +
+        "\\sstarted\\sby\\sanother\\scli\\scommand.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }

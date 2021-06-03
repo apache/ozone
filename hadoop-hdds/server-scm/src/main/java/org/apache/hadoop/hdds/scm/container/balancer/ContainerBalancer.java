@@ -114,12 +114,16 @@ public class ContainerBalancer {
     this.maxSizeToMove = config.getMaxSizeToMove();
     this.unBalancedNodes = new ArrayList<>();
     LOG.info("Starting Container Balancer...{}", this);
+    //we should start a new balancer thread async
+    //and response to cli as soon as possible
 
-    //this is a temp implementation
+
+    //this is a temporary implementation
     //modify this later
     currentBalancingThread = new Thread(() -> balance());
     currentBalancingThread.start();
     ////////////////////////
+
 
     return true;
   }
@@ -128,13 +132,18 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    initializeIteration();
-
-    // unBalancedNodes is not cleared since the next iteration uses this
-    // iteration's unBalancedNodes to find out how many nodes were balanced
-    overUtilizedNodes.clear();
-    underUtilizedNodes.clear();
-    withinThresholdUtilizedNodes.clear();
+    for (int i = 0; i < idleIteration; i++) {
+      if (!initializeIteration()) {
+        //balancer should be stopped immediately
+        break;
+      }
+      // unBalancedNodes is not cleared since the next iteration uses this
+      // iteration's unBalancedNodes to find out how many nodes were balanced
+      overUtilizedNodes.clear();
+      underUtilizedNodes.clear();
+      withinThresholdUtilizedNodes.clear();
+    }
+    balancerRunning.compareAndSet(true, false);
   }
 
   /**
@@ -155,7 +164,6 @@ public class ContainerBalancer {
     if (datanodeUsageInfos.isEmpty()) {
       LOG.info("Container Balancer could not retrieve nodes from Node " +
           "Manager.");
-      stop();
       return false;
     }
 
@@ -224,25 +232,21 @@ public class ContainerBalancer {
         maxDatanodesToBalance) {
       LOG.info("Approaching Max Datanodes To Balance limit in Container " +
           "Balancer. Stopping Balancer.");
-      stop();
       return false;
     } else {
       unBalancedNodes.addAll(overUtilizedNodes);
       unBalancedNodes.addAll(underUtilizedNodes);
 
+      //for now, we just sleep to simulate the execution of balancer
+      //this if for acceptance test now. modify this later when balancer
+      //if fully completed
+      try {
+        Thread.sleep(50);
+      } catch (InterruptedException e) {}
+      /////////////////////////////
+
       if (unBalancedNodes.isEmpty()) {
         LOG.info("Did not find any unbalanced Datanodes.");
-
-        //sleep to simulate balancer running
-        //remove these later
-        try {
-          Thread.sleep(50000);
-        } catch (Exception e) {
-          LOG.info("sleep Error");
-        }
-        ////////////////////////////////////
-
-        stop();
         return false;
       } else {
         LOG.info("Container Balancer has identified Datanodes that need to be" +
@@ -336,14 +340,22 @@ public class ContainerBalancer {
    * Stops ContainerBalancer.
    */
   public void stop() {
-    //this is a temp implementation
+    //we should stop the balancer thread gracefully
+    if(!balancerRunning.get()) {
+      LOG.info("Container Balancer is not running.");
+      return;
+    }
+
+
+    //this is a temporary implementation
     //modify this later
-    if(currentBalancingThread.isAlive()) {
+    if (currentBalancingThread.isAlive()) {
       currentBalancingThread.stop();
     }
     ///////////////////////////
+
     balancerRunning.compareAndSet(true, false);
-    LOG.info("Container Balancer stopped.");
+    LOG.info("Container Balancer stopped successfully.");
   }
 
   public void setNodeManager(NodeManager nodeManager) {

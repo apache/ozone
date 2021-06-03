@@ -30,7 +30,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests container balancer operations
@@ -70,18 +71,34 @@ public class TestContainerBalancerOperations {
    * @throws Exception
    */
   @Test
-  public void testContainerBalancerOperations() throws Exception {
+  public void testContainerBalancerCLIOperations() throws Exception {
+    // test normally start and stop
     boolean running = containerBalancerClient.getContainerBalancerStatus();
-    assertEquals(false, running);
+    assertFalse(running);
 
-    //let container balancer run for a long time
-    containerBalancerClient.startContainerBalancer(0.1, 1000, 1000, 1000);
+    containerBalancerClient.startContainerBalancer(0.1, 1, 1, 1);
     running = containerBalancerClient.getContainerBalancerStatus();
-    assertEquals(true, running);
+    assertTrue(running);
 
-    //stop balancer and then verify the running stat
+    // waiting for balance completed.
+    // this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(100);
+    } catch (InterruptedException e) {}
+
+    running = containerBalancerClient.getContainerBalancerStatus();
+    assertFalse(running);
+
+    // test normally start , and stop it before balance is completed
+    containerBalancerClient.startContainerBalancer(0.1, 10000, 1, 1);
+    running = containerBalancerClient.getContainerBalancerStatus();
+    assertTrue(running);
+
     containerBalancerClient.stopContainerBalancer();
     running = containerBalancerClient.getContainerBalancerStatus();
-    assertEquals(false, running);
+    assertFalse(running);
   }
+
+  //TODO: add more acceptance after container balancer is fully completed
 }

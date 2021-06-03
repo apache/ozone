@@ -675,7 +675,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void startContainerBalancer(double threshold, int idleiterations,
+  public boolean startContainerBalancer(double threshold, int idleiterations,
        int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -685,7 +685,7 @@ public class SCMClientProtocolServer implements
     cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
     cbc.setMaxSizeToMove(maxSizeToMove);
     cbc.setIdleIteration(idleiterations);
-    scm.getContainerBalancer().start(cbc);
+    return scm.getContainerBalancer().start(cbc);
   }
 
   @Override

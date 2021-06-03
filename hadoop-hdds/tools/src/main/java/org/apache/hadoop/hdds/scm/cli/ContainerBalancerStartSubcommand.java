@@ -52,8 +52,13 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    System.out.println("Starting ContainerBalancer...");
-    scmClient.startContainerBalancer(threshold, idleiterations,
+    boolean result = scmClient.startContainerBalancer(threshold, idleiterations,
         maxDatanodesToBalance, maxSizeToMove);
+    if (result) {
+      System.out.println("Starting ContainerBalancer Successfully.");
+      return;
+    }
+    System.out.println("ContainerBalancer has been started" +
+        " by another cli command.");
   }
 }

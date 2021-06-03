@@ -308,7 +308,7 @@ public interface ScmClient extends Closeable {
   /**
    * Start ContainerBalancer.
    */
-  void startContainerBalancer(double threshold, int idleiterations,
+  boolean startContainerBalancer(double threshold, int idleiterations,
       int maxDatanodesToBalance, long maxSizeToMove) throws IOException;
 
   /**

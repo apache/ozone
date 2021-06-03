@@ -72,6 +72,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -717,18 +718,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void startContainerBalancer(double threshold, int idleiterations,
+  public boolean startContainerBalancer(double threshold, int idleiterations,
          int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
-
     StartContainerBalancerRequestProto request =
         StartContainerBalancerRequestProto.newBuilder()
             .setIdleiterations(idleiterations)
             .setMaxDatanodesToBalance(maxDatanodesToBalance)
             .setMaxSizeToMove(maxSizeToMove)
             .setThreshold(threshold).build();
-    submitRequest(Type.StartContainerBalancer,
-        builder -> builder.setStartContainerBalancerRequest(request));
-
+    StartContainerBalancerResponseProto response =
+        submitRequest(Type.StartContainerBalancer,
+            builder -> builder.setStartContainerBalancerRequest(request))
+            .getStartContainerBalancerResponse();
+    return response.getStart();
   }
 
   @Override
