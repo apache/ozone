@@ -27,7 +27,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 /**
- * TODO: javadoc.
+ * DeletedBlockLogStateManager interface to provide BlocksTransaction
+ * function from {@link DeletedBlockLogStateManagerImpl}.
  */
 public interface DeletedBlockLogStateManager {
   @Replicate
