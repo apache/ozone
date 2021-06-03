@@ -113,11 +113,14 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
-  private Map<InetSocketAddress,
+  // Endpoint -> ReportType -> Boolean of whether the full report should be
+  //  queued in getFullReports call.
+  private final Map<InetSocketAddress,
       Map<String, AtomicBoolean>> fullReportSendIndicator;
-
-  private List<String> fullReportTypeList;
-  private Map<String, AtomicReference<GeneratedMessage>> type2Reports;
+  // List of supported full report types.
+  private final List<String> fullReportTypeList;
+  // ReportType -> Report.
+  private final Map<String, AtomicReference<GeneratedMessage>> type2Reports;
 
   /**
    * term of latest leader SCM, extract from SCMCommand.
