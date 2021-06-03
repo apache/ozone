@@ -183,12 +183,8 @@ public class TestReportPublisher {
     DatanodeCRLStore dnCrlStore = Mockito.mock(DatanodeCRLStore.class);
     when(dnCrlStore.getLatestCRLSequenceID()).thenReturn(3L);
     List<CRLInfo> pendingCRLs = new ArrayList<>();
-    pendingCRLs.add(new CRLInfo.Builder()
-        .setCrlSequenceID(100L)
-        .build());
-    pendingCRLs.add(new CRLInfo.Builder()
-        .setCrlSequenceID(101L)
-        .build());
+    pendingCRLs.add(Mockito.mock(CRLInfo.class));
+    pendingCRLs.add(Mockito.mock(CRLInfo.class));
     when(dnCrlStore.getPendingCRLs()).thenReturn(pendingCRLs);
     when(dummyStateMachine.getDnCRLStore()).thenReturn(dnCrlStore);
     when(dummyContext.getParent()).thenReturn(dummyStateMachine);
