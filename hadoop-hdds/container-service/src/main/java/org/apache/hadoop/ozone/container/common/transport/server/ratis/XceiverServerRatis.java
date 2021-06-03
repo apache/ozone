@@ -102,6 +102,7 @@ import org.apache.ratis.server.RaftServerRpc;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
+import org.apache.ratis.util.TraditionalBinaryPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -219,7 +220,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     setRaftSegmentAndWriteBufferSize(properties);
 
     // set raft segment pre-allocated size
-    final int raftSegmentPreallocatedSize =
+    final long raftSegmentPreallocatedSize =
         setRaftSegmentPreallocatedSize(properties);
 
     TimeUnit timeUnit;
@@ -380,8 +381,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setExpiryTime(properties, retryCacheTimeout);
   }
 
-  private int setRaftSegmentPreallocatedSize(RaftProperties properties) {
-    final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(
+  private long setRaftSegmentPreallocatedSize(RaftProperties properties) {
+    final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
@@ -425,12 +426,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void setPendingRequestsLimits(RaftProperties properties) {
 
-    final int pendingRequestsByteLimit = (int)conf.getStorageSize(
+    final int pendingRequestsMegaBytesLimit = (int)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
-        StorageUnit.BYTES);
+        StorageUnit.MB);
     RaftServerConfigKeys.Write.setByteLimit(properties,
-        SizeInBytes.valueOf(pendingRequestsByteLimit));
+        SizeInBytes.valueOf(pendingRequestsMegaBytesLimit,
+            TraditionalBinaryPrefix.MEGA));
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
