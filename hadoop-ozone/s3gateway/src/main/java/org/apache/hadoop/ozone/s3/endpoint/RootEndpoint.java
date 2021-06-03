@@ -47,7 +47,7 @@ public class RootEndpoint extends EndpointBase {
    */
   @GET
   public Response get()
-      throws OS3Exception, IOException {
+      throws OS3Exception, IOException, InterruptedException {
     ListBucketResponse response = new ListBucketResponse();
 
     Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(null);

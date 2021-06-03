@@ -35,7 +35,8 @@ import org.junit.Test;
 public class TestObjectDelete {
 
   @Test
-  public void delete() throws IOException, OS3Exception {
+  public void delete() throws
+      IOException, OS3Exception, InterruptedException {
     //GIVEN
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");

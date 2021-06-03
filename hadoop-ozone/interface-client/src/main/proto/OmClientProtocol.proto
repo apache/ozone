@@ -169,6 +169,12 @@ message OMRequest {
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
+
+  optional string stringToSign = 94;
+
+  optional string signature = 95;
+
+  optional string awsAccessId = 96;
 }
 
 message OMResponse {

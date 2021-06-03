@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,18 +26,29 @@ import com.google.protobuf.RpcController;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
-import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc
+    .OzoneManagerServiceImplBase;
+import org.apache.hadoop.ozone.protocolPB
+    .OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto
+    .OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.Server.Call;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.ClientId;
 import io.grpc.Server;
 import io.grpc.netty.NettyServerBuilder;
-import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.security.UserGroupInformation;
+
+import static org.apache.hadoop.ozone.protocol.proto
+    .OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
   private static final Logger LOG =
@@ -46,10 +58,16 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private OzoneManagerProtocolServerSideTranslatorPB omTranslator;
+  private OzoneDelegationTokenSecretManager delegationTokenMgr;
+  private final SecurityConfig secConfig;
 
   OzoneManagerServiceGrpc(
-      OzoneManagerProtocolServerSideTranslatorPB omTranslator) {
+      OzoneManagerProtocolServerSideTranslatorPB omTranslator,
+      OzoneDelegationTokenSecretManager delegationTokenMgr,
+      OzoneConfiguration configuration) {
     this.omTranslator = omTranslator;
+    this.delegationTokenMgr = delegationTokenMgr;
+    this.secConfig = new SecurityConfig(configuration);
   }
 
   @Override
@@ -60,9 +78,31 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
                                 hadoop.ozone.protocol.proto.
                                 OzoneManagerProtocolProtos.OMResponse>
                                 responseObserver) {
-    LOG.debug("GrpcOzoneManagerServer: OzoneManagerServiceImplBase " +
+    LOG.info("GrpcOzoneManagerServer: OzoneManagerServiceImplBase " +
         "processing s3g client submit request");
     AtomicInteger callCount = new AtomicInteger(0);
+
+    if (secConfig.isSecurityEnabled()) {
+      if (request.hasStringToSign()) {
+        LOG.info(request.getStringToSign());
+        OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
+        identifier.setTokenType(S3AUTHINFO);
+        identifier.setStrToSign(request.getStringToSign());
+        identifier.setSignature(request.getSignature());
+        identifier.setAwsAccessId(request.getAwsAccessId());
+        identifier.setOwner(new Text(request.getAwsAccessId()));
+        LOG.info("validating S3 identifier:{}",
+            identifier);
+        try {
+          delegationTokenMgr.retrievePassword(identifier);
+          LOG.info("valid signature");
+        } catch (OzoneDelegationTokenSecretManager.InvalidToken e) {
+          LOG.info("signatures do NOT match for S3 identifier:{}",
+              identifier, e);
+        }
+      }
+    }
+
     try {
         // need to look into handling the error path, trapping exception
       org.apache.hadoop.ipc.Server.getCurCall().set(new Call(1,
@@ -72,10 +112,14 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
           RPC.RpcKind.RPC_PROTOCOL_BUFFER,
           ClientId.getClientId()));
 
-      OMResponse omResponse = this.omTranslator.
-          submitRequest(NULL_RPC_CONTROLLER, request);
+      OMResponse omResponse =
+          UserGroupInformation.getCurrentUser().doAs(
+            (PrivilegedExceptionAction<OMResponse>) () -> {
+              return this.omTranslator.
+                  submitRequest(NULL_RPC_CONTROLLER, request);
+            });
       responseObserver.onNext(omResponse);
-    } catch (ServiceException e) {}
+    } catch (Exception e) {}
     responseObserver.onCompleted();
   }
 }
@@ -91,17 +135,27 @@ public class GrpcOzoneManagerServer {
   private final String host = "0.0.0.0";
   private int port = 8981;
 
-  public GrpcOzoneManagerServer(GrpcOzoneManagerServerConfig omServerConfig,
+  public GrpcOzoneManagerServer(OzoneConfiguration config,
                                 OzoneManagerProtocolServerSideTranslatorPB
-                                    omTranslator) {
-    this.port = omServerConfig.getPort();
-    init(omTranslator);
+                                    omTranslator,
+                                OzoneDelegationTokenSecretManager
+                                    delegationTokenMgr) {
+    this.port = config.getObject(
+        GrpcOzoneManagerServerConfig.class).
+        getPort();
+    init(omTranslator,
+        delegationTokenMgr,
+        config);
   }
 
-  public void init(OzoneManagerProtocolServerSideTranslatorPB omTranslator) {
+  public void init(OzoneManagerProtocolServerSideTranslatorPB omTranslator,
+                   OzoneDelegationTokenSecretManager delegationTokenMgr,
+                   OzoneConfiguration omServerConfig) {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .addService(new OzoneManagerServiceGrpc(omTranslator));
+        .addService(new OzoneManagerServiceGrpc(omTranslator,
+            delegationTokenMgr,
+            omServerConfig));
 
     server = nettyServerBuilder.build();
   }

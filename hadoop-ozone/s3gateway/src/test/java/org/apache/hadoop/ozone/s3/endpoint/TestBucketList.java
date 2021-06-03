@@ -36,7 +36,8 @@ import org.junit.Test;
 public class TestBucketList {
 
   @Test
-  public void listRoot() throws OS3Exception, IOException {
+  public void listRoot() throws OS3Exception,
+      IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -60,7 +61,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void listDir() throws OS3Exception, IOException {
+  public void listDir() throws OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -81,7 +82,8 @@ public class TestBucketList {
   }
 
   @Test
-  public void listSubDir() throws OS3Exception, IOException {
+  public void listSubDir() throws
+      OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -109,7 +111,8 @@ public class TestBucketList {
 
 
   @Test
-  public void listWithPrefixAndDelimiter() throws OS3Exception, IOException {
+  public void listWithPrefixAndDelimiter() throws
+      OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -128,7 +131,8 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithPrefixAndDelimiter1() throws OS3Exception, IOException {
+  public void listWithPrefixAndDelimiter1() throws
+      OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -149,7 +153,8 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithPrefixAndDelimiter2() throws OS3Exception, IOException {
+  public void listWithPrefixAndDelimiter2() throws
+      OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -168,7 +173,8 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithContinuationToken() throws OS3Exception, IOException {
+  public void listWithContinuationToken() throws
+      OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -212,7 +218,7 @@ public class TestBucketList {
 
   @Test
   public void listWithContinuationTokenDirBreak()
-      throws OS3Exception, IOException {
+      throws OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -262,7 +268,8 @@ public class TestBucketList {
    * behavior.
    */
   @Test
-  public void listWithContinuationToken1() throws OS3Exception, IOException {
+  public void listWithContinuationToken1() throws
+      OS3Exception, IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -303,7 +310,8 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithContinuationTokenFail() throws IOException {
+  public void listWithContinuationTokenFail() throws
+      IOException, InterruptedException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -326,7 +334,8 @@ public class TestBucketList {
 
 
   @Test
-  public void testStartAfter() throws IOException, OS3Exception {
+  public void testStartAfter() throws
+      IOException, OS3Exception, InterruptedException {
     BucketEndpoint getBucket = new BucketEndpoint();
 
     OzoneClient ozoneClient =

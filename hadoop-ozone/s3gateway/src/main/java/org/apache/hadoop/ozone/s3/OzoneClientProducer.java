@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3;
 
 import javax.annotation.PreDestroy;
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.context.RequestScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
 import javax.ws.rs.WebApplicationException;
@@ -43,25 +44,63 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.protocol.proto
+    .OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import static org.apache.hadoop.ozone.s3.exception
+    .S3ErrorTable.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.s3.exception
+    .S3ErrorTable.MALFORMED_HEADER;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@ApplicationScoped
+final class OzoneClientCache {
+  // single, cached OzoneClient established on first connection
+  // for s3g gRPC OmTransport, OmRequest - OmResponse channel
+  private static OzoneClientCache instance;
+  private OzoneClient client;
+
+  private OzoneClientCache(String omServiceID,
+                           OzoneConfiguration ozoneConfiguration) {
+    try {
+      if (omServiceID == null) {
+        client = OzoneClientFactory.getRpcClient(ozoneConfiguration);
+      } else {
+        // As in HA case, we need to pass om service ID.
+        client = OzoneClientFactory.getRpcClient(omServiceID,
+            ozoneConfiguration);
+      }
+    } catch (IOException e) {}
+  }
+
+  public static OzoneClient getOzoneClientInstance(String omServiceID,
+                                                   OzoneConfiguration
+                                                       ozoneConfiguration) {
+    if (instance == null) {
+      instance = new OzoneClientCache(omServiceID, ozoneConfiguration);
+    }
+    return instance.client;
+  }
+
+  @PreDestroy
+  public void destroy() throws IOException {
+    client.close();
+  }
+}
+
 /**
  * This class creates the OzoneClient for the Rest endpoints.
  */
-@ApplicationScoped
+@RequestScoped
 public class OzoneClientProducer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
 
-  // single, cached OzoneClient established on first connection
-  // for s3g gRPC OmTransport, OmRequest - OmResponse channel
-  private static OzoneClient client;
+  private OzoneClient client;
+
+  private UserGroupInformation remoteUser = null;
 
   @Inject
   private SignatureProcessor signatureProcessor;
@@ -85,17 +124,12 @@ public class OzoneClientProducer {
     return client;
   }
 
-  @PreDestroy
-  public void destroy() throws IOException {
-    client.close();
-  }
-
-  private OzoneClient getOzoneClientInstance() throws IOException {
-    if (client == null) {
-      LOG.info("creating OzoneClient instance");
-      client = createOzoneClient();
+  @Produces
+  public UserGroupInformation createUgi() {
+    if (remoteUser == null) {
+      client = getClient(ozoneConfiguration);
     }
-    return client;
+    return remoteUser;
   }
 
   private OzoneClient getClient(OzoneConfiguration config)
@@ -113,7 +147,7 @@ public class OzoneClientProducer {
       String awsAccessId = signatureInfo.getAwsAccessId();
       validateAccessId(awsAccessId);
 
-      UserGroupInformation remoteUser =
+      this.remoteUser =
           UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
@@ -136,11 +170,14 @@ public class OzoneClientProducer {
             identifier.getKind(),
             omService);
         remoteUser.addToken(token);
+        remoteUser.addTokenIdentifier(identifier);
 
       }
       ozoneClient =
           remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>) () -> {
-            return getOzoneClientInstance();
+            //return OzoneClientCache.getOzoneClientInstance();
+            return OzoneClientCache.getOzoneClientInstance(omServiceID,
+                ozoneConfiguration);
           });
     } catch (OS3Exception ex) {
       if (LOG.isDebugEnabled()) {

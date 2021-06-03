@@ -48,7 +48,7 @@ public class TestObjectGet {
   public static final String CONTENT = "0123456789";
 
   @Test
-  public void get() throws IOException, OS3Exception {
+  public void get() throws IOException, OS3Exception, InterruptedException {
     //GIVEN
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");

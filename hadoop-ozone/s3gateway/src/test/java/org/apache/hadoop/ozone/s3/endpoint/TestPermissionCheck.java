@@ -175,7 +175,8 @@ public class TestPermissionCheck {
   }
 
   @Test
-  public void testDeleteKeys() throws IOException, OS3Exception {
+  public void testDeleteKeys() throws
+      IOException, OS3Exception, InterruptedException {
     Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).deleteKey(any());
