@@ -27,9 +27,6 @@ import java.util.Set;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.reflections.Reflections;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,10 +61,7 @@ public class HDDSLayoutVersionManager extends
    */
   @VisibleForTesting
   void registerUpgradeActions(String[] packageNames) {
-    Reflections reflections = new Reflections(new ConfigurationBuilder()
-        .forPackages(packageNames)
-        .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
-        .useParallelExecutor());
+    Reflections reflections = new Reflections(packageNames);
     Set<Class<?>> typesAnnotatedWith =
         reflections.getTypesAnnotatedWith(UpgradeActionHdds.class);
     typesAnnotatedWith.forEach(actionClass -> {
