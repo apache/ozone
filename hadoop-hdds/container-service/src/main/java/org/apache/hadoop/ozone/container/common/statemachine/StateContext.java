@@ -366,7 +366,7 @@ public class StateContext {
     return reportsToReturn;
   }
 
-  List<GeneratedMessage> getNonIncrementalReports(
+  List<GeneratedMessage> getFullReports(
       InetSocketAddress endpoint) {
     Map<String, AtomicBoolean> mp = fullReportSendIndicator.get(endpoint);
     List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
@@ -375,10 +375,12 @@ public class StateContext {
         if (kv.getValue().get()) {
           String reportType = kv.getKey();
           GeneratedMessage msg = type2Reports.get(reportType).get();
-          if (null != msg) {
-            nonIncrementalReports.add(msg);
-            mp.get(reportType).set(false);
+          if (null == msg) {
+            throw new NullPointerException( "Error on getting report, Type: "
+                + reportType);
           }
+          nonIncrementalReports.add(msg);
+          mp.get(reportType).set(false);
         }
       }
     }
@@ -396,7 +398,7 @@ public class StateContext {
     if (maxLimit < 0) {
       throw new IllegalArgumentException("Illegal maxLimit value: " + maxLimit);
     }
-    List<GeneratedMessage> reports = getNonIncrementalReports(endpoint);
+    List<GeneratedMessage> reports = getFullReports(endpoint);
     if (maxLimit <= reports.size()) {
       return reports.subList(0, maxLimit);
     } else {
