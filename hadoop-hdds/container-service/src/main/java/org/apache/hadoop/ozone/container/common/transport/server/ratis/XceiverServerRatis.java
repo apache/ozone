@@ -405,7 +405,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
-    final int raftSegmentSize = (int)conf.getStorageSize(
+    final long raftSegmentSize = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
         StorageUnit.BYTES);
