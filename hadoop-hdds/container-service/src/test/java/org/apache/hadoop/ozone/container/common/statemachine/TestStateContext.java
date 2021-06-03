@@ -547,7 +547,8 @@ public class TestStateContext {
         StateContext.CONTAINER_REPORTS_PROTO_NAME, 128);
     batchRefreshfullReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 128);
     batchRefreshfullReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 128);
-    batchRefreshfullReports(ctx, StateContext.CRL_STATUS_REPORT_PROTO_NAME, 128);
+    batchRefreshfullReports(ctx,
+        StateContext.CRL_STATUS_REPORT_PROTO_NAME, 128);
     batchAddIncrementalReport(ctx,
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 128);
 
