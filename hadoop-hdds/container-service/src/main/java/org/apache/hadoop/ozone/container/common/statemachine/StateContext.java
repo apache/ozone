@@ -383,12 +383,10 @@ public class StateContext {
         if (kv.getValue().get()) {
           String reportType = kv.getKey();
           GeneratedMessage msg = type2Reports.get(reportType).get();
-          if (null == msg) {
-            throw new NullPointerException("Error on getting report, Type: "
-                + reportType);
+          if (msg != null) {
+            nonIncrementalReports.add(msg);
+            mp.get(reportType).set(false);
           }
-          nonIncrementalReports.add(msg);
-          mp.get(reportType).set(false);
         }
       }
     }
