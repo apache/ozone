@@ -305,8 +305,8 @@ public class StateContext {
           "not full report message type: " + reportType);
     }
     type2Reports.get(reportType).set(report);
-    if (null != fullReportSendIndicator){
-      for (Map<String, AtomicBoolean> mp : fullReportSendIndicator.values()){
+    if (fullReportSendIndicator != null) {
+      for (Map<String, AtomicBoolean> mp : fullReportSendIndicator.values()) {
         mp.get(reportType).set(true);
       }
     }
