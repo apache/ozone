@@ -28,9 +28,9 @@ import java.io.IOException;
  * Interface used by the WritableContainerFactory to obtain a writable container
  * from the providers.
  */
-public interface WritableContainerProvider {
+public interface WritableContainerProvider<T extends ReplicationConfig> {
 
-  ContainerInfo getContainer(long size, ReplicationConfig repConfig,
+  ContainerInfo getContainer(long size, T repConfig,
       String owner, ExcludeList excludeList) throws IOException;
 
 }

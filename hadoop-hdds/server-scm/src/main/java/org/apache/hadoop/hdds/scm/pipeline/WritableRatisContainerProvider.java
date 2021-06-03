@@ -39,7 +39,7 @@ import java.util.List;
  * Class to obtain a writable container for Ratis and Standalone pipelines.
  */
 public class WritableRatisContainerProvider
-    implements WritableContainerProvider {
+    implements WritableContainerProvider<ReplicationConfig> {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(WritableRatisContainerProvider.class);

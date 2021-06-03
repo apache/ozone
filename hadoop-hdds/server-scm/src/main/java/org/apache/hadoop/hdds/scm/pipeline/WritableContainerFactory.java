@@ -31,8 +31,8 @@ import java.io.IOException;
  */
 public class WritableContainerFactory {
 
-  private WritableContainerProvider ratisProvider;
-  private WritableContainerProvider standaloneProvider;
+  private final WritableContainerProvider<ReplicationConfig> ratisProvider;
+  private final WritableContainerProvider<ReplicationConfig> standaloneProvider;
 
   public WritableContainerFactory(StorageContainerManager scm) {
     this.ratisProvider = new WritableRatisContainerProvider(
