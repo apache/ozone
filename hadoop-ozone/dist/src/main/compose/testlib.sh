@@ -40,13 +40,19 @@ create_results_dir() {
 }
 
 ## @description find all the test.sh scripts in the immediate child dirs
+all_tests_in_immediate_child_dirs() {
+  find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | sort
+}
+
+## @description Find all test.sh scripts in immediate child dirs,
+## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$")
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
+       untagged="$(all_tests_in_immediate_child_dirs | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -55,9 +61,11 @@ find_tests(){
     if [[ -z "${tests}" ]]; then
        echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
        exit 1
-  fi
+    fi
+  elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
+    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(all_tests_in_immediate_child_dirs | xargs grep -L '^#suite:failing')
   fi
   echo $tests
 }

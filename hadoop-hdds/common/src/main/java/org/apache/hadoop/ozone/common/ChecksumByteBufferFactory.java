@@ -39,6 +39,9 @@ public final class ChecksumByteBufferFactory {
   private static volatile boolean useJava9Crc32C
       = JavaUtils.isJavaVersionAtLeast(9);
 
+  /**
+   * Factory for CRC32C implementation introduced in Java 9.
+   */
   public static class Java9Crc32CFactory {
     private static final MethodHandle NEW_CRC32C_MH;
 

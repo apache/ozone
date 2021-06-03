@@ -396,7 +396,6 @@ public final class OzoneConsts {
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
-  public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
 
   // SCM HA
   public static final String SCM_SERVICE_ID_DEFAULT = "scmServiceIdDefault";

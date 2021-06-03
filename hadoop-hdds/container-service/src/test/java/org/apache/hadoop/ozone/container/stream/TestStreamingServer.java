@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.stream;
 
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 

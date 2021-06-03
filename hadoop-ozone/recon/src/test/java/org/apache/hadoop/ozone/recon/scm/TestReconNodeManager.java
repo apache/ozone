@@ -19,11 +19,16 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
@@ -43,6 +48,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -104,7 +110,7 @@ public class TestReconNodeManager {
     // This command should never be returned by Recon
     reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
         new SetNodeOperationalStateCommand(1234,
-        HddsProtos.NodeOperationalState.DECOMMISSIONING, 0));
+        DECOMMISSIONING, 0));
 
     // This one should be returned
     reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
@@ -155,5 +161,38 @@ public class TestReconNodeManager {
     assertEquals(1, reconNodeManager.getAllNodes().size());
     assertNotNull(
         reconNodeManager.getNodeByUuid(datanodeDetails.getUuidString()));
+  }
+
+  @Test
+  public void testUpdateNodeOperationalStateFromScm() throws Exception {
+    ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf);
+    EventQueue eventQueue = new EventQueue();
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    Table<UUID, DatanodeDetails> nodeTable =
+        ReconSCMDBDefinition.NODES.getTable(store);
+    ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
+        scmStorageConfig, eventQueue, clusterMap, nodeTable);
+
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    HddsProtos.Node node = mock(HddsProtos.Node.class);
+
+    LambdaTestUtils.intercept(NodeNotFoundException.class, () -> {
+      reconNodeManager.updateNodeOperationalStateFromScm(node, datanodeDetails);
+    });
+
+    reconNodeManager.register(datanodeDetails, null, null);
+    assertEquals(IN_SERVICE, reconNodeManager
+        .getNodeByUuid(datanodeDetails.getUuidString()).getPersistedOpState());
+
+    when(node.getNodeOperationalStates(eq(0)))
+        .thenReturn(DECOMMISSIONING);
+    reconNodeManager.updateNodeOperationalStateFromScm(node, datanodeDetails);
+    assertEquals(DECOMMISSIONING, reconNodeManager
+        .getNodeByUuid(datanodeDetails.getUuidString()).getPersistedOpState());
+    List<DatanodeDetails> nodes =
+        reconNodeManager.getNodes(DECOMMISSIONING, null);
+    assertEquals(1, nodes.size());
+    assertEquals(datanodeDetails.getUuid(), nodes.get(0).getUuid());
   }
 }

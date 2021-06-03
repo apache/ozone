@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.security.x509.crl;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.jetbrains.annotations.NotNull;
 
@@ -26,6 +27,8 @@ import java.io.IOException;
 import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509CRL;
+import java.security.cert.X509CRLEntry;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.Objects;
 
@@ -38,11 +41,17 @@ public class CRLInfo implements Comparator<CRLInfo>,
   private X509CRL x509CRL;
   private long creationTimestamp;
   private long crlSequenceID;
+  private Instant revocationTime;
 
   private CRLInfo(X509CRL x509CRL, long creationTimestamp, long crlSequenceID) {
+    assert((x509CRL != null) &&
+        !x509CRL.getRevokedCertificates().isEmpty());
     this.x509CRL = x509CRL;
     this.creationTimestamp = creationTimestamp;
     this.crlSequenceID = crlSequenceID;
+    X509CRLEntry entry = x509CRL.getRevokedCertificates().iterator().next();
+    this.revocationTime = Instant.ofEpochMilli(
+        entry.getRevocationDate().getTime());
   }
 
   /**
@@ -71,6 +80,28 @@ public class CRLInfo implements Comparator<CRLInfo>,
         .build();
   }
 
+  public static CRLInfo fromCRLProto3(
+      SCMUpdateServiceProtos.CRLInfoProto info)
+      throws IOException, CRLException, CertificateException {
+    CRLInfo.Builder builder = new CRLInfo.Builder();
+    return builder
+        .setX509CRL(CRLCodec.getX509CRL(info.getX509CRL()))
+        .setCreationTimestamp(info.getCreationTimestamp())
+        .setCrlSequenceID(info.getCrlSequenceID())
+        .build();
+  }
+
+  public SCMUpdateServiceProtos.CRLInfoProto getCRLProto3()
+      throws SCMSecurityException {
+    SCMUpdateServiceProtos.CRLInfoProto.Builder builder =
+        SCMUpdateServiceProtos.CRLInfoProto.newBuilder();
+
+    return builder.setX509CRL(CRLCodec.getPEMEncodedString(getX509CRL()))
+        .setCreationTimestamp(getCreationTimestamp())
+        .setCrlSequenceID(getCrlSequenceID())
+        .build();
+  }
+
   public X509CRL getX509CRL() {
     return x509CRL;
   }
@@ -81,6 +112,14 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
   public long getCrlSequenceID() {
     return crlSequenceID;
+  }
+
+  public boolean shouldRevokeNow() {
+    return revocationTime.isBefore(Instant.now());
+  }
+
+  public Instant getRevocationTime() {
+    return revocationTime;
   }
 
   /**

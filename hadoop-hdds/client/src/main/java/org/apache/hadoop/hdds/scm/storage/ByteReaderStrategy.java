@@ -16,23 +16,26 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils;
+package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 /**
- * A consumer for metadata store key-value entries.
- * Used by {@link MetadataStore} class.
+ * A Reader interface to work with InputStream.
  */
-@FunctionalInterface
-public interface EntryConsumer {
-
+public interface ByteReaderStrategy {
   /**
-   * Consumes a key and value and produces a boolean result.
-   * @param key key
-   * @param value value
-   * @return a boolean value produced by the consumer
+   * Read from a block using the InputStream.
+   * @param is
+   * @param numBytesToRead how many bytes to read
+   * @return number of bytes read
    * @throws IOException
    */
-  boolean consume(byte[] key, byte[] value) throws IOException;
+  int readFromBlock(InputStream is, int numBytesToRead) throws IOException;
+
+  /**
+   * @return the target length to read.
+   */
+  int getTargetLength();
 }
