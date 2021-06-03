@@ -26,6 +26,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -81,7 +83,8 @@ public class SCMStateMachine extends BaseStateMachine {
   // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
 
-  private Daemon leaderReady;
+  private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
+  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean(false);
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
@@ -135,15 +138,13 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
       applyTransactionFuture.complete(process(request));
-      // After restart ratis replay logs from last snapshot index.
-      // So if some transactions which need to be updated to DB will not be
-      // applied to DB. After a restart of SCM container/pipeline managers
-      // have setup the safemode rules with not to update DB. Due to this
-      // some time safemode rules are not validated and SCM does not exit
-      // safe mode. So, once after restart as transactions are applied, we
-      // check whether safe mode rules are validated to solve the issue of
-      // SCM not coming out of safemode.
-      if (scm.isInSafeMode()) {
+
+      // If not leader we still need to refresh and validate.
+      // The follower can still stuck in safemode in the case when leader is
+      // out of safemode, and it has closed few pipelines. Then safemode
+      // rules need to be refresh and validated to get current state of SCM.
+      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()
+          && !scm.getScmContext().isLeader()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.builder()
@@ -185,16 +186,6 @@ public class SCMStateMachine extends BaseStateMachine {
     }
     LOG.info("current leader SCM steps down.");
 
-    if (leaderReady != null) {
-      try {
-
-        leaderReady.join();
-      } catch (InterruptedException ex) {
-        LOG.error("Interrupted while waiting for daemon to exit.", ex);
-      }
-    }
-
-    leaderReady = null;
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
 
@@ -254,38 +245,18 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
+
+    currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
+        .getInfo().getCurrentTerm());
+
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
       LOG.info("leader changed, yet current SCM is still follower.");
       return;
     }
 
-    leaderReady = new Daemon(() -> {
-      RaftServer.Division division =
-          scm.getScmHAManager().getRatisServer().getDivision();
-      while (!division.getInfo().isLeaderReady()) {
-        try {
-          Thread.sleep(300);
-        } catch (InterruptedException ex) {
-          Thread.currentThread().interrupt();
-        }
-      }
-      if (division.getInfo().isLeaderReady()) {
-        scm.getScmContext().updateLeader(true);
-        scm.getSCMServiceManager().notifyStatusChanged();
-        return;
-      }
-    });
+    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
 
-    leaderReady.start();
-    long term = scm.getScmHAManager()
-        .getRatisServer()
-        .getDivision()
-        .getInfo()
-        .getCurrentTerm();
-
-    LOG.info("current SCM becomes leader of term {}.", term);
-
-    scm.getScmContext().updateTerm(term);
+    scm.getScmContext().updateTerm(currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
@@ -338,6 +309,23 @@ public class SCMStateMachine extends BaseStateMachine {
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastAppliedTermIndex(term, index);
+
+    if (currentLeaderTerm.get() == term &&
+        scm.getScmHAManager().getRatisServer().getDivision().getInfo()
+            .isLeaderReady()) {
+      scm.getScmContext().updateLeader(true);
+      scm.getSCMServiceManager().notifyStatusChanged();
+    }
+
+    if (currentLeaderTerm.get() == term && !refreshedAfterLeaderReady.get()
+        && scm.isInSafeMode()) {
+      // Means all transactions before this term have been applied.
+      // This means after a restart, all pending transactions have been applied.
+      scm.getScmSafeModeManager().refresh();
+      scm.getDatanodeProtocolServer().start();
+      currentLeaderTerm.set(-1L);
+      refreshedAfterLeaderReady.set(true);
+    }
   }
 
   @Override
