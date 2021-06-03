@@ -225,4 +225,18 @@ public class CertificateClientTestImpl implements CertificateClient {
     return 0;
   }
 
+  @Override
+  public long getLocalCrlId() {
+    return 0;
+  }
+
+  @Override
+  public void setLocalCrlId(long crlId) {
+  }
+
+  @Override
+  public boolean processCrl(CRLInfo crl) {
+    return false;
+  }
+
 }

@@ -404,6 +404,18 @@ message SetNodeOperationalStateCommandProto {
   required  int64 stateExpiryEpochSeconds = 3;
 }
 
+message CRLStatusReport {
+  required int64 receivedCrlId=1;
+  repeated int64 pendingCrlIds=2;
+}
+
+/**
+ * This command asks the datanode to process a new CRL.
+ */
+message ProcessCRLCommandProto {
+  required CRLInfoProto crlInfo = 1;
+}
+
 /**
  * Protocol used from a datanode to StorageContainerManager.
  *

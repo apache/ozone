@@ -43,6 +43,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -89,6 +90,9 @@ public class StateContext {
   @VisibleForTesting
   static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
+  @VisibleForTesting
+  static final String CRL_STATUS_REPORT_PROTO_NAME =
+      CRLStatusReport.getDescriptor().getFullName();
   // Accepted types of reports that can be queued to incrementalReportsQueue
   private static final Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
       Sets.newHashSet(COMMAND_STATUS_REPORTS_PROTO_NAME,
@@ -107,6 +111,7 @@ public class StateContext {
   private final AtomicReference<GeneratedMessage> containerReports;
   private final AtomicReference<GeneratedMessage> nodeReport;
   private final AtomicReference<GeneratedMessage> pipelineReports;
+  private final AtomicReference<GeneratedMessage> crlStatusReport;
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<GeneratedMessage>>
       incrementalReportsQueue;
@@ -134,12 +139,12 @@ public class StateContext {
    * real HB frequency after scm registration. With this method the
    * initial registration could be significant faster.
    */
-  private AtomicLong heartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
 
   /**
    * Constructs a StateContext.
    *
-   * @param conf   - Configration
+   * @param conf   - Configuration
    * @param state  - State
    * @param parent Parent State Machine
    */
@@ -155,6 +160,7 @@ public class StateContext {
     containerReports = new AtomicReference<>();
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
+    crlStatusReport = new AtomicReference<>();
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
@@ -268,6 +274,8 @@ public class StateContext {
           incrementalReportsQueue.get(endpoint).add(report);
         }
       }
+    } else if(reportType.equals(CRL_STATUS_REPORT_PROTO_NAME)) {
+      crlStatusReport.set(report);
     } else {
       throw new IllegalArgumentException(
           "Unidentified report message type: " + reportType);
@@ -343,6 +351,10 @@ public class StateContext {
       nonIncrementalReports.add(report);
     }
     report = pipelineReports.get();
+    if (report != null) {
+      nonIncrementalReports.add(report);
+    }
+    report = crlStatusReport.get();
     if (report != null) {
       nonIncrementalReports.add(report);
     }
@@ -804,5 +816,10 @@ public class StateContext {
   @VisibleForTesting
   public GeneratedMessage getPipelineReports() {
     return pipelineReports.get();
+  }
+
+  @VisibleForTesting
+  public GeneratedMessage getCRLStatusReport() {
+    return crlStatusReport.get();
   }
 }

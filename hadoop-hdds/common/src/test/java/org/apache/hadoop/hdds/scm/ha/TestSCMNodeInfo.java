@@ -42,6 +42,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 
+/**
+ * Tests for {@link SCMNodeInfo}.
+ */
 public class TestSCMNodeInfo {
 
   private OzoneConfiguration conf = new OzoneConfiguration();
