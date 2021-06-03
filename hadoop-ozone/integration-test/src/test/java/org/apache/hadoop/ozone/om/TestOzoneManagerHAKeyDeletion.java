@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -26,6 +26,9 @@ import java.util.List;
 
 import static org.junit.Assert.fail;
 
+/**
+ * Tests key deletion in OM HA setup.
+ */
 public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
 
   @Test

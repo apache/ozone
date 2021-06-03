@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;

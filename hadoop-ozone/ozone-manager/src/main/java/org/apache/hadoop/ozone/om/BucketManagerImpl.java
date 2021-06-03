@@ -39,7 +39,6 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
-import org.iq80.leveldb.DBException;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,7 +175,7 @@ public class BucketManagerImpl implements BucketManager {
         LOG.debug("created bucket: {} in volume: {}", bucketName,
             volumeName);
       }
-    } catch (IOException | DBException ex) {
+    } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Bucket creation failed for bucket:{} in volume:{}",
             bucketName, volumeName, ex);
@@ -255,7 +254,7 @@ public class BucketManagerImpl implements BucketManager {
             BUCKET_NOT_FOUND);
       }
       return value;
-    } catch (IOException | DBException ex) {
+    } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Exception while getting bucket info for bucket: {}",
             bucketName, ex);
@@ -326,7 +325,7 @@ public class BucketManagerImpl implements BucketManager {
 
 
       commitBucketInfoToDB(omBucketInfo);
-    } catch (IOException | DBException ex) {
+    } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Setting bucket property failed for bucket:{} in volume:{}",
             bucketName, volumeName, ex);

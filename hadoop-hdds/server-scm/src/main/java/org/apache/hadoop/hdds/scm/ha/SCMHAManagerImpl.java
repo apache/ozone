@@ -356,6 +356,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
    // TODO: Fix the metrics ??
     final SCMMetadataStore metadataStore = scm.getScmMetadataStore();
     metadataStore.start(OzoneConfiguration.of(conf));
+    scm.getSequenceIdGen().reinitialize(metadataStore.getSequenceIdTable());
     scm.getPipelineManager().reinitialize(metadataStore.getPipelineTable());
     scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
