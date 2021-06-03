@@ -825,7 +825,7 @@ public class StateContext {
       this.pipelineActions.put(endpoint, new LinkedList<>());
       this.incrementalReportsQueue.put(endpoint, new LinkedList<>());
       Map<String, AtomicBoolean> mp = new HashMap<>();
-      fullReportTypeList.forEach(e ->{
+      fullReportTypeList.forEach(e -> {
         mp.putIfAbsent(e, new AtomicBoolean(true));
       });
       this.fullReportSendIndicator.putIfAbsent(endpoint, mp);
