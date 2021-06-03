@@ -209,6 +209,9 @@ public class PipelineStateManagerV2Impl implements StateManager {
       Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
       nodeManager.removePipeline(pipeline);
       LOG.info("Pipeline {} removed.", pipeline);
+    } catch (PipelineNotFoundException pnfe) {
+      LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
+          + " may have been deleted already.", pipelineIDProto.getId());
     } finally {
       lock.writeLock().unlock();
     }
