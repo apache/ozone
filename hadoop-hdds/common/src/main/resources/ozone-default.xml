@@ -2901,4 +2901,15 @@
       directory deleting service per time interval.
     </description>
   </property>
+
+  <property>
+    <name>ozone.scm.datanode.metadata.volume.free-space.min</name>
+    <value>0MB</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>Minimum amount of storage space required for each metadata
+      volume on a datanode to hold a new pipeline.
+      Datanodes with all its metadata volumes with space under this value
+      will not be allocated a pipeline or container replica.
+    </description>
+  </property>
 </configuration>

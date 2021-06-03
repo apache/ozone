@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
+    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -55,8 +55,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
-    .NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
@@ -129,11 +127,17 @@ public class TestDeadNodeHandler {
     DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
 
     String storagePath = GenericTestUtils.getRandomizedTempPath()
-        .concat("/" + datanode1.getUuidString());
+        .concat("/data-" + datanode1.getUuidString());
+    String metaStoragePath = GenericTestUtils.getRandomizedTempPath()
+        .concat("/metadata-" + datanode1.getUuidString());
 
     StorageReportProto storageOne = TestUtils.createStorageReport(
         datanode1.getUuid(), storagePath, 100 * OzoneConsts.TB,
         10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
+    MetadataStorageReportProto metaStorageOne =
+        TestUtils.createMetadataStorageReport(metaStoragePath,
+            100 * OzoneConsts.GB, 10 * OzoneConsts.GB,
+            90 * OzoneConsts.GB, null);
 
     // Exit safemode, as otherwise the safemode precheck will prevent pipelines
     // from getting created. Due to how this test is wired up, safemode will
@@ -144,25 +148,34 @@ public class TestDeadNodeHandler {
     // test case happy.
 
     nodeManager.register(datanode1,
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
     nodeManager.register(datanode2,
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
     nodeManager.register(datanode3,
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
 
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
 
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Arrays.asList(metaStorageOne)), null);
 
     LambdaTestUtils.await(120000, 1000,
         () -> {
@@ -264,11 +277,5 @@ public class TestDeadNodeHandler {
             Arrays.stream(containers)
                 .map(ContainerInfo::containerID)
                 .collect(Collectors.toSet()));
-  }
-
-  private NodeReportFromDatanode getNodeReport(DatanodeDetails dn,
-      StorageReportProto... reports) {
-    NodeReportProto nodeReportProto = TestUtils.createNodeReport(reports);
-    return new NodeReportFromDatanode(dn, nodeReportProto);
   }
 }
