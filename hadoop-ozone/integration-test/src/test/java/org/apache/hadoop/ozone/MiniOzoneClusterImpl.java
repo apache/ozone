@@ -727,6 +727,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        scmStore.setSCMHAFlag(true);
+        scmStore.persistCurrentState();
         SCMRatisServerImpl.initialize(clusterId, scmId.get(),
             SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
       }
