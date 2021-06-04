@@ -181,14 +181,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
     if (containerInfo != null) {
       return newBlock(containerInfo);
-    } else {
-      // we have tried all strategies we know and but somehow we are not able
-      // to get a container for this block. Log that info and return a null.
-      LOG.error(
-          "Unable to allocate a block for the size: {}, replicationConfig: {}",
-          size, replicationConfig);
-      return null;
     }
+    // we have tried all strategies we know and but somehow we are not able
+    // to get a container for this block. Log that info and return a null.
+    LOG.error(
+        "Unable to allocate a block for the size: {}, replicationConfig: {}",
+        size, replicationConfig);
+    return null;
   }
 
   /**
