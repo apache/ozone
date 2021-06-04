@@ -109,7 +109,7 @@ public class OMPrepareRequest extends OMClientRequest {
       // transactions have been flushed.
       waitForLogIndex(transactionLogIndex, ozoneManager, division,
           flushTimeout, flushCheckInterval);
-      takeSnapshotAndPurgeLogs(division);
+      takeSnapshotAndPurgeLogs(transactionLogIndex, division);
 
       // Save prepare index to a marker file, so if the OM restarts,
       // it will remain in prepare mode as long as the file exists and its
@@ -132,6 +132,15 @@ public class OMPrepareRequest extends OMClientRequest {
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, new OMException(e,
               OMException.ResultCodes.PREPARE_FAILED)));
+
+      // Disable prepare gate and attempt to delete prepare marker file.
+      // Whether marker file delete fails or succeeds, we will return the
+      // above error response to the caller.
+      try {
+        ozoneManager.getPrepareState().cancelPrepare();
+      } catch (IOException ex) {
+        LOG.error("Failed to delete prepare marker file.", ex);
+      }
     }
 
     return response;
@@ -203,31 +212,41 @@ public class OMPrepareRequest extends OMClientRequest {
 
   /**
    * Take a snapshot of the state machine at the last index, and purge at
-   * least all log with indices less than or equal to the snapshot index.
+   * least all log with indices less than or equal to the prepare index.
    * If there is another prepare request or cancel prepare request,
    * this one will end up purging that request since it was allowed through
    * the pre-append prepare gate.
    * This means that an OM cannot support 2 prepare requests in the
    * transaction pipeline (un-applied) at the same time.
    */
-  public static void takeSnapshotAndPurgeLogs(RaftServer.Division division)
-      throws IOException {
+  public static void takeSnapshotAndPurgeLogs(long prepareIndex,
+      RaftServer.Division division) throws IOException {
     StateMachine stateMachine = division.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
+
+    if (snapshotIndex < prepareIndex) {
+      throw new IOException(String.format("OM DB snapshot index %d is less " +
+          "than prepare index %d. Some required logs may not have" +
+          "been persisted to the state machine.", snapshotIndex,
+          prepareIndex));
+    }
 
     CompletableFuture<Long> purgeFuture =
         division.getRaftLog().onSnapshotInstalled(snapshotIndex);
 
     try {
       long actualPurgeIndex = purgeFuture.get();
-      if (actualPurgeIndex < snapshotIndex) {
-        throw new IOException(String.format("Actual purge index %d is less " +
-            "than specified purge index %d. Some required logs may not have" +
-            "been removed.", actualPurgeIndex, snapshotIndex));
-      } else if (actualPurgeIndex != snapshotIndex) {
+
+      if (actualPurgeIndex != snapshotIndex) {
         LOG.warn("Actual purge index {} does not " +
-                "match specified purge index {}. ", actualPurgeIndex,
-            snapshotIndex);
+              "match specified purge index {}. ", actualPurgeIndex,
+          snapshotIndex);
+      }
+
+      if (actualPurgeIndex < prepareIndex) {
+        throw new IOException(String.format("Actual purge index %d is less " +
+          "than prepare index %d. Some required logs may not have" +
+            " been removed.", actualPurgeIndex, prepareIndex));
       }
     } catch (Exception e) {
       // Ozone manager error handler does not respect exception chaining and

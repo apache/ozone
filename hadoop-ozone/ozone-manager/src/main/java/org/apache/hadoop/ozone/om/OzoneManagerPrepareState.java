@@ -110,10 +110,10 @@ public final class OzoneManagerPrepareState {
    * deleted.
    */
   public synchronized void cancelPrepare() throws IOException {
-    deletePrepareMarkerFile();
     prepareIndex = NO_PREPARE_INDEX;
     prepareGateEnabled = false;
     status = PrepareStatus.NOT_PREPARED;
+    deletePrepareMarkerFile();
   }
 
   /**
