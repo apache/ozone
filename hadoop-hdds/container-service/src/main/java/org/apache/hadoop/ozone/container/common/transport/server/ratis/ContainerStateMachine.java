@@ -174,8 +174,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.MB);
     stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-        (index, data) -> new int[] {1, data.size()}, numPendingRequests,
-        pendingRequestsMegaBytesLimit);
+        (index, data) -> new int[] {1, (int) StorageUnit.MB.fromBytes(data.size())},
+        numPendingRequests, pendingRequestsMegaBytesLimit);
 
     this.chunkExecutors = chunkExecutors;
 
