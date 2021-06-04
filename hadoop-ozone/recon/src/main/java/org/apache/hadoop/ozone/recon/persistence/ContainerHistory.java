@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.recon.persistence;
 
 import java.io.Serializable;
 
+/**
+ * Some historical info about a container on a datanode.
+ */
 public class ContainerHistory implements Serializable {
 
   private long containerId;
