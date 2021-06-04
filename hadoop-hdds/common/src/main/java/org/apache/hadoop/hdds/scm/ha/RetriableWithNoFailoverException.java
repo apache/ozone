@@ -19,6 +19,10 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
 
+/**
+ * This exception indicates that the request can be retried, but only on the
+ * same server, without failover.
+ */
 public class RetriableWithNoFailoverException extends IOException {
   public RetriableWithNoFailoverException(IOException exception) {
     super(exception);

@@ -317,6 +317,7 @@ public final class OzoneConsts {
   public static final String DATA_SIZE = "dataSize";
   public static final String REPLICATION_TYPE = "replicationType";
   public static final String REPLICATION_FACTOR = "replicationFactor";
+  public static final String REPLICATION_CONFIG = "replicationConfig";
   public static final String KEY_LOCATION_INFO = "keyLocationInfo";
   public static final String MULTIPART_LIST = "multipartList";
   public static final String UPLOAD_ID = "uploadID";
@@ -397,7 +398,6 @@ public final class OzoneConsts {
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
-  public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
 
   // SCM HA
   public static final String SCM_SERVICE_ID_DEFAULT = "scmServiceIdDefault";

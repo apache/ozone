@@ -446,7 +446,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
       String owner, URI defaultUri, Path workingDir) {
     OmKeyInfo keyInfo = status.getKeyInfo();
-    short replication = (short) keyInfo.getFactor().getNumber();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
         new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())

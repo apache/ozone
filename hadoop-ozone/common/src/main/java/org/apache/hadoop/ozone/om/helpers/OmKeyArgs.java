@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -38,8 +37,7 @@ public final class OmKeyArgs implements Auditable {
   private final String bucketName;
   private final String keyName;
   private long dataSize;
-  private final ReplicationType type;
-  private final ReplicationFactor factor;
+  private final ReplicationConfig replicationConfig;
   private List<OmKeyLocationInfo> locationInfoList;
   private final boolean isMultipartKey;
   private final String multipartUploadID;
@@ -51,7 +49,7 @@ public final class OmKeyArgs implements Auditable {
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
-      long dataSize, ReplicationType type, ReplicationFactor factor,
+      long dataSize, ReplicationConfig replicationConfig,
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
@@ -60,8 +58,7 @@ public final class OmKeyArgs implements Auditable {
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.dataSize = dataSize;
-    this.type = type;
-    this.factor = factor;
+    this.replicationConfig = replicationConfig;
     this.locationInfoList = locationInfoList;
     this.isMultipartKey = isMultipart;
     this.multipartUploadID = uploadID;
@@ -84,12 +81,8 @@ public final class OmKeyArgs implements Auditable {
     return multipartUploadPartNumber;
   }
 
-  public ReplicationType getType() {
-    return type;
-  }
-
-  public ReplicationFactor getFactor() {
-    return factor;
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   public List<OzoneAcl> getAcls() {
@@ -147,10 +140,9 @@ public final class OmKeyArgs implements Auditable {
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.KEY, this.keyName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
-    auditMap.put(OzoneConsts.REPLICATION_TYPE,
-        (this.type != null) ? this.type.name() : null);
-    auditMap.put(OzoneConsts.REPLICATION_FACTOR,
-        (this.factor != null) ? this.factor.name() : null);
+    auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+        (this.replicationConfig != null) ?
+            this.replicationConfig.toString() : null);
     return auditMap;
   }
 
@@ -168,8 +160,7 @@ public final class OmKeyArgs implements Auditable {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(dataSize)
-        .setType(type)
-        .setFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setLocationInfoList(locationInfoList)
         .setIsMultipartKey(isMultipartKey)
         .setMultipartUploadID(multipartUploadID)
@@ -188,8 +179,7 @@ public final class OmKeyArgs implements Auditable {
     private String bucketName;
     private String keyName;
     private long dataSize;
-    private ReplicationType type;
-    private ReplicationFactor factor;
+    private ReplicationConfig replicationConfig;
     private List<OmKeyLocationInfo> locationInfoList;
     private boolean isMultipartKey;
     private String multipartUploadID;
@@ -219,13 +209,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setType(ReplicationType replicationType) {
-      this.type = replicationType;
-      return this;
-    }
-
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
+    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+      this.replicationConfig = replConfig;
       return this;
     }
 
@@ -275,8 +260,9 @@ public final class OmKeyArgs implements Auditable {
     }
 
     public OmKeyArgs build() {
-      return new OmKeyArgs(volumeName, bucketName, keyName, dataSize, type,
-          factor, locationInfoList, isMultipartKey, multipartUploadID,
+      return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
+          replicationConfig, locationInfoList, isMultipartKey,
+          multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
           sortDatanodesInPipeline);
     }

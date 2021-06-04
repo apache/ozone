@@ -385,7 +385,6 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
-   org.fusesource.leveldbjni:leveldbjni-all
    org.ow2.asm:asm
 
 
