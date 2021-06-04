@@ -38,6 +38,8 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -96,6 +98,9 @@ import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -192,10 +197,10 @@ public class TestKeyManagerImpl {
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
-            Mockito.any(ReplicationType.class),
-            Mockito.any(ReplicationFactor.class), Mockito.anyString(),
+            Mockito.any(ReplicationConfig.class),
+            Mockito.anyString(),
             Mockito.any(ExcludeList.class))).thenThrow(
-        new SCMException("SafeModePrecheck failed for allocateBlock",
+                new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
     createBucket(VOLUME_NAME, BUCKET_NAME);
@@ -265,8 +270,7 @@ public class TestKeyManagerImpl {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationType(keyArgs.getType())
-        .setReplicationFactor(keyArgs.getFactor())
+        .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();
     metadataManager.getOpenKeyTable().put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
@@ -286,6 +290,7 @@ public class TestKeyManagerImpl {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .build();
@@ -825,11 +830,11 @@ public class TestKeyManagerImpl {
         TestOMRequestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            ONE, metadataManager);
       } else {  // Add to TableCache
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
       }
     }
@@ -896,12 +901,12 @@ public class TestKeyManagerImpl {
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            ONE, metadataManager);
       } else {  // Add to TableCache
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
       }
     }
@@ -939,12 +944,12 @@ public class TestKeyManagerImpl {
         TestOMRequestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            ONE, metadataManager);
         existKeySet.add(prefixKey + i);
       } else {
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
 
         String key = metadataManager.getOzoneKey(
@@ -1371,9 +1376,9 @@ public class TestKeyManagerImpl {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return new OmKeyArgs.Builder()
         .setBucketName(BUCKET_NAME)
-        .setFactor(ReplicationFactor.ONE)
         .setDataSize(0)
-        .setType(ReplicationType.STAND_ALONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .setVolumeName(VOLUME_NAME);

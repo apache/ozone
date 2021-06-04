@@ -302,7 +302,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // commitKey.
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
-          * omKeyInfo.getFactor().getNumber();
+          * omKeyInfo.getReplicationConfig().getRequiredNodes();
       // check bucket and volume quota
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);

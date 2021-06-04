@@ -38,6 +38,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -389,8 +390,8 @@ public class TestReconWithOzoneManager {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setReplicationConfig(new StandaloneReplicationConfig(
+                HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
   }

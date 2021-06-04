@@ -24,6 +24,8 @@ import java.util.Arrays;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -45,6 +47,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
 import static org.junit.Assert.fail;
 
@@ -300,8 +303,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(getVolumeName())
         .setBucketName(getBucketName())
         .setKeyName(keyName)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
         .build();
     OmKeyInfo keyInfo = getCluster().getOzoneManager().lookupKey(keyArgs);
 
