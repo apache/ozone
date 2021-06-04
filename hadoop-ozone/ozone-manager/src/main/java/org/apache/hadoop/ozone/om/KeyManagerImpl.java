@@ -45,11 +45,11 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -362,8 +362,13 @@ public class KeyManagerImpl implements KeyManager {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, keyInfo.getType(),
-              keyInfo.getFactor(), omId, excludeList);
+          .allocateBlock(
+              scmBlockSize,
+              numBlocks,
+              keyInfo.getReplicationConfig(),
+              omId,
+              excludeList);
+
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
@@ -441,16 +446,6 @@ public class KeyManagerImpl implements KeyManager {
         args.getDataSize() : scmBlockSize;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
 
-    ReplicationFactor factor = args.getFactor();
-    if (factor == null) {
-      factor = useRatis ? ReplicationFactor.THREE : ReplicationFactor.ONE;
-    }
-
-    ReplicationType type = args.getType();
-    if (type == null) {
-      type = useRatis ? ReplicationType.RATIS : ReplicationType.STAND_ALONE;
-    }
-
     String dbKeyName = metadataManager.getOzoneKey(
         args.getVolumeName(), args.getBucketName(), args.getKeyName());
 
@@ -475,8 +470,8 @@ public class KeyManagerImpl implements KeyManager {
     if (keyInfo == null) {
       // the key does not exist, create a new object, the new blocks are the
       // version 0
-      keyInfo = createKeyInfo(args, locations, factor, type, size,
-          encInfo, bucketInfo);
+      keyInfo = createKeyInfo(args, locations, args.getReplicationConfig(),
+              size, encInfo, bucketInfo);
     }
     openVersion = keyInfo.getLatestVersionLocations().getVersion();
     LOG.debug("Key {} allocated in volume {} bucket {}",
@@ -529,8 +524,6 @@ public class KeyManagerImpl implements KeyManager {
   private OmKeyInfo prepareMultipartKeyInfo(OmKeyArgs args, long size,
       List<OmKeyLocationInfo> locations, FileEncryptionInfo encInfo)
       throws IOException {
-    ReplicationFactor factor;
-    ReplicationType type;
 
     Preconditions.checkArgument(args.getMultipartUploadPartNumber() > 0,
         "PartNumber Should be greater than zero");
@@ -549,13 +542,12 @@ public class KeyManagerImpl implements KeyManager {
       throw new OMException("No such Multipart upload is with specified " +
           "uploadId " + uploadID,
           ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-    } else {
-      factor = partKeyInfo.getFactor();
-      type = partKeyInfo.getType();
     }
+
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
-    return createKeyInfo(args, locations, factor, type, size, encInfo,
+    return createKeyInfo(args, locations,
+            partKeyInfo.getReplicationConfig(), size, encInfo,
         getBucketInfo(args.getVolumeName(), args.getBucketName()));
   }
 
@@ -563,8 +555,7 @@ public class KeyManagerImpl implements KeyManager {
    * Create OmKeyInfo object.
    * @param keyArgs
    * @param locations
-   * @param factor
-   * @param type
+   * @param replicationConfig
    * @param size
    * @param encInfo
    * @param omBucketInfo
@@ -572,8 +563,7 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo createKeyInfo(OmKeyArgs keyArgs,
       List<OmKeyLocationInfo> locations,
-      ReplicationFactor factor,
-      ReplicationType type, long size,
+      ReplicationConfig replicationConfig, long size,
       FileEncryptionInfo encInfo,
       OmBucketInfo omBucketInfo) {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
@@ -585,8 +575,7 @@ public class KeyManagerImpl implements KeyManager {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(size)
-        .setReplicationType(type)
-        .setReplicationFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
         .addAllMetadata(keyArgs.getMetadata());
     builder.setAcls(getAclsForKey(keyArgs, omBucketInfo));
@@ -1010,8 +999,7 @@ public class KeyManagerImpl implements KeyManager {
       OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(multipartUploadID)
           .setCreationTime(currentTime)
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setReplicationConfig(keyArgs.getReplicationConfig())
           .setPartKeyInfoList(partKeyInfoMap)
           .build();
       Map<Long, List<OmKeyLocationInfo>> locations = new HashMap<>();
@@ -1021,8 +1009,7 @@ public class KeyManagerImpl implements KeyManager {
           .setKeyName(keyArgs.getKeyName())
           .setCreationTime(currentTime)
           .setModificationTime(currentTime)
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setReplicationConfig(keyArgs.getReplicationConfig())
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, locations)))
           .setAcls(getAclsForKey(keyArgs, bucketInfo))
@@ -1342,10 +1329,8 @@ public class KeyManagerImpl implements KeyManager {
 
               upload.setCreationTime(
                   Instant.ofEpochMilli(multipartKeyInfo.getCreationTime()));
-              upload.setReplicationType(
-                  multipartKeyInfo.getReplicationType());
-              upload.setReplicationFactor(
-                  multipartKeyInfo.getReplicationFactor());
+              upload.setReplicationConfig(
+                      multipartKeyInfo.getReplicationConfig());
             } catch (IOException e) {
               LOG.warn(
                   "Open key entry for multipart upload record can be read  {}",
@@ -1397,8 +1382,7 @@ public class KeyManagerImpl implements KeyManager {
         Iterator<Map.Entry<Integer, PartKeyInfo>> partKeyInfoMapIterator =
             partKeyInfoMap.entrySet().iterator();
 
-        HddsProtos.ReplicationType replicationType = null;
-        HddsProtos.ReplicationFactor replicationFactor = null;
+        ReplicationConfig replicationConfig = null;
 
         int count = 0;
         List<OmPartInfo> omPartInfoList = new ArrayList<>();
@@ -1418,13 +1402,14 @@ public class KeyManagerImpl implements KeyManager {
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts
-            replicationType = partKeyInfo.getPartKeyInfo().getType();
-            replicationFactor = partKeyInfo.getPartKeyInfo().getFactor();
+            replicationConfig = ReplicationConfig.fromTypeAndFactor(
+                    partKeyInfo.getPartKeyInfo().getType(),
+                    partKeyInfo.getPartKeyInfo().getFactor());
             count++;
           }
         }
 
-        if (replicationType == null) {
+        if (replicationConfig == null) {
           //if there are no parts, use the replicationType from the open key.
 
           OmKeyInfo omKeyInfo =
@@ -1435,13 +1420,10 @@ public class KeyManagerImpl implements KeyManager {
                 "Open key is missing for multipart upload " + multipartKey);
           }
 
-          replicationType = omKeyInfo.getType();
-          replicationFactor = omKeyInfo.getFactor();
+          replicationConfig = omKeyInfo.getReplicationConfig();
         }
-        Preconditions.checkNotNull(replicationType,
-            "Replication type can't be identified");
-        Preconditions.checkNotNull(replicationFactor,
-            "Replication factor can't be identified");
+        Preconditions.checkNotNull(replicationConfig,
+            "ReplicationConfig can't be identified");
 
         if (partKeyInfoMapIterator.hasNext()) {
           Map.Entry<Integer, PartKeyInfo> partKeyInfoEntry =
@@ -1452,7 +1434,7 @@ public class KeyManagerImpl implements KeyManager {
           nextPartNumberMarker = 0;
         }
         OmMultipartUploadListParts omMultipartUploadListParts =
-            new OmMultipartUploadListParts(replicationType, replicationFactor,
+            new OmMultipartUploadListParts(replicationConfig,
                 nextPartNumberMarker, isTruncated);
         omMultipartUploadListParts.addPartList(omPartInfoList);
         return omMultipartUploadListParts;
@@ -1899,8 +1881,7 @@ public class KeyManagerImpl implements KeyManager {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.ONE)
+        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.ONE))
         .setFileEncryptionInfo(encInfo)
         .setAcls(acls)
         .build();

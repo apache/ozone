@@ -217,7 +217,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
-      int factor = omKeyInfo.getFactor().getNumber();
+      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // Block was pre-requested and UsedBytes updated when createKey and
       // AllocatedBlock. The space occupied by the Key shall be based on
