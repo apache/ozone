@@ -382,7 +382,13 @@ public class StateContext {
       for (Map.Entry<String, AtomicBoolean> kv : mp.entrySet()) {
         if (kv.getValue().get()) {
           String reportType = kv.getKey();
-          GeneratedMessage msg = type2Reports.get(reportType).get();
+          final AtomicReference<GeneratedMessage> ref =
+              type2Reports.get(reportType);
+          if (ref == null) {
+            throw new RuntimeException(reportType + " is not a valid full "
+                + "report type!");
+          }
+          final GeneratedMessage msg = ref.get();
           if (msg != null) {
             nonIncrementalReports.add(msg);
             mp.get(reportType).set(false);
