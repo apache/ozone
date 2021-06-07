@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.google.re2j.Matcher;
+import com.google.re2j.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
@@ -27,6 +31,8 @@ import java.util.Objects;
  */
 public class ECReplicationConfig implements ReplicationConfig {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ECReplicationConfig.class);
+
   private int data;
 
   private int parity;
@@ -34,6 +40,29 @@ public class ECReplicationConfig implements ReplicationConfig {
   public ECReplicationConfig(int data, int parity) {
     this.data = data;
     this.parity = parity;
+  }
+
+  public ECReplicationConfig(String string) {
+    final Pattern pattern = Pattern.compile("(\\d+)-(\\d+)");
+    final Matcher matcher = pattern.matcher(string);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("EC replication config should be " +
+          "defined in the form 3-2, 6-3 or 10-4");
+    }
+
+    data = Integer.parseInt(matcher.group(1));
+    parity = Integer.parseInt(matcher.group(2));
+    if (data <= 0 || parity <= 0) {
+      throw new IllegalArgumentException("Data and parity part in EC " +
+          "replication config supposed to be positive numbers");
+    }
+    if ((data == 3 && parity == 2)
+        || (data == 6 && parity == 3)
+        || (data == 10 && parity == 4)) {
+      return;
+    }
+    LOG.warn("We recommend to use EC 3-2, 6-3 or 10-4. Other combinations " +
+        "are not tested");
   }
 
   public ECReplicationConfig(
