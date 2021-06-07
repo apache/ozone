@@ -34,6 +34,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Container balancer is a service in SCM to move containers between over- and
@@ -65,6 +67,7 @@ public class ContainerBalancer {
   private double clusterAvgUtilisation;
   private final AtomicBoolean balancerRunning = new AtomicBoolean(false);
   private Thread currentBalancingThread;
+  private Lock lock;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
@@ -98,36 +101,42 @@ public class ContainerBalancer {
     this.underUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
+    this.lock = new ReentrantLock();
   }
   /**
    * Starts ContainerBalancer. Current implementation is incomplete.
    *
    * @param balancerConfiguration Configuration values.
    */
-  public synchronized boolean start(
+  public boolean start(
       ContainerBalancerConfiguration balancerConfiguration) {
-    if (!balancerRunning.compareAndSet(false, true)) {
-      LOG.error("Container Balancer is already running.");
-      return false;
+    lock.lock();
+    try {
+      if (!balancerRunning.compareAndSet(false, true)) {
+        LOG.error("Container Balancer is already running.");
+        return false;
+      }
+
+      ozoneConfiguration = new OzoneConfiguration();
+      this.config = balancerConfiguration;
+      this.idleIteration = config.getIdleIteration();
+      this.threshold = config.getThreshold();
+      this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
+      this.maxSizeToMove = config.getMaxSizeToMove();
+      this.unBalancedNodes = new ArrayList<>();
+      LOG.info("Starting Container Balancer...{}", this);
+      //we should start a new balancer thread async
+      //and response to cli as soon as possible
+
+
+      //TODO: this is a temporary implementation
+      //modify this later
+      currentBalancingThread = new Thread(() -> balance());
+      currentBalancingThread.start();
+      ////////////////////////
+    } finally {
+      lock.unlock();
     }
-
-    ozoneConfiguration = new OzoneConfiguration();
-    this.config = balancerConfiguration;
-    this.idleIteration = config.getIdleIteration();
-    this.threshold = config.getThreshold();
-    this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
-    this.maxSizeToMove = config.getMaxSizeToMove();
-    this.unBalancedNodes = new ArrayList<>();
-    LOG.info("Starting Container Balancer...{}", this);
-    //we should start a new balancer thread async
-    //and response to cli as soon as possible
-
-
-    //TODO: this is a temporary implementation
-    //modify this later
-    currentBalancingThread = new Thread(() -> balance());
-    currentBalancingThread.start();
-    ////////////////////////
 
 
     return true;
@@ -344,22 +353,27 @@ public class ContainerBalancer {
   /**
    * Stops ContainerBalancer.
    */
-  public synchronized void stop() {
-    //we should stop the balancer thread gracefully
-    if(!balancerRunning.get()) {
-      LOG.info("Container Balancer is not running.");
-      return;
+  public void stop() {
+    lock.lock();
+    try {
+      //we should stop the balancer thread gracefully
+      if(!balancerRunning.get()) {
+        LOG.info("Container Balancer is not running.");
+        return;
+      }
+
+
+      //TODO: this is a temporary implementation
+      //modify this later
+      if (currentBalancingThread.isAlive()) {
+        currentBalancingThread.stop();
+      }
+      ///////////////////////////
+
+      balancerRunning.compareAndSet(true, false);
+    } finally {
+      lock.unlock();
     }
-
-
-    //TODO: this is a temporary implementation
-    //modify this later
-    if (currentBalancingThread.isAlive()) {
-      currentBalancingThread.stop();
-    }
-    ///////////////////////////
-
-    balancerRunning.compareAndSet(true, false);
     LOG.info("Container Balancer stopped successfully.");
   }
 
