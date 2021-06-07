@@ -240,7 +240,7 @@ public class OMPrepareRequest extends OMClientRequest {
       if (actualPurgeIndex != snapshotIndex) {
         LOG.warn("Actual purge index {} does not " +
               "match specified purge index {}. ", actualPurgeIndex,
-          snapshotIndex);
+            snapshotIndex);
       }
 
       if (actualPurgeIndex < prepareIndex) {
