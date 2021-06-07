@@ -27,11 +27,10 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringEncoder;
+import io.netty.handler.ssl.SslContext;
 import io.netty.util.CharsetUtil;
 
 import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.ozone.container.stream.DirstreamServerHandler.END_MARKER;
 
 /**
  * Client to stream huge binaries from a streamling server.
@@ -49,6 +48,15 @@ public class StreamingClient implements AutoCloseable {
       int port,
       StreamingDestination streamingDestination
   ) throws InterruptedException {
+    this(host, port, streamingDestination, null);
+  }
+
+  public StreamingClient(
+      String host,
+      int port,
+      StreamingDestination streamingDestination,
+      SslContext sslContext
+  ) throws InterruptedException {
     this.port = port;
     this.host = host;
 
@@ -63,14 +71,16 @@ public class StreamingClient implements AutoCloseable {
           @Override
           public void initChannel(SocketChannel ch) throws Exception {
             ChannelPipeline p = ch.pipeline();
-            p.addLast(new StringEncoder(CharsetUtil.UTF_8),
+            if (sslContext != null) {
+              p.addLast(sslContext.newHandler(ch.alloc(), host, port));
+            }
+            p.addLast(
+                new StringEncoder(CharsetUtil.UTF_8),
                 dirstreamClientHandler
             );
           }
         });
-
   }
-
 
   public void stream(String id) {
     stream(id, 200L, TimeUnit.SECONDS);
@@ -82,7 +92,7 @@ public class StreamingClient implements AutoCloseable {
       channel.writeAndFlush(id + "\n")
           .await(timeout, unit);
       channel.closeFuture().await(timeout, unit);
-      if (!dirstreamClientHandler.getCurrentFileName().equals(END_MARKER)) {
+      if (!dirstreamClientHandler.isAtTheEnd()) {
         throw new RuntimeException("Streaming is failed. Not all files " +
             "are streamed. Please check the log of the server." +
             " Last (partial?) streamed file: "
