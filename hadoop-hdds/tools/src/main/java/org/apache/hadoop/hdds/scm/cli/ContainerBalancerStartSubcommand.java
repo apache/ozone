@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 
 import java.io.IOException;
 
@@ -34,19 +34,19 @@ import java.io.IOException;
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"-t", "--threshold"},
+  @Option(names = {"-t", "--threshold"},
       description = "Threshold target whether the cluster is balanced")
   private double threshold;
 
-  @CommandLine.Option(names = {"-i", "--idleiterations"},
+  @Option(names = {"-i", "--idleiterations"},
       description = "Maximum consecutive idle iterations")
   private int idleiterations;
 
-  @CommandLine.Option(names = {"-d", "--maxDatanodesToBalance"},
+  @Option(names = {"-d", "--maxDatanodesToBalance"},
       description = "Maximum datanodes to move")
   private int maxDatanodesToBalance;
 
-  @CommandLine.Option(names = {"-s", "--maxSizeToMove"},
+  @Option(names = {"-s", "--maxSizeToMove"},
       description = "Maximum size to move")
   private long maxSizeToMove;
 

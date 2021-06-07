@@ -81,7 +81,7 @@ public class TestContainerBalancerOperations {
     assertTrue(running);
 
     // waiting for balance completed.
-    // this is a temporary implementation for now
+    // TODO: this is a temporary implementation for now
     // modify this after balancer is fully completed
     try {
       Thread.sleep(100);

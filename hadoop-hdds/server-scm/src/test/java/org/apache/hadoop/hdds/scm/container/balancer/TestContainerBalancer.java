@@ -99,7 +99,7 @@ public class TestContainerBalancer {
       containerBalancer.start(balancerConfiguration);
 
       // waiting for balance completed.
-      // this is a temporary implementation for now
+      // TODO: this is a temporary implementation for now
       // modify this after balancer is fully completed
       try {
         Thread.sleep(100);
@@ -146,7 +146,7 @@ public class TestContainerBalancer {
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
-    // this is a temporary implementation for now
+    // TODO: this is a temporary implementation for now
     // modify this after balancer is fully completed
     try {
       Thread.sleep(3000);

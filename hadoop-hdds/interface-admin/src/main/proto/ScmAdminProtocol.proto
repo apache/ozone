@@ -456,10 +456,10 @@ message GetContainerTokenResponseProto {
 
 message StartContainerBalancerRequestProto {
   optional string traceID = 1;
-  required double threshold = 2;
-  required int32 idleiterations = 3;
-  required int32 maxDatanodesToBalance = 4;
-  required int64 maxSizeToMove = 5;
+  optional double threshold = 2;
+  optional int32 idleiterations = 3;
+  optional int32 maxDatanodesToBalance = 4;
+  optional int64 maxSizeToMove = 5;
 }
 
 message StartContainerBalancerResponseProto {

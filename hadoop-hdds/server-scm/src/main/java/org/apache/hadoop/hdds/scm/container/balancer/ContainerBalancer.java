@@ -104,7 +104,7 @@ public class ContainerBalancer {
    *
    * @param balancerConfiguration Configuration values.
    */
-  public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
+  public synchronized boolean start(ContainerBalancerConfiguration balancerConfiguration) {
     if (!balancerRunning.compareAndSet(false, true)) {
       LOG.error("Container Balancer is already running.");
       return false;
@@ -122,7 +122,7 @@ public class ContainerBalancer {
     //and response to cli as soon as possible
 
 
-    //this is a temporary implementation
+    //TODO: this is a temporary implementation
     //modify this later
     currentBalancingThread = new Thread(() -> balance());
     currentBalancingThread.start();
@@ -343,7 +343,7 @@ public class ContainerBalancer {
   /**
    * Stops ContainerBalancer.
    */
-  public void stop() {
+  public synchronized void stop() {
     //we should stop the balancer thread gracefully
     if(!balancerRunning.get()) {
       LOG.info("Container Balancer is not running.");
@@ -351,7 +351,7 @@ public class ContainerBalancer {
     }
 
 
-    //this is a temporary implementation
+    //TODO: this is a temporary implementation
     //modify this later
     if (currentBalancingThread.isAlive()) {
       currentBalancingThread.stop();
