@@ -85,8 +85,12 @@ public class StreamingGenerator extends BaseFreonGenerator
   private void generateBaseData() {
     try {
       Path sourceDir = threadRootDir().resolve("streaming-0");
-      if (Files.exists(sourceDir.getParent())) {
-        deleteDirRecursive(sourceDir.getParent());
+      final Path sourceDirParent = sourceDir.getParent();
+      if (sourceDirParent == null) {
+        throw new AssertionError("Empty parrent");
+      }
+      if (Files.exists(sourceDirParent)) {
+        deleteDirRecursive(sourceDirParent);
       }
       Path subDir = sourceDir.resolve(subdir);
       Files.createDirectories(subDir);
