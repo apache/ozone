@@ -164,7 +164,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -3605,15 +3604,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return true if remoteUser is OM admin, false otherwise.
-   * @param remoteUser User name
-   * @throws AccessControlException
+   * Return true if a UserGroupInformation is OM admin, false otherwise.
+   * @param callerUgi Caller UserGroupInformation
    */
-  public boolean isAdmin(String remoteUser) throws AccessControlException {
-    if (remoteUser == null || remoteUser.isEmpty()) {
+  public boolean isAdmin(UserGroupInformation callerUgi) {
+    if (callerUgi == null || omAdminUsernames == null) {
       return false;
     }
-    return omAdminUsernames.contains(remoteUser)
+
+    return omAdminUsernames.contains(callerUgi.getShortUserName())
+        || omAdminUsernames.contains(callerUgi.getUserName())
         || omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD);
   }
 

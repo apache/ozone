@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -997,8 +998,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
                                 final DatanodeDetails datanode,
                                 final boolean force) {
 
+    ContainerID containerID = container.containerID();
     LOG.info("Sending close container command for container {}" +
-            " to datanode {}.", container.containerID(), datanode);
+            " to datanode {}.", containerID, datanode);
     CloseContainerCommand closeContainerCommand =
         new CloseContainerCommand(container.getContainerID(),
             container.getPipelineID(), force);
@@ -1009,8 +1011,16 @@ public class ReplicationManager implements MetricsSource, SCMService {
           + " since current SCM is not leader.", nle);
       return;
     }
+    closeContainerCommand.setEncodedToken(getContainerToken(containerID));
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
         new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
+  }
+
+  private String getContainerToken(ContainerID containerID) {
+    StorageContainerManager scm = scmContext.getScm();
+    return scm != null
+        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
+        : ""; // unit test
   }
 
   /**

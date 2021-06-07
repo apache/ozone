@@ -186,7 +186,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // check bucket and volume quota
       long preAllocatedSpace = newLocationList.size()
               * ozoneManager.getScmBlockSize()
-              * omFileInfo.getFactor().getNumber();
+              * omFileInfo.getReplicationConfig().getRequiredNodes();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);
 

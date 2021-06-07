@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -531,7 +532,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
-    int keyFactor = omKeyInfo.getFactor().getNumber();
+    int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
     OmKeyLocationInfoGroup keyLocationGroup =
         omKeyInfo.getLatestVersionLocations();
 
@@ -618,8 +619,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
-    return createFileInfo(keyArgs, locations, keyArgs.getFactor(),
-            keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
+    return createFileInfo(keyArgs, locations,
+            ReplicationConfig.fromTypeAndFactor(
+                    keyArgs.getType(), keyArgs.getFactor()),
+            keyArgs.getDataSize(), encInfo, prefixManager,
             omBucketInfo, omPathInfo, transactionLogIndex, objectID);
   }
 
@@ -630,8 +633,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
   @SuppressWarnings("parameterNumber")
   protected OmKeyInfo createFileInfo(@Nonnull KeyArgs keyArgs,
       @Nonnull List<OmKeyLocationInfo> locations,
-      @Nonnull HddsProtos.ReplicationFactor factor,
-      @Nonnull HddsProtos.ReplicationType type, long size,
+      @Nonnull ReplicationConfig replicationConfig,
+      long size,
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
@@ -647,8 +650,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setCreationTime(keyArgs.getModificationTime())
             .setModificationTime(keyArgs.getModificationTime())
             .setDataSize(size)
-            .setReplicationType(type)
-            .setReplicationFactor(factor)
+            .setReplicationConfig(replicationConfig)
             .setFileEncryptionInfo(encInfo)
             .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
@@ -680,8 +682,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
           OMFileRequest.OMPathInfoWithFSO omPathInfo,
           @Nonnull long transactionLogIndex, long objectID)
           throws IOException {
-    HddsProtos.ReplicationFactor factor;
-    HddsProtos.ReplicationType type;
 
     Preconditions.checkArgument(args.getMultipartNumber() > 0,
             "PartNumber Should be greater than zero");
@@ -708,14 +708,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("No such Multipart upload is with specified " +
               "uploadId " + uploadID,
               OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-    } else {
-      factor = partKeyInfo.getFactor();
-      type = partKeyInfo.getType();
     }
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
-    return createFileInfo(args, locations, factor, type, size, encInfo,
-            prefixManager, omBucketInfo, omPathInfo, transactionLogIndex,
-            objectID);
+    return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
+            size, encInfo, prefixManager, omBucketInfo, omPathInfo,
+            transactionLogIndex, objectID);
   }
 }

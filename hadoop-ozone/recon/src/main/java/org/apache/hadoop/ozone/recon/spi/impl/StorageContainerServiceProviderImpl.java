@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -65,5 +67,11 @@ public class StorageContainerServiceProviderImpl
   public List<ContainerWithPipeline> getExistContainerWithPipelinesInBatch(
       List<Long> containerIDs) {
     return scmClient.getExistContainerWithPipelinesInBatch(containerIDs);
+  }
+
+  @Override
+  public List<HddsProtos.Node> getNodes() throws IOException {
+    return scmClient.queryNode(null, null, HddsProtos.QueryScope.CLUSTER,
+        "", CURRENT_VERSION);
   }
 }

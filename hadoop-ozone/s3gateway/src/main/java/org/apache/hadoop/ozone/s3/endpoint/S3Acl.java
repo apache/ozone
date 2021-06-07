@@ -35,6 +35,9 @@ import java.util.List;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 
+/**
+ * TODO: javadoc.
+ */
 public final class S3Acl {
   private static final Logger LOG = LoggerFactory.getLogger(S3Acl.class);
 
@@ -89,6 +92,9 @@ public final class S3Acl {
     }
   }
 
+  /**
+   * TODO: javadoc.
+   */
   enum ACLIdentityType {
     USER("CanonicalUser", true, "id"),
     GROUP("Group", false, "url"),

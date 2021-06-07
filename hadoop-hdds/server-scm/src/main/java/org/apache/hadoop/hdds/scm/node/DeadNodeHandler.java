@@ -171,5 +171,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         });
   }
 
+  protected NodeManager getNodeManager() {
+    return nodeManager;
+  }
 
 }

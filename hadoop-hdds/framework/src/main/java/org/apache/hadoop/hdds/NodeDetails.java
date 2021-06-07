@@ -22,7 +22,10 @@ import org.apache.hadoop.net.NetUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
-public class NodeDetails {
+/**
+ * Basic information about nodes in an HA setup.
+ */
+public abstract class NodeDetails {
   private String serviceId;
   private String nodeId;
   private InetSocketAddress rpcAddress;

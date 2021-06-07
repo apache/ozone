@@ -26,6 +26,9 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import java.io.IOException;
 import java.util.ArrayList;
 
+/**
+ * TODO: javadoc.
+ */
 public interface DeletedBlockLogStateManager {
   @Replicate
   void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
