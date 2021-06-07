@@ -23,6 +23,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -50,6 +54,18 @@ public class PipelineFactory {
         new RatisPipelineProvider(nodeManager,
             stateManager, conf,
             eventPublisher, scmContext));
+    PlacementPolicy placementPolicy;
+    try {
+      placementPolicy = ContainerPlacementPolicyFactory.getPolicy(conf,
+          nodeManager, nodeManager.getClusterNetworkTopologyMap(), true,
+          SCMContainerPlacementMetrics.create());
+    } catch (SCMException e) {
+      throw new RuntimeException("Unable to get the container placement policy",
+          e);
+    }
+    providers.put(ReplicationType.EC,
+        new ECPipelineProvider(nodeManager, stateManager, conf,
+            placementPolicy));
   }
 
   protected PipelineFactory() {
