@@ -130,7 +130,7 @@ public class OzoneContainer {
           .newBuilder()
           .addReport(containerReplicaProto)
           .build();
-      context.addReport(icr);
+      context.addIncrementalReport(icr);
       context.getParent().triggerHeartbeat();
     };
 
