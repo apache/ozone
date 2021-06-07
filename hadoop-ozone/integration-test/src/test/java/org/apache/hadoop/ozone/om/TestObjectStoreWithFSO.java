@@ -75,6 +75,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+/**
+ * Tests to verify Object store with prefix enabled cases.
+ */
 public class TestObjectStoreWithFSO {
 
   private static MiniOzoneCluster cluster = null;

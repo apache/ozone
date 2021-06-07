@@ -31,6 +31,9 @@ import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
+/**
+ * Implementation of OzonePrefixPath interface.
+ */
 public class OzonePrefixPathImpl implements OzonePrefixPath {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzonePrefixPathImpl.class);
