@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.junit.After;
 import org.junit.Before;
@@ -90,8 +91,8 @@ public class TestS3MultipartResponse {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(multipartUploadID)
         .setCreationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(new RatisReplicationConfig(
+            HddsProtos.ReplicationFactor.ONE))
         .build();
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
@@ -100,8 +101,8 @@ public class TestS3MultipartResponse {
         .setKeyName(keyName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(new RatisReplicationConfig(
+            HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .build();
@@ -181,8 +182,8 @@ public class TestS3MultipartResponse {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
             .setUploadID(multipartUploadID)
             .setCreationTime(Time.now())
-            .setReplicationType(HddsProtos.ReplicationType.RATIS)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplicationConfig(new RatisReplicationConfig(
+                    HddsProtos.ReplicationFactor.ONE))
             .setParentID(parentID)
             .build();
 
@@ -195,8 +196,8 @@ public class TestS3MultipartResponse {
             .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
-            .setReplicationType(HddsProtos.ReplicationType.RATIS)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplicationConfig(new RatisReplicationConfig(
+                    HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
                     new OmKeyLocationInfoGroup(0, new ArrayList<>())))
             .setParentObjectID(parentID)
@@ -232,8 +233,8 @@ public class TestS3MultipartResponse {
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
               .setUploadID(multipartUploadID)
               .setCreationTime(Time.now())
-              .setReplicationType(HddsProtos.ReplicationType.RATIS)
-              .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+              .setReplicationConfig(new RatisReplicationConfig(
+                      HddsProtos.ReplicationFactor.ONE))
               .setParentID(parentID)
               .build();
     }
@@ -255,8 +256,8 @@ public class TestS3MultipartResponse {
             .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
-            .setReplicationType(HddsProtos.ReplicationType.RATIS)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplicationConfig(new RatisReplicationConfig(
+                    HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
                     new OmKeyLocationInfoGroup(0, new ArrayList<>())))
             .build();

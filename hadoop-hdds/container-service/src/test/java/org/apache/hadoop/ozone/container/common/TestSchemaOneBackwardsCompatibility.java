@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.SchemaOneDeletedBlocksTable;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -238,7 +238,7 @@ public class TestSchemaOneBackwardsCompatibility {
     final long numBlocksToDelete = TestDB.NUM_PENDING_DELETION_BLOCKS;
     String datanodeUuid = UUID.randomUUID().toString();
     ContainerSet containerSet = makeContainerSet();
-    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
@@ -305,7 +305,7 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testReadDeletedBlockChunkInfo() throws Exception {
     String datanodeUuid = UUID.randomUUID().toString();
     ContainerSet containerSet = makeContainerSet();
-    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,

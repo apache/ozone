@@ -21,6 +21,15 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import com.google.common.base.Optional;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -275,7 +284,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       Map<String, String> auditMap, String volumeName,
       String bucketName, String keyName, IOException exception,
       Result result) {
-    auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString());
+    auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString()
+        .replaceAll("\\n", " "));
 
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
@@ -326,7 +336,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmKeyInfo.Builder builder =
           new OmKeyInfo.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
-          .setReplicationFactor(factor).setReplicationType(type)
+          .setReplicationConfig(
+              ReplicationConfig.fromTypeAndFactor(type, factor))
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setDataSize(dataSize)

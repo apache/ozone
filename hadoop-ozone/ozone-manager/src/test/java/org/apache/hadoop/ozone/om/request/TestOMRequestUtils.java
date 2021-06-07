@@ -269,8 +269,7 @@ public final class TestOMRequestUtils {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setReplicationConfig(ReplicationConfig
-            .fromTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
+        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setNodes(new ArrayList<>())
         .build();
 
@@ -355,8 +354,9 @@ public final class TestOMRequestUtils {
         .setCreationTime(creationTime)
         .setModificationTime(Time.now())
         .setDataSize(1000L)
-        .setReplicationType(replicationType)
-        .setReplicationFactor(replicationFactor)
+        .setReplicationConfig(
+            ReplicationConfig
+                .fromTypeAndFactor(replicationType, replicationFactor))
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();
@@ -917,8 +917,8 @@ public final class TestOMRequestUtils {
             .setCreationTime(creationTime)
             .setModificationTime(Time.now())
             .setDataSize(1000L)
-            .setReplicationType(replicationType)
-            .setReplicationFactor(replicationFactor)
+            .setReplicationConfig(ReplicationConfig
+                    .fromTypeAndFactor(replicationType, replicationFactor))
             .setObjectID(objectID)
             .setUpdateID(trxnLogIndex)
             .setParentObjectID(parentID)

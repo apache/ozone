@@ -20,7 +20,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -269,18 +268,11 @@ public class NodeDecommissionManager {
       throws NodeNotFoundException, InvalidNodeStateException {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
-    HddsProtos.NodeState health = nodeStatus.getHealth();
     if (opState == NodeOperationalState.IN_SERVICE) {
-      if (health != HddsProtos.NodeState.DEAD) {
-        LOG.info("Starting Decommission for node {}", dn);
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.DECOMMISSIONING);
-        monitor.startMonitoring(dn);
-      } else {
-        LOG.info("{} is dead. Moving to decommissioned immediately", dn);
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.DECOMMISSIONED);
-      }
+      LOG.info("Starting Decommission for node {}", dn);
+      nodeManager.setNodeOperationalState(
+          dn, NodeOperationalState.DECOMMISSIONING);
+      monitor.startMonitoring(dn);
     } else if (nodeStatus.isDecommission()) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
           "do.", dn, opState);
@@ -362,18 +354,11 @@ public class NodeDecommissionManager {
       maintenanceEnd =
           (System.currentTimeMillis() / 1000L) + (endInHours * 60L * 60L);
     }
-    HddsProtos.NodeState health = nodeStatus.getHealth();
     if (opState == NodeOperationalState.IN_SERVICE) {
-      if (health != HddsProtos.NodeState.DEAD) {
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
-        monitor.startMonitoring(dn);
-        LOG.info("Starting Maintenance for node {}", dn);
-      }  else {
-        LOG.info("{} is dead. Moving to maintenance immediately", dn);
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.IN_MAINTENANCE);
-      }
+      nodeManager.setNodeOperationalState(
+          dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
+      monitor.startMonitoring(dn);
+      LOG.info("Starting Maintenance for node {}", dn);
     } else if (nodeStatus.isMaintenance()) {
       LOG.info("Starting Maintenance called on node {} with state {}. "+
           "Nothing to do.", dn, opState);

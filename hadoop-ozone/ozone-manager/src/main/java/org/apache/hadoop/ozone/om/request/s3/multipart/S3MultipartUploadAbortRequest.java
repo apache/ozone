@@ -157,7 +157,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
       long quotaReleased = 0;
-      int keyFactor = omKeyInfo.getFactor().getNumber();
+      int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       Iterator iter =
           multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
       while(iter.hasNext()) {

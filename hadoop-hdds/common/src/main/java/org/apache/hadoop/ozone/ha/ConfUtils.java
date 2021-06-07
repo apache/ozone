@@ -25,6 +25,9 @@ import org.slf4j.Logger;
 
 import java.net.InetSocketAddress;
 
+/**
+ * Utilities related to configuration.
+ */
 public final class ConfUtils {
 
   private ConfUtils() {

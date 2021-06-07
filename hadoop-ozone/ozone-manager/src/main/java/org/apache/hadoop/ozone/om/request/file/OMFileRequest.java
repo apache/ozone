@@ -29,6 +29,8 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -682,8 +684,8 @@ public final class OMFileRequest {
     builder.setObjectID(dirInfo.getObjectID());
     builder.setUpdateID(dirInfo.getUpdateID());
     builder.setFileName(dirInfo.getName());
-    builder.setReplicationType(HddsProtos.ReplicationType.RATIS);
-    builder.setReplicationFactor(HddsProtos.ReplicationFactor.ONE);
+    builder.setReplicationConfig(new RatisReplicationConfig(
+            HddsProtos.ReplicationFactor.ONE));
     builder.setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())));
     return builder.build();

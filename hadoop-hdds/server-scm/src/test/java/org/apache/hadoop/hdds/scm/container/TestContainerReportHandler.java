@@ -663,14 +663,14 @@ public class TestContainerReportHandler {
     return new ContainerReportFromDatanode(dn, containerReport);
   }
 
-  private static ContainerReportsProto getContainerReportsProto(
+  protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId) {
     return getContainerReportsProto(containerId, state, originNodeId,
         2000000000L, 100000000L);
   }
 
-  private static ContainerReportsProto getContainerReportsProto(
+  protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, final long usedBytes, final long keyCount) {
     final ContainerReportsProto.Builder crBuilder =

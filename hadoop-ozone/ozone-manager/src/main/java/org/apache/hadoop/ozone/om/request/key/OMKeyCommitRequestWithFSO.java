@@ -151,7 +151,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               omKeyInfo, fileName, trxnLogIndex);
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
-      int factor = omKeyInfo.getFactor().getNumber();
+      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       // Block was pre-requested and UsedBytes updated when createKey and
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should

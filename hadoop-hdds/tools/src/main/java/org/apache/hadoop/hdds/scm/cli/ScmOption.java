@@ -53,16 +53,12 @@ public class ScmOption {
   private String scmServiceId;
 
   public ScmClient createScmClient() {
-    try {
-      GenericParentCommand parent = (GenericParentCommand)
-          spec.root().userObject();
-      OzoneConfiguration conf = parent.createOzoneConfiguration();
-      checkAndSetSCMAddressArg(conf);
+    GenericParentCommand parent = (GenericParentCommand)
+        spec.root().userObject();
+    OzoneConfiguration conf = parent.createOzoneConfiguration();
+    checkAndSetSCMAddressArg(conf);
 
-      return new ContainerOperationClient(conf);
-    } catch (IOException ex) {
-      throw new IllegalArgumentException("Can't create SCM client", ex);
-    }
+    return new ContainerOperationClient(conf);
   }
 
   private void checkAndSetSCMAddressArg(MutableConfigurationSource conf) {
