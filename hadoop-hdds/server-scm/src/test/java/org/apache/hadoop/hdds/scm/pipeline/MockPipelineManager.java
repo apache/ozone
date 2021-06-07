@@ -34,7 +34,7 @@ import java.util.stream.Stream;
 /**
  * Mock PipelineManager implementation for testing.
  */
-public final class MockPipelineManager implements PipelineManager {
+public class MockPipelineManager implements PipelineManager {
 
   private PipelineStateManager stateManager;
 
@@ -42,7 +42,7 @@ public final class MockPipelineManager implements PipelineManager {
     return new MockPipelineManager();
   }
 
-  private MockPipelineManager() {
+  MockPipelineManager() {
     this.stateManager = new PipelineStateManager();
   }
 

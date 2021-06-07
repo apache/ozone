@@ -91,14 +91,15 @@ public final class MockPipeline {
   }
 
   public static Pipeline createEcPipeline() {
+    return createEcPipeline(new ECReplicationConfig(3, 2));
+  }
+
+  public static Pipeline createEcPipeline(ECReplicationConfig repConfig) {
 
     List<DatanodeDetails> nodes = new ArrayList<>();
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-
+    for (int i=0; i<repConfig.getRequiredNodes(); i++) {
+      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    }
     Map<DatanodeDetails, Integer> nodeIndexes = new HashMap<>();
 
     int index = nodes.size() - 1;
@@ -110,8 +111,7 @@ public final class MockPipeline {
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setReplicationConfig(
-            new ECReplicationConfig(3, 2))
+        .setReplicationConfig(repConfig)
         .setNodes(nodes)
         .setReplicaIndexes(nodeIndexes)
         .build();
