@@ -84,7 +84,7 @@ public class StreamingGenerator extends BaseFreonGenerator
 
   private void generateBaseData() {
     try {
-      Path sourceDir = testRoot.resolve(Thread.currentThread().getName()).resolve("streaming-0");
+      Path sourceDir = threadRootDir().resolve("streaming-0");
       if (Files.exists(sourceDir.getParent())) {
         deleteDirRecursive(sourceDir.getParent());
       }
@@ -111,8 +111,8 @@ public class StreamingGenerator extends BaseFreonGenerator
       generateBaseData();
       index = 0;
     }
-    Path sourceDir = testRoot.resolve(Thread.currentThread().getName()).resolve("streaming-" + index);
-    Path destinationDir = testRoot.resolve(Thread.currentThread().getName()).resolve("streaming-" + (index + 1));
+    Path sourceDir = threadRootDir().resolve("streaming-" + index);
+    Path destinationDir = threadRootDir().resolve("streaming-" + (index + 1));
     counter.set(index + 1);
 
     int port = (int) (1234 + l);
@@ -141,6 +141,13 @@ public class StreamingGenerator extends BaseFreonGenerator
       deleteDirRecursive(sourceDir);
 
     }
+  }
+
+  /**
+   * Return the thread specific test root directory.
+   */
+  private Path threadRootDir() {
+    return testRoot.resolve(Thread.currentThread().getName());
   }
 
   private void deleteDirRecursive(Path destinationDir) {
