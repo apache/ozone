@@ -316,8 +316,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
   private ContainerInfo getMockDeletedContainer(int containerID) {
     ContainerInfo c = mock(ContainerInfo.class);
     when(c.getContainerID()).thenReturn((long)containerID);
-    when(c.getReplicationFactor())
-        .thenReturn(HddsProtos.ReplicationFactor.THREE);
+    when(c.getReplicationConfig())
+        .thenReturn(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
     when(c.containerID()).thenReturn(ContainerID.valueOf(containerID));
     when(c.getState()).thenReturn(HddsProtos.LifeCycleState.DELETED);
     return c;
