@@ -720,15 +720,37 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public boolean startContainerBalancer(double threshold, int idleiterations,
          int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
-    StartContainerBalancerRequestProto request =
-        StartContainerBalancerRequestProto.newBuilder()
-            .setIdleiterations(idleiterations)
-            .setMaxDatanodesToBalance(maxDatanodesToBalance)
-            .setMaxSizeToMove(maxSizeToMove)
-            .setThreshold(threshold).build();
+    Preconditions.checkState(threshold >= 0,
+        "threshold ID cannot be negative.");
+    Preconditions.checkState(maxSizeToMove >= 0,
+        "maxSizeToMove ID cannot be negative.");
+    Preconditions.checkState(maxDatanodesToBalance >= 0,
+        "maxDatanodesToBalance ID cannot be negative.");
+    Preconditions.checkState(idleiterations >= 0,
+        "idleiterations ID cannot be negative.");
+
+    StartContainerBalancerRequestProto.Builder builder =
+        StartContainerBalancerRequestProto.newBuilder();
+    builder.setTraceID(TracingUtil.exportCurrentSpan());
+
+    //make balancer configuration optional
+    if (threshold > 0) {
+      builder.setThreshold(threshold);
+    }
+    if (maxSizeToMove > 0) {
+      builder.setMaxSizeToMove(maxSizeToMove);
+    }
+    if (maxDatanodesToBalance > 0) {
+      builder.setMaxDatanodesToBalance(maxDatanodesToBalance);
+    }
+    if (idleiterations > 0) {
+      builder.setIdleiterations(idleiterations);
+    }
+
+    StartContainerBalancerRequestProto request = builder.build();
     StartContainerBalancerResponseProto response =
         submitRequest(Type.StartContainerBalancer,
-            builder -> builder.setStartContainerBalancerRequest(request))
+            builder1 -> builder1.setStartContainerBalancerRequest(request))
             .getStartContainerBalancerResponse();
     return response.getStart();
   }

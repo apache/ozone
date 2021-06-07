@@ -104,7 +104,8 @@ public class ContainerBalancer {
    *
    * @param balancerConfiguration Configuration values.
    */
-  public synchronized boolean start(ContainerBalancerConfiguration balancerConfiguration) {
+  public synchronized boolean start(
+      ContainerBalancerConfiguration balancerConfiguration) {
     if (!balancerRunning.compareAndSet(false, true)) {
       LOG.error("Container Balancer is already running.");
       return false;

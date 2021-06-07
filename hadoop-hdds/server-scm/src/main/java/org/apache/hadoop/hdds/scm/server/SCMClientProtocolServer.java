@@ -675,10 +675,18 @@ public class SCMClientProtocolServer implements
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_CONTAINER_BALANCER, null));
     ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
-    cbc.setThreshold(threshold);
-    cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
-    cbc.setMaxSizeToMove(maxSizeToMove);
-    cbc.setIdleIteration(idleiterations);
+    if (threshold > 0) {
+      cbc.setThreshold(threshold);
+    }
+    if (maxDatanodesToBalance > 0) {
+      cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
+    }
+    if (maxSizeToMove > 0) {
+      cbc.setMaxSizeToMove(maxSizeToMove);
+    }
+    if (idleiterations > 0) {
+      cbc.setIdleIteration(idleiterations);
+    }
     return scm.getContainerBalancer().start(cbc);
   }
 

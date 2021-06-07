@@ -641,11 +641,28 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StartContainerBalancerResponseProto startContainerBalancer(
       StartContainerBalancerRequestProto request)
       throws IOException {
+    double threshold = 0;
+    int idleiterations = 0;
+    int maxDatanodesToBalance = 0;
+    long maxSizeToMove = 0L;
+
+    if(request.hasThreshold()) {
+      threshold = request.getThreshold();
+    }
+    if(request.hasIdleiterations()) {
+      idleiterations = request.getIdleiterations();
+    }
+    if(request.hasMaxDatanodesToBalance()) {
+      maxDatanodesToBalance = request.getMaxDatanodesToBalance();
+    }
+    if(request.hasMaxSizeToMove()) {
+      maxSizeToMove = request.getMaxSizeToMove();
+    }
+
     return StartContainerBalancerResponseProto.newBuilder().
-        setStart(impl.startContainerBalancer(request.getThreshold(),
-            request.getIdleiterations(),
-            request.getMaxDatanodesToBalance(),
-            request.getMaxSizeToMove())).build();
+        setStart(impl.startContainerBalancer(threshold,
+            idleiterations, maxDatanodesToBalance,
+            maxSizeToMove)).build();
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(
