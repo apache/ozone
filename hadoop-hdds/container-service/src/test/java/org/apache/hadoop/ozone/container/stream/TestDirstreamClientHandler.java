@@ -27,17 +27,13 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.Assert.*;
-
 /**
- * Test streaming client
+ * Test streaming client.
  */
 public class TestDirstreamClientHandler {
 
@@ -62,7 +58,6 @@ public class TestDirstreamClientHandler {
 
     handler.doRead(null, wrap("4 asd.txt\nxxxx0 END"));
 
-    String content = new String(Files.readAllBytes(tmpDir.resolve("asd.txt")), StandardCharsets.UTF_8);
     Assert.assertEquals("xxxx", getContent("asd.txt"));
     Assert.assertTrue(handler.isAtTheEnd());
 
@@ -134,7 +129,8 @@ public class TestDirstreamClientHandler {
 
   @NotNull
   private String getContent(String name) throws IOException {
-    return new String(Files.readAllBytes(tmpDir.resolve(name)), StandardCharsets.UTF_8);
+    return new String(Files.readAllBytes(tmpDir.resolve(name)),
+        StandardCharsets.UTF_8);
   }
 
   private ByteBuf wrap(String content) {
