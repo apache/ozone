@@ -225,9 +225,6 @@ public class TestHDDSUpgrade {
     } catch (TimeoutException | InterruptedException e) {
       Assert.fail("Timeout waiting for Upgrade to complete on SCM.");
     }
-    int pipelineCount = scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
-        .size();
-    Assert.assertTrue(pipelineCount >= 1);
 
     // SCM will not return from finalization until there is at least one
     // RATIS 3 pipeline. For this to exist, all three of our datanodes must
@@ -513,6 +510,7 @@ public class TestHDDSUpgrade {
           new ArrayList<>(cluster.getHddsDatanodes());
       for (HddsDatanodeService ds: currentDataNodes) {
         DatanodeDetails dn = ds.getDatanodeDetails();
+        LOG.info("Restarting datanode {}", dn.getUuidString());
         cluster.restartHddsDatanode(dn, false);
       }
       cluster.waitForClusterToBeReady();
