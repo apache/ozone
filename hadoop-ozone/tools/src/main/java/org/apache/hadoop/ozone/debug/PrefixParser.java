@@ -50,6 +50,9 @@ import picocli.CommandLine.Spec;
 @MetaInfServices(SubcommandWithParent.class)
 public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
+  /**
+   * Types to represent the level or path component type.
+   */
   public enum Types {
     VOLUME,
     BUCKET,
