@@ -2849,7 +2849,6 @@
     </description>
   </property>
 
-
   <property>
     <name>ozone.scm.ca.list.retry.interval</name>
     <tag>OZONE, SCM, OM, DATANODE</tag>
@@ -2863,4 +2862,11 @@
     </description>
   </property>
 
+  <property>
+    <name>ozone.client.key.latest.version.location</name>
+    <tag>OZONE, CLIENT</tag>
+    <value>true</value>
+    <description>Ozone client gets the latest version location.
+    </description>
+  </property>
 </configuration>

@@ -668,6 +668,10 @@ public class KeyManagerImpl implements KeyManager {
       throw new OMException("Key not found", KEY_NOT_FOUND);
     }
 
+    if (args.getLatestVersionLocation()) {
+      slimLocationVersion(value);
+    }
+
     // add block token for read.
     addBlockToken4Read(value);
 
@@ -910,6 +914,11 @@ public class KeyManagerImpl implements KeyManager {
 
     List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
+
+    // For listKeys, we return the latest Key Location by default
+    for (OmKeyInfo omKeyInfo : keyList) {
+      slimLocationVersion(omKeyInfo);
+    }
 
     return keyList;
   }
@@ -1757,7 +1766,8 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = args.getKeyName();
 
     return getOzoneFileStatus(volumeName, bucketName, keyName,
-            args.getRefreshPipeline(), args.getSortDatanodes(), clientAddress);
+        args.getRefreshPipeline(), args.getSortDatanodes(),
+        args.getLatestVersionLocation(), clientAddress);
   }
 
   private OzoneFileStatus getOzoneFileStatus(String volumeName,
@@ -1765,6 +1775,7 @@ public class KeyManagerImpl implements KeyManager {
                                              String keyName,
                                              boolean refreshPipeline,
                                              boolean sortDatanodes,
+                                             boolean latestLocationVersion,
                                              String clientAddress)
       throws IOException {
     OmKeyInfo fileKeyInfo = null;
@@ -1798,6 +1809,9 @@ public class KeyManagerImpl implements KeyManager {
 
       // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
+        if (latestLocationVersion) {
+          slimLocationVersion(fileKeyInfo);
+        }
         // refreshPipeline flag check has been removed as part of
         // https://issues.apache.org/jira/browse/HDDS-3658.
         // Please refer this jira for more details.
@@ -1962,8 +1976,8 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus = getOzoneFileStatus(volumeName, bucketName,
-            keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
-            clientAddress);
+        keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
+        args.getLatestVersionLocation(), clientAddress);
       //if key is not of type file or if key is not found we throw an exception
     if (fileStatus.isFile()) {
       // add block token for read.
@@ -2190,6 +2204,9 @@ public class KeyManagerImpl implements KeyManager {
     for (OzoneFileStatus fileStatus : fileStatusList) {
       keyInfoList.add(fileStatus.getKeyInfo());
     }
+    if (args.getLatestVersionLocation()) {
+      slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
+    }
     refreshPipeline(keyInfoList);
 
     if (args.getSortDatanodes()) {
@@ -2350,5 +2367,23 @@ public class KeyManagerImpl implements KeyManager {
       nodeSet.add(node.getUuidString());
     }
     return nodeSet;
+  }
+
+  private void slimLocationVersion(OmKeyInfo... keyInfos) {
+    if (keyInfos != null) {
+      for (OmKeyInfo keyInfo : keyInfos) {
+        OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();
+        if (key == null) {
+          LOG.warn("No location version for key {}", keyInfo);
+          continue;
+        }
+        int keyLocationVersionLength = keyInfo.getKeyLocationVersions().size();
+        if (keyLocationVersionLength <= 1) {
+          continue;
+        }
+        keyInfo.setKeyLocationVersions(keyInfo.getKeyLocationVersions()
+            .subList(keyLocationVersionLength-1, keyLocationVersionLength));
+      }
+    }
   }
 }
