@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLoca
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
 
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,17 +82,6 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.dataSize = dataSize;
-    // it is important that the versions are ordered from old to new.
-    // Do this sanity check when versions got loaded on creating OmKeyInfo.
-    // TODO : this is not necessary, here only because versioning is still a
-    // work in-progress, remove this following check when versioning is
-    // complete and prove correctly functioning
-    long currentVersion = -1;
-    for (OmKeyLocationInfoGroup version : versions) {
-      Preconditions.checkArgument(
-            currentVersion + 1 == version.getVersion());
-      currentVersion = version.getVersion();
-    }
     this.keyLocationVersions = versions;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
@@ -168,6 +156,11 @@ public final class OmKeyInfo extends WithParentObjectId {
 
   public List<OmKeyLocationInfoGroup> getKeyLocationVersions() {
     return keyLocationVersions;
+  }
+
+  public void setKeyLocationVersions(
+      List<OmKeyLocationInfoGroup> keyLocationVersions) {
+    this.keyLocationVersions = keyLocationVersions;
   }
 
   public void updateModifcationTime() {

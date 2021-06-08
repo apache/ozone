@@ -2849,7 +2849,6 @@
     </description>
   </property>
 
-
   <property>
     <name>ozone.scm.ca.list.retry.interval</name>
     <tag>OZONE, SCM, OM, DATANODE</tag>
@@ -2860,6 +2859,14 @@
       1. (Additional one certificate is root CA certificate). If the received
       CA list size is not matching with expected count, this is the duration
       used to wait before making next attempt to get CA list.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.key.latest.version.location</name>
+    <tag>OZONE, CLIENT</tag>
+    <value>true</value>
+    <description>Ozone client gets the latest version location.
     </description>
   </property>
 
@@ -2894,5 +2901,4 @@
       directory deleting service per time interval.
     </description>
   </property>
-
 </configuration>

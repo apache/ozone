@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -66,6 +67,11 @@ public class ContainerHealthStatus {
 
   public boolean isHealthy() {
     return replicaDelta == 0 && !isMisReplicated();
+  }
+
+  public boolean isDeleted() {
+    return container.getState() == HddsProtos.LifeCycleState.DELETED ||
+        container.getState() == HddsProtos.LifeCycleState.DELETING;
   }
 
   public boolean isOverReplicated() {
