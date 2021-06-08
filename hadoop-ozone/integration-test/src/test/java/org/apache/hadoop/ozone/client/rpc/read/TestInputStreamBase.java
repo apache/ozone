@@ -57,8 +57,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
+/**
+ * Common tests for Ozone's {@code InputStream} implementations.
+ */
 @RunWith(Parameterized.class)
-public class TestInputStreamBase {
+public abstract class TestInputStreamBase {
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();

@@ -54,6 +54,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.onFailure;
 
 import org.slf4j.Logger;
@@ -336,6 +337,17 @@ public final class ChunkUtils {
           of, expected, actual);
       LOG.error(err);
       throw new StorageContainerException(err, code);
+    }
+  }
+
+  public static void limitReadSize(long len)
+      throws StorageContainerException {
+    if (len > OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE) {
+      String err = String.format(
+          "Oversize read. max: %d, actual: %d",
+          OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE, len);
+      LOG.error(err);
+      throw new StorageContainerException(err, UNSUPPORTED_REQUEST);
     }
   }
 

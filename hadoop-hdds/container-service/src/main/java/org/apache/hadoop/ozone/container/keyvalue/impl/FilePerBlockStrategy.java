@@ -59,6 +59,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
@@ -152,6 +153,8 @@ public class FilePerBlockStrategy implements ChunkManager {
       return ChunkBuffer.wrap(ByteBuffer.wrap(new byte[0]));
     }
 
+    limitReadSize(info.getLen());
+
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
@@ -159,7 +162,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     File chunkFile = getChunkFile(container, blockID, info);
 
-    long len = info.getLen();
+    int len = (int) info.getLen();
     long offset = info.getOffset();
     long bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);

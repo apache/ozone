@@ -40,13 +40,19 @@ create_results_dir() {
 }
 
 ## @description find all the test.sh scripts in the immediate child dirs
+all_tests_in_immediate_child_dirs() {
+  find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | sort
+}
+
+## @description Find all test.sh scripts in immediate child dirs,
+## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$")
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
+       untagged="$(all_tests_in_immediate_child_dirs | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -55,9 +61,11 @@ find_tests(){
     if [[ -z "${tests}" ]]; then
        echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
        exit 1
-  fi
+    fi
+  elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
+    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(all_tests_in_immediate_child_dirs | xargs grep -L '^#suite:failing')
   fi
   echo $tests
 }
@@ -76,7 +84,7 @@ wait_for_safemode_exit(){
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
          status=$(docker-compose exec -T ${SCM} bash -c "$command")
      fi
@@ -112,7 +120,7 @@ wait_for_om_leader() {
   while [[ $SECONDS -lt 120 ]]; do
     local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
       status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
     fi

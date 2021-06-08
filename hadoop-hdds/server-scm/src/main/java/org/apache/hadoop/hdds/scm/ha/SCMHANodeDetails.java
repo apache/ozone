@@ -60,6 +60,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
+/**
+ * SCM HA node details.
+ */
 public class SCMHANodeDetails {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMHANodeDetails.class);
@@ -90,6 +93,11 @@ public class SCMHANodeDetails {
       OZONE_SCM_ADDRESS_KEY
   };
 
+  /**
+   * SCMHANodeDetails object.
+   * @param localNodeDetails
+   * @param peerNodeDetails
+   */
   public SCMHANodeDetails(SCMNodeDetails localNodeDetails,
       List<SCMNodeDetails> peerNodeDetails) {
     this.localNodeDetails = localNodeDetails;

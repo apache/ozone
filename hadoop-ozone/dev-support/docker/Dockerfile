@@ -63,7 +63,7 @@ USER jenkins1000
 RUN cd /tmp && \
    git clone --depth=1 https://gitbox.apache.org/repos/asf/hadoop.git -b trunk && \
    cd /tmp/hadoop && \
-   mvn package dependency:go-offline -DskipTests -P hdds -pl :hadoop-ozone-dist -am && \
+   mvn package dependency:go-offline -DskipTests -P hdds -pl :ozone-dist -am && \
    rm -rf /tmp/.m2/repository/org/apache/hadoop/*hdds* && \
    rm -rf /tmp/.m2/repository/org/apache/hadoop/*ozone* && \
    find /tmp/.m2/repository -exec chmod o+wx {} \;
