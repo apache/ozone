@@ -2190,7 +2190,7 @@ public class KeyManagerImpl implements KeyManager {
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       fileStatus = getOzoneFileStatusFSO(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress,
-              args.getLatestVersionLocation(),false);
+              args.getLatestVersionLocation(), false);
     } else {
       fileStatus = getOzoneFileStatus(volumeName, bucketName,
               keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
@@ -2556,7 +2556,7 @@ public class KeyManagerImpl implements KeyManager {
 
         OzoneFileStatus fileStatusInfo = getOzoneFileStatusFSO(volumeName,
                 bucketName, startKey, false, null,
-                args.getLatestVersionLocation(),true);
+                args.getLatestVersionLocation(), true);
 
         if (fileStatusInfo != null) {
           prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
@@ -2990,7 +2990,7 @@ public class KeyManagerImpl implements KeyManager {
           continue;
         }
         keyInfo.setKeyLocationVersions(keyInfo.getKeyLocationVersions()
-                .subList(keyLocationVersionLength - 1, keyLocationVersionLength));
+            .subList(keyLocationVersionLength - 1, keyLocationVersionLength));
       }
     }
   }
