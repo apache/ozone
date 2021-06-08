@@ -30,7 +30,7 @@ jobs:
     strategy:
       matrix:
         java: [ 8, 11 ]
-      #fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -84,7 +84,7 @@ jobs:
           - findbugs
           - rat
           - unit
-      #fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -154,7 +154,7 @@ jobs:
           - secure
           - unsecure
           - misc
-      #fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -232,7 +232,7 @@ jobs:
           - client
           - filesystem-hdds
           - ozone
-      #fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Setup link to SSD
         run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
