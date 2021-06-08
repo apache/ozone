@@ -30,7 +30,7 @@ import java.util.Objects;
 public class StandaloneReplicationConfig implements ReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
-  private final static String REPLICATION_TYPE = "STANDALONE";
+  private static final String REPLICATION_TYPE = "STANDALONE";
 
   public StandaloneReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
