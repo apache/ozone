@@ -681,6 +681,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     req.setKeyArgs(keyArgs);
 
@@ -1214,6 +1215,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     GetFileStatusRequest req =
         GetFileStatusRequest.newBuilder()
@@ -1267,6 +1269,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     LookupFileRequest lookupFileRequest = LookupFileRequest.newBuilder()
             .setKeyArgs(keyArgs)
@@ -1431,6 +1434,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     ListStatusRequest listStatusRequest =
         ListStatusRequest.newBuilder()
