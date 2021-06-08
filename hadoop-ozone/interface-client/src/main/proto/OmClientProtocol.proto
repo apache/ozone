@@ -741,9 +741,10 @@ message KeyArgs {
 
     // This will be set by leader OM in HA and update the original request.
     optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+    optional bool latestVersionLocation = 16;
 
     // This will be set when user performs delete directory recursively.
-    optional bool recursive = 16;
+    optional bool recursive = 17;
 }
 
 message KeyLocation {

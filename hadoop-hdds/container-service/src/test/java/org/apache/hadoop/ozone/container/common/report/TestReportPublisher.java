@@ -133,7 +133,7 @@ public class TestReportPublisher {
     Thread.sleep(150);
     executorService.shutdown();
     Assert.assertEquals(1, ((DummyReportPublisher) publisher).getReportCount);
-    verify(dummyContext, times(1)).addReport(null);
+    verify(dummyContext, times(1)).refreshFullReport(null);
     // After executor shutdown, no new reports should be published
     Thread.sleep(100);
     Assert.assertEquals(1, ((DummyReportPublisher) publisher).getReportCount);
