@@ -32,7 +32,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
-
+/**
+ * Tests to verify ofs with prefix enabled cases.
+ */
 @RunWith(Parameterized.class)
 public class TestRootedOzoneFileSystemWithFSO
     extends TestRootedOzoneFileSystem {

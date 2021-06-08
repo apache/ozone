@@ -26,8 +26,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * Unit test OzoneObjInfo cases.
+ */
 public class TestOzoneObj {
-
 
   private OzoneObjInfo objInfo;
   private OzoneObjInfo.Builder builder;
