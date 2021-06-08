@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
@@ -200,14 +201,15 @@ public final class RatisUtil {
       // primary SCM. When the bootstrapped SCM connects to other
       // bootstrapped SCM we get the NOT_A_PRIMARY_SCM. In this scenario
       // client needs to retry next SCM.
+
+      // And also on primary/leader SCM if it failed due to any other reason
+      // retry again.
       SCMSecurityException ex = (SCMSecurityException) e;
       if (ex.getErrorCode().equals(NOT_A_PRIMARY_SCM)) {
         throw new ServiceException(new RetriableWithFailOverException(e));
       } else if (ex.getErrorCode().equals(GET_SCM_CERTIFICATE_FAILED) ||
           ex.getErrorCode().equals(GET_OM_CERTIFICATE_FAILED) ||
-          ex.getErrorCode().equals(GET_OM_CERTIFICATE_FAILED)) {
-        // And also on primary SCM if it failed due to any other reason give
-        // another retry again.
+          ex.getErrorCode().equals(GET_DN_CERTIFICATE_FAILED)) {
         throw new ServiceException(new RetriableWithNoFailoverException(e));
       }
     }
