@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.stream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
