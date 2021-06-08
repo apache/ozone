@@ -22,6 +22,7 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
@@ -37,6 +38,9 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
 import static org.apache.ratis.server.RaftServerConfigKeys.Log;
 import static org.apache.ratis.server.RaftServerConfigKeys.RetryCache;
 import static org.apache.ratis.server.RaftServerConfigKeys.Rpc;
@@ -190,6 +194,22 @@ public final class RatisUtil {
       throw new ServiceException(ServerNotLeaderException
           .convertToNotLeaderException(nle,
               SCMRatisServerImpl.getSelfPeerId(scmId), port));
+    } else if (e instanceof SCMSecurityException) {
+      // For this error client needs to retry on next SCM.
+      // GetSCMCertificate call can happen on non-leader SCM and only an
+      // primary SCM. When the bootstrapped SCM connects to other
+      // bootstrapped SCM we get the NOT_A_PRIMARY_SCM. In this scenario
+      // client needs to retry next SCM.
+      SCMSecurityException ex = (SCMSecurityException) e;
+      if (ex.getErrorCode().equals(NOT_A_PRIMARY_SCM)) {
+        throw new ServiceException(new RetriableWithFailOverException(e));
+      } else if (ex.getErrorCode().equals(GET_SCM_CERTIFICATE_FAILED) ||
+          ex.getErrorCode().equals(GET_OM_CERTIFICATE_FAILED) ||
+          ex.getErrorCode().equals(GET_OM_CERTIFICATE_FAILED)) {
+        // And also on primary SCM if it failed due to any other reason give
+        // another retry again.
+        throw new ServiceException(new RetriableWithNoFailoverException(e));
+      }
     }
   }
 }
