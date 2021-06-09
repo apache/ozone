@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -28,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -35,7 +37,9 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -43,13 +47,16 @@ import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * A class that encapsulates OzoneBucket.
@@ -555,6 +562,10 @@ public class OzoneBucket extends WithMetadata {
    */
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
       String prevKey) throws IOException {
+
+    if(OzoneFSUtils.isFSOptimizedBucket(getMetadata())){
+      return new KeyIteratorWithFSO(keyPrefix, prevKey);
+    }
     return new KeyIterator(keyPrefix, prevKey);
   }
 
@@ -564,7 +575,21 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException
    */
   public void deleteKey(String key) throws IOException {
-    proxy.deleteKey(volumeName, name, key);
+    proxy.deleteKey(volumeName, name, key, false);
+  }
+
+  /**
+   * Ozone FS api to delete a directory. Sub directories will be deleted if
+   * recursive flag is true, otherwise it will be non-recursive.
+   *
+   * @param key       Name of the key to be deleted.
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
+   * @throws IOException
+   */
+  public void deleteDirectory(String key, boolean recursive)
+      throws IOException {
+    proxy.deleteKey(volumeName, name, key, recursive);
   }
 
   /**
@@ -817,6 +842,13 @@ public class OzoneBucket extends WithMetadata {
     private Iterator<OzoneKey> currentIterator;
     private OzoneKey currentValue;
 
+    String getKeyPrefix() {
+      return keyPrefix;
+    }
+
+    void setKeyPrefix(String keyPrefixPath) {
+      keyPrefix = keyPrefixPath;
+    }
 
     /**
      * Creates an Iterator to iterate over all keys after prevKey in the bucket.
@@ -825,7 +857,7 @@ public class OzoneBucket extends WithMetadata {
      * @param keyPrefix
      */
     KeyIterator(String keyPrefix, String prevKey) throws IOException{
-      this.keyPrefix = keyPrefix;
+      setKeyPrefix(keyPrefix);
       this.currentValue = null;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
     }
@@ -857,10 +889,285 @@ public class OzoneBucket extends WithMetadata {
      * @param prevKey
      * @return {@code List<OzoneKey>}
      */
-    private List<OzoneKey> getNextListOfKeys(String prevKey) throws
+    List<OzoneKey> getNextListOfKeys(String prevKey) throws
         IOException {
       return proxy.listKeys(volumeName, name, keyPrefix, prevKey,
           listCacheSize);
     }
+  }
+
+
+  /**
+   * An Iterator to iterate over {@link OzoneKey} list.
+   *
+   *                  buck-1
+   *                    |
+   *                    a
+   *                    |
+   *      -----------------------------------
+   *     |           |                       |
+   *     b1          b2                      b3
+   *   -----       --------               ----------
+   *   |    |      |    |   |             |    |     |
+   *  c1   c2     d1   d2  d3             e1   e2   e3
+   *                   |                  |
+   *               --------               |
+   *              |        |              |
+   *           d21.txt   d22.txt        e11.txt
+   *
+   * Say, keyPrefix="a" and prevKey="", then will do Depth-First-Traversal and
+   * visit node to getChildren in below fashion:-
+   * 1. getChildren("a/")  2. getChildren("a/b1")  3. getChildren("a/b1/c1")
+   * 4. getChildren("a/b1/c2")  5. getChildren("a/b2/d1")
+   * 6. getChildren("a/b2/d2")  7. getChildren("a/b2/d3")
+   * 8. getChildren("a/b3/e1")  9. getChildren("a/b3/e2")
+   * 10. getChildren("a/b3/e3")
+   *
+   * Note: Does not guarantee to return the list of keys in a sorted order.
+   */
+  private class KeyIteratorWithFSO extends KeyIterator{
+
+    private Stack<String> stack;
+    private List<OzoneKey> pendingItemsToBeBatched;
+    private boolean addedKeyPrefix;
+
+    /**
+     * Creates an Iterator to iterate over all keys after prevKey in the bucket.
+     * If prevKey is null it iterates from the first key in the bucket.
+     * The returned keys match key prefix.
+     *
+     * @param keyPrefix
+     * @param prevKey
+     */
+    KeyIteratorWithFSO(String keyPrefix, String prevKey) throws IOException {
+      super(keyPrefix, prevKey);
+    }
+
+    @Override
+    List<OzoneKey> getNextListOfKeys(String prevKey) throws IOException {
+      if (stack == null) {
+        stack = new Stack();
+        pendingItemsToBeBatched = new ArrayList<>();
+      }
+
+      // normalize paths
+      if (!addedKeyPrefix) {
+        prevKey = OmUtils.normalizeKey(prevKey, true);
+        String keyPrefixName = "";
+        if (StringUtils.isNotBlank(getKeyPrefix())) {
+          keyPrefixName = OmUtils.normalizeKey(getKeyPrefix(), true);
+        }
+        setKeyPrefix(keyPrefixName);
+      }
+
+      // Get immediate children
+      List<OzoneKey> keysResultList = new ArrayList<>();
+      getChildrenKeys(getKeyPrefix(), prevKey, keysResultList);
+
+      // TODO: Back and Forth seek all the files & dirs, starting from
+      //  startKey till keyPrefix.
+
+      return keysResultList;
+    }
+
+    /**
+     * List children under the given keyPrefix and startKey path. It does
+     * recursive #listStatus calls to list all the sub-keys resultList.
+     *
+     *                  buck-1
+     *                    |
+     *                    a
+     *                    |
+     *      -----------------------------------
+     *     |           |                       |
+     *     b1          b2                      b3
+     *   -----       --------               ----------
+     *   |    |      |    |   |             |    |     |
+     *  c1   c2     d1   d2  d3             e1   e2   e3
+     *                   |                  |
+     *               --------               |
+     *              |        |              |
+     *           d21.txt   d22.txt        e11.txt
+     *
+     * Say, KeyPrefix = "a" and startKey = null;
+     *
+     * Iteration-1) RPC call proxy#listStatus("a").
+     *              Add b3, b2 and b1 to stack.
+     * Iteration-2) pop b1 and do RPC call proxy#listStatus("b1")
+     *              Add c2, c1 to stack.
+     * Iteration-3) pop c1 and do RPC call proxy#listStatus("c1"). Empty list.
+     * Iteration-4) pop c2 and do RPC call proxy#listStatus("c2"). Empty list.
+     * Iteration-5) pop b2 and do RPC call proxy#listStatus("b2")
+     *              Add d3, d2 and d1 to stack.
+     *              ..........
+     *              ..........
+     * Iteration-n) pop e3 and do RPC call proxy#listStatus("e3")
+     *              Reached end of the FS tree.
+     *
+     * @param keyPrefix
+     * @param startKey
+     * @param keysResultList
+     * @return true represents it reached limit batch size, false otherwise.
+     * @throws IOException
+     */
+    private boolean getChildrenKeys(String keyPrefix, String startKey,
+        List<OzoneKey> keysResultList) throws IOException {
+
+      // listStatus API expects a not null 'startKey' value
+      startKey = startKey == null ? "" : startKey;
+
+      // 1. Add pending items to the user key resultList
+      if (addAllPendingItemsToResultList(keysResultList)) {
+        // reached limit batch size.
+        return true;
+      }
+
+      // 2. Get immediate children of keyPrefix, starting with startKey
+      List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
+              keyPrefix, false, startKey, listCacheSize);
+
+      // 3. Special case: ListKey expects keyPrefix element should present in
+      // the resultList, only if startKey is blank. If startKey is not blank
+      // then resultList shouldn't contain the startKey element.
+      // Since proxy#listStatus API won't return keyPrefix element in the
+      // resultList. So, this is to add user given keyPrefix to the return list.
+      addKeyPrefixInfoToResultList(keyPrefix, startKey, keysResultList);
+
+      // 4. Special case: ListKey expects startKey shouldn't present in the
+      // resultList. Since proxy#listStatus API returns startKey element to
+      // the returnList, this function is to remove the startKey element.
+      removeStartKeyIfExistsInStatusList(startKey, statuses);
+
+      boolean reachedLimitCacheSize = false;
+      // This dirList is used to store paths elements in left-to-right order.
+      List<String> dirList = new ArrayList<>();
+
+      // 5. Iterating over the resultStatuses list and add each key to the
+      // resultList. If the listCacheSize reaches then it will add the rest
+      // of the statuses to pendingItemsToBeBatched
+      for (int indx = 0; indx < statuses.size(); indx++) {
+        OzoneFileStatus status = statuses.get(indx);
+        OmKeyInfo keyInfo = status.getKeyInfo();
+        String keyName = keyInfo.getKeyName();
+
+        // Add dir to the dirList
+        if (status.isDirectory()) {
+          dirList.add(keyInfo.getKeyName());
+          // add trailing slash to represent directory
+          keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+        }
+
+        OzoneKey ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
+                keyInfo.getBucketName(), keyName,
+                keyInfo.getDataSize(), keyInfo.getCreationTime(),
+                keyInfo.getModificationTime(),
+                keyInfo.getReplicationConfig());
+
+        // 5.1) Add to the resultList till it reaches limit batch size.
+        // Once it reaches limit, then add rest of the items to
+        // pendingItemsToBeBatched and this will picked in next batch iteration
+        if (!reachedLimitCacheSize && listCacheSize > keysResultList.size()) {
+          keysResultList.add(ozoneKey);
+          reachedLimitCacheSize = listCacheSize <= keysResultList.size();
+        } else {
+          pendingItemsToBeBatched.add(ozoneKey);
+        }
+      }
+
+      // 6. Push elements in reverse order so that the FS tree traversal will
+      // occur in left-to-right fashion.
+      for (int indx = dirList.size() - 1; indx >= 0; indx--) {
+        String dirPathComponent = dirList.get(indx);
+        stack.push(dirPathComponent);
+      }
+
+      if (reachedLimitCacheSize) {
+        return true;
+      }
+
+      // 7. Pop element and seek for its sub-child path(s). Basically moving
+      // seek pointer to next level(depth) in FS tree.
+      while (!stack.isEmpty()) {
+        keyPrefix = stack.pop();
+        if (getChildrenKeys(keyPrefix, "", keysResultList)) {
+          // reached limit batch size.
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    private void removeStartKeyIfExistsInStatusList(String startKey,
+        List<OzoneFileStatus> statuses) {
+
+      if (StringUtils.isNotBlank(startKey) && !statuses.isEmpty()) {
+        String startKeyPath = startKey;
+        if (startKey.endsWith(OZONE_URI_DELIMITER)) {
+          startKeyPath = OzoneFSUtils.removeTrailingSlashIfNeeded(startKey);
+        }
+        if (StringUtils.equals(statuses.get(0).getKeyInfo().getKeyName(),
+                startKeyPath)) {
+          // remove the duplicateKey from the list.
+          statuses.remove(0);
+        }
+      }
+    }
+
+    private boolean addAllPendingItemsToResultList(List<OzoneKey> keys) {
+
+      Iterator<OzoneKey> ozoneKeyItr = pendingItemsToBeBatched.iterator();
+      while (ozoneKeyItr.hasNext()) {
+        if (listCacheSize <= keys.size()) {
+          // reached limit batch size.
+          return true;
+        }
+        keys.add(ozoneKeyItr.next());
+        ozoneKeyItr.remove();
+      }
+      return false;
+    }
+
+    private void addKeyPrefixInfoToResultList(String keyPrefix,
+        String startKey, List<OzoneKey> keysResultList) throws IOException {
+
+      if (addedKeyPrefix) {
+        return;
+      }
+
+      // setting flag to true.
+      addedKeyPrefix = true;
+
+      // not required to addKeyPrefix
+      // case-1) if keyPrefix is null or empty
+      // case-2) if startKey is not null or empty
+      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey)) {
+        return;
+      }
+
+      // TODO: HDDS-4859 will fix the case where startKey not started with
+      //  keyPrefix.
+
+      OzoneFileStatus status = proxy.getOzoneFileStatus(volumeName, name,
+          keyPrefix);
+
+      if (status != null) {
+        OmKeyInfo keyInfo = status.getKeyInfo();
+        String keyName = keyInfo.getKeyName();
+        if (status.isDirectory()) {
+          // add trailing slash to represent directory
+          keyName =
+              OzoneFSUtils.addTrailingSlashIfNeeded(keyInfo.getKeyName());
+        }
+
+        OzoneKey ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
+            keyInfo.getBucketName(), keyName,
+            keyInfo.getDataSize(), keyInfo.getCreationTime(),
+            keyInfo.getModificationTime(),
+            keyInfo.getReplicationConfig());
+        keysResultList.add(ozoneKey);
+      }
+    }
+
   }
 }

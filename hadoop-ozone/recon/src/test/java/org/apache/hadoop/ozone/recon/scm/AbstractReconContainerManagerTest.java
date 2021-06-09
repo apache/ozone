@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -48,7 +49,6 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
@@ -144,10 +144,9 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationFactor(ONE)
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOwner("test")
             .setState(OPEN)
-            .setReplicationType(STAND_ALONE)
             .build();
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
@@ -165,11 +164,10 @@ public class AbstractReconContainerManagerTest {
               .setContainerID(cID.getId())
               .setNumberOfKeys(10)
               .setPipelineID(pipeline.getId())
-              .setReplicationFactor(ONE)
+              .setReplicationConfig(new StandaloneReplicationConfig(ONE))
               .setOwner("test")
               //add containers in all kinds of state
               .setState(stateTypes[i % stateTypeCount])
-              .setReplicationType(STAND_ALONE)
               .build();
       verifiedContainerPipeline.add(
           new ContainerWithPipeline(cInfo, pipeline));
@@ -200,10 +198,9 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationFactor(ONE)
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOwner("test")
             .setState(state)
-            .setReplicationType(STAND_ALONE)
             .build();
     return new ContainerWithPipeline(containerInfo, pipeline);
   }
@@ -219,10 +216,9 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationFactor(ONE)
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOwner("test")
             .setState(state)
-            .setReplicationType(STAND_ALONE)
             .build();
     return new ContainerWithPipeline(containerInfo, pipeline);
   }

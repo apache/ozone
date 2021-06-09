@@ -27,7 +27,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 /**
- * TODO: javadoc.
+ * DeletedBlockLogStateManager interface to
+ * manage deleted blocks and record them in the underlying persist store.
  */
 public interface DeletedBlockLogStateManager {
   @Replicate

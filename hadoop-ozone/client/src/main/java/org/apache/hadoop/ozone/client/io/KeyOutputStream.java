@@ -90,6 +90,8 @@ public class KeyOutputStream extends OutputStream {
   private boolean isException;
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
+  private long clientID;
+
   /**
    * A constructor for testing purpose only.
    */
@@ -125,6 +127,11 @@ public class KeyOutputStream extends OutputStream {
     return retryCount;
   }
 
+  @VisibleForTesting
+  public long getClientID() {
+    return clientID;
+  }
+
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public KeyOutputStream(
       OzoneClientConfig config,
@@ -156,6 +163,7 @@ public class KeyOutputStream extends OutputStream {
     this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
+    this.clientID = handler.getId();
   }
 
   /**
