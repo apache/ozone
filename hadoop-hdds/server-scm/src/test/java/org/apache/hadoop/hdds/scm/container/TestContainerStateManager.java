@@ -91,7 +91,7 @@ public class TestContainerStateManager {
         .getContainerReplicas(c1.containerID());
 
     Assert.assertEquals(2, replicas.size());
-    Assert.assertEquals(3, c1.getReplicationFactor().getNumber());
+    Assert.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node)
