@@ -28,11 +28,15 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -62,11 +66,13 @@ public class NodeEndpoint {
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
+  private ReconContainerManager reconContainerManager;
 
   @Inject
   NodeEndpoint(OzoneStorageContainerManager reconSCM) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
+    this.reconContainerManager = (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
   }
 
@@ -117,11 +123,26 @@ public class NodeEndpoint {
         }
       });
       try {
-        int containers = nodeManager.getContainers(datanode).size();
+        Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
+
+        int openContainers = 0;
+        for (ContainerID containerID: allContainers) {
+          ContainerInfo containerInfo = reconContainerManager.getContainer(containerID);
+          if (containerInfo.isOpen()) {
+            ++openContainers;
+          }
+        }
+
+        int containers = allContainers.size();
+        int closedContainers = containers - openContainers;
         builder.withContainers(containers);
+        builder.withOpenContainers(openContainers);
+        builder.withClosedContainers(closedContainers);
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
+      } catch (ContainerNotFoundException cnfe) {
+        LOG.warn("Cannot found container.", cnfe);
       }
       datanodes.add(builder.withHostname(hostname)
           .withDatanodeStorageReport(storageReport)
