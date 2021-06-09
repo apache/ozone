@@ -1782,7 +1782,7 @@ public class KeyManagerImpl implements KeyManager {
         return true;
       }
 
-      boolean hasAccess = OzoneAclUtil.checkAclRight(
+      boolean hasAccess = OzoneAclUtil.checkAclRights(
           keyInfo.getAcls(), context);
       if (LOG.isDebugEnabled()) {
         LOG.debug("user:{} has access rights for key:{} :{} ",
