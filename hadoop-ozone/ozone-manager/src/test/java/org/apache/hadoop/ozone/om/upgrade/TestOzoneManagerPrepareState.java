@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -115,19 +117,19 @@ public class TestOzoneManagerPrepareState {
   @Test
   public void testRestoreCorrectIndex() throws Exception {
     writePrepareMarkerFile(TEST_INDEX);
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_COMPLETED, status);
-
+    prepareState.restorePrepareFromFile(TEST_INDEX);
     assertPrepareCompleted(TEST_INDEX);
   }
 
   @Test
   public void testRestoreIncorrectIndex() throws Exception {
     writePrepareMarkerFile(TEST_INDEX);
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX + 1);
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
-
-    assertPrepareNotStarted();
+    // Ratis is allowed to apply transactions after prepare, like commit and
+    // conf entries, but OM write requests are not allowed.
+    // Therefore prepare restoration should only fail if the marker file index
+    // is less than the OM's txn index.
+    assertPrepareFailedException(() ->
+        prepareState.restorePrepareFromFile(TEST_INDEX - 1));
   }
 
   @Test
@@ -136,61 +138,54 @@ public class TestOzoneManagerPrepareState {
     RANDOM.nextBytes(randomBytes);
     writePrepareMarkerFile(randomBytes);
 
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
-
-    assertPrepareNotStarted();
+    assertPrepareFailedException(() ->
+        prepareState.restorePrepareFromFile(TEST_INDEX));
   }
 
   @Test
   public void testRestoreEmptyMarkerFile() throws Exception {
     writePrepareMarkerFile(new byte[]{});
 
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
-
-    assertPrepareNotStarted();
+    assertPrepareFailedException(() ->
+        prepareState.restorePrepareFromFile(TEST_INDEX));
   }
 
   @Test
   public void testRestoreNoMarkerFile() throws Exception {
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
-
+    assertPrepareFailedException(() ->
+        prepareState.restorePrepareFromFile(TEST_INDEX));
     assertPrepareNotStarted();
   }
 
   @Test
-  public void testRestoreAfterStart() throws Exception {
+  public void testRestoreWithGateOnly() throws Exception {
     prepareState.enablePrepareGate();
 
-    // If prepare is started but never finished, no marker file is written to
-    // disk, and restoring the prepare state on an OM restart should leave it
-    // not prepared.
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
-    assertPrepareNotStarted();
+    // If prepare is started but never finished, (gate is up but no marker
+    // file written), then restoring the prepare state from the file should
+    // fail, but leave the in memory state the same.
+    assertPrepareFailedException(() ->
+        prepareState.restorePrepareFromFile(TEST_INDEX));
+    assertPrepareInProgress();
   }
 
   @Test
   public void testMultipleRestores() throws Exception {
-    PrepareStatus status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
+    assertPrepareFailedException(() ->
+        prepareState.restorePrepareFromFile(TEST_INDEX));
     assertPrepareNotStarted();
 
-    status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, status);
+    assertPrepareFailedException(() ->
+        prepareState.restorePrepareFromFile(TEST_INDEX));
     assertPrepareNotStarted();
 
     prepareState.enablePrepareGate();
     prepareState.finishPrepare(TEST_INDEX);
 
-    status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_COMPLETED, status);
+    prepareState.restorePrepareFromFile(TEST_INDEX);
     assertPrepareCompleted(TEST_INDEX);
 
-    status = prepareState.restorePrepare(TEST_INDEX);
-    Assert.assertEquals(PrepareStatus.PREPARE_COMPLETED, status);
+    prepareState.restorePrepareFromFile(TEST_INDEX);
     assertPrepareCompleted(TEST_INDEX);
   }
 
@@ -226,7 +221,7 @@ public class TestOzoneManagerPrepareState {
 
   private void assertPrepareNotStarted() {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assert.assertEquals(PrepareStatus.PREPARE_NOT_STARTED, state.getStatus());
+    Assert.assertEquals(PrepareStatus.NOT_PREPARED, state.getStatus());
     Assert.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
         state.getIndex());
     Assert.assertFalse(prepareState.getPrepareMarkerFile().exists());
@@ -236,7 +231,7 @@ public class TestOzoneManagerPrepareState {
 
   private void assertPrepareInProgress() {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assert.assertEquals(PrepareStatus.PREPARE_IN_PROGRESS, state.getStatus());
+    Assert.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED, state.getStatus());
     Assert.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
         state.getIndex());
     Assert.assertFalse(prepareState.getPrepareMarkerFile().exists());
@@ -269,6 +264,17 @@ public class TestOzoneManagerPrepareState {
   private void assertPrepareGateDown() {
     for (Type cmdType: Type.values()) {
       Assert.assertTrue(prepareState.requestAllowed(cmdType));
+    }
+  }
+
+  private void assertPrepareFailedException(LambdaTestUtils.VoidCallable call)
+      throws Exception {
+    try {
+      call.call();
+    } catch (OMException ex) {
+      if (ex.getResult() != OMException.ResultCodes.PREPARE_FAILED) {
+        throw ex;
+      }
     }
   }
 }

@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -53,16 +54,39 @@ public final class OzoneManagerPrepareState {
   private PrepareStatus status;
   private final ConfigurationSource conf;
 
+  /**
+   * Sets prepare state to {@link PrepareStatus#NOT_PREPARED},
+   * ignoring any marker file that may or may not exist.
+   */
   public OzoneManagerPrepareState(ConfigurationSource conf) {
-    prepareGateEnabled = false;
-    prepareIndex = NO_PREPARE_INDEX;
-    status = PrepareStatus.PREPARE_NOT_STARTED;
     this.conf = conf;
+    prepareIndex = NO_PREPARE_INDEX;
+    prepareGateEnabled = false;
+    status = PrepareStatus.NOT_PREPARED;
+  }
+
+  /**
+   * Restores prepare state from the marker file if it exists, otherwise sets
+   * prepare state to {@link PrepareStatus#NOT_PREPARED}.
+   *
+   * @param conf Configuration used to determine marker file location.
+   * @param currentIndex The OM's current log index to verify the prepare
+   *     index against. Prepare index should not be larger than the current
+   *     index.
+   * @throws IOException On error restoring prepare state from marker file.
+   */
+  public OzoneManagerPrepareState(ConfigurationSource conf, long currentIndex)
+      throws IOException {
+    this(conf);
+
+    if (getPrepareMarkerFile().exists()) {
+      restorePrepareFromFile(currentIndex);
+    }
   }
 
   /**
    * Turns on the prepare gate flag, clears the prepare index, and moves the
-   * prepare status to {@link PrepareStatus#PREPARE_IN_PROGRESS}.
+   * prepare status to {@link PrepareStatus#PREPARE_GATE_ENABLED}.
    *
    * Turning on the prepare gate flag will enable a gate in the
    * {@link OzoneManagerStateMachine#preAppendTransaction} (called on leader
@@ -73,24 +97,23 @@ public final class OzoneManagerPrepareState {
   public synchronized void enablePrepareGate() {
     prepareGateEnabled = true;
     prepareIndex = NO_PREPARE_INDEX;
-    status = PrepareStatus.PREPARE_IN_PROGRESS;
+    status = PrepareStatus.PREPARE_GATE_ENABLED;
   }
 
   /**
    * Removes the prepare marker file, clears the prepare index, turns off
    * the prepare gate, and moves the prepare status to
-   * {@link PrepareStatus#PREPARE_NOT_STARTED}.
+   * {@link PrepareStatus#NOT_PREPARED}.
    * This can be called from any state to clear the current prepare state.
    *
    * @throws IOException If the prepare marker file exists but cannot be
    * deleted.
    */
-  public synchronized void cancelPrepare()
-      throws IOException {
-    deletePrepareMarkerFile();
+  public synchronized void cancelPrepare() throws IOException {
     prepareIndex = NO_PREPARE_INDEX;
     prepareGateEnabled = false;
-    status = PrepareStatus.PREPARE_NOT_STARTED;
+    status = PrepareStatus.NOT_PREPARED;
+    deletePrepareMarkerFile();
   }
 
   /**
@@ -103,40 +126,57 @@ public final class OzoneManagerPrepareState {
    * @throws IOException If the marker file cannot be written.
    */
   public synchronized void finishPrepare(long index) throws IOException {
-    finishPrepare(index, true);
+    restorePrepareFromIndex(index, index, true);
   }
 
-  private void finishPrepare(long index, boolean writeFile) throws IOException {
-    // Enabling the prepare gate is idempotent, and may have already been
-    // performed if we are the leader. If we are a follower, we must ensure this
-    // is run now case we become the leader.
-    enablePrepareGate();
+  /**
+   * Finishes preparation the same way as
+   * {@link OzoneManagerPrepareState#finishPrepare(long)}, but only if {@code
+   * currentIndex} is at least as large as {@code minIndex}. This is useful
+   * if the current log index needs to be checked against a prepare index
+   * saved to disk for validity.
+   */
+  public synchronized void restorePrepareFromIndex(long restoredPrepareIndex,
+      long currentIndex) throws IOException {
+    restorePrepareFromIndex(restoredPrepareIndex, currentIndex, true);
+  }
 
-    if (writeFile) {
-      writePrepareMarkerFile(index);
+  private void restorePrepareFromIndex(long restoredPrepareIndex,
+      long currentIndex, boolean writeFile) throws IOException {
+    if (restoredPrepareIndex <= currentIndex) {
+      // Enabling the prepare gate is idempotent, and may have already been
+      // performed if we are the leader. If we are a follower, we must ensure
+      // this is run now in case we become the leader.
+      enablePrepareGate();
+
+      if (writeFile) {
+        writePrepareMarkerFile(restoredPrepareIndex);
+      }
+      prepareIndex = currentIndex;
+      status = PrepareStatus.PREPARE_COMPLETED;
+    } else {
+      throwPrepareException("Failed to restore OM prepare " +
+              "state, because the existing prepare index %d is larger than" +
+              "the current index %d.", restoredPrepareIndex, currentIndex);
     }
-    prepareIndex = index;
-    status = PrepareStatus.PREPARE_COMPLETED;
   }
 
   /**
    * Uses the on disk marker file to determine the OM's prepare state.
    * If the marker file exists and contains an index matching {@code
-   * expectedPrepareIndex}, the necessary steps will be taken to finish
+   * currentIndex}, the necessary steps will be taken to finish
    * preparation and the state will be moved to
    * {@link PrepareStatus#PREPARE_COMPLETED}.
    * Else, the status will be moved to
-   * {@link PrepareStatus#PREPARE_NOT_STARTED} and any preparation steps will
+   * {@link PrepareStatus#NOT_PREPARED} and any preparation steps will
    * be cancelled.
    *
-   * @return The status the OM is in after this method call.
    * @throws IOException If the marker file cannot be read, and it cannot be
    * deleted as part of moving to the
-   * {@link PrepareStatus#PREPARE_NOT_STARTED} state.
+   * {@link PrepareStatus#NOT_PREPARED} state.
    */
-  public synchronized PrepareStatus restorePrepare(long expectedPrepareIndex)
+  public synchronized void restorePrepareFromFile(long currentIndex)
       throws IOException {
-    boolean prepareIndexRead = true;
     long prepareMarkerIndex = NO_PREPARE_INDEX;
 
     File prepareMarkerFile = getPrepareMarkerFile();
@@ -145,48 +185,37 @@ public final class OzoneManagerPrepareState {
       try(FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
         stream.read(data);
       } catch (IOException e) {
-        LOG.error("Failed to read prepare marker file {} while restoring OM.",
-            prepareMarkerFile.getAbsolutePath());
-        prepareIndexRead = false;
+        throwPrepareException(e, "Failed to read prepare marker " +
+            "file %s while restoring OM.", prepareMarkerFile.getAbsolutePath());
       }
 
       try {
         prepareMarkerIndex = Long.parseLong(
             new String(data, StandardCharsets.UTF_8));
       } catch (NumberFormatException e) {
-        LOG.error("Failed to parse log index from prepare marker file {} " +
-            "while restoring OM.", prepareMarkerFile.getAbsolutePath());
-        prepareIndexRead = false;
+        throwPrepareException("Failed to parse log index from " +
+            "prepare marker file %s while restoring OM.",
+            prepareMarkerFile.getAbsolutePath());
       }
     } else {
       // No marker file found.
-      prepareIndexRead = false;
+      throwPrepareException("Unable to find prepare marker file to restore" +
+          " from. Expected %s: ", prepareMarkerFile.getAbsolutePath());
     }
 
-    boolean prepareRestored = false;
-    if (prepareIndexRead) {
-      if (prepareMarkerIndex != expectedPrepareIndex) {
-        LOG.error("Failed to restore OM prepare state, because the expected " +
-            "prepare index {} does not match the index {} written to the " +
-            "marker file.", expectedPrepareIndex, prepareMarkerIndex);
-      } else {
-        // Prepare state can only be restored if we read the expected index
-        // from the marker file.
-        prepareRestored = true;
-      }
-    }
+    restorePrepareFromIndex(prepareMarkerIndex, currentIndex, false);
+  }
 
-    if (prepareRestored) {
-      // Do not rewrite the marker file, since we verified it already exists.
-      finishPrepare(prepareMarkerIndex, false);
-    } else {
-      // If the potentially faulty marker file cannot be deleted,
-      // propagate the IOException.
-      // If there is no marker file, this call sets the in memory state only.
-      cancelPrepare();
-    }
+  private void throwPrepareException(Throwable cause, String format,
+      Object... args) throws OMException {
+    throw new OMException(String.format(format, args), cause,
+        OMException.ResultCodes.PREPARE_FAILED);
+  }
 
-    return status;
+  private void throwPrepareException(String format,
+      Object... args) throws OMException {
+    throw new OMException(String.format(format, args),
+        OMException.ResultCodes.PREPARE_FAILED);
   }
 
   /**
@@ -241,7 +270,7 @@ public final class OzoneManagerPrepareState {
       Files.delete(markerFile.toPath());
       LOG.info("Deleted prepare marker file: {}", markerFile.getAbsolutePath());
     } else {
-      LOG.info("Request to delete prepare marker file that does not exist: {}",
+      LOG.debug("Request to delete prepare marker file that does not exist: {}",
           markerFile.getAbsolutePath());
     }
   }

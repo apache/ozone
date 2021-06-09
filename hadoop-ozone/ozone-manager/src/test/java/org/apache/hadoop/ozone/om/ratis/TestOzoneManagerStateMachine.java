@@ -271,14 +271,14 @@ public class TestOzoneManagerStateMachine {
         .setClientId("123")
         .build();
 
+    // Without prepare enabled, the txn should be returned unaltered.
     TransactionContext submittedTrx = mockTransactionContext(createKeyRequest);
     TransactionContext returnedTrx =
         ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-
-    // No prepare should be triggered, and the txn should be returned unaltered.
-    Assert.assertEquals(prepareState.getState().getStatus(),
-        PrepareStatus.PREPARE_NOT_STARTED);
     Assert.assertSame(submittedTrx, returnedTrx);
+
+    Assert.assertEquals(PrepareStatus.NOT_PREPARED,
+        prepareState.getState().getStatus());
 
     // Submit prepare request.
     OMRequest prepareRequest = OMRequest.newBuilder()
@@ -291,11 +291,11 @@ public class TestOzoneManagerStateMachine {
 
     submittedTrx = mockTransactionContext(prepareRequest);
     returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-
-    // Prepare should be started, and txn should be returned unaltered.
-    Assert.assertEquals(prepareState.getState().getStatus(),
-        PrepareStatus.PREPARE_IN_PROGRESS);
     Assert.assertSame(submittedTrx, returnedTrx);
+
+    // Prepare should be started.
+    Assert.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
+        prepareState.getState().getStatus());
 
     // Submitting a write request should now fail.
     try {
@@ -313,11 +313,15 @@ public class TestOzoneManagerStateMachine {
     }
 
     // Should be able to prepare again without issue.
-    Assert.assertEquals(prepareState.getState().getStatus(),
-        PrepareStatus.PREPARE_IN_PROGRESS);
+    submittedTrx = mockTransactionContext(prepareRequest);
+    returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
     Assert.assertSame(submittedTrx, returnedTrx);
 
-    // TODO: Add test for cancel prepare once it is implemented.
+    Assert.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
+        prepareState.getState().getStatus());
+
+    // Cancel prepare is handled in the cancel request apply txn step, not
+    // the pre-append state machine step, so it is tested in other classes.
   }
 
   private TransactionContext mockTransactionContext(OMRequest request) {

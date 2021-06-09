@@ -50,6 +50,8 @@ import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test OM prepare against actual mini cluster.
@@ -67,6 +69,9 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private MiniOzoneHAClusterImpl cluster;
   private ClientProtocol clientProtocol;
   private ObjectStore store;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneManagerPrepare.class);
 
   public void setup() throws Exception {
     cluster = getCluster();
@@ -168,7 +173,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
-  @Ignore("Flaky test tracked in HDDS-5109")
   @Test
   public void testPrepareWithRestart() throws Exception {
     setup();
@@ -370,18 +374,39 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertKeysWritten(volumeName, expectedKeys, cluster.getOzoneManagersList());
   }
 
+  /**
+   * Checks that all provided OMs have {@code expectedKeys} in the volume
+   * {@code volumeName} and retries checking until the test timeout.
+   * All provided OMs are checked, not just a majority, so that we can
+   * test that downed OMs are able to make a full recovery after preparation,
+   * even though the cluster could appear healthy with just 2 OMs.
+   */
   private void assertKeysWritten(String volumeName, Set<String> expectedKeys,
       List<OzoneManager> ozoneManagers) throws Exception {
     for (OzoneManager om: ozoneManagers) {
-      List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
-          BUCKET, null, KEY_PREFIX, 100);
+      // Wait for a potentially slow follower to apply all key writes.
+      LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000, () -> {
+        List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
+            BUCKET, null, KEY_PREFIX, 100);
 
-      Assert.assertEquals("Keys not found in " + om.getOMNodeId(),
-          expectedKeys.size(),
-          keys.size());
-      for (OmKeyInfo keyInfo: keys) {
-        Assert.assertTrue(expectedKeys.contains(keyInfo.getKeyName()));
-      }
+        boolean allKeysFound = (expectedKeys.size() == keys.size());
+        if (!allKeysFound) {
+          LOG.info("In {} waiting for number of keys {} to equal " +
+              "expected number of keys {}.", om.getOMNodeId(),
+              keys.size(), expectedKeys.size());
+        } else {
+          for (OmKeyInfo keyInfo : keys) {
+            if (!expectedKeys.contains(keyInfo.getKeyName())) {
+              allKeysFound = false;
+              LOG.info("In {} expected keys did not contain key {}",
+                  om.getOMNodeId(), keyInfo.getKeyName());
+              break;
+            }
+          }
+        }
+
+        return allKeysFound;
+      });
     }
   }
 
@@ -395,11 +420,13 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     clientProtocol.getOzoneManagerClient().cancelOzoneManagerPrepare();
   }
 
-  private void assertClusterPrepared(long preparedIndex) throws Exception {
-    assertClusterPrepared(preparedIndex, cluster.getOzoneManagersList());
+  private void assertClusterPrepared(long expectedPreparedIndex)
+      throws Exception {
+    assertClusterPrepared(expectedPreparedIndex,
+        cluster.getOzoneManagersList());
   }
 
-  private void assertClusterPrepared(long preparedIndex,
+  private void assertClusterPrepared(long expectedPreparedIndex,
       List<OzoneManager> ozoneManagers) throws Exception {
 
     for (OzoneManager om : ozoneManagers) {
@@ -408,24 +435,17 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS,
           1000, () -> {
           if (!om.isRunning()) {
+            LOG.info("{} is not yet started.", om.getOMNodeId());
             return false;
           } else {
-            boolean preparedAtIndex = false;
             OzoneManagerPrepareState.State state =
                 om.getPrepareState().getState();
 
-            if (state.getStatus() == PrepareStatus.PREPARE_COMPLETED) {
-              if (state.getIndex() == preparedIndex) {
-                preparedAtIndex = true;
-              } else {
-                // State will not change if we are prepared at the wrong index.
-                // Break out of wait.
-                throw new Exception("OM " + om.getOMNodeId() + " prepared " +
-                    "but prepare index " + state.getIndex() + " does not " +
-                    "match expected prepare index " + preparedIndex);
-              }
-            }
-            return preparedAtIndex;
+            LOG.info("{} has prepare status: {} prepare index: {}.",
+                om.getOMNodeId(), state.getStatus(), state.getIndex());
+
+            return (state.getStatus() == PrepareStatus.PREPARE_COMPLETED) &&
+                (state.getIndex() >= expectedPreparedIndex);
           }
         });
     }
@@ -457,7 +477,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
               return false;
             } else {
               return om.getPrepareState().getState().getStatus() ==
-                  PrepareStatus.PREPARE_NOT_STARTED;
+                  PrepareStatus.NOT_PREPARED;
             }
           });
     }
