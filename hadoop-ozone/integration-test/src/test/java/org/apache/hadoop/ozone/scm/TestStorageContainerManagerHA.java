@@ -88,6 +88,7 @@ public class TestStorageContainerManagerHA {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
