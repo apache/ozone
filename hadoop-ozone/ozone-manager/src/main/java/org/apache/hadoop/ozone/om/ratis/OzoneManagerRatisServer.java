@@ -692,8 +692,12 @@ public final class OzoneManagerRatisServer {
     return RaftServerStatus.NOT_LEADER;
   }
 
+  /**
+   * Get list of peer NodeIds from Ratis.
+   * @return List of Peer NodeId's.
+   */
   @VisibleForTesting
-  public List<String> getCurrentPeersFromRaftConf() {
+  public List<String> getCurrentPeersFromRaftConf() throws IOException {
     try {
       Collection<RaftPeer> currentPeers =
           server.getDivision(raftGroupId).getRaftConf().getCurrentPeers();
@@ -702,9 +706,8 @@ public final class OzoneManagerRatisServer {
       return currentPeerList;
     } catch (IOException e) {
       // In this case we return not a leader.
-      LOG.error("Failed to get RaftServer information. ", e);
+      throw new IOException("Failed to get peer information from Ratis.", e);
     }
-    return null;
   }
 
   public int getServerPort() {
