@@ -138,12 +138,9 @@ public class SCMStateMachine extends BaseStateMachine {
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
       applyTransactionFuture.complete(process(request));
 
-      // If not leader we still need to refresh and validate.
-      // The follower can still stuck in safemode in the case when leader is
-      // out of safemode, and it has closed few pipelines. Then safemode
-      // rules need to be refresh and validated to get current state of SCM.
-      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()
-          && !scm.getScmContext().isLeader()) {
+      // After previous term transactions are applied, still in safe mode,
+      // perform refreshAndValidate to update the safemode rule state.
+      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.builder()
