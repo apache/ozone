@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,8 +91,12 @@ public class PipelineReportHandler implements
       try {
         processPipelineReport(report, dn, publisher);
       } catch (IOException e) {
-        LOGGER.error("Could not process pipeline report={} from dn={}.",
-            report, dn, e);
+        // Avoid NotLeaderException logging which happens when processing
+        // pipeline report on followers.
+        if (!(e instanceof NotLeaderException)) {
+          LOGGER.error("Could not process pipeline report={} from dn={}.",
+              report, dn, e);
+        }
       }
     }
   }
@@ -103,10 +108,13 @@ public class PipelineReportHandler implements
     try {
       pipeline = pipelineManager.getPipeline(pipelineID);
     } catch (PipelineNotFoundException e) {
-      SCMCommand<?> command = new ClosePipelineCommand(pipelineID);
-      command.setTerm(scmContext.getTermOfLeader());
-      publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(dn.getUuid(), command));
+      if (scmContext.isLeader()) {
+        LOGGER.info("Reported pipeline {} is not found", pipelineID);
+        SCMCommand< ? > command = new ClosePipelineCommand(pipelineID);
+        command.setTerm(scmContext.getTermOfLeader());
+        publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+            new CommandForDatanode<>(dn.getUuid(), command));
+      }
       return;
     }
 
