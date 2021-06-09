@@ -90,13 +90,12 @@ public class PipelineReportHandler implements
     for (PipelineReport report : pipelineReport.getPipelineReportList()) {
       try {
         processPipelineReport(report, dn, publisher);
-      } catch (IOException e) {
+      } catch(NotLeaderException ex) {
         // Avoid NotLeaderException logging which happens when processing
         // pipeline report on followers.
-        if (!(e instanceof NotLeaderException)) {
-          LOGGER.error("Could not process pipeline report={} from dn={}.",
-              report, dn, e);
-        }
+      } catch(IOException e) {
+        LOGGER.error("Could not process pipeline report={} from dn={}.",
+            report, dn, e);
       }
     }
   }
