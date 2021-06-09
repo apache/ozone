@@ -63,7 +63,7 @@ public class TestOMCancelPrepareRequest extends TestOMKeyRequest {
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
     OzoneManagerPrepareState.State state = prepareState.getState();
 
-    Assert.assertEquals(state.getStatus(), PrepareStatus.PREPARE_NOT_STARTED);
+    Assert.assertEquals(state.getStatus(), PrepareStatus.NOT_PREPARED);
     Assert.assertEquals(state.getIndex(),
         OzoneManagerPrepareState.NO_PREPARE_INDEX);
     Assert.assertFalse(prepareState.getPrepareMarkerFile().exists());

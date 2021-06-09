@@ -1105,8 +1105,8 @@ message PrepareStatusRequest {
 
 message PrepareStatusResponse {
     enum PrepareStatus {
-        PREPARE_NOT_STARTED = 1;
-        PREPARE_IN_PROGRESS = 2;
+        NOT_PREPARED = 1;
+        PREPARE_GATE_ENABLED = 2;
         PREPARE_COMPLETED = 3;
     }
     required PrepareStatus status = 1;
