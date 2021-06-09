@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -103,7 +104,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
     final ReplicationConfig config = ReplicationConfig
-        .fromProto(info.getReplicationType(), info.getReplicationFactor());
+        .fromProto(info.getReplicationType(), info.getReplicationFactor(),
+            info.getEcReplicationConfig());
     builder.setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
         .setState(info.getState())
@@ -217,11 +219,16 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setOwner(getOwner())
-        .setSequenceId(getSequenceId());
+        .setSequenceId(getSequenceId())
+        .setReplicationType(getReplicationType());
 
-    builder.setReplicationFactor(
-        ReplicationConfig.getLegacyFactor(replicationConfig));
-    builder.setReplicationType(replicationConfig.getReplicationType());
+    if (replicationConfig instanceof ECReplicationConfig) {
+      builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)
+          .toProto());
+    } else {
+      builder.setReplicationFactor(
+          ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
 
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());
