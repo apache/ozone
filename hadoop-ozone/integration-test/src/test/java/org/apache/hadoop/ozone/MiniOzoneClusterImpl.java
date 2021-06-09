@@ -200,7 +200,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
-    // Nothing implemented here
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      GenericTestUtils.waitFor(scm::checkLeader,
+          1000, waitForClusterToBeReadyTimeout);
+    }
   }
 
   public StorageContainerManager getActiveSCM() {
@@ -225,8 +228,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
           healthy, hddsDatanodes.size());
       LOG.info(exitSafeMode ? "Cluster exits safe mode" :
-              "Waiting for cluster to exit safe mode",
-          healthy, hddsDatanodes.size());
+              "Waiting for cluster to exit safe mode");
       LOG.info(checkScmLeader ? "SCM became leader" :
           "SCM has not become leader");
 
