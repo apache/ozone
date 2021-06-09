@@ -42,7 +42,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
 
 /**
- * TODO: javadoc.
+ * {@link DeletedBlockLogStateManager} implementation
+ * based on {@link DeletedBlocksTransaction}.
  */
 public class DeletedBlockLogStateManagerImpl
     implements DeletedBlockLogStateManager {
