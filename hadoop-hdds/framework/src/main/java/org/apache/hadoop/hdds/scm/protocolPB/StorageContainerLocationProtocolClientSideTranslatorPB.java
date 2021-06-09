@@ -720,7 +720,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public boolean startContainerBalancer(double threshold, int idleiterations,
          int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
-    Preconditions.checkState(threshold >= 0,
+    Preconditions.checkState(threshold >= 0.0D && threshold < 1.0D,
         "threshold ID cannot be negative.");
     Preconditions.checkState(maxSizeToMove >= 0,
         "maxSizeToMove ID cannot be negative.");
