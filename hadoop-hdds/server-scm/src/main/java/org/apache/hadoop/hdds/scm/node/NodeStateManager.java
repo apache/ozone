@@ -303,7 +303,6 @@ public class NodeStateManager implements Runnable, Closeable {
       LOG.error("Inconsistent NodeStateMap! Datanode with ID {} was " +
           "added but not found in  map: {}", dnID, nodeStateMap);
     }
-    eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
   }
 
   /**
