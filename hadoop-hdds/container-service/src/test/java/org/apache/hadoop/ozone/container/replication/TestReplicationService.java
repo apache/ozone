@@ -105,7 +105,7 @@ public class TestReplicationService {
     OzoneConfiguration clientConfig = new OzoneConfiguration();
     clientConfig.set("hdds.datanode.dir", destDir.toString());
     MutableVolumeSet volumeSet =
-        new MutableVolumeSet(destDnUUID, clientConfig);
+        new MutableVolumeSet(destDnUUID, clientConfig, null);
 
     DownloadAndImportReplicator replicator = new DownloadAndImportReplicator(
         clientConfig,
@@ -140,7 +140,7 @@ public class TestReplicationService {
     ozoneConfig.set("hdds.datanode.dir", sourceDir);
 
     MutableVolumeSet sourceVolumes =
-        new MutableVolumeSet(sourceDnUUID, ozoneConfig);
+        new MutableVolumeSet(sourceDnUUID, ozoneConfig, null);
 
     VolumeChoosingPolicy v = new RoundRobinVolumeChoosingPolicy();
     final HddsVolume volume =

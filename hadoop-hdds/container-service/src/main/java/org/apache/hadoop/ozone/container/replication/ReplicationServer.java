@@ -67,11 +67,7 @@ public class ReplicationServer {
   }
 
   public void start() throws IOException {
-    try {
       server.start();
-    } catch (InterruptedException e) {
-      throw new RuntimeException("Couldn't start replication server", e);
-    }
   }
 
   public void stop() {
