@@ -64,7 +64,7 @@ Verbose container info
                         Should contain   ${output}   Pipeline Info
 
 Close container
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationFactor == "THREE") | .containerID' | head -1
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"
     ${output} =         Execute          ozone admin container info "${container}"
                         Should contain   ${output}   CLOS
