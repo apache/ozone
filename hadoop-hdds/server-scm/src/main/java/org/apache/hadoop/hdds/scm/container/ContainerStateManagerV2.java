@@ -156,7 +156,6 @@ public interface ContainerStateManagerV2 {
   /**
    *
    */
-  // Make this as @Replicate
   void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
       throws IOException;
 
