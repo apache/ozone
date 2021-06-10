@@ -25,9 +25,10 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -205,8 +206,7 @@ public class GeneratorOm extends BaseGenerator implements
         .setDataSize(0)
         .setCreationTime(System.currentTimeMillis())
         .setModificationTime(System.currentTimeMillis())
-        .setReplicationFactor(ReplicationFactor.ONE)
-        .setReplicationType(ReplicationType.RATIS)
+        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.ONE))
         .build();
     omKeyTable.putWithBatch(omKeyTableBatchOperation,
         "/" + volumeName + "/" + bucketName + "/" + keyName, l3DirInfo);
@@ -262,9 +262,8 @@ public class GeneratorOm extends BaseGenerator implements
         .setDataSize(getKeySize())
         .setCreationTime(System.currentTimeMillis())
         .setModificationTime(System.currentTimeMillis())
-        .setReplicationFactor(
-            ReplicationFactor.valueOf(ReplicationFactor.THREE_VALUE))
-        .setReplicationType(ReplicationType.STAND_ALONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.THREE))
         .addOmKeyLocationInfoGroup(infoGroup)
         .build();
     omKeyTable.putWithBatch(omKeyTableBatchOperation, keyName, keyInfo);

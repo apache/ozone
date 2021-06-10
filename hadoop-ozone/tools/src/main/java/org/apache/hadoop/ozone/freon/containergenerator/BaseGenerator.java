@@ -26,6 +26,9 @@ import org.apache.hadoop.ozone.freon.BaseFreonGenerator;
 
 import picocli.CommandLine.Option;
 
+/**
+ * Common options of data generators for fast scale test.
+ */
 public abstract class BaseGenerator extends BaseFreonGenerator implements
     Callable<Void> {
 

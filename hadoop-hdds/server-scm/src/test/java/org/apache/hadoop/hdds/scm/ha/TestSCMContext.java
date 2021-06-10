@@ -34,8 +34,8 @@ public class TestSCMContext {
   @Test
   public void testRaftOperations() {
     // start as follower
-    SCMContext scmContext =
-        new SCMContext.Builder().setLeader(false).setTerm(0).build();
+    SCMContext scmContext = new SCMContext.Builder()
+        .setLeader(false).setTerm(0).buildMaybeInvalid();
 
     assertFalse(scmContext.isLeader());
 
@@ -59,7 +59,7 @@ public class TestSCMContext {
     SCMContext scmContext = new SCMContext.Builder()
         .setIsInSafeMode(true)
         .setIsPreCheckComplete(false)
-        .build();
+        .buildMaybeInvalid();
 
     assertTrue(scmContext.isInSafeMode());
     assertFalse(scmContext.isPreCheckComplete());

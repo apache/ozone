@@ -107,7 +107,7 @@ public final class BlockUtils {
    *
    * @param containerData containerData.
    * @param conf configuration.
-   * @return MetadataStore handle.
+   * @return DB handle.
    * @throws StorageContainerException
    */
   public static ReferenceCountedDB getDB(KeyValueContainerData containerData,

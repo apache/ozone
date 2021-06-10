@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,6 +42,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -200,6 +201,40 @@ public class TestBlockInputStream {
     byte[] b = new byte[200];
     blockStream.read(b, 0, 200);
     matchWithInputData(b, 50, 200);
+
+    // The new position of the blockInputStream should be the last index read
+    // + 1.
+    Assert.assertEquals(250, blockStream.getPos());
+    Assert.assertEquals(2, blockStream.getChunkIndex());
+  }
+
+  @Test
+  public void testReadWithByteBuffer() throws Exception {
+    // read 200 bytes of data starting from position 50. Chunk0 contains
+    // indices 0 to 99, chunk1 from 100 to 199 and chunk3 from 200 to 299. So
+    // the read should result in 3 ChunkInputStream reads
+    seekAndVerify(50);
+    ByteBuffer buffer = ByteBuffer.allocate(200);
+    blockStream.read(buffer);
+    matchWithInputData(buffer.array(), 50, 200);
+
+    // The new position of the blockInputStream should be the last index read
+    // + 1.
+    Assert.assertEquals(250, blockStream.getPos());
+    Assert.assertEquals(2, blockStream.getChunkIndex());
+  }
+
+  @Test
+  public void testReadWithDirectByteBuffer() throws Exception {
+    // read 200 bytes of data starting from position 50. Chunk0 contains
+    // indices 0 to 99, chunk1 from 100 to 199 and chunk3 from 200 to 299. So
+    // the read should result in 3 ChunkInputStream reads
+    seekAndVerify(50);
+    ByteBuffer buffer = ByteBuffer.allocateDirect(200);
+    blockStream.read(buffer);
+    for (int i = 50; i < 50 + 200; i++) {
+      Assert.assertEquals(blockData[i], buffer.get(i - 50));
+    }
 
     // The new position of the blockInputStream should be the last index read
     // + 1.

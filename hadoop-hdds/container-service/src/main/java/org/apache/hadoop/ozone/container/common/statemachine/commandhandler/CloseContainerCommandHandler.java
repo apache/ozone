@@ -98,7 +98,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
             .isExist(closeCommand.getPipelineID())) {
           ContainerCommandRequestProto request =
               getContainerCommandRequestProto(datanodeDetails,
-                  closeCommand.getContainerID());
+                  closeCommand.getContainerID(),
+                  command.getEncodedToken());
           ozoneContainer.getWriteChannel()
               .submitRequest(request, closeCommand.getPipelineID());
         } else {
@@ -134,7 +135,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
   }
 
   private ContainerCommandRequestProto getContainerCommandRequestProto(
-      final DatanodeDetails datanodeDetails, final long containerId) {
+      final DatanodeDetails datanodeDetails, final long containerId,
+      final String encodedToken) {
     final ContainerCommandRequestProto.Builder command =
         ContainerCommandRequestProto.newBuilder();
     command.setCmdType(ContainerProtos.Type.CloseContainer);
@@ -143,6 +145,9 @@ public class CloseContainerCommandHandler implements CommandHandler {
     command.setCloseContainer(
         ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
     command.setDatanodeUuid(datanodeDetails.getUuidString());
+    if (encodedToken != null) {
+      command.setEncodedToken(encodedToken);
+    }
     return command.build();
   }
 

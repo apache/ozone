@@ -37,6 +37,9 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 
+/**
+ * Tests snapshots in SCM HA.
+ */
 public class TestSCMSnapshot {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

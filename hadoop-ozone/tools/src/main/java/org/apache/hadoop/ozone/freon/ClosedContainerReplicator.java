@@ -166,7 +166,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
-    MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf);
+    MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
+        null);
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
 

@@ -82,6 +82,9 @@ public class ReplicationServer {
     return server.getPort();
   }
 
+  /**
+   * Replication-related configuration.
+   */
   @ConfigGroup(prefix = "hdds.datanode.replication")
   public static final class ReplicationConfig {
 
