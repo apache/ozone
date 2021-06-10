@@ -184,7 +184,6 @@ public class SCMStateMachine extends BaseStateMachine {
 
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
-
   }
 
   /**
