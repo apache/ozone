@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.AddAcl;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +29,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.util.BooleanBiFunction;
@@ -148,10 +145,6 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
             exception);
       }
     }
-  }
-
-  public static String getRequestType() {
-    return AddAcl.name() + "-" + ObjectType.BUCKET.name();
   }
 
   @Override

@@ -387,7 +387,4 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
   }
 
-  public static String getRequestType() {
-    return CreateFile.name();
-  }
 }

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CancelDelegationToken;
-
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -118,7 +116,4 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
         cancelDelegationTokenRequest.getToken());
   }
 
-  public static String getRequestType() {
-    return CancelDelegationToken.name();
-  }
 }

@@ -254,8 +254,4 @@ public class OMPrepareRequest extends OMClientRequest {
       throw new IOException("Unable to purge logs: " + e.getMessage());
     }
   }
-
-  public static String getRequestType() {
-    return Type.Prepare.name();
-  }
 }

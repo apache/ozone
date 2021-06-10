@@ -57,7 +57,6 @@ import static org.apache.hadoop.ozone.audit.OMAction.DELETE_KEYS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 
 /**
  * Handles DeleteKey request.
@@ -246,10 +245,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       List<String> unDeletedKeys) {
     auditMap.put(DELETED_KEYS_LIST, String.join(",", deletedKeys));
     auditMap.put(UNDELETED_KEYS_LIST, String.join(",", unDeletedKeys));
-  }
-
-  public static String getRequestType() {
-    return DeleteKeys.name();
   }
 
 }
