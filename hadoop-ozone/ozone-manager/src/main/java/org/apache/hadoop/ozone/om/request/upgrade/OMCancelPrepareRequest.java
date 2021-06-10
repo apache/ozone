@@ -94,7 +94,4 @@ public class OMCancelPrepareRequest extends OMClientRequest {
     return response;
   }
 
-  public static String getRequestType() {
-    return Type.CancelPrepare.name();
-  }
 }

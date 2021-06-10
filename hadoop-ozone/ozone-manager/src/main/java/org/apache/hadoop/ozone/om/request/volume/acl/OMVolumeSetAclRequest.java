@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.SetAcl;
-
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -33,7 +31,6 @@ import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -143,10 +140,6 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
 
     auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
         ex, getOmRequest().getUserInfo()));
-  }
-
-  public static String getRequestType() {
-    return SetAcl.name() + "-" + ObjectType.VOLUME;
   }
 
   @Override

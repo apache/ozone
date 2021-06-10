@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenewDelegationToken;
-
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -159,7 +157,4 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-  public static String getRequestType() {
-    return RenewDelegationToken.name();
-  }
 }
