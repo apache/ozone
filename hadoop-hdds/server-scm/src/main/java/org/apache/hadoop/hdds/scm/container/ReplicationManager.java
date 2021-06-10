@@ -65,7 +65,6 @@ import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
@@ -117,11 +116,6 @@ public class ReplicationManager implements MetricsSource, SCMService {
    * SCMContext from StorageContainerManager.
    */
   private final SCMContext scmContext;
-
-  /**
-   * Used for locking a container using its ID while processing it.
-   */
-  private final LockManager<ContainerID> lockManager;
 
   /**
    * Used to lookup the health of a nodes or the nodes operational state.
@@ -187,13 +181,11 @@ public class ReplicationManager implements MetricsSource, SCMService {
                             final EventPublisher eventPublisher,
                             final SCMContext scmContext,
                             final SCMServiceManager serviceManager,
-                            final LockManager<ContainerID> lockManager,
                             final NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
-    this.lockManager = lockManager;
     this.nodeManager = nodeManager;
     this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
     this.running = false;
@@ -310,134 +302,135 @@ public class ReplicationManager implements MetricsSource, SCMService {
     if (!shouldRun()) {
       return;
     }
-
     final ContainerID id = container.containerID();
-    lockManager.lock(id);
     try {
-      final Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(container.containerID());
-      final LifeCycleState state = container.getState();
+      // synchronize on the containerInfo object to solve container
+      // race conditions with ICR/FCR handlers
+      synchronized (container) {
+        final Set<ContainerReplica> replicas = containerManager
+            .getContainerReplicas(id);
+        final LifeCycleState state = container.getState();
 
-      /*
-       * We don't take any action if the container is in OPEN state and
-       * the container is healthy. If the container is not healthy, i.e.
-       * the replicas are not in OPEN state, send CLOSE_CONTAINER command.
-       */
-      if (state == LifeCycleState.OPEN) {
-        if (!isOpenContainerHealthy(container, replicas)) {
-          eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
-        }
-        return;
-      }
-
-      /*
-       * If the container is in CLOSING state, the replicas can either
-       * be in OPEN or in CLOSING state. In both of this cases
-       * we have to resend close container command to the datanodes.
-       */
-      if (state == LifeCycleState.CLOSING) {
-        replicas.forEach(replica -> sendCloseCommand(
-            container, replica.getDatanodeDetails(), false));
-        return;
-      }
-
-      /*
-       * If the container is in QUASI_CLOSED state, check and close the
-       * container if possible.
-       */
-      if (state == LifeCycleState.QUASI_CLOSED &&
-          canForceCloseContainer(container, replicas)) {
-        forceCloseContainer(container, replicas);
-        return;
-      }
-
-      /*
-       * Before processing the container we have to reconcile the
-       * inflightReplication and inflightDeletion actions.
-       *
-       * We remove the entry from inflightReplication and inflightDeletion
-       * list, if the operation is completed or if it has timed out.
-       */
-      updateInflightAction(container, inflightReplication,
-          action -> replicas.stream()
-              .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
-
-      updateInflightAction(container, inflightDeletion,
-          action -> replicas.stream()
-              .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
-
-      /*
-       * If container is under deleting and all it's replicas are deleted, then
-       * make the container as CLEANED, or resend the delete replica command if
-       * needed.
-       */
-      if (state == LifeCycleState.DELETING) {
-        handleContainerUnderDelete(container, replicas);
-        return;
-      }
-
-      /**
-       * We don't need to take any action for a DELETE container - eventually
-       * it will be removed from SCM.
-       */
-      if (state == LifeCycleState.DELETED) {
-        return;
-      }
-
-      ContainerReplicaCount replicaSet =
-          getContainerReplicaCount(container, replicas);
-      ContainerPlacementStatus placementStatus = getPlacementStatus(
-          replicas, container.getReplicationConfig().getRequiredNodes());
-
-      /*
-       * We don't have to take any action if the container is healthy.
-       *
-       * According to ReplicationMonitor container is considered healthy if
-       * the container is either in QUASI_CLOSED or in CLOSED state and has
-       * exact number of replicas in the same state.
-       */
-      if (isContainerEmpty(container, replicas)) {
         /*
-         *  If container is empty, schedule task to delete the container.
+         * We don't take any action if the container is in OPEN state and
+         * the container is healthy. If the container is not healthy, i.e.
+         * the replicas are not in OPEN state, send CLOSE_CONTAINER command.
          */
-        deleteContainerReplicas(container, replicas);
-        return;
-      }
+        if (state == LifeCycleState.OPEN) {
+          if (!isOpenContainerHealthy(container, replicas)) {
+            eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
+          }
+          return;
+        }
 
-      /*
-       * Check if the container is under replicated and take appropriate
-       * action.
-       */
-      if (!replicaSet.isSufficientlyReplicated()
-          || !placementStatus.isPolicySatisfied()) {
-        handleUnderReplicatedContainer(container, replicaSet, placementStatus);
-        return;
-      }
+        /*
+         * If the container is in CLOSING state, the replicas can either
+         * be in OPEN or in CLOSING state. In both of this cases
+         * we have to resend close container command to the datanodes.
+         */
+        if (state == LifeCycleState.CLOSING) {
+          replicas.forEach(replica -> sendCloseCommand(
+              container, replica.getDatanodeDetails(), false));
+          return;
+        }
 
-      /*
-       * Check if the container is over replicated and take appropriate
-       * action.
-       */
-      if (replicaSet.isOverReplicated()) {
-        handleOverReplicatedContainer(container, replicaSet);
-        return;
-      }
+        /*
+         * If the container is in QUASI_CLOSED state, check and close the
+         * container if possible.
+         */
+        if (state == LifeCycleState.QUASI_CLOSED &&
+            canForceCloseContainer(container, replicas)) {
+          forceCloseContainer(container, replicas);
+          return;
+        }
+
+        /*
+         * Before processing the container we have to reconcile the
+         * inflightReplication and inflightDeletion actions.
+         *
+         * We remove the entry from inflightReplication and inflightDeletion
+         * list, if the operation is completed or if it has timed out.
+         */
+        updateInflightAction(container, inflightReplication,
+            action -> replicas.stream()
+                .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
+
+        updateInflightAction(container, inflightDeletion,
+            action -> replicas.stream()
+                .noneMatch(r ->
+                    r.getDatanodeDetails().equals(action.datanode)));
+
+        /*
+         * If container is under deleting and all it's replicas are deleted,
+         * then make the container as CLEANED,
+         * or resend the delete replica command if needed.
+         */
+        if (state == LifeCycleState.DELETING) {
+          handleContainerUnderDelete(container, replicas);
+          return;
+        }
+
+        /**
+         * We don't need to take any action for a DELETE container - eventually
+         * it will be removed from SCM.
+         */
+        if (state == LifeCycleState.DELETED) {
+          return;
+        }
+
+        ContainerReplicaCount replicaSet =
+            getContainerReplicaCount(container, replicas);
+        ContainerPlacementStatus placementStatus = getPlacementStatus(
+            replicas, container.getReplicationConfig().getRequiredNodes());
+
+        /*
+         * We don't have to take any action if the container is healthy.
+         *
+         * According to ReplicationMonitor container is considered healthy if
+         * the container is either in QUASI_CLOSED or in CLOSED state and has
+         * exact number of replicas in the same state.
+         */
+        if (isContainerEmpty(container, replicas)) {
+          /*
+           *  If container is empty, schedule task to delete the container.
+           */
+          deleteContainerReplicas(container, replicas);
+          return;
+        }
+
+        /*
+         * Check if the container is under replicated and take appropriate
+         * action.
+         */
+        if (!replicaSet.isSufficientlyReplicated()
+            || !placementStatus.isPolicySatisfied()) {
+          handleUnderReplicatedContainer(container,
+              replicaSet, placementStatus);
+          return;
+        }
+
+        /*
+         * Check if the container is over replicated and take appropriate
+         * action.
+         */
+        if (replicaSet.isOverReplicated()) {
+          handleOverReplicatedContainer(container, replicaSet);
+          return;
+        }
 
       /*
        If we get here, the container is not over replicated or under replicated
        but it may be "unhealthy", which means it has one or more replica which
        are not in the same state as the container itself.
        */
-      if (!replicaSet.isHealthy()) {
-        handleUnstableContainer(container, replicas);
+        if (!replicaSet.isHealthy()) {
+          handleUnstableContainer(container, replicas);
+        }
       }
-
     } catch (ContainerNotFoundException ex) {
       LOG.warn("Missing container {}.", id);
     } catch (Exception ex) {
       LOG.warn("Process container {} error: ", id, ex);
-    } finally {
-      lockManager.writeUnlock(id);
     }
   }
 
@@ -540,13 +533,11 @@ public class ReplicationManager implements MetricsSource, SCMService {
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerInfo container)
       throws ContainerNotFoundException {
-    lockManager.readLock(container.containerID());
-    try {
+    // TODO: using a RW lock for only read
+    synchronized (container) {
       final Set<ContainerReplica> replica = containerManager
           .getContainerReplicas(container.containerID());
       return getContainerReplicaCount(container, replica);
-    } finally {
-      lockManager.readUnlock(container.containerID());
     }
   }
 
