@@ -150,9 +150,10 @@ public class ContainerSafeModeRule extends
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh) {
       reInitializeRule();
-    }
-    if (!validate()) {
-      reInitializeRule();
+    } else {
+      if (!validate()) {
+        reInitializeRule();
+      }
     }
   }
 

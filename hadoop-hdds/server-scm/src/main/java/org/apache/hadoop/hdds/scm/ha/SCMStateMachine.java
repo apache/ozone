@@ -294,6 +294,11 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyTermIndexUpdated(long term, long index) {
+
+    if (!isInitialized) {
+      return;
+    }
+
     if (transactionBuffer != null) {
       transactionBuffer.updateLatestTrxInfo(
           TransactionInfo.builder().setCurrentTerm(term)
@@ -326,12 +331,8 @@ public class SCMStateMachine extends BaseStateMachine {
 
         refreshedAfterLeaderReady.set(true);
       }
-
       currentLeaderTerm.set(-1L);
-
     }
-
-
   }
 
   @Override
