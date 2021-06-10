@@ -44,17 +44,28 @@ public final class ContainerBalancerConfiguration {
           " of the entire cluster) no more than the threshold value.")
   private String threshold = "0.1";
 
-  @Config(key = "datanodes.balanced.max", type = ConfigType.INT,
+  @Config(key = "datanodes.balanced.max.per.iteration", type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.BALANCER}, description = "The " +
-      "maximum number of datanodes that should be balanced. Container " +
-      "Balancer will not balance more number of datanodes than this limit.")
+      "maximum number of datanodes that should be balanced in one iteration.")
   private int maxDatanodesToBalance = 5;
 
-  @Config(key = "size.moved.max", type = ConfigType.SIZE,
+  @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
       defaultValue = "10GB", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in bytes that will be moved " +
-          "by Container Balancer.")
+          "by Container Balancer in one iteration.")
   private long maxSizeToMove = 10 * OzoneConsts.GB;
+
+  @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
+      defaultValue = "5GB", tags = {ConfigTag.BALANCER}, description = "The " +
+      "maximum size that can enter a target datanode while balancing. This is" +
+      " the sum of data from multiple sources.")
+  private long maxSizeEnteringTarget = 5 * OzoneConsts.GB;
+
+  @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
+      defaultValue = "5GB", tags = {ConfigTag.BALANCER}, description = "The " +
+      "maximum size that can leave a source datanode while balancing. This is" +
+      " the sum of data moving to multiple targets.")
+  private long maxSizeLeavingSource = 5 * OzoneConsts.GB;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -80,7 +91,7 @@ public final class ContainerBalancerConfiguration {
 
   /**
    * Gets the value of maximum number of datanodes that will be balanced by
-   * Container Balancer.
+   * Container Balancer in one iteration.
    *
    * @return maximum number of datanodes
    */
@@ -90,7 +101,7 @@ public final class ContainerBalancerConfiguration {
 
   /**
    * Sets the value of maximum number of datanodes that will be balanced by
-   * Container Balancer.
+   * Container Balancer in one iteration.
    *
    * @param maxDatanodesToBalance maximum number of datanodes
    */
@@ -99,7 +110,8 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the maximum size that will be moved by Container Balancer.
+   * Gets the maximum size that will be moved by Container Balancer in one
+   * iteration.
    *
    * @return maximum size in Bytes
    */
@@ -108,12 +120,29 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Sets the value of maximum size that will be moved by Container Balancer.
+   * Sets the value of maximum size that will be moved by Container Balancer
+   * in one iteration.
    *
    * @param maxSizeToMove maximum number of Bytes
    */
   public void setMaxSizeToMove(long maxSizeToMove) {
     this.maxSizeToMove = maxSizeToMove;
+  }
+
+  public long getMaxSizeEnteringTarget() {
+    return maxSizeEnteringTarget;
+  }
+
+  public void setMaxSizeEnteringTarget(long maxSizeEnteringTarget) {
+    this.maxSizeEnteringTarget = maxSizeEnteringTarget;
+  }
+
+  public long getMaxSizeLeavingSource() {
+    return maxSizeLeavingSource;
+  }
+
+  public void setMaxSizeLeavingSource(long maxSizeLeavingSource) {
+    this.maxSizeLeavingSource = maxSizeLeavingSource;
   }
 
   @Override

@@ -128,6 +128,9 @@ public class TestContainerBalancer {
   }
 
   /**
+   * TODO: Update this test to reflect config changes to max datanodes balanced-
+   * TODO: -per iteration
+   *
    * Checks whether ContainerBalancer stops when the limit of
    * MaxDatanodesToBalance is reached.
    */
