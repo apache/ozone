@@ -149,7 +149,7 @@ public class ContainerSafeModeRule extends
   @Override
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh) {
-     reInitializeRule();
+      reInitializeRule();
     }
     if (!validate()) {
       reInitializeRule();
