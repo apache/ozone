@@ -721,13 +721,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public boolean startContainerBalancer(double threshold, int idleiterations,
          int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
     Preconditions.checkState(threshold >= 0.0D && threshold < 1.0D,
-        "threshold ID cannot be negative.");
+        "threshold should to be specified in range [0.0, 1.0).");
     Preconditions.checkState(maxSizeToMove >= 0,
-        "maxSizeToMove ID cannot be negative.");
+        "maxSizeToMove cannot be negative.");
     Preconditions.checkState(maxDatanodesToBalance >= 0,
-        "maxDatanodesToBalance ID cannot be negative.");
-    Preconditions.checkState(idleiterations >= 0,
-        "idleiterations ID cannot be negative.");
+        "maxDatanodesToBalance cannot be negative.");
+    Preconditions.checkState(idleiterations > -2,
+        "idleiterations cannot be smaller than -1.");
 
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
@@ -743,7 +743,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (maxDatanodesToBalance > 0) {
       builder.setMaxDatanodesToBalance(maxDatanodesToBalance);
     }
-    if (idleiterations > 0) {
+    if (idleiterations >= 0) {
       builder.setIdleiterations(idleiterations);
     }
 

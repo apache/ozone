@@ -39,7 +39,12 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   private double threshold;
 
   @Option(names = {"-i", "--idleiterations"},
-      description = "Maximum consecutive idle iterations")
+      description = "Maximum consecutive idle iterations",
+      //idleiteration could be as follows:
+      // 0 ： indicate running infinitely
+      // positive number ： indicate the specific iterations
+      // -1 : user does not set this value
+      defaultValue = "-1")
   private int idleiterations;
 
   @Option(names = {"-d", "--maxDatanodesToBalance"},

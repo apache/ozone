@@ -43,14 +43,21 @@ import picocli.CommandLine.Spec;
  *      ozone admin containerbalancer start
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -i/--idleiterations {@literal <idleiterations>}]
- *      Example: ozone admin containerbalancer start
- *                  start balancer with a default threshold of 10%
- *               ozone admin containerbalancer start -t 5
- *                  start balancer with a threshold of 5%
- *               ozone admin containerbalancer start -i 20
- *                  start balancer with maximum 20 consecutive idle iterations
- *               ozone admin containerbalancer start -i -1
- *                  run balancer with default threshold infinitely
+ *      [ -d/--maxDatanodesToBalance {@literal <maxDatanodesToBalance>}]
+ *      [ -s/--maxSizeToMove {@literal <maxSizeToMove>}]
+ *      Examples:
+ *      ozone admin containerbalancer start
+ *        start balancer with default values in the configuration
+ *      ozone admin containerbalancer start -t 0.05
+ *        start balancer with a threshold of 5%
+ *      ozone admin containerbalancer start -i 20
+ *        start balancer with maximum 20 consecutive idle iterations
+ *      ozone admin containerbalancer start -i 0
+ *        run balancer infinitely with default values in the configuration
+ *      ozone admin containerbalancer start -d 10
+ *        start balancer with maximum 10 datanodes to balance
+ *      ozone admin containerbalancer start -s 10
+ *        start balancer with maximum size of 10GB to move
  * To stop:
  *      ozone admin containerbalancer stop
  * </pre>

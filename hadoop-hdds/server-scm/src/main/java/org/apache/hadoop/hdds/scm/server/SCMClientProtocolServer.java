@@ -60,6 +60,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -675,6 +676,7 @@ public class SCMClientProtocolServer implements
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_CONTAINER_BALANCER, null));
     ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
+
     if (threshold > 0) {
       cbc.setThreshold(threshold);
     }
@@ -682,10 +684,13 @@ public class SCMClientProtocolServer implements
       cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
     }
     if (maxSizeToMove > 0) {
-      cbc.setMaxSizeToMove(maxSizeToMove);
+      cbc.setMaxSizeToMove(maxSizeToMove * OzoneConsts.GB);
     }
     if (idleiterations > 0) {
       cbc.setIdleIteration(idleiterations);
+    } else if (0 == idleiterations) {
+      // run balancer infinitely
+      cbc.setIdleIteration(Integer.MAX_VALUE);
     }
     return scm.getContainerBalancer().start(cbc);
   }

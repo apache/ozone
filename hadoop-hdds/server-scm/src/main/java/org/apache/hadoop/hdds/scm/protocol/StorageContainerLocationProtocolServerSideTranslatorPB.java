@@ -641,8 +641,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StartContainerBalancerResponseProto startContainerBalancer(
       StartContainerBalancerRequestProto request)
       throws IOException {
-    double threshold = 0;
-    int idleiterations = 0;
+    double threshold = 0.0D;
+    int idleiterations = -1;
     int maxDatanodesToBalance = 0;
     long maxSizeToMove = 0L;
 
