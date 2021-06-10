@@ -26,6 +26,9 @@ import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.debug.container.ContainerCommands.outputContainer;
 
+/**
+ * Handles {@code ozone debug container info} command.
+ */
 @Command(
     name = "info",
     description = "Show container info of a container replica on datanode")

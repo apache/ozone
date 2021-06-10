@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.function.Supplier;
 
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Test;
 
 /**

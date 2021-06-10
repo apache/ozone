@@ -17,16 +17,19 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 /**
  * OzoneInputStream is used to read data from Ozone.
  * It uses {@link KeyInputStream} for reading the data.
  */
-public class OzoneInputStream extends InputStream implements CanUnbuffer {
+public class OzoneInputStream extends InputStream implements CanUnbuffer,
+    ByteBufferReadable {
 
   private final InputStream inputStream;
 
@@ -50,6 +53,16 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer {
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
     return inputStream.read(b, off, len);
+  }
+
+  @Override
+  public int read(ByteBuffer byteBuffer) throws IOException {
+    if (inputStream instanceof ByteBufferReadable) {
+      return ((ByteBufferReadable)inputStream).read(byteBuffer);
+    } else {
+      throw new UnsupportedOperationException("Read with ByteBuffer is not " +
+          " supported by " + inputStream.getClass().getName());
+    }
   }
 
   @Override

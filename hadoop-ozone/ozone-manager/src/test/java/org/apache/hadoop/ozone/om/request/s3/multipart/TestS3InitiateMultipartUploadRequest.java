@@ -56,7 +56,7 @@ public class TestS3InitiateMultipartUploadRequest
         bucketName, keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(modifiedRequest);
+        getS3InitiateMultipartUploadReq(modifiedRequest);
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
@@ -65,8 +65,8 @@ public class TestS3InitiateMultipartUploadRequest
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, modifiedRequest.getInitiateMultiPartUploadRequest()
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
     Assert.assertNotNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
@@ -102,7 +102,7 @@ public class TestS3InitiateMultipartUploadRequest
         volumeName, bucketName, keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(modifiedRequest);
+        getS3InitiateMultipartUploadReq(modifiedRequest);
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
@@ -111,8 +111,8 @@ public class TestS3InitiateMultipartUploadRequest
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, modifiedRequest.getInitiateMultiPartUploadRequest()
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
     Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
@@ -130,7 +130,7 @@ public class TestS3InitiateMultipartUploadRequest
         keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(modifiedRequest);
+        getS3InitiateMultipartUploadReq(modifiedRequest);
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
@@ -139,12 +139,18 @@ public class TestS3InitiateMultipartUploadRequest
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, modifiedRequest.getInitiateMultiPartUploadRequest()
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
     Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
+  }
+
+  protected String getMultipartKey(String volumeName, String bucketName,
+                                   String keyName, String multipartUploadID) {
+    return omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
   }
 }

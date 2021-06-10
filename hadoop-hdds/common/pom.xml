@@ -81,11 +81,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
 
     <dependency>
-      <groupId>org.fusesource.leveldbjni</groupId>
-      <artifactId>leveldbjni-all</artifactId>
-    </dependency>
-
-    <dependency>
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-core</artifactId>
     </dependency>

@@ -30,7 +30,7 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
 import org.apache.commons.lang3.RandomStringUtils;

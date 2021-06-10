@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -258,8 +259,8 @@ public class TestOMDBUpdatesHandler {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-        .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(random.nextLong())
         .build();
   }

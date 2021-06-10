@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -62,6 +62,7 @@ public class TestSCMInstallSnapshot {
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     SCMHAConfiguration scmhaConfiguration = conf.getObject(
         SCMHAConfiguration.class);
     scmhaConfiguration.setRatisSnapshotThreshold(1L);

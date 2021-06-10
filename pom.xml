@@ -1021,23 +1021,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
       <dependency>
         <groupId>io.netty</groupId>
-        <artifactId>netty-all</artifactId>
+        <artifactId>netty-bom</artifactId>
         <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-transport</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-codec</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-handler</artifactId>
-        <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <dependency>
@@ -1457,12 +1444,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.glassfish.grizzly</groupId>
         <artifactId>grizzly-http-server</artifactId>
         <version>2.2.21</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.fusesource.leveldbjni</groupId>
-        <artifactId>leveldbjni-all</artifactId>
-        <version>1.8</version>
       </dependency>
 
       <dependency>
@@ -1951,7 +1932,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <properties>
             <property>
               <name>listener</name>
-              <value>org.apache.hadoop.test.TimedOutTestsListener</value>
+              <value>org.apache.ozone.test.TimedOutTestsListener</value>
             </property>
           </properties>
           <includes>

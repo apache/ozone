@@ -29,7 +29,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -129,8 +128,8 @@ public class BenchMarkOzoneManager {
           .setBucketName(bucketName)
           .setKeyName(key)
           .setDataSize(0)
-          .setFactor(HddsProtos.ReplicationFactor.THREE)
-          .setType(HddsProtos.ReplicationType.RATIS)
+          .setReplicationConfig(
+              new RatisReplicationConfig(ReplicationFactor.THREE))
           .build();
       OpenKeySession keySession = om.getKeyManager().openKey(omKeyArgs);
       long clientID = keySession.getId();
@@ -168,8 +167,8 @@ public class BenchMarkOzoneManager {
         .setBucketName(bucketName)
         .setKeyName(key)
         .setDataSize(50)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
-        .setType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .build();
     state.om.allocateBlock(omKeyArgs, clientIDs.get(index), new ExcludeList());
   }
@@ -184,8 +183,8 @@ public class BenchMarkOzoneManager {
         .setBucketName(bucketName)
         .setKeyName(key)
         .setDataSize(50)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
-        .setType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .build();
     OpenKeySession openKeySession = state.om.openKey(omKeyArgs);
     state.om.allocateBlock(omKeyArgs, openKeySession.getId(),

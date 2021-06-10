@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -66,7 +66,7 @@ public class TestDataNodeStartupSlvLessThanMlv {
 
     try {
       new DatanodeStateMachine(getNewDatanodeDetails(), conf, null,
-                   null);
+                   null, null);
       Assert.fail("Expected IOException due to incorrect MLV on DataNode " +
           "creation.");
     } catch (IOException e) {

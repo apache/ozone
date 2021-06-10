@@ -38,6 +38,8 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -88,14 +90,17 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -192,10 +197,10 @@ public class TestKeyManagerImpl {
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
-            Mockito.any(ReplicationType.class),
-            Mockito.any(ReplicationFactor.class), Mockito.anyString(),
+            Mockito.any(ReplicationConfig.class),
+            Mockito.anyString(),
             Mockito.any(ExcludeList.class))).thenThrow(
-        new SCMException("SafeModePrecheck failed for allocateBlock",
+                new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
     createBucket(VOLUME_NAME, BUCKET_NAME);
@@ -265,8 +270,7 @@ public class TestKeyManagerImpl {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationType(keyArgs.getType())
-        .setReplicationFactor(keyArgs.getFactor())
+        .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();
     metadataManager.getOpenKeyTable().put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
@@ -286,6 +290,7 @@ public class TestKeyManagerImpl {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .build();
@@ -814,6 +819,107 @@ public class TestKeyManagerImpl {
   }
 
   @Test
+  public void testLatestLocationVersion() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+    OmKeyArgs keyArgs = createBuilder()
+        .setKeyName(keyName)
+        .setLatestVersionLocation(true)
+        .build();
+
+    // lookup for a non-existent key
+    try {
+      keyManager.lookupKey(keyArgs, null);
+      Assert.fail("Lookup key should fail for non existent key");
+    } catch (OMException ex) {
+      if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+        throw ex;
+      }
+    }
+
+    // create a key
+    OpenKeySession keySession = keyManager.createFile(keyArgs, false, false);
+    // randomly select 3 datanodes
+    List<DatanodeDetails> nodeList = new ArrayList<>();
+    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
+        0, null, null, null, null, 0));
+    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
+        1, null, null, null, null, 0));
+    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
+        2, null, null, null, null, 0));
+    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(1)));
+    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
+    // create a pipeline using 3 datanodes
+    Pipeline pipeline = scm.getPipelineManager().createPipeline(
+        new RatisReplicationConfig(ReplicationFactor.THREE), nodeList);
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    List<OmKeyLocationInfo> locationList =
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
+    Assert.assertEquals(1, locationList.size());
+    locationInfoList.add(
+        new OmKeyLocationInfo.Builder().setPipeline(pipeline)
+            .setBlockID(new BlockID(locationList.get(0).getContainerID(),
+                locationList.get(0).getLocalID())).build());
+    keyArgs.setLocationInfoList(locationInfoList);
+
+    keyManager.commitKey(keyArgs, keySession.getId());
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+
+    keySession = keyManager.createFile(keyArgs, true, true);
+    keyManager.commitKey(keyArgs, keySession.getId());
+
+    // Test lookupKey (latestLocationVersion == true)
+    key = keyManager.lookupKey(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+
+    // Test ListStatus (latestLocationVersion == true)
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(keyArgs, false, "", 1);
+    Assert.assertEquals(fileStatuses.size(), 1);
+    Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
+        .getKeyLocationVersions().size(), 1);
+
+    // Test GetFileStatus (latestLocationVersion == true)
+    OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
+    Assert.assertEquals(ozoneFileStatus.getKeyInfo()
+        .getKeyLocationVersions().size(), 1);
+
+    // Test LookupFile (latestLocationVersion == true)
+    key = keyManager.lookupFile(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+
+    keyArgs = createBuilder()
+        .setKeyName(keyName)
+        .setLatestVersionLocation(false)
+        .build();
+
+    // Test lookupKey (latestLocationVersion == false)
+    key = keyManager.lookupKey(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
+
+    // Test ListStatus (latestLocationVersion == false)
+    fileStatuses = keyManager.listStatus(keyArgs, false, "", 100);
+    Assert.assertEquals(fileStatuses.size(), 1);
+    Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
+        .getKeyLocationVersions().size(), 2);
+
+    // Test GetFileStatus (latestLocationVersion == false)
+    ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
+    Assert.assertEquals(ozoneFileStatus.getKeyInfo()
+        .getKeyLocationVersions().size(), 2);
+
+    // Test LookupFile (latestLocationVersion == false)
+    key = keyManager.lookupFile(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
+
+    // Test ListKeys (latestLocationVersion is always true for ListKeys)
+    List<OmKeyInfo> keyInfos = keyManager.listKeys(keyArgs.getVolumeName(),
+        keyArgs.getBucketName(), "", keyArgs.getKeyName(), 100);
+    Assert.assertEquals(keyInfos.size(), 1);
+    Assert.assertEquals(keyInfos.get(0).getKeyLocationVersions().size(), 1);
+  }
+
+  @Test
   public void testListStatusWithTableCache() throws Exception {
     // Inspired by TestOmMetadataManager#testListKeys
     String prefixKeyInDB = "key-d";
@@ -825,11 +931,11 @@ public class TestKeyManagerImpl {
         TestOMRequestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            ONE, metadataManager);
       } else {  // Add to TableCache
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
       }
     }
@@ -896,12 +1002,12 @@ public class TestKeyManagerImpl {
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            ONE, metadataManager);
       } else {  // Add to TableCache
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
       }
     }
@@ -939,12 +1045,12 @@ public class TestKeyManagerImpl {
         TestOMRequestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            ONE, metadataManager);
         existKeySet.add(prefixKey + i);
       } else {
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
 
         String key = metadataManager.getOzoneKey(
@@ -1371,9 +1477,9 @@ public class TestKeyManagerImpl {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return new OmKeyArgs.Builder()
         .setBucketName(BUCKET_NAME)
-        .setFactor(ReplicationFactor.ONE)
         .setDataSize(0)
-        .setType(ReplicationType.STAND_ALONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .setVolumeName(VOLUME_NAME);

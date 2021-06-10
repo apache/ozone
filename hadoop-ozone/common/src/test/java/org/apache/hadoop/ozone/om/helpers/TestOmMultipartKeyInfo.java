@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -37,8 +38,8 @@ public class TestOmMultipartKeyInfo {
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
         .setCreationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+                new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
         .build();
 
     OmMultipartKeyInfo cloneMultipartKeyInfo = omMultipartKeyInfo.copyObject();

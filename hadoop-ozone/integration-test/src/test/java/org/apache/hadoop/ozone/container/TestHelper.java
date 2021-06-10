@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;

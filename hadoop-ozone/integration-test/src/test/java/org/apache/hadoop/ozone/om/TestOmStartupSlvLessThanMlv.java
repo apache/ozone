@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
 
 
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;

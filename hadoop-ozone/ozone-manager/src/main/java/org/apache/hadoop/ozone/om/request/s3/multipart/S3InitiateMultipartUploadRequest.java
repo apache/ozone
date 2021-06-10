@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -164,11 +165,15 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
 
+      final ReplicationConfig replicationConfig =
+          ReplicationConfig.fromTypeAndFactor(
+              keyArgs.getType(), keyArgs.getFactor());
+
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setReplicationConfig(
+              replicationConfig)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .build();
@@ -182,8 +187,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setKeyName(keyArgs.getKeyName())
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setReplicationConfig(replicationConfig)
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
           .setAcls(getAclsForKey(keyArgs, bucketInfo,
@@ -226,7 +230,17 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
             volumeName, bucketName);
       }
     }
+    logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,
+            bucketName, keyName, exception, result);
 
+    return omClientResponse;
+  }
+
+  @SuppressWarnings("parameternumber")
+  protected void logResult(OzoneManager ozoneManager,
+      MultipartInfoInitiateRequest multipartInfoInitiateRequest,
+      Map<String, String> auditMap, String volumeName, String bucketName,
+      String keyName, IOException exception, Result result) {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
@@ -248,8 +262,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
           multipartInfoInitiateRequest);
     }
-
-    return omClientResponse;
   }
 
   public static String getRequestType() {

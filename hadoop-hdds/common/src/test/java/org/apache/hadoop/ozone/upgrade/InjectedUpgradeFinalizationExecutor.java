@@ -43,6 +43,9 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
   private Callable<Boolean> injectTestFunction;
   private UpgradeTestInjectionPoints testInjectionPoint;
 
+  /**
+   * Enum to denote failure injection points in finalization.
+   */
   public enum UpgradeTestInjectionPoints {
     BEFORE_PRE_FINALIZE_UPGRADE(1),
     AFTER_PRE_FINALIZE_UPGRADE(2),

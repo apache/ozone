@@ -19,10 +19,13 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -37,13 +40,14 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
 import static org.junit.Assert.fail;
 
@@ -184,14 +188,14 @@ public class TestKeyInputStream extends TestInputStreamBase {
   }
 
   @Test
-  public void testReadChunk() throws Exception {
+  public void testReadChunkWithByteArray() throws Exception {
     String keyName = getNewKeyName();
 
     // write data spanning multiple blocks/chunks
     int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
     byte[] data = writeRandomBytes(keyName, dataLength);
 
-    // read chunk data
+    // read chunk data using Byte Array
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
       int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
@@ -199,6 +203,27 @@ public class TestKeyInputStream extends TestInputStreamBase {
           BLOCK_SIZE - 1, BLOCK_SIZE, BLOCK_SIZE + 1, BLOCK_SIZE * 2};
       for (int bufferSize : bufferSizeList) {
         assertReadFully(data, keyInputStream, bufferSize, 0);
+        keyInputStream.seek(0);
+      }
+    }
+  }
+
+  @Test
+  public void testReadChunkWithByteBuffer() throws Exception {
+    String keyName = getNewKeyName();
+
+    // write data spanning multiple blocks/chunks
+    int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
+    byte[] data = writeRandomBytes(keyName, dataLength);
+
+    // read chunk data using ByteBuffer
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+
+      int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
+          CHUNK_SIZE / 2, CHUNK_SIZE - 1, CHUNK_SIZE, CHUNK_SIZE + 1,
+          BLOCK_SIZE - 1, BLOCK_SIZE, BLOCK_SIZE + 1, BLOCK_SIZE * 2};
+      for (int bufferSize : bufferSizeList) {
+        assertReadFullyUsingByteBuffer(data, keyInputStream, bufferSize, 0);
         keyInputStream.seek(0);
       }
     }
@@ -278,8 +303,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(getVolumeName())
         .setBucketName(getBucketName())
         .setKeyName(keyName)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
         .build();
     OmKeyInfo keyInfo = getCluster().getOzoneManager().lookupKey(keyArgs);
 
@@ -297,18 +321,26 @@ public class TestKeyInputStream extends TestInputStreamBase {
 
     // read chunk data
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
-
       int b = keyInputStream.read();
       Assert.assertNotEquals(-1, b);
-
       if (doUnbuffer) {
         keyInputStream.unbuffer();
       }
-
       getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
-
       // check that we can still read it
       assertReadFully(data, keyInputStream, dataLength - 1, 1);
+    }
+
+    // read chunk data with ByteBuffer
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+      int b = keyInputStream.read();
+      Assert.assertNotEquals(-1, b);
+      if (doUnbuffer) {
+        keyInputStream.unbuffer();
+      }
+      getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
+      // check that we can still read it
+      assertReadFullyUsingByteBuffer(data, keyInputStream, dataLength - 1, 1);
     }
   }
 
@@ -348,6 +380,27 @@ public class TestKeyInputStream extends TestInputStreamBase {
           Arrays.copyOfRange(buffer, 0, numBytesRead);
       Assert.assertArrayEquals(tmp1, tmp2);
       totalRead += numBytesRead;
+    }
+    Assert.assertEquals(data.length, totalRead);
+  }
+
+  private void assertReadFullyUsingByteBuffer(byte[] data, KeyInputStream in,
+      int bufferSize, int totalRead) throws IOException {
+
+    ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize);
+    while (totalRead < data.length) {
+      int numBytesRead = in.read(buffer);
+      if (numBytesRead == -1 || numBytesRead == 0) {
+        break;
+      }
+      byte[] tmp1 =
+          Arrays.copyOfRange(data, totalRead, totalRead + numBytesRead);
+      byte[] tmp2 = new byte[numBytesRead];
+      buffer.flip();
+      buffer.get(tmp2, 0, numBytesRead);
+      Assert.assertArrayEquals(tmp1, tmp2);
+      totalRead += numBytesRead;
+      buffer.clear();
     }
     Assert.assertEquals(data.length, totalRead);
   }

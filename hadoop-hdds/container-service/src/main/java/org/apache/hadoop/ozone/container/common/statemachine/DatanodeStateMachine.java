@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -27,8 +27,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -81,11 +82,12 @@ public class DatanodeStateMachine implements Closeable {
   private final SCMConnectionManager connectionManager;
   private StateContext context;
   private final OzoneContainer container;
-  private DatanodeDetails datanodeDetails;
+  private final DatanodeCRLStore dnCRLStore;
+  private final DatanodeDetails datanodeDetails;
   private final CommandDispatcher commandDispatcher;
   private final ReportManager reportManager;
   private long commandsHandled;
-  private AtomicLong nextHB;
+  private final AtomicLong nextHB;
   private Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
@@ -113,10 +115,10 @@ public class DatanodeStateMachine implements Closeable {
    *                     enabled
    */
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
-                              OzoneConfiguration conf,
+                              ConfigurationSource conf,
                               CertificateClient certClient,
-                              HddsDatanodeStopService hddsDatanodeStopService)
-      throws IOException {
+                              HddsDatanodeStopService hddsDatanodeStopService,
+                              DatanodeCRLStore crlStore) throws IOException {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
 
@@ -133,6 +135,7 @@ public class DatanodeStateMachine implements Closeable {
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
     DatanodeMetadataFeatures.initialize(layoutVersionManager);
 
+    this.dnCRLStore = crlStore;
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
         new ThreadFactoryBuilder()
@@ -188,6 +191,7 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(ContainerReportsProto.class)
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
+        .addPublisherFor(CRLStatusReport.class)
         .build();
   }
 
@@ -234,6 +238,10 @@ public class DatanodeStateMachine implements Closeable {
     } finally {
       constructionLock.readLock().unlock();
     }
+  }
+
+  public DatanodeCRLStore getDnCRLStore() {
+    return dnCRLStore;
   }
 
   /**

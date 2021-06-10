@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.base.Supplier;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
@@ -65,7 +65,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCA
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
-import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;

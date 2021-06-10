@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -103,8 +104,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.commons.io.FileUtils;
@@ -807,7 +808,8 @@ public abstract class TestOzoneRpcClientAbstract {
         keyInfo.getLatestVersionLocations().getLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
-      if (!container.getReplicationFactor().equals(replicationFactor) || (
+      if (!ReplicationConfig.getLegacyFactor(container.getReplicationConfig())
+          .equals(replicationFactor) || (
           container.getReplicationType() != replicationType)) {
         return false;
       }

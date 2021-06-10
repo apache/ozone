@@ -165,8 +165,8 @@ public class ReconStorageContainerManagerFacade
 
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(nodeManager, pipelineManager, conf);
-    DeadNodeHandler deadNodeHandler = new DeadNodeHandler(nodeManager,
-        pipelineManager, containerManager);
+    DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
+        pipelineManager, containerManager, scmServiceProvider);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);
@@ -195,11 +195,13 @@ public class ReconStorageContainerManagerFacade
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     reconScmTasks.add(new PipelineSyncTask(
         pipelineManager,
+        nodeManager,
         scmServiceProvider,
         reconTaskStatusDao,
         reconTaskConfig));
     reconScmTasks.add(new ContainerHealthTask(
         containerManager,
+        scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy,
         reconTaskConfig));
@@ -338,5 +340,9 @@ public class ReconStorageContainerManagerFacade
 
   public EventQueue getEventQueue() {
     return eventQueue;
+  }
+
+  public StorageContainerServiceProvider getScmServiceProvider() {
+    return scmServiceProvider;
   }
 }

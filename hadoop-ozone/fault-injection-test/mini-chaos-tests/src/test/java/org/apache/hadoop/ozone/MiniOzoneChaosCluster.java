@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.slf4j.Logger;

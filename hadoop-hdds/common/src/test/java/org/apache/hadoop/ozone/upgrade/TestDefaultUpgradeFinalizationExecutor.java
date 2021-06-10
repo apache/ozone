@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Test;
 
 /**
