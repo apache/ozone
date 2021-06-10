@@ -252,7 +252,8 @@ public class SCMStateMachine extends BaseStateMachine {
 
     LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
 
-    scm.getScmContext().updateTerm(currentLeaderTerm.get());
+    scm.getScmContext().updateLeaderAndTerm(true,
+        currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
@@ -306,10 +307,12 @@ public class SCMStateMachine extends BaseStateMachine {
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastAppliedTermIndex(term, index);
 
+    // Once all previous leader term transactions are applied, refresh safe-mode
+    // rule state to udpate with latest state of SCM.
     if (currentLeaderTerm.get() == term &&
         scm.getScmHAManager().getRatisServer().getDivision().getInfo()
             .isLeaderReady()) {
-      scm.getScmContext().updateLeader(true);
+      scm.getScmContext().setLeaderReady();
       scm.getSCMServiceManager().notifyStatusChanged();
     }
 
