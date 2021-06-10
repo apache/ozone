@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -35,7 +36,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,7 @@ import java.util.function.Function;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
-import static org.apache.hadoop.ozone.om.OmGenericConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -667,11 +668,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
-  @FunctionalInterface
-  public interface CheckedConsumer<T> {
-    void apply(T t) throws IOException;
-  }
-
   /**
    * MiniOzoneHAService is a helper class used for both SCM and OM HA.
    * This class keeps track of active and inactive OM/SCM services
@@ -741,13 +737,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       return this.serviceMap.get(id);
     }
 
-    public void startInactiveService(
-        String id, CheckedConsumer<Type> serviceStarter) throws IOException {
+    public void startInactiveService(String id,
+        CheckedConsumer<Type, IOException> serviceStarter) throws IOException {
       Type service = serviceMap.get(id);
       if (!inactiveServices.contains(service)) {
         throw new IOException(serviceName + " is already active.");
       } else {
-        serviceStarter.apply(service);
+        serviceStarter.execute(service);
         activeServices.add(service);
         inactiveServices.remove(service);
       }

@@ -298,8 +298,8 @@ public class SCMDatanodeProtocolServer implements
   @VisibleForTesting
   public SCMCommandProto getCommandResponse(SCMCommand cmd)
       throws IOException {
-    SCMCommandProto.Builder builder =
-        SCMCommandProto.newBuilder();
+    SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
+        .setEncodedToken(cmd.getEncodedToken());
 
     // In HA mode, it is the term of current leader SCM.
     // In non-HA mode, it is the default value 0.

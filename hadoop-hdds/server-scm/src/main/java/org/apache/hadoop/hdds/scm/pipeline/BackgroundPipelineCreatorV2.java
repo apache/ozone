@@ -150,7 +150,7 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
    * Stop RatisPipelineUtilsThread.
    */
   public void stop() {
-    if (running.compareAndSet(true, false)) {
+    if (!running.compareAndSet(true, false)) {
       LOG.warn("{} is not running, just ignore.", THREAD_NAME);
       return;
     }
@@ -280,7 +280,13 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
         || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
         || event == PRE_CHECK_COMPLETED) {
       LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
-      oneShotRun = true;
+
+      serviceLock.lock();
+      try {
+        oneShotRun = true;
+      } finally {
+        serviceLock.unlock();
+      }
 
       synchronized (monitor) {
         monitor.notifyAll();

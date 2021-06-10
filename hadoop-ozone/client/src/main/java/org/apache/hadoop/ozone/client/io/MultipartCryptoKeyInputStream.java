@@ -31,6 +31,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * {@link OzoneInputStream} for accessing MPU keys in encrypted buckets.
+ */
 public class MultipartCryptoKeyInputStream extends OzoneInputStream
     implements Seekable, CanUnbuffer {
 

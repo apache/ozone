@@ -261,7 +261,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         initializeCertificateClient(conf);
       }
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, this::terminateDatanode);
+          dnCertClient, this::terminateDatanode, dnCRLStore);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -73,6 +74,7 @@ public final class SCMConfigurator {
   private NetworkTopology networkTopology;
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
+  private WritableContainerFactory writableContainerFactory;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -173,6 +175,15 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to set the WritableContainerFactory to be used with this SCM.
+   * @param writableContainerFactory - Container Factory to use.
+   */
+  public void setWritableContainerFactory(
+      WritableContainerFactory writableContainerFactory) {
+    this.writableContainerFactory = writableContainerFactory;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -259,4 +270,13 @@ public final class SCMConfigurator {
   public SCMContext getScmContext() {
     return scmContext;
   }
+
+  /**
+   * Get the WritableContainerFactory.
+   * @return WritableContainerFactory.
+   */
+  public WritableContainerFactory getWritableContainerFactory() {
+    return writableContainerFactory;
+  }
+
 }

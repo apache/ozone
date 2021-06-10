@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,9 +41,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Sets;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -62,10 +63,11 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.GeneratedMessage;
 import static java.lang.Math.min;
-import org.apache.commons.collections.CollectionUtils;
-
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+
+import org.apache.commons.collections.CollectionUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,10 +91,9 @@ public class StateContext {
   @VisibleForTesting
   static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
-  // Accepted types of reports that can be queued to incrementalReportsQueue
-  private static final Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
-      Sets.newHashSet(COMMAND_STATUS_REPORTS_PROTO_NAME,
-          INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
+  @VisibleForTesting
+  static final String CRL_STATUS_REPORT_PROTO_NAME =
+      CRLStatusReport.getDescriptor().getFullName();
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
@@ -107,6 +108,7 @@ public class StateContext {
   private final AtomicReference<GeneratedMessage> containerReports;
   private final AtomicReference<GeneratedMessage> nodeReport;
   private final AtomicReference<GeneratedMessage> pipelineReports;
+  private final AtomicReference<GeneratedMessage> crlStatusReport;
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<GeneratedMessage>>
       incrementalReportsQueue;
@@ -116,6 +118,14 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
+  // Endpoint -> ReportType -> Boolean of whether the full report should be
+  //  queued in getFullReports call.
+  private final Map<InetSocketAddress,
+      Map<String, AtomicBoolean>> fullReportSendIndicator;
+  // List of supported full report types.
+  private final List<String> fullReportTypeList;
+  // ReportType -> Report.
+  private final Map<String, AtomicReference<GeneratedMessage>> type2Reports;
 
   /**
    * term of latest leader SCM, extract from SCMCommand.
@@ -134,12 +144,12 @@ public class StateContext {
    * real HB frequency after scm registration. With this method the
    * initial registration could be significant faster.
    */
-  private AtomicLong heartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
 
   /**
    * Constructs a StateContext.
    *
-   * @param conf   - Configration
+   * @param conf   - Configuration
    * @param state  - State
    * @param parent Parent State Machine
    */
@@ -155,12 +165,31 @@ public class StateContext {
     containerReports = new AtomicReference<>();
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
+    crlStatusReport = new AtomicReference<>();
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
+    fullReportSendIndicator = new HashMap<>();
+    fullReportTypeList = new ArrayList<>();
+    type2Reports = new HashMap<>();
+    initReportTypeCollection();
+  }
+
+  /**
+   * init related ReportType Collections.
+   */
+  private void initReportTypeCollection(){
+    fullReportTypeList.add(CONTAINER_REPORTS_PROTO_NAME);
+    type2Reports.put(CONTAINER_REPORTS_PROTO_NAME, containerReports);
+    fullReportTypeList.add(NODE_REPORT_PROTO_NAME);
+    type2Reports.put(NODE_REPORT_PROTO_NAME, nodeReport);
+    fullReportTypeList.add(PIPELINE_REPORTS_PROTO_NAME);
+    type2Reports.put(PIPELINE_REPORTS_PROTO_NAME, pipelineReports);
+    fullReportTypeList.add(CRL_STATUS_REPORT_PROTO_NAME);
+    type2Reports.put(CRL_STATUS_REPORT_PROTO_NAME, crlStatusReport);
   }
 
   /**
@@ -248,7 +277,7 @@ public class StateContext {
    *
    * @param report report to be added
    */
-  public void addReport(GeneratedMessage report) {
+  public void addIncrementalReport(GeneratedMessage report) {
     if (report == null) {
       return;
     }
@@ -256,21 +285,38 @@ public class StateContext {
     Preconditions.checkState(descriptor != null);
     final String reportType = descriptor.getFullName();
     Preconditions.checkState(reportType != null);
-    if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
-      containerReports.set(report);
-    } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
-      nodeReport.set(report);
-    } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
-      pipelineReports.set(report);
-    } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
-      synchronized (incrementalReportsQueue) {
-        for (InetSocketAddress endpoint : endpoints) {
-          incrementalReportsQueue.get(endpoint).add(report);
-        }
+    // in some case, we want to add a fullReportType message
+    // as an incremental message.
+    // see XceiverServerRatis#sendPipelineReport
+    synchronized (incrementalReportsQueue) {
+      for (InetSocketAddress endpoint : endpoints) {
+        incrementalReportsQueue.get(endpoint).add(report);
       }
-    } else {
+    }
+  }
+
+  /**
+   * refresh Full report.
+   *
+   * @param report report to be refreshed
+   */
+  public void refreshFullReport(GeneratedMessage report) {
+    if (report == null) {
+      return;
+    }
+    final Descriptor descriptor = report.getDescriptorForType();
+    Preconditions.checkState(descriptor != null);
+    final String reportType = descriptor.getFullName();
+    Preconditions.checkState(reportType != null);
+    if (!fullReportTypeList.contains(reportType)) {
       throw new IllegalArgumentException(
-          "Unidentified report message type: " + reportType);
+          "not full report message type: " + reportType);
+    }
+    type2Reports.get(reportType).set(report);
+    if (fullReportSendIndicator != null) {
+      for (Map<String, AtomicBoolean> mp : fullReportSendIndicator.values()) {
+        mp.get(reportType).set(true);
+      }
     }
   }
 
@@ -293,10 +339,6 @@ public class StateContext {
       Preconditions.checkState(descriptor != null);
       final String reportType = descriptor.getFullName();
       Preconditions.checkState(reportType != null);
-      if (!ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
-        throw new IllegalArgumentException(
-            "Unaccepted report message type: " + reportType);
-      }
     }
     synchronized (incrementalReportsQueue) {
       if (incrementalReportsQueue.containsKey(endpoint)){
@@ -332,19 +374,27 @@ public class StateContext {
     return reportsToReturn;
   }
 
-  List<GeneratedMessage> getNonIncrementalReports() {
+  List<GeneratedMessage> getFullReports(
+      InetSocketAddress endpoint) {
+    Map<String, AtomicBoolean> mp = fullReportSendIndicator.get(endpoint);
     List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
-    GeneratedMessage report = containerReports.get();
-    if (report != null) {
-      nonIncrementalReports.add(report);
-    }
-    report = nodeReport.get();
-    if (report != null) {
-      nonIncrementalReports.add(report);
-    }
-    report = pipelineReports.get();
-    if (report != null) {
-      nonIncrementalReports.add(report);
+    if (null != mp){
+      for (Map.Entry<String, AtomicBoolean> kv : mp.entrySet()) {
+        if (kv.getValue().get()) {
+          String reportType = kv.getKey();
+          final AtomicReference<GeneratedMessage> ref =
+              type2Reports.get(reportType);
+          if (ref == null) {
+            throw new RuntimeException(reportType + " is not a valid full "
+                + "report type!");
+          }
+          final GeneratedMessage msg = ref.get();
+          if (msg != null) {
+            nonIncrementalReports.add(msg);
+            mp.get(reportType).set(false);
+          }
+        }
+      }
     }
     return nonIncrementalReports;
   }
@@ -360,7 +410,7 @@ public class StateContext {
     if (maxLimit < 0) {
       throw new IllegalArgumentException("Illegal maxLimit value: " + maxLimit);
     }
-    List<GeneratedMessage> reports = getNonIncrementalReports();
+    List<GeneratedMessage> reports = getFullReports(endpoint);
     if (maxLimit <= reports.size()) {
       return reports.subList(0, maxLimit);
     } else {
@@ -787,6 +837,11 @@ public class StateContext {
       this.containerActions.put(endpoint, new LinkedList<>());
       this.pipelineActions.put(endpoint, new LinkedList<>());
       this.incrementalReportsQueue.put(endpoint, new LinkedList<>());
+      Map<String, AtomicBoolean> mp = new HashMap<>();
+      fullReportTypeList.forEach(e -> {
+        mp.putIfAbsent(e, new AtomicBoolean(true));
+      });
+      this.fullReportSendIndicator.putIfAbsent(endpoint, mp);
     }
   }
 
@@ -803,5 +858,10 @@ public class StateContext {
   @VisibleForTesting
   public GeneratedMessage getPipelineReports() {
     return pipelineReports.get();
+  }
+
+  @VisibleForTesting
+  public GeneratedMessage getCRLStatusReport() {
+    return crlStatusReport.get();
   }
 }

@@ -183,7 +183,7 @@ public class HeartbeatEndpointTask
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
-      putBackReports(requestBuilder);
+      putBackIncrementalReports(requestBuilder);
       rpcEndpoint.logIfNeeded(ex);
     } finally {
       rpcEndpoint.unlock();
@@ -192,7 +192,8 @@ public class HeartbeatEndpointTask
   }
 
   // TODO: Make it generic.
-  private void putBackReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
+  private void putBackIncrementalReports(
+      SCMHeartbeatRequestProto.Builder requestBuilder) {
     List<GeneratedMessage> reports = new LinkedList<>();
     // We only put back CommandStatusReports and IncrementalContainerReport
     // because those are incremental. Container/Node/PipelineReport are
@@ -322,6 +323,10 @@ public class HeartbeatEndpointTask
                 commandResponseProto.getCloseContainerCommandProto());
         if (commandResponseProto.hasTerm()) {
           closeContainer.setTerm(commandResponseProto.getTerm());
+        }
+        if (commandResponseProto.hasEncodedToken()) {
+          closeContainer.setEncodedToken(
+              commandResponseProto.getEncodedToken());
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container close request for container {}",

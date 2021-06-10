@@ -701,8 +701,10 @@ public class SCMPipelineManager implements
     pipelineFactory.shutdown();
     lock.writeLock().lock();
     try {
-      pipelineStore.close();
-      pipelineStore = null;
+      if (pipelineStore != null) {
+        pipelineStore.close();
+        pipelineStore = null;
+      }
     } catch (Exception ex) {
       LOG.error("Pipeline  store close failed", ex);
     } finally {

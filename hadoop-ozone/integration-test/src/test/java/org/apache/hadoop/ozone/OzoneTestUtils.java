@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.test.LambdaTestUtils.VoidCallable;
+import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.Assert;

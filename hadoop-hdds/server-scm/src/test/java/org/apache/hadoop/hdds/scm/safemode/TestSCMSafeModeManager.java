@@ -53,7 +53,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -90,7 +90,7 @@ public class TestSCMSafeModeManager {
   @Before
   public void setUp() {
     queue = new EventQueue();
-    scmContext = new SCMContext.Builder().build();
+    scmContext = SCMContext.emptyContext();
     serviceManager = new SCMServiceManager();
     config = new OzoneConfiguration();
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,

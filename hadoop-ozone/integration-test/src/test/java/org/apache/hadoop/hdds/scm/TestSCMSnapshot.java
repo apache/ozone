@@ -37,6 +37,9 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 
+/**
+ * Tests snapshots in SCM HA.
+ */
 public class TestSCMSnapshot {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -45,6 +48,7 @@ public class TestSCMSnapshot {
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     SCMHAConfiguration scmhaConfiguration = conf.getObject(
         SCMHAConfiguration.class);
     scmhaConfiguration.setRatisSnapshotThreshold(1L);

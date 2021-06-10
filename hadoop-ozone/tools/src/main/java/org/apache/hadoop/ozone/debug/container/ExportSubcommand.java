@@ -30,6 +30,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.concurrent.Callable;
 
+/**
+ * Handles {@code ozone debug container export} command.
+ */
 @Command(
     name = "export",
     description = "Export one container to a tarball")

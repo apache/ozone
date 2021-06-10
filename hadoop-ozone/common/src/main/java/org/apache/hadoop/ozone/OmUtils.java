@@ -299,6 +299,7 @@ public final class OmUtils {
     case CancelPrepare:
     case DeleteOpenKeys:
     case RevokeS3Secret:
+    case PurgePaths:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
