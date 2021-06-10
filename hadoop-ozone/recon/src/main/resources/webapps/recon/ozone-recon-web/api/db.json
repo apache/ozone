@@ -9,6 +9,8 @@
       "remaining": 12094627905536
     },
     "containers": 3230,
+    "openContainers": 3210,
+    "closedContainers": 20,
     "volumes": 5,
     "buckets": 156,
     "keys": 253000
@@ -42,6 +44,8 @@
           }
         ],
         "containers": 80,
+        "openContainers": 79,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574728775759,
@@ -74,6 +78,8 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
+        "closedContainers": 10,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -106,6 +112,8 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
+        "closedContainers": 10,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -138,6 +146,8 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
+        "closedContainers": 10,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -170,6 +180,8 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
+        "closedContainers": 10,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -208,6 +220,8 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -246,6 +260,8 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -284,6 +300,8 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -322,6 +340,8 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -360,6 +380,8 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -379,6 +401,8 @@
         },
         "pipelines": [],
         "containers": 0,
+        "openContainers": 0,
+        "closedContainers": 0,
         "leaderCount": 0,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1074724802059,
@@ -411,6 +435,8 @@
           }
         ],
         "containers": 643,
+        "openContainers": 632,
+        "closedContainers": 10,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724816029,
@@ -443,6 +469,8 @@
           }
         ],
         "containers": 5,
+        "openContainers": 4,
+        "closedContainers": 1,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724802059,
@@ -481,6 +509,8 @@
           }
         ],
         "containers": 64,
+        "openContainers": 63,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724676009,
@@ -513,6 +543,8 @@
           }
         ],
         "containers": 21,
+        "openContainers": 20,
+        "closedContainers": 1,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724276050,
@@ -545,6 +577,8 @@
           }
         ],
         "containers": 897,
+        "openContainers": 896,
+        "closedContainers": 1,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724573011,
@@ -583,6 +617,8 @@
           }
         ],
         "containers": 6754,
+        "openContainers": 6744,
+        "closedContainers": 10,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574723756059,
@@ -615,6 +651,8 @@
           }
         ],
         "containers": 78,
+        "openContainers": 77,
+        "closedContainers": 1,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1474724705783,
@@ -647,6 +685,8 @@
           }
         ],
         "containers": 543,
+        "openContainers": 540,
+        "closedContainers": 3,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724706232,

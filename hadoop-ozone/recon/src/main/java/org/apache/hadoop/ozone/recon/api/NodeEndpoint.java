@@ -72,7 +72,8 @@ public class NodeEndpoint {
   NodeEndpoint(OzoneStorageContainerManager reconSCM) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
-    this.reconContainerManager = (ReconContainerManager) reconSCM.getContainerManager();
+    this.reconContainerManager = 
+        (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
   }
 
@@ -127,7 +128,8 @@ public class NodeEndpoint {
 
         int openContainers = 0;
         for (ContainerID containerID: allContainers) {
-          ContainerInfo containerInfo = reconContainerManager.getContainer(containerID);
+          ContainerInfo containerInfo = 
+              reconContainerManager.getContainer(containerID);
           if (containerInfo.isOpen()) {
             ++openContainers;
           }
@@ -142,7 +144,7 @@ public class NodeEndpoint {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot found container.", cnfe);
+        LOG.warn("Cannot find container.", cnfe);
       }
       datanodes.add(builder.withHostname(hostname)
           .withDatanodeStorageReport(storageReport)
