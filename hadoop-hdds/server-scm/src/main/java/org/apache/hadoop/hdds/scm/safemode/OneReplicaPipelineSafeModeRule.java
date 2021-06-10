@@ -151,9 +151,13 @@ public class OneReplicaPipelineSafeModeRule extends
   }
 
   @Override
-  public synchronized void refresh() {
-    if (!validate()) {
+  public synchronized void refresh(boolean forceRefresh) {
+    if (forceRefresh) {
       initializeRule(true);
+    } else {
+      if (!validate()) {
+        initializeRule(true);
+      }
     }
   }
 

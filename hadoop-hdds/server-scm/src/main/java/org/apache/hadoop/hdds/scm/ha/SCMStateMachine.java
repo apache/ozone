@@ -306,24 +306,32 @@ public class SCMStateMachine extends BaseStateMachine {
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastAppliedTermIndex(term, index);
 
-    // Once all previous leader term transactions are applied, refresh safe-mode
-    // rule state to udpate with latest state of SCM.
-    if (currentLeaderTerm.get() == term &&
-        scm.getScmHAManager().getRatisServer().getDivision().getInfo()
-            .isLeaderReady()) {
-      scm.getScmContext().setLeaderReady();
-      scm.getSCMServiceManager().notifyStatusChanged();
-    }
+    if (currentLeaderTerm.get() == term) {
+      // On leader SCM once after it is ready, notify SCM services and also set
+      // leader ready  in SCMContext.
+      if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
+          .isLeaderReady()) {
+        scm.getScmContext().setLeaderReady();
+        scm.getSCMServiceManager().notifyStatusChanged();
+      }
 
-    if (currentLeaderTerm.get() == term && !refreshedAfterLeaderReady.get()
-        && scm.isInSafeMode()) {
       // Means all transactions before this term have been applied.
       // This means after a restart, all pending transactions have been applied.
-      scm.getScmSafeModeManager().refresh();
-      scm.getDatanodeProtocolServer().start();
+      // Perform
+      // 1. Refresh Safemode rules state.
+      // 2. Start DN Rpc server.
+      if (!refreshedAfterLeaderReady.get()) {
+        scm.getScmSafeModeManager().refresh();
+        scm.getDatanodeProtocolServer().start();
+
+        refreshedAfterLeaderReady.set(true);
+      }
+
       currentLeaderTerm.set(-1L);
-      refreshedAfterLeaderReady.set(true);
+
     }
+
+
   }
 
   @Override

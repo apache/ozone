@@ -89,7 +89,7 @@ public class DataNodeSafeModeRule extends
 
 
   @Override
-  public void refresh() {
+  public void refresh(boolean forceRefresh) {
     // Do nothing.
     // As for this rule, there is nothing we read from SCM DB state and
     // validate it.

@@ -263,7 +263,10 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void refresh() {
     if (inSafeMode.get()) {
       exitRules.values().forEach(rule -> {
-        rule.refresh();
+        // Refresh rule irrespective of validate(), as at this point validate
+        // does not represent current state validation, as validate is being
+        // done with stale state.
+        rule.refresh(true);
       });
     }
   }
@@ -274,7 +277,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void refreshAndValidate() {
     if (inSafeMode.get()) {
       exitRules.values().forEach(rule -> {
-        rule.refresh();
+        rule.refresh(false);
         if (rule.validate() && inSafeMode.get()) {
           validateSafeModeExitRules(rule.getRuleName(), eventPublisher);
           rule.cleanup();

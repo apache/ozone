@@ -147,29 +147,36 @@ public class ContainerSafeModeRule extends
 
 
   @Override
-  public synchronized void refresh() {
-    if (!validate()) {
-      containerMap.clear();
-      containerManager.getContainers().forEach(container -> {
-        // There can be containers in OPEN/CLOSING state which were never
-        // created by the client. We are not considering these containers for
-        // now. These containers can be handled by tracking pipelines.
-
-        Optional.ofNullable(container.getState())
-            .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
-                state == HddsProtos.LifeCycleState.CLOSED))
-            .ifPresent(s -> containerMap.put(container.getContainerID(),
-                container));
-      });
-
-      maxContainer = containerMap.size();
-      long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
-
-      LOG.info("Refreshed one replica container threshold {}, " +
-              "currentThreshold {}", cutOff, containerWithMinReplicas.get());
-      getSafeModeMetrics()
-          .setNumContainerWithOneReplicaReportedThreshold(cutOff);
+  public synchronized void refresh(boolean forceRefresh) {
+    if (forceRefresh) {
+     reInitializeRule();
     }
+    if (!validate()) {
+      reInitializeRule();
+    }
+  }
+
+  private void reInitializeRule() {
+    containerMap.clear();
+    containerManager.getContainers().forEach(container -> {
+      // There can be containers in OPEN/CLOSING state which were never
+      // created by the client. We are not considering these containers for
+      // now. These containers can be handled by tracking pipelines.
+
+      Optional.ofNullable(container.getState())
+          .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
+              state == HddsProtos.LifeCycleState.CLOSED))
+          .ifPresent(s -> containerMap.put(container.getContainerID(),
+              container));
+    });
+
+    maxContainer = containerMap.size();
+    long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
+
+    LOG.info("Refreshed one replica container threshold {}, " +
+        "currentThreshold {}", cutOff, containerWithMinReplicas.get());
+    getSafeModeMetrics()
+        .setNumContainerWithOneReplicaReportedThreshold(cutOff);
   }
 
 }
