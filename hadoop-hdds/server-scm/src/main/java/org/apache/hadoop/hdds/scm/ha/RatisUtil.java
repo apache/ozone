@@ -196,7 +196,7 @@ public final class RatisUtil {
           .convertToNotLeaderException(nle,
               SCMRatisServerImpl.getSelfPeerId(scmId), port));
     } else if (e instanceof SCMSecurityException) {
-      // For this error client needs to retry on next SCM.
+      // For NOT_A_PRIMARY_SCM error client needs to retry on next SCM.
       // GetSCMCertificate call can happen on non-leader SCM and only an
       // primary SCM. When the bootstrapped SCM connects to other
       // bootstrapped SCM we get the NOT_A_PRIMARY_SCM. In this scenario
