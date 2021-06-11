@@ -295,6 +295,15 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void notifyTermIndexUpdated(long term, long index) {
 
+    // We need to call updateLastApplied here because now in ratis when a
+    // node becomes leader, it is checking stateMachineIndex >=
+    // placeHolderIndex (when a node becomes leader, it writes a conf entry
+    // with some information like its peers and termIndex). So, calling
+    // updateLastApplied updates lastAppliedTermIndex.
+    updateLastAppliedTermIndex(term, index);
+
+    // Skip below part if state machine is not initialized.
+
     if (!isInitialized) {
       return;
     }
@@ -304,12 +313,6 @@ public class SCMStateMachine extends BaseStateMachine {
           TransactionInfo.builder().setCurrentTerm(term)
               .setTransactionIndex(index).build());
     }
-    // We need to call updateLastApplied here because now in ratis when a
-    // node becomes leader, it is checking stateMachineIndex >=
-    // placeHolderIndex (when a node becomes leader, it writes a conf entry
-    // with some information like its peers and termIndex). So, calling
-    // updateLastApplied updates lastAppliedTermIndex.
-    updateLastAppliedTermIndex(term, index);
 
     if (currentLeaderTerm.get() == term) {
       // On leader SCM once after it is ready, notify SCM services and also set
@@ -327,6 +330,7 @@ public class SCMStateMachine extends BaseStateMachine {
       // 2. Start DN Rpc server.
       if (!refreshedAfterLeaderReady.get()) {
         scm.getScmSafeModeManager().refresh();
+        LOG.info("bharat starting from sm");
         scm.getDatanodeProtocolServer().start();
 
         refreshedAfterLeaderReady.set(true);
