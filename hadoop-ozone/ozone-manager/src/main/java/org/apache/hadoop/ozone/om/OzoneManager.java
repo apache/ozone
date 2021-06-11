@@ -364,6 +364,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private OzoneManagerPrepareState prepareState;
 
+  /**
+   * OM Startup mode.
+   */
   public enum StartupOption {
     REGUALR,
     BOOTSTRAP

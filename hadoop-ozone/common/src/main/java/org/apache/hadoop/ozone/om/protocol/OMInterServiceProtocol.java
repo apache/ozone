@@ -30,7 +30,6 @@ import org.apache.hadoop.security.token.TokenInfo;
  */
 @KerberosInfo(
     serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
-@TokenInfo(OzoneDelegationTokenSelector.class)
 public interface OMInterServiceProtocol extends Closeable {
 
   /**

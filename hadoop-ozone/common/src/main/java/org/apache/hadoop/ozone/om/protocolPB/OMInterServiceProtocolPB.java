@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
     protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
-@TokenInfo(OzoneDelegationTokenSelector.class)
 @InterfaceAudience.Private
 public interface OMInterServiceProtocolPB
     extends OzoneManagerInterService.BlockingInterface {

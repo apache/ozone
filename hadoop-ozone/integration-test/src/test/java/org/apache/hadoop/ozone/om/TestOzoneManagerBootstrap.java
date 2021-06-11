@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -48,6 +48,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
 
+/**
+ * Test for OM bootstrap process.
+ */
 public class TestOzoneManagerBootstrap {
 
   @Rule
@@ -122,14 +125,11 @@ public class TestOzoneManagerBootstrap {
     }
 
     OzoneManager newOM = cluster.getOzoneManager(nodeId);
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        try {
-          return newOM.getRatisSnapshotIndex() >= lastTransactionIndex;
-        } catch (IOException e) {
-          return false;
-        }
+    GenericTestUtils.waitFor((Supplier<Boolean>) () -> {
+      try {
+        return newOM.getRatisSnapshotIndex() >= lastTransactionIndex;
+      } catch (IOException e) {
+        return false;
       }
     }, 100, 100000);
 
