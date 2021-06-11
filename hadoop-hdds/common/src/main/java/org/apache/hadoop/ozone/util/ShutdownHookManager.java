@@ -63,8 +63,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * This code is taken from hadoop project.
  * 1. This is to avoid dependency on hadoop.
- * 2. To use a ozone specific config and defaults for
- * OzoneConfigKeys#SERVICE_SHUTDOWN_TIMEOUT config.
+ * 2. To use a ozone specific config and defaults.
  * 3. Now any fix happened to this class in hadoop for this class, we can
  * backport this to this with out waiting for a new hadoop release.
  *
