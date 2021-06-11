@@ -24,7 +24,6 @@ import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
@@ -46,7 +45,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -155,8 +153,8 @@ public class TestOMKeyRequest {
 
     allocatedBlocks.add(allocatedBlock);
 
-    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
-        any(), anyString(), any(ExcludeList.class))).thenReturn(allocatedBlocks);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any())).thenReturn(allocatedBlocks);
 
 
     volumeName = UUID.randomUUID().toString();
