@@ -22,9 +22,9 @@ import java.util.HashMap;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -38,9 +38,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 
 import org.junit.After;
@@ -99,8 +100,8 @@ public class TestCloseContainerHandler {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.STAND_ALONE)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setDataSize(1024)
             .setKeyName("test")
             .setRefreshPipeline(true)
             .build();

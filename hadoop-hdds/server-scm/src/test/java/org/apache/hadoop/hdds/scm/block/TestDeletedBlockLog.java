@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -68,6 +68,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.mockito.Matchers.anyObject;
@@ -123,7 +124,7 @@ public class TestDeletedBlockLog {
 
     final ContainerInfo container =
         new ContainerInfo.Builder().setContainerID(1)
-            .setReplicationFactor(ReplicationFactor.THREE)
+            .setReplicationConfig(new RatisReplicationConfig(THREE))
             .setState(HddsProtos.LifeCycleState.CLOSED)
             .build();
     final Set<ContainerReplica> replicaSet = dnList.stream()
@@ -419,9 +420,7 @@ public class TestDeletedBlockLog {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
     builder.setContainerID(containerID)
         .setPipelineID(pipeline.getId())
-        .setReplicationType(pipeline.getType())
-        .setReplicationFactor(
-            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+        .setReplicationConfig(pipeline.getReplicationConfig());
 
     ContainerInfo containerInfo = builder.build();
     Mockito.doReturn(containerInfo).when(containerManager)

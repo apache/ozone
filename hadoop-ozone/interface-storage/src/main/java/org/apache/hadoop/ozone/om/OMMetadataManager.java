@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -381,6 +382,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String bucketName, String prefix) throws IOException;
 
   /**
+   * Gets the DirectoryTable.
+   * @return Table.
+   */
+  Table<String, OmDirectoryInfo> getDirectoryTable();
+
+  /**
    * Return table mapped to the specified table name.
    * @param tableName
    * @return Table
@@ -404,4 +411,43 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
       getKeyIterator();
+
+  /**
+   * Given parent object id and path component name, return the corresponding
+   * DB 'prefixKey' key.
+   *
+   * @param parentObjectId - parent object Id
+   * @param pathComponentName   - path component name
+   * @return DB directory key as String.
+   */
+  String getOzonePathKey(long parentObjectId, String pathComponentName);
+
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param id             - client id for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long parentObjectId, String fileName, long id);
+
+  /**
+   * Returns the DB key name of a multipart upload key in OM metadata store.
+   *
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param uploadId       - the upload id for this key
+   * @return bytes of DB key.
+   */
+  String getMultipartKey(long parentObjectId, String fileName, String uploadId);
+
+  /**
+   * Get Deleted Directory Table.
+   *
+   * @return Deleted Directory Table.
+   */
+  Table<String, OmKeyInfo> getDeletedDirTable();
+
 }

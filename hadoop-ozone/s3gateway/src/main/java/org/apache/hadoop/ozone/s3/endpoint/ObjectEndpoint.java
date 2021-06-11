@@ -438,6 +438,11 @@ public class ObjectEndpoint extends EndpointBase {
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
+      } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
+        // With PREFIX metadata layout, a dir deletion without recursive flag
+        // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
+        // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
+        // keys. Just return 204
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
       } else {

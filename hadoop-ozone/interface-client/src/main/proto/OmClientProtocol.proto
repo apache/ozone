@@ -100,6 +100,8 @@ enum Type {
   RecoverTrash = 92;
 
   RevokeS3Secret = 93;
+
+  PurgePaths = 94;
 }
 
 message OMRequest {
@@ -180,6 +182,8 @@ message OMRequest {
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
+
+  optional PurgePathsRequest                purgePathsRequest              = 94;
 }
 
 message OMResponse {
@@ -255,6 +259,7 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  optional PurgePathsResponse                 purgePathsResponse           = 93;
 }
 
 enum Status {
@@ -341,12 +346,14 @@ enum Status {
 
     QUOTA_ERROR = 67;
 
-    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 68;
-    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
-    UPDATE_LAYOUT_VERSION_FAILED = 70;
-    LAYOUT_FEATURE_FINALIZATION_FAILED = 71;
-    PREPARE_FAILED = 72;
-    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 73;
+    DIRECTORY_NOT_EMPTY = 68;
+
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70;
+    UPDATE_LAYOUT_VERSION_FAILED = 71;
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
+    PREPARE_FAILED = 73;
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
 }
 
 /**
@@ -757,6 +764,10 @@ message KeyArgs {
 
     // This will be set by leader OM in HA and update the original request.
     optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+    optional bool latestVersionLocation = 16;
+
+    // This will be set when user performs delete directory recursively.
+    optional bool recursive = 17;
 }
 
 message KeyLocation {
@@ -800,6 +811,18 @@ message KeyInfo {
     repeated OzoneAclInfo acls = 13;
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
+    optional uint64 parentID = 16;
+}
+
+message DirectoryInfo {
+    required string name = 1;
+    required uint64 creationTime = 2;
+    required uint64 modificationTime = 3;
+    repeated hadoop.hdds.KeyValue metadata = 4;
+    repeated OzoneAclInfo acls = 5;
+    required uint64 objectID = 6;
+    required uint64 updateID = 7;
+    required uint64 parentID = 8;
 }
 
 message RepeatedKeyInfo {
@@ -963,6 +986,16 @@ message PurgeKeysRequest {
 }
 
 message PurgeKeysResponse {
+
+}
+
+message PurgePathsRequest {
+    repeated string deletedDirs = 1;
+    repeated KeyInfo deletedSubFiles = 2;
+    repeated KeyInfo markDeletedSubDirs = 3;
+}
+
+message PurgePathsResponse {
 
 }
 
@@ -1164,6 +1197,7 @@ message MultipartKeyInfo {
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
+    optional uint64 parentID = 8;
 }
 
 message PartKeyInfo {

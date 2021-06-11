@@ -36,6 +36,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+/**
+ *  OM request class to cancel preparation.
+ */
 public class OMCancelPrepareRequest extends OMClientRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMCancelPrepareRequest.class);
@@ -91,7 +94,4 @@ public class OMCancelPrepareRequest extends OMClientRequest {
     return response;
   }
 
-  public static String getRequestType() {
-    return Type.CancelPrepare.name();
-  }
 }

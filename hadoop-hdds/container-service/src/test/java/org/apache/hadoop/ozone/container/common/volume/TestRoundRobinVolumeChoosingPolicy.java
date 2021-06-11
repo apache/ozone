@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;

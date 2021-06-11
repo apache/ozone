@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.GetDelegationToken;
-
 import com.google.common.base.Optional;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -183,7 +181,4 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-  public static String getRequestType() {
-    return GetDelegationToken.name();
-  }
 }

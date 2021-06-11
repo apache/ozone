@@ -180,6 +180,9 @@ public class TestOMVersionManager {
     verify(omMock, times(1)).getVersion();
   }
 
+  /**
+   * Mock OM upgrade action class.
+   */
   @UpgradeActionOm(type = VALIDATE_IN_PREFINALIZE, feature =
       INITIAL_VERSION)
   public static class MockOmUpgradeAction implements OmUpgradeAction {

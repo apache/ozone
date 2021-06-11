@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
-import org.apache.hadoop.test.LambdaTestUtils.VoidCallable;
+import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;

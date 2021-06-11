@@ -113,7 +113,4 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     return response;
   }
 
-  public static String getRequestType() {
-    return FinalizeUpgrade.name();
-  }
 }

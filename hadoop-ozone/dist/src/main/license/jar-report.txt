@@ -155,7 +155,6 @@ share/ozone/lib/kerby-util.jar
 share/ozone/lib/kerby-xdr.jar
 share/ozone/lib/kotlin-stdlib-common.jar
 share/ozone/lib/kotlin-stdlib.jar
-share/ozone/lib/leveldbjni-all.jar
 share/ozone/lib/libthrift.jar
 share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
 share/ozone/lib/log4j-api.jar

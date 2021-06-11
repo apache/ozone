@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -184,11 +185,11 @@ public class TestReconContainerManager
   ContainerInfo newContainerInfo(long containerId, Pipeline pipeline) {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationConfig(new RatisReplicationConfig(
+            HddsProtos.ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setOwner("owner2")
         .setNumberOfKeys(99L)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
         .setPipelineID(pipeline.getId())
         .build();
   }

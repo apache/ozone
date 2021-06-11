@@ -59,7 +59,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.OzoneConsts.RENAMED_KEYS_MAP;
 import static org.apache.hadoop.ozone.OzoneConsts.UNRENAMED_KEYS_MAP;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKeys;
 
 /**
  * Handles rename keys request.
@@ -252,10 +251,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
-  }
-
-  public static String getRequestType() {
-    return RenameKeys.name();
   }
 
   /**

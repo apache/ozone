@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -64,8 +65,8 @@ public class TestRepeatedOmKeyInfoCodec {
     return new OmKeyInfo.Builder()
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+                new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
         .setKeyName(KEYNAME)

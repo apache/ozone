@@ -67,6 +67,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
+/**
+ * Utilities for SCM HA security.
+ */
 public final class HASecurityUtils {
 
   private HASecurityUtils() {
@@ -354,7 +357,7 @@ public final class HASecurityUtils {
         .setLeaderId(null)
         .setProperties(properties)
         .setRetryPolicy(
-            RetryPolicies.retryUpToMaximumCountWithFixedSleep(15,
+            RetryPolicies.retryUpToMaximumCountWithFixedSleep(120,
                 TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
 
     if (tlsConfig != null) {

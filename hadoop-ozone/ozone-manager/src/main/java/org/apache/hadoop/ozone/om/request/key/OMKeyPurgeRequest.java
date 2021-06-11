@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PurgeKeys;
-
 import java.util.ArrayList;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -74,7 +72,4 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  public static String getRequestType() {
-    return PurgeKeys.name();
-  }
 }

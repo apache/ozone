@@ -38,6 +38,9 @@ public @interface UpgradeActionHdds {
 
   UpgradeActionType type();
 
+  /**
+   * Simple enum to denote if an action is for the SCM or the DN.
+   */
   enum Component {
     SCM,
     DATANODE;

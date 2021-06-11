@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -38,6 +38,9 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Random;
 
+/**
+ * Class to test Ozone Manager prepare state maintenance.
+ */
 public class TestOzoneManagerPrepareState {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();

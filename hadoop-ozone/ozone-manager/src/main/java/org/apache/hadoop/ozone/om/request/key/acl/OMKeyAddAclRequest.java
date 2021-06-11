@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key.acl;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.AddAcl;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +33,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -149,8 +146,5 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
         omDoubleBufferHelper);
   }
 
-  public static String getRequestType() {
-    return AddAcl.name() + "-" + ObjectType.KEY;
-  }
 }
 

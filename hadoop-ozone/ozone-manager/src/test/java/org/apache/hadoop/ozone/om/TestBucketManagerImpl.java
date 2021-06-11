@@ -21,10 +21,10 @@ import java.io.IOException;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -321,16 +321,16 @@ public class TestBucketManagerImpl {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_one")
-            .setReplicationFactor(ReplicationFactor.ONE)
-            .setReplicationType(ReplicationType.STAND_ALONE)
+            .setReplicationConfig(
+                    new StandaloneReplicationConfig(ReplicationFactor.ONE))
             .build());
     metaMgr.getKeyTable().put("/sampleVol/bucketOne/key_two",
         new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_two")
-            .setReplicationFactor(ReplicationFactor.ONE)
-            .setReplicationType(ReplicationType.STAND_ALONE)
+            .setReplicationConfig(
+                        new StandaloneReplicationConfig(ReplicationFactor.ONE))
             .build());
     try {
       bucketManager.deleteBucket("sampleVol", "bucketOne");

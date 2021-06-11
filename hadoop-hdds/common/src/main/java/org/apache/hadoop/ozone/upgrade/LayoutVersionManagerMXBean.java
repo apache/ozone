@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+/**
+ * Interface for exposing Layout version metrics to JMX.
+ */
 public interface LayoutVersionManagerMXBean {
   int getMetadataLayoutVersion();
 

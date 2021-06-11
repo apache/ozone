@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -40,7 +41,7 @@ public class DatanodeLayoutStorage extends Storage {
    * Construct DataNodeStorageConfig.
    * @throws IOException if any directories are inaccessible.
    */
-  public DatanodeLayoutStorage(OzoneConfiguration conf, String dataNodeId)
+  public DatanodeLayoutStorage(ConfigurationSource conf, String dataNodeId)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
         DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultLayoutVersion(conf));
@@ -83,7 +84,7 @@ public class DatanodeLayoutStorage extends Storage {
    * @return The layout version that should be used for the datanode if no
    * layout version is found on disk.
    */
-  private static int getDefaultLayoutVersion(OzoneConfiguration conf) {
+  private static int getDefaultLayoutVersion(ConfigurationSource conf) {
     int defaultLayoutVersion = maxLayoutVersion();
 
     File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));

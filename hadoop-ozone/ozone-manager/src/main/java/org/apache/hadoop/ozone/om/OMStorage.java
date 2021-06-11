@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 
-import static org.apache.hadoop.ozone.om.OmGenericConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 
 /**
  * OMStorage is responsible for management of the StorageDirectories used by

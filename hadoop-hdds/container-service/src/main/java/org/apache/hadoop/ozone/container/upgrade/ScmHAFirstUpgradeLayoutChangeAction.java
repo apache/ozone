@@ -28,6 +28,9 @@ import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Action to run upgrade flow for SCM HA exactly once.
+ */
 @UpgradeActionHdds(feature = SCM_HA, component = DATANODE,
     type = ON_FIRST_UPGRADE_START)
 public class ScmHAFirstUpgradeLayoutChangeAction

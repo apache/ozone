@@ -32,26 +32,41 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
+import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
@@ -83,8 +98,23 @@ import java.nio.file.Path;
  */
 public final class OzoneManagerRatisUtils {
 
+  // TODO: Temporary workaround for OM upgrade path and will be replaced once
+  //  upgrade HDDS-3698 story reaches consensus.
+  private static boolean isBucketFSOptimized = false;
+
   private OzoneManagerRatisUtils() {
   }
+
+  /**
+   * Sets enabled/disabled file system optimized path property. A true value
+   * represents enabled, false represents disabled.
+   *
+   * @param enabledFSO enabled/disabled file system optimized
+   */
+  public static void setBucketFSOptimized(boolean enabledFSO) {
+    OzoneManagerRatisUtils.isBucketFSOptimized = enabledFSO;
+  }
+
   /**
    * Create OMClientRequest which encapsulates the OMRequest.
    * @param omRequest
@@ -119,32 +149,67 @@ public final class OzoneManagerRatisUtils {
     case SetBucketProperty:
       return new OMBucketSetPropertyRequest(omRequest);
     case AllocateBlock:
+      if (isBucketFSOptimized()) {
+        return new OMAllocateBlockRequestWithFSO(omRequest);
+      }
       return new OMAllocateBlockRequest(omRequest);
     case CreateKey:
+      if (isBucketFSOptimized()) {
+        return new OMKeyCreateRequestWithFSO(omRequest);
+      }
       return new OMKeyCreateRequest(omRequest);
     case CommitKey:
+      if (isBucketFSOptimized()) {
+        return new OMKeyCommitRequestWithFSO(omRequest);
+      }
       return new OMKeyCommitRequest(omRequest);
     case DeleteKey:
+      if (isBucketFSOptimized()) {
+        return new OMKeyDeleteRequestWithFSO(omRequest);
+      }
       return new OMKeyDeleteRequest(omRequest);
     case DeleteKeys:
       return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
+      if (isBucketFSOptimized()) {
+        return new OMKeyRenameRequestWithFSO(omRequest);
+      }
       return new OMKeyRenameRequest(omRequest);
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
+      if (isBucketFSOptimized()) {
+        return new OMDirectoryCreateRequestWithFSO(omRequest);
+      }
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
+      if (isBucketFSOptimized()) {
+        return new OMFileCreateRequestWithFSO(omRequest);
+      }
       return new OMFileCreateRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
+    case PurgePaths:
+      return new OMPathsPurgeRequestWithFSO(omRequest);
     case InitiateMultiPartUpload:
+      if (isBucketFSOptimized()) {
+        return new S3InitiateMultipartUploadRequestWithFSO(omRequest);
+      }
       return new S3InitiateMultipartUploadRequest(omRequest);
     case CommitMultiPartUpload:
+      if (isBucketFSOptimized()) {
+        return new S3MultipartUploadCommitPartRequestWithFSO(omRequest);
+      }
       return new S3MultipartUploadCommitPartRequest(omRequest);
     case AbortMultiPartUpload:
+      if (isBucketFSOptimized()) {
+        return new S3MultipartUploadAbortRequestWithFSO(omRequest);
+      }
       return new S3MultipartUploadAbortRequest(omRequest);
     case CompleteMultiPartUpload:
+      if (isBucketFSOptimized()) {
+        return new S3MultipartUploadCompleteRequestWithFSO(omRequest);
+      }
       return new S3MultipartUploadCompleteRequest(omRequest);
     case AddAcl:
     case RemoveAcl:
@@ -183,6 +248,9 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.BUCKET == type) {
         return new OMBucketAddAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
+        if (isBucketFSOptimized()){
+          return new OMKeyAddAclRequestWithFSO(omRequest);
+        }
         return new OMKeyAddAclRequest(omRequest);
       } else {
         return new OMPrefixAddAclRequest(omRequest);
@@ -194,6 +262,9 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.BUCKET == type) {
         return new OMBucketRemoveAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
+        if (isBucketFSOptimized()){
+          return new OMKeyRemoveAclRequestWithFSO(omRequest);
+        }
         return new OMKeyRemoveAclRequest(omRequest);
       } else {
         return new OMPrefixRemoveAclRequest(omRequest);
@@ -205,6 +276,9 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.BUCKET == type) {
         return new OMBucketSetAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
+        if (isBucketFSOptimized()){
+          return new OMKeySetAclRequestWithFSO(omRequest);
+        }
         return new OMKeySetAclRequest(omRequest);
       } else {
         return new OMPrefixSetAclRequest(omRequest);
@@ -264,4 +338,15 @@ public final class OzoneManagerRatisUtils {
         .verifyTransactionInfo(transactionInfo, lastAppliedIndex, leaderId,
             newDBlocation, OzoneManager.LOG);
   }
+
+  /**
+   * Returns enabled/disabled file system optimized path property. A true value
+   * represents FSO path is enabled, false represents disabled.
+   *
+   * @return true or false.
+   */
+  public static boolean isBucketFSOptimized() {
+    return isBucketFSOptimized;
+  }
+
 }

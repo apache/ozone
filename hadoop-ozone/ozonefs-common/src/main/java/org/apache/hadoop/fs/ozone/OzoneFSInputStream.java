@@ -105,23 +105,29 @@ public class OzoneFSInputStream extends FSInputStream
       throw new ReadOnlyBufferException();
     }
 
-    int readLen = Math.min(buf.remaining(), available());
-
     int bytesRead;
-    if (buf.hasArray()) {
-      int pos = buf.position();
-      bytesRead = read(buf.array(), pos, readLen);
-      if (bytesRead > 0) {
-        buf.position(pos + bytesRead);
-      }
+    if (inputStream instanceof ByteBufferReadable) {
+      bytesRead = ((ByteBufferReadable)inputStream).read(buf);
     } else {
-      byte[] readData = new byte[readLen];
-      bytesRead = read(readData, 0, readLen);
-      if (bytesRead > 0) {
-        buf.put(readData);
+      int readLen = Math.min(buf.remaining(), available());
+      if (buf.hasArray()) {
+        int pos = buf.position();
+        bytesRead = read(buf.array(), pos, readLen);
+        if (bytesRead > 0) {
+          buf.position(pos + bytesRead);
+        }
+      } else {
+        byte[] readData = new byte[readLen];
+        bytesRead = read(readData, 0, readLen);
+        if (bytesRead > 0) {
+          buf.put(readData);
+        }
       }
     }
 
+    if (statistics != null && bytesRead >= 0) {
+      statistics.incrementBytesRead(bytesRead);
+    }
     return bytesRead;
   }
 

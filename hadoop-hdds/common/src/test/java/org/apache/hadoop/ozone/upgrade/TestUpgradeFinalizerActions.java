@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.upgrade.test.MockComponent;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockDnUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockScmUpgradeAction;
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;

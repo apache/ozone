@@ -245,4 +245,28 @@ public final class OMConfigKeys {
 
   public static final long  OZONE_FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
 
+//  This property is used to define the metadata layout of file system
+//  paths. If it is configured as PREFIX in combination with
+//  ozone.om.enable.filesystem.paths to true then this allows to perform
+//  atomic rename and delete of any directory at any level in the namespace.
+//  Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
+
+  public static final String OZONE_OM_METADATA_LAYOUT =
+          "ozone.om.metadata.layout";
+  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "SIMPLE";
+
+  public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
+
+  /**
+   * Configuration properties for Directory Deleting Service.
+   */
+  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL =
+      "ozone.directory.deleting.service.interval";
+  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
+      = "60s";
+
+  public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
+      "ozone.path.deleting.limit.per.task";
+  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
+
 }

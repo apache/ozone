@@ -79,6 +79,7 @@ public class TestBucketRequest {
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    when(ozoneManager.getOMMetadataLayout()).thenReturn(null);
   }
 
   @After

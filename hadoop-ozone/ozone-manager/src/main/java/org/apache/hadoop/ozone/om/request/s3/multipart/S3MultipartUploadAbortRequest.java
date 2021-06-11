@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.AbortMultiPartUpload;
 
 /**
  * Handles Abort of multipart upload request.
@@ -127,8 +126,20 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       multipartKey = omMetadataManager.getMultipartKey(
           volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());
 
+      String multipartOpenKey;
+      try {
+        multipartOpenKey =
+            getMultipartOpenKey(keyArgs.getMultipartUploadID(), volumeName,
+                bucketName, keyName, omMetadataManager);
+      } catch (OMException ome) {
+        throw new OMException(
+            "Abort Multipart Upload Failed: volume: " + requestedVolume
+                + ", bucket: " + requestedBucket + ", key: " + keyName, ome,
+            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+
       OmKeyInfo omKeyInfo =
-          omMetadataManager.getOpenKeyTable().get(multipartKey);
+          omMetadataManager.getOpenKeyTable().get(multipartOpenKey);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // If there is no entry in openKeyTable, then there is no multipart
@@ -146,7 +157,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
       long quotaReleased = 0;
-      int keyFactor = omKeyInfo.getFactor().getNumber();
+      int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       Iterator iter =
           multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
       while(iter.hasNext()) {
@@ -161,25 +172,20 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // No need to add the cache entries to delete table, as the entries
       // in delete table are not used by any read/write operations.
       omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(multipartKey),
+          new CacheKey<>(multipartOpenKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      omClientResponse = new S3MultipartUploadAbortResponse(
-          omResponse.setAbortMultiPartUploadResponse(
-              MultipartUploadAbortResponse.newBuilder()).build(),
-          multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject());
+      omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
+          multipartKey, multipartOpenKey, omResponse, omBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse =
-          new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
-              exception));
+      omClientResponse = getOmClientResponse(exception, omResponse);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -214,7 +220,32 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  public static String getRequestType() {
-    return AbortMultiPartUpload.name();
+  protected OMClientResponse getOmClientResponse(IOException exception,
+      OMResponse.Builder omResponse) {
+
+    return new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
+            exception));
+  }
+
+  protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
+      OmMultipartKeyInfo multipartKeyInfo, String multipartKey,
+      String multipartOpenKey, OMResponse.Builder omResponse,
+      OmBucketInfo omBucketInfo) {
+
+    OMClientResponse omClientResponse = new S3MultipartUploadAbortResponse(
+        omResponse.setAbortMultiPartUploadResponse(
+            MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
+        multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
+        omBucketInfo.copyObject());
+    return omClientResponse;
+  }
+
+  protected String getMultipartOpenKey(String multipartUploadID,
+      String volumeName, String bucketName, String keyName,
+      OMMetadataManager omMetadataManager) throws IOException {
+
+    String multipartKey = omMetadataManager.getMultipartKey(
+        volumeName, bucketName, keyName, multipartUploadID);
+    return multipartKey;
   }
 }

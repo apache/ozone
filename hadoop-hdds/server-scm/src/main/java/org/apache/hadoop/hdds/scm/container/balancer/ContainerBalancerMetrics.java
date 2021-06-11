@@ -23,6 +23,9 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 
+/**
+ * Metrics related to Container Balancer running in SCM.
+ */
 @Metrics(name = "ContainerBalancer Metrics", about = "Metrics related to " +
     "Container Balancer running in SCM", context = "SCM")
 public final class ContainerBalancerMetrics {
