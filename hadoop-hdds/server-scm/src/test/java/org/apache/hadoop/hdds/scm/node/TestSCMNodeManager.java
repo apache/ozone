@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.After;
 import org.junit.Assert;
