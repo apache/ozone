@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.conf;
-
 /**
  * Configuration classes for Ozone.
  */
+package org.apache.hadoop.ozone.conf;
