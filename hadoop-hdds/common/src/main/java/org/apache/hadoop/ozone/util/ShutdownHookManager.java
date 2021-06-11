@@ -54,11 +54,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Unless a hook was registered with a shutdown explicitly set through
  * {@link #addShutdownHook(Runnable, int, long, TimeUnit)},
  * the shutdown time allocated to it is set by the configuration option
- * {@link org.apache.hadoop.ozone.OzoneConfigKeys#SERVICE_SHUTDOWN_TIMEOUT} in
+ * {@link org.apache.hadoop.ozone.conf.OzoneServiceConfig
+ * #SERVICE_SHUTDOWN_TIMEOUT}
  * {@code ozone-site.xml}, with a default value of
- * {@link org.apache.hadoop.ozone.OzoneConfigKeys
+ * {@link org.apache.hadoop.ozone.conf.OzoneServiceConfig
  * #SERVICE_SHUTDOWN_TIMEOUT_DEFAULT}
  * seconds.
+ *
+ * This code is taken from hadoop project.
+ * 1. This is to avoid dependency on hadoop.
+ * 2. To use a ozone specific config and defaults for
+ * OzoneConfigKeys#SERVICE_SHUTDOWN_TIMEOUT config.
+ * 3. Now any fix happened to this class in hadoop for this class, we can
+ * backport this to this with out waiting for a new hadoop release.
+ *
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -67,7 +76,7 @@ public final class ShutdownHookManager {
   private static final ShutdownHookManager MGR = new ShutdownHookManager();
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(org.apache.hadoop.util.ShutdownHookManager.class);
+      LoggerFactory.getLogger(ShutdownHookManager.class);
 
   /** Minimum shutdown timeout: {@value} second(s). */
   public static final long TIMEOUT_MINIMUM = 1;

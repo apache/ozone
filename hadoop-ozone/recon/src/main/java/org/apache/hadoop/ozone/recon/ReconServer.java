@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -53,6 +54,7 @@ import java.net.InetSocketAddress;
 public class ReconServer extends GenericCli {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
+  private static final int SHUTDOWN_HOOK_PRIORITY = 10;
   private Injector injector;
 
   private ReconHttpServer httpServer;
@@ -115,14 +117,14 @@ public class ReconServer extends GenericCli {
     start();
     isStarted = true;
 
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+    ShutdownHookManager.get().addShutdownHook(() -> {
       try {
         stop();
         join();
       } catch (Exception e) {
         LOG.error("Error during stop Recon server", e);
       }
-    }));
+    }, SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 

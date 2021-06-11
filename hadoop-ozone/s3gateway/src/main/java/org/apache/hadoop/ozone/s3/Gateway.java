@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ import picocli.CommandLine.Command;
 public class Gateway extends GenericCli {
 
   private static final Logger LOG = LoggerFactory.getLogger(Gateway.class);
+  private static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
   private S3GatewayHttpServer httpServer;
 
@@ -56,6 +58,14 @@ public class Gateway extends GenericCli {
     UserGroupInformation.setConfiguration(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     start();
+
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      try {
+        stop();
+      } catch (Exception e) {
+        LOG.error("Error during stop S3Gateway", e);
+      }
+    }, SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 

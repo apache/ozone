@@ -171,7 +171,7 @@ public class StorageContainerManagerStarter extends GenericCli {
           stm.stop();
           stm.join();
         } catch (Exception e) {
-          LOG.error("Error during stop StorageContainerManager server", e);
+          LOG.error("Error during stop StorageContainerManager", e);
         }
       }, SHUTDOWN_HOOK_PRIORITY);
     }

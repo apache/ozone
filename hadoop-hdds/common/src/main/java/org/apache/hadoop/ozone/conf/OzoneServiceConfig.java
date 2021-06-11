@@ -1,0 +1,49 @@
+package org.apache.hadoop.ozone.conf;
+
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigType;
+
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
+import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.RECON;
+import static org.apache.hadoop.hdds.conf.ConfigTag.S3GATEWAY;
+import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+
+/**
+ * This class is used to define Ozone service level configs which are needed
+ * for all the ozone services.
+ */
+@ConfigGroup(prefix = "ozone.service")
+public class OzoneServiceConfig {
+
+  public static final String SERVICE_SHUTDOWN_TIMEOUT =
+      "shutdown.timeout";
+  /** Default shutdown hook timeout: {@value} seconds. */
+  public static final String SERVICE_SHUTDOWN_TIMEOUT_DEFAULT = "60s";
+
+  @Config(key = SERVICE_SHUTDOWN_TIMEOUT,
+      defaultValue = SERVICE_SHUTDOWN_TIMEOUT_DEFAULT,
+      type = ConfigType.TIME,
+      tags = {OZONE, OM, SCM, DATANODE, RECON, S3GATEWAY},
+      timeUnit = TimeUnit.SECONDS,
+      description = "Timeout to wait for each shutdown operation to complete" +
+          "If a hook takes longer than this time to complete, it will " +
+          "be interrupted, so the service will shutdown. This allows the " +
+          "service shutdown to recover from a blocked operation. " +
+          "The minimum duration of the timeout is 1 second, if " +
+          "hook has been configured with a timeout less than 1 second."
+  )
+  private long serviceShutdownTimeout = 60;
+
+  public long getServiceShutdownTimeout() {
+    return serviceShutdownTimeout;
+  }
+
+  public void setServiceShutdownTimeout(long serviceShutdownTimeout) {
+    this.serviceShutdownTimeout = serviceShutdownTimeout;
+  }
+}
