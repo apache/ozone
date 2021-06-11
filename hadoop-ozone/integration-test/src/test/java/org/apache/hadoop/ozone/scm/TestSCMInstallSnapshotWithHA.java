@@ -93,6 +93,7 @@ public class TestSCMInstallSnapshotWithHA {
     scmhaConfiguration.setRatisSnapshotThreshold(SNAPSHOT_THRESHOLD);
     conf.setFromObject(scmhaConfiguration);
 
+
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)

@@ -157,7 +157,7 @@ public class TestBlockManager {
             pipelineManager,
             scmMetadataStore.getContainerTable());
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager.getContainers(),
+        containerManager.getContainers(), containerManager,
         pipelineManager, eventQueue, serviceManager, scmContext) {
       @Override
       public void emitSafeModeStatus() {

@@ -61,6 +61,7 @@ public final class SCMContext {
    * Raft related info.
    */
   private boolean isLeader;
+  private boolean isLeaderReady;
   private long term;
 
   /**
@@ -77,6 +78,7 @@ public final class SCMContext {
     this.term = term;
     this.safeModeStatus = safeModeStatus;
     this.scm = scm;
+    this.isLeaderReady = false;
   }
 
   /**
@@ -90,6 +92,12 @@ public final class SCMContext {
           isLeader, term, leader, newTerm);
 
       isLeader = leader;
+      // If it is not leader, set isLeaderReady to false.
+      if (!isLeader) {
+        isLeaderReady = false;
+        LOG.info("update <isLeaderReady> from <{}> to <{}>", isLeaderReady,
+            false);
+      }
       term = newTerm;
     } finally {
       lock.writeLock().unlock();
@@ -97,7 +105,31 @@ public final class SCMContext {
   }
 
   /**
+   * Set isLeaderReady flag to true, this indicate leader is ready to accept
+   * transactions.
+   *
+   * On the leader SCM once all the previous leader term transaction are
+   * applied, this will be called to set the isLeaderReady to true.
+   *
+   */
+  public void setLeaderReady() {
+    lock.writeLock().lock();
+    try {
+      LOG.info("update <isLeaderReady> from <{}> to <{}>",
+          isLeaderReady, true);
+
+      isLeaderReady = true;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
    * Check whether current SCM is leader or not.
+   *
+   * Use this API to know if SCM can send a command to DN once after it is
+   * elected as leader.
+   * True - it is leader, else false.
    *
    * @return isLeader
    */
@@ -109,6 +141,34 @@ public final class SCMContext {
       }
 
       return isLeader;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+
+  /**
+   * Check whether current SCM is leader ready.
+   *
+   * Use this API to know when all the previous leader term transactions are
+   * applied and the SCM DB/in-memory state is latest state and then only
+   * particular command/action need to be taken by SCM.
+   *
+   * In general all background services should use this API to start their
+   * service.
+   *
+   * True - it is leader and ready, else false.
+   *
+   * @return isLeaderReady
+   */
+  public boolean isLeaderReady() {
+    lock.readLock().lock();
+    try {
+      if (term == INVALID_TERM) {
+        return true;
+      }
+
+      return isLeaderReady;
     } finally {
       lock.readLock().unlock();
     }
