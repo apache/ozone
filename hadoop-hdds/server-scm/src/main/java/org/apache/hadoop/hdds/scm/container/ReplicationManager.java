@@ -1283,9 +1283,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
   public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      // 1) SCMContext#isLeader returns true.
+      // 1) SCMContext#isLeaderReady returns true.
       // 2) not in safe mode.
-      if (scmContext.isLeader() && !scmContext.isInSafeMode()) {
+      if (scmContext.isLeaderReady() && !scmContext.isInSafeMode()) {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());

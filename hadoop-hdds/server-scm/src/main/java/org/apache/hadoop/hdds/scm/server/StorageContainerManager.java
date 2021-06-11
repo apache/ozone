@@ -579,7 +579,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
-          containerManager.getContainers(),
+          containerManager.getContainers(), containerManager,
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
@@ -1229,7 +1229,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
           "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    getDatanodeProtocolServer().start();
+
+    // If HA is enabled, start datanode protocol server once leader is ready.
+    if (!scmStorageConfig.isSCMHAEnabled()) {
+      getDatanodeProtocolServer().start();
+    }
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -1516,7 +1520,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public boolean checkLeader() {
     // For NON-HA setup, the node will always be the leader
     if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-      Preconditions.checkArgument(scmContext.isLeader());
       return true;
     } else {
       // FOR HA setup, the node has to be the leader and ready to serve
