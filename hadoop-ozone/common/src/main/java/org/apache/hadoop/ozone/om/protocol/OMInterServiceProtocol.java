@@ -21,9 +21,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.security.KerberosInfo;
-import org.apache.hadoop.security.token.TokenInfo;
 
 /**
  * Protocol for inter OM communication.
