@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 
 /**
  * Wrapper class for Scm protocol clients.
@@ -27,6 +28,7 @@ public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
   private final StorageContainerLocationProtocol containerClient;
+  private SCMUpdateServiceGrpcClient updateServiceGrpcClient;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient) {
@@ -40,5 +42,14 @@ public class ScmClient {
 
   public StorageContainerLocationProtocol getContainerClient() {
     return this.containerClient;
+  }
+
+  public void setUpdateServiceGrpcClient(
+      SCMUpdateServiceGrpcClient updateClient) {
+    this.updateServiceGrpcClient = updateClient;
+  }
+
+  public SCMUpdateServiceGrpcClient getUpdateServiceGrpcClient() {
+    return updateServiceGrpcClient;
   }
 }

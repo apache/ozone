@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
@@ -30,9 +31,25 @@ public class RatisReplicationConfig
     implements ReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
+  private static final ReplicationType REPLICATION_TYPE = ReplicationType.RATIS;
 
   public RatisReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
+  }
+
+  public RatisReplicationConfig(String factorString) {
+    ReplicationFactor factor = null;
+    try {
+      factor = ReplicationFactor.valueOf(Integer.parseInt(factorString));
+    } catch (NumberFormatException ex) {
+      try {
+        factor = ReplicationFactor.valueOf(factorString);
+      } catch (IllegalArgumentException x) {
+        throw new IllegalArgumentException("Invalid RatisReplicationFactor '" +
+                factorString + "'. Please use ONE or THREE!");
+      }
+    }
+    this.replicationFactor = factor;
   }
 
   public static boolean hasFactor(ReplicationConfig replicationConfig,
@@ -45,8 +62,9 @@ public class RatisReplicationConfig
   }
 
   @Override
+  @JsonProperty("replicationType")
   public ReplicationType getReplicationType() {
-    return ReplicationType.RATIS;
+    return REPLICATION_TYPE;
   }
 
   @Override
@@ -72,7 +90,7 @@ public class RatisReplicationConfig
 
   @Override
   public String toString() {
-    return "RATIS/" + replicationFactor;
+    return REPLICATION_TYPE.name() + "/" + replicationFactor;
   }
 
   @Override

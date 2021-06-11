@@ -42,6 +42,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.update.server.SCMUpdateServiceGrpcServer;
+import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
+import org.apache.hadoop.hdds.scm.update.server.SCMCRLStore;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -83,7 +86,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
   private final X509Certificate rootCACertificate;
-  private final RPC.Server rpcServer;
+  private final RPC.Server rpcServer; // HADOOP RPC SERVER
+  private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
   private final StorageContainerManager storageContainerManager;
@@ -124,6 +128,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       rpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
+
+    this.grpcUpdateServer = new SCMUpdateServiceGrpcServer(
+        conf.getObject(UpdateServiceConfig.class),
+        new SCMCRLStore(scmCertificateServer));
   }
 
   /**
@@ -352,11 +360,17 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
             .collect(Collectors.toList()), CRLReason.lookup(reason),
         new Date(revocationTime));
     try {
-      return revoked.get().get().longValue();
+      Long crlId = revoked.get().get();
+      getGrpcUpdateServer().notifyCrlUpdate();
+      return crlId;
     } catch (InterruptedException | ExecutionException e) {
       throw new SCMException("Fail to revoke certs",
           SCMException.ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
     }
+  }
+
+  public SCMUpdateServiceGrpcServer getGrpcUpdateServer() {
+    return grpcUpdateServer;
   }
 
   @VisibleForTesting
@@ -372,12 +386,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     return rpcAddress;
   }
 
-  public void start() {
+  public void start() throws IOException {
     String startupMsg = StorageContainerManager.buildRpcServerStartMessage(
         "Starting RPC server for SCMSecurityProtocolServer.", getRpcAddress());
     LOGGER.info(startupMsg);
     metrics.register();
     getRpcServer().start();
+    getGrpcUpdateServer().start();
   }
 
   public void stop() {
@@ -385,6 +400,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       LOGGER.info("Stopping the SCMSecurityProtocolServer.");
       metrics.unregister();
       getRpcServer().stop();
+      getGrpcUpdateServer().stop();
     } catch (Exception ex) {
       LOGGER.error("SCMSecurityProtocolServer stop failed.", ex);
     }
@@ -393,6 +409,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public void join() throws InterruptedException {
     LOGGER.trace("Join RPC server for SCMSecurityProtocolServer.");
     getRpcServer().join();
+    LOGGER.trace("Join gRPC server for SCMSecurityProtocolServer.");
+    getGrpcUpdateServer().join();
+
   }
 
   public CertificateServer getRootCertificateServer() {

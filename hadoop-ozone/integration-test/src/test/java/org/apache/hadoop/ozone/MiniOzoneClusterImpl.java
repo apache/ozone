@@ -69,7 +69,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -200,7 +200,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
-    // Nothing implemented here
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      GenericTestUtils.waitFor(scm::checkLeader,
+          1000, waitForClusterToBeReadyTimeout);
+    }
   }
 
   public StorageContainerManager getActiveSCM() {
@@ -225,8 +228,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
           healthy, hddsDatanodes.size());
       LOG.info(exitSafeMode ? "Cluster exits safe mode" :
-              "Waiting for cluster to exit safe mode",
-          healthy, hddsDatanodes.size());
+              "Waiting for cluster to exit safe mode");
       LOG.info(checkScmLeader ? "SCM became leader" :
           "SCM has not become leader");
 

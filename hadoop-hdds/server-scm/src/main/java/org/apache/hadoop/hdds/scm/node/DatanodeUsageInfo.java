@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 
 import java.util.Comparator;
 
+/**
+ * Bundles datanode details with usage statistics.
+ */
 public class DatanodeUsageInfo {
 
   private DatanodeDetails datanodeDetails;

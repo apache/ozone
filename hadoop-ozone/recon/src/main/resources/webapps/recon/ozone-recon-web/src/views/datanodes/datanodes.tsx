@@ -137,7 +137,7 @@ const COLUMNS = [
     filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
     onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
+    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState),
     fixed: 'left'
   },
   {

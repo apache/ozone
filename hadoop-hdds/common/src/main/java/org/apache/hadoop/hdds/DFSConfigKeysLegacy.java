@@ -84,11 +84,6 @@ public final class DFSConfigKeysLegacy {
   public static final String DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT =
       "10m";
 
-  public static final String DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY =
-      "dfs.datanode.failed.volumes.tolerated";
-
-  public static final int DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT = 0;
-
   public static final String DFS_METRICS_PERCENTILES_INTERVALS_KEY =
       "dfs.metrics.percentiles.intervals";
 

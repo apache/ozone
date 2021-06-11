@@ -29,7 +29,8 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 
@@ -88,7 +89,7 @@ public class TestVolumeSetDiskChecks {
 
     conf = getConfWithDataNodeDirs(numVolumes);
     final MutableVolumeSet volumeSet =
-        new MutableVolumeSet(UUID.randomUUID().toString(), conf);
+        new MutableVolumeSet(UUID.randomUUID().toString(), conf, null);
 
     assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
     assertThat(volumeSet.getFailedVolumesList().size(), is(0));
@@ -113,7 +114,7 @@ public class TestVolumeSetDiskChecks {
 
     conf = getConfWithDataNodeDirs(numVolumes);
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
-        UUID.randomUUID().toString(), conf) {
+        UUID.randomUUID().toString(), conf, null) {
       @Override
       HddsVolumeChecker getVolumeChecker(ConfigurationSource configuration)
           throws DiskErrorException {
@@ -137,7 +138,7 @@ public class TestVolumeSetDiskChecks {
     conf = getConfWithDataNodeDirs(numVolumes);
 
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
-        UUID.randomUUID().toString(), conf) {
+        UUID.randomUUID().toString(), conf, null) {
       @Override
       HddsVolumeChecker getVolumeChecker(ConfigurationSource configuration)
           throws DiskErrorException {
@@ -163,6 +164,10 @@ public class TestVolumeSetDiskChecks {
     }
     ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
         String.join(",", dirs));
+    DatanodeConfiguration dnConf =
+        ozoneConf.getObject(DatanodeConfiguration.class);
+    dnConf.setFailedVolumesTolerated(numDirs);
+    ozoneConf.setFromObject(dnConf);
     return ozoneConf;
   }
 

@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -386,7 +387,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
       ContainerReplicaCount replicaSet =
           getContainerReplicaCount(container, replicas);
       ContainerPlacementStatus placementStatus = getPlacementStatus(
-          replicas, container.getReplicationFactor().getNumber());
+          replicas, container.getReplicationConfig().getRequiredNodes());
 
       /*
        * We don't have to take any action if the container is healthy.
@@ -566,7 +567,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
         replica,
         getInflightAdd(container.containerID()),
         getInflightDel(container.containerID()),
-        container.getReplicationFactor().getNumber(),
+        container.getReplicationConfig().getRequiredNodes(),
         minHealthyForMaintenance);
   }
 
@@ -582,7 +583,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
       final Set<ContainerReplica> replicas) {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.QUASI_CLOSED);
-    final int replicationFactor = container.getReplicationFactor().getNumber();
+    final int replicationFactor =
+        container.getReplicationConfig().getRequiredNodes();
     final long uniqueQuasiClosedReplicaCount = replicas.stream()
         .filter(r -> r.getState() == State.QUASI_CLOSED)
         .map(ContainerReplica::getOriginDatanodeId)
@@ -738,7 +740,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
           .collect(Collectors.toList());
       if (source.size() > 0) {
         final int replicationFactor = container
-            .getReplicationFactor().getNumber();
+            .getReplicationConfig().getRequiredNodes();
         // Want to check if the container is mis-replicated after considering
         // inflight add and delete.
         // Create a new list from source (healthy replicas minus pending delete)
@@ -817,7 +819,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
 
     final Set<ContainerReplica> replicas = replicaSet.getReplica();
     final ContainerID id = container.containerID();
-    final int replicationFactor = container.getReplicationFactor().getNumber();
+    final int replicationFactor =
+        container.getReplicationConfig().getRequiredNodes();
     int excess = replicaSet.additionalReplicaNeeded() * -1;
     if (excess > 0) {
 
@@ -997,8 +1000,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
                                 final DatanodeDetails datanode,
                                 final boolean force) {
 
+    ContainerID containerID = container.containerID();
     LOG.info("Sending close container command for container {}" +
-            " to datanode {}.", container.containerID(), datanode);
+            " to datanode {}.", containerID, datanode);
     CloseContainerCommand closeContainerCommand =
         new CloseContainerCommand(container.getContainerID(),
             container.getPipelineID(), force);
@@ -1009,8 +1013,16 @@ public class ReplicationManager implements MetricsSource, SCMService {
           + " since current SCM is not leader.", nle);
       return;
     }
+    closeContainerCommand.setEncodedToken(getContainerToken(containerID));
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
         new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
+  }
+
+  private String getContainerToken(ContainerID containerID) {
+    StorageContainerManager scm = scmContext.getScm();
+    return scm != null
+        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
+        : ""; // unit test
   }
 
   /**

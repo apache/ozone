@@ -26,6 +26,10 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import java.io.IOException;
 import java.util.ArrayList;
 
+/**
+ * DeletedBlockLogStateManager interface to
+ * manage deleted blocks and record them in the underlying persist store.
+ */
 public interface DeletedBlockLogStateManager {
   @Replicate
   void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)

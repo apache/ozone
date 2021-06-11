@@ -22,6 +22,9 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compile:
     runs-on: ubuntu-18.04
@@ -62,13 +65,13 @@ jobs:
         if: matrix.java == '8'
         with:
           name: ozone-bin
-          path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
+          path: hadoop-ozone/dist/target/ozone*.tar.gz
           retention-days: 1
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   basic:
     runs-on: ubuntu-18.04
@@ -113,8 +116,8 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   dependency:
     needs: compile
@@ -131,7 +134,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir dist
-          tar  -C dist --strip-components 1 -xzf hadoop-ozone*.tar.gz
+          tar  -C dist --strip-components 1 -xzf ozone*.tar.gz
       - name: Execute tests
         run: |
           export OZONE_DIST_DIR=`pwd`/dist
@@ -171,7 +174,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
           sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
       - name: Execute tests
         run: |
@@ -189,9 +192,42 @@ jobs:
           name: acceptance-${{ matrix.suite }}
           path: /mnt/ozone/target/acceptance
         continue-on-error: true
+  kubernetes:
+    needs: compile
+    runs-on: ubuntu-18.04
+    timeout-minutes: 60
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+        with:
+          path: ozone
+      - name: Move Ozone to /mnt
+        run: |
+          sudo chmod 777 /mnt
+          mv ozone /mnt/
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+      - name: Execute tests
+        run: |
+          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: kubernetes
+          path: /mnt/ozone/target/kubernetes
+        continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
-    timeout-minutes: 120
+    timeout-minutes: 150
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -207,10 +243,17 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: mnt/ozone
-      - name: Execute tests
-        uses: ./mnt/ozone/.github/buildenv
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
         with:
-          args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+      - name: Execute tests
+        run: mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
       - name: Summary of failures
         run: cat mnt/ozone/target/${{ github.job }}/summary.txt
         if: always()
@@ -221,6 +264,12 @@ jobs:
           name: it-${{ matrix.profile }}
           path: mnt/ozone/target/integration
         continue-on-error: true
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
   coverage:
     runs-on: ubuntu-18.04
     timeout-minutes: 30
@@ -248,7 +297,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p hadoop-ozone/dist/target
-          tar xzvf target/artifacts/ozone-bin/hadoop-ozone*.tar.gz -C hadoop-ozone/dist/target
+          tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Setup java 11
@@ -266,36 +315,9 @@ jobs:
           name: coverage
           path: target/coverage
         continue-on-error: true
-  kubernetes:
-    needs: compile
-    runs-on: ubuntu-18.04
-    timeout-minutes: 60
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
-        with:
-          path: ozone
-      - name: Move Ozone to /mnt
+      - name: Delete temporary build artifacts before caching
         run: |
-          sudo chmod 777 /mnt
-          mv ozone /mnt/
-      - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v2
-        with:
-          name: ozone-bin
-      - name: Untar binaries
-        run: |
-          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
-      - name: Execute tests
-        run: |
-          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
-      - name: Archive build results
-        uses: actions/upload-artifact@v2
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
-        with:
-          name: kubernetes
-          path: /mnt/ozone/target/kubernetes
-        continue-on-error: true

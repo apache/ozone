@@ -20,7 +20,7 @@
       <env name="OZONE_CONF_DIR" value="$PROJECT_DIR$/hadoop-ozone/dev-support/intellij" />
     </envs>
     <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.fs.ozone.OzoneFsShell" />
-    <module name="hadoop-ozone-tools" />
+    <module name="ozone-tools" />
     <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site.xml -ls -R o3fs://bucket1.vol1/" />
     <option name="VM_PARAMETERS" value="-Dlog4j.configuration=file:hadoop-ozone/dev-support/intellij/log4j.properties -Xbootclasspath/a:$PROJECT_DIR$/hadoop-ozone/dev-support/intellij" />
     <extension name="coverage">

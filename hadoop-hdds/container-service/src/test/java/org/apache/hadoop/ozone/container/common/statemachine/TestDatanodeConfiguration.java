@@ -26,6 +26,8 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
 
 import static org.junit.Assert.assertEquals;
 
@@ -40,11 +42,13 @@ public class TestDatanodeConfiguration {
     int validReplicationLimit = 123;
     int validDeleteThreads = 42;
     long validDiskCheckIntervalMinutes = 60;
+    int validFailedVolumesTolerated = 10;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, validReplicationLimit);
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, validDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
         validDiskCheckIntervalMinutes);
+    conf.setInt(FAILED_VOLUMES_TOLERATED_KEY, validFailedVolumesTolerated);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -54,6 +58,8 @@ public class TestDatanodeConfiguration {
     assertEquals(validDeleteThreads, subject.getContainerDeleteThreads());
     assertEquals(validDiskCheckIntervalMinutes,
         subject.getPeriodicDiskCheckIntervalMinutes());
+    assertEquals(validFailedVolumesTolerated,
+        subject.getFailedVolumesTolerated());
   }
 
   @Test
@@ -62,11 +68,13 @@ public class TestDatanodeConfiguration {
     int invalidReplicationLimit = -5;
     int invalidDeleteThreads = 0;
     long invalidDiskCheckIntervalMinutes = -1;
+    int invalidFailedVolumesTolerated = -2;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, invalidReplicationLimit);
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, invalidDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
         invalidDiskCheckIntervalMinutes);
+    conf.setInt(FAILED_VOLUMES_TOLERATED_KEY, invalidFailedVolumesTolerated);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -78,6 +86,8 @@ public class TestDatanodeConfiguration {
         subject.getContainerDeleteThreads());
     assertEquals(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT,
         subject.getPeriodicDiskCheckIntervalMinutes());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedVolumesTolerated());
   }
 
   @Test
@@ -95,6 +105,8 @@ public class TestDatanodeConfiguration {
         subject.getContainerDeleteThreads());
     assertEquals(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT,
         subject.getPeriodicDiskCheckIntervalMinutes());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedVolumesTolerated());
   }
 
 }

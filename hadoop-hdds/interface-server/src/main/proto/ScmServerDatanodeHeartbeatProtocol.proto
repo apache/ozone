@@ -309,6 +309,7 @@ message SCMCommandProto {
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
   optional int64 term = 15;
+  optional string encodedToken = 16;
 }
 
 /**
@@ -401,6 +402,18 @@ message SetNodeOperationalStateCommandProto {
   required  int64 cmdId = 1;
   required  NodeOperationalState nodeOperationalState = 2;
   required  int64 stateExpiryEpochSeconds = 3;
+}
+
+message CRLStatusReport {
+  required int64 receivedCrlId=1;
+  repeated int64 pendingCrlIds=2;
+}
+
+/**
+ * This command asks the datanode to process a new CRL.
+ */
+message ProcessCRLCommandProto {
+  required CRLInfoProto crlInfo = 1;
 }
 
 /**
