@@ -25,9 +25,9 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.util.Time;
 
@@ -50,8 +50,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private HddsProtos.LifeCycleState state;
   @JsonIgnore
   private PipelineID pipelineID;
-  private ReplicationFactor replicationFactor;
-  private ReplicationType replicationType;
+  private ReplicationConfig replicationConfig;
   private long usedBytes;
   private long numberOfKeys;
   private Instant lastUsed;
@@ -82,8 +81,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       String owner,
       long deleteTransactionId,
       long sequenceId,
-      ReplicationFactor replicationFactor,
-      ReplicationType repType) {
+      ReplicationConfig repConfig) {
     this.containerID = containerID;
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
@@ -94,8 +92,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.owner = owner;
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
-    this.replicationFactor = replicationFactor;
-    this.replicationType = repType;
+    this.replicationConfig = repConfig;
   }
 
   /**
@@ -106,6 +103,9 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
+    final ReplicationConfig config = ReplicationConfig
+        .fromProto(info.getReplicationType(), info.getReplicationFactor(),
+            info.getEcReplicationConfig());
     builder.setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
         .setState(info.getState())
@@ -113,8 +113,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setOwner(info.getOwner())
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
-        .setReplicationFactor(info.getReplicationFactor())
-        .setReplicationType(info.getReplicationType())
+        .setReplicationConfig(config)
         .setSequenceId(info.getSequenceId())
         .build();
 
@@ -146,8 +145,12 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return stateEnterTime;
   }
 
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
+  }
+
+  public HddsProtos.ReplicationType getReplicationType() {
+    return replicationConfig.getReplicationType();
   }
 
   public PipelineID getPipelineID() {
@@ -200,10 +203,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return lastUsed;
   }
 
-  public ReplicationType getReplicationType() {
-    return replicationType;
-  }
-
   public void updateLastUsedTime() {
     lastUsed = Instant.ofEpochMilli(Time.now());
   }
@@ -219,10 +218,17 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setStateEnterTime(getStateEnterTime().toEpochMilli())
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
-        .setReplicationFactor(getReplicationFactor())
-        .setReplicationType(getReplicationType())
         .setOwner(getOwner())
-        .setSequenceId(getSequenceId());
+        .setSequenceId(getSequenceId())
+        .setReplicationType(getReplicationType());
+
+    if (replicationConfig instanceof ECReplicationConfig) {
+      builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)
+          .toProto());
+    } else {
+      builder.setReplicationFactor(
+          ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
 
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());
@@ -390,22 +396,15 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private long deleteTransactionId;
     private long sequenceId;
     private PipelineID pipelineID;
-    private ReplicationFactor replicationFactor;
-    private ReplicationType replicationType;
-
-    public Builder setReplicationType(
-        ReplicationType repType) {
-      this.replicationType = repType;
-      return this;
-    }
+    private ReplicationConfig replicationConfig;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
       return this;
     }
 
-    public Builder setReplicationFactor(ReplicationFactor repFactor) {
-      this.replicationFactor = repFactor;
+    public Builder setReplicationConfig(ReplicationConfig repConfig) {
+      this.replicationConfig = repConfig;
       return this;
     }
 
@@ -453,7 +452,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     public ContainerInfo build() {
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationFactor, replicationType);
+          sequenceId, replicationConfig);
     }
   }
 
