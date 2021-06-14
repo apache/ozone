@@ -117,6 +117,19 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  public int getPipelineCount(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state) {
+    return stateManager.getPipelineCount(replicationConfig, state);
+  }
+
+  @Override
   public void addContainerToPipeline(final PipelineID pipelineID,
                                      final ContainerID containerID)
       throws IOException {

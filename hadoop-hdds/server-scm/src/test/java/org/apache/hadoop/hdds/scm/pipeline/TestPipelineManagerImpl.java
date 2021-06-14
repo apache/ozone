@@ -209,11 +209,17 @@ public class TestPipelineManagerImpl {
     Assert.assertFalse(pipelineManager
         .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    Assert.assertEquals(1, pipelineManager
+        .getPipelineCount(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.DORMANT));
 
     pipelineManager.activatePipeline(pipeline.getId());
     Assert.assertTrue(pipelineManager
         .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    Assert.assertEquals(1, pipelineManager
+        .getPipelineCount(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN));
     buffer.flush();
     Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
     pipelineManager.close();
