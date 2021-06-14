@@ -47,14 +47,11 @@ public final class SCMContext {
    */
   public static final long INVALID_TERM = -1;
 
-  private static final SCMContext EMPTY_CONTEXT
-      = new SCMContext.Builder().buildMaybeInvalid();
-
   /**
    * Used by non-HA mode SCM, Recon and Unit Tests.
    */
   public static SCMContext emptyContext() {
-    return EMPTY_CONTEXT;
+    return new SCMContext.Builder().buildMaybeInvalid();
   }
 
   /**
