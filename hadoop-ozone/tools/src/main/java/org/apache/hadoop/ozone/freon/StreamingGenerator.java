@@ -62,8 +62,7 @@ public class StreamingGenerator extends BaseFreonGenerator
       defaultValue = "104857600")
   private int fileSize;
 
-
-  private String subdir = "dir1";
+  private static final String SUB_DIR_NAME = "dir1";
 
   private ThreadLocal<Integer> counter = new ThreadLocal<>();
 
@@ -74,8 +73,6 @@ public class StreamingGenerator extends BaseFreonGenerator
   public Void call() throws Exception {
     init();
 
-    generateBaseData();
-
     timer = getMetrics().timer("streaming");
     runTests(this::copyDir);
 
@@ -84,15 +81,12 @@ public class StreamingGenerator extends BaseFreonGenerator
 
   private void generateBaseData() {
     try {
-      Path sourceDir = threadRootDir().resolve("streaming-0");
-      final Path sourceDirParent = sourceDir.getParent();
-      if (sourceDirParent == null) {
-        throw new AssertionError("Empty parrent");
-      }
+      final Path sourceDirParent = threadRootDir();
+      Path sourceDir = sourceDirParent.resolve("streaming-0");
       if (Files.exists(sourceDirParent)) {
         deleteDirRecursive(sourceDirParent);
       }
-      Path subDir = sourceDir.resolve(subdir);
+      Path subDir = sourceDir.resolve(SUB_DIR_NAME);
       Files.createDirectories(subDir);
       ContentGenerator contentGenerator = new ContentGenerator(fileSize,
           1024);
@@ -119,7 +113,7 @@ public class StreamingGenerator extends BaseFreonGenerator
     Path destinationDir = threadRootDir().resolve("streaming-" + (index + 1));
     counter.set(index + 1);
 
-    int port = (int) (1234 + l);
+    int port = (int) (1234 + (l % 64000));
     try (StreamingServer server =
              new StreamingServer(new DirectoryServerSource(sourceDir), port)) {
       try {
@@ -132,7 +126,7 @@ public class StreamingGenerator extends BaseFreonGenerator
                      new DirectoryServerDestination(
                          destinationDir))) {
 
-          timer.time(() -> client.stream(subdir));
+          timer.time(() -> client.stream(SUB_DIR_NAME));
 
         }
         LOG.info("Replication has been finished to {}", sourceDir);
