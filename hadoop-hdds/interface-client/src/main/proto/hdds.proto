@@ -219,8 +219,9 @@ message ContainerInfoProto {
     required string owner = 7;
     optional int64 deleteTransactionId = 8;
     optional int64 sequenceId = 9;
-    required ReplicationFactor replicationFactor  = 10;
+    optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
+    optional ECReplicationConfig ecReplicationConfig = 12;
 }
 
 message ContainerWithPipeline {
