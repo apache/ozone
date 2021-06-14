@@ -141,7 +141,7 @@ public class NodeEndpoint {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot find it.");
+        LOG.warn("Cannot find container.", cnfe);
       }
       datanodes.add(builder.withHostname(hostname)
           .withDatanodeStorageReport(storageReport)

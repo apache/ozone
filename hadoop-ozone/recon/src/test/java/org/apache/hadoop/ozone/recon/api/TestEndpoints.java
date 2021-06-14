@@ -691,12 +691,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(0, resultSet.size());
   }
 
-  @Test
-  public void testOpenContainers() {
-
-  }
-
-
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
       throws Exception {
     // if container report is processed first, and pipeline does not exist
