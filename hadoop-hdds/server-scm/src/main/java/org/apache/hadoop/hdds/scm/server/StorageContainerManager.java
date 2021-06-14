@@ -122,7 +122,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
-import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -572,7 +571,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           eventQueue,
           scmContext,
           serviceManager,
-          new LockManager<>(conf),
           scmNodeManager);
     }
     if(configurator.getScmSafeModeManager() != null) {
