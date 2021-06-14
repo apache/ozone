@@ -1,0 +1,1 @@
+ERROR | OMAudit | ? | user=john | ip=192.168.0.1 | op=CREATE_VOLUME {key1=value1, key2=value2} | ret=FAILURE

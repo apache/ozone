@@ -125,26 +125,23 @@ public class NodeEndpoint {
       });
       try {
         Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
-
         int openContainers = 0;
         for (ContainerID containerID: allContainers) {
-          ContainerInfo containerInfo = 
-              reconContainerManager.getContainer(containerID);
+          ContainerInfo containerInfo =
+                  reconContainerManager.getContainer(containerID);
           if (containerInfo.isOpen()) {
             ++openContainers;
           }
         }
+        return openContainers;
 
-        int containers = allContainers.size();
-        int closedContainers = containers - openContainers;
-        builder.withContainers(containers);
+        builder.withContainers(allContainers.size());
         builder.withOpenContainers(openContainers);
-        builder.withClosedContainers(closedContainers);
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot find container.", cnfe);
+        LOG.warn("Cannot find it.");
       }
       datanodes.add(builder.withHostname(hostname)
           .withDatanodeStorageReport(storageReport)
