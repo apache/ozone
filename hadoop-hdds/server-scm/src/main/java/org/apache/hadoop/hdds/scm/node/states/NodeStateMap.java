@@ -317,8 +317,6 @@ public class NodeStateMap {
     lock.writeLock().lock();
     try {
       checkIfNodeExist(uuid);
-      // SCMContainerManager.getContainer() -> containerInfo
-
       nodeToContainer.get(uuid).add(containerId);
     } finally {
       lock.writeLock().unlock();
