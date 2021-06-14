@@ -133,7 +133,6 @@ public class NodeEndpoint {
             ++openContainers;
           }
         }
-        return openContainers;
 
         builder.withContainers(allContainers.size());
         builder.withOpenContainers(openContainers);
