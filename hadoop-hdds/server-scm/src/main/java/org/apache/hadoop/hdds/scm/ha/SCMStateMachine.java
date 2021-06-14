@@ -330,7 +330,6 @@ public class SCMStateMachine extends BaseStateMachine {
       // 2. Start DN Rpc server.
       if (!refreshedAfterLeaderReady.get()) {
         scm.getScmSafeModeManager().refresh();
-        LOG.info("bharat starting from sm");
         scm.getDatanodeProtocolServer().start();
 
         refreshedAfterLeaderReady.set(true);
