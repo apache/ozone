@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.nimbusds.jose.Payload;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
@@ -89,6 +90,42 @@ public class EventQueue implements EventPublisher, AutoCloseable {
         StringUtils.camelize(event.getName()) + EXECUTOR_NAME_SEPARATOR
             + handlerName;
     this.addHandler(event, new SingleThreadExecutor<>(executorName), handler);
+  }
+
+  /**
+   * Add new handler to the event queue.
+   *
+   * Specified event executor will be used to deliver the events to the
+   * registered event handler.
+   * @param event          Triggering event.
+   * @param handler        Handler of event (will be called from a separated
+   *                       thread)
+   * @param eventExecutor  Event executor to deliver the events to the event
+   *                       handler.
+   * @param <PAYLOAD>    The type of the event payload.
+   * @param <EVENT_TYPE> The type of the event identifier.
+   */
+  public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(
+      EVENT_TYPE event, EventHandler<PAYLOAD> handler,
+      EventExecutor<PAYLOAD> eventExecutor) {
+    validateEvent(event);
+    String executorName = getExecutorName(event, handler.getClass().getName());
+    Preconditions.checkState(executorName != eventExecutor.getName(),
+        "Event Executor name is not matching the specified format. " +
+            "It should be " + executorName + " but it is " +
+            eventExecutor.getName());
+    this.addHandler(event, eventExecutor, handler);
+  }
+
+  /**
+   * Return executor name for the given event and handler name.
+   * @param event
+   * @param handlerName
+   * @return executor name
+   */
+  public static String getExecutorName(Event event, String handlerName) {
+    return StringUtils.camelize(event.getName()) + EXECUTOR_NAME_SEPARATOR
+        + handlerName;
   }
 
   private <EVENT_TYPE extends Event<?>> void validateEvent(EVENT_TYPE event) {
