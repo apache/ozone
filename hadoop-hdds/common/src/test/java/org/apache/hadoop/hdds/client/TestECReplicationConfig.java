@@ -36,13 +36,13 @@ public class TestECReplicationConfig {
 
   @Test(expected = IllegalArgumentException.class)
   public void testStringParsingWithString() {
-    final ECReplicationConfig ec = new ECReplicationConfig("x3-2");
+    new ECReplicationConfig("x3-2");
   }
 
 
   @Test(expected = IllegalArgumentException.class)
   public void testStringParsingWithZero() {
-    final ECReplicationConfig ec = new ECReplicationConfig("3-0");
+    new ECReplicationConfig("3-0");
   }
 
 
