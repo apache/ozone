@@ -31,7 +31,8 @@ import java.util.Objects;
  */
 public class ECReplicationConfig implements ReplicationConfig {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ECReplicationConfig.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECReplicationConfig.class);
 
   private int data;
 
