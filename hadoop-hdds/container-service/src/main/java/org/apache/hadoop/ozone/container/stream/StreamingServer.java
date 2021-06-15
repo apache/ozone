@@ -94,7 +94,7 @@ public class StreamingServer implements AutoCloseable {
       port = socketAddress.getPort();
       LOG.info("Started streaming server on " + port);
     } catch (InterruptedException ex) {
-      throw new RuntimeException(ex);
+      throw new StreamingException(ex);
     }
   }
 
