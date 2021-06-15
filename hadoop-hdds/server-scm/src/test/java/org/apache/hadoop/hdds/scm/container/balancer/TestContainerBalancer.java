@@ -71,7 +71,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setIdleIteration(1);
     balancerConfiguration.setMaxDatanodesToBalance(10);
-    balancerConfiguration.setmaxSizeToMoveInGB(500 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMoveInGB(500 * OzoneConsts.GB);
     conf.setFromObject(balancerConfiguration);
 
     // create datanodes with the generated nodeUtilization values

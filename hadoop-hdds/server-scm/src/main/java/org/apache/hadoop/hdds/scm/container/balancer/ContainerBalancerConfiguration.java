@@ -130,7 +130,7 @@ public final class ContainerBalancerConfiguration {
    *
    * @return maximum size in Bytes
    */
-  public long getmaxSizeToMoveInGB() {
+  public long getMaxSizeToMoveInGB() {
     return maxSizeToMoveInGB;
   }
 
@@ -139,7 +139,7 @@ public final class ContainerBalancerConfiguration {
    *
    * @param maxSizeToMoveInGB maximum number of Bytes
    */
-  public void setmaxSizeToMoveInGB(long maxSizeToMoveInGB) {
+  public void setMaxSizeToMoveInGB(long maxSizeToMoveInGB) {
     this.maxSizeToMoveInGB = maxSizeToMoveInGB;
   }
 

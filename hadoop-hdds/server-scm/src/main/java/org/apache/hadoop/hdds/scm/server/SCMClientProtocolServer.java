@@ -684,7 +684,7 @@ public class SCMClientProtocolServer implements
       cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
     }
     if (maxSizeToMoveInGB > 0) {
-      cbc.setmaxSizeToMoveInGB(maxSizeToMoveInGB * OzoneConsts.GB);
+      cbc.setMaxSizeToMoveInGB(maxSizeToMoveInGB * OzoneConsts.GB);
     }
     if (0 == idleiterations || idleiterations < -1) {
       //startBalancer maybe trigger by an alternative method to cli,

@@ -47,7 +47,8 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   private int maxDatanodesToBalance;
 
   @Option(names = {"-s", "--maxSizeToMoveInGB"},
-      description = "Maximum size to move in GB, for 10GB it should be set as 10")
+      description = "Maximum size to move in GB, " +
+          "for 10GB it should be set as 10")
   private long maxSizeToMoveInGB;
 
   @Override
