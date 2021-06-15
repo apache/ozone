@@ -529,7 +529,7 @@ public final class ScmConfigKeys {
   public static final long OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT = 10;
 
 
-  public static String OZONE_SCM_EVENT_PREFIX = "ozone.scm.event.";
+  public static final String OZONE_SCM_EVENT_PREFIX = "ozone.scm.event.";
 
   public static final String OZONE_SCM_EVENT_CONTAINER_REPORT_THREAD_POOL_SIZE =
       OZONE_SCM_EVENT_PREFIX + "ContainerReport.thread.pool.size";

@@ -43,7 +43,7 @@ public class TestEventQueue {
 
   private EventQueue queue;
 
-  private AtomicLong result = new AtomicLong();
+  private AtomicLong eventTotal = new AtomicLong();
 
   @Before
   public void startEventQueue() {
@@ -102,13 +102,16 @@ public class TestEventQueue {
         eventExecutor.scheduledEvents() <= 10);
 
     queue.processAll(60000);
-    Assert.assertEquals(110, result.intValue());
+    Assert.assertEquals(110, eventTotal.intValue());
 
     Assert.assertEquals(10, eventExecutor.successfulEvents());
-    result.set(0);
+    eventTotal.set(0);
 
   }
 
+  /**
+   * Event handler used in tests.
+   */
   public class TestHandler implements EventHandler {
     @Override
     public void onMessage(Object payload, EventPublisher publisher) {
@@ -117,7 +120,7 @@ public class TestEventQueue {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
       }
-      result.getAndAdd((long) payload);
+      eventTotal.getAndAdd((long) payload);
     }
   }
 

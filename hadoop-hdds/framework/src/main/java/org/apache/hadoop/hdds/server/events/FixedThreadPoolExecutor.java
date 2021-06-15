@@ -75,8 +75,8 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
 
 
     OzoneConfiguration configuration = new OzoneConfiguration();
-    int threadPoolSize = configuration.getInt(
-        OZONE_SCM_EVENT_PREFIX + StringUtils.camelize(eventName) + ".thread.pool.size",
+    int threadPoolSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
+            StringUtils.camelize(eventName) + ".thread.pool.size",
         OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
 
     executor = Executors.newFixedThreadPool(threadPoolSize, runnable -> {
