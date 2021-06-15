@@ -60,7 +60,6 @@ public interface EventExecutor<PAYLOAD> extends AutoCloseable {
 
   /**
    * Return the number of events scheduled to be processed.
-   * @return
    */
   long scheduledEvents();
 
