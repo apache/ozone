@@ -644,7 +644,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     double threshold = 0.0D;
     int idleiterations = -1;
     int maxDatanodesToBalance = 0;
-    long maxSizeToMove = 0L;
+    long maxSizeToMoveInGB = 0L;
 
     if(request.hasThreshold()) {
       threshold = request.getThreshold();
@@ -655,14 +655,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     if(request.hasMaxDatanodesToBalance()) {
       maxDatanodesToBalance = request.getMaxDatanodesToBalance();
     }
-    if(request.hasMaxSizeToMove()) {
-      maxSizeToMove = request.getMaxSizeToMove();
+    if(request.hasMaxSizeToMoveInGB()) {
+      maxSizeToMoveInGB = request.getMaxSizeToMoveInGB();
     }
 
     return StartContainerBalancerResponseProto.newBuilder().
         setStart(impl.startContainerBalancer(threshold,
             idleiterations, maxDatanodesToBalance,
-            maxSizeToMove)).build();
+            maxSizeToMoveInGB)).build();
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(

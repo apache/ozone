@@ -459,7 +459,7 @@ message StartContainerBalancerRequestProto {
   optional double threshold = 2;
   optional int32 idleiterations = 3;
   optional int32 maxDatanodesToBalance = 4;
-  optional int64 maxSizeToMove = 5;
+  optional int64 maxSizeToMoveInGB = 5;
 }
 
 message StartContainerBalancerResponseProto {

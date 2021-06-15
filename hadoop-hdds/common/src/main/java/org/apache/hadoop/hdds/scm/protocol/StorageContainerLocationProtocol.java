@@ -290,7 +290,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Start ContainerBalancer.
    */
   boolean startContainerBalancer(double threshold, int idleiterations,
-      int maxDatanodesToBalance, long maxSizeToMove) throws IOException;
+      int maxDatanodesToBalance, long maxSizeToMoveInGB) throws IOException;
 
   /**
    * Stop ContainerBalancer.

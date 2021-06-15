@@ -53,7 +53,7 @@ public class ContainerBalancer {
   private final SCMContext scmContext;
   private double threshold;
   private int maxDatanodesToBalance;
-  private long maxSizeToMove;
+  private long maxSizeToMoveInGB;
   private int idleIteration;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
@@ -122,7 +122,7 @@ public class ContainerBalancer {
       this.idleIteration = config.getIdleIteration();
       this.threshold = config.getThreshold();
       this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
-      this.maxSizeToMove = config.getMaxSizeToMove();
+      this.maxSizeToMoveInGB = config.getmaxSizeToMoveInGB();
       this.unBalancedNodes = new ArrayList<>();
       LOG.info("Starting Container Balancer...{}", this);
       //we should start a new balancer thread async

@@ -552,9 +552,9 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public boolean startContainerBalancer(double threshold, int idleiterations,
-         int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
+         int maxDatanodesToBalance, long maxSizeToMoveInGB) throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
-        idleiterations, maxDatanodesToBalance, maxSizeToMove);
+        idleiterations, maxDatanodesToBalance, maxSizeToMoveInGB);
   }
 
   @Override

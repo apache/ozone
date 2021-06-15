@@ -44,7 +44,7 @@ import picocli.CommandLine.Spec;
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -i/--idleiterations {@literal <idleiterations>}]
  *      [ -d/--maxDatanodesToBalance {@literal <maxDatanodesToBalance>}]
- *      [ -s/--maxSizeToMove {@literal <maxSizeToMove>}]
+ *      [ -s/--maxSizeToMoveInGB {@literal <maxSizeToMoveInGB>}]
  *      Examples:
  *      ozone admin containerbalancer start
  *        start balancer with default values in the configuration

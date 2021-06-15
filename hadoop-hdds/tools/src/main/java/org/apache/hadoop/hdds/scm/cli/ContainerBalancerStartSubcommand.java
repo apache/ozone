@@ -51,14 +51,14 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       description = "Maximum datanodes to move")
   private int maxDatanodesToBalance;
 
-  @Option(names = {"-s", "--maxSizeToMove"},
-      description = "Maximum size to move")
-  private long maxSizeToMove;
+  @Option(names = {"-s", "--maxSizeToMoveInGB"},
+      description = "Maximum size to move, for 10GB it should be set as 10")
+  private long maxSizeToMoveInGB;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean result = scmClient.startContainerBalancer(threshold, idleiterations,
-        maxDatanodesToBalance, maxSizeToMove);
+        maxDatanodesToBalance, maxSizeToMoveInGB);
     if (result) {
       System.out.println("Starting ContainerBalancer Successfully.");
       return;

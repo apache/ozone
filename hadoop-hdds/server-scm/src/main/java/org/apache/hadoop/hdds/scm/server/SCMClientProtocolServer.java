@@ -671,7 +671,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public boolean startContainerBalancer(double threshold, int idleiterations,
-       int maxDatanodesToBalance, long maxSizeToMove) throws IOException {
+       int maxDatanodesToBalance, long maxSizeToMoveInGB) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_CONTAINER_BALANCER, null));
@@ -683,8 +683,8 @@ public class SCMClientProtocolServer implements
     if (maxDatanodesToBalance > 0) {
       cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
     }
-    if (maxSizeToMove > 0) {
-      cbc.setMaxSizeToMove(maxSizeToMove * OzoneConsts.GB);
+    if (maxSizeToMoveInGB > 0) {
+      cbc.setmaxSizeToMoveInGB(maxSizeToMoveInGB * OzoneConsts.GB);
     }
     if (idleiterations > 0) {
       cbc.setIdleIteration(idleiterations);
