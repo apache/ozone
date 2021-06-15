@@ -743,7 +743,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (maxDatanodesToBalance > 0) {
       builder.setMaxDatanodesToBalance(maxDatanodesToBalance);
     }
-    if (idleiterations >= 0) {
+    if (idleiterations == 0) {
+      throw new IllegalArgumentException(
+          "Invalid values for idleiterations: " + idleiterations);
+    } else {
       builder.setIdleiterations(idleiterations);
     }
 

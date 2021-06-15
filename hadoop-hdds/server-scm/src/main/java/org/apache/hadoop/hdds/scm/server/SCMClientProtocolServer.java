@@ -686,9 +686,17 @@ public class SCMClientProtocolServer implements
     if (maxSizeToMoveInGB > 0) {
       cbc.setmaxSizeToMoveInGB(maxSizeToMoveInGB * OzoneConsts.GB);
     }
+    if (0 == idleiterations || idleiterations < -1) {
+      //startBalancer maybe trigger by an alternative method to cli,
+      //so for the sake of robustness, we should judge the input
+      //idleiterations at server side.
+      LOG.error("idleiterations should not be 0 or smaller than -1.");
+      throw new IllegalArgumentException(
+          "Invalid values for idleiterations: " + idleiterations);
+    }
     if (idleiterations > 0) {
       cbc.setIdleIteration(idleiterations);
-    } else if (0 == idleiterations) {
+    } else {
       // run balancer infinitely
       cbc.setIdleIteration(Integer.MAX_VALUE);
     }

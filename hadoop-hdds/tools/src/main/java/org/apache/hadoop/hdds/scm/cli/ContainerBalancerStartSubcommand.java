@@ -39,12 +39,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   private double threshold;
 
   @Option(names = {"-i", "--idleiterations"},
-      description = "Maximum consecutive idle iterations",
-      //idleiteration could be as follows:
-      // 0 ： indicate running infinitely
-      // positive number ： indicate the specific iterations
-      // -1 : user does not set this value
-      defaultValue = "-1")
+      description = "Maximum consecutive idle iterations")
   private int idleiterations;
 
   @Option(names = {"-d", "--maxDatanodesToBalance"},
@@ -52,7 +47,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   private int maxDatanodesToBalance;
 
   @Option(names = {"-s", "--maxSizeToMoveInGB"},
-      description = "Maximum size to move, for 10GB it should be set as 10")
+      description = "Maximum size to move in GB, for 10GB it should be set as 10")
   private long maxSizeToMoveInGB;
 
   @Override
@@ -63,7 +58,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       System.out.println("Starting ContainerBalancer Successfully.");
       return;
     }
-    System.out.println("ContainerBalancer has been started" +
-        " by another cli command.");
+    System.out.println("ContainerBalancer is already running" +
+        "Please stop it first.");
   }
 }
