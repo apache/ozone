@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -43,9 +43,9 @@ public class TraceAllMethod<T> implements InvocationHandler {
    */
   private final Map<String, Map<Class<?>[], Method>> methods = new HashMap<>();
 
-  private T delegate;
+  private final T delegate;
 
-  private String name;
+  private final String name;
 
   public TraceAllMethod(T delegate, String name) {
     this.delegate = delegate;
@@ -71,7 +71,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
     Span span = GlobalTracer.get().buildSpan(
         name + "." + method.getName())
         .start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       try {
         return delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {
