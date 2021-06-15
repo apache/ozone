@@ -29,8 +29,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
@@ -99,7 +97,9 @@ public class NodeEndpoint {
       Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
       List<DatanodePipeline> pipelines = new ArrayList<>();
       AtomicInteger leaderCount = new AtomicInteger();
+      AtomicInteger openContainers = new AtomicInteger();
       DatanodeMetadata.Builder builder = DatanodeMetadata.newBuilder();
+
       pipelineIDs.forEach(pipelineID -> {
         try {
           Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
@@ -115,6 +115,10 @@ public class NodeEndpoint {
           if (datanode.getUuid().equals(pipeline.getLeaderId())) {
             leaderCount.getAndIncrement();
           }
+          int openContainerPerPipeline =
+                  reconContainerManager.getPipelineToOpenContainer()
+                  .getOrDefault(pipelineID, 0);
+          openContainers.set(openContainers.get() + openContainerPerPipeline);
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
               pipelineID.getId(), hostname, ex);
@@ -125,22 +129,12 @@ public class NodeEndpoint {
       });
       try {
         Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
-        int openContainers = 0;
-        for (ContainerID containerID: allContainers) {
-          ContainerInfo containerInfo =
-                  reconContainerManager.getContainer(containerID);
-          if (containerInfo.isOpen()) {
-            ++openContainers;
-          }
-        }
 
         builder.withContainers(allContainers.size());
-        builder.withOpenContainers(openContainers);
+        builder.withOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
-      } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot find container.", cnfe);
       }
       datanodes.add(builder.withHostname(hostname)
           .withDatanodeStorageReport(storageReport)

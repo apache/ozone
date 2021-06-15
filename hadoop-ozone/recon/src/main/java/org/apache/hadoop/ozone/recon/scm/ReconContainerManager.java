@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -70,6 +71,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final Table<UUID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
+  // Pipeline -> open containers
+  private Map<PipelineID, Integer> pipelineToOpenContainer;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -101,6 +104,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     // batchHandler = scmDBStore
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(store);
     this.replicaHistoryMap = new ConcurrentHashMap<>();
+    this.pipelineToOpenContainer = new ConcurrentHashMap<>();
   }
 
   /**
@@ -203,6 +207,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
         && isHealthy(state)) {
       LOG.info("Container {} has state OPEN, but given state is {}.",
           containerID, state);
+      Pipeline pipeline =
+              pipelineManager.getPipeline(containerInfo.getPipelineID());
+      // subtract open container count from the pipeline
+      int curCnt = pipelineToOpenContainer.getOrDefault(pipeline.getId(), 0);
+      if (curCnt > 0) {
+        pipelineToOpenContainer.put(pipeline.getId(), curCnt - 1);
+      }
       updateContainerState(containerID, FINALIZE);
     }
   }
@@ -223,12 +234,16 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
-        PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
+        Pipeline pipeline = containerWithPipeline.getPipeline();
+        PipelineID pipelineID = pipeline.getId();
         if (pipelineManager.containsPipeline(pipelineID)) {
           getContainerStateManager().addContainer(containerInfo.getProtobuf());
           pipelineManager.addContainerToPipeline(
               containerWithPipeline.getPipeline().getId(),
               containerInfo.containerID());
+          // update open container count on all datanodes on this pipeline
+          pipelineToOpenContainer.put(pipelineID,
+                    pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
           LOG.info("Successfully added container {} to Recon.",
               containerInfo.containerID());
         } else {
@@ -431,6 +446,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
   public Table<UUID, DatanodeDetails> getNodeDB() {
     return nodeDB;
+  }
+
+  public Map<PipelineID, Integer> getPipelineToOpenContainer() {
+    return pipelineToOpenContainer;
   }
 
 }
