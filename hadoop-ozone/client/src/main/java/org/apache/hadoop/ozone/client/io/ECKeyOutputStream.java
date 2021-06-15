@@ -18,26 +18,32 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
+import org.apache.hadoop.io.ByteBufferPool;
+import org.apache.hadoop.io.ElasticByteBufferPool;
+import org.apache.hadoop.io.erasurecode.CodecUtil;
+import org.apache.hadoop.io.erasurecode.ECSchema;
+import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
+import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
+import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -49,23 +55,32 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
-import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Maintaining a list of BlockInputStream. Write based on offset.
- *
+ * <p>
  * Note that this may write to multiple containers in one write call. In case
  * that first container succeeded but later ones failed, the succeeded writes
  * are not rolled back.
- *
+ * <p>
  * TODO : currently not support multi-thread access.
  */
-public class KeyOutputStream extends OutputStream {
+public class ECKeyOutputStream extends KeyOutputStream {
 
   private OzoneClientConfig config;
+  private CellBuffers ecChunkBufferCache;
+  private int cellSize = 1000;
+  private int numDataBlks = 3;
+  private final RawErasureEncoder encoder;
+  private long currentBlockGroupLen = 0;
+  // TODO: EC: Currently using the below EC Schema. This has to be modified and
+  //  created dynamically once OM return the configured scheme details.
+  private ECSchema schema = new ECSchema("rs", 3, 2);
+  private ErasureCodecOptions options = new ErasureCodecOptions(schema);
+  private RSErasureCodec codec =
+      new RSErasureCodec(new Configuration(), options);
 
   /**
    * Defines stream action while calling handleFlushOrClose.
@@ -90,21 +105,21 @@ public class KeyOutputStream extends OutputStream {
   private boolean isException;
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
-  private long clientID;
-
   /**
    * A constructor for testing purpose only.
    */
   @VisibleForTesting
-  public KeyOutputStream() {
+  public ECKeyOutputStream() {
     closed = false;
-    this.retryPolicyMap = HddsClientUtils.getExceptionList()
-        .stream()
-        .collect(Collectors.toMap(Function.identity(),
-            e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
+    this.retryPolicyMap = HddsClientUtils.getExceptionList().stream().collect(
+        Collectors
+            .toMap(Function.identity(), e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
     blockOutputStreamEntryPool = new BlockOutputStreamEntryPool();
+    encoder = CodecUtil.createRawEncoder(new Configuration(),
+        SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
+        codec.getCoderOptions());
   }
 
   @VisibleForTesting
@@ -127,43 +142,33 @@ public class KeyOutputStream extends OutputStream {
     return retryCount;
   }
 
-  @VisibleForTesting
-  public long getClientID() {
-    return clientID;
-  }
-
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public KeyOutputStream(
-      OzoneClientConfig config,
-      OpenKeySession handler,
-      XceiverClientFactory xceiverClientManager,
-      OzoneManagerProtocol omClient, int chunkSize,
-      String requestId, ReplicationConfig replicationConfig,
+  public ECKeyOutputStream(OzoneClientConfig config, OpenKeySession handler,
+      XceiverClientFactory xceiverClientManager, OzoneManagerProtocol omClient,
+      int chunkSize, String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion
-  ) {
+      boolean unsafeByteBufferConversion) {
+    ecChunkBufferCache = new CellBuffers(2, cellSize, 5, numDataBlks);
     this.config = config;
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(
-            config,
-            omClient,
-            requestId, replicationConfig,
-            uploadID, partNumber,
-            isMultipart, info,
-            unsafeByteBufferConversion,
-            xceiverClientManager,
-            handler.getId(), false);
+        new BlockOutputStreamEntryPool(config, omClient, requestId,
+            replicationConfig, uploadID, partNumber, isMultipart, info,
+            unsafeByteBufferConversion, xceiverClientManager, handler.getId(),
+            true);
 
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
-    this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
-        config.getMaxRetryCount(), config.getRetryInterval());
+    this.retryPolicyMap = HddsClientUtils
+        .getRetryPolicyByException(config.getMaxRetryCount(),
+            config.getRetryInterval());
     this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
-    this.clientID = handler.getId();
+    encoder = CodecUtil.createRawEncoder(new Configuration(),
+        SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
+        codec.getCoderOptions());
   }
 
   /**
@@ -175,7 +180,7 @@ public class KeyOutputStream extends OutputStream {
    * for write. To do this, the following method checks that, only those
    * blocks created in this particular open version are added to stream entries.
    *
-   * @param version the set of blocks that are pre-allocated.
+   * @param version     the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
    * @throws IOException
    */
@@ -193,19 +198,18 @@ public class KeyOutputStream extends OutputStream {
 
   /**
    * Try to write the bytes sequence b[off:off+len) to streams.
-   *
+   * <p>
    * NOTE: Throws exception if the data could not fit into the remaining space.
    * In which case nothing will be written.
    * TODO:May need to revisit this behaviour.
    *
-   * @param b byte data
+   * @param b   byte data
    * @param off starting offset
    * @param len length to write
    * @throws IOException
    */
   @Override
-  public void write(byte[] b, int off, int len)
-      throws IOException {
+  public void write(byte[] b, int off, int len) throws IOException {
     checkNotClosed();
     if (b == null) {
       throw new NullPointerException();
@@ -217,49 +221,134 @@ public class KeyOutputStream extends OutputStream {
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
+
+    int currentChunkBufferRemainingLength =
+        ecChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
+            .remaining();
+    int currentChunkBufferLen =
+        ecChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
+            .position();
+    int maxLenToCurrChunkBuffer = (int) Math.min(len, cellSize);
+    int currentWriterChunkLenToWrite =
+        Math.min(currentChunkBufferRemainingLength, maxLenToCurrChunkBuffer);
+    handleWrite(b, off, currentWriterChunkLenToWrite,
+        currentChunkBufferLen + currentWriterChunkLenToWrite == cellSize,
+        false);
+    checkAndWriteParityCells();
+
+    int remLen = len - currentWriterChunkLenToWrite;
+    int iters = remLen / cellSize;
+    int lastCellSize = remLen % cellSize;
+    while (iters > 0) {
+      handleWrite(b, off, cellSize, true, false);
+      off += cellSize;
+      iters--;
+      checkAndWriteParityCells();
+    }
+
+    if (lastCellSize > 0) {
+      handleWrite(b, off, lastCellSize, false, false);
+      checkAndWriteParityCells();
+    }
     writeOffset += len;
   }
 
-  private void handleWrite(byte[] b, int off, long len, boolean retry)
-      throws IOException {
+  private void checkAndWriteParityCells() throws IOException {
+    //check data blocks finished
+    //If index is > datanum blks
+    if (blockOutputStreamEntryPool.getCurrIdx() == numDataBlks) {
+      //Lets encode and write
+      //encoder.encode();
+      writeParityCells();
+      // check if block ends?
+      if (currentBlockGroupLen == numDataBlks * blockOutputStreamEntryPool
+          .getStreamEntries().get(blockOutputStreamEntryPool.getCurrIdx())
+          .getLength()) {
+        blockOutputStreamEntryPool.endECBlock(numDataBlks);
+        currentBlockGroupLen = 0;
+      }
+    }
+  }
+
+  void writeParityCells() throws IOException {
+    final ByteBuffer[] buffers = ecChunkBufferCache.getBuffers();
+    // Skips encoding and writing parity cells if there are no healthy parity
+    // data streamers
+    //if (!checkAnyParityStreamerIsHealthy()) {
+    //return;
+    //}
+    //encode the data cells
+    for (int i = 0; i < numDataBlks; i++) {
+      buffers[i].flip();
+    }
+    encode(encoder, numDataBlks, buffers);
+    for (int i = numDataBlks; i < numDataBlks + 2; i++) {
+      handleWrite(buffers[i].array(), 0, cellSize, true, true);
+    }
+
+    ecChunkBufferCache.flipAllDataBuffers();
+    ecChunkBufferCache.clear();
+  }
+
+  private static void encode(RawErasureEncoder encoder, int numData,
+      ByteBuffer[] buffers) throws IOException {
+    final ByteBuffer[] dataBuffers = new ByteBuffer[numData];
+    final ByteBuffer[] parityBuffers = new ByteBuffer[buffers.length - numData];
+    System.arraycopy(buffers, 0, dataBuffers, 0, dataBuffers.length);
+    System.arraycopy(buffers, numData, parityBuffers, 0, parityBuffers.length);
+
+    encoder.encode(dataBuffers, parityBuffers);
+  }
+
+  private void handleWrite(byte[] b, int off, long len, boolean isFullCell,
+      boolean isParity) throws IOException {
+    ecChunkBufferCache
+        .addTo(blockOutputStreamEntryPool.getCurrIdx(), b, off, (int) len);
     while (len > 0) {
       try {
+
         BlockOutputStreamEntry current =
             blockOutputStreamEntryPool.allocateBlockIfNeeded();
         // length(len) will be in int range if the call is happening through
         // write API of blockOutputStream. Length can be in long range if it
         // comes via Exception path.
-        int expectedWriteLen = Math.min((int) len,
-                (int) current.getRemaining());
+        int expectedWriteLen =
+            Math.min((int) len, (int) current.getRemaining());
         long currentPos = current.getWrittenDataLength();
         // writeLen will be updated based on whether the write was succeeded
         // or if it sees an exception, how much the actual write was
         // acknowledged.
         int writtenLength =
-                writeToOutputStream(current, retry, len, b, expectedWriteLen,
-                off, currentPos);
+            writeToOutputStream(current, len, b, expectedWriteLen, off,
+                currentPos, isParity);
+        currentBlockGroupLen += isParity ? 0 : writtenLength;
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
-          handleFlushOrClose(StreamAction.FULL);
+          closeCurrentStream(StreamAction.CLOSE);
         }
+
         len -= writtenLength;
         off += writtenLength;
+
       } catch (Exception e) {
         markStreamClosed();
         throw new IOException(e);
       }
+
+      if (isFullCell) {
+        handleFlushOrClose(StreamAction.FLUSH);
+        blockOutputStreamEntryPool.updateToNextStream(numDataBlks + 2);
+      }
     }
+
   }
 
-  private int writeToOutputStream(BlockOutputStreamEntry current,
-      boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
+  private int writeToOutputStream(BlockOutputStreamEntry current, long len,
+      byte[] b, int writeLen, int off, long currentPos, boolean isParity)
       throws IOException {
     try {
-      if (retry) {
-        current.writeOnRetry(len);
-      } else {
-        current.write(b, off, writeLen);
+      current.write(b, off, writeLen);
+      if (!isParity) {
         offset += writeLen;
       }
     } catch (IOException ioe) {
@@ -270,12 +359,11 @@ public class KeyOutputStream extends OutputStream {
       // to or less than the max length of the buffer allocated.
       // The len specified here is the combined sum of the data length of
       // the buffers
-      Preconditions.checkState(!retry || len <= config
-          .getStreamBufferMaxSize());
+      Preconditions.checkState(len <= config.getStreamBufferMaxSize());
       int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
-      writeLen = retry ? (int) len : dataWritten;
-      // In retry path, the data written is already accounted in offset.
-      if (!retry) {
+      writeLen = dataWritten;
+
+      if (!isParity) {
         offset += writeLen;
       }
       LOG.debug("writeLen {}, total len {}", writeLen, len);
@@ -284,164 +372,17 @@ public class KeyOutputStream extends OutputStream {
     return writeLen;
   }
 
-  /**
-   * It performs following actions :
-   * a. Updates the committed length at datanode for the current stream in
-   * datanode.
-   * b. Reads the data from the underlying buffer and writes it the next stream.
-   *
-   * @param streamEntry StreamEntry
-   * @param exception   actual exception that occurred
-   * @throws IOException Throws IOException if Write fails
-   */
   private void handleException(BlockOutputStreamEntry streamEntry,
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
-    boolean retryFailure = checkForRetryFailure(t);
-    boolean containerExclusionException = false;
-    if (!retryFailure) {
-      containerExclusionException = checkIfContainerToExclude(t);
-    }
-    Pipeline pipeline = streamEntry.getPipeline();
-    PipelineID pipelineId = pipeline.getId();
-    long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
-    //set the correct length for the current stream
-    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
-    long bufferedDataLen = blockOutputStreamEntryPool.computeBufferData();
-    if (containerExclusionException) {
-      LOG.debug(
-          "Encountered exception {}. The last committed block length is {}, "
-              + "uncommitted data length is {} retry count {}", exception,
-          totalSuccessfulFlushedData, bufferedDataLen, retryCount);
-    } else {
-      LOG.warn(
-          "Encountered exception {} on the pipeline {}. "
-              + "The last committed block length is {}, "
-              + "uncommitted data length is {} retry count {}", exception,
-          pipeline, totalSuccessfulFlushedData, bufferedDataLen, retryCount);
-    }
-    Preconditions.checkArgument(
-        bufferedDataLen <= config.getStreamBufferMaxSize());
-    Preconditions.checkArgument(
-        offset - blockOutputStreamEntryPool.getKeyLength() == bufferedDataLen);
-    long containerId = streamEntry.getBlockID().getContainerID();
-    Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
-    ExcludeList excludeList = blockOutputStreamEntryPool.getExcludeList();
-    if (!failedServers.isEmpty()) {
-      excludeList.addDatanodes(failedServers);
-    }
-
-    // if the container needs to be excluded , add the container to the
-    // exclusion list , otherwise add the pipeline to the exclusion list
-    if (containerExclusionException) {
-      excludeList.addConatinerId(ContainerID.valueOf(containerId));
-    } else {
-      excludeList.addPipeline(pipelineId);
-    }
-    // just clean up the current stream.
-    streamEntry.cleanup(retryFailure);
-
-    // discard all subsequent blocks the containers and pipelines which
-    // are in the exclude list so that, the very next retry should never
-    // write data on the  closed container/pipeline
-    if (containerExclusionException) {
-      // discard subsequent pre allocated blocks from the streamEntries list
-      // from the closed container
-      blockOutputStreamEntryPool
-          .discardPreallocatedBlocks(streamEntry.getBlockID().getContainerID(),
-              null);
-    } else {
-      // In case there is timeoutException or Watch for commit happening over
-      // majority or the client connection failure to the leader in the
-      // pipeline, just discard all the pre allocated blocks on this pipeline.
-      // Next block allocation will happen with excluding this specific pipeline
-      // This will ensure if 2 way commit happens , it cannot span over multiple
-      // blocks
-      blockOutputStreamEntryPool
-          .discardPreallocatedBlocks(-1, pipelineId);
-    }
-    if (bufferedDataLen > 0) {
-      // If the data is still cached in the underlying stream, we need to
-      // allocate new block and write this data in the datanode.
-      handleRetry(exception, bufferedDataLen);
-      // reset the retryCount after handling the exception
-      retryCount = 0;
-    }
+    // In EC, we will just close the current stream.
+    streamEntry.close();
   }
 
   private void markStreamClosed() {
     blockOutputStreamEntryPool.cleanup();
     closed = true;
-  }
-
-  private void handleRetry(IOException exception, long len) throws IOException {
-    RetryPolicy retryPolicy = retryPolicyMap
-        .get(HddsClientUtils.checkForException(exception).getClass());
-    if (retryPolicy == null) {
-      retryPolicy = retryPolicyMap.get(Exception.class);
-    }
-    RetryPolicy.RetryAction action = null;
-    try {
-      action = retryPolicy.shouldRetry(exception, retryCount, 0, true);
-    } catch (Exception e) {
-      setExceptionAndThrow(new IOException(e));
-    }
-    if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
-      String msg = "";
-      if (action.reason != null) {
-        msg = "Retry request failed. " + action.reason;
-        LOG.error(msg, exception);
-      }
-      setExceptionAndThrow(new IOException(msg, exception));
-    }
-
-    // Throw the exception if the thread is interrupted
-    if (Thread.currentThread().isInterrupted()) {
-      LOG.warn("Interrupted while trying for retry");
-      setExceptionAndThrow(exception);
-    }
-    Preconditions.checkArgument(
-        action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
-    if (action.delayMillis > 0) {
-      try {
-        Thread.sleep(action.delayMillis);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        IOException ioe =  (IOException) new InterruptedIOException(
-            "Interrupted: action=" + action + ", retry policy=" + retryPolicy)
-            .initCause(e);
-        setExceptionAndThrow(ioe);
-      }
-    }
-    retryCount++;
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Retrying Write request. Already tried {} time(s); " +
-          "retry policy is {} ", retryCount, retryPolicy);
-    }
-    handleWrite(null, 0, len, true);
-  }
-
-  private void setExceptionAndThrow(IOException ioe) throws IOException {
-    isException = true;
-    throw ioe;
-  }
-
-  /**
-   * Checks if the provided exception signifies retry failure in ratis client.
-   * In case of retry failure, ratis client throws RaftRetryFailureException
-   * and all succeeding operations are failed with AlreadyClosedException.
-   */
-  private boolean checkForRetryFailure(Throwable t) {
-    return t instanceof RaftRetryFailureException
-        || t instanceof AlreadyClosedException;
-  }
-
-  // Every container specific exception from datatnode will be seen as
-  // StorageContainerException
-  private boolean checkIfContainerToExclude(Throwable t) {
-    return t instanceof StorageContainerException;
   }
 
   @Override
@@ -453,13 +394,7 @@ public class KeyOutputStream extends OutputStream {
   /**
    * Close or Flush the latest outputStream depending upon the action.
    * This function gets called when while write is going on, the current stream
-   * gets full or explicit flush or close request is made by client. when the
-   * stream gets full and we try to close the stream , we might end up hitting
-   * an exception in the exception handling path, we write the data residing in
-   * in the buffer pool to a new Block. In cases, as such, when the data gets
-   * written to new stream , it will be at max half full. In such cases, we
-   * should just write the data and not close the stream as the block won't be
-   * completely full.
+   * gets full or explicit flush or close request is made by client.
    *
    * @param op Flag which decides whether to call close or flush on the
    *           outputStream.
@@ -489,14 +424,66 @@ public class KeyOutputStream extends OutputStream {
     }
   }
 
-  private void handleStreamAction(BlockOutputStreamEntry entry,
-                                  StreamAction op) throws IOException {
+  private void handleFlushOrCloseAllStreams(StreamAction op)
+      throws IOException {
+    if (!blockOutputStreamEntryPool.isEmpty()) {
+      List<BlockOutputStreamEntry> allStreamEntries =
+          blockOutputStreamEntryPool.getStreamEntries();
+      for (int i = 0; i < allStreamEntries.size(); i++) {
+        while (true) {
+          try {
+            BlockOutputStreamEntry entry = allStreamEntries.get(i);
+            if (entry != null) {
+              try {
+                handleStreamAction(entry, op);
+              } catch (IOException ioe) {
+                handleException(entry, ioe);
+                continue;
+              }
+            }
+            return;
+          } catch (Exception e) {
+            markStreamClosed();
+            throw e;
+          }
+        }
+      }
+    }
+  }
+
+  private void closeCurrentStream(StreamAction op) throws IOException {
+    if (!blockOutputStreamEntryPool.isEmpty()) {
+      List<BlockOutputStreamEntry> allStreamEntries =
+          blockOutputStreamEntryPool.getStreamEntries();
+      for (int i = 0; i < allStreamEntries.size(); i++) {
+        while (true) {
+          try {
+            BlockOutputStreamEntry entry = allStreamEntries.get(i);
+            if (entry != null) {
+              try {
+                handleStreamAction(entry, op);
+              } catch (IOException ioe) {
+                handleException(entry, ioe);
+                continue;
+              }
+            }
+            return;
+          } catch (Exception e) {
+            markStreamClosed();
+            throw e;
+          }
+        }
+      }
+    }
+  }
+
+  private void handleStreamAction(BlockOutputStreamEntry entry, StreamAction op)
+      throws IOException {
     Collection<DatanodeDetails> failedServers = entry.getFailedServers();
     // failed servers can be null in case there is no data written in
     // the stream
     if (!failedServers.isEmpty()) {
-      blockOutputStreamEntryPool.getExcludeList().addDatanodes(
-          failedServers);
+      blockOutputStreamEntryPool.getExcludeList().addDatanodes(failedServers);
     }
     switch (op) {
     case CLOSE:
@@ -527,13 +514,15 @@ public class KeyOutputStream extends OutputStream {
     }
     closed = true;
     try {
-      handleFlushOrClose(StreamAction.CLOSE);
+      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
+      blockOutputStreamEntryPool.endECBlock(numDataBlks);
+      //TODO: offset should not consider parity blocks length
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
-      blockOutputStreamEntryPool.cleanup();
+      blockOutputStreamEntryPool.cleanupAll();
     }
   }
 
@@ -559,6 +548,8 @@ public class KeyOutputStream extends OutputStream {
     private OzoneManagerProtocol omClient;
     private int chunkSize;
     private String requestID;
+    private ReplicationType type;
+    private ReplicationFactor factor;
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
@@ -601,6 +592,16 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder setType(ReplicationType replicationType) {
+      this.type = replicationType;
+      return this;
+    }
+
+    public Builder setFactor(ReplicationFactor replicationFactor) {
+      this.factor = replicationFactor;
+      return this;
+    }
+
     public Builder setIsMultipartKey(boolean isMultipart) {
       this.isMultipartKey = isMultipart;
       return this;
@@ -616,32 +617,23 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-
-    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+    public ECKeyOutputStream.Builder setReplicationConfig(
+        ReplicationConfig replConfig) {
       this.replicationConfig = replConfig;
       return this;
     }
 
-    public KeyOutputStream build() {
-      return new KeyOutputStream(
-          clientConfig,
-          openHandler,
-          xceiverManager,
-          omClient,
-          chunkSize,
-          requestID,
-          replicationConfig,
-          multipartUploadID,
-          multipartNumber,
-          isMultipartKey,
-          unsafeByteBufferConversion);
+    public ECKeyOutputStream build() {
+      return new ECKeyOutputStream(clientConfig, openHandler, xceiverManager,
+          omClient, chunkSize, requestID, replicationConfig, multipartUploadID,
+          multipartNumber, isMultipartKey, unsafeByteBufferConversion);
     }
-
   }
 
   /**
    * Verify that the output stream is open. Non blocking; this gives
    * the last state of the volatile {@link #closed} field.
+   *
    * @throws IOException if the connection is closed.
    */
   private void checkNotClosed() throws IOException {
@@ -651,4 +643,65 @@ public class KeyOutputStream extends OutputStream {
               + blockOutputStreamEntryPool.getKeyName());
     }
   }
+
+  class CellBuffers {
+    private final ByteBuffer[] buffers;
+    private final int numAllBlocks;
+    private final int numDataBlks;
+    private int cellSize;
+
+    CellBuffers(int numParityBlocks, int cellSize, int numAllBlocks,
+        int numDataBlks) {
+      this.cellSize = cellSize;
+      this.numAllBlocks = numAllBlocks;
+      this.numDataBlks = numDataBlks;
+      buffers = new ByteBuffer[numAllBlocks];
+      for (int i = 0; i < buffers.length; i++) {
+        buffers[i] = BUFFER_POOL.getBuffer(false, cellSize);
+        buffers[i].limit(cellSize);
+      }
+    }
+
+    private ByteBuffer[] getBuffers() {
+      return buffers;
+    }
+
+    private int addTo(int i, byte[] b, int off, int len) {
+      final ByteBuffer buf = buffers[i];
+      final int pos = buf.position() + len;
+      Preconditions.checkState(pos <= cellSize);
+      buf.put(b, off, len);
+      return pos;
+    }
+
+    private void clear() {
+      for (int i = 0; i < numAllBlocks; i++) {
+        buffers[i].clear();
+        buffers[i].limit(cellSize);
+      }
+    }
+
+    private void release() {
+      for (int i = 0; i < numAllBlocks; i++) {
+        if (buffers[i] != null) {
+          BUFFER_POOL.putBuffer(buffers[i]);
+          buffers[i] = null;
+        }
+      }
+    }
+
+    private void flipDataBuffers() {
+      for (int i = 0; i < numDataBlks; i++) {
+        buffers[i].flip();
+      }
+    }
+
+    private void flipAllDataBuffers() {
+      for (int i = 0; i < numAllBlocks; i++) {
+        buffers[i].flip();
+      }
+    }
+  }
+
+  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
 }

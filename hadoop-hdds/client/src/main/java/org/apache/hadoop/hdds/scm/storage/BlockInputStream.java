@@ -199,7 +199,8 @@ public class BlockInputStream extends InputStream
   protected List<ChunkInfo> getChunkInfos() throws IOException {
     // irrespective of the container state, we will always read via Standalone
     // protocol.
-    if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
+    if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE && pipeline
+        .getType() != HddsProtos.ReplicationType.EC) {
       pipeline = Pipeline.newBuilder(pipeline)
           .setReplicationConfig(new StandaloneReplicationConfig(
               ReplicationConfig

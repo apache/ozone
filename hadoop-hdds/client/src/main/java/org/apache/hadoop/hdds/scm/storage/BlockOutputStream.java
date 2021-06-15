@@ -125,6 +125,7 @@ public class BlockOutputStream extends OutputStream {
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
   private int replicationIndex;
+  private boolean isECWrite = false;
 
   /**
    * Creates a new BlockOutputStream.
@@ -155,6 +156,9 @@ public class BlockOutputStream extends OutputStream {
     this.token = token;
 
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
+    if (replicationIndex > 0) {
+      isECWrite = true;
+    }
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer(bufferPool);
@@ -258,6 +262,7 @@ public class BlockOutputStream extends OutputStream {
     while (len > 0) {
       allocateNewBufferIfNeeded();
       final int writeLen = Math.min(currentBufferRemaining, len);
+      LOG.info("writeLen: " + writeLen + "  off: " + off);
       currentBuffer.put(b, off, writeLen);
       currentBufferRemaining -= writeLen;
       writeChunkIfNeeded();
@@ -526,7 +531,15 @@ public class BlockOutputStream extends OutputStream {
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
       updateFlushLength();
+
       executePutBlock(close, false);
+      if (isECWrite) {
+        // In EC writes, we must clean the buffers when we flush the content, so
+        // that partial buffers will not be used in next writes.
+        bufferPool.releaseCurrentBuffer(currentBuffer);
+        currentBufferRemaining = 0;
+        bufferPool.clearBufferPool();
+      }
     } else if (close) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag

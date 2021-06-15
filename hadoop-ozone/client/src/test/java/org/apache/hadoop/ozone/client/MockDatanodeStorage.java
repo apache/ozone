@@ -48,7 +48,8 @@ public class MockDatanodeStorage {
   public void writeChunk(
       DatanodeBlockID blockID,
       ChunkInfo chunkInfo, ByteString bytes) {
-    data.put(createKey(blockID, chunkInfo), bytes);
+    data.put(createKey(blockID, chunkInfo),
+        ByteString.copyFrom(bytes.toByteArray()));
     chunks.put(createKey(blockID, chunkInfo), chunkInfo);
   }
 
@@ -68,6 +69,10 @@ public class MockDatanodeStorage {
   private String createKey(DatanodeBlockID blockId, ChunkInfo chunkInfo) {
     return blockId.getContainerID() + "_" + blockId.getLocalID() + "_"
         + chunkInfo.getChunkName() + "_" + chunkInfo.getOffset();
+  }
+
+  public Map<String, ByteString> getAllBlockData(){
+    return this.data;
   }
 
 }

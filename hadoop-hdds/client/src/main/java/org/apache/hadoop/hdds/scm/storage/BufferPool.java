@@ -95,6 +95,17 @@ public class BufferPool {
     currentBufferIndex--;
   }
 
+  void releaseCurrentBuffer(ChunkBuffer chunkBuffer) {
+    // always remove from head of the list and append at last
+    final ChunkBuffer buffer = bufferList.get(bufferList.indexOf(chunkBuffer));
+    // Ensure the buffer to be removed is always at the head of the list.
+    Preconditions.checkArgument(buffer == chunkBuffer);
+    buffer.clear();
+    bufferList.add(buffer);
+    Preconditions.checkArgument(currentBufferIndex >= 0);
+    currentBufferIndex--;
+  }
+
   public void clearBufferPool() {
     bufferList.clear();
     currentBufferIndex = -1;

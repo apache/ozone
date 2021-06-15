@@ -20,15 +20,20 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -53,6 +58,7 @@ public class BlockOutputStreamEntryPool {
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
 
   private final List<BlockOutputStreamEntry> streamEntries;
+  private final List<BlockOutputStreamEntry> finishedStreamEntries;
   private final OzoneClientConfig config;
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
@@ -63,6 +69,7 @@ public class BlockOutputStreamEntryPool {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private final boolean isEC;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -72,11 +79,13 @@ public class BlockOutputStreamEntryPool {
       String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
-      XceiverClientFactory xceiverClientFactory, long openID
+      XceiverClientFactory xceiverClientFactory, long openID, boolean isEC
   ) {
     this.config = config;
     this.xceiverClientFactory = xceiverClientFactory;
     streamEntries = new ArrayList<>();
+    this.finishedStreamEntries = new ArrayList<>();
+    this.isEC = isEC;
     currentStreamIndex = 0;
     this.omClient = omClient;
     this.keyArgs = new OmKeyArgs.Builder().setVolumeName(info.getVolumeName())
@@ -104,6 +113,8 @@ public class BlockOutputStreamEntryPool {
   @VisibleForTesting
   BlockOutputStreamEntryPool() {
     streamEntries = new ArrayList<>();
+    this.finishedStreamEntries = new ArrayList<>();
+    this.isEC = false;
     omClient = null;
     keyArgs = null;
     xceiverClientFactory = null;
@@ -147,22 +158,61 @@ public class BlockOutputStreamEntryPool {
 
   private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    BlockOutputStreamEntry.Builder builder =
-        new BlockOutputStreamEntry.Builder()
-            .setBlockID(subKeyInfo.getBlockID())
-            .setKey(keyArgs.getKeyName())
-            .setXceiverClientManager(xceiverClientFactory)
-            .setPipeline(subKeyInfo.getPipeline())
-            .setConfig(config)
-            .setLength(subKeyInfo.getLength())
-            .setBufferPool(bufferPool)
-            .setToken(subKeyInfo.getToken());
-    streamEntries.add(builder.build());
+    if(!isEC) {
+      BlockOutputStreamEntry.Builder builder =
+              new BlockOutputStreamEntry.Builder()
+                      .setBlockID(subKeyInfo.getBlockID())
+                      .setKey(keyArgs.getKeyName())
+                      .setXceiverClientManager(xceiverClientFactory)
+                      .setPipeline(subKeyInfo.getPipeline())
+                      .setConfig(config)
+                      .setLength(subKeyInfo.getLength())
+                      .setBufferPool(bufferPool)
+                      .setToken(subKeyInfo.getToken());
+      streamEntries.add(builder.build());
+    }else{
+      List<DatanodeDetails> nodes = subKeyInfo.getPipeline().getNodes();
+      for (int i = 0; i < nodes.size(); i++) {
+        Map<DatanodeDetails, Long> nodeStatus = new LinkedHashMap<>();
+        nodeStatus.put(nodes.get(i), -1L);
+        Pipeline pipeline = new Pipeline(subKeyInfo.getPipeline().getId(),
+            subKeyInfo.getPipeline().getReplicationConfig(),
+            subKeyInfo.getPipeline().getPipelineState(), nodeStatus, null);
+        Map<DatanodeDetails, Integer> nodeVsIdx = new HashMap<>();
+        nodeVsIdx.put(nodes.get(i), i + 1);
+        pipeline.setReplicaIndexes(nodeVsIdx);
+        BlockOutputStreamEntry.Builder builder =
+            new BlockOutputStreamEntry.Builder()
+                .setBlockID(subKeyInfo.getBlockID())
+                .setKey(keyArgs.getKeyName())
+                .setXceiverClientManager(xceiverClientFactory)
+                .setPipeline(pipeline).setConfig(config)
+                .setLength(subKeyInfo.getLength()).setBufferPool(bufferPool)
+                .setToken(subKeyInfo.getToken());
+        streamEntries.add(builder.build());
+      }
+    }
   }
 
-  public List<OmKeyLocationInfo> getLocationInfoList()  {
+  public List<OmKeyLocationInfo> getLocationInfoList() {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    for (BlockOutputStreamEntry streamEntry : streamEntries) {
+    List<OmKeyLocationInfo> currBlocksLocationInfoList =
+        getOmKeyLocationInfos(streamEntries);
+    if (isEC) {
+      List<OmKeyLocationInfo> prevBlksKeyLocationInfos =
+          getOmKeyLocationInfos(finishedStreamEntries);
+      prevBlksKeyLocationInfos.addAll(currBlocksLocationInfoList);
+      locationInfoList = prevBlksKeyLocationInfos;
+    } else {
+      locationInfoList = currBlocksLocationInfoList;
+    }
+    return locationInfoList;
+  }
+
+  private List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      List<BlockOutputStreamEntry> entries) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (BlockOutputStreamEntry streamEntry : entries) {
       long length = streamEntry.getCurrentPosition();
 
       // Commit only those blocks to OzoneManager which are not empty
@@ -175,13 +225,27 @@ public class BlockOutputStreamEntryPool {
         locationInfoList.add(info);
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            "block written " + streamEntry.getBlockID() + ", length " + length
-                + " bcsID " + streamEntry.getBlockID()
-                .getBlockCommitSequenceId());
+        LOG.debug("block written " + streamEntry
+            .getBlockID() + ", length " + length + " bcsID " + streamEntry
+            .getBlockID().getBlockCommitSequenceId());
       }
     }
     return locationInfoList;
+  }
+
+  public void endECBlock(int numberOfDataBlks) throws IOException {
+    List<BlockOutputStreamEntry> entries = getStreamEntries();
+    for (int i = 0; i < numberOfDataBlks; i++) {
+      if (entries.size() > 0) {
+        finishedStreamEntries.add(entries.remove(i));
+      }
+    }
+
+    for (BlockOutputStreamEntry entry : finishedStreamEntries) {
+      entry.close();
+    }
+
+    cleanup();
   }
 
   /**
@@ -224,8 +288,13 @@ public class BlockOutputStreamEntryPool {
   }
 
   long getKeyLength() {
-    return streamEntries.stream().mapToLong(
-        BlockOutputStreamEntry::getCurrentPosition).sum();
+    long totalLength = streamEntries.stream()
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    if (isEC) {
+      totalLength += finishedStreamEntries.stream()
+          .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    }
+    return totalLength;
   }
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
@@ -274,6 +343,14 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
+  public int getCurrIdx(){
+    return currentStreamIndex;
+  }
+
+  public void updateToNextStream(int rotation){
+    currentStreamIndex = (currentStreamIndex+1) % rotation;
+  }
+
   BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
     BlockOutputStreamEntry streamEntry = getCurrentStreamEntry();
     if (streamEntry != null && streamEntry.isClosed()) {
@@ -308,6 +385,13 @@ public class BlockOutputStreamEntryPool {
 
     if (streamEntries != null) {
       streamEntries.clear();
+    }
+  }
+
+  void cleanupAll() {
+    cleanup();
+    if(finishedStreamEntries != null) {
+      finishedStreamEntries.clear();
     }
   }
 
