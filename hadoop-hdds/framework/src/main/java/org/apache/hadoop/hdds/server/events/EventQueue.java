@@ -93,31 +93,6 @@ public class EventQueue implements EventPublisher, AutoCloseable {
   }
 
   /**
-   * Add new handler to the event queue.
-   *
-   * Specified event executor will be used to deliver the events to the
-   * registered event handler.
-   * @param event          Triggering event.
-   * @param handler        Handler of event (will be called from a separated
-   *                       thread)
-   * @param eventExecutor  Event executor to deliver the events to the event
-   *                       handler.
-   * @param <PAYLOAD>    The type of the event payload.
-   * @param <EVENT_TYPE> The type of the event identifier.
-   */
-  public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(
-      EVENT_TYPE event, EventHandler<PAYLOAD> handler,
-      EventExecutor<PAYLOAD> eventExecutor) {
-    validateEvent(event);
-    String executorName = getExecutorName(event, handler.getClass().getName());
-    Preconditions.checkState(executorName != eventExecutor.getName(),
-        "Event Executor name is not matching the specified format. " +
-            "It should be " + executorName + " but it is " +
-            eventExecutor.getName());
-    this.addHandler(event, eventExecutor, handler);
-  }
-
-  /**
    * Return executor name for the given event and handler name.
    * @param event
    * @param handlerName
@@ -148,7 +123,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
    * Add event handler with custom executor.
    *
    * @param event        Triggering event.
-   * @param executor     The executor imlementation to deliver events from a
+   * @param executor     The executor implementation to deliver events from a
    *                     separated threads. Please keep in your mind that
    *                     registering metrics is the responsibility of the
    *                     caller.
@@ -165,6 +140,11 @@ public class EventQueue implements EventPublisher, AutoCloseable {
       return;
     }
     validateEvent(event);
+    String executorName = getExecutorName(event, handler.getClass().getName());
+    Preconditions.checkState(executorName != executor.getName(),
+        "Event Executor name is not matching the specified format. " +
+            "It should be " + executorName + " but it is " +
+            executor.getName());
     executors.putIfAbsent(event, new HashMap<>());
     executors.get(event).putIfAbsent(executor, new ArrayList<>());
 
