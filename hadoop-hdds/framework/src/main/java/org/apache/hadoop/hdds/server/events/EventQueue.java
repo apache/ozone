@@ -88,7 +88,8 @@ public class EventQueue implements EventPublisher, AutoCloseable {
    * @param eventHandler
    * @return executor name
    */
-  public static String getExecutorName(Event event, EventHandler eventHandler) {
+  public static <PAYLOAD> String getExecutorName(Event<PAYLOAD> event,
+      EventHandler<PAYLOAD> eventHandler) {
     return StringUtils.camelize(event.getName()) + EXECUTOR_NAME_SEPARATOR
         + generateHandlerName(eventHandler);
   }
@@ -101,7 +102,8 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   }
 
-  private static <PAYLOAD> String generateHandlerName(EventHandler<PAYLOAD> handler) {
+  private static <PAYLOAD> String generateHandlerName(
+      EventHandler<PAYLOAD> handler) {
     if (!handler.getClass().isAnonymousClass()) {
       return handler.getClass().getSimpleName();
     } else {
