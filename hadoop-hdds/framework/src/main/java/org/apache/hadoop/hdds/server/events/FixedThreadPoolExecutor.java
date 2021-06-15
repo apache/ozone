@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.server.events;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +59,9 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
   @Metric
   private MutableCounterLong failed;
 
+  @Metric
+  private MutableCounterLong scheduled;
+
   /**
    * Create SingleThreadExecutor.
    *
@@ -73,7 +76,7 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
 
     OzoneConfiguration configuration = new OzoneConfiguration();
     int threadPoolSize = configuration.getInt(
-        OZONE_SCM_EVENT_PREFIX + eventName + ".thread.pool.size",
+        OZONE_SCM_EVENT_PREFIX + StringUtils.camelize(eventName) + ".thread.pool.size",
         OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
 
     executor = Executors.newFixedThreadPool(threadPoolSize, runnable -> {
@@ -88,6 +91,7 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
       publisher) {
     queued.incr();
     executor.execute(() -> {
+      scheduled.incr();
       try {
         handler.onMessage(message, publisher);
         done.incr();
@@ -111,6 +115,11 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
   @Override
   public long queuedEvents() {
     return queued.value();
+  }
+
+  @Override
+  public long scheduledEvents() {
+    return scheduled.value();
   }
 
   @Override
