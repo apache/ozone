@@ -90,8 +90,21 @@ public class TestEventQueue {
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);
 
+    EventExecutor eventExecutor =
+        queue.getExecutorAndHandler(EVENT1).keySet().iterator().next();
+
+    // As it is fixed threadpool executor with 10 threads, all should be
+    // scheduled.
+    Assert.assertEquals(10, eventExecutor.queuedEvents());
+
+    // As we don't see all 10 events scheduled.
+    Assert.assertTrue(eventExecutor.scheduledEvents() > 1 &&
+        eventExecutor.scheduledEvents() <= 10);
+
     queue.processAll(60000);
     Assert.assertEquals(110, result.intValue());
+
+    Assert.assertEquals(10, eventExecutor.successfulEvents());
     result.set(0);
 
   }
@@ -100,7 +113,7 @@ public class TestEventQueue {
     @Override
     public void onMessage(Object payload, EventPublisher publisher) {
       try {
-        Thread.sleep(1000);
+        Thread.sleep(2000);
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
       }

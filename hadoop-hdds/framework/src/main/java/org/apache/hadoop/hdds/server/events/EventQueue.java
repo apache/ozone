@@ -285,4 +285,11 @@ public class EventQueue implements EventPublisher, AutoCloseable {
   public void setSilent(boolean silent) {
     isSilent = silent;
   }
+
+
+  @VisibleForTesting
+  public Map<EventExecutor, List<EventHandler>> getExecutorAndHandler(
+      Event event) {
+    return executors.get(event);
+  }
 }
