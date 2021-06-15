@@ -126,7 +126,7 @@ public final class OzoneAclUtil {
   public static boolean checkAclRights(List<OzoneAcl> acls,
       RequestContext context) throws OMException {
     String[] userGroups = context.getClientUgi().getGroupNames();
-    String userName = context.getClientUgi().getUserName();
+    String userName = context.getClientUgi().getShortUserName();
     ACLType aclToCheck = context.getAclRights();
     for (OzoneAcl acl : acls) {
       if (checkAccessInAcl(acl, userGroups, userName, aclToCheck)) {
