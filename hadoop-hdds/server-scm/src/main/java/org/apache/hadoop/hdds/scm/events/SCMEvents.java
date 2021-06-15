@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CRLStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -193,6 +194,15 @@ public final class SCMEvents {
 
   public static final TypedEvent<SafeModeStatus> SAFE_MODE_STATUS =
       new TypedEvent<>(SafeModeStatus.class, "Safe mode status");
+
+  /**
+   * A CRL status report will be sent by datanodes. This report is received
+   * and processed by SCMDatanodeHeartbeatDispatcher.
+   */
+  public static final TypedEvent<CRLStatusReportFromDatanode>
+      CRL_STATUS_REPORT =
+      new TypedEvent<>(CRLStatusReportFromDatanode.class,
+          "Crl_Status_Report");
 
   /**
    * Private Ctor. Never Constructed.

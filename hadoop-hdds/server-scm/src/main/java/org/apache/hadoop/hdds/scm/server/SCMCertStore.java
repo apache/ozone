@@ -27,9 +27,11 @@ import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Date;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,6 +39,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -67,11 +70,13 @@ public final class SCMCertStore implements CertificateStore {
   private SCMMetadataStore scmMetadataStore;
   private final Lock lock;
   private AtomicLong crlSequenceId;
+  private HashMap<UUID, CRLStatus> crlStatusMap;
 
   private SCMCertStore(SCMMetadataStore dbStore, long sequenceId) {
     this.scmMetadataStore = dbStore;
     lock = new ReentrantLock();
     crlSequenceId = new AtomicLong(sequenceId);
+    crlStatusMap = new HashMap<>();
   }
 
   @Override
@@ -362,5 +367,15 @@ public final class SCMCertStore implements CertificateStore {
   @Override
   public long getLatestCrlId() {
     return crlSequenceId.get();
+  }
+
+  @Override
+  public CRLStatus getCRLStatusForDN(UUID uuid) {
+    return crlStatusMap.get(uuid);
+  }
+
+  @Override
+  public void setCRLStatusForDN(UUID uuid, CRLStatus crlStatus) {
+    crlStatusMap.put(uuid, crlStatus);
   }
 }
