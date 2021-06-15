@@ -24,22 +24,26 @@ import org.junit.Test;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Testing the basic functionality of the event queue.
  */
 public class TestEventQueue {
 
-  private static final Event<Long> EVENT1 =
+  private static final Event< Long > EVENT1 =
       new TypedEvent<>(Long.class, "SCM_EVENT1");
-  private static final Event<Long> EVENT2 =
+  private static final Event< Long > EVENT2 =
       new TypedEvent<>(Long.class, "SCM_EVENT2");
 
-  private static final Event<Long> EVENT3 =
+  private static final Event< Long > EVENT3 =
       new TypedEvent<>(Long.class, "SCM_EVENT3");
-  private static final Event<Long> EVENT4 =
+  private static final Event< Long > EVENT4 =
       new TypedEvent<>(Long.class, "SCM_EVENT4");
 
   private EventQueue queue;
+
+  private AtomicLong result = new AtomicLong();
 
   @Before
   public void startEventQueue() {
@@ -64,6 +68,44 @@ public class TestEventQueue {
     queue.processAll(1000);
     Assert.assertEquals(11, result[0]);
 
+  }
+
+  @Test
+  public void simpleEventWithFixedThreadPoolExecutor() {
+
+    TestHandler testHandler = new TestHandler();
+
+    queue.addHandler(EVENT1, new FixedThreadPoolExecutor<>(EVENT1.getName(),
+            EventQueue.getExecutorName(EVENT1,
+                testHandler.getClass().getName())), testHandler);
+
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+
+    queue.processAll(60000);
+    Assert.assertEquals(110, result.intValue());
+    result.set(0);
+
+  }
+
+  public class TestHandler implements EventHandler {
+    @Override
+    public void onMessage(Object payload, EventPublisher publisher) {
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+      }
+      result.getAndAdd((long) payload);
+    }
   }
 
   @Test
