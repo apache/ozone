@@ -85,10 +85,9 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
         command.setTerm(scmContext.getTermOfLeader());
         command.setEncodedToken(getContainerToken(containerID));
 
-        getNodes(container).forEach(node -> {
-          publisher.fireEvent(DATANODE_COMMAND,
-                  new CommandForDatanode<>(node.getUuid(), command));
-        });
+        getNodes(container).forEach(node ->
+            publisher.fireEvent(DATANODE_COMMAND,
+                new CommandForDatanode<>(node.getUuid(), command)));
       } else {
         LOG.warn("Cannot close container {}, which is in {} state.",
             containerID, container.getState());
