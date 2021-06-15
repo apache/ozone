@@ -563,7 +563,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())
         .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
+            .fromProto(keyInfo.getType(), keyInfo.getFactor(),
+                keyInfo.getEcReplicationConfig()))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
