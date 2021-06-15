@@ -140,7 +140,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     }
     validateEvent(event);
     String executorName = getExecutorName(event, handler.getClass().getName());
-    Preconditions.checkState(executorName != executor.getName(),
+    Preconditions.checkState(executorName.equals(executor.getName()),
         "Event Executor name is not matching the specified format. " +
             "It should be " + executorName + " but it is " +
             executor.getName());
