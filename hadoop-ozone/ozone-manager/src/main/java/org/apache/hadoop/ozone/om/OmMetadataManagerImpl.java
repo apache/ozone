@@ -185,6 +185,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       DELEGATION_TOKEN_TABLE,
       PREFIX_TABLE,
       TRANSACTION_INFO_TABLE,
+      DIRECTORY_TABLE,
+      FILE_TABLE,
+      DELETED_DIR_TABLE,
+      OPEN_FILE_TABLE,
       META_TABLE
   };
 
