@@ -85,9 +85,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
       EVENT_TYPE event, EventHandler<PAYLOAD> handler, String handlerName) {
     validateEvent(event);
     Preconditions.checkNotNull(handler, "Handler name should not be null.");
-    String executorName =
-        StringUtils.camelize(event.getName()) + EXECUTOR_NAME_SEPARATOR
-            + handlerName;
+    String executorName = getExecutorName(event, handlerName);
     this.addHandler(event, new SingleThreadExecutor<>(executorName), handler);
   }
 
@@ -139,7 +137,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
       return;
     }
     validateEvent(event);
-    String executorName = getExecutorName(event, handler.getClass().getName());
+    String executorName = getExecutorName(event, generateHandlerName(handler));
     Preconditions.checkState(executorName.equals(executor.getName()),
         "Event Executor name is not matching the specified format. " +
             "It should be " + executorName + " but it is " +
