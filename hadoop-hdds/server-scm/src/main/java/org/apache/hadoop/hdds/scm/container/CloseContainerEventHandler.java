@@ -87,9 +87,8 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
 
         getNodes(container).forEach(node -> {
           publisher.fireEvent(DATANODE_COMMAND,
-                new CommandForDatanode<>(node.getUuid(), command));
+                  new CommandForDatanode<>(node.getUuid(), command));
         });
-
       } else {
         LOG.warn("Cannot close container {}, which is in {} state.",
             containerID, container.getState());

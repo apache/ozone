@@ -118,7 +118,7 @@ public class NodeEndpoint {
           int openContainerPerPipeline =
                   reconContainerManager.getPipelineToOpenContainer()
                   .getOrDefault(pipelineID, 0);
-          openContainers.set(openContainers.get() + openContainerPerPipeline);
+          openContainers.getAndAdd(openContainerPerPipeline);
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
               pipelineID.getId(), hostname, ex);

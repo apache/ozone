@@ -72,7 +72,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
   // Pipeline -> open containers
-  private Map<PipelineID, Integer> pipelineToOpenContainer;
+  private final Map<PipelineID, Integer> pipelineToOpenContainer;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -211,7 +211,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
               pipelineManager.getPipeline(containerInfo.getPipelineID());
       // subtract open container count from the pipeline
       int curCnt = pipelineToOpenContainer.getOrDefault(pipeline.getId(), 0);
-      if (curCnt > 0) {
+      if (curCnt == 1) {
+        pipelineToOpenContainer.remove(pipeline.getId());
+      } else if (curCnt > 0) {
         pipelineToOpenContainer.put(pipeline.getId(), curCnt - 1);
       }
       updateContainerState(containerID, FINALIZE);
