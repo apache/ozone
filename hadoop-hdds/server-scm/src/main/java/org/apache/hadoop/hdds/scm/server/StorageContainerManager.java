@@ -415,8 +415,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT,
         new FixedThreadPoolExecutor(SCMEvents.CONTAINER_REPORT.getName(),
             EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
-                containerReportHandler.getClass().getName())),
-        containerReportHandler);
+                containerReportHandler)), containerReportHandler);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
         incrementalContainerReportHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);

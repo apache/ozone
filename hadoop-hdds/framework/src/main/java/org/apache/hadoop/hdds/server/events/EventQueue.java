@@ -62,11 +62,6 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private boolean isSilent = false;
 
-  public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(
-      EVENT_TYPE event, EventHandler<PAYLOAD> handler) {
-    this.addHandler(event, handler, generateHandlerName(handler));
-  }
-
   /**
    * Add new handler to the event queue.
    * <p>
@@ -76,28 +71,26 @@ public class EventQueue implements EventPublisher, AutoCloseable {
    * @param event        Triggering event.
    * @param handler      Handler of event (will be called from a separated
    *                     thread)
-   * @param handlerName  The name of handler (should be unique together with
-   *                     the event name)
    * @param <PAYLOAD>    The type of the event payload.
    * @param <EVENT_TYPE> The type of the event identifier.
    */
   public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(
-      EVENT_TYPE event, EventHandler<PAYLOAD> handler, String handlerName) {
+      EVENT_TYPE event, EventHandler<PAYLOAD> handler) {
+    Preconditions.checkNotNull(handler, "Handler should not be null.");
     validateEvent(event);
-    Preconditions.checkNotNull(handler, "Handler name should not be null.");
-    String executorName = getExecutorName(event, handlerName);
+    String executorName = getExecutorName(event, handler);
     this.addHandler(event, new SingleThreadExecutor<>(executorName), handler);
   }
 
   /**
    * Return executor name for the given event and handler name.
    * @param event
-   * @param handlerName
+   * @param eventHandler
    * @return executor name
    */
-  public static String getExecutorName(Event event, String handlerName) {
+  public static String getExecutorName(Event event, EventHandler eventHandler) {
     return StringUtils.camelize(event.getName()) + EXECUTOR_NAME_SEPARATOR
-        + handlerName;
+        + generateHandlerName(eventHandler);
   }
 
   private <EVENT_TYPE extends Event<?>> void validateEvent(EVENT_TYPE event) {
@@ -108,7 +101,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   }
 
-  private <PAYLOAD> String generateHandlerName(EventHandler<PAYLOAD> handler) {
+  private static <PAYLOAD> String generateHandlerName(EventHandler<PAYLOAD> handler) {
     if (!handler.getClass().isAnonymousClass()) {
       return handler.getClass().getSimpleName();
     } else {
@@ -137,7 +130,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
       return;
     }
     validateEvent(event);
-    String executorName = getExecutorName(event, generateHandlerName(handler));
+    String executorName = getExecutorName(event, handler);
     Preconditions.checkState(executorName.equals(executor.getName()),
         "Event Executor name is not matching the specified format. " +
             "It should be " + executorName + " but it is " +

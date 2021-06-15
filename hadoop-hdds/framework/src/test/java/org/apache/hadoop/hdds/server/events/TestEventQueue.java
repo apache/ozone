@@ -76,8 +76,7 @@ public class TestEventQueue {
     TestHandler testHandler = new TestHandler();
 
     queue.addHandler(EVENT1, new FixedThreadPoolExecutor<>(EVENT1.getName(),
-            EventQueue.getExecutorName(EVENT1,
-                testHandler.getClass().getName())), testHandler);
+            EventQueue.getExecutorName(EVENT1, testHandler)), testHandler);
 
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);
