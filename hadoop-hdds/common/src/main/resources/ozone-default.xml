@@ -2901,4 +2901,13 @@
       directory deleting service per time interval.
     </description>
   </property>
+
+
+  <property>
+    <name>ozone.scm.event.ContainerReport.thread.pool.size</name>
+    <value>10</value>
+    <tag>OZONE, SCM</tag>
+    <description>Thread pool size configured to process container reports.
+    </description>
+  </property>
 </configuration>

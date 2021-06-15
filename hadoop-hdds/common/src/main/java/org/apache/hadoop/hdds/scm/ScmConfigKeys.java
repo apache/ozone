@@ -532,7 +532,7 @@ public final class ScmConfigKeys {
   public static String OZONE_SCM_EVENT_PREFIX = "ozone.scm.event.";
 
   public static final String OZONE_SCM_EVENT_CONTAINER_REPORT_THREAD_POOL_SIZE =
-      OZONE_SCM_EVENT_PREFIX + "Container_Report.thread.pool.size";
+      OZONE_SCM_EVENT_PREFIX + "ContainerReport.thread.pool.size";
   public static final int OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT = 10;
 
   /**
