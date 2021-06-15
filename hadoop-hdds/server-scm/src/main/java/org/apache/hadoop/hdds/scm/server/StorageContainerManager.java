@@ -376,7 +376,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, conf);
     CRLStatusReportHandler crlStatusReportHandler =
-        new CRLStatusReportHandler(certificateStore);
+        new CRLStatusReportHandler(certificateStore, conf);
 
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);

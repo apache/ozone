@@ -44,6 +44,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+
 /**
  * Test for the CRL Status Report Handler.
  */
@@ -63,6 +65,7 @@ public class TestCRLStatusReportHandler implements EventPublisher {
 
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempDir.newFolder().getAbsolutePath());
+    config.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
 
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
@@ -71,7 +74,8 @@ public class TestCRLStatusReportHandler implements EventPublisher {
         .setRatisServer(null)
         .setMetadaStore(scmMetadataStore)
         .build();
-    crlStatusReportHandler = new CRLStatusReportHandler(certificateStore);
+    crlStatusReportHandler =
+        new CRLStatusReportHandler(certificateStore, config);
   }
 
   @Test
