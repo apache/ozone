@@ -184,7 +184,7 @@ public class TestHddsVolume {
     // so, other = max((500 - 290 - 300, 0) = 0
     // actual other = 10(system usage)
     // A = 500 - 100 - 300 = 100, B = 290 - max((100 - 0), 0) = 190
-    SpaceUsageSource spaceUsage = fixed(500, 450, 300);
+    SpaceUsageSource spaceUsage = fixed(500, 290, 300);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
     volumeBuilder.usageCheckFactory(factory);
