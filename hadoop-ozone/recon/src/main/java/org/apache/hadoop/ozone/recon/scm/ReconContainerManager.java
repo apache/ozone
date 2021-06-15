@@ -71,7 +71,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final Table<UUID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
-  // Pipeline -> open containers
+  // Pipeline -> # of open containers
   private final Map<PipelineID, Integer> pipelineToOpenContainer;
 
   /**
