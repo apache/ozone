@@ -28,6 +28,8 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 
+import static java.util.Collections.emptyMap;
+
 /**
  * A Java proxy invocation handler to trace all the methods of the delegate
  * class.
@@ -48,11 +50,12 @@ public class TraceAllMethod<T> implements InvocationHandler {
   public TraceAllMethod(T delegate, String name) {
     this.delegate = delegate;
     this.name = name;
-    for (Method method : delegate.getClass().getDeclaredMethods()) {
-      if (!methods.containsKey(method.getName())) {
-        methods.put(method.getName(), new HashMap<>());
+    for (Method method : delegate.getClass().getMethods()) {
+      if (method.getDeclaringClass().equals(Object.class)) {
+        continue;
       }
-      methods.get(method.getName()).put(method.getParameterTypes(), method);
+      methods.computeIfAbsent(method.getName(), any -> new HashMap<>())
+        .put(method.getParameterTypes(), method);
     }
   }
 
@@ -84,8 +87,8 @@ public class TraceAllMethod<T> implements InvocationHandler {
   }
 
   private Method findDelegatedMethod(Method method) {
-    for (Entry<Class<?>[], Method> entry : methods.get(method.getName())
-        .entrySet()) {
+    for (Entry<Class<?>[], Method> entry : methods.getOrDefault(
+        method.getName(), emptyMap()).entrySet()) {
       if (Arrays.equals(entry.getKey(), method.getParameterTypes())) {
         return entry.getValue();
       }
