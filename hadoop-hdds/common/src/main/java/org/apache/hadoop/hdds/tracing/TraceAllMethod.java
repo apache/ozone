@@ -55,7 +55,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
         continue;
       }
       methods.computeIfAbsent(method.getName(), any -> new HashMap<>())
-        .put(method.getParameterTypes(), method);
+          .put(method.getParameterTypes(), method);
     }
   }
 

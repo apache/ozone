@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.tracing;
 
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -38,12 +37,16 @@ public class TestTraceAllMethod {
 
   @Test
   public void testDefaultMethod() throws Throwable {
-    TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), "service");
+    TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(),
+        "service");
 
     assertEquals("Hello default", subject.invoke(null,
         ServiceImpl.class.getMethod("defaultMethod"), new Object[]{}));
   }
 
+  /**
+   * Example interface for testing {@link TraceAllMethod}.
+   */
   public interface Service {
     default String defaultMethod() {
       return otherMethod("default");
@@ -52,6 +55,9 @@ public class TestTraceAllMethod {
     String otherMethod(String name);
   }
 
+  /**
+   * Example implementation class for testing {@link TraceAllMethod}.
+   */
   public static class ServiceImpl implements Service {
 
     @Override
