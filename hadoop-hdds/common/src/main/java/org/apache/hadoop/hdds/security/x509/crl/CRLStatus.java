@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.security.x509.crl;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
 import java.util.List;
@@ -80,7 +81,7 @@ public class CRLStatus {
   public String toString() {
     return "CRLStatus{" +
         ", receivedCRLId=" + receivedCRLId +
-        ", pendingCRLIds=" + pendingCRLIds +
+        ", pendingCRLIds=" + StringUtils.join(pendingCRLIds, ",") +
         '}';
   }
 }
