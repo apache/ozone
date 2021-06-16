@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.hdds.client;
 
-import com.google.re2j.Matcher;
-import com.google.re2j.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Replication configuration for EC replication.
@@ -34,6 +34,8 @@ public class ECReplicationConfig implements ReplicationConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(ECReplicationConfig.class);
 
+  private final static Pattern STRING_FORMAT = Pattern.compile("(\\d+)-(\\d+)");
+  
   private int data;
 
   private int parity;
@@ -44,8 +46,7 @@ public class ECReplicationConfig implements ReplicationConfig {
   }
 
   public ECReplicationConfig(String string) {
-    final Pattern pattern = Pattern.compile("(\\d+)-(\\d+)");
-    final Matcher matcher = pattern.matcher(string);
+    final Matcher matcher = STRING_FORMAT.matcher(string);
     if (!matcher.matches()) {
       throw new IllegalArgumentException("EC replication config should be " +
           "defined in the form 3-2, 6-3 or 10-4");
