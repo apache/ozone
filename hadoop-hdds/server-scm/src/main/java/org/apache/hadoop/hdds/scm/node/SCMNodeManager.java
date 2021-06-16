@@ -384,6 +384,7 @@ public class SCMNodeManager implements NodeManager {
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
         LOG.info("Registered Data node : {}", datanodeDetails);
+        scmNodeEventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
       } catch (NodeAlreadyExistsException e) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Datanode is already registered. Datanode: {}",

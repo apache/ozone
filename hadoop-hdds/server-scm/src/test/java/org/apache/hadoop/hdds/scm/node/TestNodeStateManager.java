@@ -177,7 +177,6 @@ public class TestNodeStateManager {
 
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn, defaultLayoutVersionProto());
-    assertEquals(SCMEvents.NEW_NODE, eventPublisher.getLastEvent());
     DatanodeInfo dni = nsm.getNode(dn);
     dni.updateLastHeartbeatTime();
 

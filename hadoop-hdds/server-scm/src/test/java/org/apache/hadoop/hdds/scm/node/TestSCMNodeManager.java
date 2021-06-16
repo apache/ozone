@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -436,33 +435,34 @@ public class TestSCMNodeManager {
 
     RatisReplicationConfig replConfig = new RatisReplicationConfig(factor);
 
-    LambdaTestUtils.await(10000, 1000, () -> {
-      // Make sure that none of these pipelines use nodes outside of allowedDNs.
+    // Wait for the expected number of pipelines using allowed DNs.
+    GenericTestUtils.waitFor(() -> {
       List<Pipeline> pipelines = scm.getPipelineManager()
           .getPipelines(replConfig);
+      LOG.info("Found {} pipelines of type {} and factor {}.", pipelines.size(),
+          replConfig.getReplicationType(), replConfig.getReplicationFactor());
+      boolean success = countCheck.test(pipelines.size());
 
-      for (Pipeline pipeline: pipelines) {
-        for(DatanodeDetails pipelineDN: pipeline.getNodes()) {
-          // Do not wait for this condition to be true. Unhealthy DNs should
-          // never be used.
-          if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
-            String message = String.format("Pipeline %s used datanode %s " +
-                "which is not in the set of allowed datanodes: %s",
-                pipeline.getId().toString(), pipelineDN.getUuidString(),
-                allowedDnIds.toString());
-
-            Assert.fail(message);
+      // If we have the correct number of pipelines, make sure that none of
+      // these pipelines use nodes outside of allowedDNs.
+      if (success) {
+        for (Pipeline pipeline: pipelines) {
+          for(DatanodeDetails pipelineDN: pipeline.getNodes()) {
+            // Do not wait for this condition to be true. Disallowed DNs should
+            // never be used once we have the expected number of pipelines.
+            if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
+              String message = String.format("Pipeline %s used datanode %s " +
+                      "which is not in the set of allowed datanodes: %s",
+                  pipeline.getId().toString(), pipelineDN.getUuidString(),
+                  allowedDnIds.toString());
+              Assert.fail(message);
+            }
           }
         }
       }
 
-      // Wait for the expected number of pipelines using allowed DNs.
-      String message = String.format("Found %d pipelines of type %s" +
-          " and factor %s.", pipelines.size(),
-          replConfig.getReplicationType(), replConfig.getReplicationFactor());
-      LOG.info(message);
-      return countCheck.test(pipelines.size());
-    });
+      return success;
+    }, 1000, 10000);
   }
 
   /**
