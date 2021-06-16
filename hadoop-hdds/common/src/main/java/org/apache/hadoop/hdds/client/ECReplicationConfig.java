@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  */
 public class ECReplicationConfig implements ReplicationConfig {
   
-  private final static Pattern STRING_FORMAT = Pattern.compile("(\\d+)-(\\d+)");
+  private static final Pattern STRING_FORMAT = Pattern.compile("(\\d+)-(\\d+)");
   
   private int data;
 
