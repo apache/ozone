@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
 
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
