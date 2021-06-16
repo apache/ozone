@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.dn;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -26,7 +27,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.debug.DatanodeLayout;
 import org.junit.Before;
 import org.junit.After;
@@ -107,7 +107,7 @@ public class TestDatanodeLayoutUpgradeTool {
 
     List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
     OzoneConfiguration c1 = dns.get(0).getConf();
-    Collection<String> paths = MutableVolumeSet.getDatanodeStorageDirs(c1);
+    Collection<String> paths = HddsServerUtil.getDatanodeStorageDirs(c1);
 
     for (String p : paths) {
       // Verify that tool is able to verify the storage path

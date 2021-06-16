@@ -685,6 +685,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // default max retry timeout set to 30s
       scmClientConfig.setMaxRetryTimeout(30 * 1000);
       conf.setFromObject(scmClientConfig);
+      // In this way safemode exit will happen only when atleast we have one
+      // pipeline.
+      conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
+          numOfDatanodes >=3 ? 3 : 1);
       configureTrace();
     }
 
@@ -733,6 +737,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        scmStore.setSCMHAFlag(true);
+        scmStore.persistCurrentState();
         SCMRatisServerImpl.initialize(clusterId, scmId.get(),
             SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
       }

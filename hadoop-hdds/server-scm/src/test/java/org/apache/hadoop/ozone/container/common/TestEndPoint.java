@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -195,8 +196,8 @@ public class TestEndPoint {
       newState = versionTask.call();
       Assert.assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN,
           newState);
-      List<HddsVolume> volumesList = ozoneContainer.getVolumeSet()
-          .getFailedVolumesList();
+      List<HddsVolume> volumesList = StorageVolumeUtil.getHddsVolumesList(
+          ozoneContainer.getVolumeSet().getFailedVolumesList());
       Assert.assertTrue(volumesList.size() == 1);
       Assert.assertTrue(logCapturer.getOutput()
           .contains("org.apache.hadoop.ozone.common" +

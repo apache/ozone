@@ -38,11 +38,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -85,7 +87,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     OzoneConfiguration conf = createOzoneConfiguration();
 
     final Collection<String> datanodeStorageDirs =
-        MutableVolumeSet.getDatanodeStorageDirs(conf);
+        HddsServerUtil.getDatanodeStorageDirs(conf);
 
     for (String dir : datanodeStorageDirs) {
       checkDestinationDirectory(dir);
@@ -172,7 +174,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
-        null);
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
 
