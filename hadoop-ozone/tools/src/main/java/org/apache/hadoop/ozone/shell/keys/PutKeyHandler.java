@@ -28,7 +28,6 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -99,8 +98,7 @@ public class PutKeyHandler extends KeyHandler {
     }
 
     ReplicationConfig replicationConfig =
-        getConf().getObject(ReplicationConfigValidator.class).validate(
-            ReplicationConfig.fromTypeAndString(replicationType, replication));
+        ReplicationConfig.fromTypeAndString(replicationType, replication);
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
