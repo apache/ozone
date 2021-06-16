@@ -114,7 +114,7 @@ public class TestContainerBalancerSubCommand {
   public void testContainerBalancerStartSubcommandWhenBalancerIsNotRunning()
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startContainerBalancer(0, 0, 0, 0))
+    Mockito.when(scmClient.startContainerBalancer(null, null, null, null))
         .thenAnswer(invocation -> true);
     startCmd.execute(scmClient);
 
@@ -128,7 +128,7 @@ public class TestContainerBalancerSubCommand {
   public void testContainerBalancerStartSubcommandWhenBalancerIsRunning()
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startContainerBalancer(0, 0, 0, 0))
+    Mockito.when(scmClient.startContainerBalancer(null, null, null, null))
         .thenAnswer(invocation -> false);
     startCmd.execute(scmClient);
 

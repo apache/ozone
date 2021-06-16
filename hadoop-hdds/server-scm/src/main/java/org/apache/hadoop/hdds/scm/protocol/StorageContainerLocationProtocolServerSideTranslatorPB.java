@@ -103,6 +103,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
@@ -641,22 +642,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StartContainerBalancerResponseProto startContainerBalancer(
       StartContainerBalancerRequestProto request)
       throws IOException {
-    double threshold = 0.0D;
-    int idleiterations = -1;
-    int maxDatanodesToBalance = 0;
-    long maxSizeToMoveInGB = 0L;
+    Optional<Double> threshold = Optional.empty();
+    Optional<Integer> idleiterations = Optional.empty();
+    Optional<Integer> maxDatanodesToBalance = Optional.empty();
+    Optional<Long> maxSizeToMoveInGB = Optional.empty();
 
     if(request.hasThreshold()) {
-      threshold = request.getThreshold();
+      threshold = Optional.of(request.getThreshold());
     }
     if(request.hasIdleiterations()) {
-      idleiterations = request.getIdleiterations();
+      idleiterations = Optional.of(request.getIdleiterations());
     }
     if(request.hasMaxDatanodesToBalance()) {
-      maxDatanodesToBalance = request.getMaxDatanodesToBalance();
+      maxDatanodesToBalance = Optional.of(request.getMaxDatanodesToBalance());
     }
     if(request.hasMaxSizeToMoveInGB()) {
-      maxSizeToMoveInGB = request.getMaxSizeToMoveInGB();
+      maxSizeToMoveInGB = Optional.of(request.getMaxSizeToMoveInGB());
     }
 
     return StartContainerBalancerResponseProto.newBuilder().

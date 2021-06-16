@@ -22,6 +22,7 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -81,6 +82,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Collections;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -670,35 +672,39 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public boolean startContainerBalancer(double threshold, int idleiterations,
-       int maxDatanodesToBalance, long maxSizeToMoveInGB) throws IOException {
+  public boolean startContainerBalancer(Optional<Double> threshold,
+                  Optional<Integer> idleiterations,
+                  Optional<Integer> maxDatanodesToBalance,
+                  Optional<Long> maxSizeToMoveInGB) throws IOException{
     getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_CONTAINER_BALANCER, null));
     ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
 
-    if (threshold > 0) {
-      cbc.setThreshold(threshold);
+    if (threshold.isPresent()) {
+      double tsd = threshold.get();
+      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
+          "threshold should to be specified in range [0.0, 1.0).");
+      cbc.setThreshold(tsd);
     }
-    if (maxDatanodesToBalance > 0) {
-      cbc.setMaxDatanodesToBalance(maxDatanodesToBalance);
+    if (maxSizeToMoveInGB.isPresent()) {
+      long mstm = maxSizeToMoveInGB.get();
+      Preconditions.checkState(mstm > 0,
+          "maxSizeToMoveInGB must be positive.");
+      cbc.setMaxSizeToMoveInGB(mstm * OzoneConsts.GB);
     }
-    if (maxSizeToMoveInGB > 0) {
-      cbc.setMaxSizeToMoveInGB(maxSizeToMoveInGB * OzoneConsts.GB);
+    if (maxDatanodesToBalance.isPresent()) {
+      int mdtb = maxDatanodesToBalance.get();
+      Preconditions.checkState(mdtb > 0,
+          "maxDatanodesToBalance must be positive.");
+      cbc.setMaxDatanodesToBalance(mdtb);
     }
-    if (0 == idleiterations || idleiterations < -1) {
-      //startBalancer maybe trigger by an alternative method to cli,
-      //so for the sake of robustness, we should judge the input
-      //idleiterations at server side.
-      LOG.error("idleiterations should not be 0 or smaller than -1.");
-      throw new IllegalArgumentException(
-          "Invalid values for idleiterations: " + idleiterations);
-    }
-    if (idleiterations > 0) {
-      cbc.setIdleIteration(idleiterations);
-    } else {
-      // run balancer infinitely
-      cbc.setIdleIteration(Integer.MAX_VALUE);
+    if (idleiterations.isPresent()) {
+      int idi = idleiterations.get();
+      Preconditions.checkState(idi > 0 || idi == -1,
+          "maxDatanodesToBalance must be positive or" +
+              " -1(infinitly run container balancer).");
+      cbc.setIdleIteration(idi);
     }
     return scm.getContainerBalancer().start(cbc);
   }

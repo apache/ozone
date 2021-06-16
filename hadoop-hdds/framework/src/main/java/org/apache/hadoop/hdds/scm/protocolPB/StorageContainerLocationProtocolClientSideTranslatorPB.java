@@ -96,6 +96,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
@@ -718,36 +719,39 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean startContainerBalancer(double threshold, int idleiterations,
-         int maxDatanodesToBalance, long maxSizeToMoveInGB) throws IOException {
-    Preconditions.checkState(threshold >= 0.0D && threshold < 1.0D,
-        "threshold should to be specified in range [0.0, 1.0).");
-    Preconditions.checkState(maxSizeToMoveInGB >= 0,
-        "maxSizeToMoveInGB cannot be negative.");
-    Preconditions.checkState(maxDatanodesToBalance >= 0,
-        "maxDatanodesToBalance cannot be negative.");
-    Preconditions.checkState(idleiterations > -2,
-        "idleiterations cannot be smaller than -1.");
-
+  public boolean startContainerBalancer(Optional<Double> threshold,
+                  Optional<Integer> idleiterations,
+                  Optional<Integer> maxDatanodesToBalance,
+                  Optional<Long> maxSizeToMoveInGB) throws IOException{
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
 
     //make balancer configuration optional
-    if (threshold > 0) {
-      builder.setThreshold(threshold);
+    if (threshold.isPresent()) {
+      double tsd = threshold.get();
+      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
+          "threshold should to be specified in range [0.0, 1.0).");
+      builder.setThreshold(tsd);
     }
-    if (maxSizeToMoveInGB > 0) {
-      builder.setMaxSizeToMoveInGB(maxSizeToMoveInGB);
+    if (maxSizeToMoveInGB.isPresent()) {
+      long mstm = maxSizeToMoveInGB.get();
+      Preconditions.checkState(mstm > 0,
+          "maxSizeToMoveInGB must be positive.");
+      builder.setMaxSizeToMoveInGB(mstm);
     }
-    if (maxDatanodesToBalance > 0) {
-      builder.setMaxDatanodesToBalance(maxDatanodesToBalance);
+    if (maxDatanodesToBalance.isPresent()) {
+      int mdtb = maxDatanodesToBalance.get();
+      Preconditions.checkState(mdtb > 0,
+          "maxDatanodesToBalance must be positive.");
+      builder.setMaxDatanodesToBalance(mdtb);
     }
-    if (idleiterations == 0) {
-      throw new IllegalArgumentException(
-          "Invalid values for idleiterations: " + idleiterations);
-    } else {
-      builder.setIdleiterations(idleiterations);
+    if (idleiterations.isPresent()) {
+      int idi = idleiterations.get();
+      Preconditions.checkState(idi > 0 || idi == -1,
+          "maxDatanodesToBalance must be positive or" +
+              " -1(infinitly run container balancer).");
+      builder.setIdleiterations(idi);
     }
 
     StartContainerBalancerRequestProto request = builder.build();

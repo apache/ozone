@@ -30,6 +30,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import java.util.Optional;
+
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -75,8 +77,13 @@ public class TestContainerBalancerOperations {
     // test normally start and stop
     boolean running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);
+    Optional<Double> threshold = Optional.of(0.1);
+    Optional<Integer> idleiterations = Optional.of(10000);
+    Optional<Integer> maxDatanodesToBalance = Optional.of(1);
+    Optional<Long> maxSizeToMoveInGB = Optional.of(1L);
 
-    containerBalancerClient.startContainerBalancer(0.1, 1, 1, 1);
+    containerBalancerClient.startContainerBalancer(threshold, idleiterations,
+        maxDatanodesToBalance, maxSizeToMoveInGB);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -91,7 +98,8 @@ public class TestContainerBalancerOperations {
     assertFalse(running);
 
     // test normally start , and stop it before balance is completed
-    containerBalancerClient.startContainerBalancer(0.1, 10000, 1, 1);
+    containerBalancerClient.startContainerBalancer(threshold, idleiterations,
+        maxDatanodesToBalance, maxSizeToMoveInGB);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 

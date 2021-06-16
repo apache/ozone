@@ -23,6 +23,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  * Handler to start container balancer.
@@ -36,20 +37,20 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Option(names = {"-t", "--threshold"},
       description = "Threshold target whether the cluster is balanced")
-  private double threshold;
+  private Optional<Double> threshold;
 
   @Option(names = {"-i", "--idleiterations"},
       description = "Maximum consecutive idle iterations")
-  private int idleiterations;
+  private Optional<Integer> idleiterations;
 
   @Option(names = {"-d", "--maxDatanodesToBalance"},
       description = "Maximum datanodes to move")
-  private int maxDatanodesToBalance;
+  private Optional<Integer> maxDatanodesToBalance;
 
   @Option(names = {"-s", "--maxSizeToMoveInGB"},
       description = "Maximum size to move in GB, " +
           "for 10GB it should be set as 10")
-  private long maxSizeToMoveInGB;
+  private Optional<Long> maxSizeToMoveInGB;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
