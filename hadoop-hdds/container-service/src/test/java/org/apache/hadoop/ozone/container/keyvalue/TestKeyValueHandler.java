@@ -46,10 +46,12 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
 
@@ -263,9 +265,10 @@ public class TestKeyValueHandler {
     File path = GenericTestUtils.getRandomizedTestDir();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
+    conf.set(OZONE_METADATA_DIRS, path.getAbsolutePath());
     MutableVolumeSet
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
-        null);
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
       ContainerSet cset = new ContainerSet();
       int[] interval = new int[1];

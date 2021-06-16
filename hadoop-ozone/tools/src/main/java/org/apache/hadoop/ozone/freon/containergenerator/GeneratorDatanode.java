@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
@@ -131,7 +133,7 @@ public class GeneratorDatanode extends BaseGenerator {
         .createChunkManager(config, blockManager, null);
 
     final Collection<String> storageDirs =
-        MutableVolumeSet.getDatanodeStorageDirs(config);
+        HddsServerUtil.getDatanodeStorageDirs(config);
 
     String firstStorageDir =
         StorageLocation.parse(storageDirs.iterator().next())
@@ -159,7 +161,8 @@ public class GeneratorDatanode extends BaseGenerator {
     datanodeId = HddsVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
 
-    volumeSet = new MutableVolumeSet(datanodeId, clusterId, config, null);
+    volumeSet = new MutableVolumeSet(datanodeId, clusterId, config, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
 
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
 
