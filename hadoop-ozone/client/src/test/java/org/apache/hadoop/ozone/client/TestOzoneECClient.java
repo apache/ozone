@@ -146,7 +146,8 @@ public class TestOzoneECClient {
       Assert.assertEquals(1, datanodeStorage.getAllBlockData().size());
       ByteString content =
           datanodeStorage.getAllBlockData().values().iterator().next();
-      Assert.assertEquals(new String(inputChunks[i]), content.toStringUtf8());
+      Assert.assertEquals(new String(inputChunks[i], UTF_8),
+          content.toStringUtf8());
     }
   }
 
@@ -190,7 +191,7 @@ public class TestOzoneECClient {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[1000];
       Assert.assertEquals(inputChunks[0].length, is.read(fileContent));
-      Assert.assertEquals(new String(inputChunks[0]),
+      Assert.assertEquals(new String(inputChunks[0], UTF_8),
           new String(fileContent, UTF_8));
     }
 
