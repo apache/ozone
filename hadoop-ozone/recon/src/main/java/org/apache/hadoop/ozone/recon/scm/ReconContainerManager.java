@@ -236,8 +236,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
-        Pipeline pipeline = containerWithPipeline.getPipeline();
-        PipelineID pipelineID = pipeline.getId();
+        PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
         if (pipelineManager.containsPipeline(pipelineID)) {
           getContainerStateManager().addContainer(containerInfo.getProtobuf());
           pipelineManager.addContainerToPipeline(
