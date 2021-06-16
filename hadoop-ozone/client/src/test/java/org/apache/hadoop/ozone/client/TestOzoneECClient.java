@@ -121,7 +121,7 @@ public class TestOzoneECClient {
     for (int i = 1; i <= total; i++) {
       builder.append(singleDigitNumber);
     }
-    return builder.toString().getBytes();
+    return builder.toString().getBytes(UTF_8);
   }
 
   @After
@@ -175,7 +175,8 @@ public class TestOzoneECClient {
       Assert.assertEquals(1, datanodeStorage.getAllBlockData().size());
       ByteString content =
           datanodeStorage.getAllBlockData().values().iterator().next();
-      Assert.assertEquals(new String(parityBuffers[i - dataBlocks].array()),
+      Assert.assertEquals(
+          new String(parityBuffers[i - dataBlocks].array(), UTF_8),
           content.toStringUtf8());
     }
 
@@ -201,7 +202,7 @@ public class TestOzoneECClient {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[1000];
       Assert.assertEquals(inputChunks[1].length, is.read(fileContent));
-      Assert.assertEquals(new String(inputChunks[1]),
+      Assert.assertEquals(new String(inputChunks[1], UTF_8),
           new String(fileContent, UTF_8));
     }
 
@@ -209,7 +210,7 @@ public class TestOzoneECClient {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[1000];
       Assert.assertEquals(inputChunks[2].length, is.read(fileContent));
-      Assert.assertEquals(new String(inputChunks[2]),
+      Assert.assertEquals(new String(inputChunks[2], UTF_8),
           new String(fileContent, UTF_8));
     }
   }

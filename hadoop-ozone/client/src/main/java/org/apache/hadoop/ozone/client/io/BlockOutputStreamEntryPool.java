@@ -195,7 +195,7 @@ public class BlockOutputStreamEntryPool {
   }
 
   public List<OmKeyLocationInfo> getLocationInfoList() {
-    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    List<OmKeyLocationInfo> locationInfoList;
     List<OmKeyLocationInfo> currBlocksLocationInfoList =
         getOmKeyLocationInfos(streamEntries);
     if (isEC) {

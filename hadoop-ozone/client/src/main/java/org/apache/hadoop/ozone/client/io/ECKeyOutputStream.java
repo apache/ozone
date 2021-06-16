@@ -22,16 +22,12 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -44,7 +40,6 @@ import org.apache.hadoop.io.erasurecode.ECSchema;
 import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
 import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
 import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -59,29 +54,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Maintaining a list of BlockInputStream. Write based on offset.
- * <p>
- * Note that this may write to multiple containers in one write call. In case
- * that first container succeeded but later ones failed, the succeeded writes
- * are not rolled back.
- * <p>
- * TODO : currently not support multi-thread access.
+ * ECKeyOutputStream handles the EC writes by writing the data into underlying
+ * block output streams chunk by chunk.
  */
 public class ECKeyOutputStream extends KeyOutputStream {
-
   private OzoneClientConfig config;
-  private CellBuffers ecChunkBufferCache;
+  private ECChunkBuffers ecChunkBufferCache;
   private int cellSize = 1000;
   private int numDataBlks = 3;
+  private int numParityBlks = 2;
+  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
   private final RawErasureEncoder encoder;
-  private long currentBlockGroupLen = 0;
   // TODO: EC: Currently using the below EC Schema. This has to be modified and
   //  created dynamically once OM return the configured scheme details.
-  private ECSchema schema = new ECSchema("rs", 3, 2);
+  private static final String DEFAULT_CODEC_NAME = "rs";
+  private ECSchema schema =
+      new ECSchema(DEFAULT_CODEC_NAME, numDataBlks, numParityBlks);
   private ErasureCodecOptions options = new ErasureCodecOptions(schema);
   private RSErasureCodec codec =
       new RSErasureCodec(new Configuration(), options);
 
+  private long currentBlockGroupLen = 0;
   /**
    * Defines stream action while calling handleFlushOrClose.
    */
@@ -104,23 +97,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
   // not succeed
   private boolean isException;
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
-
-  /**
-   * A constructor for testing purpose only.
-   */
-  @VisibleForTesting
-  public ECKeyOutputStream() {
-    closed = false;
-    this.retryPolicyMap = HddsClientUtils.getExceptionList().stream().collect(
-        Collectors
-            .toMap(Function.identity(), e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
-    retryCount = 0;
-    offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool();
-    encoder = CodecUtil.createRawEncoder(new Configuration(),
-        SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
-        codec.getCoderOptions());
-  }
 
   @VisibleForTesting
   public List<BlockOutputStreamEntry> getStreamEntries() {
@@ -148,7 +124,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
       int chunkSize, String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion) {
-    ecChunkBufferCache = new CellBuffers(2, cellSize, 5, numDataBlks);
+    ecChunkBufferCache =
+        new ECChunkBuffers(cellSize, numDataBlks, numParityBlks);
     this.config = config;
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
@@ -197,11 +174,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   /**
-   * Try to write the bytes sequence b[off:off+len) to streams.
-   * <p>
-   * NOTE: Throws exception if the data could not fit into the remaining space.
-   * In which case nothing will be written.
-   * TODO:May need to revisit this behaviour.
+   * Try to write the bytes sequence b[off:off+len) to underlying EC block
+   * streams.
    *
    * @param b   byte data
    * @param off starting offset
@@ -272,11 +246,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   void writeParityCells() throws IOException {
     final ByteBuffer[] buffers = ecChunkBufferCache.getBuffers();
-    // Skips encoding and writing parity cells if there are no healthy parity
-    // data streamers
-    //if (!checkAnyParityStreamerIsHealthy()) {
-    //return;
-    //}
     //encode the data cells
     for (int i = 0; i < numDataBlks; i++) {
       buffers[i].flip();
@@ -540,7 +509,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   /**
-   * Builder class of KeyOutputStream.
+   * Builder class of ECKeyOutputStream.
    */
   public static class Builder {
     private OpenKeySession openHandler;
@@ -548,8 +517,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     private OzoneManagerProtocol omClient;
     private int chunkSize;
     private String requestID;
-    private ReplicationType type;
-    private ReplicationFactor factor;
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
@@ -589,16 +556,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
     public Builder setRequestID(String id) {
       this.requestID = id;
-      return this;
-    }
-
-    public Builder setType(ReplicationType replicationType) {
-      this.type = replicationType;
-      return this;
-    }
-
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
       return this;
     }
 
@@ -644,18 +601,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  class CellBuffers {
+  private static class ECChunkBuffers {
     private final ByteBuffer[] buffers;
-    private final int numAllBlocks;
-    private final int numDataBlks;
+    private final int dataBlks;
+    private final int parityBlks;
+    private final int totalBlks;
     private int cellSize;
 
-    CellBuffers(int numParityBlocks, int cellSize, int numAllBlocks,
-        int numDataBlks) {
+    ECChunkBuffers(int cellSize, int numData, int numParity) {
       this.cellSize = cellSize;
-      this.numAllBlocks = numAllBlocks;
-      this.numDataBlks = numDataBlks;
-      buffers = new ByteBuffer[numAllBlocks];
+      this.parityBlks = numParity;
+      this.dataBlks = numData;
+      this.totalBlks = this.dataBlks + this.parityBlks;
+      buffers = new ByteBuffer[this.totalBlks];
       for (int i = 0; i < buffers.length; i++) {
         buffers[i] = BUFFER_POOL.getBuffer(false, cellSize);
         buffers[i].limit(cellSize);
@@ -675,14 +633,14 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     private void clear() {
-      for (int i = 0; i < numAllBlocks; i++) {
+      for (int i = 0; i < this.totalBlks; i++) {
         buffers[i].clear();
         buffers[i].limit(cellSize);
       }
     }
 
     private void release() {
-      for (int i = 0; i < numAllBlocks; i++) {
+      for (int i = 0; i < this.totalBlks; i++) {
         if (buffers[i] != null) {
           BUFFER_POOL.putBuffer(buffers[i]);
           buffers[i] = null;
@@ -691,17 +649,15 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     private void flipDataBuffers() {
-      for (int i = 0; i < numDataBlks; i++) {
+      for (int i = 0; i < this.totalBlks; i++) {
         buffers[i].flip();
       }
     }
 
     private void flipAllDataBuffers() {
-      for (int i = 0; i < numAllBlocks; i++) {
+      for (int i = 0; i < this.totalBlks; i++) {
         buffers[i].flip();
       }
     }
   }
-
-  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
 }
