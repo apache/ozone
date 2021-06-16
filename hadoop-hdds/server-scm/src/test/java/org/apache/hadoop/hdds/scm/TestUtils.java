@@ -438,6 +438,8 @@ public final class TestUtils {
 
   /**
    * Create CRL Status report object.
+   * @param pendingCRLIds List of Pending CRL Ids in the report.
+   * @param receivedCRLId Latest received CRL Id in the report.
    * @return {@link CRLStatusReport}
    */
   public static CRLStatusReport createCRLStatusReport(

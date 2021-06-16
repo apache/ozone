@@ -27,11 +27,12 @@ import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Date;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -69,14 +70,14 @@ public final class SCMCertStore implements CertificateStore {
       LoggerFactory.getLogger(SCMCertStore.class);
   private SCMMetadataStore scmMetadataStore;
   private final Lock lock;
-  private AtomicLong crlSequenceId;
-  private HashMap<UUID, CRLStatus> crlStatusMap;
+  private final AtomicLong crlSequenceId;
+  private final Map<UUID, CRLStatus> crlStatusMap;
 
   private SCMCertStore(SCMMetadataStore dbStore, long sequenceId) {
     this.scmMetadataStore = dbStore;
     lock = new ReentrantLock();
     crlSequenceId = new AtomicLong(sequenceId);
-    crlStatusMap = new HashMap<>();
+    crlStatusMap = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -299,7 +300,7 @@ public final class SCMCertStore implements CertificateStore {
   /**
    * Reinitialise the underlying store with SCMMetaStore
    * during SCM StateMachine reload.
-   * @param metadataStore
+   * @param metadataStore SCMMetadataStore
    */
   @Override
   public void reinitialize(SCMMetadataStore metadataStore) {

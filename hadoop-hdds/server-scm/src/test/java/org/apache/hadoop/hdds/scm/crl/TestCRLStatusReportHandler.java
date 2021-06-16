@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSto
 import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -55,6 +56,7 @@ public class TestCRLStatusReportHandler implements EventPublisher {
       .getLogger(TestCRLStatusReportHandler.class);
   private CRLStatusReportHandler crlStatusReportHandler;
   private CertificateStore certificateStore;
+  private SCMMetadataStore scmMetadataStore;
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
@@ -69,13 +71,21 @@ public class TestCRLStatusReportHandler implements EventPublisher {
 
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
-    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
+    scmMetadataStore = new SCMMetadataStoreImpl(config);
     certificateStore = new SCMCertStore.Builder()
         .setRatisServer(null)
         .setMetadaStore(scmMetadataStore)
         .build();
     crlStatusReportHandler =
         new CRLStatusReportHandler(certificateStore, config);
+  }
+
+  @After
+  public void destroyDbStore() throws Exception {
+    if (scmMetadataStore.getStore() != null) {
+      scmMetadataStore.getStore().close();
+      scmMetadataStore = null;
+    }
   }
 
   @Test
