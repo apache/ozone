@@ -19,8 +19,6 @@
 package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -30,10 +28,7 @@ import java.util.regex.Pattern;
  * Replication configuration for EC replication.
  */
 public class ECReplicationConfig implements ReplicationConfig {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ECReplicationConfig.class);
-
+  
   private final static Pattern STRING_FORMAT = Pattern.compile("(\\d+)-(\\d+)");
   
   private int data;
@@ -58,13 +53,6 @@ public class ECReplicationConfig implements ReplicationConfig {
       throw new IllegalArgumentException("Data and parity part in EC " +
           "replication config supposed to be positive numbers");
     }
-    if ((data == 3 && parity == 2)
-        || (data == 6 && parity == 3)
-        || (data == 10 && parity == 4)) {
-      return;
-    }
-    LOG.warn("We recommend to use EC 3-2, 6-3 or 10-4. Other combinations " +
-        "are not tested");
   }
 
   public ECReplicationConfig(
