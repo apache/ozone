@@ -207,14 +207,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
         && isHealthy(state)) {
       LOG.info("Container {} has state OPEN, but given state is {}.",
           containerID, state);
-      Pipeline pipeline =
-              pipelineManager.getPipeline(containerInfo.getPipelineID());
-      // subtract open container count from the pipeline
-      int curCnt = pipelineToOpenContainer.getOrDefault(pipeline.getId(), 0);
+      final PipelineID pipelineID = containerInfo.getPipelineID();
+      // subtract open container count from the map
+      int curCnt = pipelineToOpenContainer.getOrDefault(pipelineID, 0);
       if (curCnt == 1) {
-        pipelineToOpenContainer.remove(pipeline.getId());
+        pipelineToOpenContainer.remove(pipelineID);
       } else if (curCnt > 0) {
-        pipelineToOpenContainer.put(pipeline.getId(), curCnt - 1);
+        pipelineToOpenContainer.put(pipelineID, curCnt - 1);
       }
       updateContainerState(containerID, FINALIZE);
     }
