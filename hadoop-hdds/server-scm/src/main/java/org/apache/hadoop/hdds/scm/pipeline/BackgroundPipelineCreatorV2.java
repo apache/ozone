@@ -254,7 +254,7 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
     try {
       // 1) SCMContext#isLeader returns true.
       // 2) not in safe mode or createPipelineInSafeMode is true
-      if (scmContext.isLeader() &&
+      if (scmContext.isLeaderReady() &&
           (!scmContext.isInSafeMode() || createPipelineInSafeMode)) {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {

@@ -41,7 +41,9 @@ public class TestSCMContext {
 
     // become leader
     scmContext.updateLeaderAndTerm(true, 10);
+    scmContext.setLeaderReady();
     assertTrue(scmContext.isLeader());
+    assertTrue(scmContext.isLeaderReady());
     try {
       assertEquals(scmContext.getTermOfLeader(), 10);
     } catch (NotLeaderException e) {
@@ -51,6 +53,7 @@ public class TestSCMContext {
     // step down
     scmContext.updateLeaderAndTerm(false, 0);
     assertFalse(scmContext.isLeader());
+    assertFalse(scmContext.isLeaderReady());
   }
 
   @Test
