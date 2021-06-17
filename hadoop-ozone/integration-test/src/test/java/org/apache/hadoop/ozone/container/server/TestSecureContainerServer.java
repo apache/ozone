@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGr
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
@@ -72,6 +73,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.HddsUtils.isReadOnly;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -168,7 +170,9 @@ public class TestSecureContainerServer {
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(TEST_DIR, "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
-    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null);
+    conf.set(OZONE_METADATA_DIRS, TEST_DIR);
+    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);

@@ -54,6 +54,9 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -64,6 +67,7 @@ import com.google.common.collect.Maps;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 
+import org.apache.hadoop.util.Timer;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +85,8 @@ public class OzoneContainer {
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource config;
   private final MutableVolumeSet volumeSet;
+  private final MutableVolumeSet metaVolumeSet;
+  private final StorageVolumeChecker volumeChecker;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
@@ -115,9 +121,14 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
+    this.volumeChecker = getVolumeChecker(conf);
+
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
-        context);
+        context, VolumeType.DATA_VOLUME, volumeChecker);
     volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
+    metaVolumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+        context, VolumeType.META_VOLUME, volumeChecker);
+
     containerSet = new ContainerSet();
     metadataScanner = null;
 
@@ -194,14 +205,12 @@ public class OzoneContainer {
     return tlsClientConfig;
   }
 
-
-
   /**
    * Build's container map.
    */
   public static void buildContainerSet(MutableVolumeSet volumeSet,
         ContainerSet containerSet, ConfigurationSource config) {
-    Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
+    Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
     long startTime = System.currentTimeMillis();
@@ -209,9 +218,9 @@ public class OzoneContainer {
     //TODO: diskchecker should be run before this, to see how disks are.
     // And also handle disk failure tolerance need to be added
     while (volumeSetIterator.hasNext()) {
-      HddsVolume volume = volumeSetIterator.next();
-      Thread thread = new Thread(new ContainerReader(volumeSet, volume,
-          containerSet, config));
+      StorageVolume volume = volumeSetIterator.next();
+      Thread thread = new Thread(new ContainerReader(volumeSet,
+          (HddsVolume) volume, containerSet, config));
       thread.start();
       volumeThreads.add(thread);
     }
@@ -246,8 +255,9 @@ public class OzoneContainer {
       this.metadataScanner.start();
 
       dataScanners = new ArrayList<>();
-      for (HddsVolume v : volumeSet.getVolumesList()) {
-        ContainerDataScanner s = new ContainerDataScanner(c, controller, v);
+      for (StorageVolume v : volumeSet.getVolumesList()) {
+        ContainerDataScanner s = new ContainerDataScanner(c, controller,
+            (HddsVolume) v);
         s.start();
         dataScanners.add(s);
       }
@@ -320,7 +330,9 @@ public class OzoneContainer {
     readChannel.stop();
     this.handlers.values().forEach(Handler::stop);
     hddsDispatcher.shutdown();
+    volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
     volumeSet.shutdown();
+    metaVolumeSet.shutdown();
     blockDeletingService.shutdown();
     ContainerMetrics.remove();
   }
@@ -373,11 +385,11 @@ public class OzoneContainer {
     for (int i = 0; i < reports.length; i++) {
       nrb.addStorageReport(reports[i].getProtoBufMessage());
     }
-    List<StorageContainerDatanodeProtocolProtos.
-            MetadataStorageReportProto> metadataReport =
-            writeChannel.getStorageReport();
-    if (metadataReport != null) {
-      nrb.addAllMetadataStorageReport(metadataReport);
+
+    StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();
+    for (int i = 0; i < metaReports.length; i++) {
+      nrb.addMetadataStorageReport(
+          metaReports[i].getMetadataProtoBufMessage());
     }
     return nrb.build();
   }
@@ -389,6 +401,15 @@ public class OzoneContainer {
 
   public MutableVolumeSet getVolumeSet() {
     return volumeSet;
+  }
+
+  public MutableVolumeSet getMetaVolumeSet() {
+    return metaVolumeSet;
+  }
+
+  @VisibleForTesting
+  StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
+    return new StorageVolumeChecker(conf, new Timer());
   }
 
 }
