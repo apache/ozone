@@ -19,7 +19,6 @@
  */
 package org.apache.hadoop.ozone.dn.volume;
 
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.junit.After;
@@ -51,10 +51,10 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
@@ -93,14 +93,12 @@ public class TestDatanodeHddsVolumeFailureDetection {
     // keep the cache size = 1, so we could trigger io exception on
     // reading on-disk db instance
     ozoneConfig.setInt(OZONE_CONTAINER_CACHE_SIZE, 1);
-    // shorten the gap between successive checks to ease tests
-    ozoneConfig.setTimeDuration(
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY, 5,
-        TimeUnit.SECONDS);
     // set tolerated = 1
+    // shorten the gap between successive checks to ease tests
     DatanodeConfiguration dnConf =
         ozoneConfig.getObject(DatanodeConfiguration.class);
-    dnConf.setFailedVolumesTolerated(1);
+    dnConf.setFailedDataVolumesTolerated(1);
+    dnConf.setDiskCheckMinGap(Duration.ofSeconds(5));
     ozoneConfig.setFromObject(dnConf);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
@@ -150,8 +148,10 @@ public class TestDatanodeHddsVolumeFailureDetection {
     HddsDatanodeService dn = datanodes.get(0);
     OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
     MutableVolumeSet volSet = oc.getVolumeSet();
-    HddsVolume vol0 = volSet.getVolumesList().get(0);
-    File clusterDir = DatanodeTestUtils.getHddsVolumeClusterDir(vol0);
+    StorageVolume vol0 = volSet.getVolumesList().get(0);
+    Assert.assertTrue(vol0 instanceof HddsVolume);
+    File clusterDir = DatanodeTestUtils.getHddsVolumeClusterDir(
+        (HddsVolume) vol0);
     File currentDir = new File(clusterDir, Storage.STORAGE_DIR_CURRENT);
     File containerTopDir = new File(currentDir, Storage.CONTAINER_DIR + "0");
     File containerDir = new File(containerTopDir, "1");
@@ -205,7 +205,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     HddsDatanodeService dn = datanodes.get(0);
     OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
     MutableVolumeSet volSet = oc.getVolumeSet();
-    HddsVolume vol0 = volSet.getVolumesList().get(0);
+    StorageVolume vol0 = volSet.getVolumesList().get(0);
     Container c1 = oc.getContainerSet().getContainer(container.
         getContainerInfo().getContainerID());
     File metadataDir = new File(c1.getContainerFile().getParent());
@@ -267,7 +267,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     // simulate bad volume by removing write permission on root dir
     // refer to HddsVolume.check()
     MutableVolumeSet volSet = oc.getVolumeSet();
-    HddsVolume vol0 = volSet.getVolumesList().get(0);
+    StorageVolume vol0 = volSet.getVolumesList().get(0);
     DatanodeTestUtils.simulateBadVolume(vol0);
 
     // read written file to trigger checkVolumeAsync
