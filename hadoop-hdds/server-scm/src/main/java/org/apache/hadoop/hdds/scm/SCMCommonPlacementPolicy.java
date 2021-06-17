@@ -39,8 +39,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT;
 
 /**
  * This policy implements a set of invariants which are common
@@ -175,8 +175,8 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
     long metaSizeRequired = (long) conf.getStorageSize(
-        OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN,
-        OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN_DEFAULT,
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
         StorageUnit.BYTES);
 
     boolean enoughForData = false;

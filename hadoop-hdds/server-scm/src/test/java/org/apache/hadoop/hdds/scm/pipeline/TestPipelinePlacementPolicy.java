@@ -58,7 +58,7 @@ import java.io.IOException;
 
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -205,7 +205,7 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testChooseNodeNotEnoughMetadataSpace() throws SCMException {
     // a huge free space min configured
-    conf.setStorageSize(OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN,
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         500, StorageUnit.TB);
     // a small container size
     conf.set(OZONE_SCM_CONTAINER_SIZE, "100MB");

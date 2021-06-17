@@ -2903,12 +2903,12 @@
   </property>
 
   <property>
-    <name>ozone.scm.datanode.metadata.volume.free-space.min</name>
+    <name>ozone.scm.datanode.ratis.volume.free-space.min</name>
     <value>0MB</value>
     <tag>OZONE, DATANODE</tag>
-    <description>Minimum amount of storage space required for each metadata
+    <description>Minimum amount of storage space required for each ratis
       volume on a datanode to hold a new pipeline.
-      Datanodes with all its metadata volumes with space under this value
+      Datanodes with all its ratis volumes with space under this value
       will not be allocated a pipeline or container replica.
     </description>
   </property>

@@ -41,8 +41,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT;
 
 /**
  * Pipeline placement policy that choose datanodes based on load balancing
@@ -162,8 +162,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         StorageUnit.BYTES);
 
     long metaSizeRequired = (long) conf.getStorageSize(
-        OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN,
-        OZONE_DATANODE_METADATA_VOLUME_FREE_SPACE_MIN_DEFAULT,
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
         StorageUnit.BYTES);
 
     // filter nodes that don't even have space for one container
