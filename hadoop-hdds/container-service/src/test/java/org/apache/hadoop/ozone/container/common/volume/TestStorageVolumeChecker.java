@@ -22,7 +22,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -72,12 +73,12 @@ import static org.mockito.Mockito.*;
 
 
 /**
- * Tests for {@link HddsVolumeChecker}.
+ * Tests for {@link StorageVolumeChecker}.
  */
 @RunWith(Parameterized.class)
-public class TestHddsVolumeChecker {
+public class TestStorageVolumeChecker {
   public static final Logger LOG = LoggerFactory.getLogger(
-      TestHddsVolumeChecker.class);
+      TestStorageVolumeChecker.class);
 
   private static final int NUM_VOLUMES = 2;
 
@@ -99,7 +100,7 @@ public class TestHddsVolumeChecker {
 
   private final ChunkLayOutVersion layout;
 
-  public TestHddsVolumeChecker(VolumeCheckResult result,
+  public TestStorageVolumeChecker(VolumeCheckResult result,
       ChunkLayOutVersion layout) {
     this.expectedVolumeHealth = result;
     this.layout = layout;
@@ -137,7 +138,7 @@ public class TestHddsVolumeChecker {
 
 
   /**
-   * Test {@link HddsVolumeChecker#checkVolume} propagates the
+   * Test {@link StorageVolumeChecker#checkVolume} propagates the
    * check to the delegate checker.
    *
    * @throws Exception
@@ -146,8 +147,8 @@ public class TestHddsVolumeChecker {
   public void testCheckOneVolume() throws Exception {
     LOG.info("Executing {}", testName.getMethodName());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
-    final HddsVolumeChecker checker =
-        new HddsVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+    final StorageVolumeChecker checker =
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
@@ -177,7 +178,7 @@ public class TestHddsVolumeChecker {
   }
 
   /**
-   * Test {@link HddsVolumeChecker#checkAllVolumes} propagates
+   * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
    *
    * @throws Exception
@@ -188,11 +189,12 @@ public class TestHddsVolumeChecker {
 
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
-    final HddsVolumeChecker checker =
-        new HddsVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+    final StorageVolumeChecker checker =
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
     checker.setDelegateChecker(new DummyChecker());
 
-    Set<HddsVolume> failedVolumes = checker.checkAllVolumes(volumes);
+    Set<? extends StorageVolume> failedVolumes =
+        checker.checkAllVolumes(volumes);
     LOG.info("Got back {} failed volumes", failedVolumes.size());
 
     if (expectedVolumeHealth == null || expectedVolumeHealth == FAILED) {
@@ -209,7 +211,7 @@ public class TestHddsVolumeChecker {
 
 
   /**
-   * Test {@link HddsVolumeChecker#checkAllVolumes} propagates
+   * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
    *
    * @throws Exception
@@ -218,9 +220,10 @@ public class TestHddsVolumeChecker {
   public void testVolumeDeletion() throws Exception {
     LOG.info("Executing {}", testName.getMethodName());
 
-    conf.setTimeDuration(
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY, 0,
-        TimeUnit.MILLISECONDS);
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckMinGap(Duration.ofMillis(0));
+    conf.setFromObject(dnConf);
 
     DatanodeDetails datanodeDetails =
         ContainerTestUtils.createDatanodeDetails();
@@ -229,7 +232,7 @@ public class TestHddsVolumeChecker {
     MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
     ContainerSet containerSet = ozoneContainer.getContainerSet();
 
-    HddsVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
+    StorageVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
     volumeChecker.setDelegateChecker(new DummyChecker());
     File volParentDir =
         new File(folder.getRoot(), UUID.randomUUID().toString());
@@ -243,7 +246,8 @@ public class TestHddsVolumeChecker {
         Container container = ContainerTestUtils.getContainer(++i, layout,
             state);
         container.getContainerData()
-            .setVolume(volumeSet.getVolumeMap().get(volRootDir.getPath()));
+            .setVolume((HddsVolume) volumeSet.getVolumeMap()
+                .get(volRootDir.getPath()));
         ((KeyValueContainerData) container.getContainerData())
             .setMetadataPath(volParentDir.getPath());
         containerSet.addContainer(container);

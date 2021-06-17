@@ -178,7 +178,10 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
 
       try {
         synchronized (monitor) {
-          monitor.wait(intervalInMillis);
+          // skip wait if another one-shot run was triggered in the meantime
+          if (!isOneShotRunNeeded()) {
+            monitor.wait(intervalInMillis);
+          }
         }
       } catch (InterruptedException e) {
         LOG.warn("{} is interrupted.", THREAD_NAME);
@@ -308,6 +311,15 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
       return serviceStatus == ServiceStatus.RUNNING && (
           createPipelineInSafeMode ||
           Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis);
+    } finally {
+      serviceLock.unlock();
+    }
+  }
+
+  private boolean isOneShotRunNeeded() {
+    serviceLock.lock();
+    try {
+      return oneShotRun;
     } finally {
       serviceLock.unlock();
     }
