@@ -152,7 +152,7 @@ public class ObjectEndpoint extends EndpointBase {
       @HeaderParam("Content-Length") long length,
       @QueryParam("partNumber")  int partNumber,
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
-      InputStream body) throws IOException, OS3Exception, InterruptedException {
+      InputStream body) throws IOException, OS3Exception {
 
     OzoneOutputStream output = null;
 
@@ -243,7 +243,7 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("uploadId") String uploadId,
       @QueryParam("max-parts") @DefaultValue("1000") int maxParts,
       @QueryParam("part-number-marker") String partNumberMarker,
-      InputStream body) throws IOException, OS3Exception, InterruptedException {
+      InputStream body) throws IOException, OS3Exception {
     try {
 
       if (uploadId != null) {
@@ -356,8 +356,7 @@ public class ObjectEndpoint extends EndpointBase {
   @HEAD
   public Response head(
       @PathParam("bucket") String bucketName,
-      @PathParam("path") String keyPath) throws IOException,
-      OS3Exception, InterruptedException {
+      @PathParam("path") String keyPath) throws IOException, OS3Exception {
 
     OzoneKeyDetails key;
 
@@ -393,7 +392,7 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws OS3Exception
    */
   private Response abortMultipartUpload(String bucket, String key, String
-      uploadId) throws IOException, OS3Exception, InterruptedException {
+      uploadId) throws IOException, OS3Exception {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
       ozoneBucket.abortMultipartUpload(key, uploadId);
@@ -423,7 +422,7 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath,
       @QueryParam("uploadId") @DefaultValue("") String uploadId) throws
-      IOException, OS3Exception, InterruptedException {
+      IOException, OS3Exception {
 
     try {
       if (uploadId != null && !uploadId.equals("")) {
@@ -463,7 +462,7 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("bucket") String bucket,
       @PathParam("path") String key
   )
-      throws IOException, OS3Exception, InterruptedException {
+      throws IOException, OS3Exception {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
@@ -508,7 +507,7 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("path") String key,
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
       CompleteMultipartUploadRequest multipartUploadRequest)
-      throws IOException, OS3Exception, InterruptedException {
+      throws IOException, OS3Exception {
     OzoneBucket ozoneBucket = getBucket(bucket);
     // Using LinkedHashMap to preserve ordering of parts list.
     Map<Integer, String> partsMap = new LinkedHashMap<>();
@@ -569,7 +568,7 @@ public class ObjectEndpoint extends EndpointBase {
   private Response createMultipartKey(String bucket, String key, long length,
                                       int partNumber, String uploadID,
                                       InputStream body)
-      throws IOException, OS3Exception, InterruptedException {
+      throws IOException, OS3Exception {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String copyHeader;
@@ -670,8 +669,7 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws OS3Exception
    */
   private Response listParts(String bucket, String key, String uploadID,
-      int partNumberMarker, int maxParts) throws IOException,
-      OS3Exception, InterruptedException {
+      int partNumberMarker, int maxParts) throws IOException, OS3Exception {
     ListPartsResponse listPartsResponse = new ListPartsResponse();
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
@@ -729,7 +727,7 @@ public class ObjectEndpoint extends EndpointBase {
                                         ReplicationType replicationType,
                                         ReplicationFactor replicationFactor,
                                         boolean storageTypeDefault)
-      throws OS3Exception, IOException, InterruptedException {
+      throws OS3Exception, IOException {
 
     Pair<String, String> result = parseSourceHeader(copyHeader);
 

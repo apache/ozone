@@ -18,27 +18,17 @@
 package org.apache.hadoop.ozone.s3;
 
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
-import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 
-import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD5;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TYPE;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
-import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
-import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
 import static org.junit.Assert.fail;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -60,7 +50,6 @@ public class TestOzoneClientProducer {
   private String amzContentSha256;
   private String date;
   private String contentType;
-  private ContainerRequestContext context;
   private UriInfo uriInfo;
 
   public TestOzoneClientProducer(
@@ -78,11 +67,9 @@ public class TestOzoneClientProducer {
     headerMap = new MultivaluedHashMap<>();
     queryMap = new MultivaluedHashMap<>();
     uriInfo = Mockito.mock(UriInfo.class);
-    context = Mockito.mock(ContainerRequestContext.class);
     OzoneConfiguration config = new OzoneConfiguration();
     config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
     config.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
-    setupContext();
     producer.setOzoneConfiguration(config);
   }
 
@@ -130,30 +117,6 @@ public class TestOzoneClientProducer {
     } catch (Exception ex) {
       Assert.assertTrue(ex instanceof WebApplicationException);
     }
-  }
-
-  private void setupContext() throws Exception {
-    headerMap.putSingle(AUTHORIZATION_HEADER, authHeader);
-    headerMap.putSingle(CONTENT_MD5, contentMd5);
-    headerMap.putSingle(HOST_HEADER, host);
-    headerMap.putSingle(X_AMZ_CONTENT_SHA256, amzContentSha256);
-    headerMap.putSingle(X_AMAZ_DATE, date);
-    headerMap.putSingle(CONTENT_TYPE, contentType);
-
-    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryMap);
-    Mockito.when(uriInfo.getRequestUri()).thenReturn(new URI(""));
-
-    Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
-    Mockito.when(context.getHeaders()).thenReturn(headerMap);
-    Mockito.when(context.getHeaderString(AUTHORIZATION_HEADER))
-        .thenReturn(authHeader);
-    Mockito.when(context.getUriInfo().getQueryParameters())
-        .thenReturn(queryMap);
-
-    AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
-    awsSignatureProcessor.setContext(context);
-
-    producer.setSignatureParser(awsSignatureProcessor);
   }
 
 }

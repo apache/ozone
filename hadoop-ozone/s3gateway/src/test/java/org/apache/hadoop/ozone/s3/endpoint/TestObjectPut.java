@@ -74,8 +74,7 @@ public class TestObjectPut {
   }
 
   @Test
-  public void testPutObject() throws
-      IOException, OS3Exception, InterruptedException {
+  public void testPutObject() throws IOException, OS3Exception {
     //GIVEN
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     ByteArrayInputStream body =
@@ -99,8 +98,7 @@ public class TestObjectPut {
   }
 
   @Test
-  public void testPutObjectWithSignedChunks() throws
-      IOException, OS3Exception, InterruptedException {
+  public void testPutObjectWithSignedChunks() throws IOException, OS3Exception {
     //GIVEN
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     objectEndpoint.setHeaders(headers);
@@ -129,8 +127,7 @@ public class TestObjectPut {
   }
 
   @Test
-  public void testCopyObject() throws
-      IOException, OS3Exception, InterruptedException {
+  public void testCopyObject() throws IOException, OS3Exception {
     // Put object in to source bucket
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     ByteArrayInputStream body =
@@ -221,8 +218,7 @@ public class TestObjectPut {
   }
 
   @Test
-  public void testInvalidStorageType() throws
-      IOException, InterruptedException {
+  public void testInvalidStorageType() throws IOException {
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
@@ -242,8 +238,7 @@ public class TestObjectPut {
   }
 
   @Test
-  public void testEmptyStorageType() throws
-      IOException, OS3Exception, InterruptedException {
+  public void testEmptyStorageType() throws IOException, OS3Exception {
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));

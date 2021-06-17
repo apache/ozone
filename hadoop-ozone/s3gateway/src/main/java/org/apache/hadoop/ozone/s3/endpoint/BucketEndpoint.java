@@ -99,8 +99,7 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("start-after") String startAfter,
       @QueryParam("uploads") String uploads,
       @QueryParam("acl") String aclMarker,
-      @Context HttpHeaders hh) throws
-      OS3Exception, IOException, InterruptedException {
+      @Context HttpHeaders hh) throws OS3Exception, IOException {
 
     if (aclMarker != null) {
       S3BucketAcl result = getAcl(bucketName);
@@ -232,7 +231,7 @@ public class BucketEndpoint extends EndpointBase {
   public Response put(@PathParam("bucket") String bucketName,
       @QueryParam("acl") String aclMarker,
       @Context HttpHeaders httpHeaders,
-      InputStream body) throws IOException, OS3Exception, InterruptedException {
+      InputStream body) throws IOException, OS3Exception {
     if (aclMarker != null) {
       return putAcl(bucketName, httpHeaders, body);
     }
@@ -255,7 +254,7 @@ public class BucketEndpoint extends EndpointBase {
   public Response listMultipartUploads(
       @PathParam("bucket") String bucketName,
       @QueryParam("prefix") String prefix)
-      throws OS3Exception, IOException, InterruptedException {
+      throws OS3Exception, IOException {
 
     OzoneBucket bucket = getBucket(bucketName);
 
@@ -291,7 +290,7 @@ public class BucketEndpoint extends EndpointBase {
    */
   @HEAD
   public Response head(@PathParam("bucket") String bucketName)
-      throws OS3Exception, IOException, InterruptedException {
+      throws OS3Exception, IOException {
     try {
       getBucket(bucketName);
     } catch (OS3Exception ex) {
@@ -309,7 +308,7 @@ public class BucketEndpoint extends EndpointBase {
    */
   @DELETE
   public Response delete(@PathParam("bucket") String bucketName)
-      throws IOException, OS3Exception, InterruptedException {
+      throws IOException, OS3Exception {
 
     try {
       deleteS3Bucket(bucketName);
@@ -343,8 +342,7 @@ public class BucketEndpoint extends EndpointBase {
   @Produces(MediaType.APPLICATION_XML)
   public MultiDeleteResponse multiDelete(@PathParam("bucket") String bucketName,
       @QueryParam("delete") String delete,
-      MultiDeleteRequest request) throws
-      OS3Exception, IOException, InterruptedException {
+      MultiDeleteRequest request) throws OS3Exception, IOException {
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     if (request.getObjects() != null) {
@@ -383,7 +381,7 @@ public class BucketEndpoint extends EndpointBase {
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
    */
   public S3BucketAcl getAcl(String bucketName)
-      throws OS3Exception, IOException, InterruptedException {
+      throws OS3Exception, IOException {
     S3BucketAcl result = new S3BucketAcl();
     try {
       OzoneBucket bucket = getBucket(bucketName);
@@ -427,8 +425,7 @@ public class BucketEndpoint extends EndpointBase {
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
   public Response putAcl(String bucketName, HttpHeaders httpHeaders,
-      InputStream body) throws
-      IOException, OS3Exception, InterruptedException {
+      InputStream body) throws IOException, OS3Exception {
     String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
     String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
     String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);

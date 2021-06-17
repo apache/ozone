@@ -209,7 +209,7 @@ public class TestMultipartUploadWithCopy {
   }
 
   private String initiateMultipartUpload(String key) throws IOException,
-      OS3Exception, InterruptedException {
+      OS3Exception {
     setHeaders();
     Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         key);
@@ -225,7 +225,7 @@ public class TestMultipartUploadWithCopy {
   }
 
   private Part uploadPart(String key, String uploadID, int partNumber, String
-      content) throws IOException, OS3Exception, InterruptedException {
+      content) throws IOException, OS3Exception {
     setHeaders();
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
@@ -241,16 +241,14 @@ public class TestMultipartUploadWithCopy {
   }
 
   private Part uploadPartWithCopy(String key, String uploadID, int partNumber,
-      String keyOrigin, String range) throws
-      IOException, OS3Exception, InterruptedException {
+      String keyOrigin, String range) throws IOException, OS3Exception {
     return uploadPartWithCopy(key, uploadID, partNumber, keyOrigin,
         range, null, null);
   }
 
   private Part uploadPartWithCopy(String key, String uploadID, int partNumber,
       String keyOrigin, String range, String ifModifiedSinceStr,
-      String ifUnmodifiedSinceStr) throws
-      IOException, OS3Exception, InterruptedException {
+      String ifUnmodifiedSinceStr) throws IOException, OS3Exception {
     Map<String, String> additionalHeaders = new HashMap<>();
     additionalHeaders.put(COPY_SOURCE_HEADER, keyOrigin);
     if (range != null) {
@@ -282,8 +280,7 @@ public class TestMultipartUploadWithCopy {
 
   private void completeMultipartUpload(String key,
       CompleteMultipartUploadRequest completeMultipartUploadRequest,
-      String uploadID) throws
-      IOException, OS3Exception, InterruptedException {
+      String uploadID) throws IOException, OS3Exception {
     setHeaders();
     Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
         uploadID, completeMultipartUploadRequest);

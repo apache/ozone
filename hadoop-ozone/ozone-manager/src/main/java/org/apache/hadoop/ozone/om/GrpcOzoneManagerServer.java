@@ -46,10 +46,12 @@ import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.security.UserGroupInformation;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import static org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
+@SuppressFBWarnings("REC_CATCH_EXCEPTION")
 class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerServiceGrpc.class);
@@ -71,6 +73,7 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
   }
 
   @Override
+  @SuppressFBWarnings("DLS_DEAD_LOCAL_STORE")
   public void submitRequest(org.apache.hadoop.ozone.protocol.proto.
                                   OzoneManagerProtocolProtos.
                                   OMRequest request,
@@ -119,7 +122,7 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
                   submitRequest(NULL_RPC_CONTROLLER, request);
             });
       responseObserver.onNext(omResponse);
-    } catch (Exception e) {}
+    } catch (Throwable e) {}
     responseObserver.onCompleted();
   }
 }

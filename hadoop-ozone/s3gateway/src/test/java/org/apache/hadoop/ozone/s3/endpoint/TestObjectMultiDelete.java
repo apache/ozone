@@ -44,8 +44,7 @@ import static java.util.Collections.singleton;
 public class TestObjectMultiDelete {
 
   @Test
-  public void delete() throws
-      IOException, OS3Exception, JAXBException, InterruptedException {
+  public void delete() throws IOException, OS3Exception, JAXBException {
     //GIVEN
     OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
@@ -76,8 +75,7 @@ public class TestObjectMultiDelete {
   }
 
   @Test
-  public void deleteQuiet() throws
-      IOException, OS3Exception, JAXBException, InterruptedException {
+  public void deleteQuiet() throws IOException, OS3Exception, JAXBException {
     //GIVEN
     OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);

@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.protocol.proto
@@ -44,8 +45,7 @@ import io.grpc.netty.NettyChannelBuilder;
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 /**
  * Grpc transport for grpc between s3g and om.
  */
@@ -83,10 +83,11 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   @Override
+  @SuppressFBWarnings("DLS_DEAD_LOCAL_STORE")
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    for (TokenIdentifier tid: UserGroupInformation
-        .getCurrentUser().
+
+    for (TokenIdentifier tid: ugi.
             getTokenIdentifiers()) {
       if (tid instanceof OzoneTokenIdentifier) {
         OzoneTokenIdentifier oti = (OzoneTokenIdentifier)tid;
@@ -96,10 +97,14 @@ public class GrpcOmTransport implements OmTransport {
               .setSignature(oti.getSignature())
               .setStringToSign(oti.getStrToSign())
               .setAwsAccessId(oti.getAwsAccessId())
+              .setUserInfo(OzoneManagerProtocolProtos
+                  .UserInfo.newBuilder()
+                  .setUserName(ugi.getUserName()).build())
               .build();
         }
       }
     }
+    LOG.debug("OMRequest {}", payload);
     return client.submitRequest(payload);
   }
 
@@ -126,11 +131,16 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   public void shutdown() {
+    if (channel == null) {
+      return;
+    }
     channel.shutdown();
     try {
       channel.awaitTermination(5, TimeUnit.SECONDS);
     } catch (Exception e) {
       LOG.error("failed to shutdown OzoneManagerServiceGrpc channel", e);
+    } finally {
+      channel.shutdownNow();
     }
   }
 

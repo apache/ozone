@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.function.Function;
@@ -34,7 +33,6 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Basic helpers for all the REST endpoints.
@@ -44,17 +42,11 @@ public class EndpointBase {
   @Inject
   private OzoneClient client;
 
-  @Inject
-  private UserGroupInformation remoteUser;
-
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
-      throws OS3Exception, IOException, InterruptedException {
+      throws OS3Exception, IOException {
     OzoneBucket bucket;
     try {
-      bucket = remoteUser.doAs(
-          (PrivilegedExceptionAction<OzoneBucket>) () -> {
-          return volume.getBucket(bucketName);
-        });
+      bucket = volume.getBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName);
@@ -66,13 +58,10 @@ public class EndpointBase {
   }
 
   protected OzoneBucket getBucket(String bucketName)
-      throws OS3Exception, IOException, InterruptedException {
+      throws OS3Exception, IOException {
     OzoneBucket bucket;
     try {
-      bucket = remoteUser.doAs(
-          (PrivilegedExceptionAction<OzoneBucket>) () -> {
-            return client.getObjectStore().getS3Bucket(bucketName);
-          });
+      bucket = client.getObjectStore().getS3Bucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
@@ -86,13 +75,10 @@ public class EndpointBase {
     return bucket;
   }
 
-  protected OzoneVolume getVolume() throws IOException, InterruptedException {
+  protected OzoneVolume getVolume() throws IOException {
     String s3VolumeName = HddsClientUtils.getS3VolumeName(
         client.getConfiguration());
-    return remoteUser.doAs(
-        (PrivilegedExceptionAction<OzoneVolume>) () -> {
-          return client.getObjectStore().getVolume(s3VolumeName);
-        });
+    return client.getObjectStore().getVolume(s3VolumeName);
   }
 
   /**
@@ -103,12 +89,9 @@ public class EndpointBase {
    * @throws IOException
    */
   protected String createS3Bucket(String bucketName) throws
-      IOException, OS3Exception, InterruptedException {
+      IOException, OS3Exception {
     try {
-      remoteUser.doAs((PrivilegedExceptionAction<Void>) () -> {
-        client.getObjectStore().createS3Bucket(bucketName);
-        return null;
-      });
+      client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
@@ -127,13 +110,9 @@ public class EndpointBase {
    * @throws  IOException in case the bucket cannot be deleted.
    */
   public void deleteS3Bucket(String s3BucketName)
-      throws IOException, OS3Exception, InterruptedException {
+      throws IOException, OS3Exception {
     try {
-      remoteUser.doAs(
-          (PrivilegedExceptionAction<Void>) () -> {
-            client.getObjectStore().deleteS3Bucket(s3BucketName);
-            return null;
-          });
+      client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
@@ -152,7 +131,7 @@ public class EndpointBase {
    * @return {@code Iterator<OzoneBucket>}
    */
   public Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
-      throws IOException, OS3Exception, InterruptedException {
+      throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix));
   }
 
@@ -167,14 +146,13 @@ public class EndpointBase {
    * @return {@code Iterator<OzoneBucket>}
    */
   public Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
-      String previousBucket) throws IOException,
-      OS3Exception, InterruptedException {
+      String previousBucket) throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket));
   }
 
   private Iterator<? extends OzoneBucket> iterateBuckets(
       Function<OzoneVolume, Iterator<? extends OzoneBucket>> query)
-      throws IOException, OS3Exception, InterruptedException {
+      throws IOException, OS3Exception{
     try {
       return query.apply(getVolume());
     } catch (OMException e) {

@@ -26,26 +26,15 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.PrivilegedExceptionAction;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
-import org.apache.hadoop.ozone.s3.signature.SignatureProcessor;
-import org.apache.hadoop.ozone.s3.signature.StringToSignProducer;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
-import static org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.exception
     .S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception
@@ -56,13 +45,16 @@ import org.slf4j.LoggerFactory;
 
 @ApplicationScoped
 final class OzoneClientCache {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OzoneClientCache.class);
   // single, cached OzoneClient established on first connection
   // for s3g gRPC OmTransport, OmRequest - OmResponse channel
   private static OzoneClientCache instance;
   private OzoneClient client;
 
   private OzoneClientCache(String omServiceID,
-                           OzoneConfiguration ozoneConfiguration) {
+                           OzoneConfiguration
+                               ozoneConfiguration) throws IOException {
     try {
       if (omServiceID == null) {
         client = OzoneClientFactory.getRpcClient(ozoneConfiguration);
@@ -71,12 +63,16 @@ final class OzoneClientCache {
         client = OzoneClientFactory.getRpcClient(omServiceID,
             ozoneConfiguration);
       }
-    } catch (IOException e) {}
+    } catch (IOException e) {
+      LOG.warn("cannot create OzoneClient");
+      throw e;
+    }
   }
 
   public static OzoneClient getOzoneClientInstance(String omServiceID,
                                                    OzoneConfiguration
-                                                       ozoneConfiguration) {
+                                                       ozoneConfiguration)
+      throws IOException {
     if (instance == null) {
       instance = new OzoneClientCache(omServiceID, ozoneConfiguration);
     }
@@ -101,9 +97,6 @@ public class OzoneClientProducer {
   private OzoneClient client;
 
   private UserGroupInformation remoteUser = null;
-
-  @Inject
-  private SignatureProcessor signatureProcessor;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
@@ -136,54 +129,11 @@ public class OzoneClientProducer {
       throws WebApplicationException {
     OzoneClient ozoneClient = null;
     try {
-      SignatureInfo signatureInfo = signatureProcessor.parseSignature();
 
-      String stringToSign = "";
-      if (signatureInfo.getVersion() == Version.V4) {
-        stringToSign =
-            StringToSignProducer.createSignatureBase(signatureInfo, context);
-      }
-
-      String awsAccessId = signatureInfo.getAwsAccessId();
-      validateAccessId(awsAccessId);
-
-      this.remoteUser =
-          UserGroupInformation.createRemoteUser(awsAccessId);
-      if (OzoneSecurityUtil.isSecurityEnabled(config)) {
-        LOG.debug("Creating s3 auth info for client.");
-
-        if (signatureInfo.getVersion() == Version.NONE) {
-          throw MALFORMED_HEADER;
-        }
-
-        OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
-        identifier.setTokenType(S3AUTHINFO);
-        identifier.setStrToSign(stringToSign);
-        identifier.setSignature(signatureInfo.getSignature());
-        identifier.setAwsAccessId(awsAccessId);
-        identifier.setOwner(new Text(awsAccessId));
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Adding token for service:{}", omService);
-        }
-        Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
-            identifier.getSignature().getBytes(StandardCharsets.UTF_8),
-            identifier.getKind(),
-            omService);
-        remoteUser.addToken(token);
-        remoteUser.addTokenIdentifier(identifier);
-
-      }
+      this.remoteUser = UserGroupInformation.getCurrentUser();
       ozoneClient =
-          remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>) () -> {
-            //return OzoneClientCache.getOzoneClientInstance();
-            return OzoneClientCache.getOzoneClientInstance(omServiceID,
-                ozoneConfiguration);
-          });
-    } catch (OS3Exception ex) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", ex);
-      }
-      throw wrapOS3Exception(ex);
+          OzoneClientCache.getOzoneClientInstance(omServiceID,
+              ozoneConfiguration);
     } catch (Throwable t) {
       // For any other critical errors during object creation throw Internal
       // error.
@@ -217,11 +167,6 @@ public class OzoneClientProducer {
 
   public void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
-  }
-
-  @VisibleForTesting
-  public void setSignatureParser(SignatureProcessor awsSignatureProcessor) {
-    this.signatureProcessor = awsSignatureProcessor;
   }
 
   private WebApplicationException wrapOS3Exception(OS3Exception os3Exception) {

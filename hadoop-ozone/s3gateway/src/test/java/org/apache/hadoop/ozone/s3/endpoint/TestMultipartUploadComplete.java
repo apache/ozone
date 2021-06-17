@@ -71,7 +71,7 @@ public class TestMultipartUploadComplete {
   }
 
   private String initiateMultipartUpload(String key) throws IOException,
-      OS3Exception, InterruptedException {
+      OS3Exception {
     Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         key);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
@@ -86,7 +86,7 @@ public class TestMultipartUploadComplete {
   }
 
   private Part uploadPart(String key, String uploadID, int partNumber, String
-      content) throws IOException, OS3Exception, InterruptedException {
+      content) throws IOException, OS3Exception {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
@@ -102,8 +102,7 @@ public class TestMultipartUploadComplete {
 
   private void completeMultipartUpload(String key,
       CompleteMultipartUploadRequest completeMultipartUploadRequest,
-      String uploadID) throws
-      IOException, OS3Exception, InterruptedException {
+      String uploadID) throws IOException, OS3Exception {
     Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
         uploadID, completeMultipartUploadRequest);
 
