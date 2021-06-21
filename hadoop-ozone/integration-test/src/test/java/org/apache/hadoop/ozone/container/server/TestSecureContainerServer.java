@@ -64,7 +64,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.After;

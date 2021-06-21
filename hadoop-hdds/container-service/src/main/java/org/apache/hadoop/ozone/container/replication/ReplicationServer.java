@@ -67,7 +67,7 @@ public class ReplicationServer {
   }
 
   public void start() throws IOException {
-      server.start();
+    server.start();
   }
 
   public void stop() {

@@ -107,16 +107,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long maxSize = containerData.getMaxSize();
     volumeSet.readLock();
     try {
-<<<<<<< HEAD
-
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-          .getVolumesList(), maxSize);
-=======
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           maxSize);
-      String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
->>>>>>> origin/master
 
       long containerID = containerData.getContainerID();
 

@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.function.Supplier;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -32,6 +26,7 @@ import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -40,13 +35,16 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 import org.apache.hadoop.ozone.container.stream.StreamingClient;
-
-import io.netty.channel.Channel;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Supplier;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 
 /**
  * Default replication implementation.
@@ -61,10 +59,10 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
   private final ContainerSet containerSet;
 
-  protected final ConfigurationSource config;
-  protected final Supplier<String> clusterId;
-  protected VolumeChoosingPolicy volumeChoosingPolicy;
-  protected VolumeSet volumeSet;
+  private final ConfigurationSource config;
+  private final Supplier<String> clusterId;
+  private VolumeChoosingPolicy volumeChoosingPolicy;
+  private VolumeSet volumeSet;
 
   public DownloadAndImportReplicator(
       ConfigurationSource config,
@@ -120,7 +118,9 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
       //choose a volume
       final HddsVolume volume = volumeChoosingPolicy
-          .chooseVolume(volumeSet.getVolumesList(), maxContainerSize);
+          .chooseVolume(
+              StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
+              maxContainerSize);
 
       //fill the path fields
       containerData.assignToVolume(clusterId.get(), volume);
@@ -147,7 +147,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         task.setStatus(Status.DONE);
 
       }
-    } catch (Exception ex) {
+    } catch (IOException | RuntimeException ex) {
       LOG.error("Error on replicating container " + containerID, ex);
       task.setStatus(Status.FAILED);
     }
@@ -172,7 +172,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
   }
 
-  private KeyValueContainerData updateContainerData(KeyValueContainerData preCreated)
+  private KeyValueContainerData updateContainerData(
+      KeyValueContainerData preCreated)
       throws IOException {
     try (FileInputStream fis = new FileInputStream(
         preCreated.getContainerFile().toString() + ".original")) {

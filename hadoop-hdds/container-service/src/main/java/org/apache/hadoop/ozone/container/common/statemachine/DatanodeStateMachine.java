@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetN
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.JvmPauseMonitor;
@@ -90,6 +91,7 @@ public class DatanodeStateMachine implements Closeable {
    * constructor in a non-thread-safe way - see HDDS-3116.
    */
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
+  private final MeasuredReplicator replicatorMetrics;
 
   /**
    * Constructs a a datanode state machine.
@@ -134,6 +136,8 @@ public class DatanodeStateMachine implements Closeable {
             container::getClusterId,
             container.getContainerSet(),
             container.getVolumeSet());
+
+    replicatorMetrics = new MeasuredReplicator(replicator);
 
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), replicator,
@@ -469,6 +473,11 @@ public class DatanodeStateMachine implements Closeable {
    */
   public synchronized void stopDaemon() {
     try {
+      try {
+        replicatorMetrics.close();
+      } catch (Exception e) {
+        LOG.error("Couldn't stop replicator metrics", e);
+      }
       supervisor.stop();
       context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);

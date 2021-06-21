@@ -47,7 +47,7 @@ public class StreamingClient implements AutoCloseable {
       String host,
       int port,
       StreamingDestination streamingDestination
-  ) throws InterruptedException {
+  ) {
     this(host, port, streamingDestination, null);
   }
 
@@ -56,7 +56,7 @@ public class StreamingClient implements AutoCloseable {
       int port,
       StreamingDestination streamingDestination,
       SslContext sslContext
-  ) throws InterruptedException {
+  ) {
     this.port = port;
     this.host = host;
 
@@ -93,7 +93,7 @@ public class StreamingClient implements AutoCloseable {
           .await(timeout, unit);
       channel.closeFuture().await(timeout, unit);
       if (!dirstreamClientHandler.isAtTheEnd()) {
-        throw new RuntimeException("Streaming is failed. Not all files " +
+        throw new StreamingException("Streaming is failed. Not all files " +
             "are streamed. Please check the log of the server." +
             " Last (partial?) streamed file: "
             + dirstreamClientHandler.getCurrentFileName());

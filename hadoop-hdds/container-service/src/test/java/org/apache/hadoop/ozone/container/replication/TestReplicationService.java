@@ -1,14 +1,24 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
-
+import com.google.common.base.Supplier;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -17,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
@@ -25,26 +34,30 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
-import org.apache.hadoop.test.GenericTestUtils;
-
-import com.google.common.base.Supplier;
-import com.google.common.collect.Maps;
-import org.apache.commons.io.FileUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Testing end2end replication without datanode.
@@ -99,13 +112,15 @@ public class TestReplicationService {
       int port,
       String destDnUUID,
       Path destDir
-      ) throws IOException {
+  ) throws IOException {
     ContainerSet destinationContainerSet = new ContainerSet();
 
     OzoneConfiguration clientConfig = new OzoneConfiguration();
     clientConfig.set("hdds.datanode.dir", destDir.toString());
-    MutableVolumeSet volumeSet =
-        new MutableVolumeSet(destDnUUID, clientConfig, null);
+
+    final MutableVolumeSet volumeSet = new MutableVolumeSet(
+        destDnUUID, clientConfig, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
 
     DownloadAndImportReplicator replicator = new DownloadAndImportReplicator(
         clientConfig,
@@ -123,8 +138,6 @@ public class TestReplicationService {
     List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
     sourceDatanodes.add(source);
 
-    ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(destinationContainerSet, replicator, 10);
     replicator.replicate(new ReplicationTask(2L, sourceDatanodes));
     return destinationContainerSet;
   }
@@ -139,12 +152,16 @@ public class TestReplicationService {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("hdds.datanode.dir", sourceDir);
 
-    MutableVolumeSet sourceVolumes =
-        new MutableVolumeSet(sourceDnUUID, ozoneConfig, null);
+    final MutableVolumeSet sourceVolumes =
+        new MutableVolumeSet(sourceDnUUID, ozoneConfig, null,
+            StorageVolume.VolumeType.DATA_VOLUME, null);
 
     VolumeChoosingPolicy v = new RoundRobinVolumeChoosingPolicy();
     final HddsVolume volume =
-        v.chooseVolume(sourceVolumes.getVolumesList(), 5L);
+        v.chooseVolume(
+            StorageVolumeUtil.
+                getHddsVolumesList(sourceVolumes.getVolumesList()),
+            5L);
     volume.format(clusterUuid);
 
     KeyValueContainerData kvd = new KeyValueContainerData(2L, "/tmp/asd");
@@ -159,7 +176,7 @@ public class TestReplicationService {
 
     KeyValueHandler handler = new KeyValueHandler(ozoneConfig,
         sourceDnUUID, sourceContainerSet, sourceVolumes,
-        new ContainerMetrics(new int[] {}),
+        new ContainerMetrics(new int[]{}),
         containerReplicaProto -> {
         });
 
@@ -190,16 +207,14 @@ public class TestReplicationService {
     handler.handle(containerCommandRequest, kvc,
         new DispatcherContext.Builder().build());
 
-    HashMap<ContainerType, Handler> handlers = Maps.newHashMap();
-    ContainerController controller =
-        new ContainerController(sourceContainerSet, handlers);
-
     ReplicationConfig replicationConfig = new ReplicationConfig();
     replicationConfig.setPort(0);
 
     SecurityConfig securityConfig = new SecurityConfig(ozoneConfig);
     ReplicationServer replicationServer =
-        new ReplicationServer(sourceContainerSet, replicationConfig, securityConfig,
+        new ReplicationServer(sourceContainerSet,
+            replicationConfig,
+            securityConfig,
             null);
 
     kvd.setState(State.CLOSED);
