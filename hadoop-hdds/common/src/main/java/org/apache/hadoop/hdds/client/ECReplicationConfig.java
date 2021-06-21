@@ -21,12 +21,16 @@ package org.apache.hadoop.hdds.client;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Replication configuration for EC replication.
  */
 public class ECReplicationConfig implements ReplicationConfig {
-
+  
+  private static final Pattern STRING_FORMAT = Pattern.compile("(\\d+)-(\\d+)");
+  
   private int data;
 
   private int parity;
@@ -34,6 +38,21 @@ public class ECReplicationConfig implements ReplicationConfig {
   public ECReplicationConfig(int data, int parity) {
     this.data = data;
     this.parity = parity;
+  }
+
+  public ECReplicationConfig(String string) {
+    final Matcher matcher = STRING_FORMAT.matcher(string);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("EC replication config should be " +
+          "defined in the form 3-2, 6-3 or 10-4");
+    }
+
+    data = Integer.parseInt(matcher.group(1));
+    parity = Integer.parseInt(matcher.group(2));
+    if (data <= 0 || parity <= 0) {
+      throw new IllegalArgumentException("Data and parity part in EC " +
+          "replication config supposed to be positive numbers");
+    }
   }
 
   public ECReplicationConfig(
