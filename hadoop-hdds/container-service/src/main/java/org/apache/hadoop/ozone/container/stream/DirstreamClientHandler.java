@@ -30,6 +30,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ByteProcessor;
 import io.netty.util.ReferenceCountUtil;
 
+import static org.apache.hadoop.ozone.container.stream.DirstreamServerHandler.END_MARKER;
+
 /**
  * Protocol definition from streaming binary files.
  *
@@ -114,6 +116,9 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
     }
   }
 
+  public boolean isAtTheEnd(){
+    return getCurrentFileName().equals(END_MARKER);
+  }
   @Override
   public void channelUnregistered(ChannelHandlerContext ctx) {
     try {

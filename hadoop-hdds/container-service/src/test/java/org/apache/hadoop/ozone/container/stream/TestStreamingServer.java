@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.ozone.container.stream;
 
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -58,7 +62,51 @@ public class TestStreamingServer {
 
   }
 
+  @Test
+  public void ssl() throws Exception {
 
+    SelfSignedCertificate ssc = new SelfSignedCertificate();
+
+    SslContext sslCtxServer =
+        SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey())
+            .build();
+
+    final SslContext sslCtxClient = SslContextBuilder.forClient()
+        .trustManager(InsecureTrustManagerFactory.INSTANCE)
+        .build();
+
+    Path sourceDir = GenericTestUtils.getRandomizedTestDir().toPath();
+    Path destDir = GenericTestUtils.getRandomizedTestDir().toPath();
+    Files.createDirectories(sourceDir.resolve(SUBDIR));
+    Files.createDirectories(destDir.resolve(SUBDIR));
+
+    //GIVEN: generate file
+    Files.write(sourceDir.resolve(SUBDIR).resolve("file1"), CONTENT);
+
+    //WHEN: stream subdir
+    try (StreamingServer server =
+             new StreamingServer(
+                 new DirectoryServerSource(sourceDir), 0,
+                 sslCtxServer)) {
+
+      server.start();
+
+      try (StreamingClient client =
+               new StreamingClient(
+                   "localhost",
+                   server.getPort(),
+                   new DirectoryServerDestination(destDir),
+                   sslCtxClient)) {
+        client.stream(SUBDIR);
+      }
+    }
+
+    //THEN: compare the files
+    final byte[] targetContent = Files
+        .readAllBytes(destDir.resolve(SUBDIR).resolve("file1"));
+    Assert.assertArrayEquals(CONTENT, targetContent);
+
+  }
   @Test(expected = RuntimeException.class)
   public void failedStream() throws Exception {
     Path sourceDir = GenericTestUtils.getRandomizedTestDir().toPath();
