@@ -2904,7 +2904,7 @@
 
   <property>
     <name>ozone.scm.datanode.ratis.volume.free-space.min</name>
-    <value>0MB</value>
+    <value>1GB</value>
     <tag>OZONE, DATANODE</tag>
     <description>Minimum amount of storage space required for each ratis
       volume on a datanode to hold a new pipeline.

@@ -172,7 +172,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     if (canHoldList.size() < nodesRequired) {
       msg = String.format("Pipeline creation failed due to no sufficient" +
-          " healthy datanodes with enough space for container data or " +
+          " healthy datanodes with enough space for container data and " +
           "metadata. Required %d. Found %d. Container data required %d, " +
           "metadata required %d.",
           nodesRequired, canHoldList.size(), sizeRequired, metaSizeRequired);
