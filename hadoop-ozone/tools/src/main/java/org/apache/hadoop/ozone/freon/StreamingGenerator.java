@@ -111,25 +111,20 @@ public class StreamingGenerator extends BaseFreonGenerator
     try (StreamingServer server =
              new StreamingServer(new DirectoryServerSource(sourceDir),
                  1234)) {
-      try {
-        server.start();
-        LOG.info("Starting streaming server on port {} to publish dir {}",
-            port, sourceDir);
 
-        try (StreamingClient client =
-                     new StreamingClient("localhost", port,
-                             new DirectoryServerDestination(
-                                     destinationDir))) {
+      server.start();
+      LOG.info("Starting streaming server on port {} to publish dir {}",
+          port, sourceDir);
 
-          timer.time(() -> client.stream(subdir));
+      try (StreamingClient client =
+               new StreamingClient("localhost", port,
+                   new DirectoryServerDestination(
+                       destinationDir))) {
 
-        }
-        LOG.info("Replication has been finished to {}", sourceDir);
+        timer.time(() -> client.stream(subdir));
 
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
       }
-
+      LOG.info("Replication has been finished to {}", sourceDir);
 
       deleteDirRecursive(sourceDir);
 
