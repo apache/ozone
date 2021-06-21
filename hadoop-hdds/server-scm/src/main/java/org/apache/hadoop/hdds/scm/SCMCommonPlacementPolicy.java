@@ -144,19 +144,26 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
-    List<DatanodeDetails> healthyList = healthyNodes.stream().filter(d ->
+
+    return filterNodesWithSpace(healthyNodes, nodesRequired, sizeRequired);
+  }
+
+  public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,
+      int nodesRequired, long sizeRequired) throws SCMException {
+    List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
         hasEnoughSpace(d, sizeRequired)).collect(Collectors.toList());
 
-    if (healthyList.size() < nodesRequired) {
-      msg = String.format("Unable to find enough nodes that meet the space " +
-              "requirement of %d bytes in healthy node set." +
+    if (nodesWithSpace.size() < nodesRequired) {
+      String msg = String.format("Unable to find enough nodes that meet the " +
+              "space requirement of %d bytes in healthy node set." +
               " Nodes required: %d Found: %d",
-          sizeRequired, nodesRequired, healthyList.size());
+          sizeRequired, nodesRequired, nodesWithSpace.size());
       LOG.error(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
-    return healthyList;
+
+    return nodesWithSpace;
   }
 
   /**
@@ -165,7 +172,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @param datanodeDetails DatanodeDetails
    * @return true if we have enough space.
    */
-  public boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
+  public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
       long sizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
