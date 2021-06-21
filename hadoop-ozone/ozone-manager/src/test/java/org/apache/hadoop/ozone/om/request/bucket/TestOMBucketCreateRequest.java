@@ -22,7 +22,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -186,7 +186,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
   }
 
-  private void verifyRequest(OMRequest modifiedOmRequest,
+  protected void verifyRequest(OMRequest modifiedOmRequest,
       OMRequest originalRequest) {
     OzoneManagerProtocolProtos.BucketInfo original =
         originalRequest.getCreateBucketRequest().getBucketInfo();

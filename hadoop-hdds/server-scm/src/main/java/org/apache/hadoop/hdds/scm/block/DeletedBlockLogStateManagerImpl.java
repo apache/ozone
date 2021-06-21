@@ -41,6 +41,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
 
+/**
+ * {@link DeletedBlockLogStateManager} implementation
+ * based on {@link DeletedBlocksTransaction}.
+ */
 public class DeletedBlockLogStateManagerImpl
     implements DeletedBlockLogStateManager {
 

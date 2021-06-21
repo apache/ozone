@@ -156,6 +156,21 @@ public class SequenceIdGenerator {
   }
 
   /**
+   * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
+   * during SCM reload.
+   */
+  public void reinitialize(Table<String, Long> sequenceIdTable) {
+    lock.lock();
+    try {
+      LOG.info("reinitialize SequenceIdGenerator.");
+      invalidateBatch();
+      stateManager.reinitialize(sequenceIdTable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
    * Maintain SequenceIdTable in RocksDB.
    */
   interface StateManager {
@@ -177,6 +192,12 @@ public class SequenceIdGenerator {
      * @return lastId saved in db
      */
     Long getLastId(String sequenceIdName);
+
+    /**
+     * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
+     * during SCM reload.
+     */
+    void reinitialize(Table<String, Long> sequenceIdTable);
   }
 
   /**
@@ -184,7 +205,7 @@ public class SequenceIdGenerator {
    * DBTransactionBuffer until a snapshot is taken.
    */
   static final class StateManagerImpl implements StateManager {
-    private final Table<String, Long> sequenceIdTable;
+    private Table<String, Long> sequenceIdTable;
     private final DBTransactionBuffer transactionBuffer;
     private final Map<String, Long> sequenceIdToLastIdMap;
 
@@ -229,6 +250,12 @@ public class SequenceIdGenerator {
     @Override
     public Long getLastId(String sequenceIdName) {
       return sequenceIdToLastIdMap.get(sequenceIdName);
+    }
+
+    @Override
+    public void reinitialize(Table<String, Long> seqIdTable) {
+      this.sequenceIdTable = seqIdTable;
+      this.sequenceIdToLastIdMap.clear();
     }
 
     /**

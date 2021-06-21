@@ -20,13 +20,15 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+
 /**
  * Test request context.
  */
 public class TestRequestContext {
 
   @Test
-  public void testRecursiveAccessFlag() {
+  public void testRecursiveAccessFlag() throws IOException {
     RequestContext context = getUserRequestContext("om",
             IAccessAuthorizer.ACLType.CREATE, false, "volume1",
             true);
@@ -78,7 +80,8 @@ public class TestRequestContext {
 
   private RequestContext getUserRequestContext(String username,
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
-      boolean recursiveAccessCheck) {
+      boolean recursiveAccessCheck) throws IOException {
+
     return RequestContext.getBuilder(
             UserGroupInformation.createRemoteUser(username), null, null,
             type, ownerName, recursiveAccessCheck).build();

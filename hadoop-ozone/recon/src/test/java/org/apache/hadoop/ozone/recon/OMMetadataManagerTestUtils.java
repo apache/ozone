@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -145,8 +144,7 @@ public final class OMMetadataManagerTestUtils {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName(key)
-            .setReplicationFactor(ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .build());
   }
 
@@ -170,8 +168,7 @@ public final class OMMetadataManagerTestUtils {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationFactor(ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
   }

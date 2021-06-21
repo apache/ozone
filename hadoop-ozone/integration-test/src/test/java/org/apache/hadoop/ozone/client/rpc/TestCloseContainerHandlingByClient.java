@@ -24,10 +24,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -48,6 +49,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.junit.AfterClass;
@@ -139,8 +142,9 @@ public class TestCloseContainerHandlingByClient {
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -173,8 +177,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -207,8 +211,9 @@ public class TestCloseContainerHandlingByClient {
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -267,8 +272,9 @@ public class TestCloseContainerHandlingByClient {
     key.write(dataString4.getBytes(UTF_8));
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -311,8 +317,9 @@ public class TestCloseContainerHandlingByClient {
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -373,8 +380,9 @@ public class TestCloseContainerHandlingByClient {
 
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
-        setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -407,8 +415,9 @@ public class TestCloseContainerHandlingByClient {
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 

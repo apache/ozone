@@ -65,6 +65,9 @@ public class S3BucketAcl {
         '}';
   }
 
+  /**
+   * TODO: javadoc.
+   */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "AccessControlList")
   public static class AccessControlList {
@@ -96,6 +99,9 @@ public class S3BucketAcl {
     }
   }
 
+  /**
+   * TODO: javadoc.
+   */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Grant")
   public static class Grant {

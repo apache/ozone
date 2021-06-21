@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.util.UUID;
 
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 

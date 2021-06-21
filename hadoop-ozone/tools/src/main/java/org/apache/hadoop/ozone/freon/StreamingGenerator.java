@@ -33,6 +33,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
+/**
+ * Freon test for streaming service.
+ */
 @CommandLine.Command(name = "strmg",
     aliases = "streaming-generator",
     description =

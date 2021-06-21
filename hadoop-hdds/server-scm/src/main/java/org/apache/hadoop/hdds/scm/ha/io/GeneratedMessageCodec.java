@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 
 import java.lang.reflect.InvocationTargetException;
 
+/**
+ * {@link Codec} for {@link GeneratedMessage} objects.
+ */
 public class GeneratedMessageCodec implements Codec {
 
   @Override
