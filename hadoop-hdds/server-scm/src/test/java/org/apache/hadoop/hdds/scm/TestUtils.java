@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto
@@ -431,6 +433,20 @@ public final class TestUtils {
     CommandStatusReportsProto.Builder report = CommandStatusReportsProto
         .newBuilder();
     report.addAllCmdStatus(reports);
+    return report.build();
+  }
+
+  /**
+   * Create CRL Status report object.
+   * @param pendingCRLIds List of Pending CRL Ids in the report.
+   * @param receivedCRLId Latest received CRL Id in the report.
+   * @return {@link CRLStatusReport}
+   */
+  public static CRLStatusReport createCRLStatusReport(
+      List<Long> pendingCRLIds, long receivedCRLId) {
+    CRLStatusReport.Builder report = CRLStatusReport.newBuilder();
+    report.addAllPendingCrlIds(pendingCRLIds);
+    report.setReceivedCrlId(receivedCRLId);
     return report.build();
   }
 
