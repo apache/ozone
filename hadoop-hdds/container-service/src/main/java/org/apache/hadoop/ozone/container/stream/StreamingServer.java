@@ -92,9 +92,9 @@ public class StreamingServer implements AutoCloseable {
       final InetSocketAddress socketAddress =
           (InetSocketAddress) f.channel().localAddress();
       port = socketAddress.getPort();
-      LOG.info("Started streaming server on " + port);
+      LOG.info("Started streaming server on {}", port);
     } catch (InterruptedException ex) {
-      throw new RuntimeException(ex);
+      throw new StreamingException(ex);
     }
   }
 

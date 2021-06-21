@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.dn.scrubber;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -220,7 +221,8 @@ public class TestDataScrubber {
         keyInfo.getLatestVersionLocations().getLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
-      if (!container.getReplicationFactor().equals(replicationFactor) || (
+      if (!ReplicationConfig.getLegacyFactor(container.getReplicationConfig())
+          .equals(replicationFactor) || (
           container.getReplicationType() != replicationType)) {
         return false;
       }

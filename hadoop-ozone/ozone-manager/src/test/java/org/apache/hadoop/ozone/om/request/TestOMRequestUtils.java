@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -34,12 +35,15 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -68,6 +72,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -279,6 +284,25 @@ public final class TestOMRequestUtils {
   }
 
   /**
+   * Add dir key entry to DirectoryTable.
+   *
+   * @throws Exception
+   */
+  public static void addDirKeyToDirTable(boolean addToCache,
+                                         OmDirectoryInfo omDirInfo,
+                                         long trxnLogIndex,
+                                         OMMetadataManager omMetadataManager)
+          throws Exception {
+    String ozoneKey = omDirInfo.getPath();
+    if (addToCache) {
+      omMetadataManager.getDirectoryTable().addCacheEntry(
+              new CacheKey<>(ozoneKey),
+              new CacheValue<>(Optional.of(omDirInfo), trxnLogIndex));
+    }
+    omMetadataManager.getDirectoryTable().put(ozoneKey, omDirInfo);
+  }
+
+  /**
    * Create OmKeyInfo.
    */
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
@@ -286,6 +310,22 @@ public final class TestOMRequestUtils {
       HddsProtos.ReplicationFactor replicationFactor) {
     return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
         replicationFactor, 0L);
+  }
+
+  /**
+   * Create OmDirectoryInfo.
+   */
+  public static OmDirectoryInfo createOmDirectoryInfo(String keyName,
+                                                      long objectID,
+                                                      long parentObjID) {
+    return new OmDirectoryInfo.Builder()
+            .setName(keyName)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setObjectID(objectID)
+            .setParentObjectID(parentObjID)
+            .setUpdateID(objectID)
+            .build();
   }
 
   /**
@@ -440,6 +480,25 @@ public final class TestOMRequestUtils {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
+  public static OzoneManagerProtocolProtos.OMRequest createBucketReqFSO(
+          String bucketName, String volumeName, boolean isVersionEnabled,
+          OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
+    OzoneManagerProtocolProtos.BucketInfo bucketInfo =
+            OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+                    .setBucketName(bucketName)
+                    .setVolumeName(volumeName)
+                    .setIsVersionEnabled(isVersionEnabled)
+                    .setStorageType(storageTypeProto)
+                    .addAllMetadata(getMetadataListFSO()).build();
+    OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
+            OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
+    req.setBucketInfo(bucketInfo);
+    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCreateBucketRequest(req)
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
+            .setClientId(UUID.randomUUID().toString()).build();
+  }
+
   public static List< HddsProtos.KeyValue> getMetadataList() {
     List<HddsProtos.KeyValue> metadataList = new ArrayList<>();
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key1").setValue(
@@ -449,6 +508,20 @@ public final class TestOMRequestUtils {
     return metadataList;
   }
 
+  public static List< HddsProtos.KeyValue> getMetadataListFSO() {
+    List<HddsProtos.KeyValue> metadataList = new ArrayList<>();
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key1").setValue(
+            "value1").build());
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key2").setValue(
+            "value2").build());
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
+            OMConfigKeys.OZONE_OM_METADATA_LAYOUT).setValue(
+            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX).build());
+    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS).setValue(
+            "false").build());
+    return metadataList;
+  }
 
   /**
    * Add user to user table.
@@ -824,5 +897,124 @@ public final class TestOMRequestUtils {
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(dbVolumeKey),
         new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+  }
+
+  /**
+   * Create OmKeyInfo.
+   */
+  @SuppressWarnings("parameterNumber")
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long parentID, long trxnLogIndex, long creationTime) {
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    return new OmKeyInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setOmKeyLocationInfos(Collections.singletonList(
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            .setCreationTime(creationTime)
+            .setModificationTime(Time.now())
+            .setDataSize(1000L)
+            .setReplicationConfig(ReplicationConfig
+                    .fromTypeAndFactor(replicationType, replicationFactor))
+            .setObjectID(objectID)
+            .setUpdateID(trxnLogIndex)
+            .setParentObjectID(parentID)
+            .setFileName(fileName)
+            .build();
+  }
+
+
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable.
+   *
+   * @throws Exception DB failure
+   */
+  public static void addFileToKeyTable(boolean openKeyTable,
+                                       boolean addToCache, String fileName,
+                                       OmKeyInfo omKeyInfo,
+                                       long clientID, long trxnLogIndex,
+                                       OMMetadataManager omMetadataManager)
+          throws Exception {
+    if (openKeyTable) {
+      String ozoneKey = omMetadataManager.getOpenFileName(
+              omKeyInfo.getParentObjectID(), fileName, clientID);
+      if (addToCache) {
+        omMetadataManager.getOpenKeyTable().addCacheEntry(
+                new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      }
+      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+    } else {
+      String ozoneKey = omMetadataManager.getOzonePathKey(
+              omKeyInfo.getParentObjectID(), fileName);
+      if (addToCache) {
+        omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      }
+      omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
+    }
+  }
+
+  /**
+   * Gets bucketId from OM metadata manager.
+   *
+   * @param volumeName        volume name
+   * @param bucketName        bucket name
+   * @param omMetadataManager metadata manager
+   * @return bucket Id
+   * @throws Exception DB failure
+   */
+  public static long getBucketId(String volumeName, String bucketName,
+                                 OMMetadataManager omMetadataManager)
+          throws Exception {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+    return omBucketInfo.getObjectID();
+  }
+
+  /**
+   * Add path components to the directory table and returns last directory's
+   * object id.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param key        key name
+   * @param omMetaMgr  metdata manager
+   * @return last directory object id
+   * @throws Exception
+   */
+  public static long addParentsToDirTable(String volumeName, String bucketName,
+                                    String key, OMMetadataManager omMetaMgr)
+          throws Exception {
+    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
+            omMetaMgr);
+    if (org.apache.commons.lang3.StringUtils.isBlank(key)) {
+      return bucketId;
+    }
+    String[] pathComponents = StringUtils.split(key, '/');
+    long objectId = bucketId + 10;
+    long parentId = bucketId;
+    long txnID = 50;
+    for (String pathElement : pathComponents) {
+      OmDirectoryInfo omDirInfo =
+              TestOMRequestUtils.createOmDirectoryInfo(pathElement, ++objectId,
+                      parentId);
+      TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
+              txnID, omMetaMgr);
+      parentId = omDirInfo.getObjectID();
+    }
+    return parentId;
+  }
+
+  public static void configureFSOptimizedPaths(Configuration conf,
+      boolean enableFileSystemPaths, String version) {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            enableFileSystemPaths);
+    conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
   }
 }

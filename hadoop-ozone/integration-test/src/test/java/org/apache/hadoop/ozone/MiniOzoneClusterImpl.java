@@ -200,7 +200,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
-    // Nothing implemented here
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      GenericTestUtils.waitFor(scm::checkLeader,
+          1000, waitForClusterToBeReadyTimeout);
+    }
   }
 
   public StorageContainerManager getActiveSCM() {
@@ -225,8 +228,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
           healthy, hddsDatanodes.size());
       LOG.info(exitSafeMode ? "Cluster exits safe mode" :
-              "Waiting for cluster to exit safe mode",
-          healthy, hddsDatanodes.size());
+              "Waiting for cluster to exit safe mode");
       LOG.info(checkScmLeader ? "SCM became leader" :
           "SCM has not become leader");
 
@@ -680,6 +682,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // default max retry timeout set to 30s
       scmClientConfig.setMaxRetryTimeout(30 * 1000);
       conf.setFromObject(scmClientConfig);
+      // In this way safemode exit will happen only when atleast we have one
+      // pipeline.
+      conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
+          numOfDatanodes >=3 ? 3 : 1);
       configureTrace();
     }
 
@@ -721,6 +727,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        scmStore.setSCMHAFlag(true);
+        scmStore.persistCurrentState();
         SCMRatisServerImpl.initialize(clusterId, scmId.get(),
             SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
       }

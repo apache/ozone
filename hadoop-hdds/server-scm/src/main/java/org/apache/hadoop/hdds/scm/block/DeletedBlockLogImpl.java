@@ -279,7 +279,7 @@ public class DeletedBlockLogImpl
           // corresponding nodes commit the txn. It is required to check that
           // the nodes returned in the pipeline match the replication factor.
           if (min(replicas.size(), dnsWithCommittedTxn.size())
-              >= container.getReplicationFactor().getNumber()) {
+              >= container.getReplicationConfig().getRequiredNodes()) {
             List<UUID> containerDns = replicas.stream()
                 .map(ContainerReplica::getDatanodeDetails)
                 .map(DatanodeDetails::getUuid)

@@ -26,11 +26,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
@@ -43,7 +45,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
@@ -76,7 +83,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     OzoneConfiguration conf = createOzoneConfiguration();
 
     final Collection<String> datanodeStorageDirs =
-        MutableVolumeSet.getDatanodeStorageDirs(conf);
+        HddsServerUtil.getDatanodeStorageDirs(conf);
 
     for (String dir : datanodeStorageDirs) {
       checkDestinationDirectory(dir);
@@ -167,7 +174,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
-        null);
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
 

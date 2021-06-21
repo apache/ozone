@@ -96,7 +96,7 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(NodeReportProto.getDefaultInstance());
+    context.refreshFullReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -128,7 +128,7 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(ContainerReportsProto.getDefaultInstance());
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -160,7 +160,8 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(CommandStatusReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        CommandStatusReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -224,9 +225,10 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(NodeReportProto.getDefaultInstance());
-    context.addReport(ContainerReportsProto.getDefaultInstance());
-    context.addReport(CommandStatusReportsProto.getDefaultInstance());
+    context.refreshFullReport(NodeReportProto.getDefaultInstance());
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        CommandStatusReportsProto.getDefaultInstance());
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();

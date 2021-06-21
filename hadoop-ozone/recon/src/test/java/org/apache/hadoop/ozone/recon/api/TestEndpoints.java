@@ -20,13 +20,13 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -160,11 +160,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationFactor(ReplicationFactor.ONE)
+        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.ONE))
         .setState(LifeCycleState.OPEN)
         .setOwner("test")
         .setPipelineID(pipeline.getId())
-        .setReplicationType(ReplicationType.RATIS)
         .build();
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);

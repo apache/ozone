@@ -71,7 +71,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>DatanodeClientProtocol.proto</include>
-                <include>InterSCMProtocol.proto</include>
                 <include>SCMClientProtocol.proto</include>
                 <include>SCMUpdateProtocol.proto</include>
               </includes>

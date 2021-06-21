@@ -99,7 +99,7 @@ public class StreamingClient implements AutoCloseable {
             + dirstreamClientHandler.getCurrentFileName());
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+      throw new StreamingException(e);
     }
   }
 

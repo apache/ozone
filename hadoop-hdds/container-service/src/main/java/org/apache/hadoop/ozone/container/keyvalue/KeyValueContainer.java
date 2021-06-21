@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -60,7 +61,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_DB_SYNC;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,9 +107,16 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long maxSize = containerData.getMaxSize();
     volumeSet.readLock();
     try {
+<<<<<<< HEAD
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
           .getVolumesList(), maxSize);
+=======
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
+          maxSize);
+      String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+>>>>>>> origin/master
 
       long containerID = containerData.getContainerID();
 

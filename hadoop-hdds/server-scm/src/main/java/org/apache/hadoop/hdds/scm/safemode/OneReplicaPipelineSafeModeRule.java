@@ -56,6 +56,7 @@ public class OneReplicaPipelineSafeModeRule extends
   private Set<PipelineID> oldPipelineIDSet;
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
+  private final double pipelinePercent;
 
 
   public OneReplicaPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
@@ -63,32 +64,21 @@ public class OneReplicaPipelineSafeModeRule extends
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
     super(safeModeManager, ruleName, eventQueue);
 
-    double percent =
+    pipelinePercent =
         configuration.getDouble(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT,
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT);
 
-    Preconditions.checkArgument((percent >= 0.0 && percent <= 1.0),
+    Preconditions.checkArgument((pipelinePercent >= 0.0
+            && pipelinePercent <= 1.0),
         HddsConfigKeys.
             HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT  +
             " value should be >= 0.0 and <= 1.0");
 
     this.pipelineManager = pipelineManager;
-    oldPipelineIDSet = pipelineManager.getPipelines(
-        new RatisReplicationConfig(ReplicationFactor.THREE),
-        Pipeline.PipelineState.OPEN)
-        .stream().map(p -> p.getId()).collect(Collectors.toSet());
-    int totalPipelineCount = oldPipelineIDSet.size();
+    initializeRule(false);
 
-    thresholdCount = (int) Math.ceil(percent * totalPipelineCount);
-
-    LOG.info("Total pipeline count is {}, pipeline's with at least one " +
-        "datanode reported threshold count is {}", totalPipelineCount,
-        thresholdCount);
-
-    getSafeModeMetrics().setNumPipelinesWithAtleastOneReplicaReportedThreshold(
-        thresholdCount);
   }
 
   @Override
@@ -97,12 +87,12 @@ public class OneReplicaPipelineSafeModeRule extends
   }
 
   @Override
-  protected boolean validate() {
+  protected synchronized boolean validate() {
     return currentReportedPipelineCount >= thresholdCount;
   }
 
   @Override
-  protected void process(PipelineReportFromDatanode report) {
+  protected synchronized void process(PipelineReportFromDatanode report) {
     Preconditions.checkNotNull(report);
     for (PipelineReport report1 : report.getReport().getPipelineReportList()) {
       Pipeline pipeline;
@@ -136,17 +126,17 @@ public class OneReplicaPipelineSafeModeRule extends
   }
 
   @Override
-  protected void cleanup() {
+  protected synchronized void cleanup() {
     reportedPipelineIDSet.clear();
   }
 
   @VisibleForTesting
-  public int getThresholdCount() {
+  public synchronized int getThresholdCount() {
     return thresholdCount;
   }
 
   @VisibleForTesting
-  public int getCurrentReportedPipelineCount() {
+  public synchronized int getCurrentReportedPipelineCount() {
     return currentReportedPipelineCount;
   }
 
@@ -156,7 +146,43 @@ public class OneReplicaPipelineSafeModeRule extends
         .format(
             "reported Ratis/THREE pipelines with at least one datanode (=%d) "
                 + ">= threshold (=%d)",
-            this.currentReportedPipelineCount,
-            this.thresholdCount);
+            getCurrentReportedPipelineCount(),
+            getThresholdCount());
+  }
+
+  @Override
+  public synchronized void refresh(boolean forceRefresh) {
+    if (forceRefresh) {
+      initializeRule(true);
+    } else {
+      if (!validate()) {
+        initializeRule(true);
+      }
+    }
+  }
+
+  private void initializeRule(boolean refresh) {
+
+    oldPipelineIDSet = pipelineManager.getPipelines(
+        new RatisReplicationConfig(ReplicationFactor.THREE),
+        Pipeline.PipelineState.OPEN)
+        .stream().map(p -> p.getId()).collect(Collectors.toSet());
+
+    int totalPipelineCount = oldPipelineIDSet.size();
+
+    thresholdCount = (int) Math.ceil(pipelinePercent * totalPipelineCount);
+
+    if (refresh) {
+      LOG.info("Refreshed Total pipeline count is {}, pipeline's with at " +
+              "least one datanode reported threshold count is {}",
+          totalPipelineCount, thresholdCount);
+    } else {
+      LOG.info("Total pipeline count is {}, pipeline's with at " +
+              "least one datanode reported threshold count is {}",
+          totalPipelineCount, thresholdCount);
+    }
+
+    getSafeModeMetrics().setNumPipelinesWithAtleastOneReplicaReportedThreshold(
+        thresholdCount);
   }
 }
