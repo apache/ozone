@@ -88,31 +88,6 @@ public final class OzoneAclUtil {
     return retList;
   }
 
-  /**
-   * Check if acl right requested for given RequestContext exist
-   * in provided acl list.
-   * Acl validation rules:
-   * 1. If user/group has ALL bit set than all user should have all rights.
-   * 2. If user/group has NONE bit set than user/group will not have any right.
-   * 3. For all other individual rights individual bits should be set.
-   *
-   * @param acls
-   * @param context
-   * @return return true if acl list contains right requsted in context.
-   * */
-  public static boolean checkAclRight(List<OzoneAcl> acls,
-      RequestContext context) throws OMException {
-    String[] userGroups = context.getClientUgi().getGroupNames();
-    String userName = context.getClientUgi().getUserName();
-    ACLType aclToCheck = context.getAclRights();
-    for (OzoneAcl a : acls) {
-      if(checkAccessInAcl(a, userGroups, userName, aclToCheck)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private static boolean checkAccessInAcl(OzoneAcl a, String[] groups,
       String username, ACLType aclToCheck) {
     BitSet rights = a.getAclBitSet();

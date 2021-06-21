@@ -1782,7 +1782,7 @@ public class KeyManagerImpl implements KeyManager {
         return true;
       }
 
-      boolean hasAccess = OzoneAclUtil.checkAclRight(
+      boolean hasAccess = OzoneAclUtil.checkAclRights(
           keyInfo.getAcls(), context);
       if (LOG.isDebugEnabled()) {
         LOG.debug("user:{} has access rights for key:{} :{} ",
@@ -1819,7 +1819,7 @@ public class KeyManagerImpl implements KeyManager {
     // Using stack to check acls for subpaths
     Stack<OzoneFileStatus> directories = new Stack<>();
     // check whether given file/dir  has access
-    boolean hasAccess = OzoneAclUtil.checkAclRight(keyInfo.getAcls(), context);
+    boolean hasAccess = OzoneAclUtil.checkAclRights(keyInfo.getAcls(), context);
     if (LOG.isDebugEnabled()) {
       LOG.debug("user:{} has access rights for key:{} :{} ",
           context.getClientUgi(), ozObject.getKeyName(), hasAccess);
@@ -1835,7 +1835,7 @@ public class KeyManagerImpl implements KeyManager {
       while (hasAccess && children.hasNext()) {
         ozoneFileStatus = children.next();
         keyInfo = ozoneFileStatus.getKeyInfo();
-        hasAccess = OzoneAclUtil.checkAclRight(keyInfo.getAcls(), context);
+        hasAccess = OzoneAclUtil.checkAclRights(keyInfo.getAcls(), context);
         if (LOG.isDebugEnabled()) {
           LOG.debug("user:{} has access rights for key:{} :{} ",
               context.getClientUgi(), keyInfo.getKeyName(), hasAccess);

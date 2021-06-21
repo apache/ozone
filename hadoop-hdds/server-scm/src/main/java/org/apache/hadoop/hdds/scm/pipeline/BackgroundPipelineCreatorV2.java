@@ -178,7 +178,10 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
 
       try {
         synchronized (monitor) {
-          monitor.wait(intervalInMillis);
+          // skip wait if another one-shot run was triggered in the meantime
+          if (!isOneShotRunNeeded()) {
+            monitor.wait(intervalInMillis);
+          }
         }
       } catch (InterruptedException e) {
         LOG.warn("{} is interrupted.", THREAD_NAME);
@@ -254,7 +257,7 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
     try {
       // 1) SCMContext#isLeader returns true.
       // 2) not in safe mode or createPipelineInSafeMode is true
-      if (scmContext.isLeader() &&
+      if (scmContext.isLeaderReady() &&
           (!scmContext.isInSafeMode() || createPipelineInSafeMode)) {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
@@ -308,6 +311,15 @@ public class BackgroundPipelineCreatorV2 implements SCMService {
       return serviceStatus == ServiceStatus.RUNNING && (
           createPipelineInSafeMode ||
           Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis);
+    } finally {
+      serviceLock.unlock();
+    }
+  }
+
+  private boolean isOneShotRunNeeded() {
+    serviceLock.lock();
+    try {
+      return oneShotRun;
     } finally {
       serviceLock.unlock();
     }

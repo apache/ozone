@@ -72,18 +72,6 @@ public final class DFSConfigKeysLegacy {
   public static final String DFS_DATANODE_KEYTAB_FILE_KEY =
       "dfs.datanode.keytab.file";
 
-  public static final String DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY =
-      "dfs.datanode.disk.check.min.gap";
-
-  public static final String DFS_DATANODE_DISK_CHECK_MIN_GAP_DEFAULT =
-      "15m";
-
-  public static final String DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY =
-      "dfs.datanode.disk.check.timeout";
-
-  public static final String DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT =
-      "10m";
-
   public static final String DFS_METRICS_PERCENTILES_INTERVALS_KEY =
       "dfs.metrics.percentiles.intervals";
 
