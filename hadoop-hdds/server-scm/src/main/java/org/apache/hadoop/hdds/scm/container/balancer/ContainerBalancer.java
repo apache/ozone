@@ -122,7 +122,7 @@ public class ContainerBalancer {
       this.idleIteration = config.getIdleIteration();
       this.threshold = config.getThreshold();
       this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
-      this.maxSizeToMoveInGB = config.getMaxSizeToMoveInGB();
+      this.maxSizeToMoveInGB = config.getMaxSizeToMove();
       this.unBalancedNodes = new ArrayList<>();
       LOG.info("Starting Container Balancer...{}", this);
       //we should start a new balancer thread async

@@ -691,7 +691,7 @@ public class SCMClientProtocolServer implements
       long mstm = maxSizeToMoveInGB.get();
       Preconditions.checkState(mstm > 0,
           "maxSizeToMoveInGB must be positive.");
-      cbc.setMaxSizeToMoveInGB(mstm * OzoneConsts.GB);
+      cbc.setMaxSizeToMove(mstm * OzoneConsts.GB);
     }
     if (maxDatanodesToBalance.isPresent()) {
       int mdtb = maxDatanodesToBalance.get();

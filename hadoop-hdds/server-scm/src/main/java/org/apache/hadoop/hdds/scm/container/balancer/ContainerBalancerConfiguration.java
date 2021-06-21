@@ -54,7 +54,7 @@ public final class ContainerBalancerConfiguration {
       defaultValue = "10GB", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in bytes that will be moved " +
           "by Container Balancer.")
-  private long maxSizeToMoveInGB = 10 * OzoneConsts.GB;
+  private long maxSizeToMove = 10 * OzoneConsts.GB;
 
   @Config(key = "idle.iterations", type = ConfigType.INT,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
@@ -130,17 +130,17 @@ public final class ContainerBalancerConfiguration {
    *
    * @return maximum size in Bytes
    */
-  public long getMaxSizeToMoveInGB() {
-    return maxSizeToMoveInGB;
+  public long getMaxSizeToMove() {
+    return maxSizeToMove;
   }
 
   /**
    * Sets the value of maximum size that will be moved by Container Balancer.
    *
-   * @param maxSizeToMoveInGB maximum number of Bytes
+   * @param maxSizeToMove maximum number of Bytes
    */
-  public void setMaxSizeToMoveInGB(long maxSizeToMoveInGB) {
-    this.maxSizeToMoveInGB = maxSizeToMoveInGB;
+  public void setMaxSizeToMove(long maxSizeToMove) {
+    this.maxSizeToMove = maxSizeToMove;
   }
 
   @Override
@@ -151,6 +151,6 @@ public final class ContainerBalancerConfiguration {
             "%-30s %d%n" +
             "%-30s %dB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Balance", maxDatanodesToBalance,
-        "Max Size to Move", maxSizeToMoveInGB);
+        "Max Size to Move", maxSizeToMove);
   }
 }
