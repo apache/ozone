@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
@@ -40,7 +41,8 @@ import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 /**
  * Writable Container provider to obtain a writable container for EC pipelines.
  */
-public class WritableECContainerProvider implements WritableContainerProvider {
+public class WritableECContainerProvider
+    implements WritableContainerProvider<ECReplicationConfig> {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(WritableECContainerProvider.class);
@@ -63,67 +65,87 @@ public class WritableECContainerProvider implements WritableContainerProvider {
     this.containerSize = getConfiguredContainerSize();
   }
 
+  /**
+   *
+   * @param size The max size of block in bytes which will be written. This
+   *             comes from Ozone Manager and will be the block size configured
+   *             for the cluster. The client cannot pass any arbitrary value
+   *             from this setting.
+   * @param repConfig The replication Config indicating the EC data and partiy
+   *                  block counts.
+   * @param owner The owner of the container
+   * @param excludeList A set of datanodes, container and pipelines which should
+   *                    not be considered.
+   * @return A containerInfo representing a block group with with space for the
+   *         write, or null if no container can be allocated.
+   * @throws IOException
+   */
   @Override
   public ContainerInfo getContainer(final long size,
-      ReplicationConfig repConfig, String owner, ExcludeList excludeList)
+      ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
-    // TODO - Locking on Pipeline ID to prevent concurrent issues?
-    // TODO - exclude vs total available.
+    synchronized(this) {
+      int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
+          Pipeline.PipelineState.OPEN);
+      if (openPipelineCount < minPipelines) {
+        try {
+          // TODO - PipelineManager should allow for creating a pipeline with
+          //        excluded nodes.
+          return allocateContainer(repConfig, size, owner);
+        } catch (IOException e) {
+          LOG.warn("Unable to allocate a container for {} with {} existing "
+              + "containers", repConfig, openPipelineCount, e);
+        }
+      }
+    }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN,
         excludeList.getDatanodes(), excludeList.getPipelineIds());
 
-    if (existingPipelines.size() < minPipelines) {
-      try {
-        // TODO - PipelineManager should allow for creating a pipeline with
-        //        excluded nodes.
-        return allocateContainer(repConfig, size, owner);
-      } catch (IOException e) {
-        LOG.warn("Unable to allocate a container for {} with {} existing "
-            + "containers", repConfig, existingPipelines.size(), e);
-      }
-    }
-
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
-    Pipeline pipeline = null;
     while (existingPipelines.size() > 0) {
-      try {
-        pipeline = pipelineChoosePolicy.choosePipeline(existingPipelines, pri);
-        ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
-        if (!containerHasSpace(containerInfo, size)) {
-          // This is O(n), which isn't great if there are a lot of pipelines
-          // and we keep finding pipelines without enough space.
-          existingPipelines.remove(pipeline);
-          // TODO - when does it make sense to close the pipeline? What if the client makes
-          // unreasonable size requests, eg 2GB rather than the block size? Maybe we should
-          // only close if there is less space than the cluster block size.
-          // TODO - Also, for EC, what is the block size? If the client says 128MB, is that
-          // 128MB / 6 (for EC-6-3?)
-          pipelineManager.closePipeline(pipeline, true);
-        } else {
-          if (containerIsExcluded(containerInfo, excludeList)) {
+      Pipeline pipeline =
+          pipelineChoosePolicy.choosePipeline(existingPipelines, pri);
+      if (pipeline == null) {
+        LOG.warn("Unable to select a pipeline from {} in the list",
+            existingPipelines.size());
+        break;
+      }
+      synchronized (pipeline.getId()) {
+        try {
+          ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
+          // TODO - For EC, what is the block size? If the client says 128MB,
+          //        is that 128MB / 6 (for EC-6-3?)
+          if (containerInfo == null
+              || !containerHasSpace(containerInfo, size)) {
+            // This is O(n), which isn't great if there are a lot of pipelines
+            // and we keep finding pipelines without enough space.
             existingPipelines.remove(pipeline);
+            pipelineManager.closePipeline(pipeline, true);
           } else {
-            return containerInfo;
+            if (containerIsExcluded(containerInfo, excludeList)) {
+              existingPipelines.remove(pipeline);
+            } else {
+              return containerInfo;
+            }
           }
-        }
-      } catch (PipelineNotFoundException | ContainerNotFoundException e) {
-        LOG.warn("Pipeline or container not found when selecting a writable "
-            + "container", e);
-        if (pipeline != null) {
+        } catch(PipelineNotFoundException | ContainerNotFoundException e){
+          LOG.warn("Pipeline or container not found when selecting a writable "
+              + "container", e);
           existingPipelines.remove(pipeline);
           pipelineManager.closePipeline(pipeline, true);
         }
       }
     }
-    // TODO - handle excluded nodes
-    // TODO - skip this if the first allocate was tried and failed or try again?
-
     // If we get here, all the pipelines we tried were no good. So try to
     // allocate a new one and use it.
     try {
-      return allocateContainer(repConfig, size, owner);
+      synchronized(this) {
+        // TODO - PipelineManager should allow for creating a pipeline with
+        //        excluded nodes.
+        return allocateContainer(repConfig, size, owner);
+      }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
           + "existing containers", repConfig, e);
@@ -131,12 +153,13 @@ public class WritableECContainerProvider implements WritableContainerProvider {
     }
   }
 
-  // TODO - this could throw IOEXception (SCMException) from container policy
-  //        if not enough nodes etc.
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
       long size, String owner) throws IOException {
     Pipeline newPipeline = pipelineManager.createPipeline(repConfig);
-    return containerManager.getMatchingContainer(size, owner, newPipeline);
+    ContainerInfo container =
+        containerManager.getMatchingContainer(size, owner, newPipeline);
+    pipelineManager.openPipeline(newPipeline.getId());
+    return container;
   }
 
   private boolean containerIsExcluded(ContainerInfo container,
@@ -154,14 +177,17 @@ public class WritableECContainerProvider implements WritableContainerProvider {
     NavigableSet<ContainerID> containers =
         pipelineManager.getContainersInPipeline(pipeline.getId());
     // Assume 1 container per pipeline for EC
-    ContainerID containerID = containers.first();
-    if (containerID == null) {
+    if (containers.size() == 0) {
       return null;
     }
+    ContainerID containerID = containers.first();
     return containerManager.getContainer(containerID);
   }
 
   private boolean containerHasSpace(ContainerInfo container, long size) {
+    // The size passed from OM will be the cluster block size. Therefore we
+    // just check if the container has enough free space to accommodate another
+    // full block.
     return container.getUsedBytes() + size <= containerSize;
   }
 

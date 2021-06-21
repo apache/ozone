@@ -70,7 +70,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setState(Pipeline.PipelineState.OPEN)
+        .setState(Pipeline.PipelineState.ALLOCATED)
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .setReplicaIndexes(dnIndexes)
@@ -79,9 +79,6 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
   @Override
   protected void close(Pipeline pipeline) throws IOException {
-    // TODO - don't need to tell the DNs to close, but need to ensure the
-    //        containers are all closed. Check the logic for closing a pipeline,
-    //        do we wait on containers to close first?
   }
 
   @Override

@@ -81,4 +81,10 @@ public class TestPipeline {
           reloadedPipeline.getReplicaIndex(dn));
     }
   }
+
+  @Test
+  public void testECPipelineIsAlwaysHealthy() throws IOException {
+    Pipeline pipeline = MockPipeline.createEcPipeline();
+    Assert.assertTrue(pipeline.isHealthy());
+  }
 }

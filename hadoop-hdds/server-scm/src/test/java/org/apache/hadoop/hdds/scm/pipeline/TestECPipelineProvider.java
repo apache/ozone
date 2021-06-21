@@ -19,16 +19,11 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -39,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 
 /**
  * Test for the ECPipelineProvider.
@@ -77,6 +73,7 @@ public class TestECPipelineProvider {
     Assert.assertEquals(EC, pipeline.getType());
     Assert.assertEquals(ecConf.getData() + ecConf.getParity(),
         pipeline.getNodes().size());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     List<DatanodeDetails> dns = pipeline.getNodes();
     for (int i=0; i<ecConf.getRequiredNodes(); i++) {
       Assert.assertEquals(i, pipeline.getReplicaIndex(dns.get(i)));

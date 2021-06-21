@@ -263,6 +263,12 @@ public final class Pipeline {
   }
 
   public boolean isHealthy() {
+    // EC pipelines are not reported by the DN and do not have a leader. If a
+    // node goes stale or dead, EC pipelines will by closed like RATIS pipelines
+    // but at the current time there are not other health metrics for EC.
+    if (replicationConfig.getReplicationType() == ReplicationType.EC) {
+      return true;
+    }
     for (Long reportedTime : nodeStatus.values()) {
       if (reportedTime < 0) {
         return false;
