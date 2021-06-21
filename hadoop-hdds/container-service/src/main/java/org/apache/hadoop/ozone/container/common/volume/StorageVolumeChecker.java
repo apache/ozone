@@ -278,7 +278,7 @@ public class StorageVolumeChecker {
   /**
    * A callback to process the results of checking a volume.
    */
-  private class ResultHandler
+  private static class ResultHandler
       implements FutureCallback<VolumeCheckResult> {
     private final StorageVolume volume;
     private final Set<StorageVolume> failedVolumes;
