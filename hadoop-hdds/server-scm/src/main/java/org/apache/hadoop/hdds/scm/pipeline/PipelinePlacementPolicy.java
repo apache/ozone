@@ -137,7 +137,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    healthyNodes = filterNodesWithSpace(healthyNodes, nodesRequired, sizeRequired);
+    healthyNodes = filterNodesWithSpace(healthyNodes, nodesRequired,
+        sizeRequired);
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);

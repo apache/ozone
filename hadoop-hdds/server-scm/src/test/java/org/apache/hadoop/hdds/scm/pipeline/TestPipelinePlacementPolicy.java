@@ -200,7 +200,8 @@ public class TestPipelinePlacementPolicy {
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
     thrownExp.expect(SCMException.class);
-    thrownExp.expectMessage("Unable to find enough nodes that meet the space requirement");
+    thrownExp.expectMessage("Unable to find enough nodes that meet" +
+        "the space requirement");
     localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
         new ArrayList<>(datanodes.size()), nodesRequired,
         containerSizeBytes);
