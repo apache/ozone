@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -180,6 +181,10 @@ public class TestPipelinePlacementPolicy {
   public void testChooseNodeNotEnoughSpace() throws SCMException {
     // A huge container size
     conf.set(OZONE_SCM_CONTAINER_SIZE, "10TB");
+    long containerSizeBytes = (long) this.conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
 
     // There is only one node on 3 racks altogether.
     List<DatanodeDetails> datanodes = new ArrayList<>();
@@ -195,9 +200,10 @@ public class TestPipelinePlacementPolicy {
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
     thrownExp.expect(SCMException.class);
-    thrownExp.expectMessage("enough space for even a single container");
+    thrownExp.expectMessage("Unable to find enough nodes that meet the space requirement");
     localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-        new ArrayList<>(datanodes.size()), nodesRequired, 0);
+        new ArrayList<>(datanodes.size()), nodesRequired,
+        containerSizeBytes);
   }
   
   @Test

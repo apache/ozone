@@ -21,12 +21,15 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -40,6 +43,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
@@ -55,12 +59,11 @@ public class TestRatisPipelineProvider {
   private MockNodeManager nodeManager;
   private RatisPipelineProvider provider;
   private PipelineStateManager stateManager;
-  private OzoneConfiguration conf;
+  private static OzoneConfiguration conf = new OzoneConfiguration();
 
   public void init(int maxPipelinePerNode) throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
-    conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
         maxPipelinePerNode);
     stateManager = new PipelineStateManager();
@@ -217,6 +220,24 @@ public class TestRatisPipelineProvider {
     assertTrue(
         "at least 1 node should have been from members of closed pipelines",
         nodes.stream().anyMatch(membersOfClosedPipelines::contains));
+  }
+
+  @Test
+  public void testCreatePipelinesWhenNotEnoughSpace() throws Exception {
+    // Use a large enough container size that no node will have enough space
+    // to hold one.
+    conf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
+    init(1);
+
+    for (ReplicationFactor factor: ReplicationFactor.values()) {
+      try {
+        provider.create(new RatisReplicationConfig(factor));
+        Assert.fail();
+      } catch(SCMException ex) {
+        Assert.assertTrue(ex.getMessage().contains("Unable to find enough" +
+            "nodes that meet the space requirement"));
+      }
+    }
   }
 
   private void addPipeline(
