@@ -44,6 +44,7 @@ OZONE-SITE.XML_hdds.datanode.http.auth.kerberos.principal=HTTP/_HOST@EXAMPLE.COM
 OZONE-SITE.XML_hdds.datanode.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.principal=HTTP/s3g@EXAMPLE.COM
+OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 
 HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/_HOST@EXAMPLE.COM
 HDFS-SITE.XML_dfs.datanode.keytab.file=/etc/security/keytabs/dn.keytab
