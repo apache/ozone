@@ -23,10 +23,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -71,8 +71,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private ECSchema schema =
       new ECSchema(DEFAULT_CODEC_NAME, numDataBlks, numParityBlks);
   private ErasureCodecOptions options = new ErasureCodecOptions(schema);
-  private RSErasureCodec codec =
-      new RSErasureCodec(new Configuration(), options);
+  private RSErasureCodec codec;
 
   private long currentBlockGroupLen = 0;
   /**
@@ -143,7 +142,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
-    encoder = CodecUtil.createRawEncoder(new Configuration(),
+    OzoneConfiguration conf = new OzoneConfiguration();
+    this.codec = new RSErasureCodec(conf, options);
+    this.encoder = CodecUtil.createRawEncoder(conf,
         SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
         codec.getCoderOptions());
   }
