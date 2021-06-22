@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -186,8 +187,8 @@ public class StorageVolumeChecker {
     }
 
     lastAllVolumesCheck = timer.monotonicNow();
-    final Set<StorageVolume> healthyVolumes = new HashSet<>();
-    final Set<StorageVolume> failedVolumes = new HashSet<>();
+    final Set<StorageVolume> healthyVolumes = ConcurrentHashMap.newKeySet();
+    final Set<StorageVolume> failedVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> allVolumes = new HashSet<>();
 
     final AtomicLong numVolumes = new AtomicLong(volumes.size());
@@ -196,8 +197,8 @@ public class StorageVolumeChecker {
     for (StorageVolume v : volumes) {
       Optional<ListenableFuture<VolumeCheckResult>> olf =
           delegateChecker.schedule(v, null);
-      LOG.info("Scheduled health check for volume {}", v);
       if (olf.isPresent()) {
+        LOG.info("Scheduled health check for volume {}", v);
         allVolumes.add(v);
         Futures.addCallback(olf.get(),
             new ResultHandler(v, healthyVolumes, failedVolumes,
@@ -264,7 +265,8 @@ public class StorageVolumeChecker {
     if (olf.isPresent()) {
       numVolumeChecks.incrementAndGet();
       Futures.addCallback(olf.get(),
-          new ResultHandler(volume, new HashSet<>(), new HashSet<>(),
+          new ResultHandler(volume,
+              ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
               new AtomicLong(1), callback),
           checkVolumeResultHandlerExecutorService
       );
@@ -276,7 +278,7 @@ public class StorageVolumeChecker {
   /**
    * A callback to process the results of checking a volume.
    */
-  private class ResultHandler
+  private static class ResultHandler
       implements FutureCallback<VolumeCheckResult> {
     private final StorageVolume volume;
     private final Set<StorageVolume> failedVolumes;
@@ -345,15 +347,11 @@ public class StorageVolumeChecker {
     }
 
     private void markHealthy() {
-      synchronized (StorageVolumeChecker.this) {
-        healthyVolumes.add(volume);
-      }
+      healthyVolumes.add(volume);
     }
 
     private void markFailed() {
-      synchronized (StorageVolumeChecker.this) {
-        failedVolumes.add(volume);
-      }
+      failedVolumes.add(volume);
     }
 
     private void cleanup() {

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.stream;
 
-import java.net.InetSocketAddress;
-
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -27,9 +25,12 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.InetSocketAddress;
 
 /**
  * Netty based streaming server to replicate files from a directory.
@@ -37,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public class StreamingServer implements AutoCloseable {
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(StreamingServer.class);
+      LoggerFactory.getLogger(StreamingServer.class);
 
   private int port;
 
@@ -47,35 +48,54 @@ public class StreamingServer implements AutoCloseable {
 
   private EventLoopGroup workerGroup;
 
+  private SslContext sslContext;
+
   public StreamingServer(
-          StreamingSource source, int port
+      StreamingSource source, int port
+  ) {
+    this(source, port, null);
+  }
+
+  public StreamingServer(
+      StreamingSource source, int port, SslContext sslContext
   ) {
     this.port = port;
     this.source = source;
+    this.sslContext = sslContext;
   }
 
-  public void start() throws InterruptedException {
-    ServerBootstrap b = new ServerBootstrap();
-    bossGroup = new NioEventLoopGroup(100);
-    workerGroup = new NioEventLoopGroup(100);
+  public void start() {
+    try {
+      ServerBootstrap b = new ServerBootstrap();
+      bossGroup = new NioEventLoopGroup(100);
+      workerGroup = new NioEventLoopGroup(100);
 
-    b.group(bossGroup, workerGroup)
-            .channel(NioServerSocketChannel.class)
-            .option(ChannelOption.SO_BACKLOG, 100)
-            .childHandler(new ChannelInitializer<SocketChannel>() {
-              @Override
-              public void initChannel(SocketChannel ch) throws Exception {
-                ch.pipeline().addLast(
-                        new ChunkedWriteHandler(),
-                        new DirstreamServerHandler(source));
+      b.group(bossGroup, workerGroup)
+          .channel(NioServerSocketChannel.class)
+          .option(ChannelOption.SO_BACKLOG, 100)
+
+          .childHandler(new ChannelInitializer<SocketChannel>() {
+            @Override
+            public void initChannel(SocketChannel ch) throws Exception {
+              if (sslContext != null) {
+                ch.pipeline().addLast(sslContext.newHandler(ch.alloc()));
               }
-            });
+              ch.pipeline().addLast(
+                  new ChunkedWriteHandler(),
+                  new DirstreamServerHandler(source));
 
-    ChannelFuture f = b.bind(port).sync();
-    final InetSocketAddress socketAddress =
-            (InetSocketAddress) f.channel().localAddress();
-    port = socketAddress.getPort();
-    LOG.info("Started streaming server on " + port);
+
+            }
+          });
+
+      ChannelFuture f = b.bind(port).sync();
+      final InetSocketAddress socketAddress =
+          (InetSocketAddress) f.channel().localAddress();
+      port = socketAddress.getPort();
+      LOG.info("Started streaming server on {}", port);
+    } catch (InterruptedException ex) {
+      throw new StreamingException(ex);
+    }
   }
 
   public void stop() {
