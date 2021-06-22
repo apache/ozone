@@ -718,13 +718,13 @@ public class ContainerStateMachine extends BaseStateMachine {
         containerId, id -> new TaskQueue("container" + id));
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
-      try {
-        return runCommand(request, context.build());
-      } catch (Exception e) {
-        exceptionHandler.accept(e);
-        throw e;
-      }
-    };
+          try {
+            return runCommand(request, context.build());
+          } catch (Exception e) {
+            exceptionHandler.accept(e);
+            throw e;
+          }
+        };
     return queue.submit(task, executor);
   }
 
@@ -775,8 +775,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
       // Ensure the command gets executed in a separate thread than
       // stateMachineUpdater thread which is calling applyTransaction here.
-      final CompletableFuture<ContainerCommandResponseProto> future = submitTask(
-          requestProto, builder, exceptionHandler);
+      final CompletableFuture<ContainerCommandResponseProto> future
+          = submitTask(requestProto, builder, exceptionHandler);
       future.thenApply(r -> {
         if (trx.getServerRole() == RaftPeerRole.LEADER
             && trx.getStateMachineContext() != null) {
