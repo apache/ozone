@@ -57,9 +57,13 @@ public class TestRatisPipelineProvider {
   private MockNodeManager nodeManager;
   private RatisPipelineProvider provider;
   private PipelineStateManager stateManager;
-  private static OzoneConfiguration conf = new OzoneConfiguration();
 
   public void init(int maxPipelinePerNode) throws Exception {
+    init(maxPipelinePerNode, new OzoneConfiguration());
+  }
+
+  public void init(int maxPipelinePerNode, OzoneConfiguration conf)
+      throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
@@ -224,8 +228,9 @@ public class TestRatisPipelineProvider {
   public void testCreatePipelinesWhenNotEnoughSpace() throws Exception {
     // Use a large enough container size that no node will have enough space
     // to hold one.
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
-    init(1);
+    init(1, conf);
 
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       try {
