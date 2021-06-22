@@ -309,7 +309,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IOException("Cannot rename a key to a different bucket");
     }
     OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketType())) {
       return renameFSO(bucket, ofsSrc, ofsDst);
     }
 
@@ -531,7 +531,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
       if (!ofsPath.isVolume() && !ofsPath.isBucket()) {
         OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
-        if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+        if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketType())) {
           String ofsKeyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
               OZONE_URI_DELIMITER + ofsPath.getKeyName();
           return adapterImpl.deleteObject(ofsKeyPath, recursive);

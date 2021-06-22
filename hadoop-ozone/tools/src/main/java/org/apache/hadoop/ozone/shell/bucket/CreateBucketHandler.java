@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.helpers.BucketType;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
@@ -50,6 +51,12 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
+  @Option(names = { "--type", "-t" },
+      description = "Specifies the bucket type, FSO: FileSystemOptimized Bucket"
+          + " and OBJECT_STORE: Object Store Buckets.",
+      defaultValue = "OBJECT_STORE")
+  private BucketType bucketType;
+
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
 
@@ -60,9 +67,18 @@ public class CreateBucketHandler extends BucketHandler {
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    BucketArgs.Builder bb = new BucketArgs.Builder()
-        .setStorageType(StorageType.DEFAULT)
-        .setVersioning(false);
+    BucketArgs.Builder bb;
+    if (bucketType.equals(BucketType.OBJECT_STORE) || bucketType
+        .equals(BucketType.FSO)) {
+      bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
+          .setVersioning(false).setBucketType(bucketType);
+    } else {
+      throw new IllegalArgumentException(
+          "Allowed values are only " + BucketType.FSO + " or "
+              + BucketType.OBJECT_STORE);
+    }
+
+    // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {
       bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(isGdprEnforced));

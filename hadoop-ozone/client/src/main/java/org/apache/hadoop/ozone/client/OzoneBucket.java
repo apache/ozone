@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.helpers.BucketType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -135,6 +136,10 @@ public class OzoneBucket extends WithMetadata {
    * Quota of key count allocated for the bucket.
    */
   private long quotaInNamespace;
+  /**
+   * Bucket Type.
+   */
+  private BucketType bucketType;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ClientProtocol proxy) {
@@ -199,6 +204,21 @@ public class OzoneBucket extends WithMetadata {
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket, long usedBytes,
+      long usedNamespace, long quotaInBytes, long quotaInNamespace,
+      BucketType bucketType) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, modificationTime, metadata, encryptionKeyName,
+        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
+        quotaInNamespace);
+    this.bucketType = bucketType;
   }
 
   /**
@@ -563,7 +583,7 @@ public class OzoneBucket extends WithMetadata {
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
       String prevKey) throws IOException {
 
-    if(OzoneFSUtils.isFSOptimizedBucket(getMetadata())){
+    if(OzoneFSUtils.isFSOptimizedBucket(bucketType)){
       return new KeyIteratorWithFSO(keyPrefix, prevKey);
     }
     return new KeyIterator(keyPrefix, prevKey);
@@ -1169,5 +1189,9 @@ public class OzoneBucket extends WithMetadata {
       }
     }
 
+  }
+
+  public BucketType getBucketType() {
+    return bucketType;
   }
 }
