@@ -247,10 +247,10 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          key: maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8-${{ matrix.profile }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}
             maven-repo-
       - name: Execute tests
         run: mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
@@ -285,7 +285,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ github.job }}
           restore-keys: |
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
