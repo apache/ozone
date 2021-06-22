@@ -24,6 +24,7 @@ import javax.ws.rs.core.UriInfo;
 import java.util.Arrays;
 import java.util.Collection;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -52,6 +53,7 @@ public class TestOzoneClientProducer {
   private String contentType;
   private UriInfo uriInfo;
 
+  @SuppressFBWarnings("URF_UNREAD_FIELD")
   public TestOzoneClientProducer(
       String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType

@@ -96,8 +96,6 @@ public class OzoneClientProducer {
 
   private OzoneClient client;
 
-  private UserGroupInformation remoteUser = null;
-
   @Inject
   private OzoneConfiguration ozoneConfiguration;
 
@@ -117,20 +115,12 @@ public class OzoneClientProducer {
     return client;
   }
 
-  @Produces
-  public UserGroupInformation createUgi() {
-    if (remoteUser == null) {
-      client = getClient(ozoneConfiguration);
-    }
-    return remoteUser;
-  }
-
   private OzoneClient getClient(OzoneConfiguration config)
       throws WebApplicationException {
     OzoneClient ozoneClient = null;
     try {
 
-      this.remoteUser = UserGroupInformation.getCurrentUser();
+      UserGroupInformation remoteUser = UserGroupInformation.getCurrentUser();
       ozoneClient =
           OzoneClientCache.getOzoneClientInstance(omServiceID,
               ozoneConfiguration);

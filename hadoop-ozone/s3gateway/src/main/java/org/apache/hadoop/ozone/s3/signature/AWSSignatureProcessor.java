@@ -121,38 +121,6 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       return headers;
     }
 
-    /*public static LowerCaseKeyStringMap fromHeaderMap(
-        MultivaluedMap<String,
-            String> rawHeaders
-    ) {
-
-      //header map is MUTABLE. It's better to save it here. (with lower case
-      // keys!!!)
-      final LowerCaseKeyStringMap headers =
-          new LowerCaseKeyStringMap();
-
-      for (Entry<String, List<String>> headerEntry : rawHeaders.entrySet()) {
-        if (0 < headerEntry.getValue().size()) {
-          String headerKey = headerEntry.getKey();
-          if (headers.containsKey(headerKey)) {
-            //multiple headers from the same type are combined
-            headers.put(headerKey,
-                headers.get(headerKey) + "," + headerEntry.getValue().get(0));
-          } else {
-            headers.put(headerKey, headerEntry.getValue().get(0));
-          }
-        }
-      }
-
-      headers.fixContentType();
-
-      if (LOG.isTraceEnabled()) {
-        headers.keySet().forEach(k -> LOG.trace("Header:{},value:{}", k,
-            headers.get(k)));
-      }
-      return headers;
-    }*/
-
     @VisibleForTesting
     protected void fixContentType() {
       //in case of the HeaderPreprocessor executed before us, let's restore the

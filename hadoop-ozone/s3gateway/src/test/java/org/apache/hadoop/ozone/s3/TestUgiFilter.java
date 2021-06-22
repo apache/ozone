@@ -22,6 +22,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Enumeration;
@@ -29,17 +30,17 @@ import java.util.Collections;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
+import org.apache.hadoop.ozone.s3.signature.*;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.apache.hadoop.io.Text;
 
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
-import org.apache.hadoop.ozone.s3.signature.StringToSignProducer;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 
 /**
  * Test class for @{@link UgiFilter}.
@@ -49,16 +50,17 @@ public class TestUgiFilter {
   private OzoneConfiguration conf;
   private String s3HttpAddr;
   private Text omService;
+  private String curDate;
   private Map<String, String> headers;
   private Map<String, String[]> parameters;
 
-  private final String hostHeader = "Host";
-  private final String encodeHeader = "Accept-Encoding";
-  private final String userAgentHeader = "User-Agent";
-  private final String dateHeader = "X-Amz-Date";
-  private final String encryptTypeHeader = "X-Amz-Content-SHA256";
-  private final String authorizationHeader = "Authorization";
-  private final String lengthHeader = "Content-Length";
+  private static final String HOST_HEADER = "Host";
+  private static final String ENCODE_HEADER = "Accept-Encoding";
+  private static final String USER_AGENT_HEADER = "User-Agent";
+  private static final String DATE_HEADER = "X-Amz-Date";
+  private static final String ENCRYPT_TYPE_HEADER = "X-Amz-Content-SHA256";
+  private static final String AUTHORIZATION_HEADER = "Authorization";
+  private static final String LENGTH_HEADER = "Content-Length";
 
   @Before
   public void setup() {
@@ -68,25 +70,27 @@ public class TestUgiFilter {
     s3HttpAddr = s3HttpAddr.substring(0, s3HttpAddr.lastIndexOf(":"));
     conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, s3HttpAddr);
     omService = new Text("127.0.0.1:9862");
+    LocalDate now = LocalDate.now();
+    curDate = DATE_FORMATTER.format(now);
 
     headers = new HashMap<>();
     parameters = new HashMap<>();
 
-    headers.put(hostHeader, "localhost:9878");
-    headers.put(encodeHeader, "identity");
-    headers.put(userAgentHeader, "aws-cli/2.1.29 "+
+    headers.put(HOST_HEADER, "localhost:9878");
+    headers.put(ENCODE_HEADER, "identity");
+    headers.put(USER_AGENT_HEADER, "aws-cli/2.1.29 "+
         "Python/3.8.8 Linux/4.15.0-144-generic "+
         "exe/x86_64.ubuntu.18 prompt/off "+
         "command/s3api.create-bucket");
-    headers.put(dateHeader, "20210616T195044Z");
-    headers.put(encryptTypeHeader,
+    headers.put(DATE_HEADER, "20210616T195044Z");
+    headers.put(ENCRYPT_TYPE_HEADER,
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-    headers.put(authorizationHeader, "AWS4-HMAC-SHA256 "+
+    headers.put(AUTHORIZATION_HEADER, "AWS4-HMAC-SHA256 "+
         "Credential=AKIAIIIE56NH5ZHKLTWQ/20210616/us-east-1/s3/aws4_request, "+
         "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "+
         "Signature=c29b4c46e825d5df56cdde12a61adfa65560a54"+
         "7c8973b9809621086727a2f2e");
-    headers.put(lengthHeader, "0");
+    headers.put(LENGTH_HEADER, "0");
 
   }
 
@@ -101,26 +105,30 @@ public class TestUgiFilter {
     FilterChain filterChain = Mockito.mock(FilterChain.class);
     FilterConfig filterConfig = Mockito.mock(FilterConfig.class);
 
+    // correct date in autherization header for AuthorizationV4QueryParser
+    // date validator
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace("20210616", curDate));
     Enumeration<String> headerNames = Collections.enumeration(headers.keySet());
 
     Mockito.when(request.getScheme()).thenReturn("http");
     Mockito.when(request.getMethod()).thenReturn("PUT");
     Mockito.when(request.getPathInfo()).thenReturn("/bucket1");
     Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
-    Mockito.when(request.getHeader(hostHeader)).thenReturn(
-        headers.get(hostHeader));
-    Mockito.when(request.getHeader(encodeHeader)).thenReturn(
-        headers.get(encodeHeader));
-    Mockito.when(request.getHeader(userAgentHeader)).thenReturn(
-        headers.get(userAgentHeader));
-    Mockito.when(request.getHeader(dateHeader)).thenReturn(
-        headers.get(dateHeader));
-    Mockito.when(request.getHeader(encryptTypeHeader)).thenReturn(
-        headers.get(encryptTypeHeader));
-    Mockito.when(request.getHeader(authorizationHeader)).thenReturn(
-        headers.get(authorizationHeader));
-    Mockito.when(request.getHeader(lengthHeader)).thenReturn(
-        headers.get(lengthHeader));
+    Mockito.when(request.getHeader(HOST_HEADER)).thenReturn(
+        headers.get(HOST_HEADER));
+    Mockito.when(request.getHeader(ENCODE_HEADER)).thenReturn(
+        headers.get(ENCODE_HEADER));
+    Mockito.when(request.getHeader(USER_AGENT_HEADER)).thenReturn(
+        headers.get(USER_AGENT_HEADER));
+    Mockito.when(request.getHeader(DATE_HEADER)).thenReturn(
+        headers.get(DATE_HEADER));
+    Mockito.when(request.getHeader(ENCRYPT_TYPE_HEADER)).thenReturn(
+        headers.get(ENCRYPT_TYPE_HEADER));
+    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
+        headers.get(AUTHORIZATION_HEADER));
+    Mockito.when(request.getHeader(LENGTH_HEADER)).thenReturn(
+        headers.get(LENGTH_HEADER));
     Mockito.when(request.getParameterMap()).thenReturn(parameters);
 
     filter.init(filterConfig);
@@ -132,10 +140,17 @@ public class TestUgiFilter {
   public void testUgiFilterStringToSign() throws OS3Exception, Exception {
     // test to ensure http servlet request is parsed correctly for
     // aws authenciation - testing creating aws v4 stringToSign
-    AWSSignatureProcessor signature = new AWSSignatureProcessor(headers,
-        parameters);
 
-    SignatureInfo signatureInfo = signature.parseSignature();
+    final SignatureInfo signatureInfo =
+        new AuthorizationV4HeaderParser(headers.get(AUTHORIZATION_HEADER),
+            headers.get(DATE_HEADER)) {
+          @Override
+          public void validateDateRange(Credential credentialObj)
+              throws OS3Exception {
+            //NOOP
+          }
+        }.parseSignature();
+
     String stringToSign =
         StringToSignProducer.createSignatureBase(signatureInfo,
             "http",

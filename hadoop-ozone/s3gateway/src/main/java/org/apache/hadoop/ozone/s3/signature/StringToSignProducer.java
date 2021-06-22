@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -125,8 +126,14 @@ public final class StringToSignProducer {
       Map<String, String[]> queryParameters
   ) {
     Map<String, String> result = new HashMap<>();
-    for (String key : queryParameters.keySet()) {
+    /*for (String key : queryParameters.keySet()) {
       result.put(key, queryParameters.get(key)[0]);
+    }*/
+    Iterator<Map.Entry<String, String[]> > entrySet = queryParameters
+        .entrySet().iterator();
+    while (entrySet.hasNext()) {
+      Map.Entry<String, String[]> entry = entrySet.next();
+      result.put(entry.getKey(), entry.getValue()[0]);
     }
     return result;
   }
