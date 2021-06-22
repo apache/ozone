@@ -1,5 +1,7 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
+import org.apache.hadoop.ozone.recon.ReconConstants;
+
 import java.util.Arrays;
 
 /**
@@ -14,12 +16,8 @@ public class NSSummary {
   public NSSummary() {
     this.numOfFiles = 0;
     this.sizeOfFiles = 0;
-    // < 1KB, 1KB - 512KB, 513KB - 1024KB, 1MB - 10MB, 10MB - 100MB,
-    // 100MB - 1000MB, 1GB - 10GB, 10GB - 100GB, 100GB - 1000GB, > 1TB
-    // TODO: can we generate a more reasonable bucket
-    // Should this file size distribution be fixed or dynamic based on
-    // the actual situation?
-    this.fileSizeBucket = new int[10];
+    // TODO: I read the min is 1024(2^10), max is 1PB(2^50), so the number of buckets should be 40?
+    this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
   }
 
   public int getNumOfFiles() {
@@ -43,6 +41,7 @@ public class NSSummary {
   }
 
   public void setFileSizeBucket(int[] fileSizeBucket) {
-    this.fileSizeBucket = Arrays.copyOf(fileSizeBucket, 10);
+    this.fileSizeBucket = Arrays.copyOf(
+            fileSizeBucket, ReconConstants.NUM_OF_BINS);
   }
 }

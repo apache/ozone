@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
  * The Recon Container DB Service interface.
  */
 @InterfaceStability.Unstable
-public interface ContainerDBServiceProvider {
+public interface ReconContainerMetadataManager {
 
   /*
    * Close the container DB

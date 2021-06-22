@@ -58,4 +58,5 @@ public final class ReconConstants {
       + PIPELINE_DB_SUFFIX;
   public static final String RECON_SCM_NODE_DB =
       "recon-node.db";
+  public static final int NUM_OF_BINS = 40;
 }

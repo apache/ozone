@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -60,11 +60,11 @@ import org.slf4j.LoggerFactory;
  * Implementation of the Recon Container DB Service.
  */
 @Singleton
-public class ContainerDBServiceProviderImpl
-    implements ContainerDBServiceProvider {
+public class ReconContainerMetadataManagerImpl
+    implements ReconContainerMetadataManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerDBServiceProviderImpl.class);
+      LoggerFactory.getLogger(ReconContainerMetadataManagerImpl.class);
 
   private Table<ContainerKeyPrefix, Integer> containerKeyTable;
   private Table<Long, Long> containerKeyCountTable;
@@ -82,8 +82,8 @@ public class ContainerDBServiceProviderImpl
   private Configuration sqlConfiguration;
 
   @Inject
-  public ContainerDBServiceProviderImpl(DBStore dbStore,
-                                        Configuration sqlConfiguration) {
+  public ReconContainerMetadataManagerImpl(DBStore dbStore,
+                                           Configuration sqlConfiguration) {
     containerDbStore = dbStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
     initializeTables();

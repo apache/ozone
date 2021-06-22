@@ -64,11 +64,11 @@ public class ReconDBDefinition implements DBDefinition {
           ContainerReplicaHistoryList.class,
           new ContainerReplicaHistoryListCodec());
 
-  public static final DBColumnFamilyDefinition<String, NSSummary>
-      NAMESPACE_SUMMARY = new DBColumnFamilyDefinition<String, NSSummary>(
+  public static final DBColumnFamilyDefinition<Long, NSSummary>
+      NAMESPACE_SUMMARY = new DBColumnFamilyDefinition<Long, NSSummary>(
           "namespaceSummaryTable",
-          String.class,
-          new StringCodec(),
+          Long.class,
+          new LongCodec(),
           NSSummary.class,
           new NSSummaryCodec());
 
