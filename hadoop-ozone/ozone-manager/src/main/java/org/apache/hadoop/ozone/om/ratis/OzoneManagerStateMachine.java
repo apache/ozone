@@ -187,16 +187,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         newRaftConfiguration.getPeersList();
     LOG.info("Received Configuration change notification from Ratis. New Peer" +
         " list:\n{}", newPeers);
+
+    List<String> newPeerIds = new ArrayList<>();
     for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
-      String omNodeId = RaftPeerId.valueOf(raftPeerProto.getId()).toString();
-      if (!ozoneManager.doesPeerExist(omNodeId)) {
-        LOG.info("Adding new OM {} to the Peer list.", omNodeId);
-        ozoneManager.addOMNodeToPeers(omNodeId);
-      } else {
-        LOG.debug("Not adding OM {} to cluster as it is already present in " +
-            "peer list.", omNodeId);
-      }
+      newPeerIds.add(RaftPeerId.valueOf(raftPeerProto.getId()).toString());
     }
+    // Check and update the peer list in OzoneManager
+    ozoneManager.updatePeerList(newPeerIds);
   }
 
   /**

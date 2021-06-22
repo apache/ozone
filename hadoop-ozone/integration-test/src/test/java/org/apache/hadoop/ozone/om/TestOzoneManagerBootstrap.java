@@ -119,19 +119,18 @@ public class TestOzoneManagerBootstrap {
     for (OzoneManager om : cluster.getOzoneManagersList()) {
       Assert.assertTrue("New OM node " + nodeId + " not present in Peer list " +
               "of OM " + om.getOMNodeId(), om.doesPeerExist(nodeId));
+      Assert.assertTrue("New OM node " + nodeId + " not present in Peer list " +
+          "of OM " + om.getOMNodeId() + " RatisServer",
+          om.getOmRatisServer().doesPeerExist(nodeId));
       Assert.assertTrue("New OM node " + nodeId + " not present in " +
-          "RaftServer Peer list of OM " + om.getOMNodeId(),
+          "OM " + om.getOMNodeId() + "RatisServer's RaftConf",
           om.getOmRatisServer().getCurrentPeersFromRaftConf().contains(nodeId));
     }
 
     OzoneManager newOM = cluster.getOzoneManager(nodeId);
-    GenericTestUtils.waitFor((Supplier<Boolean>) () -> {
-      try {
-        return newOM.getRatisSnapshotIndex() >= lastTransactionIndex;
-      } catch (IOException e) {
-        return false;
-      }
-    }, 100, 100000);
+    GenericTestUtils.waitFor(() ->
+        newOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+            >= lastTransactionIndex, 100, 100000);
 
     // Check Ratis Dir for log files
     File[] logFiles = getRatisLogFiles(newOM);

@@ -380,6 +380,9 @@ public final class OzoneManagerRatisUtils {
     return storageDir;
   }
 
+  /**
+   * Get the local directory where ratis snapshots will be stored.
+   */
   public static String getOMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir = conf.get(OZONE_OM_RATIS_SNAPSHOT_DIR);
 

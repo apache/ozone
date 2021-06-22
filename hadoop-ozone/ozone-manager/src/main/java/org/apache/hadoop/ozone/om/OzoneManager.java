@@ -1395,7 +1395,38 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Add a new OM Node to the HA cluster. This call comes from OMRatisServer
+   * When OMStateMachine receives a configuration change update, it calls
+   * this function to update the peers list, if required.
+   */
+  public void updatePeerList(List<String> omNodeIds) {
+    List<String> ratisServerPeerIdsList = omRatisServer.getPeerIds();
+    for (String omNodeId : omNodeIds) {
+      if (getOMNodeId().equals(omNodeId)) {
+        continue;
+      }
+      boolean isPresentInOMPeers = false;
+      for (OMNodeDetails peerNode : peerNodes) {
+        if (peerNode.getNodeId().contains(omNodeId)) {
+          isPresentInOMPeers = true;
+          if (!ratisServerPeerIdsList.contains(omNodeId)) {
+            // This can happen on a bootstrapping OM. The peer information
+            // would be present in OzoneManager but OMRatisServer peer list
+            // would not have the peers list. OMRatisServer peer list of
+            // bootstrapping node should be updated after it get the RaftConf
+            // through Ratis.
+            omRatisServer.addRaftPeer(peerNode);
+          }
+        }
+      }
+      // Add the node to OM peers list if it is not present already
+      if (!isPresentInOMPeers) {
+        addOMNodeToPeers(omNodeId);
+      }
+    }
+  }
+
+  /**
+   * Add an OM Node to the peers list. This call comes from OMStateMachine
    * after a SetConfiguration request has been successfully executed by the
    * Ratis server.
    */
@@ -1424,13 +1455,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omSnapshotProvider.addNewPeerNode(newOMNodeDetails);
     }
     omRatisServer.addRaftPeer(newOMNodeDetails);
+    LOG.info("Added new OM {} to the Peer list.", newOMNodeId);
   }
 
   /**
    * Check if the input nodeId exists in the peers list.
    * @return true if the nodeId is self or it exists in peer node list,
-   *         false otherwsie.
+   *         false otherwise.
    */
+  @VisibleForTesting
   public boolean doesPeerExist(String omNodeId) {
     if (getOMNodeId().equals(omNodeId)) {
       return true;

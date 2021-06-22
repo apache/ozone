@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
@@ -814,9 +815,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private void waitForConfigUpdateOnAllOMs(String newOMNodeId)
       throws Exception {
+    OzoneManagerRatisServer newOMRatisServer =
+        omhaService.getServiceById(newOMNodeId).getOmRatisServer();
     GenericTestUtils.waitFor(() -> {
+      // Each existing active OM should contain the new OM in its peerList.
+      // Also, the new OM should contain each existing active OM in it's
+      // RatisServer peerList.
       for (OzoneManager om : omhaService.getActiveServices()) {
         if (!om.doesPeerExist(newOMNodeId)) {
+          return false;
+        }
+        if (!newOMRatisServer.doesPeerExist(om.getOMNodeId())) {
           return false;
         }
       }

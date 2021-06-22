@@ -131,7 +131,7 @@ public final class OzoneManagerRatisServer {
   @SuppressWarnings({"parameternumber", "java:S107"})
   private OzoneManagerRatisServer(ConfigurationSource conf, OzoneManager om,
       String raftGroupIdStr, RaftPeerId localRaftPeerId,
-      InetSocketAddress addr, List<RaftPeer> peers,
+      InetSocketAddress addr, List<RaftPeer> peers, boolean isBootstrapping,
       SecurityConfig secConfig, CertificateClient certClient)
       throws IOException {
     this.ozoneManager = om;
@@ -147,13 +147,17 @@ public final class OzoneManagerRatisServer {
     this.raftPeers.addAll(peers);
     this.raftGroup = RaftGroup.valueOf(raftGroupId, peers);
 
-    StringBuilder raftPeersStr = new StringBuilder();
-    for (RaftPeer peer : peers) {
-      raftPeersStr.append(", ").append(peer.getAddress());
+    if (isBootstrapping) {
+      LOG.info("OM started in Bootstrap mode. Instantiating OM Ratis server " +
+          "with groupID: {}", raftGroupIdStr);
+    } else {
+     StringBuilder raftPeersStr = new StringBuilder();
+      for (RaftPeer peer : peers) {
+        raftPeersStr.append(", ").append(peer.getAddress());
+      }
+      LOG.info("Instantiating OM Ratis server with groupID: {} and peers: {}",
+          raftGroupIdStr, raftPeersStr.toString().substring(2));
     }
-    LOG.info("Instantiating OM Ratis server with groupID: {} and " +
-        "peers: {}", raftGroupIdStr, raftPeersStr.toString().substring(2));
-
     this.omStateMachine = getStateMachine(conf);
 
     Parameters parameters = createServerTlsParameters(secConfig, certClient);
@@ -189,42 +193,40 @@ public final class OzoneManagerRatisServer {
         .setAddress(ratisAddr)
         .build();
 
+    // If OM is started in bootstrap mode, do not add peers to the RaftGroup.
+    // Raft peers will be added after SetConfiguration transaction is
+    // committed by leader and propagated to followers.
     List<RaftPeer> raftPeers = new ArrayList<>();
-
-    // If the OM is started in bootstrap mode, do not add it to the ratis ring.
-    // It will be added later using SetConfiguration from the leader OM.
-    if (isBootstrapping) {
-      LOG.debug("OM started in Bootstrap mode and hence will not be added " +
-          "to Ratis group during startup.");
-    } else {
-      // On regular startup, add current OM to Ratis ring
+    if (!isBootstrapping) {
+      // On regular startup, add all OMs to Ratis ring
       raftPeers.add(localRaftPeer);
-    }
 
-    for (OMNodeDetails peerInfo : peerNodes) {
-      String peerNodeId = peerInfo.getNodeId();
-      RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
-      RaftPeer raftPeer;
-      if (peerInfo.isHostUnresolved()) {
-        raftPeer = RaftPeer.newBuilder()
-            .setId(raftPeerId)
-            .setAddress(peerInfo.getRatisHostPortStr())
-            .build();
-      } else {
-        InetSocketAddress peerRatisAddr = new InetSocketAddress(
-            peerInfo.getInetAddress(), peerInfo.getRatisPort());
-        raftPeer = RaftPeer.newBuilder()
-            .setId(raftPeerId)
-            .setAddress(peerRatisAddr)
-            .build();
+      for (OMNodeDetails peerInfo : peerNodes) {
+        String peerNodeId = peerInfo.getNodeId();
+        RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
+        RaftPeer raftPeer;
+        if (peerInfo.isHostUnresolved()) {
+          raftPeer = RaftPeer.newBuilder()
+              .setId(raftPeerId)
+              .setAddress(peerInfo.getRatisHostPortStr())
+              .build();
+        } else {
+          InetSocketAddress peerRatisAddr = new InetSocketAddress(
+              peerInfo.getInetAddress(), peerInfo.getRatisPort());
+          raftPeer = RaftPeer.newBuilder()
+              .setId(raftPeerId)
+              .setAddress(peerRatisAddr)
+              .build();
+        }
+
+        // Add other OM nodes belonging to the same OM service to the Ratis ring
+        raftPeers.add(raftPeer);
       }
-
-      // Add other OM nodes belonging to the same OM service to the Ratis ring
-      raftPeers.add(raftPeer);
     }
 
     return new OzoneManagerRatisServer(ozoneConf, omProtocol, omServiceId,
-        localRaftPeerId, ratisAddr, raftPeers, secConfig, certClient);
+        localRaftPeerId, ratisAddr, raftPeers, isBootstrapping, secConfig,
+        certClient);
   }
 
   /**
@@ -329,6 +331,38 @@ public final class OzoneManagerRatisServer {
     }
   }
 
+  /**
+   * Return a list of peer NodeIds.
+   */
+  public List<String> getPeerIds() {
+    List<String> peerIds = new ArrayList<>();
+    for (RaftPeer raftPeer : raftPeers) {
+      peerIds.add(raftPeer.getId().toString());
+    }
+    return peerIds;
+  }
+
+  /**
+   * Check if the input peerId exists in the peers list.
+   * @return true if the nodeId is self or it exists in peer node list,
+   *         false otherwise.
+   */
+  @VisibleForTesting
+  public boolean doesPeerExist(String peerId) {
+    if (peerId.equals(raftPeerId.toString())) {
+      return true;
+    }
+    for (RaftPeer raftPeer : raftPeers) {
+      if (raftPeer.getId().toString().equals(peerId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Add given node to list of RaftPeers.
+   */
   public void addRaftPeer(OMNodeDetails omNodeDetails) {
     InetSocketAddress newOMRatisAddr = new InetSocketAddress(
         omNodeDetails.getHostAddress(), omNodeDetails.getRatisPort());
@@ -338,8 +372,7 @@ public final class OzoneManagerRatisServer {
         .setAddress(newOMRatisAddr)
         .build());
 
-    LOG.info("Added OM {} to Ratis Peers list. New OM Ratis Peers list: {}",
-        omNodeDetails.getNodeId(), raftPeers);
+    LOG.info("Added OM {} to Ratis Peers list.", omNodeDetails.getNodeId());
   }
 
   /**
