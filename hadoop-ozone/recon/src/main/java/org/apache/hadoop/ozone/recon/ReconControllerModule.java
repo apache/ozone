@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
@@ -86,7 +86,7 @@ public class ReconControllerModule extends AbstractModule {
     bind(OzoneConfiguration.class).toProvider(ConfigurationProvider.class);
     bind(ReconHttpServer.class).in(Singleton.class);
     bind(DBStore.class)
-        .toProvider(ReconContainerDBProvider.class).in(Singleton.class);
+        .toProvider(ReconDBProvider.class).in(Singleton.class);
     bind(ReconOMMetadataManager.class)
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);

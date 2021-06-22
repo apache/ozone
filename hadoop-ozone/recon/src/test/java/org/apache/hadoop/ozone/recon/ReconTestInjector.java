@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.junit.Assert;
 import org.junit.rules.TemporaryFolder;
 
@@ -174,7 +174,7 @@ public class ReconTestInjector {
           if (withContainerDB) {
             bind(ContainerDBServiceProvider.class)
                 .to(ContainerDBServiceProviderImpl.class).in(Singleton.class);
-            bind(DBStore.class).toProvider(ReconContainerDBProvider.class).
+            bind(DBStore.class).toProvider(ReconDBProvider.class).
                 in(Singleton.class);
           }
 

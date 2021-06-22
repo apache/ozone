@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.getNewDBStore;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY;

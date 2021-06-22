@@ -38,18 +38,18 @@ import com.google.inject.ProvisionException;
 /**
  * Provider for the Recon container DB (Metadata store).
  */
-public class ReconContainerDBProvider implements Provider<DBStore> {
+public class ReconDBProvider implements Provider<DBStore> {
 
   @VisibleForTesting
   private static final Logger LOG =
-      LoggerFactory.getLogger(ReconContainerDBProvider.class);
+      LoggerFactory.getLogger(ReconDBProvider.class);
 
   private OzoneConfiguration configuration;
   private ReconUtils reconUtils;
 
   @Inject
-  public ReconContainerDBProvider(OzoneConfiguration configuration,
-                                  ReconUtils reconUtils) {
+  public ReconDBProvider(OzoneConfiguration configuration,
+                         ReconUtils reconUtils) {
     this.configuration = configuration;
     this.reconUtils = reconUtils;
   }
