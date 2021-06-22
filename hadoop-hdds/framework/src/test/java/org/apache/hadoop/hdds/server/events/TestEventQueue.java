@@ -31,15 +31,10 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class TestEventQueue {
 
-  private static final Event< Long > EVENT1 =
+  private static final Event<Long> EVENT1 =
       new TypedEvent<>(Long.class, "SCM_EVENT1");
-  private static final Event< Long > EVENT2 =
+  private static final Event<Long> EVENT2 =
       new TypedEvent<>(Long.class, "SCM_EVENT2");
-
-  private static final Event< Long > EVENT3 =
-      new TypedEvent<>(Long.class, "SCM_EVENT3");
-  private static final Event< Long > EVENT4 =
-      new TypedEvent<>(Long.class, "SCM_EVENT4");
 
   private EventQueue queue;
 
