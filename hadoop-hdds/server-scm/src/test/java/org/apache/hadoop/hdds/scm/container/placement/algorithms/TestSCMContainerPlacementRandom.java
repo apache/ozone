@@ -20,8 +20,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -37,6 +37,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.junit.Assert.assertFalse;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
@@ -49,7 +50,10 @@ public class TestSCMContainerPlacementRandom {
   @Test
   public void chooseDatanodes() throws SCMException {
     //given
-    ConfigurationSource conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // We are using small units here
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        1, StorageUnit.BYTES);
 
     List<DatanodeInfo> datanodes = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
@@ -116,7 +120,9 @@ public class TestSCMContainerPlacementRandom {
   @Test
   public void testPlacementPolicySatisified() {
     //given
-    ConfigurationSource conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        10, StorageUnit.MB);
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {

@@ -21,8 +21,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -46,6 +46,8 @@ import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -64,7 +66,7 @@ import static org.mockito.Mockito.when;
 @RunWith(Parameterized.class)
 public class TestSCMContainerPlacementRackAware {
   private NetworkTopology cluster;
-  private ConfigurationSource conf;
+  private OzoneConfiguration conf;
   private NodeManager nodeManager;
   private final Integer datanodeCount;
   private final List<DatanodeInfo> datanodes = new ArrayList<>();
@@ -91,6 +93,9 @@ public class TestSCMContainerPlacementRackAware {
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
+    // We are using small units here
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        1, StorageUnit.BYTES);
     NodeSchema[] schemas = new NodeSchema[]
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);

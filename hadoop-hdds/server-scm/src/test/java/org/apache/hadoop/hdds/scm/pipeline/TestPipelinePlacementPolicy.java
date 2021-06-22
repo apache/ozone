@@ -92,6 +92,8 @@ public class TestPipelinePlacementPolicy {
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     conf = new OzoneConfiguration();
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        10, StorageUnit.MB);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
     stateManager = new PipelineStateManager();
     placementPolicy = new PipelinePlacementPolicy(
