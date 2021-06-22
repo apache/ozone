@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -96,11 +97,14 @@ public class DatanodeLayout extends GenericCli
     OzoneContainer.buildContainerSet(volumeSet, containerSet, conf);
     volumeSet.shutdown();
 
+    List<HddsVolume> failedVolumes = StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getFailedVolumesList());
+
     if (verify) {
-      for (HddsVolume vol : volumeSet.getFailedVolumesList()) {
+      for (HddsVolume vol : failedVolumes) {
         System.out.println("Failed Volume:" + vol.getHddsRootDir());
       }
     }
-    return volumeSet.getFailedVolumesList();
+    return failedVolumes;
   }
 }

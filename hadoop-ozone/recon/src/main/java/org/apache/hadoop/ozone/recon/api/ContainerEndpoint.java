@@ -252,7 +252,7 @@ public class ContainerEndpoint {
 
             List<ContainerHistory> datanodes =
                 containerManager.getLatestContainerHistory(containerID,
-                    containerInfo.getReplicationFactor().getNumber());
+                    containerInfo.getReplicationConfig().getRequiredNodes());
             missingContainers.add(new MissingContainerMetadata(containerID,
                 container.getInStateSince(), keyCount, pipelineID, datanodes));
           } catch (IOException ioEx) {
@@ -312,7 +312,7 @@ public class ContainerEndpoint {
         UUID pipelineID = containerInfo.getPipelineID().getId();
         List<ContainerHistory> datanodes =
             containerManager.getLatestContainerHistory(containerID,
-                containerInfo.getReplicationFactor().getNumber());
+                containerInfo.getReplicationConfig().getRequiredNodes());
         unhealthyMeta.add(new UnhealthyContainerMetadata(
             c, datanodes, pipelineID, keyCount));
       }

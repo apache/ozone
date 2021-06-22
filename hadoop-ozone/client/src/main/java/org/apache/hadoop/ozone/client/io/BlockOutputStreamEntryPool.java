@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -68,8 +68,7 @@ public class BlockOutputStreamEntryPool {
   public BlockOutputStreamEntryPool(
       OzoneClientConfig config,
       OzoneManagerProtocol omClient,
-      String requestId, HddsProtos.ReplicationFactor factor,
-      HddsProtos.ReplicationType type,
+      String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
@@ -82,7 +81,7 @@ public class BlockOutputStreamEntryPool {
     this.omClient = omClient;
     this.keyArgs = new OmKeyArgs.Builder().setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
-        .setType(type).setFactor(factor).setDataSize(info.getDataSize())
+        .setReplicationConfig(replicationConfig).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber).build();
     this.requestID = requestId;

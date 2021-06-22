@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -121,7 +123,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
-import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -196,6 +197,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private BlockManager scmBlockManager;
   private final SCMStorageConfig scmStorageConfig;
   private NodeDecommissionManager scmDecommissionManager;
+  private WritableContainerFactory writableContainerFactory;
 
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
@@ -280,7 +282,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Objects.requireNonNull(conf, "configuration cannot not be null");
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
-
     configuration = conf;
     initMetrics();
     containerReportCache = buildContainerReportCache();
@@ -369,13 +370,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     ContainerReportHandler containerReportHandler =
         new ContainerReportHandler(
             scmNodeManager, containerManager, scmContext, conf);
-
     IncrementalContainerReportHandler incrementalContainerReportHandler =
         new IncrementalContainerReportHandler(
             scmNodeManager, containerManager, scmContext);
-
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, conf);
+    CRLStatusReportHandler crlStatusReportHandler =
+        new CRLStatusReportHandler(certificateStore, conf);
 
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
@@ -412,6 +413,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImplV2) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
+    eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
 
     containerBalancer = new ContainerBalancer(scmNodeManager,
         containerManager, replicationManager, configuration, scmContext);
@@ -550,6 +552,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
+    if (configurator.getWritableContainerFactory() != null) {
+      writableContainerFactory = configurator.getWritableContainerFactory();
+    } else {
+      writableContainerFactory = new WritableContainerFactory(this);
+    }
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
@@ -565,14 +572,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           eventQueue,
           scmContext,
           serviceManager,
-          new LockManager<>(conf),
           scmNodeManager);
     }
     if(configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
-          containerManager.getContainers(),
+          containerManager.getContainers(), containerManager,
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
@@ -1222,7 +1228,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
           "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    getDatanodeProtocolServer().start();
+
+    // If HA is enabled, start datanode protocol server once leader is ready.
+    if (!scmStorageConfig.isSCMHAEnabled()) {
+      getDatanodeProtocolServer().start();
+    }
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -1446,6 +1456,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Returns the Writable Container Factory.
+   *
+   * @return The WritableContainerFactory instance used by SCM.
+   */
+  public WritableContainerFactory getWritableContainerFactory() {
+    return writableContainerFactory;
+  }
+
+  /**
    * Returns SCM container manager.
    */
   @VisibleForTesting
@@ -1500,7 +1519,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public boolean checkLeader() {
     // For NON-HA setup, the node will always be the leader
     if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-      Preconditions.checkArgument(scmContext.isLeader());
       return true;
     } else {
       // FOR HA setup, the node has to be the leader and ready to serve

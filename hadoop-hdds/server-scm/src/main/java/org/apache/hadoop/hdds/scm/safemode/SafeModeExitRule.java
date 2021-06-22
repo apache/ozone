@@ -116,4 +116,13 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
    * @return status text.
    */
   abstract String getStatusText();
+
+  /**
+   * Refresh the rule state from current state of SCM.
+   *
+   * @param forceRefresh - refresh rule irrespective of validate() is
+   * true/false.
+   *
+   */
+  protected abstract void refresh(boolean forceRefresh);
 }

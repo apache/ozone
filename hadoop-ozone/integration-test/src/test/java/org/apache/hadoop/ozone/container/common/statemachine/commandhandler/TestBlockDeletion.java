@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -180,8 +181,8 @@ public class TestBlockDeletion {
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
@@ -262,8 +263,8 @@ public class TestBlockDeletion {
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
@@ -392,7 +393,8 @@ public class TestBlockDeletion {
 
     logCapturer.clearOutput();
     cluster.getHddsDatanodes().get(0)
-        .getDatanodeStateMachine().getContext().addReport(dummyReport);
+        .getDatanodeStateMachine().getContext().
+        addIncrementalReport(dummyReport);
     cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().triggerHeartbeat();
     // wait for event to be handled by event handler

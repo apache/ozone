@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -287,4 +289,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
     }
   }
 
+  /**
+   * CRL Status report event payload with origin.
+   */
+  public static class CRLStatusReportFromDatanode
+      extends ReportFromDatanode<CRLStatusReport> {
+
+    public CRLStatusReportFromDatanode(DatanodeDetails datanodeDetails,
+                                           CRLStatusReport report) {
+      super(datanodeDetails, report);
+    }
+  }
 }

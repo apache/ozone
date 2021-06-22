@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.util.Time;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -30,16 +31,17 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 /**
  * Tests OMKeyCommitResponse.
  */
+@SuppressWarnings("visibilitymodifier")
 public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+    omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
+
+    OmKeyInfo omKeyInfo = getOmKeyInfo();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setCommitKeyResponse(
@@ -50,17 +52,14 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+    addKeyToOpenKeyTable();
 
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, clientID);
+    String openKey = getOpenKeyName();
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-    OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, ozoneKey, openKey, omBucketInfo);
+    String ozoneKey = getOzoneKey();
+    OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
+            omKeyInfo, omResponse, openKey, ozoneKey);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -69,8 +68,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     // When key commit key is deleted from openKey table and added to keyTable.
     Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(
-        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)));
+    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
   }
 
   @Test
@@ -78,7 +76,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+    omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
 
@@ -89,18 +87,15 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
             .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
             .build();
 
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, clientID);
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
+    String openKey = getOpenKeyName();
+    String ozoneKey = getOzoneKey();
 
-    OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, ozoneKey, openKey, omBucketInfo);
+    OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
+            omKeyInfo, omResponse, openKey, ozoneKey);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+    addKeyToOpenKeyTable();
 
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
@@ -113,7 +108,28 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     // As omResponse is error it is a no-op. So, entry should still be in
     // openKey table.
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(
-        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)));
+    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
+  }
+
+  @NotNull
+  protected void addKeyToOpenKeyTable() throws Exception {
+    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
+            clientID, replicationType, replicationFactor, omMetadataManager);
+  }
+
+  @NotNull
+  protected String getOzoneKey() {
+    Assert.assertNotNull(omBucketInfo);
+    return omMetadataManager.getOzoneKey(volumeName,
+            omBucketInfo.getBucketName(), keyName);
+  }
+
+  @NotNull
+  protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
+          OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
+          String ozoneKey) {
+    Assert.assertNotNull(omBucketInfo);
+    return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
+            omBucketInfo);
   }
 }
