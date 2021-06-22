@@ -99,8 +99,12 @@ public class StreamingServer implements AutoCloseable {
   }
 
   public void stop() {
-    bossGroup.shutdownGracefully();
-    workerGroup.shutdownGracefully();
+    if (bossGroup != null) {
+      bossGroup.shutdownGracefully();
+    }
+    if (workerGroup != null) {
+      workerGroup.shutdownGracefully();
+    }
   }
 
   public int getPort() {

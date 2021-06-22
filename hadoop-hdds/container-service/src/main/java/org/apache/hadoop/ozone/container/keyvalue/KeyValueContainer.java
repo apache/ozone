@@ -202,6 +202,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     File tempContainerFile = null;
     long containerId = containerData.getContainerID();
     try {
+      Files.createDirectories(containerFile.getParentFile().toPath());
       tempContainerFile = createTempFile(containerFile);
       ContainerDataYaml.createContainerFile(
           ContainerType.KeyValueContainer, containerData, tempContainerFile);

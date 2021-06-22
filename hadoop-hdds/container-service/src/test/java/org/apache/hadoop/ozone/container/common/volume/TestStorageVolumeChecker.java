@@ -245,11 +245,13 @@ public class TestStorageVolumeChecker {
         // add containers to the created volume
         Container container = ContainerTestUtils.getContainer(++i, layout,
             state);
-        container.getContainerData()
-            .setVolume((HddsVolume) volumeSet.getVolumeMap()
-                .get(volRootDir.getPath()));
-        ((KeyValueContainerData) container.getContainerData())
-            .setMetadataPath(volParentDir.getPath());
+
+        KeyValueContainerData kvcd = (KeyValueContainerData)
+            container.getContainerData();
+        final HddsVolume hddsVolume = (HddsVolume) volumeSet.getVolumeMap()
+            .get(volRootDir.getPath());
+        kvcd.assignToVolume(UUID.randomUUID().toString(), hddsVolume);
+
         containerSet.addContainer(container);
       }
     }
