@@ -151,7 +151,7 @@ public final class OzoneManagerRatisServer {
       LOG.info("OM started in Bootstrap mode. Instantiating OM Ratis server " +
           "with groupID: {}", raftGroupIdStr);
     } else {
-     StringBuilder raftPeersStr = new StringBuilder();
+      StringBuilder raftPeersStr = new StringBuilder();
       for (RaftPeer peer : peers) {
         raftPeersStr.append(", ").append(peer.getAddress());
       }

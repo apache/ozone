@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.base.Supplier;
 import java.io.File;
 import java.io.FileFilter;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
