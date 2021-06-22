@@ -233,7 +233,7 @@ public class TestRatisPipelineProvider {
         Assert.fail();
       } catch(SCMException ex) {
         Assert.assertTrue(ex.getMessage().contains("Unable to find enough" +
-            "nodes that meet the space requirement"));
+            " nodes that meet the space requirement"));
       }
     }
   }

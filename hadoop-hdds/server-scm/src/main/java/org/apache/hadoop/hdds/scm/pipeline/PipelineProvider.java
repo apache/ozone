@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 public abstract class PipelineProvider<REPLICATION_CONFIG
     extends ReplicationConfig> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
+      LoggerFactory.getLogger(PipelineProvider.class);
   private final NodeManager nodeManager;
   private final StateManager stateManager;
 

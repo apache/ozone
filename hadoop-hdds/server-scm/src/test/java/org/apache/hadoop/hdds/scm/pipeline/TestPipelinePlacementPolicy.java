@@ -201,7 +201,7 @@ public class TestPipelinePlacementPolicy {
 
     thrownExp.expect(SCMException.class);
     thrownExp.expectMessage("Unable to find enough nodes that meet" +
-        "the space requirement");
+        " the space requirement");
     localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
         new ArrayList<>(datanodes.size()), nodesRequired,
         containerSizeBytes);
