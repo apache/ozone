@@ -1512,6 +1512,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return replicationManager;
   }
 
+  @VisibleForTesting
+  @Override
+  public ContainerBalancer getContainerBalancer() {
+    return containerBalancer;
+  }
+
   /**
    * Check if the current scm is the leader and ready for accepting requests.
    * @return - if the current scm is the leader and is ready.
