@@ -95,7 +95,7 @@ public class WritableECContainerProvider
       if (openPipelineCount < providerConfig.getMinimumPipelines()) {
         try {
           // TODO - PipelineManager should allow for creating a pipeline with
-          //        excluded nodes.
+          //        excluded nodes. HDDS-5375.
           return allocateContainer(repConfig, size, owner);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
@@ -148,7 +148,7 @@ public class WritableECContainerProvider
     try {
       synchronized(this) {
         // TODO - PipelineManager should allow for creating a pipeline with
-        //        excluded nodes.
+        //        excluded nodes. HDDS-5375.
         return allocateContainer(repConfig, size, owner);
       }
     } catch (IOException e) {

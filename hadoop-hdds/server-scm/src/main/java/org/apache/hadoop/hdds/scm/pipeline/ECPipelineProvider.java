@@ -35,7 +35,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
   // TODO - EC Placement Policy. Standard Network Aware topology will not work
   //        for EC as it stands. We may want an "as many racks as possible"
-  //        policy.
+  //        policy. HDDS-5326.
 
   private final ConfigurationSource conf;
   private final PlacementPolicy placementPolicy;
@@ -62,7 +62,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       List<DatanodeDetails> nodes) {
 
     Map<DatanodeDetails, Integer> dnIndexes = new HashMap<>();
-    int ecIndex = 0;
+    int ecIndex = 1;
     for (DatanodeDetails dn : nodes) {
       dnIndexes.put(dn, ecIndex);
       ecIndex++;

@@ -76,7 +76,8 @@ public class TestECPipelineProvider {
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     List<DatanodeDetails> dns = pipeline.getNodes();
     for (int i=0; i<ecConf.getRequiredNodes(); i++) {
-      Assert.assertEquals(i, pipeline.getReplicaIndex(dns.get(i)));
+      // EC DN indexes are numbered starting from 1 to N.
+      Assert.assertEquals(i+1, pipeline.getReplicaIndex(dns.get(i)));
     }
   }
 
