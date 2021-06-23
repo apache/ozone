@@ -202,6 +202,9 @@ public class WritableECContainerProvider
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, BYTES);
   }
 
+  /**
+   * Class to hold configuration for WriteableECContainerProvider.
+   */
   @ConfigGroup(prefix = "ozone.scm.ec")
   public static class WritableECContainerProviderConfig {
 
