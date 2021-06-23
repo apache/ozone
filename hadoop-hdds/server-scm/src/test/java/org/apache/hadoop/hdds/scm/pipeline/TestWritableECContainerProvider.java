@@ -71,6 +71,7 @@ public class TestWritableECContainerProvider {
   private ConfigurationSource conf;
   private WritableContainerProvider provider;
   private ReplicationConfig repConfig;
+  private int minPipelines;
 
   private Map<ContainerID, ContainerInfo> containers;
 
@@ -78,6 +79,10 @@ public class TestWritableECContainerProvider {
   public void setup() throws ContainerNotFoundException {
     repConfig = new ECReplicationConfig(3, 2);
     conf = new OzoneConfiguration();
+    WritableECContainerProvider.WritableECContainerProviderConfig providerConf =
+        conf.getObject(WritableECContainerProvider
+            .WritableECContainerProviderConfig.class);
+    minPipelines = providerConf.getMinimumPipelines();
     containers = new HashMap<>();
     provider = new WritableECContainerProvider(
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
@@ -108,7 +113,7 @@ public class TestWritableECContainerProvider {
       throws IOException {
     // The first 5 calls should return a different container
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container =
           provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       assertFalse(allocatedContainers.contains(container));
@@ -121,8 +126,9 @@ public class TestWritableECContainerProvider {
           provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // Should have 5 containers created
-    assertEquals(5, pipelineManager.getPipelines(repConfig, OPEN).size());
+    // Should have minPipelines containers created
+    assertEquals(minPipelines,
+        pipelineManager.getPipelines(repConfig, OPEN).size());
     // We should have more than 1 allocatedContainers in the set proving a
     // random container is selected each time. Do not check for 5 here as there
     // is a reasonable chance that in 20 turns we don't pick all 5 nodes.
@@ -132,7 +138,7 @@ public class TestWritableECContainerProvider {
   @Test
   public void testPiplineLimitIgnoresExcludedPipelines() throws IOException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
@@ -154,7 +160,7 @@ public class TestWritableECContainerProvider {
   public void testNewPipelineCreatedIfAllPipelinesExcluded()
       throws IOException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
@@ -174,7 +180,7 @@ public class TestWritableECContainerProvider {
   public void testNewPipelineCreatedIfAllContainersExcluded()
       throws IOException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
@@ -240,7 +246,7 @@ public class TestWritableECContainerProvider {
   public void testNewContainerAllocatedAndPipelinesClosedIfNoSpaceInExisting()
       throws IOException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container =
           provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       assertFalse(allocatedContainers.contains(container));
@@ -279,7 +285,7 @@ public class TestWritableECContainerProvider {
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
 
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container =
           provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       assertFalse(allocatedContainers.contains(container));
@@ -297,7 +303,7 @@ public class TestWritableECContainerProvider {
   public void testContainerNotFoundWhenAttemptingToUseExisting()
       throws IOException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container =
           provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       assertFalse(allocatedContainers.contains(container));
@@ -328,7 +334,7 @@ public class TestWritableECContainerProvider {
     // When tha happens, CM will change the container state to CLOSING and
     // remove it from the container list in pipeline Manager.
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<minPipelines; i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       assertFalse(allocatedContainers.contains(container));

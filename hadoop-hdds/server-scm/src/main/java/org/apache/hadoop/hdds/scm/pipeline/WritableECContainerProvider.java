@@ -20,6 +20,10 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
@@ -47,18 +51,19 @@ public class WritableECContainerProvider
   private static final Logger LOG = LoggerFactory
       .getLogger(WritableECContainerProvider.class);
 
-  private static int minPipelines = 5;
-
   private final ConfigurationSource conf;
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManagerV2 containerManager;
   private final long containerSize;
+  private final WritableECContainerProviderConfig providerConfig;
 
   public WritableECContainerProvider(ConfigurationSource conf,
       PipelineManager pipelineManager, ContainerManagerV2 containerManager,
       PipelineChoosePolicy pipelineChoosePolicy) {
     this.conf = conf;
+    this.providerConfig =
+        conf.getObject(WritableECContainerProviderConfig.class);
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
@@ -87,7 +92,7 @@ public class WritableECContainerProvider
     synchronized(this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < minPipelines) {
+      if (openPipelineCount < providerConfig.getMinimumPipelines()) {
         try {
           // TODO - PipelineManager should allow for creating a pipeline with
           //        excluded nodes.
@@ -195,6 +200,27 @@ public class WritableECContainerProvider
     return (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, BYTES);
+  }
+
+  @ConfigGroup(prefix = "ozone.scm.ec")
+  public static class WritableECContainerProviderConfig {
+
+    @Config(key = "pipeline.minimum",
+        defaultValue = "5",
+        type = ConfigType.INT,
+        description = "The minimum number of pipelines to have open for each " +
+            "Erasure Coding configuration",
+        tags = ConfigTag.STORAGE)
+    private int minimumPipelines = 5;
+
+    public int getMinimumPipelines() {
+      return minimumPipelines;
+    }
+
+    public void setMinimumPipelines(int minPipelines) {
+      this.minimumPipelines = minPipelines;
+    }
+
   }
 
 }
