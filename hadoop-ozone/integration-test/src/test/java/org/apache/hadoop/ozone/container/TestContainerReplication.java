@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -73,6 +75,8 @@ public class TestContainerReplication {
   @Before
   public void setUp() throws Exception {
     OzoneConfiguration conf = createConfiguration();
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
+        5, TimeUnit.SECONDS);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).build();
     cluster.waitForClusterToBeReady();
