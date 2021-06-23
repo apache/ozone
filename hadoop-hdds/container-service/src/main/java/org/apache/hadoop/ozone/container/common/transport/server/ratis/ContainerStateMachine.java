@@ -498,26 +498,25 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public CompletableFuture<DataStream> stream(RaftClientRequest request) {
-    try {
-      ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(gid,
-              request.getMessage().getContent());
-      DispatcherContext context =
-          new DispatcherContext.Builder()
-              .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
-              .setContainer2BCSIDMap(container2BCSIDMap)
-              .build();
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        ContainerCommandRequestProto requestProto =
+            getContainerCommandRequestProto(gid,
+                request.getMessage().getContent());
+        DispatcherContext context =
+            new DispatcherContext.Builder()
+                .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
+                .setContainer2BCSIDMap(container2BCSIDMap)
+                .build();
 
-      ContainerCommandResponseProto response = runCommand(
-          requestProto, context);
-      String path = response.getMessage();
-      CompletableFuture<DataStream> dataStream = new CompletableFuture<>();
-      dataStream.complete(new LocalStream(new StreamDataChannel(
-          Paths.get(path))));
-      return dataStream;
-    } catch (IOException e) {
-      throw new CompletionException("Failed to create data stream", e);
-    }
+        ContainerCommandResponseProto response = runCommand(
+            requestProto, context);
+        String path = response.getMessage();
+        return new LocalStream(new StreamDataChannel(Paths.get(path)));
+      } catch (IOException e) {
+        throw new CompletionException("Failed to create data stream", e);
+      }
+    }, executor);
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
