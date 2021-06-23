@@ -130,7 +130,7 @@ public class SCMHAConfiguration {
           "operation for SCM")
   private long ratisSnapshotThreshold = 1000L;
 
-  @Config(key = "ratis.request.timeout",
+  @Config(key = "ratis.minimum.timeout",
       type = ConfigType.TIME,
       defaultValue = "3000ms",
       tags = {SCM, OZONE, HA, RATIS},

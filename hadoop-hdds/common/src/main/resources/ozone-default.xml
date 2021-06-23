@@ -2054,6 +2054,14 @@
   </property>
 
   <property>
+    <name>ozone.scm.ratis.minimum.timeout</name>
+    <value>1s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The minimum timeout duration for SCM's Ratis server rpc.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.metadata.dir</name>
     <value/>
     <tag>X509, SECURITY</tag>
