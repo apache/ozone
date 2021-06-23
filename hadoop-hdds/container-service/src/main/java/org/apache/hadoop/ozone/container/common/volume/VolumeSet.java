@@ -22,8 +22,8 @@ import org.apache.hadoop.ozone.lock.ReadWriteLockable;
 import java.util.List;
 
 /**
- * Set of HDDS volumes.
+ * Set of volumes.
  */
 public interface VolumeSet extends ReadWriteLockable {
-  List<HddsVolume> getVolumesList();
+  List<StorageVolume> getVolumesList();
 }

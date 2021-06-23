@@ -43,14 +43,26 @@ public class DatanodeConfiguration {
       "hdds.datanode.container.delete.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
-  public static final String FAILED_VOLUMES_TOLERATED_KEY =
-      "hdds.datanode.failed.volumes.tolerated";
+  public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY =
+      "hdds.datanode.failed.data.volumes.tolerated";
+  public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
+      "hdds.datanode.failed.metadata.volumes.tolerated";
+  public static final String DISK_CHECK_MIN_GAP_KEY =
+      "hdds.datanode.disk.check.min.gap";
+  public static final String DISK_CHECK_TIMEOUT_KEY =
+      "hdds.datanode.disk.check.timeout";
 
   static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
 
   static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 15;
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
+
+  static final long DISK_CHECK_MIN_GAP_DEFAULT =
+      Duration.ofMinutes(15).toMillis();
+
+  static final long DISK_CHECK_TIMEOUT_DEFAULT =
+      Duration.ofMinutes(10).toMillis();
 
   /**
    * The maximum number of replication commands a single datanode can execute
@@ -127,16 +139,48 @@ public class DatanodeConfiguration {
   private long periodicDiskCheckIntervalMinutes =
       PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 
-  @Config(key = "failed.volumes.tolerated",
+  @Config(key = "failed.data.volumes.tolerated",
       defaultValue = "-1",
       type = ConfigType.INT,
       tags = { DATANODE },
-      description = "The number of volumes that are allowed to fail "
+      description = "The number of data volumes that are allowed to fail "
           + "before a datanode stops offering service. "
           + "Config this to -1 means unlimited, but we should have "
           + "at least one good volume left."
   )
-  private int failedVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+  private int failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+
+  @Config(key = "failed.metadata.volumes.tolerated",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of metadata volumes that are allowed to fail "
+          + "before a datanode stops offering service. "
+          + "Config this to -1 means unlimited, but we should have "
+          + "at least one good volume left."
+  )
+  private int failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+
+  @Config(key = "disk.check.min.gap",
+      defaultValue = "15m",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "The minimum gap between two successive checks of the same"
+          + " Datanode volume. Unit could be defined with"
+          + " postfix (ns,ms,s,m,h,d)."
+  )
+  private long diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
+
+  @Config(key = "disk.check.timeout",
+      defaultValue = "10m",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "Maximum allowed time for a disk check to complete."
+          + " If the check does not complete within this time interval"
+          + " then the disk is declared as failed. Unit could be defined with"
+          + " postfix (ns,ms,s,m,h,d)."
+  )
+  private long diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
   @PostConstruct
   public void validate() {
@@ -163,11 +207,32 @@ public class DatanodeConfiguration {
           PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
     }
 
-    if (failedVolumesTolerated < -1) {
-      LOG.warn(FAILED_VOLUMES_TOLERATED_KEY +
+    if (failedDataVolumesTolerated < -1) {
+      LOG.warn(FAILED_DATA_VOLUMES_TOLERATED_KEY +
           "must be greater than -1 and was set to {}. Defaulting to {}",
-          failedVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
-      failedVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+          failedDataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
+      failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+    }
+
+    if (failedMetadataVolumesTolerated < -1) {
+      LOG.warn(FAILED_METADATA_VOLUMES_TOLERATED_KEY +
+              "must be greater than -1 and was set to {}. Defaulting to {}",
+          failedMetadataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
+      failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+    }
+
+    if (diskCheckMinGap < 0) {
+      LOG.warn(DISK_CHECK_MIN_GAP_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          diskCheckMinGap, DISK_CHECK_MIN_GAP_DEFAULT);
+      diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
+    }
+
+    if (diskCheckTimeout < 0) {
+      LOG.warn(DISK_CHECK_TIMEOUT_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
+      diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
   }
 
@@ -196,11 +261,35 @@ public class DatanodeConfiguration {
     this.periodicDiskCheckIntervalMinutes = periodicDiskCheckIntervalMinutes;
   }
 
-  public int getFailedVolumesTolerated() {
-    return failedVolumesTolerated;
+  public int getFailedDataVolumesTolerated() {
+    return failedDataVolumesTolerated;
   }
 
-  public void setFailedVolumesTolerated(int failedVolumesTolerated) {
-    this.failedVolumesTolerated = failedVolumesTolerated;
+  public void setFailedDataVolumesTolerated(int failedVolumesTolerated) {
+    this.failedDataVolumesTolerated = failedVolumesTolerated;
+  }
+
+  public int getFailedMetadataVolumesTolerated() {
+    return failedMetadataVolumesTolerated;
+  }
+
+  public void setFailedMetadataVolumesTolerated(int failedVolumesTolerated) {
+    this.failedMetadataVolumesTolerated = failedVolumesTolerated;
+  }
+
+  public Duration getDiskCheckMinGap() {
+    return Duration.ofMillis(diskCheckMinGap);
+  }
+
+  public void setDiskCheckMinGap(Duration duration) {
+    this.diskCheckMinGap = duration.toMillis();
+  }
+
+  public Duration getDiskCheckTimeout() {
+    return Duration.ofMillis(diskCheckTimeout);
+  }
+
+  public void setDiskCheckTimeout(Duration duration) {
+    this.diskCheckTimeout = duration.toMillis();
   }
 }

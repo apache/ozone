@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.genesis;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -107,9 +106,7 @@ public class BenchMarkContainerStateMap {
         ContainerInfo containerInfo = new ContainerInfo.Builder()
             .setState(CLOSED)
             .setPipelineID(pipeline.getId())
-            .setReplicationType(pipeline.getType())
-            .setReplicationFactor(ReplicationConfig
-                .getLegacyFactor(pipeline.getReplicationConfig()))
+            .setReplicationConfig(pipeline.getReplicationConfig())
             .setUsedBytes(0)
             .setNumberOfKeys(0)
             .setStateEnterTime(Time.now())
@@ -128,9 +125,7 @@ public class BenchMarkContainerStateMap {
         ContainerInfo containerInfo = new ContainerInfo.Builder()
             .setState(OPEN)
             .setPipelineID(pipeline.getId())
-            .setReplicationType(pipeline.getType())
-            .setReplicationFactor(ReplicationConfig
-                .getLegacyFactor(pipeline.getReplicationConfig()))
+            .setReplicationConfig(pipeline.getReplicationConfig())
             .setUsedBytes(0)
             .setNumberOfKeys(0)
             .setStateEnterTime(Time.now())
@@ -148,9 +143,7 @@ public class BenchMarkContainerStateMap {
       ContainerInfo containerInfo = new ContainerInfo.Builder()
           .setState(OPEN)
           .setPipelineID(pipeline.getId())
-          .setReplicationType(pipeline.getType())
-          .setReplicationFactor(ReplicationConfig
-              .getLegacyFactor(pipeline.getReplicationConfig()))
+          .setReplicationConfig(pipeline.getReplicationConfig())
           .setUsedBytes(0)
           .setNumberOfKeys(0)
           .setStateEnterTime(Time.now())
@@ -181,10 +174,7 @@ public class BenchMarkContainerStateMap {
     return new ContainerInfo.Builder()
         .setState(CLOSED)
         .setPipelineID(pipeline.getId())
-        .setReplicationType(
-            pipeline.getReplicationConfig().getReplicationType())
-        .setReplicationFactor(
-            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
+        .setReplicationConfig(pipeline.getReplicationConfig())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setStateEnterTime(Time.now())

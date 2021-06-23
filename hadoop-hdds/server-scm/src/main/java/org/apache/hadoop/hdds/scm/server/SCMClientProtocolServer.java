@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -146,6 +147,7 @@ public class SCMClientProtocolServer implements
         false)) {
       clientRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
+    HddsServerUtil.addSuppressedLoggingExceptions(clientRpcServer);
   }
 
   public RPC.Server getClientRpcServer() {
@@ -254,7 +256,8 @@ public class SCMClientProtocolServer implements
 
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
-          new StandaloneReplicationConfig(container.getReplicationFactor()),
+          new StandaloneReplicationConfig(ReplicationConfig
+              .getLegacyFactor(container.getReplicationConfig())),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
               .map(ContainerReplica::getDatanodeDetails)
@@ -339,7 +342,7 @@ public class SCMClientProtocolServer implements
     try{
       return getScm().getContainerManager()
           .getContainerReplicas(contInfo.containerID())
-          .size() >= contInfo.getReplicationFactor().getNumber();
+          .size() >= contInfo.getReplicationConfig().getRequiredNodes();
     } catch (ContainerNotFoundException ex) {
       // getContainerReplicas throws exception if no replica's exist for given
       // container.

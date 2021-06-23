@@ -305,9 +305,7 @@ public class ContainerStateManager {
         .setOwner(owner)
         .setContainerID(containerID)
         .setDeleteTransactionId(0)
-        .setReplicationFactor(
-            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
-        .setReplicationType(pipeline.getType())
+        .setReplicationConfig(pipeline.getReplicationConfig())
         .build();
     addContainerInfo(containerID, containerInfo, pipelineManager, pipeline);
     if (LOG.isTraceEnabled()) {

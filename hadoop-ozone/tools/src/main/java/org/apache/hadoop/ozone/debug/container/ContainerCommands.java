@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
@@ -35,8 +36,10 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
@@ -56,6 +59,7 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
@@ -114,7 +118,8 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
     String clusterId = getClusterId(firstStorageDir);
 
-    volumeSet = new MutableVolumeSet(datanodeUuid, conf, null);
+    volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
 
     Map<ContainerProtos.ContainerType, Handler> handlers = new HashMap<>();
 
@@ -136,8 +141,9 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
     controller = new ContainerController(containerSet, handlers);
 
-    Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
-        .iterator();
+    List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getVolumesList());
+    Iterator<HddsVolume> volumeSetIterator = volumes.iterator();
 
     LOG.info("Starting the read all the container metadata");
 
@@ -190,7 +196,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   private String getFirstStorageDir(ConfigurationSource config)
       throws IOException {
     final Collection<String> storageDirs =
-        MutableVolumeSet.getDatanodeStorageDirs(config);
+        HddsServerUtil.getDatanodeStorageDirs(config);
 
     return
         StorageLocation.parse(storageDirs.iterator().next())

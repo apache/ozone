@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
@@ -162,7 +161,6 @@ public class TestReplicationManager {
         eventQueue,
         SCMContext.emptyContext(),
         serviceManager,
-        new LockManager<>(conf),
         nodeManager);
 
     serviceManager.notifyStatusChanged();
@@ -186,7 +184,6 @@ public class TestReplicationManager {
         eventQueue,
         SCMContext.emptyContext(),
         serviceManager,
-        new LockManager<ContainerID>(config),
         nodeManager);
 
     serviceManager.notifyStatusChanged();

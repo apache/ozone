@@ -31,7 +31,7 @@ import java.time.Instant;
 
 // TODO: define a generic interface for this
 /**
- * TODO: javadoc.
+ * Checkpoint write stream and exception handling.
  */
 public class SCMDBCheckpointProvider {
 

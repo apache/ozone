@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
     .RoundRobinVolumeChoosingPolicy;
@@ -178,8 +179,8 @@ public class TestKeyValueContainer {
             datanodeId.toString());
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
-    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-        .getVolumesList(), 1);
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
     String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
     container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
@@ -220,8 +221,8 @@ public class TestKeyValueContainer {
             datanodeId.toString());
     container = new KeyValueContainer(containerData, CONF);
 
-    containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-        .getVolumesList(), 1);
+    containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
     hddsVolumeDir = containerVolume.getHddsRootDir().toString();
     container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
     try {

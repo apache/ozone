@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
+import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -33,6 +34,7 @@ import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * This interface allows the DefaultCA to be portable and use different DB
@@ -156,6 +158,10 @@ public interface CertificateStore {
    * @return latest CRL id.
    */
   long getLatestCrlId();
+
+  CRLStatus getCRLStatusForDN(UUID uuid);
+
+  void setCRLStatusForDN(UUID uuid, CRLStatus crlStatus);
 
   /**
    * Different kind of Certificate stores.

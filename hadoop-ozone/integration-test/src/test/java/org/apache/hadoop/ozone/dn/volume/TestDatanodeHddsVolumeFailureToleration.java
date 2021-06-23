@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.junit.After;
@@ -63,7 +63,7 @@ public class TestDatanodeHddsVolumeFailureToleration {
     // set tolerated = 1
     DatanodeConfiguration dnConf =
         ozoneConfig.getObject(DatanodeConfiguration.class);
-    dnConf.setFailedVolumesTolerated(1);
+    dnConf.setFailedDataVolumesTolerated(1);
     ozoneConfig.setFromObject(dnConf);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
@@ -85,9 +85,9 @@ public class TestDatanodeHddsVolumeFailureToleration {
     HddsDatanodeService dn = datanodes.get(0);
     OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
     MutableVolumeSet volSet = oc.getVolumeSet();
-    HddsVolume vol0 = volSet.getVolumesList().get(0);
+    StorageVolume vol0 = volSet.getVolumesList().get(0);
     // keep the file for restore since we'll do restart
-    File volRootDir0 = vol0.getHddsRootDir();
+    File volRootDir0 = vol0.getStorageDir();
 
     // simulate bad volumes <= tolerated
     DatanodeTestUtils.simulateBadRootDir(volRootDir0);
@@ -106,10 +106,10 @@ public class TestDatanodeHddsVolumeFailureToleration {
     HddsDatanodeService dn = datanodes.get(0);
     OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
     MutableVolumeSet volSet = oc.getVolumeSet();
-    HddsVolume vol0 = volSet.getVolumesList().get(0);
-    HddsVolume vol1 = volSet.getVolumesList().get(1);
-    File volRootDir0 = vol0.getHddsRootDir();
-    File volRootDir1 = vol1.getHddsRootDir();
+    StorageVolume vol0 = volSet.getVolumesList().get(0);
+    StorageVolume vol1 = volSet.getVolumesList().get(1);
+    File volRootDir0 = vol0.getStorageDir();
+    File volRootDir1 = vol1.getStorageDir();
 
     // simulate bad volumes > tolerated
     DatanodeTestUtils.simulateBadRootDir(volRootDir0);

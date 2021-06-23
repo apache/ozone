@@ -493,6 +493,7 @@ public class TestStorageContainerManager {
   public void testSCMInitializationWithHAEnabled() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     final String path = GenericTestUtils.getTempPath(
         UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");

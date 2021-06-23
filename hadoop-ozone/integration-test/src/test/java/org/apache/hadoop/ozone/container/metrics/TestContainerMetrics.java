@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.metrics;
 
 import java.io.File;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,8 +45,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -91,8 +94,10 @@ public class TestContainerMetrics {
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, path);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, path);
       VolumeSet volumeSet = new MutableVolumeSet(
-          datanodeDetails.getUuidString(), conf, null);
+          datanodeDetails.getUuidString(), conf,
+          null, StorageVolume.VolumeType.DATA_VOLUME, null);
       ContainerSet containerSet = new ContainerSet();
       DatanodeStateMachine stateMachine = Mockito.mock(
           DatanodeStateMachine.class);
@@ -159,7 +164,9 @@ public class TestContainerMetrics {
       assertQuantileGauges("WriteChunkNanos" + sec, containerMetrics);
 
       // Check VolumeIOStats metrics
-      HddsVolume hddsVolume = volumeSet.getVolumesList().get(0);
+      List<HddsVolume> volumes =
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+      HddsVolume hddsVolume = volumes.get(0);
       MetricsRecordBuilder volumeIOMetrics =
           getMetrics(hddsVolume.getVolumeIOStats().getMetricsSourceName());
       assertCounter("ReadBytes", 1024L, volumeIOMetrics);

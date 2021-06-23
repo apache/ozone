@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -298,8 +297,8 @@ public class TestKeyManagerUnit {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(key)
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .build();
     return omtest.initiateMultipartUpload(key1);
@@ -313,8 +312,8 @@ public class TestKeyManagerUnit {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
@@ -402,9 +401,9 @@ public class TestKeyManagerUnit {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(256000)
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
-        .setAcls(Collections.emptyList())
+        .setReplicationConfig(
+                    new RatisReplicationConfig(ReplicationFactor.THREE))
+            .setAcls(Collections.emptyList())
         .build();
     TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);
 
@@ -472,8 +471,8 @@ public class TestKeyManagerUnit {
           .setCreationTime(Time.now())
           .setOmKeyLocationInfos(singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setReplicationFactor(ReplicationFactor.THREE)
-          .setReplicationType(ReplicationType.RATIS)
+          .setReplicationConfig(
+                      new RatisReplicationConfig(ReplicationFactor.THREE))
           .setKeyName(keyPrefix + i)
           .setObjectID(i)
           .setUpdateID(i)

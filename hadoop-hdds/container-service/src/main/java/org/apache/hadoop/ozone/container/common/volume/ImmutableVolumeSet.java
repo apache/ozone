@@ -22,18 +22,18 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 
 /**
- * Fixed list of HDDS volumes.
+ * Fixed list of volumes.
  */
 public final class ImmutableVolumeSet implements VolumeSet {
 
-  private final List<HddsVolume> volumes;
+  private final List<StorageVolume> volumes;
 
-  public ImmutableVolumeSet(HddsVolume... volumes) {
+  public ImmutableVolumeSet(StorageVolume... volumes) {
     this.volumes = ImmutableList.copyOf(volumes);
   }
 
   @Override
-  public List<HddsVolume> getVolumesList() {
+  public List<StorageVolume> getVolumesList() {
     return volumes;
   }
 
