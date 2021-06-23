@@ -54,6 +54,16 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
         new OMBucketSetPropertyRequest(omRequest);
 
+    OMRequest preExecuteRequest =
+        omBucketSetPropertyRequest.preExecute(ozoneManager);
+    // When preExecute() of bucket setProperty,
+    // the new modification time is greater than origin one.
+    long originModTime = omRequest.getSetBucketPropertyRequest()
+        .getModificationTime();
+    long newModTime = preExecuteRequest.getSetBucketPropertyRequest()
+        .getModificationTime();
+    Assert.assertTrue(newModTime > originModTime);
+
     // As user info gets added.
     Assert.assertNotEquals(omRequest,
         omBucketSetPropertyRequest.preExecute(ozoneManager));

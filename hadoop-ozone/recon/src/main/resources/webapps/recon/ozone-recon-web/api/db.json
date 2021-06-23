@@ -9,6 +9,7 @@
       "remaining": 12094627905536
     },
     "containers": 3230,
+    "openContainers": 3210,
     "volumes": 5,
     "buckets": 156,
     "keys": 253000
@@ -42,6 +43,7 @@
           }
         ],
         "containers": 80,
+        "openContainers": 79,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574728775759,
@@ -74,6 +76,7 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -106,6 +109,7 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -138,6 +142,7 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -170,6 +175,7 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -208,6 +214,7 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -246,6 +253,7 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -284,6 +292,7 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -322,6 +331,7 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -360,6 +370,7 @@
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -379,6 +390,7 @@
         },
         "pipelines": [],
         "containers": 0,
+        "openContainers": 0,
         "leaderCount": 0,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1074724802059,
@@ -411,6 +423,7 @@
           }
         ],
         "containers": 643,
+        "openContainers": 632,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724816029,
@@ -443,6 +456,7 @@
           }
         ],
         "containers": 5,
+        "openContainers": 4,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724802059,
@@ -481,6 +495,7 @@
           }
         ],
         "containers": 64,
+        "openContainers": 63,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724676009,
@@ -513,6 +528,7 @@
           }
         ],
         "containers": 21,
+        "openContainers": 20,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724276050,
@@ -545,6 +561,7 @@
           }
         ],
         "containers": 897,
+        "openContainers": 896,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724573011,
@@ -583,6 +600,7 @@
           }
         ],
         "containers": 6754,
+        "openContainers": 6744,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574723756059,
@@ -615,6 +633,7 @@
           }
         ],
         "containers": 78,
+        "openContainers": 77,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1474724705783,
@@ -647,6 +666,7 @@
           }
         ],
         "containers": 543,
+        "openContainers": 540,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724706232,

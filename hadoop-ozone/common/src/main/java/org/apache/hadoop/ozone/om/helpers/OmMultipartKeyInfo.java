@@ -35,6 +35,30 @@ public class OmMultipartKeyInfo extends WithObjectID {
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
 
   /**
+   * A pointer to parent directory used for path traversal. ParentID will be
+   * used only when the multipart key is created into a FileSystemOptimized(FSO)
+   * bucket.
+   * <p>
+   * For example, if a key "a/b/multiKey1" created into a FSOBucket then each
+   * path component will be assigned an ObjectId and linked to its parent path
+   * component using parent's objectID.
+   * <p>
+   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
+   * element.
+   * <p>
+   * ------------------------------------------|
+   * PathComponent |   ObjectID   |   ParentID |
+   * ------------------------------------------|
+   *      a        |     1024     |     512    |
+   * ------------------------------------------|
+   *      b        |     1025     |     1024   |
+   * ------------------------------------------|
+   *   multiKey1   |     1026     |     1025   |
+   * ------------------------------------------|
+   */
+  private long parentID;
+
+  /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
    */
@@ -47,6 +71,28 @@ public class OmMultipartKeyInfo extends WithObjectID {
     this.partKeyInfoList = new TreeMap<>(list);
     this.objectID = objectID;
     this.updateID = updateID;
+  }
+
+  /**
+   * Construct OmMultipartKeyInfo object which holds multipart upload
+   * information for a key.
+   */
+  @SuppressWarnings("parameternumber")
+  public OmMultipartKeyInfo(String id, long creationTime,
+      ReplicationConfig replicationConfig,
+      Map<Integer, PartKeyInfo> list, long objectID, long updateID,
+      long parentObjId) {
+    this(id, creationTime, replicationConfig, list, objectID, updateID);
+    this.parentID = parentObjId;
+  }
+
+  /**
+   * Returns parentID.
+   *
+   * @return long
+   */
+  public long getParentID() {
+    return parentID;
   }
 
   /**
@@ -87,6 +133,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long objectID;
     private long updateID;
+    private long parentID;
 
     public Builder() {
       this.partKeyInfoList = new TreeMap<>();
@@ -131,9 +178,14 @@ public class OmMultipartKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setParentID(long parentObjId) {
+      this.parentID = parentObjId;
+      return this;
+    }
+
     public OmMultipartKeyInfo build() {
       return new OmMultipartKeyInfo(uploadID, creationTime, replicationConfig,
-              partKeyInfoList, objectID, updateID);
+              partKeyInfoList, objectID, updateID, parentID);
     }
   }
 
@@ -156,7 +208,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
         multipartKeyInfo.getCreationTime(), replicationConfig,
         list, multipartKeyInfo.getObjectID(),
-        multipartKeyInfo.getUpdateID());
+        multipartKeyInfo.getUpdateID(), multipartKeyInfo.getParentID());
   }
 
   /**
@@ -170,7 +222,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
         .setType(replicationConfig.getReplicationType())
         .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
         .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .setUpdateID(updateID)
+        .setParentID(parentID);
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }
@@ -198,7 +251,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     // For partKeyInfoList we can do shallow copy here, as the PartKeyInfo is
     // immutable here.
     return new OmMultipartKeyInfo(uploadID, creationTime, replicationConfig,
-            new TreeMap<>(partKeyInfoList), objectID, updateID);
+            new TreeMap<>(partKeyInfoList), objectID, updateID, parentID);
   }
 
 }

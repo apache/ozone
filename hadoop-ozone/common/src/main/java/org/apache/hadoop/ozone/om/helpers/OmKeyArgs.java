@@ -46,6 +46,8 @@ public final class OmKeyArgs implements Auditable {
   private boolean refreshPipeline;
   private boolean sortDatanodesInPipeline;
   private List<OzoneAcl> acls;
+  private boolean latestVersionLocation;
+  private boolean recursive;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
@@ -53,7 +55,8 @@ public final class OmKeyArgs implements Auditable {
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
-      List<OzoneAcl> acls, boolean sortDatanode) {
+      List<OzoneAcl> acls, boolean sortDatanode,
+      boolean latestVersionLocation, boolean recursive) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -67,6 +70,8 @@ public final class OmKeyArgs implements Auditable {
     this.refreshPipeline = refreshPipeline;
     this.acls = acls;
     this.sortDatanodesInPipeline = sortDatanode;
+    this.latestVersionLocation = latestVersionLocation;
+    this.recursive = recursive;
   }
 
   public boolean getIsMultipartKey() {
@@ -133,6 +138,14 @@ public final class OmKeyArgs implements Auditable {
     return sortDatanodesInPipeline;
   }
 
+  public boolean getLatestVersionLocation() {
+    return latestVersionLocation;
+  }
+
+  public boolean isRecursive() {
+    return recursive;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -168,6 +181,7 @@ public final class OmKeyArgs implements Auditable {
         .addAllMetadata(metadata)
         .setRefreshPipeline(refreshPipeline)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
+        .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls);
   }
 
@@ -187,7 +201,9 @@ public final class OmKeyArgs implements Auditable {
     private Map<String, String> metadata = new HashMap<>();
     private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
+    private boolean latestVersionLocation;
     private List<OzoneAcl> acls;
+    private boolean recursive;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -259,12 +275,22 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setLatestVersionLocation(boolean latest) {
+      this.latestVersionLocation = latest;
+      return this;
+    }
+
+    public Builder setRecursive(boolean isRecursive) {
+      this.recursive = isRecursive;
+      return this;
+    }
+
     public OmKeyArgs build() {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
           replicationConfig, locationInfoList, isMultipartKey,
           multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline);
+          sortDatanodesInPipeline, latestVersionLocation, recursive);
     }
 
   }

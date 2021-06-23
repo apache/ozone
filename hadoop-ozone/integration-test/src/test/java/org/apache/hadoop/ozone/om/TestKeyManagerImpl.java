@@ -819,6 +819,107 @@ public class TestKeyManagerImpl {
   }
 
   @Test
+  public void testLatestLocationVersion() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+    OmKeyArgs keyArgs = createBuilder()
+        .setKeyName(keyName)
+        .setLatestVersionLocation(true)
+        .build();
+
+    // lookup for a non-existent key
+    try {
+      keyManager.lookupKey(keyArgs, null);
+      Assert.fail("Lookup key should fail for non existent key");
+    } catch (OMException ex) {
+      if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+        throw ex;
+      }
+    }
+
+    // create a key
+    OpenKeySession keySession = keyManager.createFile(keyArgs, false, false);
+    // randomly select 3 datanodes
+    List<DatanodeDetails> nodeList = new ArrayList<>();
+    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
+        0, null, null, null, null, 0));
+    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
+        1, null, null, null, null, 0));
+    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
+        2, null, null, null, null, 0));
+    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(1)));
+    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
+    // create a pipeline using 3 datanodes
+    Pipeline pipeline = scm.getPipelineManager().createPipeline(
+        new RatisReplicationConfig(ReplicationFactor.THREE), nodeList);
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    List<OmKeyLocationInfo> locationList =
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
+    Assert.assertEquals(1, locationList.size());
+    locationInfoList.add(
+        new OmKeyLocationInfo.Builder().setPipeline(pipeline)
+            .setBlockID(new BlockID(locationList.get(0).getContainerID(),
+                locationList.get(0).getLocalID())).build());
+    keyArgs.setLocationInfoList(locationInfoList);
+
+    keyManager.commitKey(keyArgs, keySession.getId());
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+
+    keySession = keyManager.createFile(keyArgs, true, true);
+    keyManager.commitKey(keyArgs, keySession.getId());
+
+    // Test lookupKey (latestLocationVersion == true)
+    key = keyManager.lookupKey(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+
+    // Test ListStatus (latestLocationVersion == true)
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(keyArgs, false, "", 1);
+    Assert.assertEquals(fileStatuses.size(), 1);
+    Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
+        .getKeyLocationVersions().size(), 1);
+
+    // Test GetFileStatus (latestLocationVersion == true)
+    OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
+    Assert.assertEquals(ozoneFileStatus.getKeyInfo()
+        .getKeyLocationVersions().size(), 1);
+
+    // Test LookupFile (latestLocationVersion == true)
+    key = keyManager.lookupFile(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+
+    keyArgs = createBuilder()
+        .setKeyName(keyName)
+        .setLatestVersionLocation(false)
+        .build();
+
+    // Test lookupKey (latestLocationVersion == false)
+    key = keyManager.lookupKey(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
+
+    // Test ListStatus (latestLocationVersion == false)
+    fileStatuses = keyManager.listStatus(keyArgs, false, "", 100);
+    Assert.assertEquals(fileStatuses.size(), 1);
+    Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
+        .getKeyLocationVersions().size(), 2);
+
+    // Test GetFileStatus (latestLocationVersion == false)
+    ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
+    Assert.assertEquals(ozoneFileStatus.getKeyInfo()
+        .getKeyLocationVersions().size(), 2);
+
+    // Test LookupFile (latestLocationVersion == false)
+    key = keyManager.lookupFile(keyArgs, null);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
+
+    // Test ListKeys (latestLocationVersion is always true for ListKeys)
+    List<OmKeyInfo> keyInfos = keyManager.listKeys(keyArgs.getVolumeName(),
+        keyArgs.getBucketName(), "", keyArgs.getKeyName(), 100);
+    Assert.assertEquals(keyInfos.size(), 1);
+    Assert.assertEquals(keyInfos.get(0).getKeyLocationVersions().size(), 1);
+  }
+
+  @Test
   public void testListStatusWithTableCache() throws Exception {
     // Inspired by TestOmMetadataManager#testListKeys
     String prefixKeyInDB = "key-d";

@@ -85,7 +85,7 @@ public final class DatabaseHelper {
         throw new FileNotFoundException("property file '"
             + ParserConsts.PROPS_FILE + "' not found in the classpath");
       }
-    } catch(Exception e){
+    } catch (Exception e){
       LOG.error(e.getMessage());
     }
 
@@ -124,8 +124,9 @@ public final class DatabaseHelper {
           preparedStatement.executeBatch();
         }
       }
-      if (!auditEntries.isEmpty()) {
-        preparedStatement.executeBatch(); // insert remaining records
+      if (auditEntries.size() % batchSize != 0) {
+        // insert remaining records
+        preparedStatement.executeBatch();
       }
     }
     return true;
