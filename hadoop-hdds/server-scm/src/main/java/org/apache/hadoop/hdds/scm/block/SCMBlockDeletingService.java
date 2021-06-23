@@ -112,21 +112,6 @@ public class SCMBlockDeletingService extends BackgroundService
     return queue;
   }
 
-  void handlePendingDeletes(PendingDeleteStatusList deletionStatusList) {
-    DatanodeDetails dnDetails = deletionStatusList.getDatanodeDetails();
-    for (PendingDeleteStatusList.PendingDeleteStatus deletionStatus :
-        deletionStatusList.getPendingDeleteStatuses()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            "Block deletion txnID lagging in datanode {} for containerID {}."
-                + " Datanode delete txnID: {}, SCM txnID: {}",
-            dnDetails.getUuid(), deletionStatus.getContainerId(),
-            deletionStatus.getDnDeleteTransactionId(),
-            deletionStatus.getScmDeleteTransactionId());
-      }
-    }
-  }
-
   private class DeletedBlockTransactionScanner implements BackgroundTask {
 
     @Override
@@ -155,8 +140,6 @@ public class SCMBlockDeletingService extends BackgroundService
         try {
           DatanodeDeletedBlockTransactions transactions =
               deletedBlockLog.getTransactions(blockDeleteLimitSize);
-          Map<Long, Long> containerIdToMaxTxnId =
-              transactions.getContainerIdToTxnIdMap();
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
@@ -186,11 +169,6 @@ public class SCMBlockDeletingService extends BackgroundService
             }
           }
           // TODO: Fix ME!!!
-          Map<ContainerID, Long> transactionMap = new HashMap<>();
-          for (Map.Entry<Long, Long> tx : containerIdToMaxTxnId.entrySet()) {
-            transactionMap.put(ContainerID.valueOf(tx.getKey()), tx.getValue());
-          }
-          containerManager.updateDeleteTransactionId(transactionMap);
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
