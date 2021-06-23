@@ -749,7 +749,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (idleiterations.isPresent()) {
       int idi = idleiterations.get();
       Preconditions.checkState(idi > 0 || idi == -1,
-          "maxDatanodesToBalance must be positive or" +
+          "idleiterations must be positive or" +
               " -1(infinitly run container balancer).");
       builder.setIdleiterations(idi);
     }

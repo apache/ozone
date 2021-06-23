@@ -142,7 +142,7 @@ public class TestContainerBalancer {
   @Test
   public void containerBalancerShouldStopWhenMaxDatanodesToBalanceIsReached() {
     balancerConfiguration.setMaxDatanodesToBalance(2);
-    balancerConfiguration.setThreshold(1);
+    balancerConfiguration.setThreshold(0.1);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.

@@ -702,7 +702,7 @@ public class SCMClientProtocolServer implements
     if (idleiterations.isPresent()) {
       int idi = idleiterations.get();
       Preconditions.checkState(idi > 0 || idi == -1,
-          "maxDatanodesToBalance must be positive or" +
+          "idleiterations must be positive or" +
               " -1(infinitly run container balancer).");
       cbc.setIdleIteration(idi);
     }

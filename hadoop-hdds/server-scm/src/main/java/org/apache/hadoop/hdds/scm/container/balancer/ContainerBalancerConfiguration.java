@@ -98,9 +98,10 @@ public final class ContainerBalancerConfiguration {
    * @param count a idle iteration count larger than 0
    */
   public void setIdleIteration(int count) {
-    if (count < 1) {
+    if (count < -1 || 0 == count) {
       throw new IllegalArgumentException(
-          "Idle iteration count must be larger than 0.");
+          "Idle iteration count must be larger than 0 or " +
+              "-1(for infinitely running).");
     }
     this.idleIterations = count;
   }
