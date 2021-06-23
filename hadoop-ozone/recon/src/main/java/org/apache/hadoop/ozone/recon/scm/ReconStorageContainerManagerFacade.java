@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -195,6 +196,7 @@ public class ReconStorageContainerManagerFacade
         reconTaskConfig));
     reconScmTasks.add(new ContainerHealthTask(
         containerManager,
+        scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy,
         reconTaskConfig));
@@ -322,6 +324,11 @@ public class ReconStorageContainerManagerFacade
   }
 
   @Override
+  public ContainerBalancer getContainerBalancer() {
+    return null;
+  }
+
+  @Override
   public InetSocketAddress getDatanodeRpcAddress() {
     return getDatanodeProtocolServer().getDatanodeRpcAddress();
   }
@@ -333,5 +340,9 @@ public class ReconStorageContainerManagerFacade
 
   public EventQueue getEventQueue() {
     return eventQueue;
+  }
+
+  public StorageContainerServiceProvider getScmServiceProvider() {
+    return scmServiceProvider;
   }
 }

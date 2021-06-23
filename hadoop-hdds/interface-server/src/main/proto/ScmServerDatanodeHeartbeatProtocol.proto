@@ -162,6 +162,10 @@ message StorageReportProto {
 message MetadataStorageReportProto {
   required string storageLocation = 1;
   optional StorageTypeProto storageType = 2 [default = DISK];
+  optional uint64 capacity = 3 [default = 0];
+  optional uint64 scmUsed = 4 [default = 0];
+  optional uint64 remaining = 5 [default = 0];
+  optional bool failed = 6 [default = false];
 }
 
 /**

@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
+import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -32,6 +33,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  *
@@ -100,5 +102,15 @@ public class MockCAStore implements CertificateStore {
   @Override
   public long getLatestCrlId() {
     return 0;
+  }
+
+  @Override
+  public CRLStatus getCRLStatusForDN(UUID uuid) {
+    return null;
+  }
+
+  @Override
+  public void setCRLStatusForDN(UUID uuid, CRLStatus crlStatus) {
+
   }
 }

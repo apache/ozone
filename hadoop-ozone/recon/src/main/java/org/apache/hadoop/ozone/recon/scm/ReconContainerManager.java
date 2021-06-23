@@ -70,6 +70,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final Table<UUID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
+  // Pipeline -> # of open containers
+  private final Map<PipelineID, Integer> pipelineToOpenContainer;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -101,6 +103,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     // batchHandler = scmDBStore
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(store);
     this.replicaHistoryMap = new ConcurrentHashMap<>();
+    this.pipelineToOpenContainer = new ConcurrentHashMap<>();
   }
 
   /**
@@ -203,6 +206,14 @@ public class ReconContainerManager extends ContainerManagerImpl {
         && isHealthy(state)) {
       LOG.info("Container {} has state OPEN, but given state is {}.",
           containerID, state);
+      final PipelineID pipelineID = containerInfo.getPipelineID();
+      // subtract open container count from the map
+      int curCnt = pipelineToOpenContainer.getOrDefault(pipelineID, 0);
+      if (curCnt == 1) {
+        pipelineToOpenContainer.remove(pipelineID);
+      } else if (curCnt > 0) {
+        pipelineToOpenContainer.put(pipelineID, curCnt - 1);
+      }
       updateContainerState(containerID, FINALIZE);
     }
   }
@@ -229,6 +240,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
           pipelineManager.addContainerToPipeline(
               containerWithPipeline.getPipeline().getId(),
               containerInfo.containerID());
+          // update open container count on all datanodes on this pipeline
+          pipelineToOpenContainer.put(pipelineID,
+                    pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
           LOG.info("Successfully added container {} to Recon.",
               containerInfo.containerID());
         } else {
@@ -431,6 +445,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
   public Table<UUID, DatanodeDetails> getNodeDB() {
     return nodeDB;
+  }
+
+  public Map<PipelineID, Integer> getPipelineToOpenContainer() {
+    return pipelineToOpenContainer;
   }
 
 }

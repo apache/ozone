@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.DeleteBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.DeleteChunk;
@@ -41,6 +43,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
  */
 public class BlockTokenVerifier extends
     ShortLivedTokenVerifier<OzoneBlockTokenIdentifier> {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(BlockTokenVerifier.class);
 
   public static String getTokenService(BlockID blockID) {
     return getTokenService(blockID.getContainerBlockID());
@@ -76,6 +80,10 @@ public class BlockTokenVerifier extends
   @Override
   protected void verify(OzoneBlockTokenIdentifier tokenId,
       ContainerCommandRequestProtoOrBuilder cmd) throws SCMSecurityException {
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Verifying token:{} for user:{} ", tokenId,
+          tokenId.getUser());
+    }
 
     HddsProtos.BlockTokenSecretProto.AccessModeProto accessMode;
     if (HddsUtils.isReadOnly(cmd)) {

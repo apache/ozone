@@ -86,4 +86,12 @@ public class DataNodeSafeModeRule extends
         .format("registered datanodes (=%d) >= required datanodes (=%d)",
             this.registeredDns, this.requiredDns);
   }
+
+
+  @Override
+  public void refresh(boolean forceRefresh) {
+    // Do nothing.
+    // As for this rule, there is nothing we read from SCM DB state and
+    // validate it.
+  }
 }

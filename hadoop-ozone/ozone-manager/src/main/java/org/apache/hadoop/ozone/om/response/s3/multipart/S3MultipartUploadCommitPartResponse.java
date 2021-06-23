@@ -69,6 +69,9 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
    * @param openKey
    * @param omMultipartKeyInfo
    * @param oldPartKeyInfo
+   * @param openPartKeyInfoToBeDeleted
+   * @param isRatisEnabled
+   * @param omBucketInfo
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,

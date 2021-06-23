@@ -393,7 +393,8 @@ public class TestBlockDeletion {
 
     logCapturer.clearOutput();
     cluster.getHddsDatanodes().get(0)
-        .getDatanodeStateMachine().getContext().addReport(dummyReport);
+        .getDatanodeStateMachine().getContext().
+        addIncrementalReport(dummyReport);
     cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().triggerHeartbeat();
     // wait for event to be handled by event handler

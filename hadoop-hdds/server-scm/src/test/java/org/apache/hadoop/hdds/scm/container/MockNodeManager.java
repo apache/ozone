@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -243,7 +245,13 @@ public class MockNodeManager implements NodeManager {
         StorageReportProto storage1 = TestUtils.createStorageReport(
             di.getUuid(), "/data1-" + di.getUuidString(),
             capacity, used, remaining, null);
+        MetadataStorageReportProto metaStorage1 =
+            TestUtils.createMetadataStorageReport(
+                "/metadata1-" + di.getUuidString(), capacity, used,
+                remaining, null);
         di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+        di.updateMetaDataStorageReports(
+            new ArrayList<>(Arrays.asList(metaStorage1)));
 
         healthyNodesWithInfo.add(di);
       }

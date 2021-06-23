@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -295,10 +296,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
-    Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();
+    Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
 
-    for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
-      HddsVolume hddsVolume = entry.getValue();
+    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
+      HddsVolume hddsVolume = (HddsVolume) entry.getValue();
       boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
           clusterId, LOG);
       if (!result) {

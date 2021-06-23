@@ -69,6 +69,9 @@ message ScmContainerLocationRequest {
   optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
   optional GetExistContainerWithPipelinesInBatchRequestProto getExistContainerWithPipelinesInBatchRequest = 31;
   optional GetContainerTokenRequestProto containerTokenRequest = 32;
+  optional StartContainerBalancerRequestProto startContainerBalancerRequest = 33;
+  optional StopContainerBalancerRequestProto stopContainerBalancerRequest = 34;
+  optional ContainerBalancerStatusRequestProto containerBalancerStatusRequest = 35;
 }
 
 message ScmContainerLocationResponse {
@@ -109,6 +112,9 @@ message ScmContainerLocationResponse {
   optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
   optional GetExistContainerWithPipelinesInBatchResponseProto getExistContainerWithPipelinesInBatchResponse = 31;
   optional GetContainerTokenResponseProto containerTokenResponse = 32;
+  optional StartContainerBalancerResponseProto startContainerBalancerResponse = 33;
+  optional StopContainerBalancerResponseProto stopContainerBalancerResponse = 34;
+  optional ContainerBalancerStatusResponseProto containerBalancerStatusResponse = 35;
 
   enum Status {
     OK = 1;
@@ -147,6 +153,9 @@ enum Type {
   DatanodeUsageInfo = 25;
   GetExistContainerWithPipelinesInBatch = 26;
   GetContainerToken = 27;
+  StartContainerBalancer = 28;
+  StopContainerBalancer = 29;
+  GetContainerBalancerStatus = 30;
 }
 
 /**
@@ -443,6 +452,33 @@ message GetContainerTokenRequestProto {
 
 message GetContainerTokenResponseProto {
   required TokenProto token = 1;
+}
+
+message StartContainerBalancerRequestProto {
+  optional string traceID = 1;
+  optional double threshold = 2;
+  optional int32 idleiterations = 3;
+  optional int32 maxDatanodesToBalance = 4;
+  optional int64 maxSizeToMoveInGB = 5;
+}
+
+message StartContainerBalancerResponseProto {
+  required bool start = 1;
+}
+
+message StopContainerBalancerRequestProto {
+  optional string traceID = 1;
+}
+
+message StopContainerBalancerResponseProto {
+}
+
+message ContainerBalancerStatusRequestProto {
+  optional string traceID = 1;
+}
+
+message ContainerBalancerStatusResponseProto {
+  required bool isRunning = 1;
 }
 
 /**

@@ -73,6 +73,8 @@ public abstract class OzoneObj implements IOzoneObj {
 
   public abstract String getKeyName();
 
+  public abstract OzonePrefixPath getOzonePrefixPathViewer();
+
   /**
    * Get PrefixName.
    * A prefix name is like a key name under the bucket but
