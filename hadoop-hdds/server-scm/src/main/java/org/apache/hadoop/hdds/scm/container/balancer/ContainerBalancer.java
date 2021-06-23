@@ -113,11 +113,10 @@ public class ContainerBalancer {
     lock.lock();
     try {
       if (!balancerRunning.compareAndSet(false, true)) {
-        LOG.error("Container Balancer is already running.");
+        LOG.info("Container Balancer is already running.");
         return false;
       }
-
-      ozoneConfiguration = new OzoneConfiguration();
+      
       this.config = balancerConfiguration;
       this.idleIteration = config.getIdleIteration();
       this.threshold = config.getThreshold();
