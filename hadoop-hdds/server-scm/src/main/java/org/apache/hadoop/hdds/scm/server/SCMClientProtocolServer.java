@@ -680,10 +680,7 @@ public class SCMClientProtocolServer implements
                   Optional<Integer> maxDatanodesToBalance,
                   Optional<Long> maxSizeToMoveInGB) throws IOException{
     getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.START_CONTAINER_BALANCER, null));
     ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
-
     if (threshold.isPresent()) {
       double tsd = threshold.get();
       Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
@@ -709,7 +706,16 @@ public class SCMClientProtocolServer implements
               " -1(infinitly run container balancer).");
       cbc.setIdleIteration(idi);
     }
-    return scm.getContainerBalancer().start(cbc);
+
+    boolean isStartedSuccessfully = scm.getContainerBalancer().start(cbc);
+    if (isStartedSuccessfully) {
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.START_CONTAINER_BALANCER, null));
+    } else {
+      AUDIT.logWriteFailure(buildAuditMessageForSuccess(
+          SCMAction.START_CONTAINER_BALANCER, null));
+    }
+    return  isStartedSuccessfully;
   }
 
   @Override
