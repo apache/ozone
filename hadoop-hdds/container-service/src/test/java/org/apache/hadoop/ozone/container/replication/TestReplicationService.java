@@ -126,7 +126,8 @@ public class TestReplicationService {
         clientConfig,
         () -> scmUuid,
         destinationContainerSet,
-        volumeSet);
+        volumeSet,
+        null);
 
     DatanodeDetails source =
         DatanodeDetails.newBuilder()

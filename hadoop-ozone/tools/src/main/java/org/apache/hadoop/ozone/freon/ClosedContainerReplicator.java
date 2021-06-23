@@ -173,7 +173,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new DownloadAndImportReplicator(conf,
             () -> fakeClusterId,
             containerSet,
-            volumeSet);
+            volumeSet,
+            null);
 
     supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
   }

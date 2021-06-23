@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import io.netty.handler.ssl.SslContext;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -63,12 +64,14 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   private final Supplier<String> clusterId;
   private VolumeChoosingPolicy volumeChoosingPolicy;
   private VolumeSet volumeSet;
+  private SslContext sslContext;
 
   public DownloadAndImportReplicator(
       ConfigurationSource config,
       Supplier<String> clusterId,
       ContainerSet containerSet,
-      VolumeSet volumeSet
+      VolumeSet volumeSet,
+      SslContext sslContext
   ) {
     this.containerSet = containerSet;
     this.config = config;
@@ -131,9 +134,11 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       final DatanodeDetails datanode = sourceDatanodes.get(0);
 
       try (StreamingClient client =
-               new StreamingClient(datanode.getIpAddress(), datanode.getPort(
-                   Name.REPLICATION).getValue(),
-                   new ContainerStreamingDestination(containerData))) {
+               new StreamingClient(datanode.getIpAddress(),
+                   datanode.getPort(Name.REPLICATION).getValue(),
+                   new ContainerStreamingDestination(containerData),
+                   sslContext)
+      ) {
         client.stream("" + containerData.getContainerID());
 
         LOG.info("Container " + containerData.getContainerID()

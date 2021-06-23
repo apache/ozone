@@ -19,6 +19,10 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -29,6 +33,8 @@ import org.apache.hadoop.ozone.container.stream.StreamingServer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLException;
 
 /**
  * Separated network server for server2server container replication.
@@ -62,8 +68,23 @@ public class ReplicationServer {
   }
 
   public void init() {
-    server = new StreamingServer(new ContainerStreamingSource(containerSet),
-        this.port);
+    if (secConf.isSecurityEnabled()) {
+      try {
+        SslContextBuilder sslContextBuilder = SslContextBuilder
+            .forServer(caClient.getPrivateKey(), caClient.getCertificate())
+            .clientAuth(ClientAuth.REQUIRE);
+        final SslContext sslContext = sslContextBuilder.build();
+        server = new StreamingServer(new ContainerStreamingSource(containerSet),
+            this.port, sslContext);
+      } catch (SSLException ex) {
+        throw new IllegalArgumentException(
+            "Unable to setup TLS for secure datanode replication GRPC "
+                + "endpoint.", ex);
+      }
+    } else {
+      server = new StreamingServer(new ContainerStreamingSource(containerSet),
+          this.port);
+    }
   }
 
   public void start() throws IOException {
