@@ -372,6 +372,13 @@ public final class ScmConfigKeys {
       "ozone.scm.pipeline.per.metadata.disk";
 
   public static final int OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT = 2;
+
+  public static final String OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN =
+      "ozone.scm.datanode.ratis.volume.free-space.min";
+
+  public static final String
+      OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT = "1GB";
+
   // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
       "ozone.scm.pipeline.allocated.timeout";

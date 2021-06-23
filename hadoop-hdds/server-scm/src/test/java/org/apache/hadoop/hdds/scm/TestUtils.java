@@ -60,7 +60,9 @@ import org.apache.hadoop.hdds.protocol
 import org.apache.hadoop.hdds.protocol
     .proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.StorageReportProto;
+    .StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
@@ -149,7 +151,7 @@ public final class TestUtils {
    * @return NodeReportProto
    */
   public static NodeReportProto getRandomNodeReport() {
-    return getRandomNodeReport(1);
+    return getRandomNodeReport(1, 1);
   }
 
   /**
@@ -157,12 +159,15 @@ public final class TestUtils {
    *
    * @param numberOfStorageReport number of storage report this node report
    *                              should have
+   * @param numberOfMetadataStorageReport number of metadata storage report
+   *                                      this node report should have
    * @return NodeReportProto
    */
-  public static NodeReportProto getRandomNodeReport(int numberOfStorageReport) {
+  public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
+      int numberOfMetadataStorageReport) {
     UUID nodeId = UUID.randomUUID();
     return getRandomNodeReport(nodeId, File.separator + nodeId,
-        numberOfStorageReport);
+        numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
   /**
@@ -172,42 +177,41 @@ public final class TestUtils {
    * @param nodeId                datanode id
    * @param basePath              base path of storage directory
    * @param numberOfStorageReport number of storage report
+   * @param numberOfMetadataStorageReport number of metadata storage report
    *
    * @return NodeReportProto
    */
   public static NodeReportProto getRandomNodeReport(UUID nodeId,
-      String basePath, int numberOfStorageReport) {
+      String basePath, int numberOfStorageReport,
+      int numberOfMetadataStorageReport) {
     List<StorageReportProto> storageReports = new ArrayList<>();
     for (int i = 0; i < numberOfStorageReport; i++) {
       storageReports.add(getRandomStorageReport(nodeId,
-          basePath + File.separator + i));
+          basePath + File.separator + "data-" + i));
     }
-    return createNodeReport(storageReports);
-  }
-
-  /**
-   * Creates NodeReport with the given storage reports.
-   *
-   * @param reports one or more storage report
-   *
-   * @return NodeReportProto
-   */
-  public static NodeReportProto createNodeReport(
-      StorageReportProto... reports) {
-    return createNodeReport(Arrays.asList(reports));
+    List<MetadataStorageReportProto> metadataStorageReports =
+        new ArrayList<>();
+    for (int i = 0; i < numberOfMetadataStorageReport; i++) {
+      metadataStorageReports.add(getRandomMetadataStorageReport(
+          basePath + File.separator + "metadata-" + i));
+    }
+    return createNodeReport(storageReports, metadataStorageReports);
   }
 
   /**
    * Creates NodeReport with the given storage reports.
    *
    * @param reports storage reports to be included in the node report.
-   *
+   * @param metaReports metadata storage reports to be included
+   *                    in the node report.
    * @return NodeReportProto
    */
   public static NodeReportProto createNodeReport(
-      List<StorageReportProto> reports) {
+      List<StorageReportProto> reports,
+      List<MetadataStorageReportProto> metaReports) {
     NodeReportProto.Builder nodeReport = NodeReportProto.newBuilder();
     nodeReport.addAllStorageReport(reports);
+    nodeReport.addAllMetadataStorageReport(metaReports);
     return nodeReport.build();
   }
 
@@ -222,6 +226,22 @@ public final class TestUtils {
   public static StorageReportProto getRandomStorageReport(UUID nodeId,
       String path) {
     return createStorageReport(nodeId, path,
+        random.nextInt(1000),
+        random.nextInt(500),
+        random.nextInt(500),
+        StorageTypeProto.DISK);
+  }
+
+  /**
+   * Generates random metadata storage report.
+   *
+   * @param path path of the storage
+   *
+   * @return MetadataStorageReportProto
+   */
+  public static MetadataStorageReportProto getRandomMetadataStorageReport(
+      String path) {
+    return createMetadataStorageReport(path,
         random.nextInt(1000),
         random.nextInt(500),
         random.nextInt(500),
@@ -263,6 +283,39 @@ public final class TestUtils {
     return srb.build();
   }
 
+  public static MetadataStorageReportProto createMetadataStorageReport(
+      String path, long capacity, long used, long remaining,
+      StorageTypeProto type) {
+    return createMetadataStorageReport(path, capacity, used, remaining,
+        type, false);
+  }
+  /**
+   * Creates metadata storage report with the given information.
+   *
+   * @param path      storage dir
+   * @param capacity  storage size
+   * @param used      space used
+   * @param remaining space remaining
+   * @param type      type of storage
+   *
+   * @return StorageReportProto
+   */
+  public static MetadataStorageReportProto createMetadataStorageReport(
+      String path, long capacity, long used, long remaining,
+      StorageTypeProto type, boolean failed) {
+    Preconditions.checkNotNull(path);
+    MetadataStorageReportProto.Builder srb = MetadataStorageReportProto
+        .newBuilder();
+    srb.setStorageLocation(path)
+        .setCapacity(capacity)
+        .setScmUsed(used)
+        .setFailed(failed)
+        .setRemaining(remaining);
+    StorageTypeProto storageTypeProto =
+        type == null ? StorageTypeProto.DISK : type;
+    srb.setStorageType(storageTypeProto);
+    return srb.build();
+  }
 
   /**
    * Generates random container reports.
