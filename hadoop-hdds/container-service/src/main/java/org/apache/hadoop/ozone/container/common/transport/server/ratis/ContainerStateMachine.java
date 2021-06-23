@@ -23,10 +23,12 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -496,6 +498,29 @@ public class ContainerStateMachine extends BaseStateMachine {
       return r;
     });
     return raftFuture;
+  }
+
+  @Override
+  public CompletableFuture<DataStream> stream(RaftClientRequest request) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        ContainerCommandRequestProto requestProto =
+            getContainerCommandRequestProto(gid,
+                request.getMessage().getContent());
+        DispatcherContext context =
+            new DispatcherContext.Builder()
+                .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
+                .setContainer2BCSIDMap(container2BCSIDMap)
+                .build();
+
+        ContainerCommandResponseProto response = runCommand(
+            requestProto, context);
+        String path = response.getMessage();
+        return new LocalStream(new StreamDataChannel(Paths.get(path)));
+      } catch (IOException e) {
+        throw new CompletionException("Failed to create data stream", e);
+      }
+    }, executor);
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
