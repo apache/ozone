@@ -230,8 +230,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
           ReplicationConfig.getLegacyFactor(replicationConfig));
     }
 
-    builder.setReplicationFactor(
-        ReplicationConfig.getLegacyFactor(replicationConfig));
     builder.setReplicationType(replicationConfig.getReplicationType());
 
     if (getPipelineID() != null) {
