@@ -2338,7 +2338,7 @@ public class KeyManagerImpl implements KeyManager {
       listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
           recursive, cacheKeyMap, deletedKeySet);
     } finally {
-      metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
+      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
 
