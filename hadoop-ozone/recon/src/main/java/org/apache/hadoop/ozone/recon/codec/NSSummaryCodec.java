@@ -31,11 +31,11 @@ public class NSSummaryCodec implements Codec<NSSummary>{
 
   @Override
   public NSSummary fromPersistedFormat(byte[] rawData) throws IOException {
-    assert(rawData.length == NUM_OF_INTS);
+    assert(rawData.length == NUM_OF_INTS * Integer.BYTES);
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(rawData));
     NSSummary res = new NSSummary();
     res.setNumOfFiles(in.readInt());
-    res.setNumOfFiles(in.readInt());
+    res.setSizeOfFiles(in.readInt());
     int[] fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
     for (int i = 0; i < ReconConstants.NUM_OF_BINS && in.available() > 0; ++i) {
       fileSizeBucket[i] = in.readInt();

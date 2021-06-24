@@ -20,6 +20,12 @@ public class NSSummary {
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
   }
 
+  public NSSummary(int numOfFiles, int sizeOfFiles, int[] bucket) {
+    this.numOfFiles = numOfFiles;
+    this.sizeOfFiles = sizeOfFiles;
+    setFileSizeBucket(bucket);
+  }
+
   public int getNumOfFiles() {
     return numOfFiles;
   }

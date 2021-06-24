@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.getNewDBStore;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconRocksDB.clearTable;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY;
@@ -72,30 +72,17 @@ public class ReconContainerMetadataManagerImpl
       containerReplicaHistoryTable;
   private GlobalStatsDao globalStatsDao;
 
-  @Inject
-  private OzoneConfiguration configuration;
-
-  @Inject
   private DBStore containerDbStore;
 
   @Inject
   private Configuration sqlConfiguration;
 
   @Inject
-  public ReconContainerMetadataManagerImpl(DBStore dbStore,
+  public ReconContainerMetadataManagerImpl(ReconRocksDB reconRocksDB,
                                            Configuration sqlConfiguration) {
-    containerDbStore = dbStore;
+    containerDbStore = reconRocksDB.getDbStore();
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
     initializeTables();
-  }
-
-  @Override
-  public void close() throws Exception {
-    if (containerDbStore != null) {
-      LOG.info("Stopping ContainerKeyDB Service Provider");
-      containerDbStore.close();
-      containerDbStore = null;
-    }
   }
 
   /**
@@ -110,24 +97,8 @@ public class ReconContainerMetadataManagerImpl
   public void initNewContainerDB(Map<ContainerKeyPrefix, Integer>
                                      containerKeyPrefixCounts)
       throws IOException {
-
-    File oldDBLocation = containerDbStore.getDbLocation();
-    try {
-      containerDbStore.close();
-    } catch (Exception e) {
-      LOG.warn("Unable to close old Recon container key DB at {}.",
-          containerDbStore.getDbLocation().getAbsolutePath());
-    }
-    containerDbStore = getNewDBStore(configuration);
-    LOG.info("Creating new Recon Container DB at {}",
-        containerDbStore.getDbLocation().getAbsolutePath());
+    // clear and re-init all container-related tables
     initializeTables();
-
-    if (oldDBLocation.exists()) {
-      LOG.info("Cleaning up old Recon Container key DB at {}.",
-          oldDBLocation.getAbsolutePath());
-      FileUtils.deleteDirectory(oldDBLocation);
-    }
 
     if (containerKeyPrefixCounts != null) {
       for (Map.Entry<ContainerKeyPrefix, Integer> entry :
@@ -145,6 +116,9 @@ public class ReconContainerMetadataManagerImpl
    */
   private void initializeTables() {
     try {
+      clearTable(this.containerKeyTable);
+      clearTable(this.containerKeyCountTable);
+      clearTable(this.containerReplicaHistoryTable);
       this.containerKeyTable = CONTAINER_KEY.getTable(containerDbStore);
       this.containerKeyCountTable =
           CONTAINER_KEY_COUNT.getTable(containerDbStore);

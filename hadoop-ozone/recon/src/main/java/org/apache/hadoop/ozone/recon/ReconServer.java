@@ -31,7 +31,10 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconRocksDB;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -58,6 +61,8 @@ public class ReconServer extends GenericCli {
   private ReconHttpServer httpServer;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private ReconRocksDB reconRocksDB;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
   private OzoneConfiguration configuration;
 
@@ -93,8 +98,12 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
       loginReconUserIfSecurityEnabled(configuration);
+      this.reconRocksDB = injector.getInstance(ReconRocksDB.class);
+      LOG.info("Recon Rocks DB.");
       this.reconContainerMetadataManager =
           injector.getInstance(ReconContainerMetadataManager.class);
+      this.reconNamespaceSummaryManager =
+          injector.getInstance(ReconNamespaceSummaryManager.class);
 
       ReconSchemaManager reconSchemaManager =
           injector.getInstance(ReconSchemaManager.class);
@@ -159,8 +168,8 @@ public class ReconServer extends GenericCli {
       if (ozoneManagerServiceProvider != null) {
         ozoneManagerServiceProvider.stop();
       }
-      if (reconContainerMetadataManager != null) {
-        reconContainerMetadataManager.close();
+      if (reconRocksDB != null) {
+        reconRocksDB.close();
       }
       isStarted = false;
     }
@@ -236,6 +245,11 @@ public class ReconServer extends GenericCli {
   @VisibleForTesting
   public ReconContainerMetadataManager getContainerDBServiceProvider() {
     return reconContainerMetadataManager;
+  }
+
+  @VisibleForTesting
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
   }
 
   @VisibleForTesting

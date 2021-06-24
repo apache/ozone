@@ -34,11 +34,6 @@ import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 @InterfaceStability.Unstable
 public interface ReconContainerMetadataManager {
 
-  /*
-   * Close the container DB
-   */
-  void close() throws Exception;
-
   /**
    * Create new container DB and bulk Store the container to Key prefix
    * mapping.

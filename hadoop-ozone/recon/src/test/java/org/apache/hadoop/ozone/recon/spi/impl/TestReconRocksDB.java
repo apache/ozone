@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
 import java.io.File;
@@ -26,6 +27,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -40,7 +42,7 @@ import com.google.inject.Singleton;
  * Tests the class that provides the instance of the DB Store used by Recon to
  * store its container - key data.
  */
-public class TestReconDBProvider {
+public class TestReconRocksDB {
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -57,18 +59,16 @@ public class TestReconDBProvider {
         OzoneConfiguration configuration = new OzoneConfiguration();
         configuration.set(OZONE_RECON_DB_DIR, dbDir.getAbsolutePath());
         bind(OzoneConfiguration.class).toInstance(configuration);
-        bind(DBStore.class).toProvider(ReconDBProvider.class).in(
-            Singleton.class);
+        bind(ReconRocksDB.class).in(Singleton.class);
       }
     });
   }
 
   @Test
   public void testGet() throws Exception {
-    ReconDBProvider reconDBProvider = injector.getInstance(
-        ReconDBProvider.class);
-    DBStore dbStore = reconDBProvider.get();
-    assertNotNull(dbStore);
+    ReconRocksDB reconRocksDB = injector.getInstance(
+        ReconRocksDB.class);
+    assertNotNull(reconRocksDB.getDbStore());
   }
 
 }
