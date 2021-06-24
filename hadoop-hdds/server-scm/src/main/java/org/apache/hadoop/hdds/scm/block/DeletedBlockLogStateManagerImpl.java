@@ -275,8 +275,8 @@ public class DeletedBlockLogStateManagerImpl
       return this;
     }
 
-    public Builder setContainerManager(ContainerManagerV2 containerManager) {
-      this.containerManager = containerManager;
+    public Builder setContainerManager(ContainerManagerV2 contManager) {
+      this.containerManager = contManager;
       return this;
     }
 

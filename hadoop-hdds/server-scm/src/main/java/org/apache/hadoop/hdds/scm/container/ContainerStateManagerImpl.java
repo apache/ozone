@@ -416,7 +416,7 @@ public final class ContainerStateManagerImpl
         final ContainerInfo info = containers.getContainerInfo(
             transaction.getKey());
         info.updateDeleteTransactionId(transaction.getValue());
-        containerStore.put(info.containerID(), info);
+        transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
       }
     } finally {
       lock.writeLock().unlock();
