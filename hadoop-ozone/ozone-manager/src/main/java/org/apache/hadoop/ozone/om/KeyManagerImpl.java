@@ -2528,230 +2528,224 @@ public class KeyManagerImpl implements KeyManager {
 
     // TODO: recursive flag=true will be handled in HDDS-4360 jira.
 
-    try {
-      if (Strings.isNullOrEmpty(startKey)) {
-        OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
-        if (fileStatus.isFile()) {
-          return Collections.singletonList(fileStatus);
-        }
 
-        // Not required to search in DeletedTable because all the deleted
-        // keys will be marked directly in dirTable or in keyTable by
-        // breaking the pointer to its sub-dirs and sub-files. So, there is no
-        // issue of inconsistency.
+    if (Strings.isNullOrEmpty(startKey)) {
+      OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
+      if (fileStatus.isFile()) {
+        return Collections.singletonList(fileStatus);
+      }
 
-        /*
-         * keyName is a directory.
-         * Say, "/a" is the dir name and its objectID is 1024, then seek
-         * will be doing with "1024/" to get all immediate descendants.
-         */
-        if (fileStatus.getKeyInfo() != null) {
-          prefixKeyInDB = fileStatus.getKeyInfo().getObjectID();
-        } else {
-          // list root directory.
-          String bucketKey = metadataManager.getBucketKey(volumeName,
-                  bucketName);
-          OmBucketInfo omBucketInfo =
-                  metadataManager.getBucketTable().get(bucketKey);
-          prefixKeyInDB = omBucketInfo.getObjectID();
-        }
-        seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
-        seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
+      // Not required to search in DeletedTable because all the deleted
+      // keys will be marked directly in dirTable or in keyTable by
+      // breaking the pointer to its sub-dirs and sub-files. So, there is no
+      // issue of inconsistency.
 
-        // Order of seek ->
-        // (1)Seek files in fileTable
-        // (2)Seek dirs in dirTable
-
-        // First under lock obtain both entries from dir/file cache.
-        Set<String> deletedKeySet = new TreeSet<>();
-        TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
-
-        metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-            bucketName);
-
-        try {
-          countEntries = listStatusFindFilesInTableCache(cacheFileMap,
-              metadataManager.getKeyTable(),
-              prefixKeyInDB, seekFileInDB, prefixPath, startKey,
-              countEntries, numEntries, deletedKeySet);
-
-          listStatusFindDirsInTableCache(tempCacheDirMap,
-              metadataManager.getDirectoryTable(),
-              prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-              bucketName, countEntries, numEntries, deletedKeySet);
-        } finally {
-          metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-              bucketName);
-        }
-
-        countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-                prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet);
-
-        // Now first add all entries in the dir cache, if numEntries required
-        // is less than countEntries.
-        for (Map.Entry<String, OzoneFileStatus> dirEntry :
-            tempCacheDirMap.entrySet()) {
-          if (countEntries < numEntries) {
-            cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
-            countEntries++;
-          }
-        }
-
-        // 2. Seek the given key in dir table.
-        if (countEntries < numEntries) {
-          getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-              prefixKeyInDB, countEntries, numEntries, recursive,
-              volumeName, bucketName, deletedKeySet);
-        }
+      /*
+       * keyName is a directory.
+       * Say, "/a" is the dir name and its objectID is 1024, then seek
+       * will be doing with "1024/" to get all immediate descendants.
+       */
+      if (fileStatus.getKeyInfo() != null) {
+        prefixKeyInDB = fileStatus.getKeyInfo().getObjectID();
       } else {
-        /*
-         * startKey will be used in iterator seek and sets the beginning point
-         * for key traversal.
-         * keyName will be used as parentID where the user has requested to
-         * list the keys from.
-         *
-         * When recursive flag=false, parentID won't change between two pages.
-         * For example: OM has a namespace like,
-         *    /a/1...1M files and /a/b/1...1M files.
-         *    /a/1...1M directories and /a/b/1...1M directories.
-         * Listing "/a", will always have the parentID as "a" irrespective of
-         * the startKey value.
-         */
+        // list root directory.
+        String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+        OmBucketInfo omBucketInfo =
+            metadataManager.getBucketTable().get(bucketKey);
+        prefixKeyInDB = omBucketInfo.getObjectID();
+      }
+      seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
+      seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-        // Check startKey is an immediate child of keyName. For example,
-        // keyName=/a/ and expected startKey=/a/b. startKey can't be /xyz/b.
-        if (StringUtils.isNotBlank(keyName) &&
-                !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
-                    "Returns empty list", startKey, keyName);
-          }
-          return Collections.emptyList();
-        }
+      // Order of seek ->
+      // (1)Seek files in fileTable
+      // (2)Seek dirs in dirTable
 
-        // assign startKeyPath if prefixPath is empty string.
-        if (StringUtils.isBlank(prefixPath)) {
-          prefixPath = OzoneFSUtils.getParentDir(startKey);
-        }
+      // First under lock obtain both entries from dir/file cache.
+      Set<String> deletedKeySet = new TreeSet<>();
+      TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
 
-        OzoneFileStatus fileStatusInfo = getOzoneFileStatusFSO(volumeName,
-                bucketName, startKey, false, null,
-                args.getLatestVersionLocation(), true);
+      metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
+          bucketName);
 
-        if (fileStatusInfo != null) {
-          prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
-          if(fileStatusInfo.isDirectory()){
-            seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
-                    fileStatusInfo.getKeyInfo().getFileName());
+      try {
+        countEntries = listStatusFindFilesInTableCache(cacheFileMap,
+            metadataManager.getKeyTable(), prefixKeyInDB, seekFileInDB,
+            prefixPath, startKey, countEntries, numEntries, deletedKeySet);
 
-            // Order of seek -> (1) Seek dirs only in dirTable. In OM, always
-            // the order of search is, first seek into fileTable and then
-            // dirTable. So, its not required to search again in the fileTable.
+        listStatusFindDirsInTableCache(tempCacheDirMap,
+            metadataManager.getDirectoryTable(),
+            prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
+            bucketName, countEntries, numEntries, deletedKeySet);
+      } finally {
+        metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+            bucketName);
+      }
 
-            // Seek the given key in dirTable.
+      countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
+          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet);
 
-            metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-                bucketName);
-
-            TreeSet<String> deletedKeySet = new TreeSet<>();
-            TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
-            try {
-              listStatusFindDirsInTableCache(tempCacheDirMap,
-                  metadataManager.getDirectoryTable(),
-                  prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-                  bucketName, countEntries, numEntries, deletedKeySet);
-            } finally {
-              metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-                  bucketName);
-            }
-
-
-            // Now first add all entries in the dir cache, if numEntries required
-            // is less than countEntries.
-            for (Map.Entry<String, OzoneFileStatus> dirEntry :
-                tempCacheDirMap.entrySet()) {
-              if (countEntries < numEntries) {
-                cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
-                countEntries++;
-              }
-            }
-
-            if (countEntries < numEntries) {
-              getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-                  prefixKeyInDB, countEntries, numEntries, recursive,
-                  volumeName, bucketName, deletedKeySet);
-            }
-          } else {
-            seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
-                    fileStatusInfo.getKeyInfo().getFileName());
-            // begins from the first sub-dir under the parent dir
-            seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
-
-
-
-            TreeSet<String> deletedKeySet = new TreeSet<>();
-            TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
-            metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-                bucketName);
-
-            try {
-              countEntries = listStatusFindFilesInTableCache(cacheFileMap,
-                  metadataManager.getKeyTable(),
-                  prefixKeyInDB, seekFileInDB, prefixPath, startKey,
-                  countEntries, numEntries, deletedKeySet);
-
-              listStatusFindDirsInTableCache(tempCacheDirMap,
-                  metadataManager.getDirectoryTable(),
-                  prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-                  bucketName, countEntries, numEntries, deletedKeySet);
-            } finally {
-              metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-                  bucketName);
-            }
-
-            // 1. Seek the given key in key table.
-            countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-                prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet);
-
-            // Now first add all entries in the dir cache, if numEntries required
-            // is less than countEntries.
-            for (Map.Entry<String, OzoneFileStatus> dirEntry :
-                tempCacheDirMap.entrySet()) {
-              if (countEntries < numEntries) {
-                cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
-                countEntries++;
-              }
-            }
-
-            // 2. Seek the given key in dir table.
-            if (countEntries < numEntries) {
-              getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-                  prefixKeyInDB, countEntries, numEntries, recursive,
-                  volumeName, bucketName, deletedKeySet);
-            }
-          }
-        } else {
-          // TODO: HDDS-4364: startKey can be a non-existed key
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("StartKey {} is a non-existed key and returning empty " +
-                    "list", startKey);
-          }
-          return Collections.emptyList();
+      // Now first add all entries in the dir cache, if numEntries required
+      // is less than countEntries.
+      for (Map.Entry<String, OzoneFileStatus> dirEntry :
+          tempCacheDirMap.entrySet()) {
+        if (countEntries < numEntries) {
+          cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
+          countEntries++;
         }
       }
-    } finally {
-      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+
+      // 2. Seek the given key in dir table.
+      if (countEntries < numEntries) {
+        getDirectories(cacheDirMap, seekDirInDB, prefixPath,
+            prefixKeyInDB, countEntries, numEntries, recursive,
+            volumeName, bucketName, deletedKeySet);
+      }
+    } else {
+      /*
+       * startKey will be used in iterator seek and sets the beginning point
+       * for key traversal.
+       * keyName will be used as parentID where the user has requested to
+       * list the keys from.
+       *
+       * When recursive flag=false, parentID won't change between two pages.
+       * For example: OM has a namespace like,
+       *    /a/1...1M files and /a/b/1...1M files.
+       *    /a/1...1M directories and /a/b/1...1M directories.
+       * Listing "/a", will always have the parentID as "a" irrespective of
+       * the startKey value.
+       */
+
+      // Check startKey is an immediate child of keyName. For example,
+      // keyName=/a/ and expected startKey=/a/b. startKey can't be /xyz/b.
+      if (StringUtils.isNotBlank(keyName) &&
+          !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
+              "Returns empty list", startKey, keyName);
+        }
+        return Collections.emptyList();
+      }
+
+      // assign startKeyPath if prefixPath is empty string.
+      if (StringUtils.isBlank(prefixPath)) {
+        prefixPath = OzoneFSUtils.getParentDir(startKey);
+      }
+
+      OzoneFileStatus fileStatusInfo = getOzoneFileStatusFSO(volumeName,
+          bucketName, startKey, false, null,
+          args.getLatestVersionLocation(), true);
+
+      if (fileStatusInfo != null) {
+        prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
+        if(fileStatusInfo.isDirectory()){
+          seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
+              fileStatusInfo.getKeyInfo().getFileName());
+
+          // Order of seek -> (1) Seek dirs only in dirTable. In OM, always
+          // the order of search is, first seek into fileTable and then
+          // dirTable. So, its not required to search again in the fileTable.
+
+          // Seek the given key in dirTable.
+
+          metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
+                bucketName);
+
+          TreeSet<String> deletedKeySet = new TreeSet<>();
+          TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
+          try {
+            listStatusFindDirsInTableCache(tempCacheDirMap,
+                metadataManager.getDirectoryTable(),
+                prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
+                bucketName, countEntries, numEntries, deletedKeySet);
+          } finally {
+            metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+                bucketName);
+          }
+
+
+          // Now first add all entries in the dir cache, if numEntries required
+          // is less than countEntries.
+          for (Map.Entry<String, OzoneFileStatus> dirEntry :
+              tempCacheDirMap.entrySet()) {
+            if (countEntries < numEntries) {
+              cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
+              countEntries++;
+            }
+          }
+
+          if (countEntries < numEntries) {
+            getDirectories(cacheDirMap, seekDirInDB, prefixPath,
+                prefixKeyInDB, countEntries, numEntries, recursive,
+                volumeName, bucketName, deletedKeySet);
+          }
+        } else {
+          seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
+              fileStatusInfo.getKeyInfo().getFileName());
+          // begins from the first sub-dir under the parent dir
+          seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
+
+          TreeSet<String> deletedKeySet = new TreeSet<>();
+          TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
+          metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
               bucketName);
+
+          try {
+            countEntries = listStatusFindFilesInTableCache(cacheFileMap,
+                metadataManager.getKeyTable(), prefixKeyInDB, seekFileInDB,
+                prefixPath, startKey, countEntries, numEntries, deletedKeySet);
+
+            listStatusFindDirsInTableCache(tempCacheDirMap,
+                metadataManager.getDirectoryTable(),
+                prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
+                bucketName, countEntries, numEntries, deletedKeySet);
+          } finally {
+            metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+                bucketName);
+          }
+
+          // 1. Seek the given key in key table.
+          countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
+              prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet);
+
+          // Now first add all entries in the dir cache, if numEntries required
+          // is less than countEntries.
+          for (Map.Entry<String, OzoneFileStatus> dirEntry :
+              tempCacheDirMap.entrySet()) {
+            if (countEntries < numEntries) {
+              cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
+              countEntries++;
+            }
+          }
+
+          // 2. Seek the given key in dir table.
+          if (countEntries < numEntries) {
+            getDirectories(cacheDirMap, seekDirInDB, prefixPath,
+                prefixKeyInDB, countEntries, numEntries, recursive,
+                volumeName, bucketName, deletedKeySet);
+          }
+        }
+      } else {
+        // TODO: HDDS-4364: startKey can be a non-existed key
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("StartKey {} is a non-existed key and returning empty " +
+                    "list", startKey);
+        }
+        return Collections.emptyList();
+      }
     }
 
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
+
     for (OzoneFileStatus fileStatus : cacheFileMap.values()) {
       fileStatusFinalList.add(fileStatus);
       keyInfoList.add(fileStatus.getKeyInfo());
     }
+
     for (OzoneFileStatus fileStatus : cacheDirMap.values()) {
       fileStatusFinalList.add(fileStatus);
     }
+
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
@@ -2759,9 +2753,11 @@ public class KeyManagerImpl implements KeyManager {
     // https://issues.apache.org/jira/browse/HDDS-3658.
     // Please refer this jira for more details.
     refreshPipeline(keyInfoList);
+
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
     }
+
     return fileStatusFinalList;
   }
 
