@@ -2329,6 +2329,7 @@ public class KeyManagerImpl implements KeyManager {
    * @return list of file status
    */
   @Override
+  @SuppressWarnings("methodlength")
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress)
           throws IOException {
@@ -2706,7 +2707,8 @@ public class KeyManagerImpl implements KeyManager {
 
           // 1. Seek the given key in key table.
           countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-              prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet);
+              prefixPath, prefixKeyInDB, countEntries, numEntries,
+              deletedKeySet);
 
           // Now first add all entries in the dir cache, if numEntries required
           // is less than countEntries.
@@ -2807,7 +2809,8 @@ public class KeyManagerImpl implements KeyManager {
   private int getFilesFromDirectory(
       TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
-      int countEntries, long numEntries, Set<String> deletedKeySet) throws IOException {
+      int countEntries, long numEntries, Set<String> deletedKeySet)
+      throws IOException {
 
     Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable();
 
