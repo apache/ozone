@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -57,6 +58,7 @@ import java.io.IOException;
 
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -90,6 +92,8 @@ public class TestPipelinePlacementPolicy {
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     conf = new OzoneConfiguration();
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        10, StorageUnit.MB);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
     stateManager = new PipelineStateManager();
     placementPolicy = new PipelinePlacementPolicy(
@@ -195,7 +199,34 @@ public class TestPipelinePlacementPolicy {
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
     thrownExp.expect(SCMException.class);
-    thrownExp.expectMessage("enough space for even a single container");
+    thrownExp.expectMessage("healthy datanodes with enough space");
+    localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+        new ArrayList<>(datanodes.size()), nodesRequired, 0);
+  }
+
+  @Test
+  public void testChooseNodeNotEnoughMetadataSpace() throws SCMException {
+    // a huge free space min configured
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        500, StorageUnit.TB);
+    // a small container size
+    conf.set(OZONE_SCM_CONTAINER_SIZE, "100MB");
+
+    // There is only one node on 3 racks altogether.
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    for (Node node : SINGLE_NODE_RACK) {
+      DatanodeDetails datanode = overwriteLocationInNode(
+          MockDatanodeDetails.randomDatanodeDetails(), node);
+      datanodes.add(datanode);
+    }
+    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+        datanodes, false, datanodes.size());
+    PipelinePlacementPolicy localPlacementPolicy = new PipelinePlacementPolicy(
+        localNodeManager, new PipelineStateManager(), conf);
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
+
+    thrownExp.expect(SCMException.class);
+    thrownExp.expectMessage("healthy datanodes with enough space");
     localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
         new ArrayList<>(datanodes.size()), nodesRequired, 0);
   }

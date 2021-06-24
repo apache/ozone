@@ -72,7 +72,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <includes>
                 <include>DatanodeClientProtocol.proto</include>
                 <include>SCMClientProtocol.proto</include>
-                <include>SCMUpdateProtocol.proto</include>
               </includes>
               <outputDirectory>target/generated-sources/java</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
@@ -120,18 +119,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <replace token="com.google.common"
                          value="org.apache.ratis.thirdparty.com.google.common"
                          dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/datanode/proto">
-                </replace>
-                <replace token="com.google.protobuf"
-                         value="org.apache.ratis.thirdparty.com.google.protobuf"
-                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
-                </replace>
-                <replace token="io.grpc"
-                         value="org.apache.ratis.thirdparty.io.grpc"
-                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
-                </replace>
-                <replace token="com.google.common"
-                         value="org.apache.ratis.thirdparty.com.google.common"
-                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
                 </replace>
               </tasks>
             </configuration>

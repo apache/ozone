@@ -69,6 +69,7 @@ public class TestContainerBalancer {
 
     balancerConfiguration = new ContainerBalancerConfiguration();
     balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setIdleIteration(1);
     balancerConfiguration.setMaxDatanodesToBalance(10);
     balancerConfiguration.setMaxSizeToMove(500 * OzoneConsts.GB);
     conf.setFromObject(balancerConfiguration);
@@ -96,11 +97,18 @@ public class TestContainerBalancer {
 
       balancerConfiguration.setThreshold(randomThreshold);
       containerBalancer.start(balancerConfiguration);
+
+      // waiting for balance completed.
+      // TODO: this is a temporary implementation for now
+      // modify this after balancer is fully completed
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {}
+
       expectedUnBalancedNodes =
           determineExpectedUnBalancedNodes(randomThreshold);
       unBalancedNodesAccordingToBalancer =
           containerBalancer.getUnBalancedNodes();
-
       Assert.assertEquals(
           expectedUnBalancedNodes.size(),
           unBalancedNodesAccordingToBalancer.size());
@@ -134,11 +142,17 @@ public class TestContainerBalancer {
   @Test
   public void containerBalancerShouldStopWhenMaxDatanodesToBalanceIsReached() {
     balancerConfiguration.setMaxDatanodesToBalance(2);
-    balancerConfiguration.setThreshold(0);
+    balancerConfiguration.setThreshold(0.1);
     containerBalancer.start(balancerConfiguration);
 
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(3000);
+    } catch (InterruptedException e) {}
+
     Assert.assertFalse(containerBalancer.isBalancerRunning());
-    containerBalancer.stop();
   }
 
   /**

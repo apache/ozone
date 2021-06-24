@@ -152,6 +152,9 @@
                   <shadedPattern>
                     ${shaded.prefix}.io
                   </shadedPattern>
+                  <excludes>
+                    <exclude>io!netty!*</exclude>
+                  </excludes>
                 </relocation>
 
                 <!-- handling some special packages with special names -->
