@@ -143,8 +143,8 @@ public class TestOzoneClient {
 
   @Test
   public void testPutKeyRatisOneNode() throws IOException {
-    String value = "sample value";
     Instant testStartTime = Instant.now();
+    String value = "sample value";
     OzoneBucket bucket = getOzoneBucket();
 
     for (int i = 0; i < 10; i++) {
@@ -174,14 +174,13 @@ public class TestOzoneClient {
 
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
+
       try (OzoneOutputStream out = bucket
           .createKey(keyName, value.getBytes(UTF_8).length,
               ReplicationType.RATIS, ONE, new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
         out.write(value.getBytes(UTF_8));
       }
-      OzoneKey key = bucket.getKey(keyName);
-      Assert.assertEquals(keyName, key.getName());
     }
   }
 
