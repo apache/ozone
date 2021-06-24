@@ -5,6 +5,9 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 
 import java.io.IOException;
 
+/**
+ * Interface for DB operations on NS summary.
+ */
 @InterfaceStability.Unstable
 public interface ReconNamespaceSummaryManager {
 

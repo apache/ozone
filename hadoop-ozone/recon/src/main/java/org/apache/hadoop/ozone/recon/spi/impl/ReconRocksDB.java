@@ -13,13 +13,14 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import com.google.inject.ProvisionException;
-import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
-
+/**
+ * Provider for Recon's RDB.
+ */
 public class ReconRocksDB {
   private OzoneConfiguration configuration;
   private ReconUtils reconUtils;
@@ -84,7 +85,8 @@ public class ReconRocksDB {
     if (table == null) {
       return;
     }
-    TableIterator<Object, ? extends KeyValue<Object, Object>> tableIterator = table.iterator();
+    TableIterator<Object, ? extends KeyValue<Object, Object>>
+            tableIterator = table.iterator();
     while (tableIterator.hasNext()) {
       KeyValue<Object, Object> entry = tableIterator.next();
       table.delete(entry.getKey());

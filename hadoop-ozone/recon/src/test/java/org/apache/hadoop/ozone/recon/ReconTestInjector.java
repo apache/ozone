@@ -36,7 +36,6 @@ import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -175,9 +174,11 @@ public class ReconTestInjector {
 
           if (withContainerDB) {
             bind(ReconContainerMetadataManager.class)
-                .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
+                .to(ReconContainerMetadataManagerImpl.class)
+                    .in(Singleton.class);
             bind(ReconNamespaceSummaryManager.class)
-                    .to(ReconNamespaceSummaryManagerImpl.class).in(Singleton.class);
+                    .to(ReconNamespaceSummaryManagerImpl.class)
+                    .in(Singleton.class);
             bind(ReconRocksDB.class).in(Singleton.class);
           }
 

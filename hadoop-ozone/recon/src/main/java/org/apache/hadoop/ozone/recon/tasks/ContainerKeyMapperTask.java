@@ -230,8 +230,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           }
 
           // update the count of keys for the given containerID
-          long keyCount =
-              reconContainerMetadataManager.getKeyCountForContainer(containerId);
+          long keyCount = reconContainerMetadataManager
+                  .getKeyCountForContainer(containerId);
 
           // increment the count and update containerKeyCount.
           // keyCount will be 0 if containerID is not found. So, there is no

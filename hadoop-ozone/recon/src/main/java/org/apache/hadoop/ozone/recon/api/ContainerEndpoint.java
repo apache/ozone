@@ -113,7 +113,8 @@ public class ContainerEndpoint {
     Map<Long, ContainerMetadata> containersMap;
     long containersCount;
     try {
-      containersMap = reconContainerMetadataManager.getContainers(limit, prevKey);
+      containersMap =
+              reconContainerMetadataManager.getContainers(limit, prevKey);
       containersCount = reconContainerMetadataManager.getCountForContainers();
     } catch (IOException ioEx) {
       throw new WebApplicationException(ioEx,

@@ -2,21 +2,21 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 
-import javax.validation.constraints.AssertFalse;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Test for NSSummary manager.
+ */
 public class TestReconNamespaceSummaryManagerImpl {
   @ClassRule
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
-  private static int[] TEST_BUCKET;
+  private static int[] testBucket;
 
   @BeforeClass
   public static void setupOnce() throws Exception {
@@ -25,11 +25,11 @@ public class TestReconNamespaceSummaryManagerImpl {
                     .withReconSqlDb()
                     .withContainerDB()
                     .build();
-    reconNamespaceSummaryManager =
-            reconTestInjector.getInstance(ReconNamespaceSummaryManagerImpl.class);
-    TEST_BUCKET = new int[40];
+    reconNamespaceSummaryManager = reconTestInjector.getInstance(
+            ReconNamespaceSummaryManagerImpl.class);
+    testBucket = new int[40];
     for (int i = 0; i < 40; ++i) {
-      TEST_BUCKET[i] = i + 1;
+      testBucket[i] = i + 1;
     }
   }
 
@@ -58,16 +58,18 @@ public class TestReconNamespaceSummaryManagerImpl {
   @Test
   public void testInitNSSummaryTable() throws IOException {
     putThreeNSMetadata();
-    Assert.assertFalse(reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
+    Assert.assertFalse(
+            reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
     reconNamespaceSummaryManager.initNSSummaryTable();
-    Assert.assertTrue(reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
+    Assert.assertTrue(
+            reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
   }
 
   private void putThreeNSMetadata() throws IOException {
     HashMap<Long, NSSummary> hmap = new HashMap<>();
-    hmap.put(1L, new NSSummary(1, 2, TEST_BUCKET));
-    hmap.put(2L, new NSSummary(3, 4, TEST_BUCKET));
-    hmap.put(3L, new NSSummary(5, 6, TEST_BUCKET));
+    hmap.put(1L, new NSSummary(1, 2, testBucket));
+    hmap.put(2L, new NSSummary(3, 4, testBucket));
+    hmap.put(3L, new NSSummary(5, 6, testBucket));
     for (Map.Entry entry: hmap.entrySet()) {
       reconNamespaceSummaryManager.storeNSSummary(
               (long)entry.getKey(), (NSSummary)entry.getValue());

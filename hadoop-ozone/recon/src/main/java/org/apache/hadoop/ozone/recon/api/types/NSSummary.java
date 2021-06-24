@@ -5,7 +5,7 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 import java.util.Arrays;
 
 /**
- * Class to encapsulate namespace metadata summaries from OM
+ * Class to encapsulate namespace metadata summaries from OM.
  */
 
 public class NSSummary {
@@ -16,7 +16,8 @@ public class NSSummary {
   public NSSummary() {
     this.numOfFiles = 0;
     this.sizeOfFiles = 0;
-    // TODO: I read the min is 1024(2^10), max is 1PB(2^50), so the number of buckets should be 40?
+    // TODO: I read the min is 1024(2^10), max is 1PB(2^50),
+    //  so the number of buckets should be 40?
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
   }
 

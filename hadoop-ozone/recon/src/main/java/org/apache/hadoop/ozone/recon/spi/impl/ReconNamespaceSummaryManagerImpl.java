@@ -13,6 +13,9 @@ import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE
 
 import java.io.IOException;
 
+/**
+ * Wrapper functions for DB operations on recon namespace summary metadata.
+ */
 public class ReconNamespaceSummaryManagerImpl
         implements ReconNamespaceSummaryManager {
 
@@ -23,7 +26,7 @@ public class ReconNamespaceSummaryManagerImpl
 
   // TODO: compute disk usage here?
   @Inject
-  public ReconNamespaceSummaryManagerImpl(ReconRocksDB reconRocksDB) throws IOException {
+  public ReconNamespaceSummaryManagerImpl(ReconRocksDB reconRocksDB) {
     namespaceDbStore = reconRocksDB.getDbStore();
     initializeTable();
   }
@@ -34,7 +37,8 @@ public class ReconNamespaceSummaryManagerImpl
   }
 
   @Override
-  public void storeNSSummary(long objectId, NSSummary nsSummary) throws IOException {
+  public void storeNSSummary(long objectId, NSSummary nsSummary)
+          throws IOException {
     nsSummaryTable.put(objectId, nsSummary);
   }
 

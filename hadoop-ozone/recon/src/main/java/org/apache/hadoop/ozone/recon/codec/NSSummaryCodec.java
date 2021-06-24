@@ -10,6 +10,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 
+/**
+ * Codec for Namespace Summary.
+ */
 public class NSSummaryCodec implements Codec<NSSummary>{
 
   private final Codec<Integer> integerCodec = new IntegerCodec();

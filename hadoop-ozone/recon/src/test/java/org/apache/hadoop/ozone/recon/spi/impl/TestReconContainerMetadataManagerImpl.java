@@ -208,7 +208,8 @@ public class TestReconContainerMetadataManagerImpl {
     reconContainerMetadataManager.storeContainerKeyCount(nextContainerId, 3L);
 
     assertTrue(reconContainerMetadataManager.doesContainerExists(containerId));
-    assertTrue(reconContainerMetadataManager.doesContainerExists(nextContainerId));
+    assertTrue(reconContainerMetadataManager.
+            doesContainerExists(nextContainerId));
     assertFalse(reconContainerMetadataManager.doesContainerExists(0L));
     assertFalse(reconContainerMetadataManager.doesContainerExists(3L));
   }
