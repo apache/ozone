@@ -745,33 +745,34 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     Set<Long> containerIDs = new HashSet<>();
-    for (OmKeyInfo keyInfo : keyList) {
-      List<OmKeyLocationInfoGroup> locationInfoGroups =
-          keyInfo.getKeyLocationVersions();
-
-      for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          containerIDs.add(k.getContainerID());
-        }
-      }
-    }
+    keyList.forEach(
+        keyInfo -> keyInfo.getKeyLocationVersions().forEach(
+            key -> key.getLocationLists().forEach(
+                OmKeyLocationInfoList -> OmKeyLocationInfoList.forEach(
+                    k -> containerIDs.add(k.getContainerID())
+                )
+            )
+        )
+    );
 
     Map<Long, ContainerWithPipeline> containerWithPipelineMap =
         refreshPipeline(containerIDs);
 
-    for (OmKeyInfo keyInfo : keyList) {
-      List<OmKeyLocationInfoGroup> locationInfoGroups =
-          keyInfo.getKeyLocationVersions();
-      for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          ContainerWithPipeline cp =
-              containerWithPipelineMap.get(k.getContainerID());
-          if (cp != null && !cp.getPipeline().equals(k.getPipeline())) {
-            k.setPipeline(cp.getPipeline());
-          }
-        }
-      }
-    }
+    keyList.forEach(
+        keyInfo -> keyInfo.getKeyLocationVersions().forEach(
+            key -> key.getLocationLists().forEach(
+                OmKeyLocationInfoList -> OmKeyLocationInfoList.forEach(
+                    k -> {
+                      ContainerWithPipeline cp =
+                          containerWithPipelineMap.get(k.getContainerID());
+                      if (cp != null && !cp.getPipeline().equals(k.getPipeline())) {
+                        k.setPipeline(cp.getPipeline());
+                      }
+                    }
+                )
+            )
+        )
+    );
   }
 
   /**
