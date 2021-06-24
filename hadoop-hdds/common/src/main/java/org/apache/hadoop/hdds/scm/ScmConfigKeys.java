@@ -444,11 +444,6 @@ public final class ScmConfigKeys {
   public static final int OZONE_SCM_GRPC_PORT_DEFAULT
       = 9895;
 
-  public static final String OZONE_SCM_RATIS_REQUEST_TIMEOUT_KEY
-      = "ozone.scm.ratis.minimum.timeout";
-  public static final String OZONE_SCM_RATIS_REQUEST_TIMEOUT_DEFAULT
-      = "30s";
-
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL =
       "ozone.scm.datanode.admin.monitor.interval";
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
