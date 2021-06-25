@@ -40,7 +40,7 @@ public interface ReconContainerMetadataManager {
    * @param containerKeyPrefixCounts Map of containerId, key-prefix tuple to
    *                                 key count.
    */
-  void initNewContainerDB(Map<ContainerKeyPrefix, Integer>
+  void reinitWithNewContainerDataFromOm(Map<ContainerKeyPrefix, Integer>
                                     containerKeyPrefixCounts)
       throws IOException;
 

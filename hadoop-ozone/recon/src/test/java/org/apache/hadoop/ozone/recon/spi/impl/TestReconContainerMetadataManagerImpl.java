@@ -64,7 +64,7 @@ public class TestReconContainerMetadataManagerImpl {
   @Before
   public void setUp() throws Exception {
     // Reset containerDB before running each test
-    reconContainerMetadataManager.initNewContainerDB(null);
+    reconContainerMetadataManager.reinitWithNewContainerDataFromOm(null);
   }
 
   private void populateKeysInContainers(long containerId1, long containerId2)
@@ -123,7 +123,8 @@ public class TestReconContainerMetadataManagerImpl {
         "V1/B3/K2", 0);
     prefixCounts.put(ckp5, 15);
 
-    reconContainerMetadataManager.initNewContainerDB(prefixCounts);
+    reconContainerMetadataManager
+            .reinitWithNewContainerDataFromOm(prefixCounts);
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(containerId);
 

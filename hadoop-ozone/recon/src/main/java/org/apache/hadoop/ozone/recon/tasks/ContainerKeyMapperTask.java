@@ -74,7 +74,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       Instant start = Instant.now();
 
       // initialize new container DB
-      reconContainerMetadataManager.initNewContainerDB(new HashMap<>());
+      reconContainerMetadataManager
+              .reinitWithNewContainerDataFromOm(new HashMap<>());
 
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable();
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>

@@ -39,7 +39,7 @@ import com.google.inject.Singleton;
  * Tests the class that provides the instance of the DB Store used by Recon to
  * store its container - key data.
  */
-public class TestReconRocksDB {
+public class TestReconDBProvider {
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -56,16 +56,16 @@ public class TestReconRocksDB {
         OzoneConfiguration configuration = new OzoneConfiguration();
         configuration.set(OZONE_RECON_DB_DIR, dbDir.getAbsolutePath());
         bind(OzoneConfiguration.class).toInstance(configuration);
-        bind(ReconRocksDB.class).in(Singleton.class);
+        bind(ReconDBProvider.class).in(Singleton.class);
       }
     });
   }
 
   @Test
   public void testGet() throws Exception {
-    ReconRocksDB reconRocksDB = injector.getInstance(
-        ReconRocksDB.class);
-    assertNotNull(reconRocksDB.getDbStore());
+    ReconDBProvider reconDBProvider = injector.getInstance(
+        ReconDBProvider.class);
+    assertNotNull(reconDBProvider.getDbStore());
   }
 
 }

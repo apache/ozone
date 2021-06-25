@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconRocksDB.clearTable;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,10 +42,9 @@ public class ReconNamespaceSummaryManagerImpl
   private Table<Long, NSSummary> nsSummaryTable;
   private DBStore namespaceDbStore;
 
-  // TODO: compute disk usage here?
   @Inject
-  public ReconNamespaceSummaryManagerImpl(ReconRocksDB reconRocksDB) {
-    namespaceDbStore = reconRocksDB.getDbStore();
+  public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider) {
+    namespaceDbStore = reconDBProvider.getDbStore();
     initializeTable();
   }
 
@@ -67,8 +66,10 @@ public class ReconNamespaceSummaryManagerImpl
 
   private void initializeTable() {
     try {
-      clearTable(this.nsSummaryTable);
-      this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
+      truncateTable(this.nsSummaryTable);
+      if (nsSummaryTable == null) {
+        this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
+      }
     } catch (IOException e) {
       LOG.error("cannot initialize table");
     }

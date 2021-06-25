@@ -34,8 +34,6 @@ public class NSSummary {
   public NSSummary() {
     this.numOfFiles = 0;
     this.sizeOfFiles = 0;
-    // TODO: I read the min is 1024(2^10), max is 1PB(2^50),
-    //  so the number of buckets should be 40?
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
   }
 
@@ -54,7 +52,7 @@ public class NSSummary {
   }
 
   public int[] getFileSizeBucket() {
-    return fileSizeBucket;
+    return Arrays.copyOf(this.fileSizeBucket, ReconConstants.NUM_OF_BINS);
   }
 
   public void setNumOfFiles(int numOfFiles) {

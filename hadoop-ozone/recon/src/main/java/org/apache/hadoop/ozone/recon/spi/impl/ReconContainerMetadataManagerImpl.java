@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconRocksDB.clearTable;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY;
@@ -75,9 +75,9 @@ public class ReconContainerMetadataManagerImpl
   private Configuration sqlConfiguration;
 
   @Inject
-  public ReconContainerMetadataManagerImpl(ReconRocksDB reconRocksDB,
+  public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
                                            Configuration sqlConfiguration) {
-    containerDbStore = reconRocksDB.getDbStore();
+    containerDbStore = reconDBProvider.getDbStore();
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
     initializeTables();
   }
@@ -91,10 +91,12 @@ public class ReconContainerMetadataManagerImpl
    * @throws IOException
    */
   @Override
-  public void initNewContainerDB(Map<ContainerKeyPrefix, Integer>
+  public void reinitWithNewContainerDataFromOm(Map<ContainerKeyPrefix, Integer>
                                      containerKeyPrefixCounts)
       throws IOException {
     // clear and re-init all container-related tables
+    truncateTable(this.containerKeyTable);
+    truncateTable(this.containerKeyCountTable);
     initializeTables();
 
     if (containerKeyPrefixCounts != null) {
@@ -113,9 +115,6 @@ public class ReconContainerMetadataManagerImpl
    */
   private void initializeTables() {
     try {
-      clearTable(this.containerKeyTable);
-      clearTable(this.containerKeyCountTable);
-      clearTable(this.containerReplicaHistoryTable);
       this.containerKeyTable = CONTAINER_KEY.getTable(containerDbStore);
       this.containerKeyCountTable =
           CONTAINER_KEY_COUNT.getTable(containerDbStore);

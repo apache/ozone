@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconRocksDB;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.junit.Assert;
 import org.junit.rules.TemporaryFolder;
 
@@ -179,7 +179,7 @@ public class ReconTestInjector {
             bind(ReconNamespaceSummaryManager.class)
                     .to(ReconNamespaceSummaryManagerImpl.class)
                     .in(Singleton.class);
-            bind(ReconRocksDB.class).in(Singleton.class);
+            bind(ReconDBProvider.class).in(Singleton.class);
           }
 
           for (Map.Entry<Class, Object> entry :

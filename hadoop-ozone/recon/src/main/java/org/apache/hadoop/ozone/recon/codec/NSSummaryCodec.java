@@ -31,7 +31,7 @@ import java.io.IOException;
 /**
  * Codec for Namespace Summary.
  */
-public class NSSummaryCodec implements Codec<NSSummary>{
+public class NSSummaryCodec implements Codec<NSSummary> {
 
   private final Codec<Integer> integerCodec = new IntegerCodec();
   // 2 int fields + 40-length int array

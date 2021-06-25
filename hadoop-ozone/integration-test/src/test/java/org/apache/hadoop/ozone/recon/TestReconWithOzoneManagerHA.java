@@ -131,7 +131,7 @@ public class TestReconWithOzoneManagerHA {
     impl.syncDataFromOM();
 
     ReconContainerMetadataManager reconContainerMetadataManager =
-        cluster.getReconServer().getContainerDBServiceProvider();
+        cluster.getReconServer().getRCMM();
     TableIterator iterator =
         reconContainerMetadataManager.getContainerTableIterator();
     String reconKeyPrefix = null;

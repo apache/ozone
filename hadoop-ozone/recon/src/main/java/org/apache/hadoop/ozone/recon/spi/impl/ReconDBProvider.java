@@ -24,7 +24,6 @@ import java.io.IOException;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -39,17 +38,17 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 /**
  * Provider for Recon's RDB.
  */
-public class ReconRocksDB {
+public class ReconDBProvider {
   private OzoneConfiguration configuration;
   private ReconUtils reconUtils;
   private DBStore dbStore;
 
   @VisibleForTesting
   private static final Logger LOG =
-          LoggerFactory.getLogger(ReconRocksDB.class);
+          LoggerFactory.getLogger(ReconDBProvider.class);
 
   @Inject
-  ReconRocksDB(OzoneConfiguration configuration, ReconUtils reconUtils) {
+  ReconDBProvider(OzoneConfiguration configuration, ReconUtils reconUtils) {
     this.configuration = configuration;
     this.reconUtils = reconUtils;
     this.dbStore = provideReconDB();
@@ -62,7 +61,7 @@ public class ReconRocksDB {
     File lastKnownContainerKeyDb =
             reconUtils.getLastKnownDB(reconDbDir, RECON_CONTAINER_KEY_DB);
     if (lastKnownContainerKeyDb != null) {
-      LOG.info("Last known DB : {}",
+      LOG.info("Last known Recon DB : {}",
               lastKnownContainerKeyDb.getAbsolutePath());
       db = initializeDBStore(configuration,
               lastKnownContainerKeyDb.getName());
@@ -80,26 +79,7 @@ public class ReconRocksDB {
     return dbStore;
   }
 
-  public void reInit() throws IOException {
-    File oldDBLocation = dbStore.getDbLocation();
-    try {
-      dbStore.close();
-    } catch (Exception e) {
-      LOG.warn("Unable to close old Recon container key DB at {}.",
-              dbStore.getDbLocation().getAbsolutePath());
-    }
-    dbStore = getNewDBStore(configuration);
-    LOG.info("Creating new Recon Container DB at {}",
-            dbStore.getDbLocation().getAbsolutePath());
-
-    if (oldDBLocation.exists()) {
-      LOG.info("Cleaning up old Recon Container key DB at {}.",
-              oldDBLocation.getAbsolutePath());
-      FileUtils.deleteDirectory(oldDBLocation);
-    }
-  }
-
-  static void clearTable(Table table) throws IOException {
+  static void truncateTable(Table table) throws IOException {
     if (table == null) {
       return;
     }

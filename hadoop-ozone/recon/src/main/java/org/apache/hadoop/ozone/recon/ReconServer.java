@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconRocksDB;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -60,7 +60,7 @@ public class ReconServer extends GenericCli {
   private ReconHttpServer httpServer;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
-  private ReconRocksDB reconRocksDB;
+  private ReconDBProvider reconDBProvider;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
   private OzoneConfiguration configuration;
@@ -97,8 +97,7 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
       loginReconUserIfSecurityEnabled(configuration);
-      this.reconRocksDB = injector.getInstance(ReconRocksDB.class);
-      LOG.info("Recon Rocks DB.");
+      this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
       this.reconContainerMetadataManager =
           injector.getInstance(ReconContainerMetadataManager.class);
       this.reconNamespaceSummaryManager =
@@ -167,8 +166,8 @@ public class ReconServer extends GenericCli {
       if (ozoneManagerServiceProvider != null) {
         ozoneManagerServiceProvider.stop();
       }
-      if (reconRocksDB != null) {
-        reconRocksDB.close();
+      if (reconDBProvider != null) {
+        reconDBProvider.close();
       }
       isStarted = false;
     }
@@ -242,13 +241,8 @@ public class ReconServer extends GenericCli {
   }
 
   @VisibleForTesting
-  public ReconContainerMetadataManager getContainerDBServiceProvider() {
+  public ReconContainerMetadataManager getRCMM() {
     return reconContainerMetadataManager;
-  }
-
-  @VisibleForTesting
-  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
-    return reconNamespaceSummaryManager;
   }
 
   @VisibleForTesting
