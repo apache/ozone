@@ -61,7 +61,8 @@ public final class ReconConstants {
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
   public static final long MIN_FILE_SIZE_UPPER_BOUND = 1024L;
-  public static final int NUM_OF_BINS = (int)(Math.log(
-          MAX_FILE_SIZE_UPPER_BOUND) / Math.log(2) - Math.log(
-                  MIN_FILE_SIZE_UPPER_BOUND) / Math.log(2)) + 1;
+  // 41 bins
+  public static final int NUM_OF_BINS = (int) Math.ceil(Math.log(
+      (double) MAX_FILE_SIZE_UPPER_BOUND / MIN_FILE_SIZE_UPPER_BOUND) /
+      Math.log(2)) + 1;
 }
