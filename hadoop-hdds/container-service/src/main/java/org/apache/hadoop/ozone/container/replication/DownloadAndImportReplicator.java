@@ -77,6 +77,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     this.config = config;
     this.clusterId = clusterId;
     this.volumeSet = volumeSet;
+    this.sslContext = sslContext;
     Class<? extends VolumeChoosingPolicy> volumeChoosingPolicyType = null;
     try {
       volumeChoosingPolicyType =

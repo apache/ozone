@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.stream;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
@@ -29,14 +30,21 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.CharsetUtil;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Client to stream huge binaries from a streamling server.
  */
 public class StreamingClient implements AutoCloseable {
 
+  private static final Logger LOG = LoggerFactory.getLogger(StreamingClient.class);
   private final Bootstrap bootstrap;
   private final DirstreamClientHandler dirstreamClientHandler;
   private EventLoopGroup group;
@@ -80,6 +88,8 @@ public class StreamingClient implements AutoCloseable {
             );
           }
         });
+    bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000);
+
   }
 
   public void stream(String id) {
@@ -87,19 +97,35 @@ public class StreamingClient implements AutoCloseable {
   }
 
   public void stream(String id, long timeout, TimeUnit unit) {
+    Channel channel = null;
     try {
-      Channel channel = bootstrap.connect(host, port).sync().channel();
-      channel.writeAndFlush(id + "\n")
-          .await(timeout, unit);
-      channel.closeFuture().await(timeout, unit);
+      ChannelFuture f = bootstrap.connect(host, port);
+      f.awaitUninterruptibly();
+      if (f.isCancelled()) {
+        throw new StreamingException("Connection is cancelled");
+      } else if (!f.isSuccess()) {
+        throw new StreamingException(f.cause());
+      }
+      channel = f.channel();
+      final ChannelFuture channelFuture = channel.writeAndFlush(id + "\n");
+      channelFuture.awaitUninterruptibly(timeout, unit);
+      if (channelFuture.cause() != null) {
+        throw new StreamingException(channelFuture.cause());
+      }
       if (!dirstreamClientHandler.isAtTheEnd()) {
         throw new StreamingException("Streaming is failed. Not all files " +
             "are streamed. Please check the log of the server." +
             " Last (partial?) streamed file: "
             + dirstreamClientHandler.getCurrentFileName());
       }
-    } catch (InterruptedException e) {
-      throw new StreamingException(e);
+    } finally {
+      if (channel != null) {
+        try {
+          channel.closeFuture().await(timeout, unit);
+        } catch (InterruptedException e) {
+          LOG.error("Couldn't close the replication stream channel", e);
+        }
+      }
     }
   }
 

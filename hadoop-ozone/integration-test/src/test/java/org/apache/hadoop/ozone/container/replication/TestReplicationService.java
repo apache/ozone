@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import com.google.common.base.Supplier;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -31,7 +32,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
@@ -80,8 +83,14 @@ public class TestReplicationService {
     final String sourceDnUUID = "d6979383-5fd5-4fa5-be02-9b39f06d763d";
     final String destDnUUID = "bb11a0cc-8902-4f07-adae-a853ba891132";
 
+    InMemoryConfiguration conf = new InMemoryConfiguration();
+    conf.setBoolean("ozone.security.enabled", true);
+    final CertificateClientTestImpl certificateClient =
+        new CertificateClientTestImpl(conf);
+
     ReplicationServer replicationServer =
-        initSource(clusterUuid, scmUuid, destDnUUID, sourceDir.toString());
+        initSource(clusterUuid, scmUuid, destDnUUID, sourceDir.toString(),
+            certificateClient);
 
     //start client
     ContainerSet
@@ -90,14 +99,13 @@ public class TestReplicationService {
             sourceDnUUID,
             replicationServer.getPort(),
             destDnUUID,
-            destDir);
+            destDir,
+            certificateClient);
 
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        return destinationContainerSet.getContainer(2L) != null;
-      }
-    }, 1000, 10_000);
+    GenericTestUtils.waitFor(() ->
+            destinationContainerSet.getContainer(2L) != null,
+        1000,
+        10_000);
 
     final Path firstBlockFile = destDir.resolve(
         "hdds/" + scmUuid + "/current/containerDir0/" + 2L + "/chunks/1.block");
@@ -111,8 +119,8 @@ public class TestReplicationService {
       String sourceDnUUID,
       int port,
       String destDnUUID,
-      Path destDir
-  ) throws IOException {
+      Path destDir,
+      CertificateClientTestImpl certificateClient) throws IOException {
     ContainerSet destinationContainerSet = new ContainerSet();
 
     OzoneConfiguration clientConfig = new OzoneConfiguration();
@@ -127,7 +135,7 @@ public class TestReplicationService {
         () -> scmUuid,
         destinationContainerSet,
         volumeSet,
-        null);
+        certificateClient.);
 
     DatanodeDetails source =
         DatanodeDetails.newBuilder()
@@ -147,11 +155,13 @@ public class TestReplicationService {
       String clusterUuid,
       String scmUuid,
       String sourceDnUUID,
-      String sourceDir
-  )
+      String sourceDir,
+      CertificateClientTestImpl certificateClient)
       throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("hdds.datanode.dir", sourceDir);
+    ozoneConfig.setBoolean("ozone.security.enabled", true);
+
 
     final MutableVolumeSet sourceVolumes =
         new MutableVolumeSet(sourceDnUUID, ozoneConfig, null,
@@ -211,12 +221,13 @@ public class TestReplicationService {
     ReplicationConfig replicationConfig = new ReplicationConfig();
     replicationConfig.setPort(0);
 
+
     SecurityConfig securityConfig = new SecurityConfig(ozoneConfig);
     ReplicationServer replicationServer =
         new ReplicationServer(sourceContainerSet,
             replicationConfig,
             securityConfig,
-            null);
+            certificateClient);
 
     kvd.setState(State.CLOSED);
 
