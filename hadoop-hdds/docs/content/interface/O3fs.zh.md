@@ -55,7 +55,7 @@ ozone sh bucket create /volume/bucket
 </property>
 <property>
   <name>fs.defaultFS</name>
-  <value>o3fs://bucket.volume</value>
+  <value>o3fs://bucket.volume.OzoneServiceId</value>
 </property>
 {{< /highlight >}}
 

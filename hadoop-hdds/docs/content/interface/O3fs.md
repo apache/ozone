@@ -59,7 +59,7 @@ Please add the following entry to the core-site.xml.
 </property>
 <property>
   <name>fs.defaultFS</name>
-  <value>o3fs://bucket.volume</value>
+  <value>o3fs://bucket.volume.OzoneServiceId</value>
 </property>
 ```
 
