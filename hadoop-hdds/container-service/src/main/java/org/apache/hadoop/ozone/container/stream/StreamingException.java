@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,27 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.block;
+package org.apache.hadoop.ozone.container.stream;
 
-import org.apache.hadoop.hdds.server.events.EventHandler;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
+import java.io.IOException;
 
 /**
- * Event handler for PedingDeleteStatuList events.
+ * Runtime exception for any streaming related errors.
  */
-public class PendingDeleteHandler implements
-    EventHandler<PendingDeleteStatusList> {
+public class StreamingException extends RuntimeException {
 
-  private SCMBlockDeletingService scmBlockDeletingService;
-
-  public PendingDeleteHandler(
-      SCMBlockDeletingService scmBlockDeletingService) {
-    this.scmBlockDeletingService = scmBlockDeletingService;
+  public StreamingException(InterruptedException ex) {
+    super(ex);
   }
 
-  @Override
-  public void onMessage(PendingDeleteStatusList pendingDeleteStatusList,
-      EventPublisher publisher) {
-    scmBlockDeletingService.handlePendingDeletes(pendingDeleteStatusList);
+  public StreamingException(String s, IOException e) {
+    super(s, e);
+  }
+
+  public StreamingException(String s) {
+    super(s);
   }
 }

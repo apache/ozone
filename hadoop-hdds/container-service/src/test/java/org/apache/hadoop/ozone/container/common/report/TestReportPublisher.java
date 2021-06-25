@@ -133,7 +133,7 @@ public class TestReportPublisher {
     Thread.sleep(150);
     executorService.shutdown();
     Assert.assertEquals(1, ((DummyReportPublisher) publisher).getReportCount);
-    verify(dummyContext, times(1)).addReport(null);
+    verify(dummyContext, times(1)).refreshFullReport(null);
     // After executor shutdown, no new reports should be published
     Thread.sleep(100);
     Assert.assertEquals(1, ((DummyReportPublisher) publisher).getReportCount);
@@ -183,12 +183,8 @@ public class TestReportPublisher {
     DatanodeCRLStore dnCrlStore = Mockito.mock(DatanodeCRLStore.class);
     when(dnCrlStore.getLatestCRLSequenceID()).thenReturn(3L);
     List<CRLInfo> pendingCRLs = new ArrayList<>();
-    pendingCRLs.add(new CRLInfo.Builder()
-        .setCrlSequenceID(100L)
-        .build());
-    pendingCRLs.add(new CRLInfo.Builder()
-        .setCrlSequenceID(101L)
-        .build());
+    pendingCRLs.add(Mockito.mock(CRLInfo.class));
+    pendingCRLs.add(Mockito.mock(CRLInfo.class));
     when(dnCrlStore.getPendingCRLs()).thenReturn(pendingCRLs);
     when(dummyStateMachine.getDnCRLStore()).thenReturn(dnCrlStore);
     when(dummyContext.getParent()).thenReturn(dummyStateMachine);

@@ -46,6 +46,8 @@ class OzoneContract extends AbstractFSContract {
   private static MiniOzoneCluster cluster;
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
+  private static boolean fsOptimizedServer;
+
   OzoneContract(Configuration conf) {
     super(conf);
     //insert the base features
@@ -63,6 +65,10 @@ class OzoneContract extends AbstractFSContract {
     return path;
   }
 
+  public static void initOzoneConfiguration(boolean fsoServer){
+    fsOptimizedServer = fsoServer;
+  }
+
   public static void createCluster() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
@@ -78,6 +84,13 @@ class OzoneContract extends AbstractFSContract {
     conf.setFromObject(raftClientConfig);
 
     conf.addResource(CONTRACT_XML);
+
+    if (fsOptimizedServer){
+      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+          true);
+      conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT,
+          OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    }
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {

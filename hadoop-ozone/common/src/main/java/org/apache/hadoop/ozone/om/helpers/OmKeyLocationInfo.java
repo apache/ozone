@@ -182,11 +182,11 @@ public final class OmKeyLocationInfo {
         .setLength(length)
         .setOffset(offset)
         .setCreateVersion(createVersion).setPartNumber(partNumber);
-    if (this.token != null) {
-      builder.setToken(OzonePBHelper.protoFromToken(token));
-    }
     if (!ignorePipeline) {
       try {
+        if (this.token != null) {
+          builder.setToken(OzonePBHelper.protoFromToken(token));
+        }
         builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
       } catch (UnknownPipelineStateException e) {
         //TODO: fix me: we should not return KeyLocation without pipeline.

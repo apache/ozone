@@ -64,7 +64,7 @@ public class ContainerBalancer {
   private final SCMContext scmContext;
   private double threshold;
   private int maxDatanodesToBalance;
-  private long maxSizeToMove;
+  private long maxSizeToMoveInGB;
   private int idleIteration;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
@@ -137,10 +137,10 @@ public class ContainerBalancer {
       this.idleIteration = config.getIdleIteration();
       this.threshold = config.getThreshold();
       this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
-      this.maxSizeToMove = config.getMaxSizeToMove();
+      this.maxSizeToMoveInGB = config.getMaxSizeToMove();
       LOG.info("Starting Container Balancer...{}", this);
-      LOG.info("Max size entering node config is {}",
-          config.getMaxSizeEnteringTarget());
+//      LOG.info("Max size entering node config is {}",
+//          config.getMaxSizeEnteringTarget());
 
       //we should start a new balancer thread async
       //and response to cli as soon as possible
@@ -162,15 +162,6 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    this.clusterCapacity = 0L;
-    this.clusterUsed = 0L;
-    this.clusterRemaining = 0L;
-
-    this.selectedContainers = new HashSet<>();
-    this.overUtilizedNodes = new ArrayList<>();
-    this.underUtilizedNodes = new ArrayList<>();
-    this.withinThresholdUtilizedNodes = new ArrayList<>();
-    this.unBalancedNodes = new ArrayList<>();
 
     for (int i = 0; i < idleIteration; i++) {
       if (!initializeIteration()) {
@@ -206,9 +197,15 @@ public class ContainerBalancer {
       return false;
     }
 
+    this.clusterCapacity = 0L;
+    this.clusterUsed = 0L;
+    this.clusterRemaining = 0L;
+
+    this.selectedContainers = new HashSet<>();
     overUtilizedNodes = new ArrayList<>();
     underUtilizedNodes = new ArrayList<>();
     withinThresholdUtilizedNodes = new ArrayList<>();
+    this.unBalancedNodes = new ArrayList<>();
 
     clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
     LOG.info("Average utilization of the cluster is {}", clusterAvgUtilisation);
@@ -282,13 +279,21 @@ public class ContainerBalancer {
     unBalancedNodes.addAll(overUtilizedNodes);
     unBalancedNodes.addAll(underUtilizedNodes);
 
+      //for now, we just sleep to simulate the execution of balancer
+      //this if for acceptance test now. modify this later when balancer
+      //if fully completed
+      try {
+        Thread.sleep(50);
+      } catch (InterruptedException e) {}
+      /////////////////////////////
+
     if (unBalancedNodes.isEmpty()) {
       LOG.info("Did not find any unbalanced Datanodes.");
       return false;
     }
 
     LOG.info("Container Balancer has identified Datanodes that need to be" +
-            " balanced.");
+        " balanced.");
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager);

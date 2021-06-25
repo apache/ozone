@@ -36,6 +36,7 @@ import java.util.EnumSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -285,6 +286,26 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return True if ReplicationManager is running, false otherwise.
    */
   boolean getReplicationManagerStatus() throws IOException;
+
+  /**
+   * Start ContainerBalancer.
+   */
+  boolean startContainerBalancer(Optional<Double> threshold,
+      Optional<Integer> idleiterations,
+      Optional<Integer> maxDatanodesToBalance,
+      Optional<Long> maxSizeToMoveInGB) throws IOException;
+
+  /**
+   * Stop ContainerBalancer.
+   */
+  void stopContainerBalancer() throws IOException;
+
+  /**
+   * Returns ContainerBalancer status.
+   *
+   * @return True if ContainerBalancer is running, false otherwise.
+   */
+  boolean getContainerBalancerStatus() throws IOException;
 
   /**
    * Get Datanode usage information by ip or uuid.

@@ -222,8 +222,8 @@ public class TestSCMPipelineManager {
         mockRatisProvider);
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
-            eventQueue, new SCMServiceManager(),
+        new SCMSafeModeManager(conf, new ArrayList<>(), null,
+            pipelineManager, eventQueue, new SCMServiceManager(),
             SCMContext.emptyContext());
 
     // create a pipeline in allocated state with no dns yet reported
@@ -494,7 +494,7 @@ public class TestSCMPipelineManager {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
-            pipelineManager, eventQueue,
+            null, pipelineManager, eventQueue,
             new SCMServiceManager(),
             SCMContext.emptyContext());
     PipelineReportHandler pipelineReportHandler =

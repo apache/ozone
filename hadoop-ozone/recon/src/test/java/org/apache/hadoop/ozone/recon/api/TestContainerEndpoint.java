@@ -47,6 +47,7 @@ import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -465,11 +466,11 @@ public class TestContainerEndpoint {
   ContainerInfo newContainerInfo(long containerId) {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setOwner("owner1")
         .setNumberOfKeys(keyCount)
-        .setReplicationFactor(ReplicationFactor.THREE)
         .setPipelineID(pipelineID)
         .build();
   }
