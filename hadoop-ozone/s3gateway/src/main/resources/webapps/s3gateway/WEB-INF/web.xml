@@ -47,11 +47,11 @@
     <url-pattern>/*</url-pattern>
   </filter-mapping>
   <filter-mapping>
-    <filter-name>perrequest-preprocess-signaturelocalthread</filter-name>
+    <filter-name>info-page-redirect</filter-name>
     <url-pattern>/*</url-pattern>
   </filter-mapping>
   <filter-mapping>
-    <filter-name>info-page-redirect</filter-name>
+    <filter-name>perrequest-preprocess-signaturelocalthread</filter-name>
     <url-pattern>/*</url-pattern>
   </filter-mapping>
   <listener>

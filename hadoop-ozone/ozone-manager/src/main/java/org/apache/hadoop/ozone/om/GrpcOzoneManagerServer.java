@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc
     .OzoneManagerServiceImplBase;
 import org.apache.hadoop.ozone.protocolPB
@@ -39,14 +41,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.Server.Call;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.ClientId;
-import io.grpc.Server;
-import io.grpc.netty.NettyServerBuilder;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+
+import io.grpc.Server;
+import io.grpc.netty.NettyServerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.security.UserGroupInformation;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 
 import static org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
@@ -83,6 +88,7 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
                                 responseObserver) {
     LOG.info("GrpcOzoneManagerServer: OzoneManagerServiceImplBase " +
         "processing s3g client submit request");
+    OMResponse omResponse;
     AtomicInteger callCount = new AtomicInteger(0);
 
     if (secConfig.isSecurityEnabled()) {
@@ -99,31 +105,73 @@ class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
         try {
           delegationTokenMgr.retrievePassword(identifier);
           LOG.info("valid signature");
-        } catch (OzoneDelegationTokenSecretManager.InvalidToken e) {
+        } catch (Throwable e) {
           LOG.info("signatures do NOT match for S3 identifier:{}",
               identifier, e);
+          responseObserver.onNext(
+              createErrorResponse(request,
+                  new OMException("User " + request.getUserInfo()
+                      .getUserName() +
+                      " request authorization failure: " +
+                      "signatures do NOT match",
+                      OMException.ResultCodes.S3_SECRET_NOT_FOUND)));
+          responseObserver.onCompleted();
+          return;
         }
       }
     }
 
-    try {
-        // need to look into handling the error path, trapping exception
-      org.apache.hadoop.ipc.Server.getCurCall().set(new Call(1,
-          callCount.incrementAndGet(),
-          null,
-          null,
-          RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-          ClientId.getClientId()));
+    org.apache.hadoop.ipc.Server.getCurCall().set(new Call(1,
+        callCount.incrementAndGet(),
+        null,
+        null,
+        RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+        ClientId.getClientId()));
 
-      OMResponse omResponse =
+    try {
+      omResponse =
           UserGroupInformation.getCurrentUser().doAs(
-            (PrivilegedExceptionAction<OMResponse>) () -> {
-              return this.omTranslator.
-                  submitRequest(NULL_RPC_CONTROLLER, request);
-            });
-      responseObserver.onNext(omResponse);
-    } catch (Throwable e) {}
+              (PrivilegedExceptionAction<OMResponse>) () -> {
+                try {
+                  return this.omTranslator.
+                      submitRequest(NULL_RPC_CONTROLLER, request);
+                } catch (Throwable se) {
+                  Throwable e = se.getCause();
+                  if (se == null) {
+                    throw new IOException(se);
+                  } else {
+                    throw e instanceof IOException ?
+                        (IOException) e : new IOException(se);
+                  }
+                }
+              });
+    } catch (Throwable e) {
+      omResponse = createErrorResponse(
+          request,
+          new IOException(e));
+    }
+    responseObserver.onNext(omResponse);
     responseObserver.onCompleted();
+  }
+
+  /**
+   * Create OMResponse from the specified OMRequest and exception.
+   *
+   * @param omRequest
+   * @param exception
+   * @return OMResponse
+   */
+  private OMResponse createErrorResponse(
+      OzoneManagerProtocolProtos.OMRequest omRequest, IOException exception) {
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
   }
 }
 

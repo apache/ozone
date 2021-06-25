@@ -47,6 +47,7 @@ import java.util.Enumeration;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 
@@ -113,8 +114,7 @@ public class UgiFilter implements Filter {
       LOG.debug("Creating s3 auth info for client.");
 
       if (signatureInfo.getVersion() == SignatureInfo.Version.NONE) {
-        //throw MALFORMED_HEADER;
-        throw new IOException("MALFORMED_HEADER");
+        throw new IOException(wrapOS3Exception(MALFORMED_HEADER));
       }
 
       OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
@@ -134,13 +134,14 @@ public class UgiFilter implements Filter {
       remoteUser.addTokenIdentifier(identifier);
 
     }
+    OS3Exception os3Exception;
     try {
       remoteUser.doAs((PrivilegedExceptionAction<Void>) () -> {
         filterChain.doFilter(httpRequest, servletResponse);
         return null;
       });
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted thread call doAs", e);
+    } catch (Throwable e) {
+      throw new IOException(e);
     }
   }
 

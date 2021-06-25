@@ -50,6 +50,8 @@ public class EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName);
+      } else if (ex.getResult() == ResultCodes.S3_SECRET_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, "");
       } else {
         throw ex;
       }
@@ -66,6 +68,8 @@ public class EndpointBase {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName);
+      } else if (ex.getResult() == ResultCodes.S3_SECRET_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, "");
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else {
@@ -95,6 +99,8 @@ public class EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+      } else if (ex.getResult() == ResultCodes.S3_SECRET_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, "");
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
         // S3 does not return error for bucket already exists, it just
         // returns the location.
@@ -117,8 +123,11 @@ public class EndpointBase {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             s3BucketName);
+      } else if (ex.getResult() == ResultCodes.S3_SECRET_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, "");
+      } else {
+        throw ex;
       }
-      throw ex;
     }
   }
 
@@ -161,6 +170,8 @@ public class EndpointBase {
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             "listBuckets");
+      } else if (e.getResult() == ResultCodes.S3_SECRET_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, "");
       } else {
         throw e;
       }
