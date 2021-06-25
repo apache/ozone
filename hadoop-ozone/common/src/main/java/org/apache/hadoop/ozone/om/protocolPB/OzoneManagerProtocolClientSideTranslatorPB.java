@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -560,8 +561,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -618,8 +624,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize());
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -653,8 +664,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()));
 
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgsBuilder.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgsBuilder.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
 
