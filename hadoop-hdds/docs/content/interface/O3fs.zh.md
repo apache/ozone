@@ -55,9 +55,16 @@ ozone sh bucket create /volume/bucket
 </property>
 <property>
   <name>fs.defaultFS</name>
-  <value>o3fs://bucket.volume.OzoneServiceId</value>
+  <value>o3fs://bucket.volume</value>
 </property>
 {{< /highlight >}}
+
+<div class="alert alert-warning" role="alert">
+
+提示：对于 OM HA 集群，需要指定 ozone service id。
+对于非 HA，它可以是 `o3fs://bucket.volume`。
+
+</div>
 
 这样会使指定的桶成为 HDFS 的 dfs 命令的默认文件系统，并且将其注册为了 o3fs 文件系统类型。
 
