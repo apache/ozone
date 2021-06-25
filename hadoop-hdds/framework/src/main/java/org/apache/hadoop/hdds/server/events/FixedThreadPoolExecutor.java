@@ -44,7 +44,7 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
   private static final String EVENT_QUEUE = "EventQueue";
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SingleThreadExecutor.class);
+      LoggerFactory.getLogger(FixedThreadPoolExecutor.class);
 
   private final String name;
 
@@ -63,7 +63,7 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
   private MutableCounterLong scheduled;
 
   /**
-   * Create SingleThreadExecutor.
+   * Create FixedThreadPoolExecutor.
    *
    * @param eventName
    * @param name Unique name used in monitoring and metrics.
