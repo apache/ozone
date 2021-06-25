@@ -25,8 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -134,7 +132,6 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
         processContainerReplicas(datanodeDetails, replicas, publisher);
         processMissingReplicas(datanodeDetails, missingReplicas);
-        updateDeleteTransaction(datanodeDetails, replicas, publisher);
 
         /*
          * Update the latest set of containers for this datanode in
@@ -211,41 +208,6 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         LOG.warn("Cannot remove container replica, container {} not found.",
             id, e);
       }
-    }
-  }
-
-  /**
-   * Updates the Delete Transaction Id for the given datanode.
-   *
-   * @param datanodeDetails DatanodeDetails
-   * @param replicas List of ContainerReplicaProto
-   * @param publisher EventPublisher reference
-   */
-  private void updateDeleteTransaction(final DatanodeDetails datanodeDetails,
-      final List<ContainerReplicaProto> replicas,
-      final EventPublisher publisher) {
-    final PendingDeleteStatusList pendingDeleteStatusList =
-        new PendingDeleteStatusList(datanodeDetails);
-    for (ContainerReplicaProto replica : replicas) {
-      try {
-        final ContainerInfo containerInfo = containerManager.getContainer(
-            ContainerID.valueOf(replica.getContainerID()));
-        if (containerInfo.getDeleteTransactionId() >
-            replica.getDeleteTransactionId()) {
-          pendingDeleteStatusList.addPendingDeleteStatus(
-              replica.getDeleteTransactionId(),
-              containerInfo.getDeleteTransactionId(),
-              containerInfo.getContainerID());
-        }
-      } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot update pending delete transaction for " +
-            "container #{}. Reason: container missing.",
-            replica.getContainerID());
-      }
-    }
-    if (pendingDeleteStatusList.getNumPendingDeletes() > 0) {
-      publisher.fireEvent(SCMEvents.PENDING_DELETE_STATUS,
-          pendingDeleteStatusList);
     }
   }
 }
