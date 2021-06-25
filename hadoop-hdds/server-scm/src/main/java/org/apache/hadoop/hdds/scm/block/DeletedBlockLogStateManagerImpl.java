@@ -178,8 +178,8 @@ public class DeletedBlockLogStateManagerImpl
       containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
           (k, v) -> v != null && v > tid ? v : tid);
       transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
-      containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
     }
+    containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
   }
 
   @Override
