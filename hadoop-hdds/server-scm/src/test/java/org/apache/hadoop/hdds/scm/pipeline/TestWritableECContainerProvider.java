@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Matchers;
@@ -62,7 +61,7 @@ public class TestWritableECContainerProvider {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestWritableECContainerProvider.class);
   private static final String OWNER = "SCM";
-  private PipelineManager pipelineManager = MockPipelineManager.getInstance();
+  private PipelineManager pipelineManager;
   private ContainerManagerV2 containerManager
       = Mockito.mock(ContainerManagerV2.class);
   private PipelineChoosePolicy pipelineChoosingPolicy
@@ -84,6 +83,7 @@ public class TestWritableECContainerProvider {
             .WritableECContainerProviderConfig.class);
     minPipelines = providerConf.getMinimumPipelines();
     containers = new HashMap<>();
+    pipelineManager = MockPipelineManager.getInstance();
     provider = new WritableECContainerProvider(
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
 
@@ -102,10 +102,6 @@ public class TestWritableECContainerProvider {
         containers.get((ContainerID)call.getArguments()[0]))
         .when(containerManager).getContainer(Matchers.any(ContainerID.class));
 
-  }
-
-  @After
-  public void teardown() {
   }
 
   @Test

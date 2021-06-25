@@ -105,10 +105,8 @@ public class PipelineStateManager implements StateManager {
    * @param state The current state of the pipelines to count
    * @return The count of pipelines meeting the above criteria
    */
-  public int getPipelineCount(
-      ReplicationConfig replicationConfig,
-      PipelineState state
-  ) {
+  public int getPipelineCount(ReplicationConfig replicationConfig,
+      PipelineState state) {
     return pipelineStateMap.getPipelineCount(replicationConfig, state);
   }
 
