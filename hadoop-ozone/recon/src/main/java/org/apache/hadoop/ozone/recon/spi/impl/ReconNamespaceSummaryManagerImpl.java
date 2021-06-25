@@ -23,8 +23,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE_SUMMARY;
@@ -37,20 +35,19 @@ import java.io.IOException;
 public class ReconNamespaceSummaryManagerImpl
         implements ReconNamespaceSummaryManager {
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(ReconNamespaceSummaryManagerImpl.class);
   private Table<Long, NSSummary> nsSummaryTable;
   private DBStore namespaceDbStore;
 
   @Inject
-  public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider) {
+  public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider)
+          throws IOException {
     namespaceDbStore = reconDBProvider.getDbStore();
-    initializeTable();
+    this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
   }
 
   @Override
   public void initNSSummaryTable() throws IOException {
-    initializeTable();
+    truncateTable(nsSummaryTable);
   }
 
   @Override
@@ -62,17 +59,6 @@ public class ReconNamespaceSummaryManagerImpl
   @Override
   public NSSummary getNSSummary(long objectId) throws IOException {
     return nsSummaryTable.get(objectId);
-  }
-
-  private void initializeTable() {
-    try {
-      truncateTable(this.nsSummaryTable);
-      if (nsSummaryTable == null) {
-        this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
-      }
-    } catch (IOException e) {
-      LOG.error("cannot initialize table");
-    }
   }
 
   public Table getNSSummaryTable() {
