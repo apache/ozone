@@ -2719,11 +2719,6 @@ public class KeyManagerImpl implements KeyManager {
 
   /**
    * Build final OzoneFileStatus list to be returned to client.
-   * @param cacheFileMap
-   * @param cacheDirMap
-   * @param omKeyArgs
-   * @param clientAddress
-   * @return list of OzoneFileStatus
    * @throws IOException
    */
   private List<OzoneFileStatus> buildFinalStatusList(
@@ -2758,6 +2753,10 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusFinalList;
   }
 
+  /***
+   * Build files, directories and marked for deleted entries from dir/file
+   * cache.
+   */
   private int getFilesAndDirsFromCache(String volumeName, String bucketName,
       Map<String, OzoneFileStatus> cacheFileMap,
       Map<String, OzoneFileStatus> tempCacheDirMap,
