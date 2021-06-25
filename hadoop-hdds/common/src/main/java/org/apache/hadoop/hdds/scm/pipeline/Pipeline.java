@@ -71,7 +71,7 @@ public final class Pipeline {
    * ContainerStateManager#getMatchingContainerByPipeline to take a lock on
    * the container allocations for a particular pipeline.
    */
-  public Pipeline(PipelineID id,
+  private Pipeline(PipelineID id,
       ReplicationConfig replicationConfig, PipelineState state,
       Map<DatanodeDetails, Long> nodeStatus, UUID suggestedLeaderId) {
     this.id = id;

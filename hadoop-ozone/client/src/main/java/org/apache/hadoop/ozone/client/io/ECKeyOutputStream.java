@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ECKeyOutputStream extends KeyOutputStream {
   private OzoneClientConfig config;
-  private ECChunkBuffers ecDataChunkBufferCache;
+  private ECChunkBuffers ecChunkBufferCache;
   private int ecChunkSize = 1024;
   private final int numDataBlks;
   private final int numParityBlks;
@@ -119,9 +119,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
     assert replicationConfig instanceof ECReplicationConfig;
     this.numDataBlks = ((ECReplicationConfig) replicationConfig).getData();
     this.numParityBlks = ((ECReplicationConfig) replicationConfig).getParity();
-    ecDataChunkBufferCache =
+    ecChunkBufferCache =
         new ECChunkBuffers(ecChunkSize, numDataBlks, numParityBlks);
-
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(config, omClient, requestId,
@@ -186,10 +185,10 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     int currentChunkBufferRemainingLength =
-        ecDataChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
+        ecChunkBufferCache.dataBuffers[blockOutputStreamEntryPool.getCurrIdx()]
             .remaining();
     int currentChunkBufferLen =
-        ecDataChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
+        ecChunkBufferCache.dataBuffers[blockOutputStreamEntryPool.getCurrIdx()]
             .position();
     int maxLenToCurrChunkBuffer = (int) Math.min(len, ecChunkSize);
     int currentWriterChunkLenToWrite =
@@ -234,37 +233,29 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   void writeParityCells() throws IOException {
-    final ByteBuffer[] buffers = ecDataChunkBufferCache.getBuffers();
+    final ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
     //encode the data cells
     for (int i = 0; i < numDataBlks; i++) {
       buffers[i].flip();
     }
 
-    final ByteBuffer[] parityBuffers = new ByteBuffer[numParityBlks];
-    for (int i = 0; i < numParityBlks; i++) {
-      parityBuffers[i] = BUFFER_POOL.getBuffer(false, ecChunkSize);
-      parityBuffers[i].limit(ecChunkSize);
-    }
+    final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
     encoder.encode(buffers, parityBuffers);
-
     for (int i =
          numDataBlks; i < (this.numDataBlks + this.numParityBlks); i++) {
       handleWrite(parityBuffers[i - numDataBlks].array(), 0, ecChunkSize, true,
           true);
     }
 
-    ecDataChunkBufferCache.clear();
-    for (int i = 0; i < numParityBlks; i++) {
-      parityBuffers[i].clear();
-      BUFFER_POOL.putBuffer(parityBuffers[i]);
-    }
+    ecChunkBufferCache.clear();
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean isFullCell,
       boolean isParity) throws IOException {
     if (!isParity) {
-      ecDataChunkBufferCache
-          .addTo(blockOutputStreamEntryPool.getCurrIdx(), b, off, (int) len);
+      ecChunkBufferCache
+          .addToDataBuffer(blockOutputStreamEntryPool.getCurrIdx(), b, off,
+              (int) len);
     }
     while (len > 0) {
       try {
@@ -487,7 +478,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     } finally {
       blockOutputStreamEntryPool.cleanupAll();
     }
-    ecDataChunkBufferCache.release();
+    ecChunkBufferCache.release();
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
@@ -597,30 +588,32 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private static class ECChunkBuffers {
-    private final ByteBuffer[] buffers;
+    private final ByteBuffer[] dataBuffers;
+    private final ByteBuffer[] parityBuffers;
     private final int dataBlks;
     private final int parityBlks;
-    private final int totalBlks;
     private int cellSize;
 
     ECChunkBuffers(int cellSize, int numData, int numParity) {
       this.cellSize = cellSize;
       this.parityBlks = numParity;
       this.dataBlks = numData;
-      this.totalBlks = this.dataBlks + this.parityBlks;
-      buffers = new ByteBuffer[this.dataBlks];
-      for (int i = 0; i < buffers.length; i++) {
-        buffers[i] = BUFFER_POOL.getBuffer(false, cellSize);
-        buffers[i].limit(cellSize);
-      }
+      dataBuffers = new ByteBuffer[this.dataBlks];
+      parityBuffers = new ByteBuffer[this.parityBlks];
+      allocateBuffers(cellSize, dataBuffers);
+      allocateBuffers(cellSize, parityBuffers);
     }
 
-    private ByteBuffer[] getBuffers() {
-      return buffers;
+    private ByteBuffer[] getDataBuffers() {
+      return dataBuffers;
     }
 
-    private int addTo(int i, byte[] b, int off, int len) {
-      final ByteBuffer buf = buffers[i];
+    private ByteBuffer[] getParityBuffers() {
+      return parityBuffers;
+    }
+
+    private int addToDataBuffer(int i, byte[] b, int off, int len) {
+      final ByteBuffer buf = dataBuffers[i];
       final int pos = buf.position() + len;
       Preconditions.checkState(pos <= cellSize);
       buf.put(b, off, len);
@@ -628,14 +621,31 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     private void clear() {
-      for (int i = 0; i < this.dataBlks; i++) {
+      clearBuffers(cellSize, dataBuffers);
+      clearBuffers(cellSize, parityBuffers);
+    }
+
+    private void release() {
+      releaseBuffers(dataBuffers);
+      releaseBuffers(parityBuffers);
+    }
+
+    private static void allocateBuffers(int cellSize, ByteBuffer[] buffers) {
+      for (int i = 0; i < buffers.length; i++) {
+        buffers[i] = BUFFER_POOL.getBuffer(false, cellSize);
+        buffers[i].limit(cellSize);
+      }
+    }
+
+    private static void clearBuffers(int cellSize, ByteBuffer[] buffers) {
+      for (int i = 0; i < buffers.length; i++) {
         buffers[i].clear();
         buffers[i].limit(cellSize);
       }
     }
 
-    private void release() {
-      for (int i = 0; i < this.dataBlks; i++) {
+    private static void releaseBuffers(ByteBuffer[] buffers) {
+      for (int i = 0; i < buffers.length; i++) {
         if (buffers[i] != null) {
           BUFFER_POOL.putBuffer(buffers[i]);
           buffers[i] = null;
