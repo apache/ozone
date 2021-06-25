@@ -746,6 +746,7 @@ message KeyArgs {
 
     // This will be set when user performs delete directory recursively.
     optional bool recursive = 17;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 18;
 }
 
 message KeyLocation {
@@ -779,7 +780,7 @@ message KeyInfo {
     required string keyName = 3;
     required uint64 dataSize = 4;
     required hadoop.hdds.ReplicationType type = 5;
-    required hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
     repeated KeyLocationList keyLocationList = 7;
     required uint64 creationTime = 8;
     required uint64 modificationTime = 9;
@@ -790,6 +791,7 @@ message KeyInfo {
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
     optional uint64 parentID = 16;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
 }
 
 message DirectoryInfo {

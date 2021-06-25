@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
@@ -180,6 +181,24 @@ public class TestOzoneClient {
         out.write(value.getBytes(UTF_8));
         out.write(value.getBytes(UTF_8));
       }
+    }
+  }
+
+  @Test
+  public void testPutKeyWithECReplicationConfig() throws IOException {
+    String value = new String(new byte[1024], UTF_8);
+    OzoneBucket bucket = getOzoneBucket();
+
+    for (int i = 0; i < 10; i++) {
+      String keyName = UUID.randomUUID().toString();
+      try (OzoneOutputStream out = bucket
+          .createKey(keyName, value.getBytes(UTF_8).length,
+              new ECReplicationConfig(3, 2), new HashMap<>())) {
+        out.write(value.getBytes(UTF_8));
+        out.write(value.getBytes(UTF_8));
+      }
+      OzoneKey key = bucket.getKey(keyName);
+      Assert.assertEquals(keyName, key.getName());
     }
   }
 
