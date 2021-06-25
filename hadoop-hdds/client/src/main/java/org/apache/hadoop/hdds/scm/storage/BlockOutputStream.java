@@ -125,7 +125,6 @@ public class BlockOutputStream extends OutputStream {
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
   private int replicationIndex;
-  private boolean isECWrite = false;
 
   /**
    * Creates a new BlockOutputStream.
@@ -156,9 +155,6 @@ public class BlockOutputStream extends OutputStream {
     this.token = token;
 
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-    if (replicationIndex > 0) {
-      isECWrite = true;
-    }
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer(bufferPool);
@@ -530,7 +526,6 @@ public class BlockOutputStream extends OutputStream {
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
       updateFlushLength();
-
       executePutBlock(close, false);
     } else if (close) {
       // forcing an "empty" putBlock if stream is being closed without new

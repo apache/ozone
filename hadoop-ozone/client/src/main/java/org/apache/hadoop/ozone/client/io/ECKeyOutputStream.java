@@ -257,44 +257,40 @@ public class ECKeyOutputStream extends KeyOutputStream {
           .addToDataBuffer(blockOutputStreamEntryPool.getCurrIdx(), b, off,
               (int) len);
     }
-    while (len > 0) {
-      try {
-
-        BlockOutputStreamEntry current =
-            blockOutputStreamEntryPool.allocateBlockIfNeeded();
-        // length(len) will be in int range if the call is happening through
-        // write API of blockOutputStream. Length can be in long range if it
-        // comes via Exception path.
-        int expectedWriteLen =
-            Math.min((int) len, (int) current.getRemaining());
-        long currentPos = current.getWrittenDataLength();
-        // writeLen will be updated based on whether the write was succeeded
-        // or if it sees an exception, how much the actual write was
-        // acknowledged.
-        int writtenLength =
-            writeToOutputStream(current, len, b, expectedWriteLen, off,
-                currentPos, isParity);
-        currentBlockGroupLen += isParity ? 0 : writtenLength;
-        if (current.getRemaining() <= 0) {
-          // since the current block is already written close the stream.
-          closeCurrentStream(StreamAction.CLOSE);
-        }
-
-        len -= writtenLength;
-        off += writtenLength;
-
-      } catch (Exception e) {
-        markStreamClosed();
-        throw new IOException(e);
-      }
-
-      if (isFullCell) {
-        handleFlushOrClose(StreamAction.FLUSH);
-        blockOutputStreamEntryPool
-            .updateToNextStream(numDataBlks + numParityBlks);
-      }
+    BlockOutputStreamEntry current =
+        blockOutputStreamEntryPool.allocateBlockIfNeeded();
+    // length(len) will be in int range if the call is happening through
+    // write API of blockOutputStream. Length can be in long range if it
+    // comes via Exception path.
+    int expectedWriteLen = Math.min((int) len, (int) current.getRemaining());
+    // writeLen will be updated based on whether the write was succeeded
+    // or if it sees an exception, how much the actual write was
+    // acknowledged.
+    int writtenLength = expectedWriteLen;
+    currentBlockGroupLen += isParity ? 0 : writtenLength;
+    if (current.getRemaining() <= 0) {
+      // since the current block is already written close the stream.
+      closeCurrentStream(StreamAction.CLOSE);
     }
 
+    len -= writtenLength;
+    if (isFullCell) {
+      ByteBuffer bytesToWrite = isParity ?
+          ecChunkBufferCache.getParityBuffers()[blockOutputStreamEntryPool
+              .getCurrIdx() - numDataBlks] :
+          ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
+              .getCurrIdx()];
+      try {
+        writeToOutputStream(current, len, bytesToWrite.array(),
+            bytesToWrite.array().length, 0, current.getWrittenDataLength(),
+            isParity);
+      } catch (Exception e) {
+        markStreamClosed();
+      }
+
+      blockOutputStreamEntryPool
+          .updateToNextStream(numDataBlks + numParityBlks);
+    }
   }
 
   private int writeToOutputStream(BlockOutputStreamEntry current, long len,
