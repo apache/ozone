@@ -53,8 +53,18 @@ public class SCMContainerPlacementMetrics implements MetricsSource {
   public SCMContainerPlacementMetrics() {
   }
 
+  /**
+   * Return the existing instance of SCMContainerPlacementMetrics if it is
+   * registered in the metrics System, otherwise create a new instance, register
+   * it and return it.
+   * @return A new or existing SCMContainerPlacementMetrics object
+   */
   public static SCMContainerPlacementMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSource existingSource = ms.getSource(SOURCE_NAME);
+    if (existingSource != null) {
+      return (SCMContainerPlacementMetrics)existingSource;
+    }
     registry = new MetricsRegistry(RECORD_INFO);
     return ms.register(SOURCE_NAME, "SCM Container Placement Metrics",
         new SCMContainerPlacementMetrics());

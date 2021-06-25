@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -181,6 +182,11 @@ public class TestSCMContainerPlacementRackAware {
         nodeManager, conf, cluster, true, metrics);
     policyNoFallback = new SCMContainerPlacementRackAware(
         nodeManager, conf, cluster, false, metrics);
+  }
+
+  @After
+  public void teardown() {
+    metrics.unRegister();
   }
 
   @Test

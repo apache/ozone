@@ -34,7 +34,7 @@ import java.util.stream.Stream;
 /**
  * Mock PipelineManager implementation for testing.
  */
-public final class MockPipelineManager implements PipelineManager {
+public class MockPipelineManager implements PipelineManager {
 
   private PipelineStateManager stateManager;
 
@@ -42,7 +42,7 @@ public final class MockPipelineManager implements PipelineManager {
     return new MockPipelineManager();
   }
 
-  private MockPipelineManager() {
+  MockPipelineManager() {
     this.stateManager = new PipelineStateManager();
   }
 
@@ -114,6 +114,19 @@ public final class MockPipelineManager implements PipelineManager {
       final Collection<PipelineID> excludePipelines) {
     return stateManager.getPipelines(replicationConfig, state,
         excludeDns, excludePipelines);
+  }
+
+  @Override
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  public int getPipelineCount(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state) {
+    return stateManager.getPipelineCount(replicationConfig, state);
   }
 
   @Override
