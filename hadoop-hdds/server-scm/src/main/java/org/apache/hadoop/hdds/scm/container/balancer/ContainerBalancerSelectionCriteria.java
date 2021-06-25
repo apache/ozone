@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
@@ -64,6 +65,7 @@ public class ContainerBalancerSelectionCriteria {
   /**
    * Checks whether container is currently undergoing replication.
    *
+   * TODO: Implement method
    * @param containerID Container to check.
    * @return true if container is replicating, otherwise false.
    */
@@ -100,6 +102,23 @@ public class ContainerBalancerSelectionCriteria {
     if (selectedContainers != null) {
       containerIDSet.removeAll(selectedContainers);
     }
+
+    // remove not closed containers
+    containerIDSet.removeIf(containerID -> {
+      try {
+        LOG.info("Container state for container {} is {}", containerID,
+            containerManagerV2.getContainer(containerID).getState());
+
+        return containerManagerV2.getContainer(containerID).getState() !=
+            HddsProtos.LifeCycleState.CLOSED;
+      } catch (ContainerNotFoundException e) {
+        LOG.warn("Could not retrieve ContainerInfo for container {} for " +
+            "checking lifecycle state in ContainerBalancer. Excluding this " +
+            "container.", containerID.toString(), e);
+        return true;
+      }
+    });
+
     containerIDSet.removeIf(this::isContainerReplicating);
     return containerIDSet;
   }

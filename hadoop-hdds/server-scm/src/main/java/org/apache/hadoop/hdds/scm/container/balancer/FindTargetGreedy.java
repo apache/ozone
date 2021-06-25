@@ -1,6 +1,7 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -11,8 +12,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 /**
  * Find a target giving preference to more under-utilized nodes.
@@ -49,14 +52,27 @@ public class FindTargetGreedy implements FindTargetStrategy {
           continue;
         }
         if (replicas.stream().noneMatch(
-            replica -> replica.getDatanodeDetails().equals(target)) &&
-            containerMoveSatisfiesPlacementPolicy(container, replicas, source,
-                target) &&
-            canSizeEnterTarget.apply(target, containerInfo.getUsedBytes())) {
-          return new ContainerMoveSelection(target, container);
+            replica -> replica.getDatanodeDetails().equals(target))) {
+//            containerMoveSatisfiesPlacementPolicy(container, replicas, source,
+//                target) &&
+
+          if (canSizeEnterTarget.apply(target, containerInfo.getUsedBytes())) {
+            LOG.info("Container Balancer found target {} and container {} for" +
+                " source {}", target.getUuidString(),
+                containerInfo.containerID(), source.getUuidString());
+            return new ContainerMoveSelection(target, container);
+          } else {
+            LOG.info("ContainerBalancer can't move size {} to target {}.",
+                containerInfo.getUsedBytes(), target.getUuidString());
+          }
         }
+//        LOG.info("For source {} and potential target {} found container " +
+//                "replicas {}", source.getUuidString(),
+//            target.getUuidString(), replicas);
       }
     }
+    LOG.info("Container Balancer could not find a target for source datanode " +
+        "{}", source.getUuidString());
     return null;
   }
 
@@ -64,6 +80,26 @@ public class FindTargetGreedy implements FindTargetStrategy {
   public boolean containerMoveSatisfiesPlacementPolicy(
       ContainerID containerID, Set<ContainerReplica> replicas,
       DatanodeDetails source, DatanodeDetails target) {
+    ContainerInfo containerInfo;
+    try {
+      containerInfo = containerManager.getContainer(containerID);
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Could not get Container {} from Container Manager while " +
+          "checking if container move satisfies placemenet policy in " +
+          "Container Balancer.", containerID.toString(), e);
+      return false;
+    }
+    List<DatanodeDetails> replicaList =
+        replicas.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .filter(datanodeDetails -> !datanodeDetails.equals(source))
+            .collect(Collectors.toList());
+    replicaList.add(target);
+    ContainerPlacementStatus placementStatus =
+        placementPolicy.validateContainerPlacement(replicaList,
+        containerInfo.getReplicationFactor().getNumber());
+
+//    return placementStatus.isPolicySatisfied();
     return true;
   }
 }

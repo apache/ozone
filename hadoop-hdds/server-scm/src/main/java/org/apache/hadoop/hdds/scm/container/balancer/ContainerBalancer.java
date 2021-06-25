@@ -44,6 +44,8 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 /**
@@ -63,6 +65,7 @@ public class ContainerBalancer {
   private double threshold;
   private int maxDatanodesToBalance;
   private long maxSizeToMove;
+  private int idleIteration;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
@@ -74,10 +77,13 @@ public class ContainerBalancer {
   private long clusterRemaining;
   private double clusterAvgUtilisation;
   private final AtomicBoolean balancerRunning = new AtomicBoolean(false);
+  private Thread currentBalancingThread;
+  private Lock lock;
   private ContainerBalancerSelectionCriteria selectionCriteria;
   private Map<DatanodeDetails, ContainerMoveSelection> sourceToTarget;
   private Map<DatanodeDetails, Long> sizeLeavingNode;
   private Map<DatanodeDetails, Long> sizeEnteringNode;
+  private Set<ContainerID> selectedContainers;
   private FindTargetStrategy findTargetStrategy;
   private PlacementPolicy placementPolicy;
 
@@ -96,7 +102,8 @@ public class ContainerBalancer {
       ContainerManagerV2 containerManager,
       ReplicationManager replicationManager,
       OzoneConfiguration ozoneConfiguration,
-      final SCMContext scmContext) {
+      final SCMContext scmContext,
+      PlacementPolicy placementPolicy) {
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
@@ -104,15 +111,9 @@ public class ContainerBalancer {
     this.config = new ContainerBalancerConfiguration();
     this.metrics = new ContainerBalancerMetrics();
     this.scmContext = scmContext;
+    this.placementPolicy = placementPolicy;
 
-    this.clusterCapacity = 0L;
-    this.clusterUsed = 0L;
-    this.clusterRemaining = 0L;
-
-    this.overUtilizedNodes = new ArrayList<>();
-    this.underUtilizedNodes = new ArrayList<>();
-    this.unBalancedNodes = new ArrayList<>();
-    this.withinThresholdUtilizedNodes = new ArrayList<>();
+    this.lock = new ReentrantLock();
     findTargetStrategy =
         new FindTargetGreedy(containerManager, placementPolicy);
   }
@@ -122,21 +123,38 @@ public class ContainerBalancer {
    *
    * @param balancerConfiguration Configuration values.
    */
-  public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
-    if (!balancerRunning.compareAndSet(false, true)) {
-      LOG.error("Container Balancer is already running.");
-      return false;
+  public boolean start(
+      ContainerBalancerConfiguration balancerConfiguration) {
+    lock.lock();
+    try {
+      if (!balancerRunning.compareAndSet(false, true)) {
+        LOG.error("Container Balancer is already running.");
+        return false;
+      }
+
+      ozoneConfiguration = new OzoneConfiguration();
+      this.config = balancerConfiguration;
+      this.idleIteration = config.getIdleIteration();
+      this.threshold = config.getThreshold();
+      this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
+      this.maxSizeToMove = config.getMaxSizeToMove();
+      LOG.info("Starting Container Balancer...{}", this);
+      LOG.info("Max size entering node config is {}",
+          config.getMaxSizeEnteringTarget());
+
+      //we should start a new balancer thread async
+      //and response to cli as soon as possible
+
+
+      //TODO: this is a temporary implementation
+      //modify this later
+      currentBalancingThread = new Thread(this::balance);
+      currentBalancingThread.start();
+      ////////////////////////
+    } finally {
+      lock.unlock();
     }
 
-    ozoneConfiguration = new OzoneConfiguration();
-    this.config = balancerConfiguration;
-    this.threshold = config.getThreshold();
-    this.maxDatanodesToBalance = config.getMaxDatanodesToBalance();
-    this.maxSizeToMove = config.getMaxSizeToMove();
-    this.unBalancedNodes = new ArrayList<>();
-
-    LOG.info("Starting Container Balancer...{}", this);
-    balance();
     return true;
   }
 
@@ -144,8 +162,24 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    initializeIteration();
-    doIteration();
+    this.clusterCapacity = 0L;
+    this.clusterUsed = 0L;
+    this.clusterRemaining = 0L;
+
+    this.selectedContainers = new HashSet<>();
+    this.overUtilizedNodes = new ArrayList<>();
+    this.underUtilizedNodes = new ArrayList<>();
+    this.withinThresholdUtilizedNodes = new ArrayList<>();
+    this.unBalancedNodes = new ArrayList<>();
+
+    for (int i = 0; i < idleIteration; i++) {
+      if (!initializeIteration()) {
+        //balancer should be stopped immediately
+        break;
+      }
+      doIteration();
+    }
+    balancerRunning.compareAndSet(true, false);
   }
 
   /**
@@ -169,9 +203,12 @@ public class ContainerBalancer {
     if (datanodeUsageInfos.isEmpty()) {
       LOG.info("Container Balancer could not retrieve nodes from Node " +
           "Manager.");
-      stop();
       return false;
     }
+
+    overUtilizedNodes = new ArrayList<>();
+    underUtilizedNodes = new ArrayList<>();
+    withinThresholdUtilizedNodes = new ArrayList<>();
 
     clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
     LOG.info("Average utilization of the cluster is {}", clusterAvgUtilisation);
@@ -218,66 +255,84 @@ public class ContainerBalancer {
       }
     }
     Collections.reverse(underUtilizedNodes);
-    Collections.reverse(withinThresholdUtilizedNodes);
 
-    long countDatanodesBalanced = 0;
-    // count number of nodes that were balanced in previous iteration
-    for (DatanodeUsageInfo node : unBalancedNodes) {
-      if (!containsNode(overUtilizedNodes, node) &&
-          !containsNode(underUtilizedNodes, node)) {
-        countDatanodesBalanced += 1;
-      }
-    }
-    // calculate total number of nodes that have been balanced so far
-    countDatanodesBalanced =
-        metrics.incrementDatanodesNumBalanced(countDatanodesBalanced);
+//    long countDatanodesBalanced = 0;
+//    // count number of nodes that were balanced in previous iteration
+//    for (DatanodeUsageInfo node : unBalancedNodes) {
+//      if (!containsNode(overUtilizedNodes, node) &&
+//          !containsNode(underUtilizedNodes, node)) {
+//        countDatanodesBalanced += 1;
+//      }
+//    }
+//    // calculate total number of nodes that have been balanced so far
+//    countDatanodesBalanced =
+//        metrics.incrementDatanodesNumBalanced(countDatanodesBalanced);
 
     unBalancedNodes = new ArrayList<>(
         overUtilizedNodes.size() + underUtilizedNodes.size());
 
-    if (countDatanodesBalanced + countDatanodesToBalance >
-        maxDatanodesToBalance) {
-      LOG.info("Approaching Max Datanodes To Balance limit in Container " +
-          "Balancer. Stopping Balancer.");
-      stop();
-      return false;
-    } else {
-      unBalancedNodes.addAll(overUtilizedNodes);
-      unBalancedNodes.addAll(underUtilizedNodes);
+//    if (countDatanodesBalanced + countDatanodesToBalance >
+//        maxDatanodesToBalance) {
+//      LOG.info("Approaching Max Datanodes To Balance limit in Container " +
+//          "Balancer. Stopping Balancer.");
+//      stop();
+//      return false;
+//    }
+//
+    unBalancedNodes.addAll(overUtilizedNodes);
+    unBalancedNodes.addAll(underUtilizedNodes);
 
-      if (unBalancedNodes.isEmpty()) {
-        LOG.info("Did not find any unbalanced Datanodes.");
-        stop();
-        return false;
-      } else {
-        LOG.info("Container Balancer has identified Datanodes that need to be" +
-            " balanced.");
-      }
+    if (unBalancedNodes.isEmpty()) {
+      LOG.info("Did not find any unbalanced Datanodes.");
+      return false;
     }
+
+    LOG.info("Container Balancer has identified Datanodes that need to be" +
+            " balanced.");
+
+    selectionCriteria = new ContainerBalancerSelectionCriteria(config,
+        nodeManager, replicationManager, containerManager);
+    selectionCriteria.setSelectedContainers(selectedContainers);
+    sourceToTarget = new HashMap<>(overUtilizedNodes.size() +
+        withinThresholdUtilizedNodes.size());
+
+    // initialize maps to track how much size is leaving and entering datanodes
+    sizeLeavingNode = new HashMap<>(overUtilizedNodes.size() +
+        withinThresholdUtilizedNodes.size());
+    overUtilizedNodes.forEach(datanodeUsageInfo -> sizeLeavingNode
+        .put(datanodeUsageInfo.getDatanodeDetails(), 0L));
+    withinThresholdUtilizedNodes.forEach(datanodeUsageInfo -> sizeLeavingNode
+        .put(datanodeUsageInfo.getDatanodeDetails(), 0L));
+
+    sizeEnteringNode = new HashMap<>(underUtilizedNodes.size() +
+        withinThresholdUtilizedNodes.size());
+    underUtilizedNodes.forEach(datanodeUsageInfo -> sizeEnteringNode
+        .put(datanodeUsageInfo.getDatanodeDetails(), 0L));
+    withinThresholdUtilizedNodes.forEach(datanodeUsageInfo -> sizeEnteringNode
+        .put(datanodeUsageInfo.getDatanodeDetails(), 0L));
+
     return true;
   }
 
   public void doIteration() {
-    selectionCriteria = new ContainerBalancerSelectionCriteria(config,
-        nodeManager, replicationManager, containerManager);
-
-    sizeLeavingNode = new HashMap<>(overUtilizedNodes.size() +
-        withinThresholdUtilizedNodes.size());
-    sizeEnteringNode = new HashMap<>(underUtilizedNodes.size() +
-        withinThresholdUtilizedNodes.size());
-
     List<DatanodeDetails> potentialTargets = findPotentialTargets();
-    sourceToTarget = new HashMap<>(overUtilizedNodes.size() +
-        withinThresholdUtilizedNodes.size());
     Set<DatanodeDetails> selectedTargets =
         new HashSet<>(potentialTargets.size());
-    Set<ContainerID> selectedContainers = new HashSet<>();
 
     // match each overUtilized node with a target
     for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
       DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
-      matchSourceWithTarget(source, potentialTargets, selectedTargets,
-          selectedContainers);
+      ContainerMoveSelection moveSelection =
+          matchSourceWithTarget(source, potentialTargets, selectedTargets);
+
+      if (moveSelection != null) {
+        LOG.info("ContainerBalancer is trying to move container {} from " +
+                "source datanode {} to target datanode {}",
+            moveSelection.getContainerID().toString(), source.getUuidString(),
+            moveSelection.getTargetNode().getUuidString());
+
+          // move container
+      }
     }
 
     // if not all underUtilized nodes have been selected, try to match
@@ -288,18 +343,22 @@ public class ContainerBalancer {
 
       for (DatanodeUsageInfo datanodeUsageInfo : withinThresholdUtilizedNodes) {
         DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
-        if (!sourceToTarget.containsKey(source)) {
-          matchSourceWithTarget(source, potentialTargets, selectedTargets,
-              selectedContainers);
+        if (!selectedTargets.contains(source)) {
+          ContainerMoveSelection moveSelection = matchSourceWithTarget(source,
+              potentialTargets, selectedTargets);
+
+          if (moveSelection != null) {
+            LOG.info("ContainerBalancer is trying to move container {} from " +
+                    "source datanode {} to target datanode {}",
+                moveSelection.getContainerID().toString(),
+                source.getUuidString(),
+                moveSelection.getTargetNode().getUuidString());
+
+            // move container
+          }
         }
       }
     }
-
-    // unBalancedNodes is not cleared since the next iteration uses this
-    // iteration's unBalancedNodes to find out how many nodes were balanced
-    overUtilizedNodes.clear();
-    underUtilizedNodes.clear();
-    withinThresholdUtilizedNodes.clear();
   }
 
   /**
@@ -307,32 +366,44 @@ public class ContainerBalancer {
    * to move.
    * @param potentialTargets List of potential targets to move container to
    * @param selectedTargets Set of already selected targets
-   * @param selectedContainers Set of already selected containers
+   * @return ContainerMoveSelection containing the selected target and container
    */
-  public void matchSourceWithTarget(DatanodeDetails source,
+  public ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source,
                                     List<DatanodeDetails> potentialTargets,
-                                     Set<DatanodeDetails> selectedTargets,
-                                     Set<ContainerID> selectedContainers) {
+                                     Set<DatanodeDetails> selectedTargets) {
 
     NavigableSet<ContainerID> candidateContainers =
         selectionCriteria.getCandidateContainers(source);
+
+    if (candidateContainers.isEmpty()) {
+      LOG.info("ContainerBalancer could not find any candidate containers for" +
+          " datanode {}", source.getUuidString());
+      return null;
+    }
+    LOG.info("ContainerBalancer is finding suitable target for source " +
+        "datanode {}", source.getUuidString());
     ContainerMoveSelection moveSelection =
         findTargetStrategy.findTargetForContainerMove(
             source, potentialTargets, candidateContainers,
             this::canSizeEnterTarget);
 
     if (moveSelection == null) {
-      LOG.info("Container Balancer could not find a suitable target for " +
-          "source node {}", source.toString());
-      return;
+      LOG.info("ContainerBalancer could not find a suitable target for " +
+          "source node {}.", source.getUuidString());
+      return null;
     }
 
+    LOG.info("ContainerBalancer matched source datanode {} with target " +
+            "datanode {} for container move.", source.getUuidString(),
+        moveSelection.getTargetNode().getUuidString());
+
     incSizeSelectedForMoving(source, moveSelection);
-    potentialTargets = updatePotentialTargets(potentialTargets);
+    updatePotentialTargets(potentialTargets);
     sourceToTarget.put(source, moveSelection);
     selectedTargets.add(moveSelection.getTargetNode());
     selectedContainers.add(moveSelection.getContainerID());
     selectionCriteria.setSelectedContainers(selectedContainers);
+    return moveSelection;
   }
 
   /**
@@ -486,8 +557,26 @@ public class ContainerBalancer {
    * Stops ContainerBalancer.
    */
   public void stop() {
-    balancerRunning.set(false);
-    LOG.info("Container Balancer stopped.");
+    lock.lock();
+    try {
+      //we should stop the balancer thread gracefully
+      if(!balancerRunning.get()) {
+        LOG.info("Container Balancer is not running.");
+        return;
+      }
+
+      //TODO: this is a temporary implementation
+      //modify this later
+      if (currentBalancingThread.isAlive()) {
+        currentBalancingThread.stop();
+      }
+      ///////////////////////////
+
+      balancerRunning.compareAndSet(true, false);
+    } finally {
+      lock.unlock();
+    }
+    LOG.info("Container Balancer stopped successfully.");
   }
 
   public void setNodeManager(NodeManager nodeManager) {

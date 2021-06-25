@@ -67,6 +67,11 @@ public final class ContainerBalancerConfiguration {
       " the sum of data moving to multiple targets.")
   private long maxSizeLeavingSource = 5 * OzoneConsts.GB;
 
+  @Config(key = "idle.iterations", type = ConfigType.INT,
+      defaultValue = "10", tags = {ConfigTag.BALANCER},
+      description = "The idle iteration count of Container Balancer")
+  private int idleIterations = 10;
+
   /**
    * Gets the threshold value for Container Balancer.
    *
@@ -87,6 +92,28 @@ public final class ContainerBalancerConfiguration {
           "Threshold must be a fraction in the range 0 to 1.");
     }
     this.threshold = String.valueOf(threshold);
+  }
+
+  /**
+   * Gets the idle iteration value for Container Balancer.
+   *
+   * @return a idle iteration count larger than 0
+   */
+  public int getIdleIteration() {
+    return idleIterations;
+  }
+
+  /**
+   * Sets the idle iteration value for Container Balancer.
+   *
+   * @param count a idle iteration count larger than 0
+   */
+  public void setIdleIteration(int count) {
+    if (count < 1) {
+      throw new IllegalArgumentException(
+          "Idle iteration count must be larger than 0.");
+    }
+    this.idleIterations = count;
   }
 
   /**
