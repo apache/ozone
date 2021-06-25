@@ -110,6 +110,7 @@ public class DeletedBlockLogImplV2
         .newBuilder()
         .setConfiguration(conf)
         .setDeletedBlocksTable(deletedBlocksTXTable)
+        .setContainerManager(containerManager)
         .setRatisServer(ratisServer)
         .setSCMDBTransactionBuffer(dbTxBuffer)
         .build();
