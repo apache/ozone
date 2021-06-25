@@ -24,6 +24,8 @@ import org.junit.Test;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Testing the basic functionality of the event queue.
  */
@@ -34,12 +36,9 @@ public class TestEventQueue {
   private static final Event<Long> EVENT2 =
       new TypedEvent<>(Long.class, "SCM_EVENT2");
 
-  private static final Event<Long> EVENT3 =
-      new TypedEvent<>(Long.class, "SCM_EVENT3");
-  private static final Event<Long> EVENT4 =
-      new TypedEvent<>(Long.class, "SCM_EVENT4");
-
   private EventQueue queue;
+
+  private AtomicLong eventTotal = new AtomicLong();
 
   @Before
   public void startEventQueue() {
@@ -64,6 +63,59 @@ public class TestEventQueue {
     queue.processAll(1000);
     Assert.assertEquals(11, result[0]);
 
+  }
+
+  @Test
+  public void simpleEventWithFixedThreadPoolExecutor() {
+
+    TestHandler testHandler = new TestHandler();
+
+    queue.addHandler(EVENT1, new FixedThreadPoolExecutor<>(EVENT1.getName(),
+            EventQueue.getExecutorName(EVENT1, testHandler)), testHandler);
+
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 11L);
+
+    EventExecutor eventExecutor =
+        queue.getExecutorAndHandler(EVENT1).keySet().iterator().next();
+
+    // As it is fixed threadpool executor with 10 threads, all should be
+    // scheduled.
+    Assert.assertEquals(10, eventExecutor.queuedEvents());
+
+    // As we don't see all 10 events scheduled.
+    Assert.assertTrue(eventExecutor.scheduledEvents() > 1 &&
+        eventExecutor.scheduledEvents() <= 10);
+
+    queue.processAll(60000);
+    Assert.assertEquals(110, eventTotal.intValue());
+
+    Assert.assertEquals(10, eventExecutor.successfulEvents());
+    eventTotal.set(0);
+
+  }
+
+  /**
+   * Event handler used in tests.
+   */
+  public class TestHandler implements EventHandler {
+    @Override
+    public void onMessage(Object payload, EventPublisher publisher) {
+      try {
+        Thread.sleep(2000);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+      }
+      eventTotal.getAndAdd((long) payload);
+    }
   }
 
   @Test

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,18 +30,21 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_PREFIX;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
+
 /**
- * Simple EventExecutor to call all the event handler one-by-one.
+ * Fixed thread pool EventExecutor to call all the event handler one-by-one.
  *
  * @param <P> the payload type of events
  */
 @Metrics(context = "EventQueue")
-public class SingleThreadExecutor<P> implements EventExecutor<P> {
+public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
 
   private static final String EVENT_QUEUE = "EventQueue";
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SingleThreadExecutor.class);
+      LoggerFactory.getLogger(FixedThreadPoolExecutor.class);
 
   private final String name;
 
@@ -58,21 +63,27 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
   private MutableCounterLong scheduled;
 
   /**
-   * Create SingleThreadExecutor.
+   * Create FixedThreadPoolExecutor.
    *
+   * @param eventName
    * @param name Unique name used in monitoring and metrics.
    */
-  public SingleThreadExecutor(String name) {
+  public FixedThreadPoolExecutor(String eventName, String name) {
     this.name = name;
     DefaultMetricsSystem.instance()
         .register(EVENT_QUEUE + name, "Event Executor metrics ", this);
 
-    executor = Executors.newSingleThreadExecutor(
-        runnable -> {
-          Thread thread = new Thread(runnable);
-          thread.setName(EVENT_QUEUE + "-" + name);
-          return thread;
-        });
+
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    int threadPoolSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
+            StringUtils.camelize(eventName) + ".thread.pool.size",
+        OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
+
+    executor = Executors.newFixedThreadPool(threadPoolSize, runnable -> {
+      Thread thread = new Thread(runnable);
+      thread.setName(EVENT_QUEUE + "-" + name);
+      return thread;
+    });
   }
 
   @Override
