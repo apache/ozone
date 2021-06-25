@@ -34,7 +34,7 @@ import java.io.IOException;
 public class NSSummaryCodec implements Codec<NSSummary> {
 
   private final Codec<Integer> integerCodec = new IntegerCodec();
-  // 2 int fields + 40-length int array
+  // 2 int fields + 41-length int array
   private static final int NUM_OF_INTS = 2 + ReconConstants.NUM_OF_BINS;
 
   @Override
