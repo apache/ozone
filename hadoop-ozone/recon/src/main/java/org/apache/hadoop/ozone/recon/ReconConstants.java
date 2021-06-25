@@ -58,5 +58,9 @@ public final class ReconConstants {
       + PIPELINE_DB_SUFFIX;
   public static final String RECON_SCM_NODE_DB =
       "recon-node.db";
-  public static final int NUM_OF_BINS = 40;
+  public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
+  public static final long MIN_FILE_SIZE_UPPER_BOUND = 1024L;
+  public static final int NUM_OF_BINS = (int)(Math.log(
+          MAX_FILE_SIZE_UPPER_BOUND) / Math.log(2) - Math.log(
+                  MIN_FILE_SIZE_UPPER_BOUND) / Math.log(2)) + 1;
 }

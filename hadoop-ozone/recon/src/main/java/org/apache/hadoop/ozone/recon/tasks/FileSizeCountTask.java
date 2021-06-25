@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
@@ -53,7 +54,6 @@ public class FileSizeCountTask implements ReconOmTask {
       LoggerFactory.getLogger(FileSizeCountTask.class);
 
   // 1125899906842624L = 1PB
-  private static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
 
@@ -167,7 +167,7 @@ public class FileSizeCountTask implements ReconOmTask {
   }
 
   private long getFileSizeUpperBound(long fileSize) {
-    if (fileSize >= MAX_FILE_SIZE_UPPER_BOUND) {
+    if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
       return Long.MAX_VALUE;
     }
     int index = nextClosestPowerIndexOfTwo(fileSize);
