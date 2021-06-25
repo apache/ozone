@@ -53,7 +53,6 @@ public class FileSizeCountTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(FileSizeCountTask.class);
 
-  // 1125899906842624L = 1PB
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
 

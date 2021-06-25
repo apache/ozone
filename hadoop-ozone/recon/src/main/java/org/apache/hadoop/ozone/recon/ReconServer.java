@@ -241,7 +241,7 @@ public class ReconServer extends GenericCli {
   }
 
   @VisibleForTesting
-  public ReconContainerMetadataManager getRCMM() {
+  public ReconContainerMetadataManager getReconContainerMetadataManager() {
     return reconContainerMetadataManager;
   }
 
