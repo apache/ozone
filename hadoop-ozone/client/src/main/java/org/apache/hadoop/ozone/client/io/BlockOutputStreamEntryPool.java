@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -173,11 +172,15 @@ public class BlockOutputStreamEntryPool {
     }else{
       List<DatanodeDetails> nodes = subKeyInfo.getPipeline().getNodes();
       for (int i = 0; i < nodes.size(); i++) {
-        Map<DatanodeDetails, Long> nodeStatus = new LinkedHashMap<>();
-        nodeStatus.put(nodes.get(i), -1L);
-        Pipeline pipeline = new Pipeline(subKeyInfo.getPipeline().getId(),
-            subKeyInfo.getPipeline().getReplicationConfig(),
-            subKeyInfo.getPipeline().getPipelineState(), nodeStatus, null);
+        List<DatanodeDetails> nodeStatus = new ArrayList<>();
+        nodeStatus.add(nodes.get(i));
+        Pipeline pipeline = Pipeline.newBuilder()
+            .setId(subKeyInfo.getPipeline().getId())
+            .setReplicationConfig(subKeyInfo.getPipeline()
+                .getReplicationConfig())
+            .setState(subKeyInfo.getPipeline().getPipelineState())
+            .setNodes(nodeStatus)
+            .build();
         Map<DatanodeDetails, Integer> nodeVsIdx = new HashMap<>();
         nodeVsIdx.put(nodes.get(i), i + 1);
         pipeline.setReplicaIndexes(nodeVsIdx);

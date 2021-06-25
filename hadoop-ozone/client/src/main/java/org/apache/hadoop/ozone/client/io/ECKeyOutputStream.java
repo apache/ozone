@@ -21,10 +21,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -40,7 +40,6 @@ import org.apache.hadoop.io.erasurecode.ECSchema;
 import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
 import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
 import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
-import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -59,19 +58,15 @@ import org.slf4j.LoggerFactory;
  */
 public class ECKeyOutputStream extends KeyOutputStream {
   private OzoneClientConfig config;
-  private ECChunkBuffers ecChunkBufferCache;
-  private int cellSize = 1000;
-  private int numDataBlks = 3;
-  private int numParityBlks = 2;
+  private ECChunkBuffers ecDataChunkBufferCache;
+  private int ecChunkSize = 1024;
+  private final int numDataBlks;
+  private final int numParityBlks;
   private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
   private final RawErasureEncoder encoder;
   // TODO: EC: Currently using the below EC Schema. This has to be modified and
   //  created dynamically once OM return the configured scheme details.
   private static final String DEFAULT_CODEC_NAME = "rs";
-  private ECSchema schema =
-      new ECSchema(DEFAULT_CODEC_NAME, numDataBlks, numParityBlks);
-  private ErasureCodecOptions options = new ErasureCodecOptions(schema);
-  private RSErasureCodec codec;
 
   private long currentBlockGroupLen = 0;
   /**
@@ -86,8 +81,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   private boolean closed;
   private FileEncryptionInfo feInfo;
-  private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
-  private int retryCount;
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
@@ -112,20 +105,23 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return blockOutputStreamEntryPool.getLocationInfoList();
   }
 
-  @VisibleForTesting
-  public int getRetryCount() {
-    return retryCount;
-  }
-
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public ECKeyOutputStream(OzoneClientConfig config, OpenKeySession handler,
       XceiverClientFactory xceiverClientManager, OzoneManagerProtocol omClient,
       int chunkSize, String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion) {
-    ecChunkBufferCache =
-        new ECChunkBuffers(cellSize, numDataBlks, numParityBlks);
     this.config = config;
+    // For EC, cell/chunk size and buffer size can be same for now.
+    this.config.setStreamBufferMaxSize(ecChunkSize);
+    this.config.setStreamBufferFlushSize(ecChunkSize);
+    this.config.setStreamBufferSize(ecChunkSize);
+    assert replicationConfig instanceof ECReplicationConfig;
+    this.numDataBlks = ((ECReplicationConfig) replicationConfig).getData();
+    this.numParityBlks = ((ECReplicationConfig) replicationConfig).getParity();
+    ecDataChunkBufferCache =
+        new ECChunkBuffers(ecChunkSize, numDataBlks, numParityBlks);
+
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(config, omClient, requestId,
@@ -136,14 +132,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
-    this.retryPolicyMap = HddsClientUtils
-        .getRetryPolicyByException(config.getMaxRetryCount(),
-            config.getRetryInterval());
-    this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
     OzoneConfiguration conf = new OzoneConfiguration();
-    this.codec = new RSErasureCodec(conf, options);
+    ECSchema schema =
+        new ECSchema(DEFAULT_CODEC_NAME, numDataBlks, numParityBlks);
+    ErasureCodecOptions options = new ErasureCodecOptions(schema);
+    RSErasureCodec codec = new RSErasureCodec(conf, options);
     this.encoder = CodecUtil.createRawEncoder(conf,
         SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
         codec.getCoderOptions());
@@ -165,13 +160,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
   public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
       long openVersion) throws IOException {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
-  }
-
-  @Override
-  public void write(int b) throws IOException {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    write(buf, 0, 1);
   }
 
   /**
@@ -198,25 +186,25 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     int currentChunkBufferRemainingLength =
-        ecChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
+        ecDataChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
             .remaining();
     int currentChunkBufferLen =
-        ecChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
+        ecDataChunkBufferCache.buffers[blockOutputStreamEntryPool.getCurrIdx()]
             .position();
-    int maxLenToCurrChunkBuffer = (int) Math.min(len, cellSize);
+    int maxLenToCurrChunkBuffer = (int) Math.min(len, ecChunkSize);
     int currentWriterChunkLenToWrite =
         Math.min(currentChunkBufferRemainingLength, maxLenToCurrChunkBuffer);
     handleWrite(b, off, currentWriterChunkLenToWrite,
-        currentChunkBufferLen + currentWriterChunkLenToWrite == cellSize,
+        currentChunkBufferLen + currentWriterChunkLenToWrite == ecChunkSize,
         false);
     checkAndWriteParityCells();
 
     int remLen = len - currentWriterChunkLenToWrite;
-    int iters = remLen / cellSize;
-    int lastCellSize = remLen % cellSize;
+    int iters = remLen / ecChunkSize;
+    int lastCellSize = remLen % ecChunkSize;
     while (iters > 0) {
-      handleWrite(b, off, cellSize, true, false);
-      off += cellSize;
+      handleWrite(b, off, ecChunkSize, true, false);
+      off += ecChunkSize;
       iters--;
       checkAndWriteParityCells();
     }
@@ -246,34 +234,38 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   void writeParityCells() throws IOException {
-    final ByteBuffer[] buffers = ecChunkBufferCache.getBuffers();
+    final ByteBuffer[] buffers = ecDataChunkBufferCache.getBuffers();
     //encode the data cells
     for (int i = 0; i < numDataBlks; i++) {
       buffers[i].flip();
     }
-    encode(encoder, numDataBlks, buffers);
-    for (int i = numDataBlks; i < numDataBlks + 2; i++) {
-      handleWrite(buffers[i].array(), 0, cellSize, true, true);
+
+    final ByteBuffer[] parityBuffers = new ByteBuffer[numParityBlks];
+    for (int i = 0; i < numParityBlks; i++) {
+      parityBuffers[i] = BUFFER_POOL.getBuffer(false, ecChunkSize);
+      parityBuffers[i].limit(ecChunkSize);
+    }
+    encoder.encode(buffers, parityBuffers);
+
+    for (int i =
+         numDataBlks; i < (this.numDataBlks + this.numParityBlks); i++) {
+      handleWrite(parityBuffers[i - numDataBlks].array(), 0, ecChunkSize, true,
+          true);
     }
 
-    ecChunkBufferCache.flipAllDataBuffers();
-    ecChunkBufferCache.clear();
-  }
-
-  private static void encode(RawErasureEncoder encoder, int numData,
-      ByteBuffer[] buffers) throws IOException {
-    final ByteBuffer[] dataBuffers = new ByteBuffer[numData];
-    final ByteBuffer[] parityBuffers = new ByteBuffer[buffers.length - numData];
-    System.arraycopy(buffers, 0, dataBuffers, 0, dataBuffers.length);
-    System.arraycopy(buffers, numData, parityBuffers, 0, parityBuffers.length);
-
-    encoder.encode(dataBuffers, parityBuffers);
+    ecDataChunkBufferCache.clear();
+    for (int i = 0; i < numParityBlks; i++) {
+      parityBuffers[i].clear();
+      BUFFER_POOL.putBuffer(parityBuffers[i]);
+    }
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean isFullCell,
       boolean isParity) throws IOException {
-    ecChunkBufferCache
-        .addTo(blockOutputStreamEntryPool.getCurrIdx(), b, off, (int) len);
+    if (!isParity) {
+      ecDataChunkBufferCache
+          .addTo(blockOutputStreamEntryPool.getCurrIdx(), b, off, (int) len);
+    }
     while (len > 0) {
       try {
 
@@ -307,7 +299,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
       if (isFullCell) {
         handleFlushOrClose(StreamAction.FLUSH);
-        blockOutputStreamEntryPool.updateToNextStream(numDataBlks + 2);
+        blockOutputStreamEntryPool
+            .updateToNextStream(numDataBlks + numParityBlks);
       }
     }
 
@@ -494,6 +487,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     } finally {
       blockOutputStreamEntryPool.cleanupAll();
     }
+    ecDataChunkBufferCache.release();
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
@@ -614,7 +608,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       this.parityBlks = numParity;
       this.dataBlks = numData;
       this.totalBlks = this.dataBlks + this.parityBlks;
-      buffers = new ByteBuffer[this.totalBlks];
+      buffers = new ByteBuffer[this.dataBlks];
       for (int i = 0; i < buffers.length; i++) {
         buffers[i] = BUFFER_POOL.getBuffer(false, cellSize);
         buffers[i].limit(cellSize);
@@ -634,30 +628,18 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     private void clear() {
-      for (int i = 0; i < this.totalBlks; i++) {
+      for (int i = 0; i < this.dataBlks; i++) {
         buffers[i].clear();
         buffers[i].limit(cellSize);
       }
     }
 
     private void release() {
-      for (int i = 0; i < this.totalBlks; i++) {
+      for (int i = 0; i < this.dataBlks; i++) {
         if (buffers[i] != null) {
           BUFFER_POOL.putBuffer(buffers[i]);
           buffers[i] = null;
         }
-      }
-    }
-
-    private void flipDataBuffers() {
-      for (int i = 0; i < this.totalBlks; i++) {
-        buffers[i].flip();
-      }
-    }
-
-    private void flipAllDataBuffers() {
-      for (int i = 0; i < this.totalBlks; i++) {
-        buffers[i].flip();
       }
     }
   }

@@ -22,10 +22,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.io.erasurecode.CodecUtil;
@@ -62,7 +60,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Used for testing Ozone client without external network calls.
  */
 public class TestOzoneECClient {
-  private int chunkSize = 1000;
+  private int chunkSize = 1024;
   private int dataBlocks = 3;
   private int parityBlocks = 2;
   private OzoneClient client;
@@ -85,13 +83,7 @@ public class TestOzoneECClient {
   @Before
   public void init() throws IOException {
     ConfigurationSource config = new InMemoryConfiguration();
-    OzoneClientConfig object = config.getObject(OzoneClientConfig.class);
-    object.setStreamBufferMaxSize(1000);
-    object.setStreamBufferFlushSize(1000);
-    object.setStreamBufferSize(1000);
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setFromObject(object);
-    client = new OzoneClient(conf, new RpcClient(conf, null) {
+    client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
       protected OmTransport createOmTransport(String omServiceId)
@@ -160,7 +152,7 @@ public class TestOzoneECClient {
     }
     final ByteBuffer[] parityBuffers = new ByteBuffer[parityBlocks];
     for (int i = 0; i < parityBlocks; i++) {
-      parityBuffers[i] = ByteBuffer.allocate(1000);
+      parityBuffers[i] = ByteBuffer.allocate(1024);
     }
     encoder.encode(dataBuffers, parityBuffers);
     OzoneKey key = bucket.getKey(keyName);
@@ -189,7 +181,7 @@ public class TestOzoneECClient {
     OzoneKey key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1000];
+      byte[] fileContent = new byte[1024];
       Assert.assertEquals(inputChunks[0].length, is.read(fileContent));
       Assert.assertEquals(new String(inputChunks[0], UTF_8),
           new String(fileContent, UTF_8));
@@ -201,7 +193,7 @@ public class TestOzoneECClient {
     // first node in pipeline and assert for second chunk in EC data.
     updatePipelineToKeepSingleNode(2);
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1000];
+      byte[] fileContent = new byte[1024];
       Assert.assertEquals(inputChunks[1].length, is.read(fileContent));
       Assert.assertEquals(new String(inputChunks[1], UTF_8),
           new String(fileContent, UTF_8));
@@ -209,7 +201,7 @@ public class TestOzoneECClient {
 
     updatePipelineToKeepSingleNode(3);
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1000];
+      byte[] fileContent = new byte[1024];
       Assert.assertEquals(inputChunks[2].length, is.read(fileContent));
       Assert.assertEquals(new String(inputChunks[2], UTF_8),
           new String(fileContent, UTF_8));
