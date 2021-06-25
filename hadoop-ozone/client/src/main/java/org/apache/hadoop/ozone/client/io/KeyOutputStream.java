@@ -153,7 +153,7 @@ public class KeyOutputStream extends OutputStream {
             isMultipart, info,
             unsafeByteBufferConversion,
             xceiverClientManager,
-            handler.getId(), false);
+            handler.getId());
 
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.

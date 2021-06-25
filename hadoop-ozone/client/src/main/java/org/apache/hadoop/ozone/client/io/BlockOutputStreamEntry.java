@@ -37,7 +37,7 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * Helper class used inside {@link BlockOutputStream}.
  * */
-public final class BlockOutputStreamEntry extends OutputStream {
+public class BlockOutputStreamEntry extends OutputStream {
 
   private final OzoneClientConfig config;
   private OutputStream outputStream;
@@ -54,7 +54,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private BufferPool bufferPool;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  private BlockOutputStreamEntry(
+  BlockOutputStreamEntry(
       BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
@@ -95,12 +95,14 @@ public final class BlockOutputStreamEntry extends OutputStream {
    */
   private void checkStream() throws IOException {
     if (this.outputStream == null) {
-      this.outputStream =
-          new BlockOutputStream(blockID, xceiverClientManager,
-              pipeline, bufferPool, config, token);
+      this.outputStream = createOutputStream();
     }
   }
 
+  BlockOutputStream createOutputStream() throws IOException {
+    return new BlockOutputStream(blockID, xceiverClientManager,
+        pipeline, bufferPool, config, token);
+  }
 
   @Override
   public void write(int b) throws IOException {
@@ -268,6 +270,10 @@ public final class BlockOutputStreamEntry extends OutputStream {
 
   public String getKey() {
     return key;
+  }
+
+  public OzoneClientConfig getConf(){
+    return this.config;
   }
 
   public XceiverClientFactory getXceiverClientManager() {

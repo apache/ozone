@@ -88,7 +88,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
-  private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
+  private final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
   @VisibleForTesting
   public List<BlockOutputStreamEntry> getStreamEntries() {
@@ -123,10 +123,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
         new ECChunkBuffers(ecChunkSize, numDataBlks, numParityBlks);
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(config, omClient, requestId,
+        new ECBlockOutputStreamEntryPool(config, omClient, requestId,
             replicationConfig, uploadID, partNumber, isMultipart, info,
-            unsafeByteBufferConversion, xceiverClientManager, handler.getId(),
-            true);
+            unsafeByteBufferConversion, xceiverClientManager, handler.getId());
 
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
@@ -222,6 +221,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
       //Lets encode and write
       //encoder.encode();
       writeParityCells();
+      // By this time, we should have finished full stripe. So, lets call
+      // executePutBlock for all.
+      // TODO: we should alter the put block calls to share CRC to each stream.
+      blockOutputStreamEntryPool.executePutBlockForAll();
+      ecChunkBufferCache.clear();
+
       // check if block ends?
       if (currentBlockGroupLen == numDataBlks * blockOutputStreamEntryPool
           .getStreamEntries().get(blockOutputStreamEntryPool.getCurrIdx())
@@ -246,8 +251,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       handleWrite(parityBuffers[i - numDataBlks].array(), 0, ecChunkSize, true,
           true);
     }
-
-    ecChunkBufferCache.clear();
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean isFullCell,
