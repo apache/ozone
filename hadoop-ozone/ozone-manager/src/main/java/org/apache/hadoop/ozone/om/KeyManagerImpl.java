@@ -2493,7 +2493,7 @@ public class KeyManagerImpl implements KeyManager {
     // unsorted OMKeyInfo list contains combine results from TableCache and DB.
 
     if (numEntries <= 0) {
-      return new ArrayList<>();;
+      return new ArrayList<>();
     }
 
     /**
@@ -2757,6 +2757,7 @@ public class KeyManagerImpl implements KeyManager {
    * Build files, directories and marked for deleted entries from dir/file
    * cache.
    */
+  @SuppressWarnings("parameternumber")
   private int getFilesAndDirsFromCache(String volumeName, String bucketName,
       Map<String, OzoneFileStatus> cacheFileMap,
       Map<String, OzoneFileStatus> tempCacheDirMap,
@@ -2948,7 +2949,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @SuppressWarnings("parameternumber")
   private int addKeyInfoToFileStatusList(
-      TreeMap<String, OzoneFileStatus> cacheKeyMap,
+      Map<String, OzoneFileStatus> cacheKeyMap,
       long prefixKeyInDB, String seekKeyInDB, String startKey,
       int countEntries, String cacheKey, OmKeyInfo cacheOmKeyInfo,
       boolean isDirectory) {
