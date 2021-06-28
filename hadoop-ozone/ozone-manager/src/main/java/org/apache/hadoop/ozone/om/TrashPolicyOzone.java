@@ -314,7 +314,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           LOG.debug("Deleted trash checkpoint:{} ", dir);
         } else {
           om.getMetrics().incNumTrashFails();
-          LOG.warn("Couldn't delete checkpoint: {} Ignoring.",dir);
+          LOG.warn("Couldn't delete checkpoint: {} Ignoring.", dir);
         }
       }
     }
