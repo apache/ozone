@@ -201,7 +201,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           if (now >= end) {
             Collection<FileStatus> trashRoots;
             trashRoots = fs.getTrashRoots(true); // list all trash dirs
-            LOG.debug("Trash root Size: " + trashRoots.size());
+            LOG.debug("Trash root Size: {}" + trashRoots.size());
             for (FileStatus trashRoot : trashRoots) {  // dump each trash
               LOG.debug("Trashroot: {}" + trashRoot.getPath());
               if (!trashRoot.isDirectory()) {
@@ -266,7 +266,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     while (true) {
       try {
         fs.rename(current, checkpoint);
-        LOG.debug("Created trash checkpoint: " + checkpoint.toUri().getPath());
+        LOG.debug("Created trash checkpoint: {}"
+                + checkpoint.toUri().getPath());
         break;
       } catch (FileAlreadyExistsException e) {
         if (++attempt > 1000) {
@@ -280,7 +281,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private void deleteCheckpoint(Path trashRoot, boolean deleteImmediately)
       throws IOException {
-    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: {}" + trashRoot);
+    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: {}"
+            + trashRoot);
 
     FileStatus[] dirs = null;
     try {
