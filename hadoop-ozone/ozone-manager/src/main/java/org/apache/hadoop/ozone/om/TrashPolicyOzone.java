@@ -126,9 +126,9 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     Path trashRoot = this.fs.getTrashRoot(path);
 
     String key = path.toUri().getPath();
-    LOG.debug("Key path to moveToTrash: {}"+ key);
+    LOG.debug("Key path to moveToTrash: {}", key);
     String trashRootKey = trashRoot.toUri().getPath();
-    LOG.debug("TrashrootKey for moveToTrash: {}"+ trashRootKey);
+    LOG.debug("TrashrootKey for moveToTrash: {}", trashRootKey);
 
     if (!OzoneFSUtils.isValidName(key)) {
       throw new InvalidPathException("Invalid path Name " + key);
@@ -201,9 +201,9 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           if (now >= end) {
             Collection<FileStatus> trashRoots;
             trashRoots = fs.getTrashRoots(true); // list all trash dirs
-            LOG.debug("Trash root Size: {}" + trashRoots.size());
+            LOG.debug("Trash root Size: {}", trashRoots.size());
             for (FileStatus trashRoot : trashRoots) {  // dump each trash
-              LOG.debug("Trashroot: {}" + trashRoot.getPath());
+              LOG.debug("Trashroot: {}", trashRoot.getPath());
               if (!trashRoot.isDirectory()) {
                 continue;
               }
@@ -266,8 +266,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     while (true) {
       try {
         fs.rename(current, checkpoint);
-        LOG.debug("Created trash checkpoint: {}"
-                + checkpoint.toUri().getPath());
+        LOG.debug("Created trash checkpoint: {}",
+                checkpoint.toUri().getPath());
         break;
       } catch (FileAlreadyExistsException e) {
         if (++attempt > 1000) {

@@ -595,7 +595,7 @@ public class BlockOutputStream extends OutputStream {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
       ioException.compareAndSet(null, exception);
     } else {
-      LOG.debug("Previous request had already failed with " + ioe
+      LOG.debug("Previous request had already failed with ", ioe
           + " so subsequent request also encounters"
           + " Storage Container Exception ", e);
     }
