@@ -504,7 +504,6 @@ public class OMMetrics {
   }
 
   public void incNumKeyRenameFails() {
-    numKeyOps.incr();
     numKeyRenameFails.incr();
   }
 
