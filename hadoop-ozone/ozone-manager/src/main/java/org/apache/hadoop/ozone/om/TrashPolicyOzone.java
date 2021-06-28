@@ -126,9 +126,9 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     Path trashRoot = this.fs.getTrashRoot(path);
 
     String key = path.toUri().getPath();
-    LOG.debug("Key path to moveToTrash: "+ key);
+    LOG.debug("Key path to moveToTrash: {}"+ key);
     String trashRootKey = trashRoot.toUri().getPath();
-    LOG.debug("TrashrootKey for moveToTrash: "+ trashRootKey);
+    LOG.debug("TrashrootKey for moveToTrash: {}"+ trashRootKey);
 
     if (!OzoneFSUtils.isValidName(key)) {
       throw new InvalidPathException("Invalid path Name " + key);
@@ -203,7 +203,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
             trashRoots = fs.getTrashRoots(true); // list all trash dirs
             LOG.debug("Trash root Size: " + trashRoots.size());
             for (FileStatus trashRoot : trashRoots) {  // dump each trash
-              LOG.debug("Trashroot:" + trashRoot.getPath().toString());
+              LOG.debug("Trashroot: {}" + trashRoot.getPath());
               if (!trashRoot.isDirectory()) {
                 continue;
               }
@@ -280,7 +280,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private void deleteCheckpoint(Path trashRoot, boolean deleteImmediately)
       throws IOException {
-    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: " + trashRoot);
+    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: {}" + trashRoot);
 
     FileStatus[] dirs = null;
     try {
@@ -303,7 +303,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         time = getTimeFromCheckpoint(name);
       } catch (ParseException e) {
         om.getMetrics().incNumTrashFails();
-        LOG.warn("Unexpected item in trash: "+dir+". Ignoring.");
+        LOG.warn("Unexpected item in trash: {}"+dir+". Ignoring.");
         continue;
       }
 
@@ -312,7 +312,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           LOG.debug("Deleted trash checkpoint:{} ", dir);
         } else {
           om.getMetrics().incNumTrashFails();
-          LOG.warn("Couldn't delete checkpoint: " + dir + " Ignoring.");
+          LOG.warn("Couldn't delete checkpoint: {}" + dir + " Ignoring.");
         }
       }
     }

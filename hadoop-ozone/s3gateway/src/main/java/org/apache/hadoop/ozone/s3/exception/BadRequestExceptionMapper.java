@@ -38,7 +38,7 @@ public class BadRequestExceptionMapper implements
   @Override
   public Response toResponse(BadRequestException exception) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Returning exception. ex: {}", exception.toString());
+      LOG.debug("Returning exception. ex: {}", exception);
     }
 
     return Response.status(Response.Status.BAD_REQUEST)
