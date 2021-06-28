@@ -800,7 +800,7 @@ public class KeyManagerImpl implements KeyManager {
       return containerWithPipelineMap;
     } catch (IOException ioEx) {
       LOG.debug("Get containerPipeline failed for {}",
-          containerIDs.toString(), ioEx);
+          containerIDs, ioEx);
       throw new OMException(ioEx.getMessage(), SCM_GET_PIPELINE_EXCEPTION);
     }
   }

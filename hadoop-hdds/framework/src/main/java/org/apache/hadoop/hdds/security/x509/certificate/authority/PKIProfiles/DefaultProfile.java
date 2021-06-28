@@ -238,7 +238,7 @@ public class DefaultProfile implements PKIProfile {
         final InetAddress byAddress = InetAddress.getByAddress(
             Hex.decodeHex(value.substring(1)));
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Host Name/IP Address : {}", byAddress.toString());
+          LOG.debug("Host Name/IP Address : {}", byAddress);
         }
         return true;
       } catch (UnknownHostException | DecoderException e) {
