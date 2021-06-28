@@ -281,8 +281,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private void deleteCheckpoint(Path trashRoot, boolean deleteImmediately)
       throws IOException {
-    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: {}"
-            + trashRoot);
+    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: {}",
+            trashRoot);
 
     FileStatus[] dirs = null;
     try {
@@ -305,7 +305,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         time = getTimeFromCheckpoint(name);
       } catch (ParseException e) {
         om.getMetrics().incNumTrashFails();
-        LOG.warn("Unexpected item in trash: {}"+dir+". Ignoring.");
+        LOG.warn("Unexpected item in trash: {} . Ignoring.", dir);
         continue;
       }
 
@@ -314,7 +314,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           LOG.debug("Deleted trash checkpoint:{} ", dir);
         } else {
           om.getMetrics().incNumTrashFails();
-          LOG.warn("Couldn't delete checkpoint: {}" + dir + " Ignoring.");
+          LOG.warn("Couldn't delete checkpoint: {} Ignoring.",dir);
         }
       }
     }
