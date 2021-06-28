@@ -266,8 +266,10 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     while (true) {
       try {
         fs.rename(current, checkpoint);
-        LOG.debug("Created trash checkpoint: {}",
-                checkpoint.toUri().getPath());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Created trash checkpoint: {}",
+                  checkpoint.toUri().getPath());
+        }
         break;
       } catch (FileAlreadyExistsException e) {
         if (++attempt > 1000) {
