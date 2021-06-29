@@ -68,10 +68,8 @@ import java.util.stream.IntStream;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto
@@ -1108,132 +1106,6 @@ public class TestReplicationManager {
   public void testMovePrerequisites()
       throws SCMException, ContainerNotFoundException,
       NodeNotFoundException, InterruptedException {
-
-    //all conditions is met
-    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
-    ContainerID id = container.containerID();
-    ContainerReplica dn1 = addReplica(container,
-        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
-    ContainerReplica dn2 = addReplica(container,
-        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
-    DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
-    ContainerReplica dn4 = addReplica(container,
-        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
-    //replication manager will not generate any inflight action
-    replicationManager.processContainersNow();
-    //move should succeed
-    Assert.assertTrue(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-
-
-    //the above move is executed successfully, so there may be some item in
-    //inflightReplication or inflightDeletion. here we stop replication manager
-    //to clear these states, which may impact the tests below.
-    //we don't need a running replicationManamger now
-    resetReplicationManager();
-
-    //container in not in CLOSED state
-    container.setState(LifeCycleState.CLOSING);
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    container.setState(LifeCycleState.OPEN);
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    container.setState(LifeCycleState.QUASI_CLOSED);
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    container.setState(LifeCycleState.DELETING);
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    container.setState(LifeCycleState.CLOSED);
-
-    //Node is not in healthy state
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(IN_SERVICE, STALE));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(IN_SERVICE, DEAD));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(IN_SERVICE, HEALTHY));
-    nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, STALE));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, DEAD));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
-
-    //Node is not in IN_SERVICE state
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(DECOMMISSIONING, STALE));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(DECOMMISSIONED, DEAD));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(ENTERING_MAINTENANCE, HEALTHY));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(IN_MAINTENANCE, HEALTHY));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
-        new NodeStatus(IN_SERVICE, HEALTHY));
-    nodeManager.setNodeStatus(dn3, new NodeStatus(DECOMMISSIONING, STALE));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn3, new NodeStatus(DECOMMISSIONED, DEAD));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn3,
-        new NodeStatus(ENTERING_MAINTENANCE, HEALTHY));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn3, new NodeStatus(IN_MAINTENANCE, HEALTHY));
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-    nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
-
-    //container exists in target datanode
-    Assert.assertFalse(replicationManager.move(id, dn1.getDatanodeDetails(),
-        dn2.getDatanodeDetails()).isPresent());
-
-    //container does not exist in source datanode
-    Assert.assertFalse(replicationManager.move(id, dn3,
-        dn2.getDatanodeDetails()).isPresent());
-
-    //make container over relplicated to test the
-    // case that thatcontainer is in inflightDeletion
-    ContainerReplica dn5 = addReplica(container,
-        new NodeStatus(IN_SERVICE, HEALTHY), State.CLOSED);
-    ContainerReplica dn6 = addReplica(container,
-        new NodeStatus(IN_SERVICE, HEALTHY), State.CLOSED);
-    replicationManager.processContainersNow();
-    //waiting for inflightDeletion generation
-    Thread.sleep(500);
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
-
-    //clear inflight actions
-    resetReplicationManager();
-
-    //make the replica num be 2 to test the case
-    // that container is in inflightReplication
-    containerStateManager.removeContainerReplica(id, dn6);
-    containerStateManager.removeContainerReplica(id, dn5);
-    containerStateManager.removeContainerReplica(id, dn4);
-    //replication manager should generate inflightReplication
-    replicationManager.processContainersNow();
-    //waiting for inflightReplication generation
-    Thread.sleep(500);
-    Assert.assertFalse(replicationManager.move(id,
-        dn1.getDatanodeDetails(), dn3).isPresent());
   }
 
   private ContainerInfo createContainer(LifeCycleState containerState)
