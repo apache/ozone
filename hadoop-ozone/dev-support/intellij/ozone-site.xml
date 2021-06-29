@@ -59,6 +59,114 @@
     <name>hdds.prometheus.endpoint.enabled</name>
     <value>true</value>
   </property>
+
+  <property>
+    <name>ozone.replication.type</name>
+    <value>RATIS</value>
+  </property>
+  <property>
+    <name>ozone.scm.pipeline.creation.auto.factor.one</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>ozone.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>ozone.metastore.rocksdb.statistics</name>
+    <value>OFF</value>
+  </property>
+  <property>
+    <name>ozone.scm.pipeline.owner.container.count</name>
+    <value>1</value>
+  </property>
+  <property>
+    <name>dfs.container.ratis.num.write.chunk.threads</name>
+    <value>20</value>
+  </property>
+  <property>
+    <name>ozone.client.checksum.type</name>
+    <value>NONE</value>
+  </property>
+  <property>
+    <name>raft.server.log.corruption.policy</name>
+    <value>WARN_AND_RETURN</value>
+  </property>
+  <property>
+    <name>ozone.datanode.pipeline.limit</name>
+    <value>3</value>
+  </property>
+  <property>
+    <name>ozone.scm.pipeline.leader-choose.policy</name>
+    <value>org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy</value>
+  </property>
+  <property>
+    <name>hdds.tracing.enabled</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>rpc.metrics.quantile.enable</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>rpc.metrics.percentiles.intervals</name>
+    <value>60,300</value>
+  </property>
+  <property>
+    <name>ozone.scm.handler.count.key</name>
+    <value>200</value>
+  </property>
+  <property>
+    <name>dfs.datanode.use.datanode.hostname</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>hdds.profiler.endpoint.enabled</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>ozone.client.checksum.type</name>
+    <value>NONE</value>
+  </property>
+  <property>
+    <name>raft.server.log.corruption.policy</name>
+    <value>WARN_AND_RETURN</value>
+  </property>
+  <property>
+    <name>hdds.ratis.client.retry.policy</name>
+    <value>org.apache.hadoop.hdds.ratis.retrypolicy.RetryLimitedPolicyCreator</value>
+  </property>
+  <property>
+    <name>hdds.ratis.client.retrylimited.max.retries</name>
+    <value>5</value>
+  </property>
+  <property>
+    <name>hdds.ratis.raft.client.rpc.request.timeout</name>
+    <value>10s</value>
+  </property>
+  <property>
+    <name>hdds.ratis.raft.client.rpc.watch.request.timeout</name>
+    <value>30s</value>
+  </property>
+  <property>
+    <name>ozone.scm.heartbeat.rpc-timeout</name>
+    <value>20s</value>
+  </property>
+  <property>
+    <name>ozone.scm.stale.node.interval</name>
+    <value>15m</value>
+  </property>
+  <property>
+    <name>ozone.scm.dead.node.interval</name>
+    <value>30m</value>
+  </property>
+  <property>
+    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
+    <value>20</value>
+  </property>
+
+  <!--
   <property>
     <name>ozone.recon.address</name>
     <value>localhost:9891</value>
@@ -70,5 +178,5 @@
   <property>
     <name>datanode.replication.port</name>
     <value>0</value>
-  </property>
+  </property>-->
 </configuration>

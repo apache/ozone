@@ -60,6 +60,11 @@ public interface ChunkManager {
     writeChunk(container, blockID, info, wrapper, dispatcherContext);
   }
 
+  default String streamInit(Container container, BlockID blockID, DispatcherContext dispatcherContext)
+      throws StorageContainerException {
+    return null;
+  }
+
   /**
    * reads the data defined by a chunk.
    *

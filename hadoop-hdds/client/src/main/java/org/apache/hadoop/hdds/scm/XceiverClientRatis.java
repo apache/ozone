@@ -195,7 +195,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     }
   }
 
-  private RaftClient getClient() {
+  public RaftClient getClient() {
     return Objects.requireNonNull(client.get(), "client is null");
   }
 

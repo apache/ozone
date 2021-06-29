@@ -199,7 +199,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     boolean isWriteStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
-            == DispatcherContext.WriteChunkStage.WRITE_DATA);
+            == DispatcherContext.WriteChunkStage.WRITE_DATA)
+            || (cmdType == Type.StreamInit);
     boolean isWriteCommitStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()

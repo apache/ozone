@@ -79,6 +79,7 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
@@ -89,6 +90,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedSupplier;
+import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,6 +145,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
+
   private final ConcurrentMap<Long, TaskQueue> containerTaskQueues;
   private final ExecutorService executor;
   private final List<ThreadPoolExecutor> chunkExecutors;
@@ -515,6 +518,22 @@ public class ContainerStateMachine extends BaseStateMachine {
         return new LocalStream(new StreamDataChannel(Paths.get(path)));
       } catch (IOException e) {
         throw new CompletionException("Failed to create data stream", e);
+      }
+    }, executor);
+  }
+
+  public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
+    return CompletableFuture.supplyAsync(() -> {
+      if (stream == null) {
+        return JavaUtils.completeExceptionally(
+            new IllegalStateException("DataStream: " + stream + "is Null"));
+      }
+      if (stream.getDataChannel().isOpen()) {
+        return JavaUtils.completeExceptionally(
+            new IllegalStateException(
+                "DataStream: " + stream + " is not closed properly"));
+      } else {
+        return CompletableFuture.completedFuture(null);
       }
     }, executor);
   }

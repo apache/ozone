@@ -54,6 +54,24 @@
     <description>The ipc port number of container.</description>
   </property>
   <property>
+    <name>dfs.container.ratis.datastream.ipc</name>
+    <value>9890</value>
+    <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
+    <description>The datastream ipc port number of container.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.datastream.request.threads</name>
+    <value>200</value>
+    <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
+    <description>Maximum number of threads in the thread pool for datastream request.</description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.datastream.write.threads</name>
+    <value>200</value>
+    <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
+    <description>Maximum number of threads in the thread pool for datastream write.</description>
+  </property>
+  <property>
     <name>dfs.container.ipc.random.port</name>
     <value>false</value>
     <tag>OZONE, DEBUG, CONTAINER</tag>

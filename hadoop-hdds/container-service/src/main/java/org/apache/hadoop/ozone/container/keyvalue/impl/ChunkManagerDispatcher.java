@@ -74,6 +74,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
         .writeChunk(container, blockID, info, data, dispatcherContext);
   }
 
+  public String streamInit(Container container, BlockID blockID, DispatcherContext dispatcherContext)
+      throws StorageContainerException {
+    return selectHandler(container)
+        .streamInit(container, blockID, dispatcherContext);
+  }
+
   @Override
   public void finishWriteChunks(KeyValueContainer kvContainer,
       BlockData blockData) throws IOException {
