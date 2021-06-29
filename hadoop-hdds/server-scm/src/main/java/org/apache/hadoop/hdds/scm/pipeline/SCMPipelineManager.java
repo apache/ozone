@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -263,6 +264,14 @@ public class SCMPipelineManager implements
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
       throws IOException {
+    return createPipeline(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     if (!isPipelineCreationAllowed()
         && replicationConfig.getRequiredNodes() != 1) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
@@ -272,7 +281,8 @@ public class SCMPipelineManager implements
     }
     lock.writeLock().lock();
     try {
-      Pipeline pipeline = pipelineFactory.create(replicationConfig);
+      Pipeline pipeline = pipelineFactory.create(replicationConfig,
+          excludedNodes, favoredNodes);
       if (pipelineStore != null) {
         pipelineStore.put(pipeline.getId(), pipeline);
       }

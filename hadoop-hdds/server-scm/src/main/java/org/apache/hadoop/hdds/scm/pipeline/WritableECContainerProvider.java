@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -37,6 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
 
@@ -94,9 +97,7 @@ public class WritableECContainerProvider
           Pipeline.PipelineState.OPEN);
       if (openPipelineCount < providerConfig.getMinimumPipelines()) {
         try {
-          // TODO - PipelineManager should allow for creating a pipeline with
-          //        excluded nodes. HDDS-5375.
-          return allocateContainer(repConfig, size, owner);
+          return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
               + "containers", repConfig, openPipelineCount, e);
@@ -144,12 +145,10 @@ public class WritableECContainerProvider
       }
     }
     // If we get here, all the pipelines we tried were no good. So try to
-    // allocate a new one and use it.
+    // allocate a new one and usePipelineManagerV2Impl.java it.
     try {
       synchronized(this) {
-        // TODO - PipelineManager should allow for creating a pipeline with
-        //        excluded nodes. HDDS-5375.
-        return allocateContainer(repConfig, size, owner);
+        return allocateContainer(repConfig, size, owner, excludeList);
       }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
@@ -159,8 +158,15 @@ public class WritableECContainerProvider
   }
 
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
-      long size, String owner) throws IOException {
-    Pipeline newPipeline = pipelineManager.createPipeline(repConfig);
+      long size, String owner, ExcludeList excludeList) throws IOException {
+
+    List<DatanodeDetails> excludedNodes = Collections.emptyList();
+    if (excludeList.getDatanodes().size() > 0) {
+      excludedNodes = new ArrayList<>(excludeList.getDatanodes());
+    }
+
+    Pipeline newPipeline = pipelineManager.createPipeline(repConfig,
+        excludedNodes, Collections.emptyList());
     ContainerInfo container =
         containerManager.getMatchingContainer(size, owner, newPipeline);
     pipelineManager.openPipeline(newPipeline.getId());

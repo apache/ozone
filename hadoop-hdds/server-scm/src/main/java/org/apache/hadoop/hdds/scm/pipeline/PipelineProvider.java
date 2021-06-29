@@ -61,6 +61,10 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
   protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig)
       throws IOException;
 
+  protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException;
+
   protected abstract Pipeline create(
       REPLICATION_CONFIG replicationConfig,
       List<DatanodeDetails> nodes
