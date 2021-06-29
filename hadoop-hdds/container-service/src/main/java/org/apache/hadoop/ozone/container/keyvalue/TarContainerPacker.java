@@ -30,6 +30,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.stream.Stream;
 
+import com.sun.org.slf4j.internal.Logger;
+import com.sun.org.slf4j.internal.LoggerFactory;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -51,6 +53,9 @@ import static java.util.stream.Collectors.toList;
  */
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TarContainerPacker.class);
 
   static final String CHUNKS_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
 
@@ -152,6 +157,10 @@ public class TarContainerPacker
     try (OutputStream compressed = compress(output);
          ArchiveOutputStream archiveOutput = tar(compressed)) {
 
+      if (!container.scanMetaData()) {
+        return;
+      }
+
       includePath(containerData.getDbFile().toPath(), DB_DIR_NAME,
           archiveOutput);
 
@@ -220,6 +229,9 @@ public class TarContainerPacker
   static void includeFile(File file, String entryName,
       ArchiveOutputStream archiveOutput) throws IOException {
     ArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
+    if (entry.getSize() == 0) {
+      return;
+    }
     archiveOutput.putArchiveEntry(entry);
     try (InputStream input = new FileInputStream(file)) {
       IOUtils.copy(input, archiveOutput);
