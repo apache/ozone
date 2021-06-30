@@ -299,4 +299,28 @@ public class ReconUtils {
       globalStatsDao.update(newRecord);
     }
   }
+
+  public static long getFileSizeUpperBound(long fileSize) {
+    if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
+      return Long.MAX_VALUE;
+    }
+    // The smallest file size being tracked for count
+    // is 1 KB i.e. 1024 = 2 ^ 10.
+    int binIndex = getBinIndex(fileSize);
+    return (long) Math.pow(2, (10 + binIndex));
+  }
+
+  public static int getBinIndex(long fileSize) {
+    int index = nextClosestPowerIndexOfTwo(fileSize);
+    return index < 10 ? 0 : index - 10;
+  }
+
+  private static int nextClosestPowerIndexOfTwo(long dataSize) {
+    int index = 0;
+    while(dataSize != 0) {
+      dataSize >>= 1;
+      index += 1;
+    }
+    return index;
+  }
 }
