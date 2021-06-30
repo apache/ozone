@@ -28,16 +28,16 @@ import java.util.Arrays;
 
 public class NSSummary {
   private int numOfFiles;
-  private int sizeOfFiles;
+  private long sizeOfFiles;
   private int[] fileSizeBucket;
 
   public NSSummary() {
     this.numOfFiles = 0;
-    this.sizeOfFiles = 0;
+    this.sizeOfFiles = 0L;
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
   }
 
-  public NSSummary(int numOfFiles, int sizeOfFiles, int[] bucket) {
+  public NSSummary(int numOfFiles, long sizeOfFiles, int[] bucket) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
     setFileSizeBucket(bucket);
@@ -47,7 +47,7 @@ public class NSSummary {
     return numOfFiles;
   }
 
-  public int getSizeOfFiles() {
+  public long getSizeOfFiles() {
     return sizeOfFiles;
   }
 
@@ -59,7 +59,7 @@ public class NSSummary {
     this.numOfFiles = numOfFiles;
   }
 
-  public void setSizeOfFiles(int sizeOfFiles) {
+  public void setSizeOfFiles(long sizeOfFiles) {
     this.sizeOfFiles = sizeOfFiles;
   }
 
