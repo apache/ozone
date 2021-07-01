@@ -276,6 +276,12 @@ public class DatanodeDetails extends NodeImpl implements
     if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER) {
       return getPort(Name.RATIS);
     }
+    // TODO: this is a temporary workaround to prevent NullPointerException
+    if (name == Name.DATASTREAM) {
+      Port fallback = new Port(Name.DATASTREAM, 10017);
+      LOG.error("DataStream port not defined, fallback to default: " + fallback);
+      return fallback;
+    }
     return null;
   }
 
