@@ -506,6 +506,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           Port.Name.RATIS_ADMIN);
       serverPort = getRealPort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
+      // TODO: implement serverRpc.getDataStreamAddress()
+      dataStreamPort = getRealPort(new InetSocketAddress(dataStreamPort),
+          Port.Name.DATASTREAM);
 
       isStarted = true;
     }
@@ -514,9 +517,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int getRealPort(InetSocketAddress address, Port.Name name) {
     int realPort = address.getPort();
     datanodeDetails.setPort(DatanodeDetails.newPort(name, realPort));
-    datanodeDetails.setPort(DatanodeDetails
-        .newPort(DatanodeDetails.Port.Name.DATASTREAM,
-            dataStreamPort));
     LOG.info("{} {} is started using port {} for {}",
         getClass().getSimpleName(), server.getId(), realPort, name);
     return realPort;

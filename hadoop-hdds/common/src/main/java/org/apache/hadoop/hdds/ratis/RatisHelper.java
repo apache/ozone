@@ -81,11 +81,6 @@ public final class RatisHelper {
   private RatisHelper() {
   }
 
-  private static String toRaftPeerDataStreamAddressString(DatanodeDetails id) {
-    return id.getIpAddress() + ":" +
-        id.getPort(DatanodeDetails.Port.Name.DATASTREAM).getValue();
-  }
-
   private static String toRaftPeerIdString(DatanodeDetails id) {
     return id.getUuidString();
   }
@@ -117,7 +112,7 @@ public final class RatisHelper {
   public static RaftPeer toRaftPeer(DatanodeDetails id, int priority) {
     return raftPeerBuilderFor(id)
         .setPriority(priority)
-        .setDataStreamAddress(toRaftPeerDataStreamAddressString(id))
+        .setDataStreamAddress(toRaftPeerAddress(id, Port.Name.DATASTREAM))
         .build();
   }
 
@@ -127,7 +122,7 @@ public final class RatisHelper {
         .setAddress(toRaftPeerAddress(dn, Port.Name.RATIS_SERVER))
         .setAdminAddress(toRaftPeerAddress(dn, Port.Name.RATIS_ADMIN))
         .setClientAddress(toRaftPeerAddress(dn, Port.Name.RATIS))
-        .setDataStreamAddress(toRaftPeerDataStreamAddressString(dn));
+        .setDataStreamAddress(toRaftPeerAddress(dn, Port.Name.DATASTREAM));
   }
 
   private static List<RaftPeer> toRaftPeers(Pipeline pipeline) {
@@ -233,8 +228,8 @@ public final class RatisHelper {
     RaftPeerId leaderId = RatisHelper.toRaftPeerId(leaderDn);
     RaftPeer leader = RaftPeer.newBuilder()
         .setId(leaderId.toString())
-        .setAddress(leaderDn.getIpAddress() + ":" + leaderDn.getPort(DatanodeDetails.Port.Name.RATIS).getValue())
-        .setDataStreamAddress(leaderDn.getIpAddress() + ":" + leaderDn.getPort(DatanodeDetails.Port.Name.DATASTREAM).getValue())
+        .setAddress(leaderDn.getIpAddress() + ":" + leaderDn.getPort(Port.Name.RATIS).getValue())
+        .setDataStreamAddress(leaderDn.getIpAddress() + ":" + leaderDn.getPort(Port.Name.DATASTREAM).getValue())
         .build();
     RaftClient.Builder builder =  RaftClient.newBuilder()
         .setRaftGroup(group)
