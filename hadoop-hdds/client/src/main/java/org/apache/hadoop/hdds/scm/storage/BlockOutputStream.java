@@ -447,7 +447,12 @@ public class BlockOutputStream extends OutputStream {
     BlockData blockData = containerBlockData.build();
 
     CompletableFuture[] EMPTY_COMPLETABLE_FUTURE_ARRAY = {};
-    CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY));
+    try {
+      CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).get();
+    } catch (Exception e) {
+      LOG.warn("exception in futures execution: " + e);
+      throw new IOException(e);
+    }
 
     CompletableFuture<ContainerProtos.
         ContainerCommandResponseProto> flushFuture = null;
