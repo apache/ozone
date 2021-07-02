@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -278,7 +279,7 @@ public class DatanodeDetails extends NodeImpl implements
     }
     // TODO: this is a temporary workaround to prevent NullPointerException
     if (name == Name.DATASTREAM) {
-      Port fallback = new Port(Name.DATASTREAM, 10017);
+      Port fallback = new Port(Name.DATASTREAM, OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
       LOG.error("DataStream port not defined, fallback to default: " + fallback);
       return fallback;
     }
