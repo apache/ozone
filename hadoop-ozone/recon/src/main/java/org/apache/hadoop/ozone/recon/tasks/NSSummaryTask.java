@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -20,13 +38,17 @@ import java.util.Iterator;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
+/**
+ * Task to query data from OMDB and write into Recon RocksDB.
+ */
 public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
           LoggerFactory.getLogger(NSSummaryTask.class);
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   @Inject
-  public NSSummaryTask(ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+  public NSSummaryTask(ReconNamespaceSummaryManager
+                                 reconNamespaceSummaryManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
   }
 
@@ -55,26 +77,27 @@ public class NSSummaryTask implements ReconOmTask {
 
       try {
         switch (omdbUpdateEvent.getAction()) {
-          case PUT:
-            writeOmKeyInfoOnNamespaceDB(updatedKeyValue);
-            break;
+        case PUT:
+          writeOmKeyInfoOnNamespaceDB(updatedKeyValue);
+          break;
 
-          case DELETE:
-            deleteOmKeyInfoOnNamespaceDB(updatedKeyValue);
-            break;
+        case DELETE:
+          deleteOmKeyInfoOnNamespaceDB(updatedKeyValue);
+          break;
 
-          case UPDATE:
-            if (omdbUpdateEvent.getOldValue() != null) {
-              // delete first, then put
-              deleteOmKeyInfoOnNamespaceDB(omdbUpdateEvent.getOldValue());
-            } else {
-              LOG.warn("Update event does not have the old Key Info for {}.",
-                      updatedKey);
-            }
-            writeOmKeyInfoOnNamespaceDB(updatedKeyValue);
-            break;
+        case UPDATE:
+          if (omdbUpdateEvent.getOldValue() != null) {
+            // delete first, then put
+            deleteOmKeyInfoOnNamespaceDB(omdbUpdateEvent.getOldValue());
+          } else {
+            LOG.warn("Update event does not have the old Key Info for {}.",
+                    updatedKey);
+          }
+          writeOmKeyInfoOnNamespaceDB(updatedKeyValue);
+          break;
 
-          default: LOG.debug("Skipping DB update event : {}",
+        default:
+          LOG.debug("Skipping DB update event : {}",
                   omdbUpdateEvent.getAction());
         }
 
@@ -116,7 +139,11 @@ public class NSSummaryTask implements ReconOmTask {
   private void writeOmKeyInfoOnNamespaceDB(OmKeyInfo keyInfo)
           throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    NSSummary nsSummary = reconNamespaceSummaryManager
+            .getNSSummary(parentObjectId);
+    if (nsSummary == null) {
+      nsSummary = getEmptyNSSummary();
+    }
     int numOfFile = nsSummary.getNumOfFiles();
     long sizeOfFile = nsSummary.getSizeOfFiles();
     int[] fileBucket = nsSummary.getFileSizeBucket();
@@ -128,8 +155,9 @@ public class NSSummaryTask implements ReconOmTask {
     // make sure the file is within our scope of tracking.
     if (binIndex >= 0 && binIndex < ReconConstants.NUM_OF_BINS) {
       ++fileBucket[binIndex];
+      nsSummary.setFileSizeBucket(fileBucket);
     } else {
-      LOG.error("Bucket bin isn't correctly computed.");
+      LOG.warn("File size beyond our tracking scope.");
     }
     reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
   }
@@ -137,10 +165,23 @@ public class NSSummaryTask implements ReconOmTask {
   private void deleteOmKeyInfoOnNamespaceDB(OmKeyInfo keyInfo)
           throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    NSSummary nsSummary = reconNamespaceSummaryManager
+            .getNSSummary(parentObjectId);
+
+    // Just in case the OmKeyInfo isn't correctly written.
+    if (nsSummary == null) {
+      LOG.error("The namespace table is not correctly populated.");
+      return;
+    }
     int numOfFile = nsSummary.getNumOfFiles();
     long sizeOfFile = nsSummary.getSizeOfFiles();
     int[] fileBucket = nsSummary.getFileSizeBucket();
+
+    // if the key is the only key, we simply delete the entry
+    if (numOfFile == 1) {
+      reconNamespaceSummaryManager.deleteNSSummary(parentObjectId);
+      return;
+    }
 
     long dataSize = keyInfo.getDataSize();
     int binIndex = ReconUtils.getBinIndex(dataSize);
@@ -150,20 +191,15 @@ public class NSSummaryTask implements ReconOmTask {
       return;
     }
 
-    // Just in case the OmKeyInfo isn't correctly written.
-    if (numOfFile == 0
-            || sizeOfFile < dataSize
-            || fileBucket[binIndex] == 0) {
-      LOG.error("The namespace table is not correctly populated.");
-      return;
-    }
-
     // decrement count, data size, and bucket count
     nsSummary.setNumOfFiles(numOfFile - 1);
     nsSummary.setSizeOfFiles(sizeOfFile - dataSize);
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
-    // TODO: if key count reduces to zero, should we delete it from table?
     reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
+  }
+
+  private NSSummary getEmptyNSSummary() {
+    return new NSSummary(0, 0L, new int[ReconConstants.NUM_OF_BINS]);
   }
 }
