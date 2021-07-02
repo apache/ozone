@@ -17,6 +17,17 @@
  */
 package org.apache.hadoop.ozone.container.stream;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.stream.ChunkedFile;
+import io.netty.util.ByteProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -26,19 +37,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.DefaultFileRegion;
-import io.netty.util.ByteProcessor;
-
 /**
  * Protocol definition of the streaming.
  */
 public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DirstreamServerHandler.class);
 
   public static final String END_MARKER = "0 END";
 
@@ -97,15 +102,19 @@ public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
     ChannelFuture lastFuture = ctx.writeAndFlush(identifierBuf);
     lastFuture.addListener(f -> {
       ChannelFuture nextFuture = ctx.writeAndFlush(
-          new DefaultFileRegion(file.toFile(), 0, fileSize));
+          new ChunkedFile(file.toFile()));
       if (currentIndex == entriesToWrite.size() - 1) {
-        nextFuture.addListener(a ->
-            ctx.writeAndFlush(
-                Unpooled.wrappedBuffer(
-                    END_MARKER.getBytes(StandardCharsets.UTF_8)))
-                .addListener(b -> {
-                  ctx.channel().close();
-                }));
+        nextFuture.addListener(a -> {
+          if (!a.isSuccess()) {
+            LOG.error("Error on streaming file", a.cause());
+          }
+          ctx.writeAndFlush(
+              Unpooled.wrappedBuffer(
+                  END_MARKER.getBytes(StandardCharsets.UTF_8)))
+              .addListener(b -> {
+                ctx.channel().close();
+              });
+        });
       } else {
         nextFuture.addListener(
             a -> writeOneElement(ctx, entriesToWrite,

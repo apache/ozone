@@ -41,6 +41,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT;
+
 /**
  * Pipeline placement policy that choose datanodes based on load balancing
  * and network topology to supply pipeline creation.
@@ -158,15 +161,21 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
+    long metaSizeRequired = (long) conf.getStorageSize(
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
+        StorageUnit.BYTES);
+
     // filter nodes that don't even have space for one container
     List<DatanodeDetails> canHoldList = healthyNodes.stream().filter(d ->
         hasEnoughSpace(d, sizeRequired)).collect(Collectors.toList());
 
     if (canHoldList.size() < nodesRequired) {
       msg = String.format("Pipeline creation failed due to no sufficient" +
-          " healthy datanodes with enough space for even a single container." +
-          " Required %d. Found %d. Container size %d.",
-          nodesRequired, canHoldList.size(), sizeRequired);
+          " healthy datanodes with enough space for container data and " +
+          "metadata. Required %d. Found %d. Container data required %d, " +
+          "metadata required %d.",
+          nodesRequired, canHoldList.size(), sizeRequired, metaSizeRequired);
       LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);

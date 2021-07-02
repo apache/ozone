@@ -63,6 +63,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
@@ -74,6 +76,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -98,6 +103,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
@@ -715,6 +721,73 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.GetReplicationManagerStatus,
             builder -> builder.setSeplicationManagerStatusRequest(request))
             .getReplicationManagerStatusResponse();
+    return response.getIsRunning();
+
+  }
+
+  @Override
+  public boolean startContainerBalancer(Optional<Double> threshold,
+                  Optional<Integer> idleiterations,
+                  Optional<Integer> maxDatanodesToBalance,
+                  Optional<Long> maxSizeToMoveInGB) throws IOException{
+    StartContainerBalancerRequestProto.Builder builder =
+        StartContainerBalancerRequestProto.newBuilder();
+    builder.setTraceID(TracingUtil.exportCurrentSpan());
+
+    //make balancer configuration optional
+    if (threshold.isPresent()) {
+      double tsd = threshold.get();
+      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
+          "threshold should to be specified in range [0.0, 1.0).");
+      builder.setThreshold(tsd);
+    }
+    if (maxSizeToMoveInGB.isPresent()) {
+      long mstm = maxSizeToMoveInGB.get();
+      Preconditions.checkState(mstm > 0,
+          "maxSizeToMoveInGB must be positive.");
+      builder.setMaxSizeToMoveInGB(mstm);
+    }
+    if (maxDatanodesToBalance.isPresent()) {
+      int mdtb = maxDatanodesToBalance.get();
+      Preconditions.checkState(mdtb > 0,
+          "maxDatanodesToBalance must be positive.");
+      builder.setMaxDatanodesToBalance(mdtb);
+    }
+    if (idleiterations.isPresent()) {
+      int idi = idleiterations.get();
+      Preconditions.checkState(idi > 0 || idi == -1,
+          "idleiterations must be positive or" +
+              " -1(infinitly run container balancer).");
+      builder.setIdleiterations(idi);
+    }
+
+    StartContainerBalancerRequestProto request = builder.build();
+    StartContainerBalancerResponseProto response =
+        submitRequest(Type.StartContainerBalancer,
+            builder1 -> builder1.setStartContainerBalancerRequest(request))
+            .getStartContainerBalancerResponse();
+    return response.getStart();
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+
+    StopContainerBalancerRequestProto request =
+        StopContainerBalancerRequestProto.getDefaultInstance();
+    submitRequest(Type.StopContainerBalancer,
+        builder -> builder.setStopContainerBalancerRequest(request));
+
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() throws IOException {
+
+    ContainerBalancerStatusRequestProto request =
+        ContainerBalancerStatusRequestProto.getDefaultInstance();
+    ContainerBalancerStatusResponseProto response =
+        submitRequest(Type.GetContainerBalancerStatus,
+            builder -> builder.setContainerBalancerStatusRequest(request))
+            .getContainerBalancerStatusResponse();
     return response.getIsRunning();
 
   }

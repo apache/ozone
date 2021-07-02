@@ -142,15 +142,9 @@ public class TestOzoneClient {
 
   @Test
   public void testPutKeyRatisOneNode() throws IOException {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
     Instant testStartTime = Instant.now();
-
     String value = "sample value";
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
+    OzoneBucket bucket = getOzoneBucket();
 
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
@@ -170,5 +164,31 @@ public class TestOzoneClient {
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
+  }
+
+  @Test
+  public void testPutKeyAllocateBlock() throws IOException {
+    String value = new String(new byte[1024], UTF_8);
+    OzoneBucket bucket = getOzoneBucket();
+
+    for (int i = 0; i < 10; i++) {
+      String keyName = UUID.randomUUID().toString();
+
+      try (OzoneOutputStream out = bucket
+          .createKey(keyName, value.getBytes(UTF_8).length,
+              ReplicationType.RATIS, ONE, new HashMap<>())) {
+        out.write(value.getBytes(UTF_8));
+        out.write(value.getBytes(UTF_8));
+      }
+    }
+  }
+
+  private OzoneBucket getOzoneBucket() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    return volume.getBucket(bucketName);
   }
 }

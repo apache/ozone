@@ -22,6 +22,7 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -54,11 +56,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -79,6 +83,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Collections;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -144,6 +149,7 @@ public class SCMClientProtocolServer implements
         false)) {
       clientRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
+    HddsServerUtil.addSuppressedLoggingExceptions(clientRpcServer);
   }
 
   public RPC.Server getClientRpcServer() {
@@ -700,6 +706,65 @@ public class SCMClientProtocolServer implements
 
     return scm.queryUpgradeFinalizationProgress(upgradeClientID, force,
         readonly);
+  }
+
+  @Override
+  public boolean startContainerBalancer(Optional<Double> threshold,
+                  Optional<Integer> idleiterations,
+                  Optional<Integer> maxDatanodesToBalance,
+                  Optional<Long> maxSizeToMoveInGB) throws IOException{
+    getScm().checkAdminAccess(getRemoteUser());
+    ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
+    if (threshold.isPresent()) {
+      double tsd = threshold.get();
+      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
+          "threshold should to be specified in range [0.0, 1.0).");
+      cbc.setThreshold(tsd);
+    }
+    if (maxSizeToMoveInGB.isPresent()) {
+      long mstm = maxSizeToMoveInGB.get();
+      Preconditions.checkState(mstm > 0,
+          "maxSizeToMoveInGB must be positive.");
+      cbc.setMaxSizeToMove(mstm * OzoneConsts.GB);
+    }
+    if (maxDatanodesToBalance.isPresent()) {
+      int mdtb = maxDatanodesToBalance.get();
+      Preconditions.checkState(mdtb > 0,
+          "maxDatanodesToBalance must be positive.");
+      cbc.setMaxDatanodesToBalance(mdtb);
+    }
+    if (idleiterations.isPresent()) {
+      int idi = idleiterations.get();
+      Preconditions.checkState(idi > 0 || idi == -1,
+          "idleiterations must be positive or" +
+              " -1(infinitly run container balancer).");
+      cbc.setIdleIteration(idi);
+    }
+
+    boolean isStartedSuccessfully = scm.getContainerBalancer().start(cbc);
+    if (isStartedSuccessfully) {
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.START_CONTAINER_BALANCER, null));
+    } else {
+      AUDIT.logWriteFailure(buildAuditMessageForSuccess(
+          SCMAction.START_CONTAINER_BALANCER, null));
+    }
+    return  isStartedSuccessfully;
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.STOP_CONTAINER_BALANCER, null));
+    scm.getContainerBalancer().stop();
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() {
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_CONTAINER_BALANCER_STATUS, null));
+    return scm.getContainerBalancer().isBalancerRunning();
   }
 
   /**

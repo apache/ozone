@@ -716,6 +716,7 @@ message InfoBucketResponse {
 
 message SetBucketPropertyRequest {
     optional BucketArgs bucketArgs = 1;
+    optional uint64 modificationTime = 2;
 }
 
 message SetBucketPropertyResponse {

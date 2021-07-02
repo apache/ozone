@@ -23,7 +23,9 @@ source "$SCRIPT_DIR/../testlib.sh"
 tests=$(find_tests)
 cd "$SCRIPT_DIR"
 
-run_test_scripts ${tests}
-RESULT=$?
+RESULT=0
+run_test_scripts ${tests} || RESULT=$?
+
+generate_report "ozone-mr" "${ALL_RESULT_DIR}"
 
 exit ${RESULT}

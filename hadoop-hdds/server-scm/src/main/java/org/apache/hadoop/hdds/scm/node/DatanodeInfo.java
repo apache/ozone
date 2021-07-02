@@ -185,6 +185,20 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Returns the storage reports associated with this datanode.
+   *
+   * @return list of storage report
+   */
+  public List<MetadataStorageReportProto> getMetadataStorageReports() {
+    try {
+      lock.readLock().lock();
+      return metadataStorageReports;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
    * Returns count of healthy volumes reported from datanode.
    * @return count of healthy volumes
    */
