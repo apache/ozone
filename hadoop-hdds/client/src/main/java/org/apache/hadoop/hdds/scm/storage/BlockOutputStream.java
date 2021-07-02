@@ -444,8 +444,6 @@ public class BlockOutputStream extends OutputStream {
       byteBufferList = null;
     }
 
-    BlockData blockData = containerBlockData.build();
-
     CompletableFuture[] EMPTY_COMPLETABLE_FUTURE_ARRAY = {};
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).get();
@@ -457,6 +455,7 @@ public class BlockOutputStream extends OutputStream {
     CompletableFuture<ContainerProtos.
         ContainerCommandResponseProto> flushFuture = null;
     try {
+      BlockData blockData = containerBlockData.build();
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, token);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
