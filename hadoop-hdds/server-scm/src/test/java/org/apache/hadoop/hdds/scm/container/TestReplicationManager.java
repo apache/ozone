@@ -52,6 +52,7 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,14 +109,25 @@ public class TestReplicationManager {
     datanodeCommandHandler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, datanodeCommandHandler);
 
-    Mockito.when(containerManager.getContainers())
+    Mockito.when(containerManager.getContainers(
+        Mockito.any(ContainerID.class), Mockito.anyInt()))
         .thenAnswer(invocation -> {
-          Set<ContainerID> ids = containerStateManager.getAllContainerIDs();
-          List<ContainerInfo> containers = new ArrayList<>();
-          for (ContainerID id : ids) {
-            containers.add(containerStateManager.getContainer(id));
-          }
-          return containers;
+          final long start = ((ContainerID)invocation.getArguments()[0])
+              .getId();
+          final List<ContainerID> containersIds =
+              new ArrayList<>(containerStateManager.getAllContainerIDs());
+          Collections.sort(containersIds);
+          return containersIds.stream()
+              .filter(id -> id.getId() >= start)
+              .limit((int)invocation.getArguments()[1])
+              .map(containerID -> {
+                try {
+                  return containerStateManager.getContainer(containerID);
+                } catch (ContainerNotFoundException e) {
+                  return null;
+                }
+              })
+              .collect(Collectors.toList());
         });
 
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
@@ -1094,6 +1106,57 @@ public class TestReplicationManager {
     // There should be replica scheduled, but as all nodes are stale, nothing
     // gets scheduled.
     assertReplicaScheduled(0);
+  }
+
+  /**
+   * There are 2 containers to do replicate, but only 1 should be scheduled
+   * at per round.
+   */
+  @Test
+  public void testReplicateContainerToProcessReachLimit()
+      throws InterruptedException, SCMException {
+    replicationManager.stop();
+    ReplicationManagerConfiguration newConf =
+        new ReplicationManagerConfiguration();
+    newConf.setContainerProcessingLimit(1);
+    createReplicationManager(newConf);
+    final ContainerInfo container1 = createContainer(LifeCycleState.CLOSED);
+    addReplica(container1, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container1, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    final ContainerInfo container2 = createContainer(LifeCycleState.CLOSED);
+    addReplica(container2, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container2, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    // process 1 in 1st round
+    assertReplicaScheduled(1);
+    // process 1 in 2nd round
+    assertReplicaScheduled(1);
+  }
+
+  /**
+   * There are 3 containers to do replicate, 2 scheduled at 1st round
+   * and 1 at 2nd round.
+   */
+  @Test
+  public void testReplicateContainerToProcessWithTailing()
+      throws InterruptedException, SCMException {
+    replicationManager.stop();
+    ReplicationManagerConfiguration newConf =
+        new ReplicationManagerConfiguration();
+    newConf.setContainerProcessingLimit(2);
+    createReplicationManager(newConf);
+    final ContainerInfo container1 = createContainer(LifeCycleState.CLOSED);
+    addReplica(container1, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container1, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    final ContainerInfo container2 = createContainer(LifeCycleState.CLOSED);
+    addReplica(container2, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container2, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    final ContainerInfo container3 = createContainer(LifeCycleState.CLOSED);
+    addReplica(container3, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container3, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    // process 2 in 1st round
+    assertReplicaScheduled(2);
+    // process 1 in 2nd round
+    assertReplicaScheduled(1);
   }
 
   private ContainerInfo createContainer(LifeCycleState containerState)
