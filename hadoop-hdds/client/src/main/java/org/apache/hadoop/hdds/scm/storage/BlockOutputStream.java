@@ -100,7 +100,6 @@ public class BlockOutputStream extends OutputStream {
   // request will fail upfront.
   private final AtomicReference<IOException> ioException;
   private final ExecutorService responseExecutor;
-  private final ExecutorService putBlockExecutor;
 
   // the effective length of data flushed so far
   private long totalDataFlushedLength;
@@ -193,7 +192,6 @@ public class BlockOutputStream extends OutputStream {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    putBlockExecutor = Executors.newSingleThreadExecutor();
     commitWatcher = new CommitWatcher(bufferPool, xceiverClient);
     bufferList = null;
     totalDataFlushedLength = 0;
@@ -449,64 +447,60 @@ public class BlockOutputStream extends OutputStream {
     BlockData blockData = containerBlockData.build();
 
     CompletableFuture[] EMPTY_COMPLETABLE_FUTURE_ARRAY = {};
-    return CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).thenApplyAsync(v -> {
-      try {
-        CompletableFuture<ContainerProtos.
-            ContainerCommandResponseProto> flushFuture = null;
+    CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY));
+
+    CompletableFuture<ContainerProtos.
+        ContainerCommandResponseProto> flushFuture = null;
+    try {
+      XceiverClientReply asyncReply =
+          putBlockAsync(xceiverClient, blockData, close, token);
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
+          asyncReply.getResponse();
+      flushFuture = future.thenApplyAsync(e -> {
         try {
-          XceiverClientReply asyncReply =
-              putBlockAsync(xceiverClient, blockData, close, token);
-          CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-              asyncReply.getResponse();
-          flushFuture = future.thenApplyAsync(e -> {
-            try {
-              validateResponse(e);
-            } catch (IOException sce) {
-              throw new CompletionException(sce);
-            }
-            // if the ioException is not set, putBlock is successful
-            if (getIoException() == null && !force) {
-              BlockID responseBlockID = BlockID.getFromProtobuf(
-                  e.getPutBlock().getCommittedBlockLength().getBlockID());
-              Preconditions.checkState(blockID.get().getContainerBlockID()
-                  .equals(responseBlockID.getContainerBlockID()));
-              // updates the bcsId of the block
-              blockID.set(responseBlockID);
-              if (LOG.isDebugEnabled()) {
-                LOG.debug(
-                    "Adding index " + asyncReply.getLogIndex() + " commitMap size "
-                        + commitWatcher.getCommitInfoMapSize() + " flushLength "
-                        + flushPos + " numBuffers " + byteBufferList.size()
-                        + " blockID " + blockID + " bufferPool size" + bufferPool
-                        .getSize() + " currentBufferIndex " + bufferPool
-                        .getCurrentBufferIndex());
-              }
-              // for standalone protocol, logIndex will always be 0.
-              commitWatcher
-                  .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
-            }
-            return e;
-          }, responseExecutor).exceptionally(e -> {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("putBlock failed for blockID {} with exception {}",
-                  blockID, e.getLocalizedMessage());
-            }
-            CompletionException ce = new CompletionException(e);
-            setIoException(ce);
-            throw ce;
-          });
-        } catch (IOException | ExecutionException e) {
-          throw new IOException(EXCEPTION_MSG + e.toString(), e);
-        } catch (InterruptedException ex) {
-          Thread.currentThread().interrupt();
-          handleInterruptedException(ex, false);
+          validateResponse(e);
+        } catch (IOException sce) {
+          throw new CompletionException(sce);
         }
-        commitWatcher.getFutureMap().put(flushPos, flushFuture);
-        return flushFuture.get();
-      } catch (Exception e) {
-        throw new CompletionException(e);
-      }
-    }, putBlockExecutor);
+        // if the ioException is not set, putBlock is successful
+        if (getIoException() == null && !force) {
+          BlockID responseBlockID = BlockID.getFromProtobuf(
+              e.getPutBlock().getCommittedBlockLength().getBlockID());
+          Preconditions.checkState(blockID.get().getContainerBlockID()
+              .equals(responseBlockID.getContainerBlockID()));
+          // updates the bcsId of the block
+          blockID.set(responseBlockID);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(
+                "Adding index " + asyncReply.getLogIndex() + " commitMap size "
+                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                    + flushPos + " numBuffers " + byteBufferList.size()
+                    + " blockID " + blockID + " bufferPool size" + bufferPool
+                    .getSize() + " currentBufferIndex " + bufferPool
+                    .getCurrentBufferIndex());
+          }
+          // for standalone protocol, logIndex will always be 0.
+          commitWatcher
+              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
+        }
+        return e;
+      }, responseExecutor).exceptionally(e -> {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("putBlock failed for blockID {} with exception {}",
+              blockID, e.getLocalizedMessage());
+        }
+        CompletionException ce = new CompletionException(e);
+        setIoException(ce);
+        throw ce;
+      });
+    } catch (IOException | ExecutionException e) {
+      throw new IOException(EXCEPTION_MSG + e.toString(), e);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      handleInterruptedException(ex, false);
+    }
+    commitWatcher.getFutureMap().put(flushPos, flushFuture);
+    return flushFuture;
   }
 
   @Override
