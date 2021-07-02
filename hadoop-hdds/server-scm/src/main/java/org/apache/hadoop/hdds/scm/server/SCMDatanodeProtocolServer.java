@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -172,6 +173,8 @@ public class SCMDatanodeProtocolServer implements
         false)) {
       datanodeRpcServer.refreshServiceAcl(conf, getPolicyProvider());
     }
+
+    HddsServerUtil.addSuppressedLoggingExceptions(datanodeRpcServer);
   }
 
   public void start() {

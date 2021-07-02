@@ -290,7 +290,8 @@ public class TestSCMNodeManager {
             details.getNetworkFullPath(), Long.MAX_VALUE);
     RegisteredCommand cmd = nodeManager.register(
         MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageReport),
+        TestUtils.createNodeReport(Arrays.asList(storageReport),
+            Collections.emptyList()),
         getRandomPipelineReports(), layout);
 
     Assert.assertEquals(expectedResult, cmd.getError());
@@ -1338,7 +1339,8 @@ public class TestSCMNodeManager {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.register(dn, TestUtils.createNodeReport(report), null);
+        nodeManager.register(dn, TestUtils.createNodeReport(
+            Arrays.asList(report), Collections.emptyList()), null);
         nodeManager.processHeartbeat(dn, layoutInfo);
       }
       //TODO: wait for EventQueue to be processed
@@ -1390,7 +1392,8 @@ public class TestSCMNodeManager {
                 used, free, null, failed));
         failed = !failed;
       }
-      nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
+      nodeManager.register(dn, TestUtils.createNodeReport(reports,
+          Collections.emptyList()), null);
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
       LayoutVersionProto layoutInfo = toLayoutVersionProto(
@@ -1446,7 +1449,8 @@ public class TestSCMNodeManager {
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, scmUsed,
                 remaining, null);
-        NodeReportProto nodeReportProto = TestUtils.createNodeReport(report);
+        NodeReportProto nodeReportProto = TestUtils.createNodeReport(
+            Arrays.asList(report), Collections.emptyList());
         nodeReportHandler.onMessage(
             new NodeReportFromDatanode(datanodeDetails, nodeReportProto),
             publisher);
@@ -1576,8 +1580,10 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodemanager = createNodeManager(conf)) {
       eq.addHandler(DATANODE_COMMAND, nodemanager);
 
-      nodemanager.register(datanodeDetails, TestUtils.createNodeReport(report),
-              getRandomPipelineReports());
+      nodemanager
+          .register(datanodeDetails, TestUtils.createNodeReport(
+              Arrays.asList(report), Collections.emptyList()),
+                  TestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
               new CloseContainerCommand(1L,
@@ -1759,13 +1765,18 @@ public class TestSCMNodeManager {
           .createStorageReport(dnId, storagePath, capacity, used,
               remaining, null);
 
+      nodeManager.register(datanodeDetails, TestUtils.createNodeReport(
+          Arrays.asList(report), Collections.emptyList()),
+          TestUtils.getRandomPipelineReports());
 
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
       LayoutVersionProto layoutInfo = toLayoutVersionProto(
           versionManager.getMetadataLayoutVersion(),
           versionManager.getSoftwareLayoutVersion());
-      nodeManager.register(datanodeDetails, TestUtils.createNodeReport(report),
+      nodeManager.register(datanodeDetails,
+          TestUtils.createNodeReport(Arrays.asList(report),
+              Collections.emptyList()),
           TestUtils.getRandomPipelineReports(), layoutInfo);
       nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       if (i == 5) {

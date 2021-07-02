@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
@@ -548,6 +549,25 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public boolean getReplicationManagerStatus() throws IOException {
     return storageContainerLocationClient.getReplicationManagerStatus();
+  }
+
+  @Override
+  public boolean startContainerBalancer(Optional<Double>threshold,
+                Optional<Integer> idleiterations,
+                Optional<Integer> maxDatanodesToBalance,
+                Optional<Long> maxSizeToMoveInGB) throws IOException {
+    return storageContainerLocationClient.startContainerBalancer(threshold,
+        idleiterations, maxDatanodesToBalance, maxSizeToMoveInGB);
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+    storageContainerLocationClient.stopContainerBalancer();
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() throws IOException {
+    return storageContainerLocationClient.getContainerBalancerStatus();
   }
 
   @Override

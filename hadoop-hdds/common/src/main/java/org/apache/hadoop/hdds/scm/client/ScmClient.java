@@ -32,6 +32,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The interface to call into underlying container layer.
@@ -305,6 +306,26 @@ public interface ScmClient extends Closeable {
    * @return True if ReplicationManager is running, false otherwise.
    */
   boolean getReplicationManagerStatus() throws IOException;
+
+  /**
+   * Start ContainerBalancer.
+   */
+  boolean startContainerBalancer(Optional<Double> threshold,
+      Optional<Integer> idleiterations,
+      Optional<Integer> maxDatanodesToBalance,
+      Optional<Long> maxSizeToMoveInGB) throws IOException;
+
+  /**
+   * Stop ContainerBalancer.
+   */
+  void stopContainerBalancer() throws IOException;
+
+  /**
+   * Returns ContainerBalancer status.
+   *
+   * @return True if ContainerBalancer is running, false otherwise.
+   */
+  boolean getContainerBalancerStatus() throws IOException;
 
   /**
    * returns the list of ratis peer roles. Currently only include peer address.

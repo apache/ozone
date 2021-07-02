@@ -69,9 +69,11 @@ message ScmContainerLocationRequest {
   optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
   optional GetExistContainerWithPipelinesInBatchRequestProto getExistContainerWithPipelinesInBatchRequest = 31;
   optional GetContainerTokenRequestProto containerTokenRequest = 32;
-  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 33;
-  optional QueryUpgradeFinalizationProgressRequestProto
-  queryUpgradeFinalizationProgressRequest = 34;
+  optional StartContainerBalancerRequestProto startContainerBalancerRequest = 33;
+  optional StopContainerBalancerRequestProto stopContainerBalancerRequest = 34;
+  optional ContainerBalancerStatusRequestProto containerBalancerStatusRequest = 35;
+  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 36;
+  optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
 }
 
 message ScmContainerLocationResponse {
@@ -112,9 +114,11 @@ message ScmContainerLocationResponse {
   optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
   optional GetExistContainerWithPipelinesInBatchResponseProto getExistContainerWithPipelinesInBatchResponse = 31;
   optional GetContainerTokenResponseProto containerTokenResponse = 32;
-  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 33;
-  optional QueryUpgradeFinalizationProgressResponseProto
-  queryUpgradeFinalizationProgressResponse = 34;
+  optional StartContainerBalancerResponseProto startContainerBalancerResponse = 33;
+  optional StopContainerBalancerResponseProto stopContainerBalancerResponse = 34;
+  optional ContainerBalancerStatusResponseProto containerBalancerStatusResponse = 35;
+  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 36;
+  optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
 
   enum Status {
     OK = 1;
@@ -153,8 +157,11 @@ enum Type {
   DatanodeUsageInfo = 25;
   GetExistContainerWithPipelinesInBatch = 26;
   GetContainerToken = 27;
-  FinalizeScmUpgrade = 28;
-  QueryUpgradeFinalizationProgress = 29;
+  StartContainerBalancer = 28;
+  StopContainerBalancer = 29;
+  GetContainerBalancerStatus = 30;
+  FinalizeScmUpgrade = 31;
+  QueryUpgradeFinalizationProgress = 32;
 }
 
 /**
@@ -466,6 +473,33 @@ message GetContainerTokenRequestProto {
 
 message GetContainerTokenResponseProto {
   required TokenProto token = 1;
+}
+
+message StartContainerBalancerRequestProto {
+  optional string traceID = 1;
+  optional double threshold = 2;
+  optional int32 idleiterations = 3;
+  optional int32 maxDatanodesToBalance = 4;
+  optional int64 maxSizeToMoveInGB = 5;
+}
+
+message StartContainerBalancerResponseProto {
+  required bool start = 1;
+}
+
+message StopContainerBalancerRequestProto {
+  optional string traceID = 1;
+}
+
+message StopContainerBalancerResponseProto {
+}
+
+message ContainerBalancerStatusRequestProto {
+  optional string traceID = 1;
+}
+
+message ContainerBalancerStatusResponseProto {
+  required bool isRunning = 1;
 }
 
 /**

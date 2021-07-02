@@ -25,10 +25,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
@@ -236,9 +232,6 @@ public class TestBlockDeletion {
     cluster.restartHddsDatanode(0, true);
     matchContainerTransactionIds();
 
-    // verify PENDING_DELETE_STATUS event is fired
-    verifyPendingDeleteEvent();
-
     // Verify transactions committed
     verifyTransactionsCommitted();
   }
@@ -369,46 +362,6 @@ public class TestBlockDeletion {
       Assert.assertNull(
           scm.getScmMetadataStore().getDeletedBlocksTXTable().get(txnID));
     }
-  }
-
-  private void verifyPendingDeleteEvent()
-      throws IOException, InterruptedException {
-    ContainerSet dnContainerSet =
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer().getContainerSet();
-    LogCapturer logCapturer =
-        LogCapturer.captureLogs(SCMBlockDeletingService.LOG);
-    // Create dummy container reports with deleteTransactionId set as 0
-    ContainerReportsProto containerReport = dnContainerSet.getContainerReport();
-    ContainerReportsProto.Builder dummyReportsBuilder =
-        ContainerReportsProto.newBuilder();
-    for (ContainerReplicaProto containerInfo :
-        containerReport.getReportsList()) {
-      dummyReportsBuilder.addReports(
-          ContainerReplicaProto.newBuilder(containerInfo)
-              .setDeleteTransactionId(0)
-              .build());
-    }
-    ContainerReportsProto dummyReport = dummyReportsBuilder.build();
-
-    logCapturer.clearOutput();
-    cluster.getHddsDatanodes().get(0)
-        .getDatanodeStateMachine().getContext().
-        addIncrementalReport(dummyReport);
-    cluster.getHddsDatanodes().get(0)
-        .getDatanodeStateMachine().triggerHeartbeat();
-    // wait for event to be handled by event handler
-    Thread.sleep(2000);
-    String output = logCapturer.getOutput();
-    for (ContainerReplicaProto containerInfo : dummyReport.getReportsList()) {
-      long containerId = containerInfo.getContainerID();
-      // Event should be triggered only for containers which have deleted blocks
-      if (containerIdsWithDeletedBlocks.contains(containerId)) {
-        Assert.assertTrue(output.contains(
-            "for containerID " + containerId + ". Datanode delete txnID"));
-      }
-    }
-    logCapturer.clearOutput();
   }
 
   private void matchContainerTransactionIds() throws IOException {

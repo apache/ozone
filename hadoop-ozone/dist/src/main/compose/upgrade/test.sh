@@ -26,6 +26,9 @@ source "$TEST_DIR/testlib.sh"
 export TEST_DIR
 export COMPOSE_DIR="$TEST_DIR"
 
+RESULT=0
+run_test_scripts ${tests} || RESULT=$?
+
 RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
 # Upgrade tests to be run.

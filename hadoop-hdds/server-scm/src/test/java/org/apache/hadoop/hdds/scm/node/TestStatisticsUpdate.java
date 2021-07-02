@@ -49,6 +49,8 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 
 /**
@@ -96,12 +98,16 @@ public class TestStatisticsUpdate {
         datanode2.getUuid(), storagePath2, 200, 20, 180, null);
 
     nodeManager.register(datanode1,
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Collections.emptyList()), null);
     nodeManager.register(datanode2,
-        TestUtils.createNodeReport(storageTwo), null);
+        TestUtils.createNodeReport(Arrays.asList(storageTwo),
+            Collections.emptyList()), null);
 
-    NodeReportProto nodeReportProto1 = TestUtils.createNodeReport(storageOne);
-    NodeReportProto nodeReportProto2 = TestUtils.createNodeReport(storageTwo);
+    NodeReportProto nodeReportProto1 = TestUtils.createNodeReport(
+        Arrays.asList(storageOne), Collections.emptyList());
+    NodeReportProto nodeReportProto2 = TestUtils.createNodeReport(
+        Arrays.asList(storageTwo), Collections.emptyList());
 
     nodeReportHandler.onMessage(
         new NodeReportFromDatanode(datanode1, nodeReportProto1),
