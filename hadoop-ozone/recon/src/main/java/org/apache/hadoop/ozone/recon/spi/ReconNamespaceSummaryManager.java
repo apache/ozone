@@ -33,5 +33,7 @@ public interface ReconNamespaceSummaryManager {
 
   void storeNSSummary(long objectId, NSSummary nsSummary) throws IOException;
 
+  void deleteNSSummary(long objectId) throws IOException;
+
   NSSummary getNSSummary(long objectId) throws IOException;
 }

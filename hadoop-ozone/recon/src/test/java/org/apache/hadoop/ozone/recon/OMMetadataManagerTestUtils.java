@@ -23,6 +23,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,6 +37,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -45,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 
 /**
  * Utility methods for creating OM related metadata managers and objects.
@@ -171,6 +175,47 @@ public final class OMMetadataManagerTestUtils {
             .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
+  }
+
+  /**
+   * Write a key on OM instance.
+   * @throw IOException while writing.
+   */
+  public static  void writeDataToOm(OMMetadataManager omMetadataManager,
+                                    String key,
+                                    String bucket,
+                                    String volume,
+                                    long objectID,
+                                    long parentObjectId,
+                                    long dataSize)
+          throws IOException {
+
+    String omKey = omMetadataManager.getOzoneKey(volume,
+            bucket, key);
+
+    omMetadataManager.getKeyTable().put(omKey,
+            new OmKeyInfo.Builder()
+                    .setBucketName(bucket)
+                    .setVolumeName(volume)
+                    .setKeyName(key)
+                    .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+                    .setObjectID(objectID)
+                    .setParentObjectID(parentObjectId)
+                    .setDataSize(dataSize)
+                    .build());
+  }
+
+  public static OzoneManagerServiceProviderImpl
+      getMockOzoneManagerServiceProvider() throws IOException {
+    OzoneManagerServiceProviderImpl omServiceProviderMock =
+            mock(OzoneManagerServiceProviderImpl.class);
+    OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
+    Table tableMock = mock(Table.class);
+    when(tableMock.getName()).thenReturn("keyTable");
+    when(omMetadataManagerMock.getKeyTable()).thenReturn(tableMock);
+    when(omServiceProviderMock.getOMMetadataManagerInstance())
+            .thenReturn(omMetadataManagerMock);
+    return omServiceProviderMock;
   }
 
   /**
