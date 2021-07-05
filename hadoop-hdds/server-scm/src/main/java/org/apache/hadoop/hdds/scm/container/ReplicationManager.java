@@ -183,6 +183,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
     // rack location) will not be satisfied, so we should not delete
     // the container
     DELETE_FAIL_POLICY,
+    //  replicas + target - src does not satisfy placement policy
+    PLACEMENT_POLICY_NOT_SATISFIED,
     //unexpected action, remove src at inflightReplication
     UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION,
     //unexpected action, remove target at inflightDeletion
@@ -652,6 +654,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
      *  4 the given container is in closed state
      *  5 the giver container is not taking any inflight action
      *  6 the given two datanodes are in IN_SERVICE state
+     *  7 {Existing replicas + Target_Dn - Source_Dn} satisfies
+     *     the placement policy
      *
      * move is a combination of two steps : replication and deletion.
      * if the conditions above are all met, then we take a conservative
@@ -689,8 +693,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
     // TODO: use a Read lock after introducing a RW lock into ContainerInfo
     ContainerInfo cif = containerManager.getContainer(cid);
     synchronized (cif) {
-      final Set<DatanodeDetails> replicas = containerManager
-            .getContainerReplicas(cid).stream()
+      final Set<ContainerReplica> currentReplicas = containerManager
+          .getContainerReplicas(cid);
+      final Set<DatanodeDetails> replicas = currentReplicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toSet());
       if (replicas.contains(targetDn)) {
@@ -733,6 +738,21 @@ public class ReplicationManager implements MetricsSource, SCMService {
         ret.complete(MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
         return ret;
       }
+
+      // check whether {Existing replicas + Target_Dn - Source_Dn}
+      // satisfies current placement policy
+      Set<ContainerReplica> movedReplicas = new HashSet<>();
+      movedReplicas.addAll(currentReplicas);
+      movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
+      movedReplicas.add(ContainerReplica.newBuilder()
+          .setDatanodeDetails(targetDn).build());
+      ContainerPlacementStatus placementStatus = getPlacementStatus(
+          movedReplicas, cif.getReplicationConfig().getRequiredNodes());
+      if (!placementStatus.isPolicySatisfied()) {
+        ret.complete(MoveResult.PLACEMENT_POLICY_NOT_SATISFIED);
+        return ret;
+      }
+
       inflightMove.putIfAbsent(cid, new ImmutablePair<>(srcDn, targetDn));
       inflightMoveFuture.putIfAbsent(cid, ret);
       sendReplicateCommand(cif, targetDn, Collections.singletonList(srcDn));
