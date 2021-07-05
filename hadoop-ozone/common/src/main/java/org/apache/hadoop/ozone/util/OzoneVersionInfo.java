@@ -72,7 +72,8 @@ public final class OzoneVersionInfo {
     System.out.println("Compiled by " + OZONE_VERSION_INFO.getUser() + " on "
         + OZONE_VERSION_INFO.getDate());
     System.out.println(
-        "Compiled with protoc " + OZONE_VERSION_INFO.getProtocVersion());
+        "Compiled with protoc " + OZONE_VERSION_INFO.getHadoopProtocVersion()
+            + " and " + OZONE_VERSION_INFO.getGrpcProtocVersion());
     System.out.println(
         "From source with checksum " + OZONE_VERSION_INFO.getSrcChecksum());
     System.out.println(

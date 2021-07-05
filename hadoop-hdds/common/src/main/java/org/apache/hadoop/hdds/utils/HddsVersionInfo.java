@@ -47,7 +47,8 @@ public final class HddsVersionInfo {
     System.out.println("Compiled by " + HDDS_VERSION_INFO.getUser() + " on "
         + HDDS_VERSION_INFO.getDate());
     System.out.println(
-        "Compiled with protoc " + HDDS_VERSION_INFO.getProtocVersion());
+        "Compiled with protoc " + HDDS_VERSION_INFO.getHadoopProtocVersion() +
+            " and " + HDDS_VERSION_INFO.getGrpcProtocVersion());
     System.out.println(
         "From source with checksum " + HDDS_VERSION_INFO.getSrcChecksum());
     if (LOG.isDebugEnabled()) {
