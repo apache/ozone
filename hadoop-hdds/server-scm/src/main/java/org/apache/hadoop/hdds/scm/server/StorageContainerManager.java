@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.De
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.server.events.FixedThreadPoolExecutor;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -69,7 +70,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
-import org.apache.hadoop.hdds.scm.block.PendingDeleteHandler;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
@@ -342,42 +342,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       securityProtocolServer = null;
     }
 
-    CloseContainerEventHandler closeContainerHandler =
-        new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
-    NodeReportHandler nodeReportHandler =
-        new NodeReportHandler(scmNodeManager);
-    PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(
-            scmSafeModeManager, pipelineManager, scmContext, conf);
-    CommandStatusReportHandler cmdStatusReportHandler =
-        new CommandStatusReportHandler();
-
-    NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
-        scmDecommissionManager, conf, serviceManager);
-    StaleNodeHandler staleNodeHandler =
-        new StaleNodeHandler(scmNodeManager, pipelineManager, conf);
-    DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
-        pipelineManager, containerManager);
-    StartDatanodeAdminHandler datanodeStartAdminHandler =
-        new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
-    NonHealthyToHealthyNodeHandler nonHealthyToHealthyNodeHandler =
-        new NonHealthyToHealthyNodeHandler(conf, serviceManager);
-    ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
-    PendingDeleteHandler pendingDeleteHandler =
-        new PendingDeleteHandler(scmBlockManager.getSCMBlockDeletingService());
-
-    ContainerReportHandler containerReportHandler =
-        new ContainerReportHandler(
-            scmNodeManager, containerManager, scmContext, conf);
-    IncrementalContainerReportHandler incrementalContainerReportHandler =
-        new IncrementalContainerReportHandler(
-            scmNodeManager, containerManager, scmContext);
-    PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, scmContext, conf);
-    CRLStatusReportHandler crlStatusReportHandler =
-        new CRLStatusReportHandler(certificateStore, conf);
-
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
     String scmShortUsername =
@@ -391,10 +355,64 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         eventQueue);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
+
+    initializeEventHandlers();
+
+    containerBalancer = new ContainerBalancer(scmNodeManager,
+        containerManager, replicationManager, configuration, scmContext);
+    LOG.info(containerBalancer.toString());
+
+    // Emit initial safe mode status, as now handlers are registered.
+    scmSafeModeManager.emitSafeModeStatus();
+
+    registerMXBean();
+    registerMetricsSource(this);
+  }
+
+
+  private void initializeEventHandlers() {
+    CloseContainerEventHandler closeContainerHandler =
+        new CloseContainerEventHandler(
+            pipelineManager, containerManager, scmContext);
+    NodeReportHandler nodeReportHandler =
+        new NodeReportHandler(scmNodeManager);
+    PipelineReportHandler pipelineReportHandler =
+        new PipelineReportHandler(
+            scmSafeModeManager, pipelineManager, scmContext, configuration);
+    CommandStatusReportHandler cmdStatusReportHandler =
+        new CommandStatusReportHandler();
+
+    NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
+        scmDecommissionManager, configuration, serviceManager);
+    StaleNodeHandler staleNodeHandler =
+        new StaleNodeHandler(scmNodeManager, pipelineManager, configuration);
+    DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
+        pipelineManager, containerManager);
+    StartDatanodeAdminHandler datanodeStartAdminHandler =
+        new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
+    NonHealthyToHealthyNodeHandler nonHealthyToHealthyNodeHandler =
+        new NonHealthyToHealthyNodeHandler(configuration, serviceManager);
+    ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
+
+    ContainerReportHandler containerReportHandler =
+        new ContainerReportHandler(scmNodeManager, containerManager,
+            scmContext, configuration);
+
+    IncrementalContainerReportHandler incrementalContainerReportHandler =
+        new IncrementalContainerReportHandler(
+            scmNodeManager, containerManager, scmContext);
+    PipelineActionHandler pipelineActionHandler =
+        new PipelineActionHandler(pipelineManager, scmContext, configuration);
+    CRLStatusReportHandler crlStatusReportHandler =
+        new CRLStatusReportHandler(certificateStore, configuration);
+
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
-    eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportHandler);
+    eventQueue.addHandler(SCMEvents.CONTAINER_REPORT,
+        new FixedThreadPoolExecutor<>(SCMEvents.CONTAINER_REPORT.getName(),
+            EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
+                containerReportHandler)), containerReportHandler);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
         incrementalContainerReportHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
@@ -407,23 +425,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE,
         datanodeStartAdminHandler);
     eventQueue.addHandler(SCMEvents.CMD_STATUS_REPORT, cmdStatusReportHandler);
-    eventQueue
-        .addHandler(SCMEvents.PENDING_DELETE_STATUS, pendingDeleteHandler);
     eventQueue.addHandler(SCMEvents.DELETE_BLOCK_STATUS,
         (DeletedBlockLogImplV2) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
 
-    containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration, scmContext);
-    LOG.info(containerBalancer.toString());
-
-    // Emit initial safe mode status, as now handlers are registered.
-    scmSafeModeManager.emitSafeModeStatus();
-
-    registerMXBean();
-    registerMetricsSource(this);
   }
 
   private void initializeCertificateClient() {
