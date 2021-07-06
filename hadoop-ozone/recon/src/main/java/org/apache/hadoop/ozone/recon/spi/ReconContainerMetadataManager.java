@@ -32,12 +32,7 @@ import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
  * The Recon Container DB Service interface.
  */
 @InterfaceStability.Unstable
-public interface ContainerDBServiceProvider {
-
-  /*
-   * Close the container DB
-   */
-  void close() throws Exception;
+public interface ReconContainerMetadataManager {
 
   /**
    * Create new container DB and bulk Store the container to Key prefix
@@ -45,7 +40,7 @@ public interface ContainerDBServiceProvider {
    * @param containerKeyPrefixCounts Map of containerId, key-prefix tuple to
    *                                 key count.
    */
-  void initNewContainerDB(Map<ContainerKeyPrefix, Integer>
+  void reinitWithNewContainerDataFromOm(Map<ContainerKeyPrefix, Integer>
                                     containerKeyPrefixCounts)
       throws IOException;
 

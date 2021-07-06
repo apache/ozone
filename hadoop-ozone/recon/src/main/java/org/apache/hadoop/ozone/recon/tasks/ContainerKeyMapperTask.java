@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
@@ -54,12 +54,12 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerKeyMapperTask.class);
 
-  private ContainerDBServiceProvider containerDBServiceProvider;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
 
   @Inject
-  public ContainerKeyMapperTask(ContainerDBServiceProvider
-                                    containerDBServiceProvider) {
-    this.containerDBServiceProvider = containerDBServiceProvider;
+  public ContainerKeyMapperTask(ReconContainerMetadataManager
+                                        reconContainerMetadataManager) {
+    this.reconContainerMetadataManager = reconContainerMetadataManager;
   }
 
   /**
@@ -74,7 +74,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       Instant start = Instant.now();
 
       // initialize new container DB
-      containerDBServiceProvider.initNewContainerDB(new HashMap<>());
+      reconContainerMetadataManager
+              .reinitWithNewContainerDataFromOm(new HashMap<>());
 
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable();
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -170,7 +171,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
 
     TableIterator<ContainerKeyPrefix, ? extends
         Table.KeyValue<ContainerKeyPrefix, Integer>> containerIterator =
-        containerDBServiceProvider.getContainerTableIterator();
+        reconContainerMetadataManager.getContainerTableIterator();
 
     Set<ContainerKeyPrefix> keysToBeDeleted = new HashSet<>();
 
@@ -184,14 +185,14 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     }
 
     for (ContainerKeyPrefix containerKeyPrefix : keysToBeDeleted) {
-      containerDBServiceProvider.deleteContainerMapping(containerKeyPrefix);
+      reconContainerMetadataManager.deleteContainerMapping(containerKeyPrefix);
 
       // decrement count and update containerKeyCount.
       Long containerID = containerKeyPrefix.getContainerId();
       long keyCount =
-          containerDBServiceProvider.getKeyCountForContainer(containerID);
+          reconContainerMetadataManager.getKeyCountForContainer(containerID);
       if (keyCount > 0) {
-        containerDBServiceProvider.storeContainerKeyCount(containerID,
+        reconContainerMetadataManager.storeContainerKeyCount(containerID,
             --keyCount);
       }
     }
@@ -216,34 +217,34 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         long containerId = omKeyLocationInfo.getContainerID();
         ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
             containerId, key, keyVersion);
-        if (containerDBServiceProvider.getCountForContainerKeyPrefix(
+        if (reconContainerMetadataManager.getCountForContainerKeyPrefix(
             containerKeyPrefix) == 0) {
           // Save on writes. No need to save same container-key prefix
           // mapping again.
-          containerDBServiceProvider.storeContainerKeyMapping(
+          reconContainerMetadataManager.storeContainerKeyMapping(
               containerKeyPrefix, 1);
 
           // check if container already exists and
           // increment the count of containers if it does not exist
-          if (!containerDBServiceProvider.doesContainerExists(containerId)) {
+          if (!reconContainerMetadataManager.doesContainerExists(containerId)) {
             containerCountToIncrement++;
           }
 
           // update the count of keys for the given containerID
-          long keyCount =
-              containerDBServiceProvider.getKeyCountForContainer(containerId);
+          long keyCount = reconContainerMetadataManager
+                  .getKeyCountForContainer(containerId);
 
           // increment the count and update containerKeyCount.
           // keyCount will be 0 if containerID is not found. So, there is no
           // need to initialize keyCount for the first time.
-          containerDBServiceProvider.storeContainerKeyCount(containerId,
+          reconContainerMetadataManager.storeContainerKeyCount(containerId,
               ++keyCount);
         }
       }
     }
 
     if (containerCountToIncrement > 0) {
-      containerDBServiceProvider
+      reconContainerMetadataManager
           .incrementContainerCountBy(containerCountToIncrement);
     }
   }
