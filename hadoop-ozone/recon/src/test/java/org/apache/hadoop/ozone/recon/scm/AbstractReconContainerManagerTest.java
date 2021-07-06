@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
@@ -118,7 +118,7 @@ public class AbstractReconContainerManagerTest {
         pipelineManager,
         getScmServiceProvider(),
         mock(ContainerHealthSchemaManager.class),
-        mock(ContainerDBServiceProvider.class),
+        mock(ReconContainerMetadataManager.class),
         scmhaManager,
         sequenceIdGen);
   }
