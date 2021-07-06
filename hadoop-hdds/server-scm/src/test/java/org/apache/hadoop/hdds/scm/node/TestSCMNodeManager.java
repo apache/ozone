@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -285,13 +286,18 @@ public class TestSCMNodeManager {
   private DatanodeDetails registerWithCapacity(SCMNodeManager nodeManager,
       LayoutVersionProto layout, ErrorCode expectedResult) {
     DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
+
     StorageReportProto storageReport =
         TestUtils.createStorageReport(details.getUuid(),
             details.getNetworkFullPath(), Long.MAX_VALUE);
+    MetadataStorageReportProto metadataStorageReport =
+        TestUtils.createMetadataStorageReport(details.getNetworkFullPath(),
+            Long.MAX_VALUE);
+
     RegisteredCommand cmd = nodeManager.register(
         MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(Arrays.asList(storageReport),
-            Collections.emptyList()),
+            Arrays.asList(metadataStorageReport)),
         getRandomPipelineReports(), layout);
 
     Assert.assertEquals(expectedResult, cmd.getError());
