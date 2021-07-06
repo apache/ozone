@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -40,7 +39,7 @@ import com.google.inject.Singleton;
  * Tests the class that provides the instance of the DB Store used by Recon to
  * store its container - key data.
  */
-public class TestReconContainerDBProvider {
+public class TestReconDBProvider {
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -57,18 +56,16 @@ public class TestReconContainerDBProvider {
         OzoneConfiguration configuration = new OzoneConfiguration();
         configuration.set(OZONE_RECON_DB_DIR, dbDir.getAbsolutePath());
         bind(OzoneConfiguration.class).toInstance(configuration);
-        bind(DBStore.class).toProvider(ReconContainerDBProvider.class).in(
-            Singleton.class);
+        bind(ReconDBProvider.class).in(Singleton.class);
       }
     });
   }
 
   @Test
   public void testGet() throws Exception {
-    ReconContainerDBProvider reconContainerDBProvider = injector.getInstance(
-        ReconContainerDBProvider.class);
-    DBStore dbStore = reconContainerDBProvider.get();
-    assertNotNull(dbStore);
+    ReconDBProvider reconDBProvider = injector.getInstance(
+        ReconDBProvider.class);
+    assertNotNull(reconDBProvider.getDbStore());
   }
 
 }

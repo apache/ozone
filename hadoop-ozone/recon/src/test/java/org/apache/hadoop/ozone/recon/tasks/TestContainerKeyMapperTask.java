@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.junit.Before;
@@ -61,7 +61,7 @@ public class TestContainerKeyMapperTask {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private ContainerDBServiceProvider containerDbServiceProvider;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
@@ -81,18 +81,18 @@ public class TestContainerKeyMapperTask {
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withContainerDB()
             .build();
-    containerDbServiceProvider =
-        reconTestInjector.getInstance(ContainerDBServiceProvider.class);
+    reconContainerMetadataManager =
+        reconTestInjector.getInstance(ReconContainerMetadataManager.class);
   }
 
   @Test
   public void testReprocessOMDB() throws Exception{
 
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
-        containerDbServiceProvider.getKeyPrefixesForContainer(1);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(1);
     assertTrue(keyPrefixesForContainer.isEmpty());
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
     assertTrue(keyPrefixesForContainer.isEmpty());
 
@@ -120,11 +120,11 @@ public class TestContainerKeyMapperTask {
         Collections.singletonList(omKeyLocationInfoGroup));
 
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(containerDbServiceProvider);
+        new ContainerKeyMapperTask(reconContainerMetadataManager);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer =
-        containerDbServiceProvider.getKeyPrefixesForContainer(1);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(1);
     assertEquals(1, keyPrefixesForContainer.size());
     String omKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", "key_one");
@@ -134,7 +134,7 @@ public class TestContainerKeyMapperTask {
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
 
     keyPrefixesForContainer =
-        containerDbServiceProvider.getKeyPrefixesForContainer(2);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(2);
     assertEquals(1, keyPrefixesForContainer.size());
     containerKeyPrefix = new ContainerKeyPrefix(2, omKey,
         0);
@@ -142,21 +142,21 @@ public class TestContainerKeyMapperTask {
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
 
     // Test if container key counts are updated
-    assertEquals(1, containerDbServiceProvider.getKeyCountForContainer(1L));
-    assertEquals(1, containerDbServiceProvider.getKeyCountForContainer(2L));
-    assertEquals(0, containerDbServiceProvider.getKeyCountForContainer(3L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(1L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(2L));
+    assertEquals(0, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Test if container count is updated
-    assertEquals(2, containerDbServiceProvider.getCountForContainers());
+    assertEquals(2, reconContainerMetadataManager.getCountForContainers());
   }
 
   @Test
   public void testProcessOMEvents() throws IOException {
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
-        containerDbServiceProvider.getKeyPrefixesForContainer(1);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(1);
     assertTrue(keyPrefixesForContainer.isEmpty());
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
     assertTrue(keyPrefixesForContainer.isEmpty());
 
@@ -225,46 +225,46 @@ public class TestContainerKeyMapperTask {
         }});
 
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(containerDbServiceProvider);
+        new ContainerKeyMapperTask(reconContainerMetadataManager);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
     assertEquals(1, keyPrefixesForContainer.size());
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
     assertTrue(keyPrefixesForContainer.isEmpty());
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(3);
     assertEquals(1, keyPrefixesForContainer.size());
 
-    assertEquals(1, containerDbServiceProvider.getKeyCountForContainer(1L));
-    assertEquals(0, containerDbServiceProvider.getKeyCountForContainer(2L));
-    assertEquals(1, containerDbServiceProvider.getKeyCountForContainer(3L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(1L));
+    assertEquals(0, reconContainerMetadataManager.getKeyCountForContainer(2L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Process PUT & DELETE event.
     containerKeyMapperTask.process(omUpdateEventBatch);
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
     assertEquals(1, keyPrefixesForContainer.size());
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
     assertEquals(1, keyPrefixesForContainer.size());
 
-    keyPrefixesForContainer = containerDbServiceProvider
+    keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(3);
     assertTrue(keyPrefixesForContainer.isEmpty());
 
-    assertEquals(1, containerDbServiceProvider.getKeyCountForContainer(1L));
-    assertEquals(1, containerDbServiceProvider.getKeyCountForContainer(2L));
-    assertEquals(0, containerDbServiceProvider.getKeyCountForContainer(3L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(1L));
+    assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(2L));
+    assertEquals(0, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Test if container count is updated
-    assertEquals(3, containerDbServiceProvider.getCountForContainers());
+    assertEquals(3, reconContainerMetadataManager.getCountForContainers());
   }
 
   private OmKeyInfo buildOmKeyInfo(String volume,

@@ -29,7 +29,7 @@ import java.util.Map;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -40,11 +40,11 @@ import org.junit.rules.TemporaryFolder;
 /**
  * Unit Tests for ContainerDBServiceProviderImpl.
  */
-public class TestContainerDBServiceProviderImpl {
+public class TestReconContainerMetadataManagerImpl {
 
   @ClassRule
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
-  private static ContainerDBServiceProvider containerDbServiceProvider;
+  private static ReconContainerMetadataManager reconContainerMetadataManager;
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
@@ -57,14 +57,14 @@ public class TestContainerDBServiceProviderImpl {
             .withReconSqlDb()
             .withContainerDB()
             .build();
-    containerDbServiceProvider =
-        reconTestInjector.getInstance(ContainerDBServiceProvider.class);
+    reconContainerMetadataManager =
+        reconTestInjector.getInstance(ReconContainerMetadataManager.class);
   }
 
   @Before
   public void setUp() throws Exception {
     // Reset containerDB before running each test
-    containerDbServiceProvider.initNewContainerDB(null);
+    reconContainerMetadataManager.reinitWithNewContainerDataFromOm(null);
   }
 
   private void populateKeysInContainers(long containerId1, long containerId2)
@@ -72,18 +72,18 @@ public class TestContainerDBServiceProviderImpl {
 
     ContainerKeyPrefix containerKeyPrefix1 = new
         ContainerKeyPrefix(containerId1, keyPrefix1, 0);
-    containerDbServiceProvider.storeContainerKeyMapping(containerKeyPrefix1,
+    reconContainerMetadataManager.storeContainerKeyMapping(containerKeyPrefix1,
         1);
 
     ContainerKeyPrefix containerKeyPrefix2 = new ContainerKeyPrefix(
         containerId1, keyPrefix2, 0);
-    containerDbServiceProvider.storeContainerKeyMapping(containerKeyPrefix2,
+    reconContainerMetadataManager.storeContainerKeyMapping(containerKeyPrefix2,
         2);
 
     ContainerKeyPrefix containerKeyPrefix3 = new ContainerKeyPrefix(
         containerId2, keyPrefix3, 0);
 
-    containerDbServiceProvider.storeContainerKeyMapping(containerKeyPrefix3,
+    reconContainerMetadataManager.storeContainerKeyMapping(containerKeyPrefix3,
         3);
   }
 
@@ -106,11 +106,11 @@ public class TestContainerDBServiceProviderImpl {
 
     for (Map.Entry<ContainerKeyPrefix, Integer> entry :
         prefixCounts.entrySet()) {
-      containerDbServiceProvider.storeContainerKeyMapping(
+      reconContainerMetadataManager.storeContainerKeyMapping(
           entry.getKey(), prefixCounts.get(entry.getKey()));
     }
 
-    assertEquals(1, containerDbServiceProvider
+    assertEquals(1, reconContainerMetadataManager
         .getCountForContainerKeyPrefix(ckp1).intValue());
 
     prefixCounts.clear();
@@ -123,9 +123,10 @@ public class TestContainerDBServiceProviderImpl {
         "V1/B3/K2", 0);
     prefixCounts.put(ckp5, 15);
 
-    containerDbServiceProvider.initNewContainerDB(prefixCounts);
+    reconContainerMetadataManager
+            .reinitWithNewContainerDataFromOm(prefixCounts);
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
-        containerDbServiceProvider.getKeyPrefixesForContainer(containerId);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(containerId);
 
     assertEquals(4, keyPrefixesForContainer.size());
     assertEquals(12, keyPrefixesForContainer.get(ckp2).intValue());
@@ -133,7 +134,7 @@ public class TestContainerDBServiceProviderImpl {
     assertEquals(14, keyPrefixesForContainer.get(ckp4).intValue());
     assertEquals(15, keyPrefixesForContainer.get(ckp5).intValue());
 
-    assertEquals(0, containerDbServiceProvider
+    assertEquals(0, reconContainerMetadataManager
         .getCountForContainerKeyPrefix(ckp1).intValue());
   }
 
@@ -149,20 +150,20 @@ public class TestContainerDBServiceProviderImpl {
     for (Map.Entry<String, Integer> entry : prefixCounts.entrySet()) {
       ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
           containerId, entry.getKey(), 0);
-      containerDbServiceProvider.storeContainerKeyMapping(
+      reconContainerMetadataManager.storeContainerKeyMapping(
           containerKeyPrefix, prefixCounts.get(entry.getKey()));
     }
 
     Assert.assertEquals(1,
-        containerDbServiceProvider.getCountForContainerKeyPrefix(
+        reconContainerMetadataManager.getCountForContainerKeyPrefix(
             new ContainerKeyPrefix(containerId, keyPrefix1,
                 0)).longValue());
     Assert.assertEquals(2,
-        containerDbServiceProvider.getCountForContainerKeyPrefix(
+        reconContainerMetadataManager.getCountForContainerKeyPrefix(
             new ContainerKeyPrefix(containerId, keyPrefix2,
                 0)).longValue());
     Assert.assertEquals(3,
-        containerDbServiceProvider.getCountForContainerKeyPrefix(
+        reconContainerMetadataManager.getCountForContainerKeyPrefix(
             new ContainerKeyPrefix(containerId, keyPrefix3,
                 0)).longValue());
   }
@@ -171,61 +172,62 @@ public class TestContainerDBServiceProviderImpl {
   public void testStoreContainerKeyCount() throws Exception {
     long containerId = 1L;
     long nextContainerId = 2L;
-    containerDbServiceProvider.storeContainerKeyCount(containerId, 2L);
-    containerDbServiceProvider.storeContainerKeyCount(nextContainerId, 3L);
+    reconContainerMetadataManager.storeContainerKeyCount(containerId, 2L);
+    reconContainerMetadataManager.storeContainerKeyCount(nextContainerId, 3L);
 
     assertEquals(2,
-        containerDbServiceProvider.getKeyCountForContainer(containerId));
+        reconContainerMetadataManager.getKeyCountForContainer(containerId));
     assertEquals(3,
-        containerDbServiceProvider.getKeyCountForContainer(nextContainerId));
+        reconContainerMetadataManager.getKeyCountForContainer(nextContainerId));
 
-    containerDbServiceProvider.storeContainerKeyCount(containerId, 20L);
+    reconContainerMetadataManager.storeContainerKeyCount(containerId, 20L);
     assertEquals(20,
-        containerDbServiceProvider.getKeyCountForContainer(containerId));
+        reconContainerMetadataManager.getKeyCountForContainer(containerId));
   }
 
   @Test
   public void testGetKeyCountForContainer() throws Exception {
     long containerId = 1L;
     long nextContainerId = 2L;
-    containerDbServiceProvider.storeContainerKeyCount(containerId, 2L);
-    containerDbServiceProvider.storeContainerKeyCount(nextContainerId, 3L);
+    reconContainerMetadataManager.storeContainerKeyCount(containerId, 2L);
+    reconContainerMetadataManager.storeContainerKeyCount(nextContainerId, 3L);
 
     assertEquals(2,
-        containerDbServiceProvider.getKeyCountForContainer(containerId));
+        reconContainerMetadataManager.getKeyCountForContainer(containerId));
     assertEquals(3,
-        containerDbServiceProvider.getKeyCountForContainer(nextContainerId));
+        reconContainerMetadataManager.getKeyCountForContainer(nextContainerId));
 
     assertEquals(0,
-        containerDbServiceProvider.getKeyCountForContainer(5L));
+        reconContainerMetadataManager.getKeyCountForContainer(5L));
   }
 
   @Test
   public void testDoesContainerExists() throws Exception {
     long containerId = 1L;
     long nextContainerId = 2L;
-    containerDbServiceProvider.storeContainerKeyCount(containerId, 2L);
-    containerDbServiceProvider.storeContainerKeyCount(nextContainerId, 3L);
+    reconContainerMetadataManager.storeContainerKeyCount(containerId, 2L);
+    reconContainerMetadataManager.storeContainerKeyCount(nextContainerId, 3L);
 
-    assertTrue(containerDbServiceProvider.doesContainerExists(containerId));
-    assertTrue(containerDbServiceProvider.doesContainerExists(nextContainerId));
-    assertFalse(containerDbServiceProvider.doesContainerExists(0L));
-    assertFalse(containerDbServiceProvider.doesContainerExists(3L));
+    assertTrue(reconContainerMetadataManager.doesContainerExists(containerId));
+    assertTrue(reconContainerMetadataManager.
+            doesContainerExists(nextContainerId));
+    assertFalse(reconContainerMetadataManager.doesContainerExists(0L));
+    assertFalse(reconContainerMetadataManager.doesContainerExists(3L));
   }
 
   @Test
   public void testGetCountForContainerKeyPrefix() throws Exception {
     long containerId = System.currentTimeMillis();
 
-    containerDbServiceProvider.storeContainerKeyMapping(new
+    reconContainerMetadataManager.storeContainerKeyMapping(new
         ContainerKeyPrefix(containerId, keyPrefix1), 2);
 
-    Integer count = containerDbServiceProvider.
+    Integer count = reconContainerMetadataManager.
         getCountForContainerKeyPrefix(new ContainerKeyPrefix(containerId,
             keyPrefix1));
     assertEquals(2L, count.longValue());
 
-    count = containerDbServiceProvider.
+    count = reconContainerMetadataManager.
         getCountForContainerKeyPrefix(new ContainerKeyPrefix(containerId,
             "invalid"));
     assertEquals(0L, count.longValue());
@@ -246,13 +248,13 @@ public class TestContainerDBServiceProviderImpl {
 
 
     Map<ContainerKeyPrefix, Integer> keyPrefixMap =
-        containerDbServiceProvider.getKeyPrefixesForContainer(containerId);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(containerId);
     assertEquals(2, keyPrefixMap.size());
 
     assertEquals(1, keyPrefixMap.get(containerKeyPrefix1).longValue());
     assertEquals(2, keyPrefixMap.get(containerKeyPrefix2).longValue());
 
-    keyPrefixMap = containerDbServiceProvider.getKeyPrefixesForContainer(
+    keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
         nextContainerId);
     assertEquals(1, keyPrefixMap.size());
     assertEquals(3, keyPrefixMap.get(containerKeyPrefix3).longValue());
@@ -268,25 +270,25 @@ public class TestContainerDBServiceProviderImpl {
         containerId, keyPrefix2, 0);
 
     Map<ContainerKeyPrefix, Integer> keyPrefixMap =
-        containerDbServiceProvider.getKeyPrefixesForContainer(containerId,
+        reconContainerMetadataManager.getKeyPrefixesForContainer(containerId,
             keyPrefix1);
     assertEquals(1, keyPrefixMap.size());
     assertEquals(2, keyPrefixMap.get(containerKeyPrefix2).longValue());
 
-    keyPrefixMap = containerDbServiceProvider.getKeyPrefixesForContainer(
+    keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
         nextContainerId, keyPrefix3);
     assertEquals(0, keyPrefixMap.size());
 
     // test for negative cases
-    keyPrefixMap = containerDbServiceProvider.getKeyPrefixesForContainer(
+    keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
         containerId, "V3/B1/invalid");
     assertEquals(0, keyPrefixMap.size());
 
-    keyPrefixMap = containerDbServiceProvider.getKeyPrefixesForContainer(
+    keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
         containerId, keyPrefix3);
     assertEquals(0, keyPrefixMap.size());
 
-    keyPrefixMap = containerDbServiceProvider.getKeyPrefixesForContainer(
+    keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
         10L, "");
     assertEquals(0, keyPrefixMap.size());
   }
@@ -298,35 +300,35 @@ public class TestContainerDBServiceProviderImpl {
     populateKeysInContainers(containerId, nextContainerId);
 
     Map<Long, ContainerMetadata> containerMap =
-        containerDbServiceProvider.getContainers(-1, 0L);
+        reconContainerMetadataManager.getContainers(-1, 0L);
     assertEquals(2, containerMap.size());
 
     assertEquals(3, containerMap.get(containerId).getNumberOfKeys());
     assertEquals(3, containerMap.get(nextContainerId).getNumberOfKeys());
 
     // test if limit works
-    containerMap = containerDbServiceProvider.getContainers(
+    containerMap = reconContainerMetadataManager.getContainers(
         1, 0L);
     assertEquals(1, containerMap.size());
     assertNull(containerMap.get(nextContainerId));
 
     // test for prev key
-    containerMap = containerDbServiceProvider.getContainers(
+    containerMap = reconContainerMetadataManager.getContainers(
         -1, containerId);
     assertEquals(1, containerMap.size());
     // containerId must be skipped from containerMap result
     assertNull(containerMap.get(containerId));
 
-    containerMap = containerDbServiceProvider.getContainers(
+    containerMap = reconContainerMetadataManager.getContainers(
         -1, nextContainerId);
     assertEquals(0, containerMap.size());
 
     // test for negative cases
-    containerMap = containerDbServiceProvider.getContainers(
+    containerMap = reconContainerMetadataManager.getContainers(
         -1, 10L);
     assertEquals(0, containerMap.size());
 
-    containerMap = containerDbServiceProvider.getContainers(
+    containerMap = reconContainerMetadataManager.getContainers(
         0, containerId);
     assertEquals(0, containerMap.size());
   }
@@ -338,49 +340,49 @@ public class TestContainerDBServiceProviderImpl {
     populateKeysInContainers(containerId, nextContainerId);
 
     Map<ContainerKeyPrefix, Integer> keyPrefixMap =
-        containerDbServiceProvider.getKeyPrefixesForContainer(containerId);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(containerId);
     assertEquals(2, keyPrefixMap.size());
 
-    containerDbServiceProvider.deleteContainerMapping(new ContainerKeyPrefix(
+    reconContainerMetadataManager.deleteContainerMapping(new ContainerKeyPrefix(
         containerId, keyPrefix2, 0));
     keyPrefixMap =
-        containerDbServiceProvider.getKeyPrefixesForContainer(containerId);
+        reconContainerMetadataManager.getKeyPrefixesForContainer(containerId);
     assertEquals(1, keyPrefixMap.size());
   }
 
   @Test
   public void testGetCountForContainers() throws Exception {
 
-    assertEquals(0, containerDbServiceProvider.getCountForContainers());
+    assertEquals(0, reconContainerMetadataManager.getCountForContainers());
 
-    containerDbServiceProvider.storeContainerCount(5L);
+    reconContainerMetadataManager.storeContainerCount(5L);
 
-    assertEquals(5L, containerDbServiceProvider.getCountForContainers());
-    containerDbServiceProvider.incrementContainerCountBy(1L);
+    assertEquals(5L, reconContainerMetadataManager.getCountForContainers());
+    reconContainerMetadataManager.incrementContainerCountBy(1L);
 
-    assertEquals(6L, containerDbServiceProvider.getCountForContainers());
+    assertEquals(6L, reconContainerMetadataManager.getCountForContainers());
 
-    containerDbServiceProvider.storeContainerCount(10L);
-    assertEquals(10L, containerDbServiceProvider.getCountForContainers());
+    reconContainerMetadataManager.storeContainerCount(10L);
+    assertEquals(10L, reconContainerMetadataManager.getCountForContainers());
   }
 
   @Test
   public void testStoreContainerCount() throws Exception {
-    containerDbServiceProvider.storeContainerCount(3L);
-    assertEquals(3L, containerDbServiceProvider.getCountForContainers());
+    reconContainerMetadataManager.storeContainerCount(3L);
+    assertEquals(3L, reconContainerMetadataManager.getCountForContainers());
 
-    containerDbServiceProvider.storeContainerCount(5L);
-    assertEquals(5L, containerDbServiceProvider.getCountForContainers());
+    reconContainerMetadataManager.storeContainerCount(5L);
+    assertEquals(5L, reconContainerMetadataManager.getCountForContainers());
   }
 
   @Test
   public void testIncrementContainerCountBy() throws Exception {
-    assertEquals(0, containerDbServiceProvider.getCountForContainers());
+    assertEquals(0, reconContainerMetadataManager.getCountForContainers());
 
-    containerDbServiceProvider.incrementContainerCountBy(1L);
-    assertEquals(1L, containerDbServiceProvider.getCountForContainers());
+    reconContainerMetadataManager.incrementContainerCountBy(1L);
+    assertEquals(1L, reconContainerMetadataManager.getCountForContainers());
 
-    containerDbServiceProvider.incrementContainerCountBy(3L);
-    assertEquals(4L, containerDbServiceProvider.getCountForContainers());
+    reconContainerMetadataManager.incrementContainerCountBy(3L);
+    assertEquals(4L, reconContainerMetadataManager.getCountForContainers());
   }
 }
