@@ -1178,17 +1178,17 @@ public class ReplicationManager implements MetricsSource, SCMService {
         }
         if (isTargetDnInReplicaSet) {
           if (isSourceDnInReplicaSet) {
-            // if the target is present, and source disappears somehow,
-            // we can consider move is successful.
-            inflightMoveFuture.get(id).complete(MoveResult.COMPLETED);
-            inflightMove.remove(id);
-            inflightMoveFuture.remove(id);
-          } else {
             // if the container is in inflightMove and target datanode is
             // included in the replicas, then swap the source datanode to
             // first of the replica list if exists, so the source datanode
             // will be first removed if possible.
             eligibleReplicas.add(0, eligibleReplicas.remove(sourceDnPos));
+          } else {
+            // if the target is present, and source disappears somehow,
+            // we can consider move is successful.
+            inflightMoveFuture.get(id).complete(MoveResult.COMPLETED);
+            inflightMove.remove(id);
+            inflightMoveFuture.remove(id);
           }
         } else {
           if (isSourceDnInReplicaSet) {
