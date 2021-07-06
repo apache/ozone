@@ -56,6 +56,9 @@ public final class DatanodeMetadata {
   @XmlElement(name = "containers")
   private int containers;
 
+  @XmlElement(name = "openContainers")
+  private int openContainers;
+
   @XmlElement(name = "leaderCount")
   private int leaderCount;
 
@@ -80,6 +83,7 @@ public final class DatanodeMetadata {
     this.datanodeStorageReport = builder.datanodeStorageReport;
     this.pipelines = builder.pipelines;
     this.containers = builder.containers;
+    this.openContainers = builder.openContainers;
     this.leaderCount = builder.leaderCount;
     this.version = builder.version;
     this.setupTime = builder.setupTime;
@@ -113,6 +117,10 @@ public final class DatanodeMetadata {
 
   public int getContainers() {
     return containers;
+  }
+
+  public int getOpenContainers() {
+    return openContainers;
   }
 
   public int getLeaderCount() {
@@ -161,6 +169,7 @@ public final class DatanodeMetadata {
     private DatanodeStorageReport datanodeStorageReport;
     private List<DatanodePipeline> pipelines;
     private int containers;
+    private int openContainers;
     private int leaderCount;
     private String version;
     private long setupTime;
@@ -169,6 +178,7 @@ public final class DatanodeMetadata {
 
     public Builder() {
       this.containers = 0;
+      this.openContainers = 0;
       this.leaderCount = 0;
     }
 
@@ -205,6 +215,11 @@ public final class DatanodeMetadata {
 
     public Builder withContainers(int containers) {
       this.containers = containers;
+      return this;
+    }
+
+    public Builder withOpenContainers(int openContainers) {
+      this.openContainers = openContainers;
       return this;
     }
 

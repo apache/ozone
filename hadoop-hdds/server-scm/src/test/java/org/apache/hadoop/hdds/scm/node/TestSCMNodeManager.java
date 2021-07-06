@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -936,7 +937,8 @@ public class TestSCMNodeManager {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.register(dn, TestUtils.createNodeReport(report), null);
+        nodeManager.register(dn, TestUtils.createNodeReport(
+            Arrays.asList(report), Collections.emptyList()), null);
         nodeManager.processHeartbeat(dn);
       }
       //TODO: wait for EventQueue to be processed
@@ -988,7 +990,8 @@ public class TestSCMNodeManager {
                         used, free, null, failed));
         failed = !failed;
       }
-      nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
+      nodeManager.register(dn, TestUtils.createNodeReport(reports,
+          Collections.emptyList()), null);
       nodeManager.processHeartbeat(dn);
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
@@ -1039,7 +1042,8 @@ public class TestSCMNodeManager {
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, scmUsed,
                 remaining, null);
-        NodeReportProto nodeReportProto = TestUtils.createNodeReport(report);
+        NodeReportProto nodeReportProto = TestUtils.createNodeReport(
+            Arrays.asList(report), Collections.emptyList());
         nodeReportHandler.onMessage(
                 new NodeReportFromDatanode(datanodeDetails, nodeReportProto),
                 publisher);
@@ -1159,7 +1163,8 @@ public class TestSCMNodeManager {
       eq.addHandler(DATANODE_COMMAND, nodemanager);
 
       nodemanager
-          .register(datanodeDetails, TestUtils.createNodeReport(report),
+          .register(datanodeDetails, TestUtils.createNodeReport(
+              Arrays.asList(report), Collections.emptyList()),
                   TestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
@@ -1337,7 +1342,8 @@ public class TestSCMNodeManager {
           .createStorageReport(dnId, storagePath, capacity, used,
               remaining, null);
 
-      nodeManager.register(datanodeDetails, TestUtils.createNodeReport(report),
+      nodeManager.register(datanodeDetails, TestUtils.createNodeReport(
+          Arrays.asList(report), Collections.emptyList()),
           TestUtils.getRandomPipelineReports());
 
       nodeManager.processHeartbeat(datanodeDetails);

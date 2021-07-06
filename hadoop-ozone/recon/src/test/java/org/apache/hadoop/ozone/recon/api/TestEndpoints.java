@@ -165,6 +165,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .setOwner("test")
         .setPipelineID(pipeline.getId())
         .build();
+
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
 
@@ -457,6 +458,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
               .findFirst().orElse(null);
       return (datanodeMetadata1 != null &&
           datanodeMetadata1.getContainers() == 1 &&
+          datanodeMetadata1.getOpenContainers() == 1 &&
           reconScm.getPipelineManager()
               .getContainersInPipeline(pipeline.getId()).size() == 1);
     });
@@ -688,7 +690,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
   }
-
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
       throws Exception {

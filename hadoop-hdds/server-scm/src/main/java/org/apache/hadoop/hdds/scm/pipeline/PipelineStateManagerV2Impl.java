@@ -246,10 +246,10 @@ public class PipelineStateManagerV2Impl implements StateManager {
       HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
       throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
-    Pipeline.PipelineState oldState =
-        getPipeline(pipelineID).getPipelineState();
+    Pipeline.PipelineState oldState = null;
     lock.writeLock().lock();
     try {
+      oldState = getPipeline(pipelineID).getPipelineState();
       // null check is here to prevent the case where SCM store
       // is closed but the staleNode handlers/pipeline creations
       // still try to access it.

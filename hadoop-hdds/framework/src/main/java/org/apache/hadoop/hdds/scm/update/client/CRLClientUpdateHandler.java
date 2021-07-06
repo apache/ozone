@@ -118,7 +118,7 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
         .updateStatus(new StreamObserver<UpdateResponse>() {
           @Override
           public void onNext(UpdateResponse updateResponse) {
-            LOG.debug("Receive server response: {}", updateResponse.toString());
+            LOG.debug("Receive server response: {}", updateResponse);
             serviceGrpcClient.incrUpdateCount();
             handleServerUpdate(updateResponse);
           }

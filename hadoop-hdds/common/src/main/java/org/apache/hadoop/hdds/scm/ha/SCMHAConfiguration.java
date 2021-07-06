@@ -132,11 +132,11 @@ public class SCMHAConfiguration {
 
   @Config(key = "ratis.request.timeout",
       type = ConfigType.TIME,
-      defaultValue = "3000ms",
+      defaultValue = "30s",
       tags = {SCM, OZONE, HA, RATIS},
       description = "The timeout duration for SCM's Ratis server RPC."
   )
-  private long ratisRequestTimeout = 3000L;
+  private long ratisRequestTimeout = 30 * 1000L;
 
   @Config(key = "ratis.server.retry.cache.timeout",
       type = ConfigType.TIME,

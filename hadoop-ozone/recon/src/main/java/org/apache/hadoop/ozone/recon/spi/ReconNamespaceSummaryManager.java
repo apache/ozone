@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,27 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.block;
 
-import org.apache.hadoop.hdds.server.events.EventHandler;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
+package org.apache.hadoop.ozone.recon.spi;
+
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+
+import java.io.IOException;
 
 /**
- * Event handler for PedingDeleteStatuList events.
+ * Interface for DB operations on NSSummary.
  */
-public class PendingDeleteHandler implements
-    EventHandler<PendingDeleteStatusList> {
+@InterfaceStability.Unstable
+public interface ReconNamespaceSummaryManager {
 
-  private SCMBlockDeletingService scmBlockDeletingService;
+  void initNSSummaryTable() throws IOException;
 
-  public PendingDeleteHandler(
-      SCMBlockDeletingService scmBlockDeletingService) {
-    this.scmBlockDeletingService = scmBlockDeletingService;
-  }
+  void storeNSSummary(long objectId, NSSummary nsSummary) throws IOException;
 
-  @Override
-  public void onMessage(PendingDeleteStatusList pendingDeleteStatusList,
-      EventPublisher publisher) {
-    scmBlockDeletingService.handlePendingDeletes(pendingDeleteStatusList);
-  }
+  NSSummary getNSSummary(long objectId) throws IOException;
 }
