@@ -50,7 +50,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   void executePutBlock() throws IOException {
-    this.out.executePutBlock();
+    this.out.executePutBlock(false, true);
   }
 
   /**

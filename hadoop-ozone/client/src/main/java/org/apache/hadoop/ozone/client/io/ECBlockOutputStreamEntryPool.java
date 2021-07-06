@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -39,6 +40,7 @@ import java.util.Map;
  */
 public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
   private final List<BlockOutputStreamEntry> finishedStreamEntries;
+  private final ECReplicationConfig ecReplicationConfig;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public ECBlockOutputStreamEntryPool(OzoneClientConfig config,
@@ -56,6 +58,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
         isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
         openID);
     this.finishedStreamEntries = new ArrayList<>();
+    assert replicationConfig instanceof ECReplicationConfig;
+    this.ecReplicationConfig = (ECReplicationConfig) replicationConfig;
   }
 
   @Override
@@ -97,17 +101,23 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
   }
 
   long getKeyLength() {
-    long totalLength = getStreamEntries().stream()
-        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
-    totalLength += finishedStreamEntries.stream()
-        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    long totalLength = getStreamEntries().stream().filter(c -> {
+      return (c.getPipeline().getReplicaIndex(
+          c.getPipeline().getNodes().iterator()
+              .next())) <= ecReplicationConfig.getData();
+    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    totalLength += finishedStreamEntries.stream().filter(c -> {
+      return (c.getPipeline().getReplicaIndex(
+          c.getPipeline().getNodes().iterator()
+              .next())) <= ecReplicationConfig.getData();
+    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
     return totalLength;
   }
 
-  public void endECBlock(int numberOfDataBlks) throws IOException {
+  public void endECBlock() throws IOException {
     List<BlockOutputStreamEntry> entries = getStreamEntries();
-    for (int i = 0; i < numberOfDataBlks; i++) {
-      if (entries.size() > 0) {
+    if (entries.size() > 0) {
+      for (int i = entries.size() - 1; i >= 0; i--) {
         finishedStreamEntries.add(entries.remove(i));
       }
     }

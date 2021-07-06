@@ -219,6 +219,22 @@ public class BlockOutputStream extends OutputStream {
     return ioException.get();
   }
 
+  XceiverClientSpi getXceiverClientSpi(){
+    return this.xceiverClient;
+  }
+
+  BlockData.Builder getContainerBlockData(){
+    return this.containerBlockData;
+  }
+
+  Token<? extends TokenIdentifier> getToken(){
+    return this.token;
+  }
+
+  ExecutorService getResponseExecutor(){
+    return this.responseExecutor;
+  }
+
   @VisibleForTesting
   public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
     return commitWatcher.getCommitIndex2flushedDataMap();
@@ -573,7 +589,7 @@ public class BlockOutputStream extends OutputStream {
     combinedFuture.get();
   }
 
-  private void validateResponse(
+  void validateResponse(
       ContainerProtos.ContainerCommandResponseProto responseProto)
       throws IOException {
     try {
@@ -592,7 +608,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  private void setIoException(Exception e) {
+  void setIoException(Exception e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -624,7 +640,7 @@ public class BlockOutputStream extends OutputStream {
    *
    * @throws IOException if stream is closed
    */
-  private void checkOpen() throws IOException {
+  void checkOpen() throws IOException {
     if (isClosed()) {
       throw new IOException("BlockOutputStream has been closed.");
     } else if (getIoException() != null) {
@@ -705,7 +721,7 @@ public class BlockOutputStream extends OutputStream {
    * handle ExecutionException else skip it.
    * @throws IOException
    */
-  private void handleInterruptedException(Exception ex,
+  void handleInterruptedException(Exception ex,
       boolean processExecutionException)
       throws IOException {
     LOG.error("Command execution was interrupted.");

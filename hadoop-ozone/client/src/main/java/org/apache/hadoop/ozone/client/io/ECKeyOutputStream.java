@@ -231,7 +231,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       if (currentBlockGroupLen == numDataBlks * blockOutputStreamEntryPool
           .getStreamEntries().get(blockOutputStreamEntryPool.getCurrIdx())
           .getLength()) {
-        blockOutputStreamEntryPool.endECBlock(numDataBlks);
+        blockOutputStreamEntryPool.endECBlock();
         currentBlockGroupLen = 0;
       }
     }
@@ -262,21 +262,15 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
     BlockOutputStreamEntry current =
         blockOutputStreamEntryPool.allocateBlockIfNeeded();
-    // length(len) will be in int range if the call is happening through
-    // write API of blockOutputStream. Length can be in long range if it
-    // comes via Exception path.
-    int expectedWriteLen = Math.min((int) len, (int) current.getRemaining());
-    // writeLen will be updated based on whether the write was succeeded
-    // or if it sees an exception, how much the actual write was
-    // acknowledged.
-    int writtenLength = expectedWriteLen;
-    currentBlockGroupLen += isParity ? 0 : writtenLength;
+    int writeLengthToCurrStream =
+        Math.min((int) len, (int) current.getRemaining());
+    currentBlockGroupLen += isParity ? 0 : writeLengthToCurrStream;
     if (current.getRemaining() <= 0) {
       // since the current block is already written close the stream.
       closeCurrentStream(StreamAction.CLOSE);
     }
 
-    len -= writtenLength;
+    len -= writeLengthToCurrStream;
     if (isFullCell) {
       ByteBuffer bytesToWrite = isParity ?
           ecChunkBufferCache.getParityBuffers()[blockOutputStreamEntryPool
@@ -471,8 +465,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
-      blockOutputStreamEntryPool.endECBlock(numDataBlks);
-      //TODO: offset should not consider parity blocks length
+      blockOutputStreamEntryPool.endECBlock();
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanupAll();

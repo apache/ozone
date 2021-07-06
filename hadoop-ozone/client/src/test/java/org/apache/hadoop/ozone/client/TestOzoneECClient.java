@@ -133,8 +133,6 @@ public class TestOzoneECClient {
     Arrays.sort(dnDetails);
     for (int i = 0; i < inputChunks.length; i++) {
       MockDatanodeStorage datanodeStorage = storages.get(dnDetails[i]);
-      // There will be 10 internal chunks ( stream chunks) each with 100 bytes
-      // size. So, total EC chunk size is 10*100= 1000
       Assert.assertEquals(1, datanodeStorage.getAllBlockData().size());
       ByteString content =
           datanodeStorage.getAllBlockData().values().iterator().next();

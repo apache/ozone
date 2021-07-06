@@ -147,8 +147,8 @@ public class BlockOutputStreamEntryPool {
 
   void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    ECBlockOutputStreamEntry.Builder builder =
-        new ECBlockOutputStreamEntry.Builder()
+    BlockOutputStreamEntry.Builder builder =
+        new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
             .setKey(keyArgs.getKeyName())
             .setXceiverClientManager(xceiverClientFactory)
