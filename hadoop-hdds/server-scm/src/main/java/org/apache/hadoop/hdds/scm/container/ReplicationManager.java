@@ -911,7 +911,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
     });
     containerManager.updateContainerState(container.containerID(),
         HddsProtos.LifeCycleEvent.DELETE);
-    LOG.debug("Deleting empty container {} replicas,", container.containerID());
+    LOG.debug("Deleting empty container replicas for {},", container);
   }
 
   /**
@@ -926,8 +926,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
     if (replicas.size() == 0) {
       containerManager.updateContainerState(container.containerID(),
           HddsProtos.LifeCycleEvent.CLEANUP);
-      LOG.debug("Container {} state changes to DELETED",
-          container.containerID());
+      LOG.debug("Container {} state changes to DELETED", container);
     } else {
       // Check whether to resend the delete replica command
       final List<DatanodeDetails> deletionInFlight = inflightDeletion
@@ -943,8 +942,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
         filteredReplicas.stream().forEach(rp -> {
           sendDeleteCommand(container, rp.getDatanodeDetails(), false);
         });
-        LOG.debug("Resend delete Container {} command",
-            container.containerID());
+        LOG.debug("Resend delete Container command for {}", container);
       }
     }
   }
@@ -997,8 +995,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
   private void handleUnderReplicatedContainer(final ContainerInfo container,
       final ContainerReplicaCount replicaSet,
       final ContainerPlacementStatus placementStatus) {
-    LOG.debug("Handling under-replicated container: {}",
-        container.getContainerID());
+    LOG.debug("Handling under-replicated container: {}", container);
     Set<ContainerReplica> replicas = replicaSet.getReplica();
     try {
 
