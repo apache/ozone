@@ -1207,23 +1207,24 @@ public class ReplicationManager implements MetricsSource, SCMService {
         sendDeleteCommand(cif, srcDn, true);
         eligibleReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
         minus++;
-      } else if (!isSourceDnInReplicaSet){
-        // if the target is present, and source disappears somehow,
-        // we can consider move is successful.
-        inflightMoveFuture.get(cif).complete(MoveResult.COMPLETED);
-        inflightMove.remove(cif);
-        inflightMoveFuture.remove(cif);
       } else {
-        // if source and target datanode are both in the replicaset,
-        // but we can not delete source datanode for now (e.g.,
-        // there is only 3 replicas or not policy-statisfied , etc.),
-        // we just complete the future without sending a delete command.
-        LOG.info("can not remove source replica after successfully " +
-            "replicated to target datanode");
-        inflightMoveFuture.get(cif).complete(MoveResult.DELETE_FAIL_POLICY);
-        inflightMove.remove(cif);
-        inflightMoveFuture.remove(cif);
+        if (!isSourceDnInReplicaSet) {
+          // if the target is present, and source disappears somehow,
+          // we can consider move is successful.
+          inflightMoveFuture.get(cid).complete(MoveResult.COMPLETED);
+        } else {
+          // if source and target datanode are both in the replicaset,
+          // but we can not delete source datanode for now (e.g.,
+          // there is only 3 replicas or not policy-statisfied , etc.),
+          // we just complete the future without sending a delete command.
+          LOG.info("can not remove source replica after successfully " +
+              "replicated to target datanode");
+          inflightMoveFuture.get(cid).complete(MoveResult.DELETE_FAIL_POLICY);
+        }
+        inflightMove.remove(cid);
+        inflightMoveFuture.remove(cid);
       }
+
     }
 
     return minus;
