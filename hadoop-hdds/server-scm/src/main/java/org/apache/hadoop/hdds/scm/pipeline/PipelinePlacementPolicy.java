@@ -243,7 +243,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param excludedNodes - excluded nodes
    * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired  - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return a list of chosen datanodeDetails
    * @throws SCMException when chosen nodes are not enough in numbers
    */

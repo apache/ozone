@@ -64,7 +64,8 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of Datanodes.
    * @throws SCMException  SCMException
    */

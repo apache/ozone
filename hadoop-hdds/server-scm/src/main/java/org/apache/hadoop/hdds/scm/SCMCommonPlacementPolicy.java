@@ -120,7 +120,8 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @param excludedNodes - datanodes with existing replicas
    * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired  - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return list of datanodes chosen.
    * @throws SCMException SCM exception.
    */

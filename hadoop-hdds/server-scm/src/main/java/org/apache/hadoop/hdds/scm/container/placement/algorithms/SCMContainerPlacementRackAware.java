@@ -90,7 +90,8 @@ public final class SCMContainerPlacementRackAware
    *                     depends on whether the nodes meets the allocator's
    *                     requirement.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of datanodes.
    * @throws SCMException  SCMException
    */
@@ -243,7 +244,8 @@ public final class SCMContainerPlacementRackAware
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
    * @param affinityNode - the chosen nodes should be on the same rack as
    *                    affinityNode. Can be null.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of chosen datanodes.
    * @throws SCMException  SCMException
    */
@@ -320,9 +322,9 @@ public final class SCMContainerPlacementRackAware
    *                     are chosen depends on whether they meet the constrains.
    *                     Can be null.
    * @param favorIndex - the node index of favoredNodes which is not chosen yet.
-   * @param sizeRequired - size required for the container or block.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of chosen datanodes.
    * @throws SCMException  SCMException
    */
