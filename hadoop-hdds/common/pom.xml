@@ -34,6 +34,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
