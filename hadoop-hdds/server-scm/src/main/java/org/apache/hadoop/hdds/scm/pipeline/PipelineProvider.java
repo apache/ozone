@@ -77,9 +77,10 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
   List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
       long sizeRequiredBytes) throws SCMException {
     List<DatanodeDetails> healthyDNs = pickNodesNotUsed(replicationConfig);
+    // TODO: update this to use metadata for ratis 1 pipelines.
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
         .filter(dn -> SCMCommonPlacementPolicy
-            .hasEnoughSpace(dn, sizeRequiredBytes))
+            .hasEnoughSpace(dn, 0, sizeRequiredBytes))
         .collect(Collectors.toList());
 
     int nodesRequired = replicationConfig.getRequiredNodes();

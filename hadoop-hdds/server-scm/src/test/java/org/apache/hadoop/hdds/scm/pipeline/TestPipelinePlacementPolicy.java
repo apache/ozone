@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -168,7 +169,7 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> results = localPlacementPolicy.chooseDatanodes(
         new ArrayList<>(datanodes.size()),
         new ArrayList<>(datanodes.size()),
-        nodesRequired, 0);
+        nodesRequired, 0, 0);
 
     Assert.assertEquals(nodesRequired, results.size());
     // 3 nodes should be on different racks.
@@ -181,14 +182,7 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
-  public void testChooseNodeNotEnoughSpace() throws SCMException {
-    // A huge container size
-    conf.set(OZONE_SCM_CONTAINER_SIZE, "10TB");
-    long containerSizeBytes = (long) this.conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-
+  public void testChooseNodeNotEnoughSpace() {
     // There is only one node on 3 racks altogether.
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (Node node : SINGLE_NODE_RACK) {
@@ -202,40 +196,29 @@ public class TestPipelinePlacementPolicy {
         localNodeManager, new PipelineStateManager(), conf);
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
-    thrownExp.expect(SCMException.class);
-    thrownExp.expectMessage("healthy datanodes with enough space");
-    localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-        new ArrayList<>(datanodes.size()), nodesRequired,
-        containerSizeBytes);
-  }
-
-  @Test
-  public void testChooseNodeNotEnoughMetadataSpace() throws SCMException {
-    // a huge free space min configured
-    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
-        500, StorageUnit.TB);
-    // a small container size
-    conf.set(OZONE_SCM_CONTAINER_SIZE, "100MB");
-
-    // There is only one node on 3 racks altogether.
-    List<DatanodeDetails> datanodes = new ArrayList<>();
-    for (Node node : SINGLE_NODE_RACK) {
-      DatanodeDetails datanode = overwriteLocationInNode(
-          MockDatanodeDetails.randomDatanodeDetails(), node);
-      datanodes.add(datanode);
+    String expectedMessageSubstring = "Unable to find enough nodes that meet " +
+        "the space requirement";
+    try {
+      // A huge container size
+      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+          new ArrayList<>(datanodes.size()), nodesRequired,
+          0, 10 * OzoneConsts.TB);
+      Assert.fail("SCMException should have been thrown.");
+    } catch(SCMException ex) {
+      Assert.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
-        datanodes, false, datanodes.size());
-    PipelinePlacementPolicy localPlacementPolicy = new PipelinePlacementPolicy(
-        localNodeManager, new PipelineStateManager(), conf);
-    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
-    thrownExp.expect(SCMException.class);
-    thrownExp.expectMessage("healthy datanodes with enough space");
-    localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-        new ArrayList<>(datanodes.size()), nodesRequired, 0);
+    try {
+      // a huge free space min configured
+      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+          new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB,
+          0);
+      Assert.fail("SCMException should have been thrown.");
+    } catch(SCMException ex) {
+      Assert.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
+    }
   }
-  
+
   @Test
   public void testPickLowestLoadAnchor() throws IOException{
     List<DatanodeDetails> healthyNodes = nodeManager
@@ -246,7 +229,7 @@ public class TestPipelinePlacementPolicy {
     for (int i = 0; i < maxPipelineCount; i++) {
       try {
         List<DatanodeDetails> nodes = placementPolicy.chooseDatanodes(null,
-            null, HddsProtos.ReplicationFactor.THREE.getNumber(), 0);
+            null, HddsProtos.ReplicationFactor.THREE.getNumber(), 0, 0);
 
         Pipeline pipeline = Pipeline.newBuilder()
             .setId(PipelineID.randomId())
@@ -403,7 +386,7 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> pickedNodes1 = placementPolicy.chooseDatanodes(
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
-        nodesRequired, 0);
+        nodesRequired, 0, 0);
     // modify node to pipeline mapping.
     insertHeavyNodesIntoNodeManager(healthyNodes, minorityHeavy);
     // NODES should be sufficient.
@@ -420,7 +403,7 @@ public class TestPipelinePlacementPolicy {
       pickedNodes2 = placementPolicy.chooseDatanodes(
           new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
           new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
-          nodesRequired, 0);
+          nodesRequired, 0, 0);
     } catch (SCMException e) {
       Assert.assertFalse(thrown);
       thrown = true;
@@ -513,7 +496,7 @@ public class TestPipelinePlacementPolicy {
 
     // As there is only 1 rack alive, the 3 DNs on /rack2 should be returned
     List<DatanodeDetails> pickedDns =  placementPolicy.chooseDatanodes(
-        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0);
+        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0);
 
     assertEquals(3, pickedDns.size());
     assertTrue(pickedDns.contains(dns.get(1)));
@@ -538,7 +521,7 @@ public class TestPipelinePlacementPolicy {
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
     placementPolicy.chooseDatanodes(
-        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0);
+        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0);
   }
 
   @Test
@@ -557,7 +540,7 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> excluded = new ArrayList<>();
     excluded.add(dns.get(0));
     placementPolicy.chooseDatanodes(
-        excluded, new ArrayList<>(), nodesRequired, 0);
+        excluded, new ArrayList<>(), nodesRequired, 0, 0);
   }
 
   private List<DatanodeDetails> setupSkewedRacks() {

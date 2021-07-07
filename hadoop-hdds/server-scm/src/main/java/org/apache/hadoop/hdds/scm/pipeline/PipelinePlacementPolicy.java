@@ -250,12 +250,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, long ratisSizeRequired, long dataSizeRequired)
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     // Get a list of viable nodes based on criteria
     // and make sure excludedNodes are excluded from list.
     List<DatanodeDetails> healthyNodes = filterViableNodes(excludedNodes,
-        nodesRequired, ratisSizeRequired, dataSizeRequired);
+        nodesRequired, metadataSizeRequired, dataSizeRequired);
 
     // Randomly picks nodes when all nodes are equal or factor is ONE.
     // This happens when network topology is absent or

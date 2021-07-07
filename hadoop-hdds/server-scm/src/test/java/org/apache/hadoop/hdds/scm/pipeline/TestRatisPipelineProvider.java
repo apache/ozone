@@ -29,18 +29,21 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -226,19 +229,34 @@ public class TestRatisPipelineProvider {
 
   @Test
   public void testCreatePipelinesWhenNotEnoughSpace() throws Exception {
-    // Use a large enough container size that no node will have enough space
-    // to hold one.
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
-    init(1, conf);
+    String expectedErrorSubstring = "Unable to find enough" +
+        " nodes that meet the space requirement";
 
+    // Use large enough container or metadata sizes that no node will have
+    // enough space to hold one.
+    OzoneConfiguration largeContainerConf = new OzoneConfiguration();
+    largeContainerConf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
+    init(1, largeContainerConf);
+    for (ReplicationFactor factor: ReplicationFactor.values()) {
+        try {
+          provider.create(new RatisReplicationConfig(factor));
+          Assert.fail("Expected SCMException for large container size with " +
+              "replication factor " + factor.toString());
+        } catch(SCMException ex) {
+          Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
+        }
+    }
+
+    OzoneConfiguration largeMetadataConf = new OzoneConfiguration();
+    largeContainerConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "100TB");
+    init(1, largeMetadataConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       try {
         provider.create(new RatisReplicationConfig(factor));
-        Assert.fail();
+        Assert.fail("Expected SCMException for large metadata size with " +
+            "replication factor " + factor.toString());
       } catch(SCMException ex) {
-        Assert.assertTrue(ex.getMessage().contains("Unable to find enough" +
-            " nodes that meet the space requirement"));
+        Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
   }
