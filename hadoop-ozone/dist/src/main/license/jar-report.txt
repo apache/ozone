@@ -68,6 +68,8 @@ share/ozone/lib/hdds-server-scm.jar
 share/ozone/lib/hdds-tools.jar
 share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
+share/ozone/lib/hadoop-shaded-guava.jar
+share/ozone/lib/hadoop-shaded-protobuf_3_7.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
@@ -111,7 +113,6 @@ share/ozone/lib/jakarta.validation-api.jar
 share/ozone/lib/jakarta.ws.rs-api.jar
 share/ozone/lib/jakarta.xml.bind-api.jar
 share/ozone/lib/javassist-GA.jar
-share/ozone/lib/javax.activation-api.jar
 share/ozone/lib/javax.annotation-api.jar
 share/ozone/lib/javax.el-api.jar
 share/ozone/lib/javax.inject.jar
@@ -220,6 +221,7 @@ share/ozone/lib/simpleclient.jar
 share/ozone/lib/slf4j-api.jar
 share/ozone/lib/slf4j-log4j12.jar
 share/ozone/lib/snakeyaml.jar
+share/ozone/lib/snappy-java.jar
 share/ozone/lib/spring-beans.RELEASE.jar
 share/ozone/lib/spring-core.RELEASE.jar
 share/ozone/lib/spring-jcl.RELEASE.jar
