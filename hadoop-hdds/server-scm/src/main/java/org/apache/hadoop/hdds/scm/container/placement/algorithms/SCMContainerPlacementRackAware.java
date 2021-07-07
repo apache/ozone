@@ -97,7 +97,8 @@ public final class SCMContainerPlacementRackAware
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, final long sizeRequired) throws SCMException {
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
@@ -130,7 +131,8 @@ public final class SCMContainerPlacementRackAware
         firstNode = favoredNode;
         favorIndex++;
       } else {
-        firstNode = chooseNode(null, null, sizeRequired);
+        firstNode = chooseNode(null, null, metadataSizeRequired,
+            dataSizeRequired);
       }
       chosenNodes.add(firstNode);
       nodesRequired--;
@@ -147,7 +149,8 @@ public final class SCMContainerPlacementRackAware
         secondNode = favoredNode;
         favorIndex++;
       } else {
-        secondNode = chooseNode(chosenNodes, firstNode, sizeRequired);
+        secondNode = chooseNode(chosenNodes, firstNode, metadataSizeRequired,
+            dataSizeRequired);
       }
       chosenNodes.add(secondNode);
       nodesRequired--;
@@ -156,8 +159,8 @@ public final class SCMContainerPlacementRackAware
       }
 
       // choose remaining datanodes on different rack as first and second
-      return chooseNodes(null, chosenNodes, mutableFavoredNodes, favorIndex,
-          nodesRequired, sizeRequired);
+      return chooseNodes(null, chosenNodes, mutableFavoredNodes,
+          favorIndex, nodesRequired, metadataSizeRequired, dataSizeRequired);
     } else {
       List<Node> mutableExcludedNodes = new ArrayList<>();
       mutableExcludedNodes.addAll(excludedNodes);
@@ -175,7 +178,7 @@ public final class SCMContainerPlacementRackAware
           favorIndex++;
         } else {
           firstNode = chooseNode(mutableExcludedNodes, excludedNodes.get(0),
-              sizeRequired);
+              metadataSizeRequired, dataSizeRequired);
         }
         chosenNodes.add(firstNode);
         nodesRequired--;
@@ -184,7 +187,7 @@ public final class SCMContainerPlacementRackAware
         }
         // choose remaining nodes on different racks
         return chooseNodes(null, chosenNodes, mutableFavoredNodes, favorIndex,
-            nodesRequired, sizeRequired);
+            nodesRequired, metadataSizeRequired, dataSizeRequired);
       }
       // case 2: two or more excluded nodes, if these two nodes are
       // in the same rack, then choose nodes on different racks, otherwise,
@@ -196,7 +199,8 @@ public final class SCMContainerPlacementRackAware
               excludedNodes.get(i), excludedNodes.get(j))) {
             // choose remaining nodes on different racks
             return chooseNodes(mutableExcludedNodes, chosenNodes,
-                mutableFavoredNodes, favorIndex, nodesRequired, sizeRequired);
+                mutableFavoredNodes, favorIndex, nodesRequired,
+                metadataSizeRequired, dataSizeRequired);
           }
         }
       }
@@ -210,7 +214,8 @@ public final class SCMContainerPlacementRackAware
         favorIndex++;
       } else {
         secondNode =
-            chooseNode(chosenNodes, mutableExcludedNodes.get(0), sizeRequired);
+            chooseNode(chosenNodes, mutableExcludedNodes.get(0),
+                metadataSizeRequired, dataSizeRequired);
       }
       chosenNodes.add(secondNode);
       mutableExcludedNodes.add(secondNode);
@@ -220,7 +225,7 @@ public final class SCMContainerPlacementRackAware
       }
       // choose remaining nodes on different racks
       return chooseNodes(mutableExcludedNodes, chosenNodes, mutableFavoredNodes,
-          favorIndex, nodesRequired, sizeRequired);
+          favorIndex, nodesRequired, metadataSizeRequired, dataSizeRequired);
     }
   }
 
@@ -243,7 +248,7 @@ public final class SCMContainerPlacementRackAware
    * @throws SCMException  SCMException
    */
   private Node chooseNode(List<Node> excludedNodes, Node affinityNode,
-      long sizeRequired) throws SCMException {
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
     int ancestorGen = RACK_LEVEL;
     int maxRetry = MAX_RETRY;
     List<String> excludedNodesForCapacity = null;
@@ -275,9 +280,11 @@ public final class SCMContainerPlacementRackAware
         throw new SCMException("No satisfied datanode to meet the" +
             " excludedNodes and affinityNode constrains.", null);
       }
-      if (super.hasEnoughSpace((DatanodeDetails)node, sizeRequired)) {
-        LOG.debug("Datanode {} is chosen. Required size is {}",
-            node.toString(), sizeRequired);
+      if (super.hasEnoughSpace((DatanodeDetails)node, metadataSizeRequired,
+          dataSizeRequired)) {
+        LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
+                "required data size is {}",
+            node.toString(), metadataSizeRequired, dataSizeRequired);
         metrics.incrDatanodeChooseSuccessCount();
         if (isFallbacked) {
           metrics.incrDatanodeChooseFallbackCount();
@@ -288,7 +295,8 @@ public final class SCMContainerPlacementRackAware
         if (maxRetry == 0) {
           // avoid the infinite loop
           String errMsg = "No satisfied datanode to meet the space constrains. "
-              + " sizeRequired: " + sizeRequired;
+              + "metadatadata size required: " + metadataSizeRequired +
+              " data size required: " + dataSizeRequired;
           LOG.info(errMsg);
           throw new SCMException(errMsg, null);
         }
@@ -320,8 +328,8 @@ public final class SCMContainerPlacementRackAware
    */
   private List<DatanodeDetails> chooseNodes(List<Node> excludedNodes,
       List<Node> chosenNodes, List<DatanodeDetails> favoredNodes,
-      int favorIndex, int nodesRequired, long sizeRequired)
-      throws SCMException {
+      int favorIndex, int nodesRequired, long metadataSizeRequired,
+      long dataSizeRequired) throws SCMException {
     Preconditions.checkArgument(chosenNodes != null);
     List<Node> excludedNodeList = excludedNodes != null ?
         excludedNodes : chosenNodes;
@@ -335,7 +343,8 @@ public final class SCMContainerPlacementRackAware
         chosenNode = favoredNode;
         favorIndex++;
       } else {
-        chosenNode = chooseNode(excludedNodeList, null, sizeRequired);
+        chosenNode = chooseNode(excludedNodeList, null,
+            metadataSizeRequired, dataSizeRequired);
       }
       excludedNodeList.add(chosenNode);
       if (excludedNodeList != chosenNodes) {

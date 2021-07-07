@@ -99,9 +99,10 @@ public final class SCMContainerPlacementCapacity
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      final int nodesRequired, final long sizeRequired) throws SCMException {
+      final int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
     List<DatanodeDetails> healthyNodes = super.chooseDatanodes(excludedNodes,
-        favoredNodes, nodesRequired, sizeRequired);
+        favoredNodes, nodesRequired, metadataSizeRequired, dataSizeRequired);
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;
     }

@@ -71,10 +71,11 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      final int nodesRequired, final long sizeRequired) throws SCMException {
+      final int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
     List<DatanodeDetails> healthyNodes =
         super.chooseDatanodes(excludedNodes, favoredNodes, nodesRequired,
-            sizeRequired);
+            metadataSizeRequired, dataSizeRequired);
 
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;

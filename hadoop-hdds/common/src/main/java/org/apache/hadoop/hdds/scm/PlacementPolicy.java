@@ -40,8 +40,8 @@ public interface PlacementPolicy {
    * @throws IOException
    */
   List<DatanodeDetails> chooseDatanodes(List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> favoredNodes, int nodesRequired, long sizeRequired)
-      throws IOException;
+      List<DatanodeDetails> favoredNodes, int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws IOException;
 
   /**
    * Given a list of datanode and the number of replicas required, return
