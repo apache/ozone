@@ -155,8 +155,6 @@ public class ReplicationManager implements MetricsSource, SCMService {
     COMPLETED,
     // RM is not running
     RM_NOT_RUNNING,
-    // source datanode disappear somehow
-    REPLICATION_FAIL_SOURCE_DISAPPEAR,
     // replication fail because the container does not exist in src
     REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
     // replication fail because the container exists in target
@@ -741,14 +739,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
 
       // check whether {Existing replicas + Target_Dn - Source_Dn}
       // satisfies current placement policy
-      Set<ContainerReplica> movedReplicas = new HashSet<>();
-      movedReplicas.addAll(currentReplicas);
-      movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
-      movedReplicas.add(ContainerReplica.newBuilder()
-          .setDatanodeDetails(targetDn).build());
-      ContainerPlacementStatus placementStatus = getPlacementStatus(
-          movedReplicas, cif.getReplicationConfig().getRequiredNodes());
-      if (!placementStatus.isPolicySatisfied()) {
+      if (!isPolicySatisfiedAfterMove(cif, srcDn, targetDn,
+          currentReplicas.stream().collect(Collectors.toList()))) {
         ret.complete(MoveResult.PLACEMENT_POLICY_NOT_SATISFIED);
         return ret;
       }
@@ -760,6 +752,28 @@ public class ReplicationManager implements MetricsSource, SCMService {
     LOG.info("receive a move requset about container {} , from {} to {}",
         cid, srcDn.getUuid(), targetDn.getUuid());
     return ret;
+  }
+
+  /**
+   * Returns whether {Existing replicas + Target_Dn - Source_Dn}
+   * satisfies current placement policy.
+   * @param cif Container Info of moved container
+   * @param srcDn DatanodeDetails of source data node
+   * @param targetDn DatanodeDetails of target data node
+   * @param replicas container replicas
+   * @return whether the placement policy is satisfied after move
+   */
+  private boolean isPolicySatisfiedAfterMove(ContainerInfo cif,
+                    DatanodeDetails srcDn, DatanodeDetails targetDn,
+                    final List<ContainerReplica> replicas){
+    Set<ContainerReplica> movedReplicas =
+        replicas.stream().collect(Collectors.toSet());
+    movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
+    movedReplicas.add(ContainerReplica.newBuilder()
+        .setDatanodeDetails(targetDn).build());
+    ContainerPlacementStatus placementStatus = getPlacementStatus(
+        movedReplicas, cif.getReplicationConfig().getRequiredNodes());
+    return placementStatus.isPolicySatisfied();
   }
 
   /**
@@ -1153,78 +1167,70 @@ public class ReplicationManager implements MetricsSource, SCMService {
           break;
         }
       }
-
       eligibleReplicas.removeAll(unhealthyReplicas);
-      boolean isInMove = inflightMove.containsKey(id);
-      boolean isSourceDnInReplicaSet = false;
-      boolean isTargetDnInReplicaSet = false;
 
-      if (isInMove) {
-        Pair<DatanodeDetails, DatanodeDetails> movePair =
-            inflightMove.get(id);
-        final DatanodeDetails sourceDN = movePair.getKey();
-        isSourceDnInReplicaSet = eligibleReplicas.stream()
-            .anyMatch(r -> r.getDatanodeDetails().equals(sourceDN));
-        isTargetDnInReplicaSet = eligibleReplicas.stream()
-            .anyMatch(r -> r.getDatanodeDetails()
-                .equals(movePair.getValue()));
-        int sourceDnPos = 0;
-        for (int i = 0; i < eligibleReplicas.size(); i++) {
-          if (eligibleReplicas.get(i).getDatanodeDetails()
-              .equals(sourceDN)) {
-            sourceDnPos = i;
-            break;
-          }
-        }
-        if (isTargetDnInReplicaSet) {
-          if (isSourceDnInReplicaSet) {
-            // if the container is in inflightMove and target datanode is
-            // included in the replicas, then swap the source datanode to
-            // first of the replica list if exists, so the source datanode
-            // will be first removed if possible.
-            eligibleReplicas.add(0, eligibleReplicas.remove(sourceDnPos));
-          } else {
-            // if the target is present, and source disappears somehow,
-            // we can consider move is successful.
-            inflightMoveFuture.get(id).complete(MoveResult.COMPLETED);
-            inflightMove.remove(id);
-            inflightMoveFuture.remove(id);
-          }
-        } else {
-          if (isSourceDnInReplicaSet) {
-            // a container replica that being moved should not be removed.
-            // if the container is in inflightMove and target datanode is not
-            // included in the replicas, then swap the source datanode to the
-            // last of the replica list, so the source datanode will not
-            // be removed.
-            eligibleReplicas.add(eligibleReplicas.remove(sourceDnPos));
-          } else {
-            // if the target is not present, and source disappears somehow,
-            // we fail the completeableFuture directly.
-            inflightMoveFuture.get(id).complete(
-                MoveResult.REPLICATION_FAIL_SOURCE_DISAPPEAR);
-            inflightMove.remove(id);
-            inflightMoveFuture.remove(id);
-          }
-        }
-      }
+      excess -= handleMoveIfNeeded(container, eligibleReplicas);
 
       removeExcessReplicasIfNeeded(excess, container, eligibleReplicas);
+    }
+  }
 
-      if (isInMove && isSourceDnInReplicaSet && isTargetDnInReplicaSet) {
+  /**
+   * if the container is in inflightMove, handle move if needed.
+   *
+   * @param cif ContainerInfo
+   * @param eligibleReplicas An list of replicas, which may have excess replicas
+   * @return minus how many replica is removed through sending delete command
+   */
+  private int handleMoveIfNeeded(final ContainerInfo cif,
+                   final List<ContainerReplica> eligibleReplicas) {
+    int minus = 0;
+    final ContainerID cid = cif.containerID();
+    if (!inflightMove.containsKey(cid)) {
+      return minus;
+    }
+
+    Pair<DatanodeDetails, DatanodeDetails> movePair =
+        inflightMove.get(cid);
+
+    final DatanodeDetails srcDn = movePair.getKey();
+    final DatanodeDetails targetDn = movePair.getValue();
+    boolean isSourceDnInReplicaSet;
+    boolean isTargetDnInReplicaSet;
+
+    isSourceDnInReplicaSet = eligibleReplicas.stream()
+        .anyMatch(r -> r.getDatanodeDetails().equals(srcDn));
+    isTargetDnInReplicaSet = eligibleReplicas.stream()
+        .anyMatch(r -> r.getDatanodeDetails().equals(targetDn));
+
+    // if target datanode is not in replica set , nothing to do
+    if (isTargetDnInReplicaSet) {
+      if (isSourceDnInReplicaSet &&
+          isPolicySatisfiedAfterMove(cif, srcDn, targetDn, eligibleReplicas)) {
+        sendDeleteCommand(cif, srcDn, true);
+        eligibleReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
+        minus++;
+      } else if (!isSourceDnInReplicaSet){
+        // if the target is present, and source disappears somehow,
+        // we can consider move is successful.
+        inflightMoveFuture.get(cif).complete(MoveResult.COMPLETED);
+        inflightMove.remove(cif);
+        inflightMoveFuture.remove(cif);
+      } else {
         // if source and target datanode are both in the replicaset,
         // but we can not delete source datanode for now (e.g.,
         // there is only 3 replicas or not policy-statisfied , etc.),
         // we just complete the future without sending a delete command.
         LOG.info("can not remove source replica after successfully " +
             "replicated to target datanode");
-        inflightMoveFuture.get(id).complete(MoveResult.DELETE_FAIL_POLICY);
-        inflightMove.remove(id);
-        inflightMoveFuture.remove(id);
+        inflightMoveFuture.get(cif).complete(MoveResult.DELETE_FAIL_POLICY);
+        inflightMove.remove(cif);
+        inflightMoveFuture.remove(cif);
       }
     }
-  }
 
+    return minus;
+  }
 
   /**
    * remove execess replicas if needed, replicationFactor and placement policy
