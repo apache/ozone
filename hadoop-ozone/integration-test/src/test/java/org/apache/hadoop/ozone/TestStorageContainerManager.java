@@ -827,9 +827,8 @@ public class TestStorageContainerManager {
     }
   }
 
-  @SuppressWarnings("visibilitymodifier")
-  static class CloseContainerCommandMatcher
-      extends ArgumentMatcher<CommandForDatanode> {
+  private static class CloseContainerCommandMatcher
+      implements ArgumentMatcher<CommandForDatanode> {
 
     private final CommandForDatanode cmd;
     private final UUID uuid;
@@ -840,8 +839,7 @@ public class TestStorageContainerManager {
     }
 
     @Override
-    public boolean matches(Object argument) {
-      CommandForDatanode cmdRight = (CommandForDatanode) argument;
+    public boolean matches(CommandForDatanode cmdRight) {
       CloseContainerCommand left = (CloseContainerCommand) cmd.getCommand();
       CloseContainerCommand right =
           (CloseContainerCommand) cmdRight.getCommand();

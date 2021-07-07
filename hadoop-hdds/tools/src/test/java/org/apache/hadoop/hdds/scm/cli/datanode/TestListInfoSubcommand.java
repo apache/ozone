@@ -68,9 +68,7 @@ public class TestListInfoSubcommand {
   public void testDataNodeOperationalStateAndHealthIncludedInOutput()
       throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(HddsProtos.NodeOperationalState.class),
-        any(HddsProtos.NodeState.class), any(HddsProtos.QueryScope.class),
-        Mockito.anyString()))
+    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> getNodeDetails());
     Mockito.when(scmClient.listPipelines())
         .thenReturn(new ArrayList<>());
