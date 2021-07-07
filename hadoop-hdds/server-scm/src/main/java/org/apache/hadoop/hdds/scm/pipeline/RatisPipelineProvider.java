@@ -146,7 +146,8 @@ public class RatisPipelineProvider
         replicationConfig.getReplicationFactor();
     switch (factor) {
     case ONE:
-      dns = pickNodesNotUsed(replicationConfig, containerSizeBytes);
+      dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
+          containerSizeBytes);
       break;
     case THREE:
       dns = placementPolicy.chooseDatanodes(null,

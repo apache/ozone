@@ -248,7 +248,7 @@ public class TestRatisPipelineProvider {
     }
 
     OzoneConfiguration largeMetadataConf = new OzoneConfiguration();
-    largeContainerConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "100TB");
+    largeMetadataConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "100TB");
     init(1, largeMetadataConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       try {

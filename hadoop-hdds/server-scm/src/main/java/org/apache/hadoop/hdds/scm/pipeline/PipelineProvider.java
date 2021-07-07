@@ -75,20 +75,20 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
   protected abstract void shutdown();
 
   List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
-      long sizeRequiredBytes) throws SCMException {
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
     List<DatanodeDetails> healthyDNs = pickNodesNotUsed(replicationConfig);
-    // TODO: update this to use metadata for ratis 1 pipelines.
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
         .filter(dn -> SCMCommonPlacementPolicy
-            .hasEnoughSpace(dn, 0, sizeRequiredBytes))
+            .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
         .collect(Collectors.toList());
 
     int nodesRequired = replicationConfig.getRequiredNodes();
     if (healthyDNsWithSpace.size() < nodesRequired) {
       String msg = String.format("Unable to find enough nodes that meet the " +
-              "space requirement of %d bytes in healthy node set." +
-              " Nodes required: %d Found: %d",
-          sizeRequiredBytes, nodesRequired, healthyDNsWithSpace.size());
+              "space requirement of %d bytes for metadata and %d bytes for " +
+              "data in healthy node set. Nodes required: %d Found: %d",
+          metadataSizeRequired, dataSizeRequired, nodesRequired,
+          healthyDNsWithSpace.size());
       LOG.error(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
