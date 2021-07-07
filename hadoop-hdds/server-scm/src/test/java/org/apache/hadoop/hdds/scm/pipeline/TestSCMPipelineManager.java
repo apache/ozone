@@ -118,7 +118,7 @@ class TestSCMPipelineManager {
     FileUtil.fullyDelete(testDir);
   }
 
-  @org.junit.jupiter.api.RepeatedTest(1000)
+  @Test
   void testPipelineReload() throws IOException {
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf,
