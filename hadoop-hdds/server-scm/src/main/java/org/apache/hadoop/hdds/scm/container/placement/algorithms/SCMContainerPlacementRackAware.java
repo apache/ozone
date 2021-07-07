@@ -282,7 +282,7 @@ public final class SCMContainerPlacementRackAware
         throw new SCMException("No satisfied datanode to meet the" +
             " excludedNodes and affinityNode constrains.", null);
       }
-      if (super.hasEnoughSpace((DatanodeDetails)node, metadataSizeRequired,
+      if (hasEnoughSpace((DatanodeDetails)node, metadataSizeRequired,
           dataSizeRequired)) {
         LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
                 "required data size is {}",
