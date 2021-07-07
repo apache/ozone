@@ -22,9 +22,12 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import javax.inject.Inject;
+import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 @Path("/nssummary")
 @Produces(MediaType.APPLICATION_JSON)
@@ -35,5 +38,18 @@ public class NSSummaryEndpoint {
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
+  @GET
+  @Path("/basic")
+  public Response getBasicInfoById(
+          @QueryParam("entityType") String type,
+          @QueryParam("objectId") long objectId) {
 
+  }
+
+  // "vol/bucket/" bucket
+  // "vol/"
+  // getVolumeKey
+  // getBucketKey
+
+  // /vol/bucket/dir1/dir2/dir3
 }
