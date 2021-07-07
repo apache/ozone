@@ -139,7 +139,6 @@ public class TestOzoneShellHA {
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
-    conf.setQuietMode(false);
     cluster.waitForClusterToBeReady();
   }
 
