@@ -107,6 +107,7 @@ class TestSCMPipelineManager {
       throw new IOException("Unable to create test directory path");
     }
     nodeManager = new MockNodeManager(true, 20);
+    nodeManager.setNumPipelinePerDatanode(1);
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
   }
