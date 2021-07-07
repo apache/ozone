@@ -156,23 +156,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
-//    // filter nodes that don't even have space for one container
-//    List<DatanodeDetails> canHoldList = healthyNodes.stream().filter(d ->
-//        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
-//        .collect(Collectors.toList());
-//
-//    if (canHoldList.size() < nodesRequired) {
-//      msg = String.format("Pipeline creation failed due to no sufficient" +
-//          " healthy datanodes with enough space for container data and " +
-//          "metadata. Required %d. Found %d. Container data required %d, " +
-//          "metadata required %d.",
-//          nodesRequired, canHoldList.size(), dataSizeRequired,
-//          metadataSizeRequired);
-//      LOG.warn(msg);
-//      throw new SCMException(msg,
-//          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
-//    }
-
     // filter nodes that meet the size and pipeline engagement criteria.
     // Pipeline placement doesn't take node space left into account.
     // Sort the DNs by pipeline load.
