@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
@@ -66,6 +68,7 @@ public class ReconNodeManager extends SCMNodeManager {
    * and their last heartbeat time.
    */
   private Map<UUID, Long> datanodeHeartbeatMap = new HashMap<>();
+  private Map<UUID, Integer> nodeSignatureCache = new HashMap<>();
 
   public ReconNodeManager(OzoneConfiguration conf,
                           SCMStorageConfig scmStorageConfig,
@@ -100,6 +103,8 @@ public class ReconNodeManager extends SCMNodeManager {
    */
   public void addNodeToDB(DatanodeDetails datanodeDetails) throws IOException {
     nodeDB.put(datanodeDetails.getUuid(), datanodeDetails);
+    nodeSignatureCache.put(datanodeDetails.getUuid(),
+        datanodeDetails.getSignature());
     LOG.info("Adding new node {} to Node DB.", datanodeDetails.getUuid());
   }
 
@@ -136,7 +141,14 @@ public class ReconNodeManager extends SCMNodeManager {
     // Update heartbeat map with current time
     datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
 
-    List<SCMCommand> cmds = super.processHeartbeat(datanodeDetails);
+    List<SCMCommand> cmds = new ArrayList<>();
+    if (nodeSignatureCache.containsKey(datanodeDetails.getUuid()) &&
+        nodeSignatureCache.get(datanodeDetails.getUuid()) !=
+            (datanodeDetails.getSignature())) {
+      cmds.add(new ReregisterCommand());
+      return cmds;
+    }
+    cmds = super.processHeartbeat(datanodeDetails);
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
         .collect(toList());
