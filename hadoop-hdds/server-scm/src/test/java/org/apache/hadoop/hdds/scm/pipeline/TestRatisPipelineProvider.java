@@ -29,14 +29,12 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -238,13 +236,13 @@ public class TestRatisPipelineProvider {
     largeContainerConf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
     init(1, largeContainerConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
-        try {
-          provider.create(new RatisReplicationConfig(factor));
-          Assert.fail("Expected SCMException for large container size with " +
-              "replication factor " + factor.toString());
-        } catch(SCMException ex) {
-          Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
-        }
+      try {
+        provider.create(new RatisReplicationConfig(factor));
+        Assert.fail("Expected SCMException for large container size with " +
+            "replication factor " + factor.toString());
+      } catch(SCMException ex) {
+        Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
+      }
     }
 
     OzoneConfiguration largeMetadataConf = new OzoneConfiguration();
