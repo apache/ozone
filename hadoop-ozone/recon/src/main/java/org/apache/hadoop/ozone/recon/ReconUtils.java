@@ -317,7 +317,7 @@ public class ReconUtils {
 
   private static int nextClosestPowerIndexOfTwo(long dataSize) {
     int index = 0;
-    while(dataSize != 0) {
+    while (dataSize != 0) {
       dataSize >>= 1;
       index += 1;
     }

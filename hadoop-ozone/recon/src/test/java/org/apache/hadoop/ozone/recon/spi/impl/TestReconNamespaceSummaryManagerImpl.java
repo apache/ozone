@@ -24,7 +24,10 @@ import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,6 +38,8 @@ public class TestReconNamespaceSummaryManagerImpl {
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private static int[] testBucket;
+  private static final List<Long> TEST_CHILD_DIR =
+          new ArrayList<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeClass
   public static void setupOnce() throws Exception {
@@ -69,6 +74,9 @@ public class TestReconNamespaceSummaryManagerImpl {
     Assert.assertEquals(4, summary2.getSizeOfFiles());
     Assert.assertEquals(5, summary3.getNumOfFiles());
     Assert.assertEquals(6, summary3.getSizeOfFiles());
+
+    // test child dir is written
+    Assert.assertEquals(3, summary.getChildDir().size());
     // non-existent key
     Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(0L));
   }
@@ -85,9 +93,9 @@ public class TestReconNamespaceSummaryManagerImpl {
 
   private void putThreeNSMetadata() throws IOException {
     HashMap<Long, NSSummary> hmap = new HashMap<>();
-    hmap.put(1L, new NSSummary(1, 2, testBucket));
-    hmap.put(2L, new NSSummary(3, 4, testBucket));
-    hmap.put(3L, new NSSummary(5, 6, testBucket));
+    hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR));
+    hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR));
+    hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR));
     for (Map.Entry entry: hmap.entrySet()) {
       reconNamespaceSummaryManager.storeNSSummary(
               (long)entry.getKey(), (NSSummary)entry.getValue());

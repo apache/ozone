@@ -29,6 +29,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Codec for Namespace Summary.
@@ -40,13 +42,16 @@ public class NSSummaryCodec implements Codec<NSSummary> {
   private final Codec<Long> longCodec = new LongCodec();
   // 1 int fields + 41-length int array
   private static final int NUM_OF_INTS = 1 + ReconConstants.NUM_OF_BINS;
-  // The expected length of the byte buffer.
-  private static final int RES_SIZE =
-          NUM_OF_INTS * Integer.BYTES + Long.BYTES + Short.BYTES;
 
   @Override
   public byte[] toPersistedFormat(NSSummary object) throws IOException {
-    ByteArrayOutputStream out = new ByteArrayOutputStream(RES_SIZE);
+    List<Long> childDirs = object.getChildDir();
+    int numOfChildDirs = childDirs.size();
+    final int resSize = NUM_OF_INTS * Integer.BYTES
+            + (numOfChildDirs + 1) * Long.BYTES // 1 long field + list size
+            + 2 * Short.BYTES; // 2 dummy shorts to track length
+
+    ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
     out.write(longCodec.toPersistedFormat(object.getSizeOfFiles()));
     out.write(shortCodec.toPersistedFormat((short)ReconConstants.NUM_OF_BINS));
@@ -54,12 +59,15 @@ public class NSSummaryCodec implements Codec<NSSummary> {
     for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
       out.write(integerCodec.toPersistedFormat(fileSizeBucket[i]));
     }
+    out.write(shortCodec.toPersistedFormat((short)numOfChildDirs));
+    for (int i = 0; i < numOfChildDirs; ++i) {
+      out.write(longCodec.toPersistedFormat(childDirs.get(i)));
+    }
     return out.toByteArray();
   }
 
   @Override
   public NSSummary fromPersistedFormat(byte[] rawData) throws IOException {
-    assert(rawData.length == RES_SIZE);
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(rawData));
     NSSummary res = new NSSummary();
     res.setNumOfFiles(in.readInt());
@@ -71,6 +79,13 @@ public class NSSummaryCodec implements Codec<NSSummary> {
       fileSizeBucket[i] = in.readInt();
     }
     res.setFileSizeBucket(fileSizeBucket);
+
+    short listSize = in.readShort();
+    List<Long> childDir = new ArrayList<>();
+    for (int i = 0; i < listSize; ++i) {
+      childDir.add(in.readLong());
+    }
+    res.setChildDir(childDir);
     return res;
   }
 
@@ -80,6 +95,7 @@ public class NSSummaryCodec implements Codec<NSSummary> {
     copy.setNumOfFiles(object.getNumOfFiles());
     copy.setSizeOfFiles(object.getSizeOfFiles());
     copy.setFileSizeBucket(object.getFileSizeBucket());
+    copy.setChildDir(object.getChildDir());
     return copy;
   }
 }

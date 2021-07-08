@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import org.apache.hadoop.ozone.recon.ReconConstants;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Class to encapsulate namespace metadata summaries from OM.
@@ -30,17 +32,23 @@ public class NSSummary {
   private int numOfFiles;
   private long sizeOfFiles;
   private int[] fileSizeBucket;
+  private List<Long> childDir;
 
   public NSSummary() {
     this.numOfFiles = 0;
     this.sizeOfFiles = 0L;
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
+    this.childDir = new ArrayList<>();
   }
 
-  public NSSummary(int numOfFiles, long sizeOfFiles, int[] bucket) {
+  public NSSummary(int numOfFiles,
+                   long sizeOfFiles,
+                   int[] bucket,
+                   List<Long> childDir) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
     setFileSizeBucket(bucket);
+    setChildDir(childDir);
   }
 
   public int getNumOfFiles() {
@@ -55,6 +63,10 @@ public class NSSummary {
     return Arrays.copyOf(this.fileSizeBucket, ReconConstants.NUM_OF_BINS);
   }
 
+  public List<Long> getChildDir() {
+    return new ArrayList<>(childDir);
+  }
+
   public void setNumOfFiles(int numOfFiles) {
     this.numOfFiles = numOfFiles;
   }
@@ -66,5 +78,9 @@ public class NSSummary {
   public void setFileSizeBucket(int[] fileSizeBucket) {
     this.fileSizeBucket = Arrays.copyOf(
             fileSizeBucket, ReconConstants.NUM_OF_BINS);
+  }
+
+  public void setChildDir(List<Long> childDir) {
+    this.childDir = new ArrayList<>(childDir);
   }
 }
