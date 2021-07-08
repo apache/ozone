@@ -260,10 +260,6 @@ public class KeyValueHandler extends Handler {
 
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
-    } catch (IOException ex) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException("Write Chunk failed", ex, IO_EXCEPTION),
-          request);
     }
 
     return getSuccessResponseBuilder(request)
