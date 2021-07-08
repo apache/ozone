@@ -143,7 +143,7 @@ public class NSSummaryTask implements ReconOmTask {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                       updatedKey);
             }
-            writeOmDirectoryInfoOnNamespaceDB(oldDirectoryInfo);
+            writeOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
             break;
 
           default:
