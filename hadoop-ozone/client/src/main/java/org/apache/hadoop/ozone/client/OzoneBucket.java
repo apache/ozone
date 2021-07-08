@@ -139,7 +139,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Bucket Type.
    */
-  private BucketType bucketType;
+  private BucketType bucketType = BucketType.DEFAULT;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ClientProtocol proxy) {
@@ -580,13 +580,11 @@ public class OzoneBucket extends WithMetadata {
    * @param prevKey Keys will be listed after this key name
    * @return {@code Iterator<OzoneKey>}
    */
-  public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
-      String prevKey) throws IOException {
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix, String prevKey)
+      throws IOException {
 
-    if(OzoneFSUtils.isFSOptimizedBucket(bucketType)){
-      return new KeyIteratorWithFSO(keyPrefix, prevKey);
-    }
-    return new KeyIterator(keyPrefix, prevKey);
+    return new KeyIteratorFactory()
+        .getKeyIterator(keyPrefix, prevKey, bucketType);
   }
 
   /**
@@ -1189,6 +1187,17 @@ public class OzoneBucket extends WithMetadata {
       }
     }
 
+  }
+
+  private class KeyIteratorFactory {
+    KeyIterator getKeyIterator(String keyPrefix, String prevKey,
+        BucketType bType) throws IOException {
+      if (bType.equals(BucketType.FILE_SYSTEM_OPTIMIZED)) {
+        return new KeyIteratorWithFSO(keyPrefix, prevKey);
+      } else {
+        return new KeyIterator(keyPrefix, prevKey);
+      }
+    }
   }
 
   public BucketType getBucketType() {

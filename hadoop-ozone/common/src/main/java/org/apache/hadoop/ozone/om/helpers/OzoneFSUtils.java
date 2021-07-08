@@ -210,7 +210,7 @@ public final class OzoneFSUtils {
 
 
   public static boolean isFSOptimizedBucket(BucketType bucketType) {
-    return bucketType.equals(BucketType.FSO);
+    return bucketType.equals(BucketType.FILE_SYSTEM_OPTIMIZED);
   }
 
   public static String removeTrailingSlashIfNeeded(String key) {

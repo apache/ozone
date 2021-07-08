@@ -107,7 +107,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param usedBytes - Bucket Quota Usage in bytes.
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
-   * @param bucketType Bucket Types.
+   * @param bucketType Bucket Type.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -562,12 +562,23 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return bib.build();
   }
 
+
   /**
    * Parses BucketInfo protobuf and creates OmBucketInfo.
    * @param bucketInfo
    * @return instance of OmBucketInfo
    */
   public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
+    return getFromProtobuf(bucketInfo, null);
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+      BucketType buckType) {
     OmBucketInfo.Builder obib = OmBucketInfo.newBuilder()
         .setVolumeName(bucketInfo.getVolumeName())
         .setBucketName(bucketInfo.getBucketName())
@@ -581,7 +592,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
         .setUsedNamespace(bucketInfo.getUsedNamespace())
         .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
-    if (bucketInfo.getBucketType() != null) {
+    if (buckType != null) {
+      obib.setBucketType(buckType);
+    } else if (bucketInfo.getBucketType() != null) {
       obib.setBucketType(BucketType.fromProto(bucketInfo.getBucketType()));
     }
     if (bucketInfo.hasObjectID()) {

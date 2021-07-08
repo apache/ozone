@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -30,10 +31,12 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketType;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -138,7 +141,20 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
+    String omLayout = ozoneManager.getOMMetadataLayout();
+    OmBucketInfo omBucketInfo = null;
+    if (bucketInfo.getBucketType() == null || bucketInfo.getBucketType()
+        .equals(BucketTypeProto.LEGACY)) {
+      BucketType defaultType = BucketType.LEGACY;
+      if (StringUtils
+          .equalsIgnoreCase(OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX,
+              omLayout)) {
+        defaultType = BucketType.FILE_SYSTEM_OPTIMIZED;
+      }
+      omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
+    } else {
+      omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
+    }
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();

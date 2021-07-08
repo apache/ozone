@@ -68,7 +68,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @BeforeClass
   public static void init() {
-    setBucketType(BucketType.FSO);
+    setBucketType(BucketType.FILE_SYSTEM_OPTIMIZED);
   }
 
   public TestOzoneFileSystemWithFSO(boolean setDefaultFs,

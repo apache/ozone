@@ -65,7 +65,7 @@ public final class BucketArgs {
   /**
    * Bucket Type.
    */
-  private BucketType bucketType;
+  private BucketType bucketType = BucketType.DEFAULT;
 
   /**
    * Private constructor, constructed via builder.

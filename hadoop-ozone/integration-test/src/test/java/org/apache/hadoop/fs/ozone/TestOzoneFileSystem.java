@@ -155,7 +155,7 @@ public class TestOzoneFileSystem {
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    if (bucketType.equals(BucketType.FSO)) {
+    if (bucketType.equals(BucketType.FILE_SYSTEM_OPTIMIZED)) {
       TestOMRequestUtils.configureFSOptimizedPaths(conf, enabledFileSystemPaths,
           OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     } else {

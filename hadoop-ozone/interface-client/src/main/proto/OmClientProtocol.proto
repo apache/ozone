@@ -519,7 +519,7 @@ message BucketInfo {
     optional int64 quotaInBytes = 15 [default = -2];
     optional int64 quotaInNamespace = 16 [default = -2];
     optional uint64 usedNamespace = 17;
-    optional BucketTypeProto bucketType = 18 [default = LEGACY];
+    optional BucketTypeProto bucketType = 18;
 }
 
 enum StorageTypeProto {
@@ -531,7 +531,7 @@ enum StorageTypeProto {
 
 enum BucketTypeProto {
     LEGACY = 1;
-    FSO = 2;
+    FILE_SYSTEM_OPTIMIZED = 2;
     OBJECT_STORE = 3;
 }
 

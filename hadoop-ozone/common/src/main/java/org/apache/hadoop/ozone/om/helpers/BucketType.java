@@ -21,10 +21,13 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
- * The replication type to be used while writing key into ozone.
+ * BucketType enum
+ * We have 3 types of buckets - FSO, OBJECT_STORE, and LEGACY
+ * LEGACY is used to represent the old buckets which are already
+ * present in DB while user can create new buckets as FSO or OBJECT_STORE.
  */
 public enum BucketType {
-  FSO, OBJECT_STORE, LEGACY;
+  FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY;
   public static final BucketType DEFAULT = OBJECT_STORE;
   public static BucketType fromProto(
       OzoneManagerProtocolProtos.BucketTypeProto bucketType) {
@@ -32,9 +35,12 @@ public enum BucketType {
       return BucketType.LEGACY;
     }
     switch (bucketType) {
-    case FSO:
-      return BucketType.FSO;
+    case FILE_SYSTEM_OPTIMIZED:
+      return BucketType.FILE_SYSTEM_OPTIMIZED;
+    case LEGACY:
+      return BucketType.LEGACY;
     case OBJECT_STORE:
+      return BucketType.OBJECT_STORE;
     default:
       return DEFAULT;
     }
@@ -42,15 +48,15 @@ public enum BucketType {
 
   public OzoneManagerProtocolProtos.BucketTypeProto toProto() {
     switch (this) {
-    case FSO:
-      return OzoneManagerProtocolProtos.BucketTypeProto.FSO;
+    case FILE_SYSTEM_OPTIMIZED:
+      return OzoneManagerProtocolProtos.BucketTypeProto.FILE_SYSTEM_OPTIMIZED;
     case OBJECT_STORE:
       return OzoneManagerProtocolProtos.BucketTypeProto.OBJECT_STORE;
     case LEGACY:
       return OzoneManagerProtocolProtos.BucketTypeProto.LEGACY;
     default:
-      throw new IllegalStateException(
-          "BUG: BucketType not found, type=" + this);
+      throw new IllegalArgumentException(
+          "Error: BucketType not found, type=" + this);
     }
   }
 }

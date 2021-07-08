@@ -51,11 +51,12 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
+  enum AllowedBucketTypes { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
+
   @Option(names = { "--type", "-t" },
-      description = "Specifies the bucket type, FSO: FileSystemOptimized Bucket"
-          + " and OBJECT_STORE: Object Store Buckets.",
+      description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
       defaultValue = "OBJECT_STORE")
-  private BucketType bucketType;
+  private AllowedBucketTypes allowedBucketType;
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
@@ -68,15 +69,9 @@ public class CreateBucketHandler extends BucketHandler {
       throws IOException {
 
     BucketArgs.Builder bb;
-    if (bucketType.equals(BucketType.OBJECT_STORE) || bucketType
-        .equals(BucketType.FSO)) {
-      bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-          .setVersioning(false).setBucketType(bucketType);
-    } else {
-      throw new IllegalArgumentException(
-          "Allowed values are only " + BucketType.FSO + " or "
-              + BucketType.OBJECT_STORE);
-    }
+    BucketType bucketType = BucketType.valueOf(allowedBucketType.toString());
+    bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
+        .setVersioning(false).setBucketType(bucketType);
 
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
