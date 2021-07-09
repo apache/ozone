@@ -245,10 +245,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OmBucketInfo bucketInfo, PrefixManager prefixManager) {
     List<OzoneAcl> acls = new ArrayList<>();
 
-    if(keyArgs.getAclsList() != null) {
-      acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
-    }
-
     // Inherit DEFAULT acls from prefix.
     if(prefixManager != null) {
       List< OmPrefixInfo > prefixList = prefixManager.getLongestPrefixPath(
@@ -268,8 +264,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
     }
 
-    // Inherit DEFAULT acls from bucket only if DEFAULT acls for
-    // prefix are not set.
+    // Inherit all acls from bucket
     if (bucketInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
         return acls;
