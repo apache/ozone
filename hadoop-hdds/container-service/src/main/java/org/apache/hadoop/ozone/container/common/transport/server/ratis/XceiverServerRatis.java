@@ -97,6 +97,7 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.DataStreamServerRpc;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.RaftServerRpc;
@@ -148,12 +149,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private long requestTimeout;
   private boolean shouldDeleteRatisLogDirectory;
 
-  private XceiverServerRatis(DatanodeDetails dd, int dataStreamPort,
+  private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
       StateContext context, ConfigurationSource conf, Parameters parameters)
       throws IOException {
     this.conf = conf;
-    this.dataStreamPort = dataStreamPort;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
     assignPorts();
@@ -231,6 +231,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // set the configs enable and set the stateMachineData sync timeout
     RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
 
+    int dataStreamPort = conf.getInt(
+            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT,
+            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
     // set the datastream config
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
     RaftConfigKeys.DataStream.setType(properties, SupportedDataStreamType.NETTY);
@@ -455,10 +458,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       CertificateClient caClient, StateContext context) throws IOException {
     Parameters parameters = createTlsParameters(
         new SecurityConfig(ozoneConf), caClient);
-    int dataStreamPort = ozoneConf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
-    return new XceiverServerRatis(datanodeDetails, dataStreamPort, dispatcher,
+    return new XceiverServerRatis(datanodeDetails, dispatcher,
         containerController, context, ozoneConf, parameters);
   }
 
@@ -500,14 +500,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       server.start();
 
       RaftServerRpc serverRpc = server.getServerRpc();
+      DataStreamServerRpc dataStreamServerRpc = server.getDataStreamServerRpc();
       clientPort = getRealPort(serverRpc.getClientServerAddress(),
           Port.Name.RATIS);
       adminPort = getRealPort(serverRpc.getAdminServerAddress(),
           Port.Name.RATIS_ADMIN);
       serverPort = getRealPort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
-      // TODO: implement serverRpc.getDataStreamAddress()
-      dataStreamPort = getRealPort(new InetSocketAddress(dataStreamPort),
+      dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
           Port.Name.DATASTREAM);
 
       isStarted = true;
