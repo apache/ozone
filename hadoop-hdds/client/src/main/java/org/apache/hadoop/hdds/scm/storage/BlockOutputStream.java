@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -447,7 +446,7 @@ public class BlockOutputStream extends OutputStream {
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).get();
     } catch (Exception e) {
-      LOG.warn("exception in futures execution: " + e);
+      LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
     }
 
@@ -700,32 +699,6 @@ public class BlockOutputStream extends OutputStream {
     }
 
     writeSize += data.asReadOnlyByteBuffer().remaining();
-//    try {
-//      XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-//          blockID.get(), data, token);
-//      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-//          asyncReply.getResponse();
-//      future.thenApplyAsync(e -> {
-//        try {
-//          validateResponse(e);
-//        } catch (IOException sce) {
-//          future.completeExceptionally(sce);
-//        }
-//        return e;
-//      }, responseExecutor).exceptionally(e -> {
-//        String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
-//            "into block " + blockID;
-//        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-//        CompletionException ce = new CompletionException(msg, e);
-//        setIoException(ce);
-//        throw ce;
-//      });
-//    } catch (IOException | ExecutionException e) {
-//      throw new IOException(EXCEPTION_MSG + e.toString(), e);
-//    } catch (InterruptedException ex) {
-//      Thread.currentThread().interrupt();
-//      handleInterruptedException(ex, false);
-//    }
     WriteOption[] options = new WriteOption[0];
     if (writeSize >= 16 * 1000 * 1000) {
       writeSize = 0;
@@ -735,18 +708,14 @@ public class BlockOutputStream extends OutputStream {
 
     CompletableFuture<DataStreamReply> future = out.writeAsync(data.asReadOnlyByteBuffer(), options)
         .whenCompleteAsync((r,e) -> {
-          if (e != null) {
-            LOG.error("writing chunk failed " + chunkInfo.getChunkName() +
-                " blockID " + blockID + " with exception "
-                + e.getLocalizedMessage());
-            CompletionException ce = new CompletionException(e);
-            setIoException(ce);
-            throw ce;
-          }
-          if (!r.isSuccess()) {
-            LOG.error("writing chunk failed " + chunkInfo.getChunkName() +
-                " blockID " + blockID + " with exception ");
-            CompletionException ce = new CompletionException(new IOException("write chunk failed"));
+          if (e != null || !r.isSuccess()) {
+            if (e == null) {
+              e = new IOException("result is not success");
+            }
+            String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
+                "into block " + blockID;
+            LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+            CompletionException ce = new CompletionException(msg, e);
             setIoException(ce);
             throw ce;
           }
