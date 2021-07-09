@@ -157,11 +157,7 @@ public class BlockOutputStream extends OutputStream {
     this.containerBlockData =
         BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .addMetadata(keyValue);
-    try {
-      this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
-    } catch (Exception e) {
-      LOG.warn("exception:", e);
-    }
+    this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     ContainerProtos.WriteChunkRequestProto.Builder writeChunkRequest =
         ContainerProtos.WriteChunkRequestProto.newBuilder()
             .setBlockID(blockID.getDatanodeBlockIDProtobuf());
@@ -586,8 +582,6 @@ public class BlockOutputStream extends OutputStream {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
-      } catch (Exception e) {
-        LOG.error(e.toString());
       } finally {
         cleanup(false);
       }
