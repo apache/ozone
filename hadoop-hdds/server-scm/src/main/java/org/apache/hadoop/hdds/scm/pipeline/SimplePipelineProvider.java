@@ -41,6 +41,14 @@ public class SimplePipelineProvider
   @Override
   public Pipeline create(StandaloneReplicationConfig replicationConfig)
       throws IOException {
+    return create(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline create(StandaloneReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     List<DatanodeDetails> dns = pickNodesNeverUsed(replicationConfig);
     if (dns.size() < replicationConfig.getRequiredNodes()) {
       String e = String
