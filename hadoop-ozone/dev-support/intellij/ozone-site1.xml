@@ -28,6 +28,10 @@
     <value>hadoop</value>
   </property>
   <property>
+    <name>hdds.datanode.dir</name>
+    <value>/tmp/datanode2</value>
+  </property>
+  <property>
     <name>ozone.csi.socket</name>
     <value>/tmp/csi.sock</value>
   </property>
@@ -62,10 +66,6 @@
   <property>
     <name>ozone.recon.db.dir</name>
     <value>/tmp/recon</value>
-  </property>
-  <property>
-    <name>hdds.datanode.dir</name>
-    <value>/tmp/datanode1</value>
   </property>
   <property>
     <name>datanode.replication.port</name>
