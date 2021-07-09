@@ -443,7 +443,7 @@ public final class Pipeline {
     return new Builder(pipeline);
   }
 
-  public void setReplicaIndexes(Map<DatanodeDetails, Integer> replicaIndexes) {
+  private void setReplicaIndexes(Map<DatanodeDetails, Integer> replicaIndexes) {
     this.replicaIndexes = replicaIndexes;
   }
 

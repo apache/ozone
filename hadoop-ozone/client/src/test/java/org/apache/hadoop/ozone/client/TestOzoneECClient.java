@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.ozone.client;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -73,12 +73,11 @@ public class TestOzoneECClient {
       new MultiNodePipelineBlockAllocator(dataBlocks + parityBlocks));
   private ECSchema schema = new ECSchema("rs", dataBlocks, parityBlocks);
   private ErasureCodecOptions options = new ErasureCodecOptions(schema);
-  private RSErasureCodec codec =
-      new RSErasureCodec(new Configuration(), options);
-  private final RawErasureEncoder encoder = CodecUtil
-      .createRawEncoder(new Configuration(),
-          SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
-          codec.getCoderOptions());
+  private OzoneConfiguration conf = new OzoneConfiguration();
+  private RSErasureCodec codec = new RSErasureCodec(conf, options);
+  private final RawErasureEncoder encoder = CodecUtil.createRawEncoder(conf,
+      SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
+      codec.getCoderOptions());
 
   @Before
   public void init() throws IOException {

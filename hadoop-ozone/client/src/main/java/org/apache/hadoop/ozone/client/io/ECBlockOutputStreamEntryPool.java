@@ -69,15 +69,15 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     for (int i = 0; i < nodes.size(); i++) {
       List<DatanodeDetails> nodeStatus = new ArrayList<>();
       nodeStatus.add(nodes.get(i));
+      Map<DatanodeDetails, Integer> nodeVsIdx = new HashMap<>();
+      nodeVsIdx.put(nodes.get(i), i + 1);
       Pipeline pipeline =
           Pipeline.newBuilder().setId(subKeyInfo.getPipeline().getId())
               .setReplicationConfig(
                   subKeyInfo.getPipeline().getReplicationConfig())
               .setState(subKeyInfo.getPipeline().getPipelineState())
-              .setNodes(nodeStatus).build();
-      Map<DatanodeDetails, Integer> nodeVsIdx = new HashMap<>();
-      nodeVsIdx.put(nodes.get(i), i + 1);
-      pipeline.setReplicaIndexes(nodeVsIdx);
+              .setNodes(nodeStatus).setReplicaIndexes(nodeVsIdx).build();
+
       ECBlockOutputStreamEntry.Builder builder =
           new ECBlockOutputStreamEntry.Builder()
               .setBlockID(subKeyInfo.getBlockID()).setKey(getKeyName())
