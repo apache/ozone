@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.client.api.DataStreamApi;
 
 /**
  * A Client for the storageContainer protocol.
@@ -197,4 +198,8 @@ public abstract class XceiverClientSpi implements Closeable {
   public abstract Map<DatanodeDetails, ContainerCommandResponseProto>
       sendCommandOnAllNodes(ContainerCommandRequestProto request)
       throws IOException, InterruptedException;
+
+  public DataStreamApi getDataStreamApi() {
+    return null;
+  }
 }

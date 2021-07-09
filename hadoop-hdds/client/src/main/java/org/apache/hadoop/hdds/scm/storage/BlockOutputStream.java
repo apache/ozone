@@ -174,9 +174,8 @@ public class BlockOutputStream extends OutputStream {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
-    this.out = ((XceiverClientRatis)this.xceiverClient).getClient()
-        .getDataStreamApi()
-        .stream(builder.build().toByteString().asReadOnlyByteBuffer());
+    out = Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+            .stream(builder.build().toByteString().asReadOnlyByteBuffer());
     this.bufferPool = bufferPool;
     this.token = token;
 
