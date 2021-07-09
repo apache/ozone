@@ -32,6 +32,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -654,7 +655,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfoWithFSO omPathInfo,
       long transactionLogIndex, long objectID) {
-
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -664,12 +664,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setCreationTime(keyArgs.getModificationTime())
             .setModificationTime(keyArgs.getModificationTime())
             .setDataSize(size)
-            .setReplicationConfig(replicationConfig)
             .setFileEncryptionInfo(encInfo)
             .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
             .setUpdateID(transactionLogIndex);
+    ECReplicationConfig ecReplicationConfig =
+        omBucketInfo.getEcReplicationConfig();
+    if (ecReplicationConfig != null) {
+      // if bucket has the ec replication config, then we will inherit it from
+      // bucket.
+      builder.setReplicationConfig(ecReplicationConfig);
+    } else {
+      // Otherwise use the client passed replication config.
+      builder.setReplicationConfig(replicationConfig);
+    }
+
     if (omPathInfo != null) {
       // FileTable metadata format
       objectID = omPathInfo.getLeafNodeObjectId();

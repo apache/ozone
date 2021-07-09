@@ -17,15 +17,19 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.Assert;
 import org.junit.Test;
 import org.apache.hadoop.util.Time;
 
 import java.util.Collections;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
  * Test BucketInfo.
@@ -110,5 +114,48 @@ public class TestOmBucketInfo {
     Assert.assertEquals((int) 0, omBucketInfo.getAcls().size());
     Assert.assertEquals((int) 1, cloneBucketInfo.getAcls().size());
 
+  }
+
+  @Test
+  public void getProtobufMessageEC() {
+    OmBucketInfo omBucketInfo =
+        OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
+            .setCreationTime(Time.now()).setIsVersionEnabled(false)
+            .setStorageType(StorageType.ARCHIVE).setAcls(Collections
+            .singletonList(new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
+                "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
+                OzoneAcl.AclScope.ACCESS))).build();
+    OzoneManagerProtocolProtos.BucketInfo protobuf = omBucketInfo.getProtobuf();
+    // No EC Config
+    Assert.assertFalse(protobuf.hasEcReplicationConfig());
+
+    // Reconstruct object from Proto
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(protobuf);
+    Assert.assertNull(recovered.getEcReplicationConfig());
+
+    // EC Config
+    omBucketInfo =
+        OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
+            .setCreationTime(Time.now()).setIsVersionEnabled(false)
+            .setStorageType(StorageType.ARCHIVE).setAcls(Collections
+            .singletonList(new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
+                "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
+                OzoneAcl.AclScope.ACCESS)))
+            .setEcReplicationConfig(new ECReplicationConfig(3, 2)).build();
+    protobuf = omBucketInfo.getProtobuf();
+
+    Assert.assertTrue(protobuf.hasEcReplicationConfig());
+    Assert.assertEquals(3, protobuf.getEcReplicationConfig().getData());
+    Assert.assertEquals(2, protobuf.getEcReplicationConfig().getParity());
+
+    // Reconstruct object from Proto
+    recovered = OmBucketInfo.getFromProtobuf(protobuf);
+    Assert.assertEquals(EC,
+        recovered.getEcReplicationConfig().getReplicationType());
+    Assert.assertTrue(
+        recovered.getEcReplicationConfig() instanceof ECReplicationConfig);
+    ECReplicationConfig config = recovered.getEcReplicationConfig();
+    Assert.assertEquals(3, config.getData());
+    Assert.assertEquals(2, config.getParity());
   }
 }
