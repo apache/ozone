@@ -168,7 +168,6 @@ public final class OzoneAclUtil {
     List<OzoneAcl> inheritedAcls = null;
     if (parentAcls != null && !parentAcls.isEmpty()) {
       inheritedAcls = parentAcls.stream()
-          .filter(a -> a.getAclScope() == DEFAULT)
           .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
               acl.getAclBitSet(), ACCESS))
           .collect(Collectors.toList());
