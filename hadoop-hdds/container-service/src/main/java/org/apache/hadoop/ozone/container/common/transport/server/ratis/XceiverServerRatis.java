@@ -458,6 +458,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       CertificateClient caClient, StateContext context) throws IOException {
     Parameters parameters = createTlsParameters(
         new SecurityConfig(ozoneConf), caClient);
+
     return new XceiverServerRatis(datanodeDetails, dispatcher,
         containerController, context, ozoneConf, parameters);
   }
