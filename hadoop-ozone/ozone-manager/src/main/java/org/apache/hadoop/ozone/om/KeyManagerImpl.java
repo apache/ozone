@@ -2429,17 +2429,17 @@ public class KeyManagerImpl implements KeyManager {
     // Then, find key in DB
     String seekKeyInDb =
         metadataManager.getOzoneKey(volumeName, bucketName, startKey);
-    iterator.seek(seekKeyInDb);
+    Table.KeyValue<String, OmKeyInfo> entry = iterator.seek(seekKeyInDb);
     int countEntries = 0;
     if (iterator.hasNext()) {
-      if (iterator.key().equals(keyArgs)) {
+      if (entry.getKey().equals(keyArgs)) {
         // Skip the key itself, since we are listing inside the directory
-        iterator.next();
+        entry = iterator.next();
       }
       // Iterate through seek results
       while (iterator.hasNext() && numEntries - countEntries > 0) {
-        String entryInDb = iterator.key();
-        OmKeyInfo omKeyInfo = iterator.value().getValue();
+        String entryInDb = entry.getKey();
+        OmKeyInfo omKeyInfo = entry.getValue();
         if (entryInDb.startsWith(keyArgs)) {
           String entryKeyName = omKeyInfo.getKeyName();
           if (recursive) {
@@ -2449,7 +2449,7 @@ public class KeyManagerImpl implements KeyManager {
                   scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
               countEntries++;
             }
-            iterator.next();
+            entry = iterator.next();
           } else {
             // get the child of the directory to list from the entry. For
             // example if directory to list is /a and entry is /a/b/c where
@@ -2464,7 +2464,7 @@ public class KeyManagerImpl implements KeyManager {
                     new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
                 countEntries++;
               }
-              iterator.next();
+              entry = iterator.next();
             } else {
               // if entry is a directory
               if (!deletedKeySet.contains(entryInDb)) {
@@ -2482,7 +2482,7 @@ public class KeyManagerImpl implements KeyManager {
                 countEntries++;
               }
               // skip the other descendants of this child directory.
-              iterator.seek(getNextGreaterString(volumeName, bucketName,
+              entry = iterator.seek(getNextGreaterString(volumeName, bucketName,
                   immediateChild));
             }
           }
@@ -2508,9 +2508,7 @@ public class KeyManagerImpl implements KeyManager {
     deletedKeySet.clear();
 
     List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
-    for (OzoneFileStatus fileStatus : fileStatusList) {
-      keyInfoList.add(fileStatus.getKeyInfo());
-    }
+    fileStatusList.stream().map(s -> s.getKeyInfo()).forEach(keyInfoList::add);
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
@@ -2827,8 +2825,9 @@ public class KeyManagerImpl implements KeyManager {
     iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
-      OmDirectoryInfo dirInfo = iterator.value().getValue();
-      if (deletedKeySet.contains(dirInfo.getPath())) {
+      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+      OmDirectoryInfo dirInfo = entry.getValue();
+      if (deletedKeySet.contains(dirInfo.getPath()) && iterator.hasNext()) {
         iterator.next(); // move to next entry in the table
         // entry is actually deleted in cache and can exists in DB
         continue;
@@ -2865,8 +2864,9 @@ public class KeyManagerImpl implements KeyManager {
       throws IOException {
     iterator.seek(seekKeyInDB);
     while (iterator.hasNext() && numEntries - countEntries > 0) {
-      OmKeyInfo keyInfo = iterator.value().getValue();
-      if (deletedKeySet.contains(keyInfo.getPath())) {
+      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+      OmKeyInfo keyInfo = entry.getValue();
+      if (deletedKeySet.contains(keyInfo.getPath()) && iterator.hasNext()) {
         iterator.next(); // move to next entry in the table
         // entry is actually deleted in cache and can exists in DB
         continue;
@@ -3204,7 +3204,8 @@ public class KeyManagerImpl implements KeyManager {
     iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
-      OmDirectoryInfo dirInfo = iterator.value().getValue();
+      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+      OmDirectoryInfo dirInfo = entry.getValue();
       if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
           parentInfo.getObjectID())) {
         break;
@@ -3218,7 +3219,9 @@ public class KeyManagerImpl implements KeyManager {
       countEntries++;
 
       // move to next entry in the DirTable
-      iterator.next();
+      if(iterator.hasNext()) {
+        iterator.next();
+      }
     }
 
     return directories;
@@ -3241,7 +3244,8 @@ public class KeyManagerImpl implements KeyManager {
     iterator.seek(seekFileInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
-      OmKeyInfo fileInfo = iterator.value().getValue();
+      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+      OmKeyInfo fileInfo = entry.getValue();
       if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
           parentInfo.getObjectID())) {
         break;
@@ -3254,7 +3258,9 @@ public class KeyManagerImpl implements KeyManager {
       files.add(fileInfo);
       countEntries++;
       // move to next entry in the KeyTable
-      iterator.next();
+      if(iterator.hasNext()) {
+        iterator.next();
+      }
     }
 
     return files;
