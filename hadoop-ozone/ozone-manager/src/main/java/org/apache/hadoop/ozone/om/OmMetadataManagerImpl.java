@@ -427,7 +427,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(TransactionInfo.class, new TransactionInfoCodec())
         .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
-        .addCodec(OMTransactionInfo.class, new OMTransactionInfoCodec())
         .addCodec(OmDBTenantInfo.class, new OmDBTenantInfoCodec());
   }
 
