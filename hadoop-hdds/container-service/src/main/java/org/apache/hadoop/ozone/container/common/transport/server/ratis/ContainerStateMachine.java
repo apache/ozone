@@ -79,7 +79,6 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
-import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
@@ -145,7 +144,6 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
-
   private final ConcurrentMap<Long, TaskQueue> containerTaskQueues;
   private final ExecutorService executor;
   private final List<ThreadPoolExecutor> chunkExecutors;
