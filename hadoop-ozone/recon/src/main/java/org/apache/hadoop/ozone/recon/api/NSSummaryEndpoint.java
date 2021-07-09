@@ -37,14 +37,14 @@ public class NSSummaryEndpoint {
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
-
+/*
   @GET
   @Path("/basic")
   public Response getBasicInfoById(
           @QueryParam("entityType") String type,
           @QueryParam("objectId") long objectId) {
 
-  }
+  }*/
 
   // "vol/bucket/" bucket
   // "vol/"
