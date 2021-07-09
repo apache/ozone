@@ -52,6 +52,16 @@ public class ReconPipelineFactory extends PipelineFactory {
 
     @Override
     public Pipeline create(ReplicationConfig config,
+        List<DatanodeDetails> excludedNodes,
+        List<DatanodeDetails> favoredNodes) {
+      // We don't expect this to be called at all. But adding this as a red
+      // flag for troubleshooting.
+      throw new UnsupportedOperationException(
+          "Trying to create pipeline in Recon, which is prohibited!");
+    }
+
+    @Override
+    public Pipeline create(ReplicationConfig config,
                            List<DatanodeDetails> nodes) {
       throw new UnsupportedOperationException(
           "Trying to create pipeline in Recon, which is prohibited!");

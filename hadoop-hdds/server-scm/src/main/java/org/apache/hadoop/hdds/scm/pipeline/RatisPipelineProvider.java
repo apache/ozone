@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -122,6 +123,14 @@ public class RatisPipelineProvider
   @Override
   public synchronized Pipeline create(RatisReplicationConfig replicationConfig)
       throws IOException {
+    return create(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public synchronized Pipeline create(RatisReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
       throw new SCMException("Ratis pipeline number meets the limit: " +
           pipelineNumberLimit + " replicationConfig : " +
@@ -138,8 +147,8 @@ public class RatisPipelineProvider
       dns = pickNodesNeverUsed(replicationConfig);
       break;
     case THREE:
-      dns = placementPolicy.chooseDatanodes(null,
-          null, factor.getNumber(), 0);
+      dns = placementPolicy.chooseDatanodes(excludedNodes,
+          favoredNodes, factor.getNumber(), 0);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());

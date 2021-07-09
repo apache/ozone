@@ -35,6 +35,7 @@ import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
+import static org.mockito.Mockito.verify;
 
 /**
  * Test for the ECPipelineProvider.
@@ -79,6 +80,26 @@ public class TestECPipelineProvider {
       // EC DN indexes are numbered starting from 1 to N.
       Assert.assertEquals(i+1, pipeline.getReplicaIndex(dns.get(i)));
     }
+  }
+
+  @Test
+  public void testExcludedAndFavoredNodesPassedToPlacementPolicy()
+      throws IOException {
+    ECReplicationConfig ecConf = new ECReplicationConfig(3, 2);
+
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+    excludedNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+
+    List<DatanodeDetails> favoredNodes = new ArrayList<>();
+    favoredNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+
+    Pipeline pipeline = provider.create(ecConf, excludedNodes, favoredNodes);
+    Assert.assertEquals(EC, pipeline.getType());
+    Assert.assertEquals(ecConf.getData() + ecConf.getParity(),
+        pipeline.getNodes().size());
+
+    verify(placementPolicy).chooseDatanodes(excludedNodes, favoredNodes,
+        ecConf.getRequiredNodes(), 0);
   }
 
 }

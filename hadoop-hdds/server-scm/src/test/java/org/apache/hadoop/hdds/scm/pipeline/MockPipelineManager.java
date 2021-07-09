@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -48,6 +49,14 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
+      throws IOException {
+    return createPipeline(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     final List<DatanodeDetails> nodes = Stream.generate(
         MockDatanodeDetails::randomDatanodeDetails)

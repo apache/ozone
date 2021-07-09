@@ -20,6 +20,8 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -37,8 +39,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
@@ -52,6 +57,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests to validate the WritableECContainerProvider works correctly.
@@ -162,7 +168,7 @@ public class TestWritableECContainerProvider {
       allocatedContainers.add(container);
     }
     // We have the min limit of pipelines, but then exclude one. It should use
-    // one of the existing rather than createing a new one, as the limit is
+    // one of the existing rather than creating a new one, as the limit is
     // checked against all pipelines, not just the filtered list
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
@@ -196,8 +202,9 @@ public class TestWritableECContainerProvider {
   public void testUnableToCreateAnyPipelinesReturnsNull() throws IOException {
     pipelineManager = new MockPipelineManager() {
       @Override
-      public Pipeline createPipeline(ReplicationConfig repConf)
-          throws IOException {
+      public Pipeline createPipeline(ReplicationConfig repConf,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes) throws IOException {
         throw new IOException("Cannot create pipelines");
       }
     };
@@ -217,8 +224,9 @@ public class TestWritableECContainerProvider {
       private boolean throwError = false;
 
       @Override
-      public Pipeline createPipeline(ReplicationConfig repConf)
-          throws IOException {
+      public Pipeline createPipeline(ReplicationConfig repConf,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes) throws IOException {
         if (throwError) {
           throw new IOException("Cannot create pipelines");
         }
@@ -346,6 +354,35 @@ public class TestWritableECContainerProvider {
       Pipeline pipeline = pipelineManager.getPipeline(c.getPipelineID());
       assertEquals(CLOSED, pipeline.getPipelineState());
     }
+  }
+
+  @Test
+  public void testExcludedNodesPassedToCreatePipelineIfProvided()
+      throws IOException {
+    PipelineManager pipelineManagerSpy = Mockito.spy(pipelineManager);
+    provider = new WritableECContainerProvider(
+        conf, pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
+    ExcludeList excludeList = new ExcludeList();
+
+    // EmptyList should be passed if there are no nodes excluded.
+    ContainerInfo container = provider.getContainer(
+        1, repConfig, OWNER, excludeList);
+    assertNotNull(container);
+
+    verify(pipelineManagerSpy).createPipeline(repConfig,
+        Collections.emptyList(), Collections.emptyList());
+
+    // If nodes are excluded then the excluded nodes should be passed through to
+    // the create pipeline call.
+    excludeList.addDatanode(MockDatanodeDetails.randomDatanodeDetails());
+    List<DatanodeDetails> excludedNodes =
+        new ArrayList<>(excludeList.getDatanodes());
+
+    container = provider.getContainer(
+        1, repConfig, OWNER, excludeList);
+    assertNotNull(container);
+    verify(pipelineManagerSpy).createPipeline(repConfig, excludedNodes,
+        Collections.emptyList());
   }
 
   private ContainerInfo createContainer(Pipeline pipeline,

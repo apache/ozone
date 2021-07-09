@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,10 +51,18 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   }
 
   @Override
-  protected Pipeline create(ECReplicationConfig replicationConfig)
+  public synchronized Pipeline create(ECReplicationConfig replicationConfig)
       throws IOException {
-    List<DatanodeDetails> dns = placementPolicy.chooseDatanodes(null,
-        null, replicationConfig.getRequiredNodes(), 0);
+    return create(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  protected Pipeline create(ECReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
+    List<DatanodeDetails> dns = placementPolicy.chooseDatanodes(excludedNodes,
+        favoredNodes, replicationConfig.getRequiredNodes(), 0);
     return create(replicationConfig, dns);
   }
 
