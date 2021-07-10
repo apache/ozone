@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
@@ -153,6 +154,31 @@ public final class OzoneAclUtil {
   }
 
   /**
+   * Helper function to inherit access ACL to child object.
+   * OzoneUtils.addAcl().
+   * @param acls
+   * @param parentAcls
+   * @return true if acls inherited ACCESS acls from parentAcls successfully,
+   * false otherwise.
+   */
+  public static boolean inheritAccessAcls(List<OzoneAcl> acls,
+                                           List<OzoneAcl> parentAcls) {
+    List<OzoneAcl> inheritedAcls = null;
+    if (parentAcls != null && !parentAcls.isEmpty()) {
+      inheritedAcls = parentAcls.stream()
+              .filter(a -> a.getAclScope() == ACCESS)
+              .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
+                      acl.getAclBitSet(), ACCESS))
+              .collect(Collectors.toList());
+    }
+    if (inheritedAcls != null && !inheritedAcls.isEmpty()) {
+      inheritedAcls.stream().forEach(acl -> addAcl(acls, acl));
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Helper function to inherit default ACL as access ACL for child object.
    * 1. deep copy of OzoneAcl to avoid unexpected parent default ACL change
    * 2. merge inherited access ACL with existing access ACL via
@@ -167,6 +193,7 @@ public final class OzoneAclUtil {
     List<OzoneAcl> inheritedAcls = null;
     if (parentAcls != null && !parentAcls.isEmpty()) {
       inheritedAcls = parentAcls.stream()
+          .filter(a -> a.getAclScope() == DEFAULT)
           .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
               acl.getAclBitSet(), ACCESS))
           .collect(Collectors.toList());

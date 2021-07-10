@@ -264,9 +264,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
     }
 
-    // Inherit all acls from bucket
     if (bucketInfo != null) {
+      // Inherit DEFAULT acls from bucket only if DEFAULT acls for
+      // prefix are not set.
       if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
+        return acls;
+      }
+      // Inherit ACCESS acls from bucket for File/Key creation
+      if (OzoneAclUtil.inheritAccessAcls(acls, bucketInfo.getAcls())) {
         return acls;
       }
     }
