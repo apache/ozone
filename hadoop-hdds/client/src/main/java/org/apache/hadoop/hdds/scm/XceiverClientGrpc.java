@@ -218,9 +218,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       channel.shutdownNow();
       try {
         channel.awaitTermination(60, TimeUnit.MINUTES);
-      } catch (Exception e) {
+      } catch (InterruptedException e) {
         LOG.error("Unexpected exception while waiting for channel termination",
             e);
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
   }
