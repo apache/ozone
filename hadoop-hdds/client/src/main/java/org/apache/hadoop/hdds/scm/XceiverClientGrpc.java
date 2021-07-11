@@ -261,6 +261,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
     try{
@@ -271,6 +273,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     } catch (InterruptedException e) {
       LOG.error("Command execution was interrupted.");
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
       LOG.error("Failed to execute command " + request, e);
     }
