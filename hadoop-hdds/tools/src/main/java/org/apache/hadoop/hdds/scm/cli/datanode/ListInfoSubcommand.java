@@ -52,12 +52,15 @@ public class ListInfoSubcommand extends ScmSubcommand {
   private String uuid;
 
   @CommandLine.Option(names = {"--NodeOperationalState"},
-      description = "Show info by datanode NodeOperationalState.",
+      description = "Show info by datanode NodeOperationalState." +
+          "IN_SERVICE DECOMMISSIONING DECOMMISSIONED ENTERING_MAINTENANCE" +
+          "IN_MAINTENANCE",
       defaultValue = "")
   private String nodeOperationalState;
 
   @CommandLine.Option(names = {"--NodeState"},
-      description = "Show info by datanode NodeState.",
+      description = "Show info by datanode NodeState." +
+      " HEALTHY STALE DEAD",
       defaultValue = "")
   private String nodeState;
 
