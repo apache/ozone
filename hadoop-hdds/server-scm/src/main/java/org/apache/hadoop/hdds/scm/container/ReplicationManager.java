@@ -519,12 +519,13 @@ public class ReplicationManager implements MetricsSource, SCMService {
       while(iter.hasNext()) {
         try {
           InflightAction a = iter.next();
-          NodeState health = nodeManager.getNodeStatus(a.datanode)
-              .getHealth();
-          boolean isUnhealthy = health != NodeState.HEALTHY;
+          NodeStatus status = nodeManager.getNodeStatus(a.datanode);
+          boolean isUnhealthy = status.getHealth() != NodeState.HEALTHY;
           boolean isCompleted = filter.test(a);
           boolean isTimeout = a.time < deadline;
-          if (isUnhealthy || isTimeout || isCompleted) {
+          boolean isNotInService = status.getOperationalState() !=
+              NodeOperationalState.IN_SERVICE;
+          if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
             iter.remove();
             updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
                 id, a.datanode, inflightActions);
