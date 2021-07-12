@@ -130,9 +130,14 @@ public class TestNSSummaryTask {
 
     populateOMDB();
 
+    // write a NSSummary prior to reprocess and verify it got cleaned up after.
+    NSSummary staleNSSummary = new NSSummary();
+    reconNamespaceSummaryManager.storeNSSummary(-1L, staleNSSummary);
     NSSummaryTask nsSummaryTask = new NSSummaryTask(
             reconNamespaceSummaryManager);
     nsSummaryTask.reprocess(reconOMMetadataManager);
+
+    Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
     NSSummary nsSummaryForBucket1 =
             reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
     NSSummary nsSummaryForBucket2 =

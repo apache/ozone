@@ -59,7 +59,7 @@ public class TestReconNamespaceSummaryManagerImpl {
   @Before
   public void setUp() throws Exception {
     // Clear namespace table before running each test
-    reconNamespaceSummaryManager.initNSSummaryTable();
+    reconNamespaceSummaryManager.clearNSSummaryTable();
   }
 
   @Test
@@ -86,7 +86,7 @@ public class TestReconNamespaceSummaryManagerImpl {
     putThreeNSMetadata();
     Assert.assertFalse(
             reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
-    reconNamespaceSummaryManager.initNSSummaryTable();
+    reconNamespaceSummaryManager.clearNSSummaryTable();
     Assert.assertTrue(
             reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
   }

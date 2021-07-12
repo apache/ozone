@@ -311,7 +311,14 @@ public class ReconUtils {
   }
 
   public static int getBinIndex(long fileSize) {
+    // if the file size is larger than our track scope,
+    // we map it to the last bin
+    if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
+      return ReconConstants.NUM_OF_BINS - 1;
+    }
     int index = nextClosestPowerIndexOfTwo(fileSize);
+    // if the file size is smaller than our track scope,
+    // we map it to the first bin
     return index < 10 ? 0 : index - 10;
   }
 
