@@ -145,7 +145,7 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
-  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
+  void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
     BlockOutputStreamEntry.Builder builder =
         new BlockOutputStreamEntry.Builder()
@@ -160,9 +160,18 @@ public class BlockOutputStreamEntryPool {
     streamEntries.add(builder.build());
   }
 
-  public List<OmKeyLocationInfo> getLocationInfoList()  {
+  public List<OmKeyLocationInfo> getLocationInfoList() {
+    List<OmKeyLocationInfo> locationInfoList;
+    List<OmKeyLocationInfo> currBlocksLocationInfoList =
+        getOmKeyLocationInfos(streamEntries);
+    locationInfoList = currBlocksLocationInfoList;
+    return locationInfoList;
+  }
+
+  List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      List<BlockOutputStreamEntry> streams) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    for (BlockOutputStreamEntry streamEntry : streamEntries) {
+    for (BlockOutputStreamEntry streamEntry : streams) {
       long length = streamEntry.getCurrentPosition();
 
       // Commit only those blocks to OzoneManager which are not empty
@@ -182,6 +191,14 @@ public class BlockOutputStreamEntryPool {
       }
     }
     return locationInfoList;
+  }
+
+  public BufferPool getBufferPool() {
+    return this.bufferPool;
+  }
+
+  public OzoneClientConfig getConfig() {
+    return config;
   }
 
   /**
@@ -224,8 +241,8 @@ public class BlockOutputStreamEntryPool {
   }
 
   long getKeyLength() {
-    return streamEntries.stream().mapToLong(
-        BlockOutputStreamEntry::getCurrentPosition).sum();
+    return streamEntries.stream()
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
   }
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
@@ -272,6 +289,18 @@ public class BlockOutputStreamEntryPool {
     } else {
       return streamEntries.get(currentStreamIndex);
     }
+  }
+
+  public int getCurrIdx(){
+    return currentStreamIndex;
+  }
+
+  public void setCurrIdx(int currIdx) {
+    this.currentStreamIndex = currIdx;
+  }
+
+  public void updateToNextStream(int rotation){
+    currentStreamIndex = (currentStreamIndex+1) % rotation;
   }
 
   BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {

@@ -67,6 +67,13 @@ public class MockXceiverClientFactory
       boolean b) {
 
   }
-};
+
+  /**
+   * Returns data nodes details.
+   */
+  public Map<DatanodeDetails, MockDatanodeStorage> getStorages() {
+    return this.storage;
+  }
+}
 
 
