@@ -47,7 +47,7 @@ public class NSSummary {
                    List<Long> childDir) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
-    this.fileSizeBucket = bucket;
+    setFileSizeBucket(bucket);
     this.childDir = childDir;
   }
 
