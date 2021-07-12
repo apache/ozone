@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
@@ -46,6 +49,8 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 
 /**
@@ -93,12 +98,16 @@ public class TestStatisticsUpdate {
         datanode2.getUuid(), storagePath2, 200, 20, 180, null);
 
     nodeManager.register(datanode1,
-        TestUtils.createNodeReport(storageOne), null);
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
+            Collections.emptyList()), null);
     nodeManager.register(datanode2,
-        TestUtils.createNodeReport(storageTwo), null);
+        TestUtils.createNodeReport(Arrays.asList(storageTwo),
+            Collections.emptyList()), null);
 
-    NodeReportProto nodeReportProto1 = TestUtils.createNodeReport(storageOne);
-    NodeReportProto nodeReportProto2 = TestUtils.createNodeReport(storageTwo);
+    NodeReportProto nodeReportProto1 = TestUtils.createNodeReport(
+        Arrays.asList(storageOne), Collections.emptyList());
+    NodeReportProto nodeReportProto2 = TestUtils.createNodeReport(
+        Arrays.asList(storageTwo), Collections.emptyList());
 
     nodeReportHandler.onMessage(
         new NodeReportFromDatanode(datanode1, nodeReportProto1),
@@ -119,13 +128,19 @@ public class TestStatisticsUpdate {
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
-    nodeManager.processHeartbeat(datanode2);
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo =
+        StorageContainerDatanodeProtocolProtos.LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2);
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2);
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2);
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
     Assert.assertEquals(200L, stat.getCapacity().get().longValue());

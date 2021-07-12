@@ -47,7 +47,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -61,7 +60,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -130,8 +128,8 @@ public class TestReplicationManager {
     containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
     Mockito.when(containerPlacementPolicy.chooseDatanodes(
-        Mockito.anyListOf(DatanodeDetails.class),
-        Mockito.anyListOf(DatanodeDetails.class),
+        Mockito.any(),
+        Mockito.any(),
         Mockito.anyInt(), Mockito.anyLong()))
         .thenAnswer(invocation -> {
           int count = (int) invocation.getArguments()[2];
@@ -141,7 +139,7 @@ public class TestReplicationManager {
         });
 
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.anyListOf(DatanodeDetails.class),
+        Mockito.any(),
         Mockito.anyInt()
         )).thenAnswer(invocation ->  {
           return new ContainerPlacementStatusDefault(2, 2, 3);
@@ -730,7 +728,7 @@ public class TestReplicationManager {
     // test where there are 3 replicas. When there are 2 or 4 replicas
     // the status returned will be healthy.
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.argThat(new ListOfNElements(3)),
+        Mockito.argThat(list -> list.size() == 3),
         Mockito.anyInt()
     )).thenAnswer(invocation ->  {
       return new ContainerPlacementStatusDefault(1, 2, 3);
@@ -799,7 +797,7 @@ public class TestReplicationManager {
     // Ensure a mis-replicated status is returned for any containers in this
     // test where there are exactly 3 replicas checked.
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.argThat(new ListOfNElements(3)),
+        Mockito.argThat(list -> list.size() == 3),
         Mockito.anyInt()
     )).thenAnswer(
         invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
@@ -843,7 +841,7 @@ public class TestReplicationManager {
     containerStateManager.updateContainerReplica(id, replicaFour);
 
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.argThat(new ListOfNElements(3)),
+        Mockito.argThat(list -> list.size() == 3),
         Mockito.anyInt()
     )).thenAnswer(
         invocation -> new ContainerPlacementStatusDefault(2, 2, 3));
@@ -883,8 +881,7 @@ public class TestReplicationManager {
     containerStateManager.updateContainerReplica(id, replicaFive);
 
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.argThat(new FunctionMatcher(list ->
-            list != null && ((List) list).size() <= 4)),
+        Mockito.argThat(list -> list != null && list.size() <= 4),
         Mockito.anyInt()
     )).thenAnswer(
         invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
@@ -1188,31 +1185,4 @@ public class TestReplicationManager {
     }
   }
 
-  static class ListOfNElements extends ArgumentMatcher<List> {
-
-    private int expected;
-
-    ListOfNElements(int expected) {
-      this.expected = expected;
-    }
-
-    @Override
-    public boolean matches(Object argument) {
-      return ((List)argument).size() == expected;
-    }
-  }
-
-  static class FunctionMatcher extends ArgumentMatcher<List> {
-
-    private Function<Object, Boolean> function;
-
-    FunctionMatcher(Function<Object, Boolean> function) {
-      this.function = function;
-    }
-
-    @Override
-    public boolean matches(Object argument) {
-      return function.apply(argument);
-    }
-  }
 }

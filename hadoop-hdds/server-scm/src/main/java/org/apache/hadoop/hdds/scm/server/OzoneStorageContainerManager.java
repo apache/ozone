@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -49,6 +50,8 @@ public interface OzoneStorageContainerManager {
   ContainerManagerV2 getContainerManager();
 
   ReplicationManager getReplicationManager();
+
+  ContainerBalancer getContainerBalancer();
 
   InetSocketAddress getDatanodeRpcAddress();
 

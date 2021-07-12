@@ -19,4 +19,4 @@
 /**
  * Package contains classes related to S3 security responses.
  */
-package org.apache.hadoop.ozone.om.request.s3.security;
+package org.apache.hadoop.ozone.om.response.s3.security;

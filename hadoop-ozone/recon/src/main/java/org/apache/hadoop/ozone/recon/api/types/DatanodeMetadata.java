@@ -56,6 +56,9 @@ public final class DatanodeMetadata {
   @XmlElement(name = "containers")
   private int containers;
 
+  @XmlElement(name = "openContainers")
+  private int openContainers;
+
   @XmlElement(name = "leaderCount")
   private int leaderCount;
 
@@ -71,6 +74,9 @@ public final class DatanodeMetadata {
   @XmlElement(name = "buildDate")
   private String buildDate;
 
+  @XmlElement(name = "layoutVersion")
+  private int layoutVersion;
+
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
     this.uuid = builder.uuid;
@@ -80,11 +86,13 @@ public final class DatanodeMetadata {
     this.datanodeStorageReport = builder.datanodeStorageReport;
     this.pipelines = builder.pipelines;
     this.containers = builder.containers;
+    this.openContainers = builder.openContainers;
     this.leaderCount = builder.leaderCount;
     this.version = builder.version;
     this.setupTime = builder.setupTime;
     this.revision = builder.revision;
     this.buildDate = builder.buildDate;
+    this.layoutVersion = builder.layoutVersion;
   }
 
   public String getHostname() {
@@ -115,6 +123,10 @@ public final class DatanodeMetadata {
     return containers;
   }
 
+  public int getOpenContainers() {
+    return openContainers;
+  }
+
   public int getLeaderCount() {
     return leaderCount;
   }
@@ -137,6 +149,9 @@ public final class DatanodeMetadata {
 
   public String getBuildDate() {
     return buildDate;
+  }
+  public int getLayoutVersion() {
+    return layoutVersion;
   }
 
   /**
@@ -161,14 +176,17 @@ public final class DatanodeMetadata {
     private DatanodeStorageReport datanodeStorageReport;
     private List<DatanodePipeline> pipelines;
     private int containers;
+    private int openContainers;
     private int leaderCount;
     private String version;
     private long setupTime;
     private String revision;
     private String buildDate;
+    private int layoutVersion;
 
     public Builder() {
       this.containers = 0;
+      this.openContainers = 0;
       this.leaderCount = 0;
     }
 
@@ -208,6 +226,11 @@ public final class DatanodeMetadata {
       return this;
     }
 
+    public Builder withOpenContainers(int openContainers) {
+      this.openContainers = openContainers;
+      return this;
+    }
+
     public Builder withLeaderCount(int leaderCount) {
       this.leaderCount = leaderCount;
       return this;
@@ -235,6 +258,11 @@ public final class DatanodeMetadata {
 
     public Builder withBuildDate(String buildDate) {
       this.buildDate = buildDate;
+      return this;
+    }
+
+    public Builder withLayoutVersion(int layoutVersion) {
+      this.layoutVersion = layoutVersion;
       return this;
     }
 

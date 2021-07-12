@@ -93,6 +93,10 @@ public class SCMPipelineManager implements
   // to prevent pipelines being created until sufficient nodes have registered.
   private final AtomicBoolean pipelineCreationAllowed;
 
+  // This allows for freezing/resuming the new pipeline creation while the
+  // SCM is already out of SafeMode.
+  private AtomicBoolean freezePipelineCreation;
+
   public SCMPipelineManager(ConfigurationSource conf,
       NodeManager nodeManager,
       Table<PipelineID, Pipeline> pipelineStore,
@@ -137,6 +141,9 @@ public class SCMPipelineManager implements
     // Pipeline creation is only allowed after the safemode prechecks have
     // passed, eg sufficient nodes have registered.
     this.pipelineCreationAllowed = new AtomicBoolean(!this.isInSafeMode.get());
+    // controls freezing/resuming pipeline creation regardless of SafeMode
+    // status.
+    this.freezePipelineCreation = new AtomicBoolean(false);
   }
 
   public StateManager getStateManager() {
@@ -269,6 +276,12 @@ public class SCMPipelineManager implements
           "complete");
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");
+    }
+    if (freezePipelineCreation.get()) {
+      LOG.debug("Pipeline creation is frozen while an upgrade is in " +
+          "progress");
+      throw new IOException("Pipeline creation is frozen while an upgrade " +
+          "is in progress");
     }
     lock.writeLock().lock();
     try {
@@ -745,13 +758,25 @@ public class SCMPipelineManager implements
     throw new RuntimeException("Not supported operation.");
   }
 
+  @Override
+  public void freezePipelineCreation() {
+    freezePipelineCreation.set(true);
+    backgroundPipelineCreator.pause();
+  }
+
+  @Override
+  public void resumePipelineCreation() {
+    freezePipelineCreation.set(false);
+    backgroundPipelineCreator.resume();
+  }
+
   public Table<PipelineID, Pipeline> getPipelineStore() {
     return pipelineStore;
   }
 
   @Override
   public void onMessage(SafeModeStatus status,
-      EventPublisher publisher) {
+                        EventPublisher publisher) {
     // TODO: #CLUTIL - handle safemode getting re-enabled
     boolean currentAllowPipelines =
         pipelineCreationAllowed.getAndSet(status.isPreCheckComplete());
