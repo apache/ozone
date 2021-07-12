@@ -28,6 +28,9 @@ import org.apache.hadoop.ozone.om.multitenantImpl.BucketNameSpaceImpl;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
+/**
+ * Implements Tenant.
+ */
 public class CephCompatibleTenantImpl implements Tenant {
   private final String tenantID;
   private List<String> tenantGroupsIDs;

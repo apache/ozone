@@ -22,9 +22,11 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 
+/**
+ * AccountNameSpace interface.
+ */
 @InterfaceAudience.LimitedPrivate({"HDFS", "Yarn", "Ranger", "Hive", "HBase"})
 @InterfaceStability.Evolving
-
 public interface AccountNameSpace {
   /**
    * A Tenant will typically have his own AccountNameSpace to isolate the

@@ -19,7 +19,14 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import java.security.Principal;
 
+/**
+ * OzoneMultiTenantPrincipal interface.
+ */
 public interface OzoneMultiTenantPrincipal {
+
+  /**
+   * Two types of Ozone principal.
+   */
   enum OzonePrincipalType{USER_PRINCIPAL, GROUP_PRINCIPAL};
 
   /**

@@ -25,6 +25,9 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
+/**
+ * BucketNameSpace interface.
+ */
 @InterfaceAudience.LimitedPrivate({"HDFS", "Yarn", "Ranger", "Hive", "HBase"})
 @InterfaceStability.Evolving
 public interface BucketNameSpace {

@@ -21,6 +21,9 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 
+/**
+ * Implements AccountNameSpace.
+ */
 public class AccountNameSpaceImpl implements AccountNameSpace {
   private final String accountNameSpaceID;
 

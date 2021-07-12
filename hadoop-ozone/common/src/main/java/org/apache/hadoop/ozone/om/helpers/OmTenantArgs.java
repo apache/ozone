@@ -18,6 +18,9 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+/**
+ * This class is used for storing Ozone tenant arguments.
+ */
 public class OmTenantArgs {
   private final String tenantName;
 

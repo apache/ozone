@@ -31,6 +31,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessPolicyType.RANGER_POLICY;
 import static org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal.OzonePrincipalType.GROUP_PRINCIPAL;
 
+/**
+ * This is used for Ozone tenant access policy control.
+ */
 public class RangerAccessPolicy implements AccessPolicy {
 
   // For now RangerAccessPolicy supports only one object per policy

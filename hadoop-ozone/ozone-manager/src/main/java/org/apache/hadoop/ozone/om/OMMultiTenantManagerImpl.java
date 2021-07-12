@@ -57,6 +57,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.http.auth.BasicUserPrincipal;
 
+/**
+ * Implements OMMultiTenantManager.
+ */
 public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private MultiTenantAccessAuthorizer authorizer;
   private OMMetadataManager omMetadataManager;

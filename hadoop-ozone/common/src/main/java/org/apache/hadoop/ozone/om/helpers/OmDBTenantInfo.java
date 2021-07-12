@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
 
+/**
+ * This class is used for storing Ozone tenant info.
+ */
 public final class OmDBTenantInfo {
   /**
    * Name of the tenant.
@@ -114,6 +117,9 @@ public final class OmDBTenantInfo {
     return bucketPolicyGroupName;
   }
 
+  /**
+   * Builder for OmDBTenantInfo.
+   */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String tenantName;

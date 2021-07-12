@@ -25,6 +25,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.http.auth.BasicUserPrincipal;
 
+/**
+ * Implements OzoneMultiTenantPrincipal.
+ */
 public class OzoneMultiTenantPrincipalImpl
     implements OzoneMultiTenantPrincipal {
 

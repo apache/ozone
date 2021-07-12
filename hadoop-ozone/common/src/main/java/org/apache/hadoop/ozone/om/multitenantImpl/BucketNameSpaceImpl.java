@@ -25,6 +25,9 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
+/**
+ * Implements BucketNameSpace.
+ */
 public class BucketNameSpaceImpl implements BucketNameSpace {
   private final String bucketNameSpaceID;
   private List<OzoneObj> bucketNameSpaceObjects;

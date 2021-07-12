@@ -25,6 +25,9 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.codehaus.jettison.json.JSONObject;
 
+/**
+ * AccessPolicy interface for Ozone Multi-Tenancy.
+ */
 @InterfaceAudience.LimitedPrivate({"HDFS", "Yarn", "Ranger", "Hive", "HBase"})
 @InterfaceStability.Evolving
 public interface AccessPolicy {
@@ -41,8 +44,14 @@ public interface AccessPolicy {
    */
   enum AccessPolicyType {NATIVE_ACL, RANGER_POLICY, AWS_POLICY, OTHER};
 
+  /**
+   * Allow or deny.
+   */
   enum AccessGrantType {ALLOW, DENY};
 
+  /**
+   * Defines an access policy entry.
+   */
   class AccessPolicyElem {
     private OzoneObj object;
     private OzoneMultiTenantPrincipal principal;
