@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -1830,7 +1831,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getScmRatisRoles() throws IOException {
-    return HddsUtils.format(getScmHAManager().getRatisServer().getRatisRoles());
+    final SCMRatisServer server = getScmHAManager().getRatisServer();
+    return server != null ?
+        HddsUtils.format(server.getRatisRoles()) : "STANDALONE";
   }
 
   /**
