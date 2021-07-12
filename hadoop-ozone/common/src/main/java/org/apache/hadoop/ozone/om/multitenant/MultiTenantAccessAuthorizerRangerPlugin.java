@@ -371,7 +371,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return policy;
   }
 
-  public void deleteUser(String userId) throws Exception {
+  public void deleteUser(String userId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT
@@ -385,7 +385,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     }
   }
 
-  public void deleteGroup(String groupId) throws Exception {
+  public void deleteGroup(String groupId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT
@@ -444,7 +444,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   private HttpsURLConnection makeHttpsPostCall(String urlString,
                                               String jsonInputString,
                                               String method, boolean isSpnego)
-      throws IOException, AuthenticationException {
+      throws IOException {
 
     URL url = new URL(urlString);
     HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();

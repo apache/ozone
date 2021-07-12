@@ -229,15 +229,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantUserCreateResponse(omResponse.build(),
           s3SecretValue, principal, tenantName, defaultGroupName, roleName);
     } catch (IOException ex) {
-      if (userId != null) {
-        try {
-          ozoneManager.getMultiTenantManager().destroyUser(
-              tenantName, tenantUsername);
-        } catch (IOException e) {
-          // TODO: Best Effort cleanup
-          e.printStackTrace();
-        }
-      }
+      ozoneManager.getMultiTenantManager().destroyUser(
+          tenantName, tenantUsername);
       exception = ex;
       // Set response success flag to false
       omResponse.setCreateTenantUserResponse(

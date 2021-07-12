@@ -83,7 +83,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    *                    MultiTenantGatekeeper in
    *               createUser().
    */
-  void deleteUser(String opaqueUserID) throws Exception;
+  void deleteUser(String opaqueUserID) throws IOException;
 
   /**
    * Create Group group entity for MultiTenantGatekeeper plugin.
@@ -99,7 +99,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param groupID : unique opaque ID that was returned by
    *                MultiTenantGatekeeper in createGroup().
    */
-  void deleteGroup(String groupID) throws Exception;
+  void deleteGroup(String groupID) throws IOException;
 
   /**
    *

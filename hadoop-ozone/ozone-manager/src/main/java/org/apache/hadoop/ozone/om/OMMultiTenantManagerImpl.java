@@ -56,11 +56,17 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.http.auth.BasicUserPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implements OMMultiTenantManager.
  */
 public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMMultiTenantManagerImpl.class);
+
   private MultiTenantAccessAuthorizer authorizer;
   private OMMetadataManager omMetadataManager;
   private OzoneConfiguration conf;
@@ -298,17 +304,16 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    *
    * @param tenantName
    * @param userName
-   * @return Tenant
-   * @throws IOException
+   * @return Tenant, or null on error
    */
   @Override
-  public String createUser(String tenantName, String userName)
-      throws IOException {
+  public String createUser(String tenantName, String userName) {
     try {
       controlPathLock.writeLock().lock();
       Tenant tenant = getTenantInfo(tenantName);
       if (tenant == null) {
-        throw new IOException("Tenant doesnt exist");
+        LOG.error("Tenant doesn't exist");
+        return null;
       }
       final OzoneMultiTenantPrincipal userPrincipal =
           new OzoneMultiTenantPrincipalImpl(new BasicUserPrincipal(tenantName),
@@ -330,20 +335,21 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       return userID;
     } catch (Exception e) {
       destroyUser(tenantName, userName);
-      throw new IOException(e.getMessage());
+      LOG.error(e.getMessage());
+      return null;
     } finally {
       controlPathLock.writeLock().unlock();
     }
   }
 
   @Override
-  public void destroyUser(String tenantName, String userName)
-      throws IOException {
+  public void destroyUser(String tenantName, String userName) {
     try {
       controlPathLock.writeLock().lock();
       final Tenant tenant = getTenantInfo(tenantName);
       if (tenant == null) {
-        throw new IOException("Tenant doesnt exist");
+        LOG.error("Tenant doesn't exist");
+        return;
       }
       final OzoneMultiTenantPrincipal userPrincipal =
           new OzoneMultiTenantPrincipalImpl(new BasicUserPrincipal(tenantName),
@@ -356,7 +362,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       inMemoryUserNameToListOfGroupsMap.remove(
           userPrincipal.getFullMultiTenantPrincipalID());
     } catch (Exception e) {
-      throw new IOException(e.getMessage());
+      LOG.error(e.getMessage());
     } finally {
       controlPathLock.writeLock().unlock();
     }

@@ -116,7 +116,7 @@ public interface OMMultiTenantManager {
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  String createUser(String tenantName, String userName) throws IOException;
+  String createUser(String tenantName, String userName);
 
   /**
    * Given a user, destroys all state associated with that user.
@@ -126,7 +126,7 @@ public interface OMMultiTenantManager {
    * @return
    * @throws IOException
    */
-  void destroyUser(String tenantName, String userName) throws IOException;
+  void destroyUser(String tenantName, String userName);
 
   /**
    * Given a user, return their S3-Secret Key.
