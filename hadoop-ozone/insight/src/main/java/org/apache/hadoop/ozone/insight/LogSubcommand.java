@@ -79,9 +79,9 @@ public class LogSubcommand extends BaseInsightSubCommand
     List<LoggerSource> loggers = insight.getRelatedLoggers(verbose, filters);
 
     setLogLevels(conf, loggers, LoggerSource::getLevel);
-    ShutdownHookManager.get().addShutdownHook(new Thread(() ->
-        setLogLevels(conf, loggers, any -> Level.INFO)
-    ), DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+    ShutdownHookManager.get().addShutdownHook(() ->
+        setLogLevels(conf, loggers, any -> Level.INFO),
+            DEFAULT_SHUTDOWN_HOOK_PRIORITY);
 
     Set<Component> sources = loggers.stream().map(LoggerSource::getComponent)
         .collect(Collectors.toSet());

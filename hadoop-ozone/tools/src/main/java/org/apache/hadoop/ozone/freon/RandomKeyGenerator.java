@@ -384,13 +384,12 @@ public final class RandomKeyGenerator implements Callable<Void> {
    * Adds ShutdownHook to print statistics.
    */
   private void addShutdownHook() {
-    ShutdownHookManager.get().addShutdownHook(
-        new Thread(() -> {
-          printStats(System.out);
-          if (freon != null) {
-            freon.stopHttpServer();
-          }
-        }), DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      printStats(System.out);
+      if (freon != null) {
+        freon.stopHttpServer();
+      }
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
   }
 
   private void doCleanObjects() throws InterruptedException {

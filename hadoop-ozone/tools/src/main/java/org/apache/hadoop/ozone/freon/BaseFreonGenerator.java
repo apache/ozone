@@ -252,14 +252,14 @@ public class BaseFreonGenerator {
     pathSchema = new PathSchema(prefix);
 
     ShutdownHookManager.get().addShutdownHook(
-        new Thread(() -> {
+        () -> {
           try {
             freonCommand.stopHttpServer();
           } catch (Exception ex) {
             LOG.error("HTTP server can't be stopped.", ex);
           }
           printReport();
-        }), 10);
+        }, 10);
 
     executor = Executors.newFixedThreadPool(threadNo);
 
