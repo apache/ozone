@@ -41,6 +41,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -426,13 +427,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void setPendingRequestsLimits(RaftProperties properties) {
 
-    final int pendingRequestsMegaBytesLimit = (int)conf.getStorageSize(
+    long pendingRequestsBytesLimit = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.MB);
-    RaftServerConfigKeys.Write.setByteLimit(properties,
-        SizeInBytes.valueOf(pendingRequestsMegaBytesLimit,
-            TraditionalBinaryPrefix.MEGA));
+    final int pendingRequestsMegaBytesLimit =
+        HddsUtils.roundupMb(pendingRequestsBytesLimit);
+    RaftServerConfigKeys.Write.setByteLimit(properties, SizeInBytes
+        .valueOf(pendingRequestsMegaBytesLimit, TraditionalBinaryPrefix.MEGA));
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
