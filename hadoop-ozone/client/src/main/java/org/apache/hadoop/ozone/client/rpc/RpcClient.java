@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.LengthInputStream;
@@ -1365,16 +1366,25 @@ public class RpcClient implements ClientProtocol {
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
       String requestId, ReplicationConfig replicationConfig)
       throws IOException {
-    KeyOutputStream keyOutputStream =
-        new KeyOutputStream.Builder()
-            .setHandler(openKey)
-            .setXceiverClientManager(xceiverClientManager)
-            .setOmClient(ozoneManagerClient)
-            .setRequestID(requestId)
-            .setReplicationConfig(replicationConfig)
-            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
-            .build();
+    KeyOutputStream keyOutputStream = null;
+
+    if (openKey.getKeyInfo().getReplicationConfig()
+        .getReplicationType() == HddsProtos.ReplicationType.EC) {
+      keyOutputStream = new ECKeyOutputStream.Builder().setHandler(openKey)
+          .setXceiverClientManager(xceiverClientManager)
+          .setOmClient(ozoneManagerClient).setRequestID(requestId)
+          .setReplicationConfig(replicationConfig)
+          .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+          .setConfig(clientConfig).build();
+    } else {
+      keyOutputStream = new KeyOutputStream.Builder().setHandler(openKey)
+          .setXceiverClientManager(xceiverClientManager)
+          .setOmClient(ozoneManagerClient).setRequestID(requestId)
+          .setReplicationConfig(replicationConfig)
+          .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+          .setConfig(clientConfig).build();
+    }
+
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());

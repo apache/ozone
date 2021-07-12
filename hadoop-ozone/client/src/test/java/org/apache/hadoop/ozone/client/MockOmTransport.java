@@ -258,6 +258,10 @@ public class MockOmTransport implements OmTransport {
     return CreateBucketResponse.newBuilder().build();
   }
 
+  public Map<String, Map<String, Map<String, KeyInfo>>> getKeys(){
+    return this.keys;
+  }
+
   @Override
   public Text getDelegationTokenService() {
     return null;
