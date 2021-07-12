@@ -44,6 +44,7 @@ import org.apache.http.auth.BasicUserPrincipal;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -93,6 +94,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
   }
 
   @Test
+  @Ignore("TODO:Requires (mocked) Ranger endpoint")
   public void testMultiTenantAccessAuthorizerRangerPlugin() throws Exception {
     simulateOzoneSiteXmlConfig();
     final MultiTenantAccessAuthorizer omm =
@@ -143,6 +145,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
   }
 
   @Test
+  @Ignore("TODO:Requires (mocked) Ranger endpoint")
   public void testMultiTenantAccessAuthorizerRangerPluginWithoutIds()
       throws Exception {
     OzoneMultiTenantPrincipal userPrincipal = null;
