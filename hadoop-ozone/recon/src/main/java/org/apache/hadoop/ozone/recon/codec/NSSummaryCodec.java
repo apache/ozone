@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.codec;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.ShortCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -40,16 +41,21 @@ public class NSSummaryCodec implements Codec<NSSummary> {
   private final Codec<Integer> integerCodec = new IntegerCodec();
   private final Codec<Short> shortCodec = new ShortCodec();
   private final Codec<Long> longCodec = new LongCodec();
+  private final Codec<String> stringCodec = new StringCodec();
   // 1 int fields + 41-length int array
-  private static final int NUM_OF_INTS = 1 + ReconConstants.NUM_OF_BINS;
+  // + 2 dummy field to track list size/dirName length
+  private static final int NUM_OF_INTS = 3 + ReconConstants.NUM_OF_BINS;
 
   @Override
   public byte[] toPersistedFormat(NSSummary object) throws IOException {
     List<Long> childDirs = object.getChildDir();
+    String dirName = object.getDirName();
+    int stringLen = dirName.getBytes().length;
     int numOfChildDirs = childDirs.size();
     final int resSize = NUM_OF_INTS * Integer.BYTES
             + (numOfChildDirs + 1) * Long.BYTES // 1 long field + list size
-            + 2 * Short.BYTES; // 2 dummy shorts to track length
+            + Short.BYTES // 2 dummy shorts to track length
+            + stringLen; // directory name length
 
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
@@ -59,10 +65,12 @@ public class NSSummaryCodec implements Codec<NSSummary> {
     for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
       out.write(integerCodec.toPersistedFormat(fileSizeBucket[i]));
     }
-    out.write(shortCodec.toPersistedFormat((short)numOfChildDirs));
+    out.write(integerCodec.toPersistedFormat(numOfChildDirs));
     for (int i = 0; i < numOfChildDirs; ++i) {
       out.write(longCodec.toPersistedFormat(childDirs.get(i)));
     }
+    out.write(integerCodec.toPersistedFormat(stringLen));
+    out.write(stringCodec.toPersistedFormat(dirName));
     return out.toByteArray();
   }
 
@@ -80,12 +88,22 @@ public class NSSummaryCodec implements Codec<NSSummary> {
     }
     res.setFileSizeBucket(fileSizeBucket);
 
-    short listSize = in.readShort();
+    int listSize = in.readInt();
     List<Long> childDir = new ArrayList<>();
     for (int i = 0; i < listSize; ++i) {
       childDir.add(in.readLong());
     }
     res.setChildDir(childDir);
+
+    int strLen = in.readInt();
+    if (strLen == 0) {
+      return res;
+    }
+    byte[] buffer = new byte[strLen];
+    int bytesRead = in.read(buffer);
+    assert (bytesRead == strLen);
+    String dirName = stringCodec.fromPersistedFormat(buffer);
+    res.setDirName(dirName);
     return res;
   }
 
@@ -96,6 +114,7 @@ public class NSSummaryCodec implements Codec<NSSummary> {
     copy.setSizeOfFiles(object.getSizeOfFiles());
     copy.setFileSizeBucket(object.getFileSizeBucket());
     copy.setChildDir(object.getChildDir());
+    copy.setDirName(object.getDirName());
     return copy;
   }
 }

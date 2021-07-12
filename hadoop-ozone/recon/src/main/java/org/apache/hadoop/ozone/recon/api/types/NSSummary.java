@@ -33,22 +33,26 @@ public class NSSummary {
   private long sizeOfFiles;
   private int[] fileSizeBucket;
   private List<Long> childDir;
+  private String dirName;
 
   public NSSummary() {
     this.numOfFiles = 0;
     this.sizeOfFiles = 0L;
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
     this.childDir = new ArrayList<>();
+    this.dirName = "";
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
                    int[] bucket,
-                   List<Long> childDir) {
+                   List<Long> childDir,
+                   String dirName) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
+    this.dirName = dirName;
   }
 
   public int getNumOfFiles() {
@@ -67,6 +71,10 @@ public class NSSummary {
     return childDir;
   }
 
+  public String getDirName() {
+    return dirName;
+  }
+
   public void setNumOfFiles(int numOfFiles) {
     this.numOfFiles = numOfFiles;
   }
@@ -82,5 +90,9 @@ public class NSSummary {
 
   public void setChildDir(List<Long> childDir) {
     this.childDir = childDir;
+  }
+
+  public void setDirName(String dirName) {
+    this.dirName = dirName;
   }
 }

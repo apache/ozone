@@ -235,6 +235,16 @@ public class NSSummaryTask implements ReconOmTask {
           throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
     long objectId = directoryInfo.getObjectID();
+    // write the dir name to the current directory
+    String dirName = directoryInfo.getName();
+    NSSummary curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (curNSSummary == null) {
+      curNSSummary = new NSSummary();
+    }
+    curNSSummary.setDirName(dirName);
+    reconNamespaceSummaryManager.storeNSSummary(objectId, curNSSummary);
+
+    // write the child dir list to the parent directory
     NSSummary nsSummary = reconNamespaceSummaryManager
             .getNSSummary(parentObjectId);
     if (nsSummary == null) {

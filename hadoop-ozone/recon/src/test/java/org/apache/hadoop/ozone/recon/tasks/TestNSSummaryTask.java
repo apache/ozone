@@ -75,6 +75,7 @@ public class TestNSSummaryTask {
   private static final String FILE_FOUR = "file4";
   private static final String FILE_FIVE = "file5";
   private static final String DIR_ONE = "dir1";
+  private static final String DIR_ONE_RENAME = "dir1_new";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
   private static final String DIR_FOUR = "dir4";
@@ -199,6 +200,13 @@ public class TestNSSummaryTask {
       Assert.assertEquals(0, fileDistForDir2[i]);
     }
     Assert.assertEquals(0, nsSummaryInDir2.getChildDir().size());
+
+    // bucket should have empty dirName
+    Assert.assertEquals(0, nsSummaryForBucket1.getDirName().length());
+    Assert.assertEquals(0, nsSummaryForBucket2.getDirName().length());
+    // check dirName is correctly written
+    Assert.assertEquals(DIR_ONE, nsSummaryInDir1.getDirName());
+    Assert.assertEquals(DIR_TWO, nsSummaryInDir2.getDirName());
   }
 
   @Test
@@ -286,6 +294,21 @@ public class TestNSSummaryTask {
             .setTable(omMetadataManager.getDirectoryTable().getName())
             .build();
 
+    // rename dir1
+    String omDirUpdateKey = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + DIR_ONE;
+    OmDirectoryInfo omDirOldValue = buildOmDirInfo(DIR_ONE,
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
+    OmDirectoryInfo omDirUpdateValue = buildOmDirInfo(DIR_ONE_RENAME,
+            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
+    OMDBUpdateEvent keyEvent7 = new OMDBUpdateEvent.
+            OMUpdateEventBuilder<String, OmDirectoryInfo>()
+            .setKey(omDirUpdateKey)
+            .setValue(omDirUpdateValue)
+            .setOldValue(omDirOldValue)
+            .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+            .setTable(omMetadataManager.getDirectoryTable().getName())
+            .build();
+
     OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
             new ArrayList<OMDBUpdateEvent>() {{
               add(keyEvent1);
@@ -294,6 +317,7 @@ public class TestNSSummaryTask {
               add(keyEvent4);
               add(keyEvent5);
               add(keyEvent6);
+              add(keyEvent7);
           }});
 
     NSSummaryTask nsSummaryTask = new NSSummaryTask(
@@ -350,6 +374,9 @@ public class TestNSSummaryTask {
     List<Long> childDirForDir1 = nsSummaryForDir1.getChildDir();
     Assert.assertEquals(1, childDirForDir1.size());
     Assert.assertEquals(DIR_TWO_OBJECT_ID, (long)childDirForDir1.get(0));
+
+    // after renaming dir1, check its new name
+    Assert.assertEquals(DIR_ONE_RENAME, nsSummaryForDir1.getDirName());
   }
 
   /**

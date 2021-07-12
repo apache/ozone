@@ -75,6 +75,10 @@ public class TestReconNamespaceSummaryManagerImpl {
     Assert.assertEquals(5, summary3.getNumOfFiles());
     Assert.assertEquals(6, summary3.getSizeOfFiles());
 
+    Assert.assertEquals("dir1", summary.getDirName());
+    Assert.assertEquals("dir2", summary2.getDirName());
+    Assert.assertEquals("dir3", summary3.getDirName());
+
     // test child dir is written
     Assert.assertEquals(3, summary.getChildDir().size());
     // non-existent key
@@ -93,9 +97,9 @@ public class TestReconNamespaceSummaryManagerImpl {
 
   private void putThreeNSMetadata() throws IOException {
     HashMap<Long, NSSummary> hmap = new HashMap<>();
-    hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR));
-    hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR));
-    hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR));
+    hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR, "dir1"));
+    hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR, "dir2"));
+    hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR, "dir3"));
     for (Map.Entry entry: hmap.entrySet()) {
       reconNamespaceSummaryManager.storeNSSummary(
               (long)entry.getKey(), (NSSummary)entry.getValue());
