@@ -34,6 +34,14 @@ Filter list by UUID
     ${count} =          Get Length   ${lines}
     Should Be Equal As Integers    ${count}    1
 
+Filter list by NodeOperationalState
+    ${output} =         Execute      ozone admin datanode list --NodeOperationalState IN_SERVICE
+    Should contain      ${output}    Datanode:
+
+Filter list by NodeState
+    ${output} =         Execute      ozone admin datanode list --NodeState HEALTHY
+    Should contain      ${output}    Datanode:
+
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin datanode
                         Should contain   ${output}   Incomplete command
