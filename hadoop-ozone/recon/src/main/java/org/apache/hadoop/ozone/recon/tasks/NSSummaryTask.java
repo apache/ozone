@@ -247,7 +247,6 @@ public class NSSummaryTask implements ReconOmTask {
     } else {
       LOG.warn("Duplicate write on the same directory.");
     }
-    //nsSummary.setChildDir(childDir);
     reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
   }
 
@@ -298,7 +297,6 @@ public class NSSummaryTask implements ReconOmTask {
     } else {
       LOG.warn("Try to delete a non-existent child.");
     }
-    //nsSummary.setChildDir(childDir);
     reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
   }
 }
