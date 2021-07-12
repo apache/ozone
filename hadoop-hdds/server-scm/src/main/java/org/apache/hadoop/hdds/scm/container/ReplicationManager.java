@@ -1203,8 +1203,18 @@ public class ReplicationManager implements MetricsSource, SCMService {
 
     // if target datanode is not in replica set , nothing to do
     if (isTargetDnInReplicaSet) {
+      Set<ContainerReplica> eligibleReplicaSet =
+          eligibleReplicas.stream().collect(Collectors.toSet());
+      int replicationFactor =
+          cif.getReplicationConfig().getRequiredNodes();
+      ContainerPlacementStatus currentCPS =
+          getPlacementStatus(eligibleReplicaSet, replicationFactor);
+      eligibleReplicaSet.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
+      ContainerPlacementStatus afterMoveCPS =
+          getPlacementStatus(eligibleReplicaSet, replicationFactor);
+
       if (isSourceDnInReplicaSet &&
-          isPolicySatisfiedAfterMove(cif, srcDn, targetDn, eligibleReplicas)) {
+          isPlacementStatusActuallyEqual(currentCPS, afterMoveCPS)) {
         sendDeleteCommand(cif, srcDn, true);
         eligibleReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
         minus++;
@@ -1225,7 +1235,6 @@ public class ReplicationManager implements MetricsSource, SCMService {
         inflightMove.remove(cid);
         inflightMoveFuture.remove(cid);
       }
-
     }
 
     return minus;
@@ -1263,9 +1272,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
         eligibleSet.remove(r);
         ContainerPlacementStatus nowPS =
             getPlacementStatus(eligibleSet, replicationFactor);
-        if ((!ps.isPolicySatisfied()
-            && nowPS.actualPlacementCount() == ps.actualPlacementCount())
-            || (ps.isPolicySatisfied() && nowPS.isPolicySatisfied())) {
+        if (isPlacementStatusActuallyEqual(ps, nowPS)) {
           // Remove the replica if the container was already unsatisfied
           // and losing this replica keep actual placement count unchanged.
           // OR if losing this replica still keep satisfied
@@ -1282,6 +1289,19 @@ public class ReplicationManager implements MetricsSource, SCMService {
             "violating the placement policy", container, excess);
       }
     }
+  }
+
+  /**
+   * whether the given two ContainerPlacementStatus are actually equal.
+   *
+   * @param cps1 ContainerPlacementStatus
+   * @param cps2 ContainerPlacementStatus
+   */
+  private boolean isPlacementStatusActuallyEqual(
+                      ContainerPlacementStatus cps1,
+                      ContainerPlacementStatus cps2) {
+    return cps1.actualPlacementCount() == cps2.actualPlacementCount() ||
+        cps1.isPolicySatisfied() && cps2.isPolicySatisfied();
   }
 
   /**
