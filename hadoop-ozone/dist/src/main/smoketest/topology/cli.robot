@@ -31,3 +31,6 @@ Run printTopology -o
     ${output} =         Execute          ozone admin printTopology -o
                         Should contain   ${output}         Location: /rack2
                         Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net) IN_SERVICE
+Run printTopology -n IN_SERVICE
+    ${output} =         Execute          ozone admin printTopology -n IN_SERVICE
+                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)    IN_SERVICE    /rack2
