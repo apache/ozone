@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
@@ -68,6 +69,13 @@ public class TopologySubcommand extends ScmSubcommand
       description = "Print Topology with full node infos")
   private boolean fullInfo;
 
+  @CommandLine.Option(names = {"-n", "--nodeOperationalState" +
+      " IN_SERVICE DECOMMISSIONING " +
+      " DECOMMISSIONED ENTERING_MAINTENANCE " +
+      " IN_MAINTENANCE"},
+      description = "Print Topology through nodeOperationalState")
+  private String nodeOperationalState;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     for (HddsProtos.NodeState state : STATES) {
@@ -98,7 +106,11 @@ public class TopologySubcommand extends ScmSubcommand
         new HashMap<>();
     HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
         new HashMap<>();
-
+    if (nodeOperationalState != null) {
+      nodes = nodes.stream().filter(
+          info -> info.getNodeOperationalStates(0).toString()
+              .equals(nodeOperationalState)).collect(Collectors.toList());
+    }
     for (HddsProtos.Node node : nodes) {
       String location = node.getNodeID().getNetworkLocation();
       if (location != null && !tree.containsKey(location)) {
@@ -139,6 +151,11 @@ public class TopologySubcommand extends ScmSubcommand
   // Format "ipAddress(hostName):PortName1=PortValue1    OperationalState
   //     networkLocation
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
+    if (nodeOperationalState != null) {
+      nodes = nodes.stream().filter(
+          info -> info.getNodeOperationalStates(0).toString()
+              .equals(nodeOperationalState)).collect(Collectors.toList());
+    }
     nodes.forEach(node -> {
       System.out.print(" " + getAdditionNodeOutput(node) +
           node.getNodeID().getIpAddress() + "(" +

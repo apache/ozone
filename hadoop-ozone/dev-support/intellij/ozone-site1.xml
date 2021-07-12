@@ -28,6 +28,10 @@
     <value>hadoop</value>
   </property>
   <property>
+    <name>hdds.datanode.dir</name>
+    <value>/tmp/datanode2</value>
+  </property>
+  <property>
     <name>ozone.csi.socket</name>
     <value>/tmp/csi.sock</value>
   </property>
@@ -49,7 +53,7 @@
   </property>
   <property>
     <name>ozone.scm.container.size</name>
-    <value>1G</value>
+    <value>256M</value>
   </property>
   <property>
     <name>hdds.datanode.storage.utilization.critical.threshold</name>
@@ -60,10 +64,6 @@
     <value>true</value>
   </property>
   <property>
-    <name>ozone.recon.address</name>
-    <value>localhost:9891</value>
-  </property>
-  <property>
     <name>ozone.recon.db.dir</name>
     <value>/tmp/recon</value>
   </property>
@@ -71,4 +71,12 @@
     <name>datanode.replication.port</name>
     <value>0</value>
   </property>
+<!--  <property>-->
+<!--    <name>ozone.scm.datanode.pipeline.limit</name>-->
+<!--    <value>7</value>-->
+<!--  </property>-->
+<!--  <property>-->
+<!--    <name>hdds.scm.safemode.pipeline.rate</name>-->
+<!--    <value>0/1</value>-->
+<!--  </property>-->
 </configuration>
