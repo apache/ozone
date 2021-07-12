@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
 import org.apache.hadoop.ozone.insight.LoggerSource.Level;
 
 import org.apache.hadoop.ozone.util.ShutdownHookManager;

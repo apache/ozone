@@ -42,7 +42,8 @@ public class OzoneServiceConfig {
   public static final long OZONE_SHUTDOWN_TIMEOUT_MINIMUM = 1;
 
   /** The default time unit used: seconds. */
-  public static final TimeUnit OZONE_SHUTDOWN_TIME_UNIT_DEFAULT = TimeUnit.SECONDS;
+  public static final TimeUnit OZONE_SHUTDOWN_TIME_UNIT_DEFAULT =
+          TimeUnit.SECONDS;
 
   public static final int DEFAULT_SHUTDOWN_HOOK_PRIORITY = 10;
 

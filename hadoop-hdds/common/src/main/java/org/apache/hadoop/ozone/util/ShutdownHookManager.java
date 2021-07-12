@@ -182,7 +182,8 @@ public final class ShutdownHookManager {
    * configuration.
    * @param conf configuration to use.
    * @return a timeout, always greater than or equal to
-   * {@link org.apache.hadoop.ozone.conf.OzoneServiceConfig#OZONE_SHUTDOWN_TIMEOUT_MINIMUM}
+   * {@link org.apache.hadoop.ozone.conf.OzoneServiceConfig
+   * #OZONE_SHUTDOWN_TIMEOUT_MINIMUM}
    */
   @InterfaceAudience.Private
   @VisibleForTesting
@@ -207,8 +208,8 @@ public final class ShutdownHookManager {
     private final TimeUnit unit;
 
     HookEntry(Runnable hook, int priority) {
-      this(hook, priority,
-          getShutdownTimeout(new OzoneConfiguration()), OZONE_SHUTDOWN_TIME_UNIT_DEFAULT);
+      this(hook, priority, getShutdownTimeout(new OzoneConfiguration()),
+              OZONE_SHUTDOWN_TIME_UNIT_DEFAULT);
     }
 
     HookEntry(Runnable hook, int priority, long timeout, TimeUnit unit) {
@@ -348,7 +349,8 @@ public final class ShutdownHookManager {
           "shutdownHook");
     }
     // hooks are only == by runnable
-    return hooks.remove(new HookEntry(shutdownHook, 0, OZONE_SHUTDOWN_TIMEOUT_MINIMUM,
+    return hooks.remove(new HookEntry(shutdownHook, 0,
+            OZONE_SHUTDOWN_TIMEOUT_MINIMUM,
             OZONE_SHUTDOWN_TIME_UNIT_DEFAULT));
   }
 
@@ -361,7 +363,8 @@ public final class ShutdownHookManager {
   @InterfaceAudience.Public
   @InterfaceStability.Stable
   public boolean hasShutdownHook(Runnable shutdownHook) {
-    return hooks.contains(new HookEntry(shutdownHook, 0, OZONE_SHUTDOWN_TIMEOUT_MINIMUM,
+    return hooks.contains(new HookEntry(shutdownHook, 0,
+            OZONE_SHUTDOWN_TIMEOUT_MINIMUM,
             OZONE_SHUTDOWN_TIME_UNIT_DEFAULT));
   }
 
