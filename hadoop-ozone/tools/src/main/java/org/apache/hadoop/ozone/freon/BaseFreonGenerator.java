@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.codahale.metrics.ConsoleReporter;
@@ -250,7 +251,7 @@ public class BaseFreonGenerator {
 
     pathSchema = new PathSchema(prefix);
 
-    Runtime.getRuntime().addShutdownHook(
+    ShutdownHookManager.get().addShutdownHook(
         new Thread(() -> {
           try {
             freonCommand.stopHttpServer();
@@ -258,7 +259,7 @@ public class BaseFreonGenerator {
             LOG.error("HTTP server can't be stopped.", ex);
           }
           printReport();
-        }));
+        }), 10);
 
     executor = Executors.newFixedThreadPool(threadNo);
 

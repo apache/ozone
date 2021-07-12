@@ -23,7 +23,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,11 +35,11 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.OZONE_SHUTDOWN_TIMEOUT_MINIMUM;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.OZONE_SHUTDOWN_TIME_UNIT_DEFAULT;
 
 /**
  * The <code>ShutdownHookManager</code> enables running shutdownHook
@@ -77,14 +76,10 @@ public final class ShutdownHookManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ShutdownHookManager.class);
 
-  /** Minimum shutdown timeout: {@value} second(s). */
-  public static final long TIMEOUT_MINIMUM = 1;
 
-  /** The default time unit used: seconds. */
-  public static final TimeUnit TIME_UNIT_DEFAULT = TimeUnit.SECONDS;
 
   private static final ExecutorService EXECUTOR =
-      HadoopExecutors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+      Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
           .setDaemon(true)
           .setNameFormat("shutdown-hook-%01d")
           .build());
@@ -152,8 +147,7 @@ public final class ShutdownHookManager {
       EXECUTOR.shutdown();
       long shutdownTimeout = getShutdownTimeout(conf);
       if (!EXECUTOR.awaitTermination(
-          shutdownTimeout,
-          TIME_UNIT_DEFAULT)) {
+          shutdownTimeout, OZONE_SHUTDOWN_TIME_UNIT_DEFAULT)) {
         // timeout waiting for the
         LOG.error("ShutdownHookManger shutdown forcefully after"
             + " {} seconds.", shutdownTimeout);
@@ -183,14 +177,15 @@ public final class ShutdownHookManager {
    * Get the shutdown timeout in seconds, from the supplied
    * configuration.
    * @param conf configuration to use.
-   * @return a timeout, always greater than or equal to {@link #TIMEOUT_MINIMUM}
+   * @return a timeout, always greater than or equal to
+   * {@link org.apache.hadoop.ozone.conf.OzoneServiceConfig#OZONE_SHUTDOWN_TIMEOUT_MINIMUM}
    */
   @InterfaceAudience.Private
   @VisibleForTesting
   static long getShutdownTimeout(ConfigurationSource conf) {
     long duration = HddsUtils.getShutDownTimeOut(conf);
-    if (duration < TIMEOUT_MINIMUM) {
-      duration = TIMEOUT_MINIMUM;
+    if (duration < OZONE_SHUTDOWN_TIMEOUT_MINIMUM) {
+      duration = OZONE_SHUTDOWN_TIMEOUT_MINIMUM;
     }
     return duration;
   }
@@ -209,7 +204,7 @@ public final class ShutdownHookManager {
 
     HookEntry(Runnable hook, int priority) {
       this(hook, priority,
-          getShutdownTimeout(new OzoneConfiguration()), TIME_UNIT_DEFAULT);
+          getShutdownTimeout(new OzoneConfiguration()), OZONE_SHUTDOWN_TIME_UNIT_DEFAULT);
     }
 
     HookEntry(Runnable hook, int priority, long timeout, TimeUnit unit) {
@@ -349,8 +344,8 @@ public final class ShutdownHookManager {
           "shutdownHook");
     }
     // hooks are only == by runnable
-    return hooks.remove(new HookEntry(shutdownHook, 0, TIMEOUT_MINIMUM,
-        TIME_UNIT_DEFAULT));
+    return hooks.remove(new HookEntry(shutdownHook, 0, OZONE_SHUTDOWN_TIMEOUT_MINIMUM,
+            OZONE_SHUTDOWN_TIME_UNIT_DEFAULT));
   }
 
   /**
@@ -362,8 +357,8 @@ public final class ShutdownHookManager {
   @InterfaceAudience.Public
   @InterfaceStability.Stable
   public boolean hasShutdownHook(Runnable shutdownHook) {
-    return hooks.contains(new HookEntry(shutdownHook, 0, TIMEOUT_MINIMUM,
-        TIME_UNIT_DEFAULT));
+    return hooks.contains(new HookEntry(shutdownHook, 0, OZONE_SHUTDOWN_TIMEOUT_MINIMUM,
+            OZONE_SHUTDOWN_TIME_UNIT_DEFAULT));
   }
 
   /**

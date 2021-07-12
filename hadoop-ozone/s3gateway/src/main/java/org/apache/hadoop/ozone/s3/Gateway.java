@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -31,6 +32,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
+
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * This class is used to start/stop S3 compatible rest server.
@@ -42,7 +45,6 @@ import picocli.CommandLine.Command;
 public class Gateway extends GenericCli {
 
   private static final Logger LOG = LoggerFactory.getLogger(Gateway.class);
-  private static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
   private S3GatewayHttpServer httpServer;
 
@@ -65,7 +67,7 @@ public class Gateway extends GenericCli {
       } catch (Exception e) {
         LOG.error("Error during stop S3Gateway", e);
       }
-    }, SHUTDOWN_HOOK_PRIORITY);
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 

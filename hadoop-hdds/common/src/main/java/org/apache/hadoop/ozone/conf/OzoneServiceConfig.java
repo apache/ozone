@@ -38,6 +38,14 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 @ConfigGroup(prefix = "ozone.service")
 public class OzoneServiceConfig {
 
+  /** Minimum shutdown timeout: {@value} second(s). */
+  public static final long OZONE_SHUTDOWN_TIMEOUT_MINIMUM = 1;
+
+  /** The default time unit used: seconds. */
+  public static final TimeUnit OZONE_SHUTDOWN_TIME_UNIT_DEFAULT = TimeUnit.SECONDS;
+
+  public static final int DEFAULT_SHUTDOWN_HOOK_PRIORITY = 10;
+
   public static final String SERVICE_SHUTDOWN_TIMEOUT =
       "shutdown.timeout";
   /** Default shutdown hook timeout: {@value} seconds. */

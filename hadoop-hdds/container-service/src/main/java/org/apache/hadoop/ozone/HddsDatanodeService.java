@@ -75,6 +75,7 @@ import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -94,9 +95,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
-
-
-  private static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
   private OzoneConfiguration conf;
   private DatanodeDetails datanodeDetails;
@@ -180,7 +178,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       } catch (Exception e) {
         LOG.error("Error during stop Ozone Datanode.", e);
       }
-    }, SHUTDOWN_HOOK_PRIORITY);
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
