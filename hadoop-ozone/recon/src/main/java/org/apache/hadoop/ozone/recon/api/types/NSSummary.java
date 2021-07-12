@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -59,11 +60,11 @@ public class NSSummary {
   }
 
   public int[] getFileSizeBucket() {
-    return fileSizeBucket;
+    return Arrays.copyOf(fileSizeBucket, ReconConstants.NUM_OF_BINS);
   }
 
   public List<Long> getChildDir() {
-    return new ArrayList<>(childDir);
+    return childDir;
   }
 
   public void setNumOfFiles(int numOfFiles) {
@@ -75,7 +76,8 @@ public class NSSummary {
   }
 
   public void setFileSizeBucket(int[] fileSizeBucket) {
-    this.fileSizeBucket = fileSizeBucket;
+    this.fileSizeBucket = Arrays.copyOf(fileSizeBucket,
+            ReconConstants.NUM_OF_BINS);
   }
 
   public void setChildDir(List<Long> childDir) {
