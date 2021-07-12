@@ -176,7 +176,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     int pendingRequestsMegaBytesLimit =
         HddsUtils.roundupMb(pendingRequestsBytesLimit);
     stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-        (index, data) -> new int[] {1, data.size()}, numPendingRequests,
+        (index, data) -> new int[] {1, HddsUtils.roundupMb(data.size())}, numPendingRequests,
         pendingRequestsMegaBytesLimit);
 
     this.chunkExecutors = chunkExecutors;
