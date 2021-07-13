@@ -166,7 +166,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      partName = ozoneKey + clientID;
+      int partNumber = keyArgs.getMultipartNumber();
+      partName = ozoneKey + uploadID + "-" + partNumber;
 
       if (multipartKeyInfo == null) {
         // This can occur when user started uploading part by the time commit
@@ -180,7 +181,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      int partNumber = keyArgs.getMultipartNumber();
       oldPartKeyInfo = multipartKeyInfo.getPartKeyInfo(partNumber);
 
       // Build this multipart upload part info.
