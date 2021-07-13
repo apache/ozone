@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -109,7 +110,8 @@ public class TestSCMContainerPlacementRackAware {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.createDatanodeDetails(
               hostname + i, rack + (i / NODE_PER_RACK)),
-          NodeStatus.inServiceHealthy());
+          NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = TestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
@@ -405,7 +407,8 @@ public class TestSCMContainerPlacementRackAware {
       // Totally 3 racks, each has 5 datanodes
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, null), NodeStatus.inServiceHealthy());
+          hostname + i, null), NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = TestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),

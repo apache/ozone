@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -73,6 +74,7 @@ import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -245,6 +247,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               "supported. Datanode user" + " login " + "failed.");
         }
         LOG.info("Hdds Datanode login successful.");
+      }
+
+      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+          datanodeDetails.getUuidString());
+      if (layoutStorage.getState() != INITIALIZED) {
+        layoutStorage.initialize();
       }
 
       // initialize datanode CRL store

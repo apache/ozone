@@ -218,9 +218,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       channel.shutdownNow();
       try {
         channel.awaitTermination(60, TimeUnit.MINUTES);
-      } catch (Exception e) {
-        LOG.error("Unexpected exception while waiting for channel termination",
+      } catch (InterruptedException e) {
+        LOG.error("InterruptedException while waiting for channel termination",
             e);
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
   }
@@ -261,6 +263,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
     try{
@@ -271,6 +275,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     } catch (InterruptedException e) {
       LOG.error("Command execution was interrupted.");
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
       LOG.error("Failed to execute command " + request, e);
     }

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -57,6 +58,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 /**
  * This class is responsible for dispatching heartbeat from datanode to
@@ -104,8 +107,22 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     } else {
 
+      LayoutVersionProto layoutVersion = null;
+      if (!heartbeat.hasDataNodeLayoutVersion()) {
+        // Backward compatibility to make sure old Datanodes can still talk to
+        // SCM.
+        layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
+            INITIAL_VERSION.layoutVersion());
+      } else {
+        layoutVersion = heartbeat.getDataNodeLayoutVersion();
+      }
+
+      LOG.debug("Processing DataNode Layout Report.");
+      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
+
       // should we dispatch heartbeat through eventPublisher?
-      commands = nodeManager.processHeartbeat(datanodeDetails);
+      commands = nodeManager.processHeartbeat(datanodeDetails,
+          layoutVersion);
       if (heartbeat.hasNodeReport()) {
         LOG.debug("Dispatching Node Report.");
         eventPublisher.fireEvent(
@@ -212,6 +229,18 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public NodeReportFromDatanode(DatanodeDetails datanodeDetails,
         NodeReportProto report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
+   * Layout report event payload with origin.
+   */
+  public static class LayoutReportFromDatanode
+      extends ReportFromDatanode<LayoutVersionProto> {
+
+    public LayoutReportFromDatanode(DatanodeDetails datanodeDetails,
+                                  LayoutVersionProto report) {
       super(datanodeDetails, report);
     }
   }

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
-
 /**
  * Mixin class to handle ObjectID and UpdateID.
  */
@@ -103,8 +101,8 @@ public class WithObjectID extends WithMetadata {
     // Main reason, in non-HA transaction Index after restart starts from 0.
     // And also because of this same reason we don't do replay checks in non-HA.
 
-    if (isRatisEnabled) {
-      Preconditions.checkArgument(updateId >= this.updateID, String.format(
+    if (isRatisEnabled && updateId < this.updateID) {
+      throw new IllegalArgumentException(String.format(
           "Trying to set updateID to %d which is not greater than the " +
               "current value of %d for %s", updateId, this.updateID,
           getObjectInfo()));
