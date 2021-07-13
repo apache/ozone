@@ -467,7 +467,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
-    checkOpen(dn, request.getEncodedToken());
+    checkOpen(dn);
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
@@ -529,7 +529,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
-  private synchronized void checkOpen(DatanodeDetails dn, String encodedToken)
+  private synchronized void checkOpen(DatanodeDetails dn)
       throws IOException{
     if (closed) {
       throw new IOException("This channel is not connected.");
@@ -539,12 +539,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // If the channel doesn't exist for this specific datanode or the channel
     // is closed, just reconnect
     if (!isConnected(channel)) {
-      reconnect(dn, encodedToken);
+      reconnect(dn);
     }
 
   }
 
-  private void reconnect(DatanodeDetails dn, String encodedToken)
+  private void reconnect(DatanodeDetails dn)
       throws IOException {
     ManagedChannel channel;
     try {
