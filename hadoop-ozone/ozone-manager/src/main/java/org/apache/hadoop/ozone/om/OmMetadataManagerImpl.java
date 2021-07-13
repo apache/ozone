@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBTenantInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
@@ -67,6 +68,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -128,6 +130,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
    * |----------------------------------------------------------------------|
+   * | tenantUserTable    |  tenant user name -> a tenant (organization)    |
+   * | tenantStateTable   |  tenant user name -> OmDBTenantInfo             |
+   * | tenantGroupTable   |  tenant user name -> [tenant group A, B, ...]   |
+   * | tenantRoleTable    |  tenant user name -> roles [admin, roleB, ...]  |
+   * | tenantPolicyTable  |  policyGroup -> [policyId1, policyId2]          |
+   * |----------------------------------------------------------------------|
    *
    * Simple Tables:
    * |----------------------------------------------------------------------|
@@ -152,7 +160,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  deletedDirTable   | parentId/directoryName -> KeyInfo               |
    * |----------------------------------------------------------------------|
-   *
    */
 
   public static final String USER_TABLE = "userTable";
@@ -171,6 +178,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
+
+  // Tables for S3 multi-tenancy
+  public static final String TENANT_USER_TABLE = "tenantUserTable";
+  public static final String TENANT_STATE_TABLE = "tenantStateTable";
+  public static final String TENANT_GROUP_TABLE = "tenantGroupTable";
+  public static final String TENANT_ROLE_TABLE = "tenantRoleTable";
+  public static final String TENANT_POLICY_TABLE = "tenantPolicyTable";
 
   private DBStore store;
 
@@ -191,6 +205,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table fileTable;
   private Table openFileTable;
   private Table transactionInfoTable;
+  // Tables for S3 multi-tenancy
+  private Table tenantUserTable;
+  private Table tenantStateTable;
+  private Table tenantGroupTable;
+  private Table tenantRoleTable;
+  private Table tenantPolicyTable;
+
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
@@ -389,6 +410,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(OPEN_FILE_TABLE)
         .addTable(DELETED_DIR_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
+        .addTable(TENANT_USER_TABLE)
+        .addTable(TENANT_STATE_TABLE)
+        .addTable(TENANT_GROUP_TABLE)
+        .addTable(TENANT_ROLE_TABLE)
+        .addTable(TENANT_POLICY_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -400,7 +426,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(TransactionInfo.class, new TransactionInfoCodec())
-        .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec());
+        .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
+        .addCodec(OmDBTenantInfo.class, new OmDBTenantInfoCodec());
   }
 
   /**
@@ -473,6 +500,32 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
     checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE);
+
+    // tenant user name -> tenant name string
+    tenantUserTable = this.store.getTable(TENANT_USER_TABLE,
+        String.class, String.class);
+    checkTableStatus(tenantUserTable, TENANT_USER_TABLE);
+
+    // tenant name -> tenant (tenant states)
+    tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
+        String.class, OmDBTenantInfo.class);
+    checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
+
+    // tenant user name -> list of tenant groups the user belongs to
+    tenantGroupTable = this.store.getTable(TENANT_GROUP_TABLE,
+        String.class, String.class /* TODO: Use custom list */);
+    checkTableStatus(tenantGroupTable, TENANT_GROUP_TABLE);
+
+    // tenant user name -> list of roles in a tenant. e.g. admin for "finance"
+    // TODO: Placeholder. Unused in the prototype.
+    tenantRoleTable = this.store.getTable(TENANT_ROLE_TABLE,
+        String.class, String.class /* TODO: Use custom list */);
+    checkTableStatus(tenantRoleTable, TENANT_ROLE_TABLE);
+
+    // tenant policy name -> list of tenant policies
+    tenantPolicyTable = this.store.getTable(TENANT_POLICY_TABLE,
+        String.class, String.class /* TODO: Use custom list */);
+    checkTableStatus(tenantPolicyTable, TENANT_POLICY_TABLE);
   }
 
   /**
@@ -1205,6 +1258,31 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, TransactionInfo> getTransactionInfoTable() {
     return transactionInfoTable;
+  }
+
+  @Override
+  public Table<String, String> getTenantUserTable() {
+    return tenantUserTable;
+  }
+
+  @Override
+  public Table<String, OmDBTenantInfo> getTenantStateTable() {
+    return tenantStateTable;
+  }
+
+  @Override
+  public Table<String, String> getTenantGroupTable() {
+    return tenantGroupTable;
+  }
+
+  @Override
+  public Table<String, String> getTenantRoleTable() {
+    return tenantRoleTable;
+  }
+
+  @Override
+  public Table<String, String> getTenantPolicyTable() {
+    return tenantPolicyTable;
   }
 
   /**

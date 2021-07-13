@@ -135,6 +135,7 @@ share/ozone/lib/jersey-media-json-jackson.jar
 share/ozone/lib/jersey-server.jar
 share/ozone/lib/jersey-server.jar
 share/ozone/lib/jersey-servlet.jar
+share/ozone/lib/jettison.jar
 share/ozone/lib/jetty-http.v20201120.jar
 share/ozone/lib/jetty-io.v20201120.jar
 share/ozone/lib/jetty-security.v20201120.jar

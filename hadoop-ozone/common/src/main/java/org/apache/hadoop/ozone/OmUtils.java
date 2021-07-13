@@ -291,6 +291,12 @@ public final class OmUtils {
     case DeleteOpenKeys:
     case RevokeS3Secret:
     case PurgePaths:
+    case CreateTenant:
+    case ModifyTenant:
+    case DeleteTenant:
+    case CreateTenantUser:
+    case ModifyTenantUser:
+    case DeleteTenantUser:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

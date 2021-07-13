@@ -49,6 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -276,6 +277,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String omId;
 
   private OMMetadataManager metadataManager;
+  private OMMultiTenantManager multiTenantManagr;
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private KeyManager keyManager;
@@ -542,6 +544,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices() throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
+    multiTenantManagr = new OMMultiTenantManagerImpl(metadataManager,
+        configuration);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
@@ -1087,6 +1091,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
+  }
+
+  /**
+   * Get metadata manager.
+   *
+   * @return metadata manager.
+   */
+  public OMMultiTenantManager getMultiTenantManager() {
+    return multiTenantManagr;
   }
 
   public OzoneBlockTokenSecretManager getBlockTokenMgr() {
@@ -2740,6 +2753,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     return s3SecretManager.getS3Secret(kerberosID);
   }
+
+  /**
+   * Create tenant.
+   */
+  public void createTenant(String tenantName) throws IOException {
+    throw new NotImplementedException(
+        "non-Ratis createTenant() is not implemented");
+  }
+
+  // TODO: modify, delete
+
+  /**
+   * Create tenant user.
+   */
+  public S3SecretValue createTenantUser(
+      String tenantUsername, String tenantName) throws IOException {
+    throw new NotImplementedException(
+        "non-Ratis createTenantUser() is not implemented");
+  }
+
+  // TODO: modify, delete
 
   @Override
   /**

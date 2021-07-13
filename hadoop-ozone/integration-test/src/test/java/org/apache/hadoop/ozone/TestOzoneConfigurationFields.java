@@ -89,8 +89,14 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        OMConfigKeys.OZONE_OM_HA_PREFIX
+        OMConfigKeys.OZONE_OM_HA_PREFIX,
         // TODO HDDS-2856
+        OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT,
+        OMConfigKeys.OZONE_RANGER_OM_CONNECTION_TIMEOUT,
+        OMConfigKeys.OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT,
+        OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY,
+        OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
+        OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD
     ));
   }
 }

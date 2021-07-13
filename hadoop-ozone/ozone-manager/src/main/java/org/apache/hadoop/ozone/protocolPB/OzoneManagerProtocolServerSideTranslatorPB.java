@@ -126,6 +126,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
     RaftServerStatus raftServerStatus;
+    OMClientRequest omClientRequest = null;
     if (isRatisEnabled) {
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
@@ -134,14 +135,21 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         raftServerStatus = omRatisServer.checkLeaderStatus();
         if (raftServerStatus == LEADER_AND_READY) {
           try {
-            OMClientRequest omClientRequest =
+            omClientRequest =
                 OzoneManagerRatisUtils.createClientRequest(request);
             request = omClientRequest.preExecute(ozoneManager);
           } catch (IOException ex) {
             // As some of the preExecute returns error. So handle here.
+            if (omClientRequest != null) {
+              omClientRequest.handleRequestFailure(ozoneManager);
+            }
             return createErrorResponse(request, ex);
           }
-          return submitRequestToRatis(request);
+          OMResponse response = submitRequestToRatis(request);
+          if (!response.getSuccess() && omClientRequest != null) {
+            omClientRequest.handleRequestFailure(ozoneManager);
+          }
+          return response;
         } else {
           throw createLeaderErrorException(raftServerStatus);
         }

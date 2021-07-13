@@ -334,8 +334,19 @@ public final class OzoneConsts {
   public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
   public static final String SOURCE_VOLUME = "sourceVolume";
   public static final String SOURCE_BUCKET = "sourceBucket";
+  public static final String TENANT = "tenant";
 
+  // For multi-tenancy
+  public static final String TENANT_NAME_USER_NAME_DELIMITER = "$";
+  public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
+  public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
+  public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
+  public static final String DEFAULT_TENANT_USER_GROUP_SUFFIX = "-users";
 
+  public static final String DEFAULT_TENANT_GROUP_ALL_ADMINS =
+      "GroupTenantAllAdmins";
+  public static final String DEFAULT_TENANT_GROUP_ALL_USERS =
+      "GroupTenantAllUsers";
 
   // For OM metrics saving to a file
   public static final String OM_METRICS_FILE = "omMetrics";
@@ -442,4 +453,31 @@ public final class OzoneConsts {
   public static final String OZONE_HTTP_SECURITY_ENABLED_SECURE = "true";
   public static final String OZONE_HTTP_FILTER_INITIALIZERS_SECURE =
       "org.apache.hadoop.security.AuthenticationFilterInitializer";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
+      "/service/xusers/secure/users";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT =
+      "/service/xusers/users/?name=";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT =
+      "/service/xusers/secure/users/id/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT =
+      "/service/xusers/secure/groups";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT =
+      "/service/xusers/groups?name=";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT =
+      "/service/xusers/secure/groups/id/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy/?policyName=";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT =
+      "/service/plugins/policies/";
 }
