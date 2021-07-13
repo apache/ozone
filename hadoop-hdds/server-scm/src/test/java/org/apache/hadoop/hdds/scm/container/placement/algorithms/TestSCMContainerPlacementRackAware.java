@@ -53,6 +53,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import org.hamcrest.MatcherAssert;
+
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -70,7 +71,8 @@ public class TestSCMContainerPlacementRackAware {
   private OzoneConfiguration conf;
   private NodeManager nodeManager;
   private final Integer datanodeCount;
-  private final List<DatanodeInfo> datanodes = new ArrayList<>();
+  private final List<DatanodeDetails> datanodes = new ArrayList<>();
+  private final List<DatanodeInfo> dnInfos = new ArrayList<>();
   // policy with fallback capability
   private SCMContainerPlacementRackAware policy;
   // policy prohibit fallback
@@ -107,10 +109,11 @@ public class TestSCMContainerPlacementRackAware {
     String hostname = "node";
     for (int i = 0; i < datanodeCount; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeInfo datanodeInfo = new DatanodeInfo(
+      DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
-              hostname + i, rack + (i / NODE_PER_RACK)),
-          NodeStatus.inServiceHealthy(),
+          hostname + i, rack + (i / NODE_PER_RACK));
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          datanodeDetails, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = TestUtils.createStorageReport(
@@ -125,48 +128,49 @@ public class TestSCMContainerPlacementRackAware {
       datanodeInfo.updateMetaDataStorageReports(
           new ArrayList<>(Arrays.asList(metaStorage1)));
 
-      datanodes.add(datanodeInfo);
-      cluster.add(datanodeInfo);
+      datanodes.add(datanodeDetails);
+      cluster.add(datanodeDetails);
+      dnInfos.add(datanodeInfo);
     }
 
     if (datanodeCount > 4) {
       StorageReportProto storage2 = TestUtils.createStorageReport(
-          datanodes.get(2).getUuid(),
+          dnInfos.get(2).getUuid(),
           "/data1-" + datanodes.get(2).getUuidString(),
           STORAGE_CAPACITY, 90L, 10L, null);
-      datanodes.get(2).updateStorageReports(
+      dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = TestUtils.createStorageReport(
-          datanodes.get(3).getUuid(),
-          "/data1-" + datanodes.get(3).getUuidString(),
+          dnInfos.get(3).getUuid(),
+          "/data1-" + dnInfos.get(3).getUuidString(),
           STORAGE_CAPACITY, 80L, 20L, null);
-      datanodes.get(3).updateStorageReports(
+      dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
       StorageReportProto storage4 = TestUtils.createStorageReport(
-          datanodes.get(4).getUuid(),
-          "/data1-" + datanodes.get(4).getUuidString(),
+          dnInfos.get(4).getUuid(),
+          "/data1-" + dnInfos.get(4).getUuidString(),
           STORAGE_CAPACITY, 70L, 30L, null);
-      datanodes.get(4).updateStorageReports(
+      dnInfos.get(4).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage4)));
     } else if (datanodeCount > 3) {
       StorageReportProto storage2 = TestUtils.createStorageReport(
-          datanodes.get(2).getUuid(),
-          "/data1-" + datanodes.get(2).getUuidString(),
+          dnInfos.get(2).getUuid(),
+          "/data1-" + dnInfos.get(2).getUuidString(),
           STORAGE_CAPACITY, 90L, 10L, null);
-      datanodes.get(2).updateStorageReports(
+      dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
       StorageReportProto storage3 = TestUtils.createStorageReport(
-          datanodes.get(3).getUuid(),
-          "/data1-" + datanodes.get(3).getUuidString(),
+          dnInfos.get(3).getUuid(),
+          "/data1-" + dnInfos.get(3).getUuidString(),
           STORAGE_CAPACITY, 80L, 20L, null);
-      datanodes.get(3).updateStorageReports(
+      dnInfos.get(3).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage3)));
     } else if (datanodeCount > 2) {
       StorageReportProto storage2 = TestUtils.createStorageReport(
-          datanodes.get(2).getUuid(),
-          "/data1-" + datanodes.get(2).getUuidString(),
+          dnInfos.get(2).getUuid(),
+          "/data1-" + dnInfos.get(2).getUuidString(),
           STORAGE_CAPACITY, 84L, 16L, null);
-      datanodes.get(2).updateStorageReports(
+      dnInfos.get(2).updateStorageReports(
           new ArrayList<>(Arrays.asList(storage2)));
     }
 
@@ -174,6 +178,10 @@ public class TestSCMContainerPlacementRackAware {
     nodeManager = Mockito.mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
+    for (DatanodeInfo dn: dnInfos) {
+      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+          .thenReturn(dn);
+    }
     when(nodeManager.getClusterNetworkTopologyMap())
         .thenReturn(cluster);
 
@@ -400,33 +408,40 @@ public class TestSCMContainerPlacementRackAware {
   @Test
   public void testDatanodeWithDefaultNetworkLocation() throws SCMException {
     String hostname = "node";
-    List<DatanodeInfo> dataList = new ArrayList<>();
+    List<DatanodeInfo> dnInfoList = new ArrayList<>();
+    List<DatanodeDetails> dataList = new ArrayList<>();
     NetworkTopology clusterMap =
         new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeInfo datanodeInfo = new DatanodeInfo(
-          MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, null), NodeStatus.inServiceHealthy(),
+      DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(
+          hostname + i, null);
+      DatanodeInfo dnInfo = new DatanodeInfo(
+          dn, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = TestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          dnInfo.getUuid(), "/data1-" + dnInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           TestUtils.createMetadataStorageReport(
-          "/metadata1-" + datanodeInfo.getUuidString(),
+          "/metadata1-" + dnInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
-      datanodeInfo.updateStorageReports(
+      dnInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
-      datanodeInfo.updateMetaDataStorageReports(
+      dnInfo.updateMetaDataStorageReports(
           new ArrayList<>(Arrays.asList(metaStorage1)));
 
-      dataList.add(datanodeInfo);
-      clusterMap.add(datanodeInfo);
+      dataList.add(dn);
+      clusterMap.add(dn);
+      dnInfoList.add(dnInfo);
     }
     Assert.assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
+    for (DatanodeInfo dn: dnInfoList) {
+      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+          .thenReturn(dn);
+    }
 
     // choose nodes to host 3 replica
     int nodeNum = 3;

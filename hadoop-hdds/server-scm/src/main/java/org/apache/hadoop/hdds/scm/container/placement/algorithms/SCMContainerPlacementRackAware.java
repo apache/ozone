@@ -277,7 +277,7 @@ public final class SCMContainerPlacementRackAware
             " excludedNodes and affinityNode constrains.", null);
       }
 
-      DatanodeDetails datanodeDetails = (DatanodeDetails) node;
+      DatanodeDetails datanodeDetails = (DatanodeDetails)node;
       DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
           .getNodeByUuid(datanodeDetails.getUuidString());
       if (datanodeInfo == null) {
