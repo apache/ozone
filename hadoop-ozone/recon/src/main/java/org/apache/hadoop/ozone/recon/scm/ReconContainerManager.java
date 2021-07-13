@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
 import org.slf4j.Logger;
@@ -66,7 +66,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private StorageContainerServiceProvider scmClient;
   private PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
-  private final ContainerDBServiceProvider cdbServiceProvider;
+  private final ReconContainerMetadataManager cdbServiceProvider;
   private final Table<UUID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
@@ -91,7 +91,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
       ContainerHealthSchemaManager containerHealthSchemaManager,
-      ContainerDBServiceProvider containerDBServiceProvider,
+      ReconContainerMetadataManager reconContainerMetadataManager,
       SCMHAManager scmhaManager,
       SequenceIdGenerator sequenceIdGen)
       throws IOException {
@@ -99,7 +99,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     this.scmClient = scm;
     this.pipelineManager = pipelineManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
-    this.cdbServiceProvider = containerDBServiceProvider;
+    this.cdbServiceProvider = reconContainerMetadataManager;
     // batchHandler = scmDBStore
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(store);
     this.replicaHistoryMap = new ConcurrentHashMap<>();

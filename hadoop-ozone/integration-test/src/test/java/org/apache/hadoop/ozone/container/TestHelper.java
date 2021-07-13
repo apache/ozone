@@ -338,8 +338,7 @@ public final class TestHelper {
   }
 
   public static HddsDatanodeService getDatanodeService(OmKeyLocationInfo info,
-      MiniOzoneCluster cluster)
-      throws IOException {
+      MiniOzoneCluster cluster) throws IOException {
     DatanodeDetails dnDetails =  info.getPipeline().
         getFirstNode();
     return cluster.getHddsDatanodes().get(cluster.
@@ -385,5 +384,4 @@ public final class TestHelper {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
         1000, 30_000);
   }
-
 }

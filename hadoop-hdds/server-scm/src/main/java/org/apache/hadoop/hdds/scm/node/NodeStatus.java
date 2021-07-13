@@ -35,7 +35,7 @@ public class NodeStatus {
   private long opStateExpiryEpochSeconds;
 
   public NodeStatus(HddsProtos.NodeOperationalState operationalState,
-             HddsProtos.NodeState health) {
+                    HddsProtos.NodeState health) {
     this.operationalState = operationalState;
     this.health = health;
     this.opStateExpiryEpochSeconds = 0;
@@ -52,6 +52,11 @@ public class NodeStatus {
   public static NodeStatus inServiceHealthy() {
     return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
         HddsProtos.NodeState.HEALTHY);
+  }
+
+  public static NodeStatus inServiceHealthyReadOnly() {
+    return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY_READONLY);
   }
 
   public static NodeStatus inServiceStale() {

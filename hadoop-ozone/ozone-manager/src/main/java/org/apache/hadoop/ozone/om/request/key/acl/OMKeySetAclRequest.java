@@ -142,5 +142,6 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
     return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
         omDoubleBufferHelper);
   }
+
 }
 

@@ -21,6 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for a *unstable* .proto interface.
  */
+syntax = "proto2";
 
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 
@@ -74,6 +75,15 @@ enum Status {
 }
 
 /**
+ * DataNode will advertise its current layout version through
+ * heartbeat as well as registration mechanism.
+ */
+message LayoutVersionProto {
+   required uint32 metadataLayoutVersion = 1;
+   required uint32 softwareLayoutVersion = 2;
+}
+
+/**
  * Request for version info of the software stack on the server.
  */
 message SCMVersionRequestProto {}
@@ -92,6 +102,7 @@ message SCMRegisterRequestProto {
   required NodeReportProto nodeReport = 2;
   required ContainerReportsProto containerReport = 3;
   required PipelineReportsProto pipelineReports = 4;
+  optional LayoutVersionProto dataNodeLayoutVersion = 5;
 }
 
 /**
@@ -126,6 +137,7 @@ message SCMHeartbeatRequestProto {
   optional ContainerActionsProto containerActions = 6;
   optional PipelineActionsProto pipelineActions = 7;
   optional PipelineReportsProto pipelineReports = 8;
+  optional LayoutVersionProto dataNodeLayoutVersion = 9;
 }
 
 /*
@@ -298,6 +310,7 @@ message SCMCommandProto {
     createPipelineCommand = 6;
     closePipelineCommand = 7;
     setNodeOperationalStateCommand = 8;
+    finalizeNewLayoutVersionCommand = 9;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -309,6 +322,8 @@ message SCMCommandProto {
   optional CreatePipelineCommandProto createPipelineCommandProto = 7;
   optional ClosePipelineCommandProto closePipelineCommandProto = 8;
   optional SetNodeOperationalStateCommandProto setNodeOperationalStateCommandProto = 9;
+  optional FinalizeNewLayoutVersionCommandProto
+  finalizeNewLayoutVersionCommandProto = 10;
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
@@ -418,6 +433,15 @@ message CRLStatusReport {
  */
 message ProcessCRLCommandProto {
   required CRLInfoProto crlInfo = 1;
+}
+
+/**
+ * This command asks the DataNode to finalize a new layout version.
+ */
+message FinalizeNewLayoutVersionCommandProto {
+  required bool finalizeNewLayoutVersion = 1 [default = false];
+  required LayoutVersionProto dataNodeLayoutVersion = 2;
+  required int64 cmdId = 3;
 }
 
 /**

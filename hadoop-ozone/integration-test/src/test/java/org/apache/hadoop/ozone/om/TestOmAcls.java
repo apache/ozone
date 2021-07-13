@@ -161,5 +161,4 @@ public class TestOmAcls {
       return TestOmAcls.aclAllow;
     }
   }
-
 }

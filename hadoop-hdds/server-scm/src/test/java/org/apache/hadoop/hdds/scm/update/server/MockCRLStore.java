@@ -106,7 +106,7 @@ public class MockCRLStore implements CRLStore {
     List<CRLInfo> crlInfos =
         scmCertStore.getCrls(ImmutableList.of(crlId.get()));
 
-    if (crlInfos.isEmpty()) {
+    if (!crlInfos.isEmpty()) {
       log.debug("CRL[0]: {}", crlInfos.get(0));
     }
     return crlId;

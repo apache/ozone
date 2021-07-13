@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -136,6 +137,8 @@ public class NodeEndpoint {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       }
+
+      DatanodeInfo dnInfo = (DatanodeInfo) datanode;
       datanodes.add(builder.withHostname(hostname)
           .withDatanodeStorageReport(storageReport)
           .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
@@ -148,6 +151,8 @@ public class NodeEndpoint {
           .withSetupTime(datanode.getSetupTime())
           .withRevision(datanode.getRevision())
           .withBuildDate(datanode.getBuildDate())
+          .withLayoutVersion(
+              dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
           .build());
     });
 
