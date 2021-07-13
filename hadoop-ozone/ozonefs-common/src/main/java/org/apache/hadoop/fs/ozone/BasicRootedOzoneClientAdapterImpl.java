@@ -223,31 +223,30 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
     } catch (OMException ex) {
-      // Note: always create bucket if volumeStr matches "tmp" so -put works
       if (createIfNotExist) {
-        // Note: getBucketDetails always throws BUCKET_NOT_FOUND, even if
-        // the volume doesn't exist.
-        if (ex.getResult().equals(BUCKET_NOT_FOUND)) {
-          OzoneVolume volume;
+        // getBucketDetails throws VOLUME_NOT_FOUND when the parent volume
+        // doesn't exist; throws BUCKET_NOT_FOUND when parent volume exists but
+        // the bucket doesn't exist.
+        if (ex.getResult().equals(VOLUME_NOT_FOUND)) {
           try {
-            volume = proxy.getVolumeDetails(volumeStr);
-          } catch (OMException getVolEx) {
-            if (getVolEx.getResult().equals(VOLUME_NOT_FOUND)) {
-              // Volume doesn't exist. Create it
-              try {
-                objectStore.createVolume(volumeStr);
-              } catch (OMException newVolEx) {
-                // Ignore the case where another client created the volume
-                if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
-                  throw newVolEx;
-                }
-              }
-            } else {
-              throw getVolEx;
+            objectStore.createVolume(volumeStr);
+          } catch (OMException newVolEx) {
+            // Ignore the case where another client created the volume
+            if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
+              throw newVolEx;
             }
-            // Try get volume again
-            volume = proxy.getVolumeDetails(volumeStr);
           }
+          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
+          try {
+            volume.createBucket(bucketStr);
+          } catch (OMException newBucEx) {
+            // Ignore the case where another client created the bucket
+            if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
+              throw newBucEx;
+            }
+          }
+        } else if (ex.getResult().equals(BUCKET_NOT_FOUND)) {
+          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {
             volume.createBucket(bucketStr);
