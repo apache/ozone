@@ -2262,7 +2262,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String partName = commitUploadPartInfo.getPartName();
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    //Overwrite the part by creating part key with same part number.
+    //Overwrite the part by creating part key with same part number and different content.
     sampleData = "sample Data Changed";
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
@@ -2275,12 +2275,13 @@ public abstract class TestOzoneRpcClientAbstract {
     assertNotNull(commitUploadPartInfo);
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    // AWS S3 for same content generates same partName. In AWS S3 ETag is
-    // generated from md5sum. In Ozone right now we don't do this. For now to
-    // make things work, the partName are generated in a predictable fashion.
-    // So, when a part is override partNames will still be same and when parts
-    // are override the partNames will be same. This will make S3 Mpu complete
-    // pass when comparing part names.
+    // AWS S3 for same content generates same partName during upload part.
+    // In AWS S3 ETag is generated from md5sum. In Ozone right now we
+    // don't do this. For now to make things work for large file upload
+    // through aws s3 cp, the partName are generated in a predictable fashion.
+    // So, when a part is override partNames will still be same irrespective
+    // of content in ozone s3. This will make S3 Mpu completeMPU pass when
+    // comparing part names and large file uploads work using aws cp.
     assertEquals("Part names should be same", partName,
         commitUploadPartInfo.getPartName());
   }
@@ -2321,8 +2322,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String partName = commitUploadPartInfo.getPartName();
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    //Overwrite the part by creating part key with same part number.
-    sampleData = "sample Data Changed";
+    //Overwrite the part by creating part key with same part number and same content.
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
@@ -2334,12 +2334,13 @@ public abstract class TestOzoneRpcClientAbstract {
     assertNotNull(commitUploadPartInfo);
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    // AWS S3 for same content generates same partName. In AWS S3 ETag is
-    // generated from md5sum. In Ozone right now we don't do this. For now to
-    // make things work for large file upload through aws s3 cp,
-    // the partName are generated in a predictable fashion.
-    // So, when a part is override partNames will still be same.
-    // This will make S3 Mpu completeMPU pass when comparing part names and large file uploads work using aws cp.
+    // AWS S3 for same content generates same partName during upload part.
+    // In AWS S3 ETag is generated from md5sum. In Ozone right now we
+    // don't do this. For now to make things work for large file upload
+    // through aws s3 cp, the partName are generated in a predictable fashion.
+    // So, when a part is override partNames will still be same irrespective
+    // of content in ozone s3. This will make S3 Mpu completeMPU pass when
+    // comparing part names and large file uploads work using aws cp.
     assertEquals("Part names should be same", partName,
         commitUploadPartInfo.getPartName());
   }
