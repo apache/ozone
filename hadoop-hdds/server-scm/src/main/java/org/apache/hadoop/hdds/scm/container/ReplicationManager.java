@@ -52,7 +52,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.protocol.proto.
+    StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -750,7 +751,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
       inflightMoveFuture.putIfAbsent(cid, ret);
       sendReplicateCommand(cif, targetDn, Collections.singletonList(srcDn));
     }
-    LOG.info("receive a move requset about container {} , from {} to {}",
+    LOG.info("receive a move request about container {} , from {} to {}",
         cid, srcDn.getUuid(), targetDn.getUuid());
     return ret;
   }
@@ -771,7 +772,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
         replicas.stream().collect(Collectors.toSet());
     movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
     movedReplicas.add(ContainerReplica.newBuilder()
-        .setDatanodeDetails(targetDn).build());
+        .setDatanodeDetails(targetDn)
+        .setContainerID(cif.containerID())
+        .setContainerState(State.CLOSED).build());
     ContainerPlacementStatus placementStatus = getPlacementStatus(
         movedReplicas, cif.getReplicationConfig().getRequiredNodes());
     return placementStatus.isPolicySatisfied();
