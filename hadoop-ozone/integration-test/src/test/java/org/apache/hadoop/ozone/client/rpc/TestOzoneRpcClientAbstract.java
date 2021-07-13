@@ -2262,7 +2262,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String partName = commitUploadPartInfo.getPartName();
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    //Overwrite the part by creating part key with same part number and different content.
+    // Overwrite the part by creating part key with same part number
+    // and different content.
     sampleData = "sample Data Changed";
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
@@ -2322,7 +2323,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String partName = commitUploadPartInfo.getPartName();
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    //Overwrite the part by creating part key with same part number and same content.
+    // Overwrite the part by creating part key with same part number
+    // and same content.
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
