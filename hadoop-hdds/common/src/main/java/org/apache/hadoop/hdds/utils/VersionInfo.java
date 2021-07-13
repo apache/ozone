@@ -89,6 +89,10 @@ public class VersionInfo {
     return info.getProperty("hadoopProtoc2Version", "Unknown");
   }
 
+  public String getHadoopProtocVersion() {
+    return getHadoopProtoc2Version();
+  }
+
   public String getHadoopProtoc3Version() {
     return info.getProperty("hadoopProtoc3Version", "Unknown");
   }
