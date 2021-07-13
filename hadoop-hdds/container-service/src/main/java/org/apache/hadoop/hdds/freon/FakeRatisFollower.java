@@ -119,6 +119,7 @@ public final class FakeRatisFollower {
         Thread.sleep(simulatedLatency);
       } catch (InterruptedException e) {
         e.printStackTrace();
+        Thread.currentThread().interrupt();
       }
     }
   }
