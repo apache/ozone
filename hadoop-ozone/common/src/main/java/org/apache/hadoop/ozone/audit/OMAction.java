@@ -71,7 +71,15 @@ public enum OMAction implements AuditAction {
   LIST_STATUS,
 
   GET_S3_SECRET,
-  REVOKE_S3_SECRET;
+  REVOKE_S3_SECRET,
+
+  CREATE_TENANT,
+  MODIFY_TENANT,
+  DELETE_TENANT,
+
+  CREATE_TENANT_USER,
+  MODIFY_TENANT_USER,
+  DELETE_TENANT_USER;
 
   @Override
   public String getAction() {

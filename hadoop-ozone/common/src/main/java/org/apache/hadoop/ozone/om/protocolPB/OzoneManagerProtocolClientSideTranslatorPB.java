@@ -71,6 +71,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
@@ -867,6 +870,47 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .build();
     handleError(submitRequest(omRequest));
   }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void createTenant(String tenantArgs)
+      throws IOException {
+    final CreateTenantRequest request = CreateTenantRequest.newBuilder()
+        .setTenantName(tenantArgs)
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.CreateTenant)
+        .setCreateTenantRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+  // TODO: Add a variant that uses OmTenantArgs
+  // TODO: modify, delete
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public S3SecretValue createTenantUser(
+      String tenantUsername, String tenantName) throws IOException {
+
+    final CreateTenantUserRequest request = CreateTenantUserRequest.newBuilder()
+        .setTenantUsername(tenantUsername)
+        .setTenantName(tenantName)
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.CreateTenantUser)
+        .setCreateTenantUserRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final CreateTenantUserResponse resp = handleError(omResponse)
+        .getCreateTenantUserResponse();
+
+    return S3SecretValue.fromProtobuf(resp.getS3Secret());
+  }
+  // TODO: Add a variant that uses OmTenantUserArgs
+  // TODO: modify, delete
 
   /**
    * Return the proxy object underlying this protocol translator.

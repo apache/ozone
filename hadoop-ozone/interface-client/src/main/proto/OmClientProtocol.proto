@@ -97,6 +97,14 @@ enum Type {
   RevokeS3Secret = 93;
 
   PurgePaths = 94;
+
+  CreateTenant = 95;
+  ModifyTenant = 96;
+  DeleteTenant = 97;
+
+  CreateTenantUser = 98;
+  ModifyTenantUser = 99;
+  DeleteTenantUser = 100;
 }
 
 message OMRequest {
@@ -173,6 +181,14 @@ message OMRequest {
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
+
+  optional CreateTenantRequest              CreateTenantRequest            = 95;
+  optional ModifyTenantRequest              ModifyTenantRequest            = 96;
+  optional DeleteTenantRequest              DeleteTenantRequest            = 97;
+
+  optional CreateTenantUserRequest          CreateTenantUserRequest        = 98;
+  optional ModifyTenantUserRequest          ModifyTenantUserRequest        = 99;
+  optional DeleteTenantUserRequest          DeleteTenantUserRequest        = 100;
 }
 
 message OMResponse {
@@ -244,6 +260,15 @@ message OMResponse {
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
   optional PurgePathsResponse                 purgePathsResponse           = 93;
+
+  // Skipped 94 to align with OMRequest
+  optional CreateTenantResponse              CreateTenantResponse          = 95;
+  optional ModifyTenantResponse              ModifyTenantResponse          = 96;
+  optional DeleteTenantResponse              DeleteTenantResponse          = 97;
+
+  optional CreateTenantUserResponse          CreateTenantUserResponse      = 98;
+  optional ModifyTenantUserResponse          ModifyTenantUserResponse      = 99;
+  optional DeleteTenantUserResponse          DeleteTenantUserResponse      = 100;
 }
 
 enum Status {
@@ -331,6 +356,14 @@ enum Status {
     QUOTA_ERROR = 67;
 
     DIRECTORY_NOT_EMPTY = 68;
+
+    TENANT_NOT_FOUND = 69;
+    TENANT_ALREADY_EXISTS = 70;
+    INVALID_TENANT_NAME = 71;
+
+    TENANT_USER_NOT_FOUND = 72;
+    TENANT_USER_ALREADY_EXISTS = 73;
+    INVALID_TENANT_USER_NAME = 74;
 }
 
 /**
@@ -1244,6 +1277,56 @@ message RevokeS3SecretRequest {
     required string kerberosID = 1;
 }
 
+message CreateTenantRequest {
+    optional string tenantName = 1;
+}
+
+message ModifyTenantRequest {
+    optional string tenantName = 1;
+}
+
+message DeleteTenantRequest {
+    optional string tenantName = 1;
+}
+
+message CreateTenantUserRequest {
+    optional string tenantUsername = 1;
+    optional string tenantName = 2;
+}
+
+message ModifyTenantUserRequest {
+    optional string tenantUsername = 1;
+}
+
+message DeleteTenantUserRequest {
+    optional string tenantUsername = 1;
+}
+
+message CreateTenantResponse {
+    optional bool success = 1;
+}
+
+message ModifyTenantResponse {
+    optional bool success = 1;
+}
+
+message DeleteTenantResponse {
+    optional bool success = 1;
+}
+
+message CreateTenantUserResponse {
+    optional bool success = 1;
+    optional S3Secret s3Secret = 2;
+}
+
+message ModifyTenantUserResponse {
+    optional bool success = 1;
+}
+
+message DeleteTenantUserResponse {
+    optional bool success = 1;
+}
+
 /**
   This will be used internally by OM to replicate S3 Secret across quorum of
   OM's.
@@ -1252,6 +1335,8 @@ message UpdateGetS3SecretRequest {
     required string kerberosID = 1;
     required string awsSecret = 2;
 }
+
+// MARK
 
 /**
  The OM service that takes care of Ozone namespace.
