@@ -88,11 +88,6 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>netty-transport-native-unix-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-codec-http2</artifactId>
-      <version>${netty.version}</version>
-    </dependency>
-    <dependency>
       <groupId>log4j</groupId>
       <artifactId>log4j</artifactId>
     </dependency>
@@ -182,7 +177,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>
-                io.grpc:protoc-gen-grpc-java:${grpc-compile.version}:exe:${os.detected.classifier}
+                io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}
               </pluginArtifact>
             </configuration>
           </execution>
