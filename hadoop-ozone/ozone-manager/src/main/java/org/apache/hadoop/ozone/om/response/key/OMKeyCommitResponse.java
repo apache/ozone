@@ -79,4 +79,19 @@ public class OMKeyCommitResponse extends OMClientResponse {
             omBucketInfo.getBucketName()), omBucketInfo);
   }
 
+  protected String getOpenKeyName() {
+    return openKeyName;
+  }
+
+  protected OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
+  }
+
+  protected String getOzoneKeyName() {
+    return ozoneKeyName;
+  }
 }

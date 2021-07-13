@@ -26,6 +26,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -80,6 +82,9 @@ public class SCMStateMachine extends BaseStateMachine {
   // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
 
+  private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
+  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean(false);
+
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
@@ -132,6 +137,12 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
       applyTransactionFuture.complete(process(request));
+
+      // After previous term transactions are applied, still in safe mode,
+      // perform refreshAndValidate to update the safemode rule state.
+      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
+        scm.getScmSafeModeManager().refreshAndValidate();
+      }
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.builder()
           .setCurrentTerm(trx.getLogEntry().getTerm())
           .setTransactionIndex(trx.getLogEntry().getIndex())
@@ -229,21 +240,19 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
+
+    currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
+        .getInfo().getCurrentTerm());
+
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
       LOG.info("leader changed, yet current SCM is still follower.");
       return;
     }
 
-    long term = scm.getScmHAManager()
-        .getRatisServer()
-        .getDivision()
-        .getInfo()
-        .getCurrentTerm();
+    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
 
-    LOG.info("current SCM becomes leader of term {}.", term);
-
-    scm.getScmContext().updateLeaderAndTerm(true, term);
-    scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getScmContext().updateLeaderAndTerm(true,
+        currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
@@ -251,7 +260,6 @@ public class SCMStateMachine extends BaseStateMachine {
     Preconditions.checkArgument(
         deletedBlockLog instanceof DeletedBlockLogImplV2);
     ((DeletedBlockLogImplV2) deletedBlockLog).onBecomeLeader();
-
     scm.getScmDecommissionManager().onBecomeLeader();
   }
 
@@ -286,17 +294,48 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyTermIndexUpdated(long term, long index) {
-    if (transactionBuffer != null) {
-      transactionBuffer.updateLatestTrxInfo(
-          TransactionInfo.builder().setCurrentTerm(term)
-              .setTransactionIndex(index).build());
-    }
+
     // We need to call updateLastApplied here because now in ratis when a
     // node becomes leader, it is checking stateMachineIndex >=
     // placeHolderIndex (when a node becomes leader, it writes a conf entry
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastAppliedTermIndex(term, index);
+
+    // Skip below part if state machine is not initialized.
+
+    if (!isInitialized) {
+      return;
+    }
+
+    if (transactionBuffer != null) {
+      transactionBuffer.updateLatestTrxInfo(
+          TransactionInfo.builder().setCurrentTerm(term)
+              .setTransactionIndex(index).build());
+    }
+
+    if (currentLeaderTerm.get() == term) {
+      // On leader SCM once after it is ready, notify SCM services and also set
+      // leader ready  in SCMContext.
+      if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
+          .isLeaderReady()) {
+        scm.getScmContext().setLeaderReady();
+        scm.getSCMServiceManager().notifyStatusChanged();
+      }
+
+      // Means all transactions before this term have been applied.
+      // This means after a restart, all pending transactions have been applied.
+      // Perform
+      // 1. Refresh Safemode rules state.
+      // 2. Start DN Rpc server.
+      if (!refreshedAfterLeaderReady.get()) {
+        scm.getScmSafeModeManager().refresh();
+        scm.getDatanodeProtocolServer().start();
+
+        refreshedAfterLeaderReady.set(true);
+      }
+      currentLeaderTerm.set(-1L);
+    }
   }
 
   @Override

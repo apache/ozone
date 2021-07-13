@@ -34,8 +34,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -80,6 +80,7 @@ public class TestReconAsPassiveScm {
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
+    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
   }
 
   @After

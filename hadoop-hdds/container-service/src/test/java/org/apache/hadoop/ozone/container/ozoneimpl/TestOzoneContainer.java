@@ -38,14 +38,16 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -104,7 +106,8 @@ public class TestOzoneContainer {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
     commitSpaceMap = new HashMap<String, Long>();
-    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf);
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 
@@ -120,7 +123,9 @@ public class TestOzoneContainer {
   public void testBuildContainerMap() throws Exception {
 
     // Format the volumes
-    for (HddsVolume volume : volumeSet.getVolumesList()) {
+    List<HddsVolume> volumes =
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+    for (HddsVolume volume : volumes) {
       volume.format(clusterId);
       commitSpaceMap.put(getVolumeKey(volume), Long.valueOf(0));
     }
@@ -218,8 +223,10 @@ public class TestOzoneContainer {
   public void testContainerCreateDiskFull() throws Exception {
     long containerSize = (long) StorageUnit.MB.toBytes(100);
 
+    List<HddsVolume> volumes =
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
     // Format the volumes
-    for (HddsVolume volume : volumeSet.getVolumesList()) {
+    for (HddsVolume volume : volumes) {
       volume.format(UUID.randomUUID().toString());
 
       // eat up all available space except size of 1 container
@@ -246,7 +253,9 @@ public class TestOzoneContainer {
 
   //verify committed space on each volume
   private void verifyCommittedSpace(OzoneContainer oc) {
-    for (HddsVolume dnVol : oc.getVolumeSet().getVolumesList()) {
+    List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(
+        oc.getVolumeSet().getVolumesList());
+    for (HddsVolume dnVol : volumes) {
       String key = getVolumeKey(dnVol);
       long expectedCommit = commitSpaceMap.get(key).longValue();
       long volumeCommitted = dnVol.getCommittedBytes();

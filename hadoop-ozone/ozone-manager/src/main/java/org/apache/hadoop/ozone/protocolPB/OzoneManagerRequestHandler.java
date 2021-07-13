@@ -22,10 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -50,6 +53,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
@@ -71,6 +76,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadListPartsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -78,6 +84,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
+
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -91,6 +98,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,6 +211,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getAcl(request.getGetAclRequest());
         responseBuilder.setGetAclResponse(getAclResponse);
         break;
+      case FinalizeUpgradeProgress:
+        FinalizeUpgradeProgressResponse upgradeProgressResponse =
+            reportUpgradeProgress(request.getFinalizeUpgradeProgressRequest());
+        responseBuilder
+            .setFinalizeUpgradeProgressResponse(upgradeProgressResponse);
+        break;
+      case PrepareStatus:
+        PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
+        responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -261,6 +280,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   // Convert and exception to corresponding status code
+
   protected Status exceptionToResponseStatus(IOException ex) {
     if (ex instanceof OMException) {
       return Status.values()[((OMException) ex).getResult().ordinal()];
@@ -271,7 +291,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return Status.INTERNAL_ERROR;
     }
   }
-
   /**
    * Validates that the incoming OM request has required parameters.
    * TODO: Add more validation checks before writing the request to Ratis log.
@@ -289,6 +308,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (omRequest.getClientId() == null) {
       throw new OMException("ClientId is null",
           OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    // Layout version should have been set up the leader while serializing
+    // the request, and hence cannot be null. This version is used by each
+    // node to identify which request handler version to use.
+    if (omRequest.getLayoutVersion() == null) {
+      throw new OMException("LayoutVersion for request is null.",
+          OMException.ResultCodes.INTERNAL_ERROR);
     }
   }
 
@@ -361,6 +388,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .build();
     OmKeyInfo keyInfo = impl.lookupKey(omKeyArgs);
     resp.setKeyInfo(keyInfo.getProtobuf(false, clientVersion));
@@ -492,8 +520,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     omPartInfoList.forEach(partInfo -> partInfoList.add(partInfo.getProto()));
 
-    response.setType(omMultipartUploadListParts.getReplicationType());
-    response.setFactor(omMultipartUploadListParts.getReplicationFactor());
+    response.setType(
+            omMultipartUploadListParts
+                    .getReplicationConfig()
+                    .getReplicationType());
+    response.setFactor(
+            ReplicationConfig.getLegacyFactor(
+                    omMultipartUploadListParts.getReplicationConfig()));
     response.setNextPartNumberMarker(
         omMultipartUploadListParts.getNextPartNumberMarker());
     response.setIsTruncated(omMultipartUploadListParts.isTruncated());
@@ -519,8 +552,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             .setBucketName(upload.getBucketName())
             .setKeyName(upload.getKeyName())
             .setUploadId(upload.getUploadId())
-            .setType(upload.getReplicationType())
-            .setFactor(upload.getReplicationFactor())
+            .setType(upload.getReplicationConfig().getReplicationType())
+            .setFactor(
+                    ReplicationConfig.getLegacyFactor(
+                            upload.getReplicationConfig()))
             .setCreationTime(upload.getCreationTime().toEpochMilli())
             .build())
         .collect(Collectors.toList());
@@ -558,6 +593,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .build();
     return LookupFileResponse.newBuilder()
         .setKeyInfo(impl.lookupFile(omKeyArgs).getProtobuf(clientVersion))
@@ -585,7 +621,39 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return listStatusResponseBuilder.build();
   }
 
-  protected OzoneManager getOzoneManager() {
+  private FinalizeUpgradeProgressResponse reportUpgradeProgress(
+      FinalizeUpgradeProgressRequest request) throws IOException {
+    String upgradeClientId = request.getUpgradeClientId();
+    boolean takeover = request.getTakeover();
+    boolean readonly = request.getReadonly();
+
+    StatusAndMessages progress =
+        impl.queryUpgradeFinalizationProgress(upgradeClientId, takeover,
+            readonly);
+
+    UpgradeFinalizationStatus.Status protoStatus =
+        UpgradeFinalizationStatus.Status.valueOf(progress.status().name());
+
+    UpgradeFinalizationStatus response =
+        UpgradeFinalizationStatus.newBuilder()
+            .setStatus(protoStatus)
+            .addAllMessages(progress.msgs())
+            .build();
+
+    return FinalizeUpgradeProgressResponse.newBuilder()
+        .setStatus(response)
+        .build();
+  }
+
+  private PrepareStatusResponse getPrepareStatus() {
+    OzoneManagerPrepareState.State prepareState =
+        impl.getPrepareState().getState();
+    return PrepareStatusResponse.newBuilder()
+        .setStatus(prepareState.getStatus())
+        .setCurrentTxnIndex(prepareState.getIndex()).build();
+  }
+
+  public OzoneManager getOzoneManager() {
     return impl;
   }
 }

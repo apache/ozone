@@ -21,8 +21,9 @@ package org.apache.hadoop.ozone.dn;
 
 import com.google.common.base.Supplier;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -179,28 +180,45 @@ public final class DatanodeTestUtils {
   }
 
   /**
-   * Simulate a bad volume by removing write permission.
+   * Simulate a bad rootDir by removing write permission.
    * @see {@link org.apache.hadoop.ozone.container.common.volume
-   * .HddsVolume#check(Boolean)}
-   * @param vol
+   * .StorageVolume#check(Boolean)}
+   * @param rootDir
    */
-  public static void simulateBadVolume(HddsVolume vol) {
-    File rootDir = vol.getHddsRootDir();
+  public static void simulateBadRootDir(File rootDir) {
     if (rootDir.exists()) {
       rootDir.setWritable(false);
     }
   }
 
   /**
-   * Restore a simulated bad volume to normal.
-   * @see {@link #simulateBadVolume(HddsVolume)}
+   * Simulate a bad volume by removing write permission.
+   * @see {@link org.apache.hadoop.ozone.container.common.volume
+   * .StorageVolume#check(Boolean)}
    * @param vol
    */
-  public static void restoreBadVolume(HddsVolume vol) {
-    File rootDir = vol.getHddsRootDir();
+  public static void simulateBadVolume(StorageVolume vol) {
+    simulateBadRootDir(vol.getStorageDir());
+  }
+
+  /**
+   * Restore a simulated bad volume to normal.
+   * @see {@link #simulateBadVolume(StorageVolume)}
+   * @param rootDir
+   */
+  public static void restoreBadRootDir(File rootDir) {
     if (rootDir.exists()) {
       rootDir.setWritable(true);
     }
+  }
+
+  /**
+   * Restore a simulated bad rootDir to normal.
+   * @see {@link #simulateBadVolume(StorageVolume)}
+   * @param vol
+   */
+  public static void restoreBadVolume(StorageVolume vol) {
+    restoreBadRootDir(vol.getStorageDir());
   }
 
   /**
@@ -237,7 +255,7 @@ public final class DatanodeTestUtils {
   }
 
   public static File getHddsVolumeClusterDir(HddsVolume vol) {
-    File hddsVolumeRootDir = vol.getHddsRootDir();
+    File hddsVolumeRootDir = vol.getStorageDir();
     return new File(hddsVolumeRootDir, vol.getClusterID());
   }
 }

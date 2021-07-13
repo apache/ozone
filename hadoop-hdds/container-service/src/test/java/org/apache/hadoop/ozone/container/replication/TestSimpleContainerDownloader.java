@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.junit.Assert;
 import org.junit.Test;
 
-/*
+/**
  * Test SimpleContainerDownloader.
  */
 public class TestSimpleContainerDownloader {

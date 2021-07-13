@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -92,7 +92,7 @@ public class TestHealthyPipelineSafeModeRule {
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, pipelineManager, eventQueue,
+          config, containers, null, pipelineManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -172,7 +172,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, pipelineManager, eventQueue,
+          config, containers, null, pipelineManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -270,7 +270,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, pipelineManager, eventQueue,
+          config, containers, null, pipelineManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =

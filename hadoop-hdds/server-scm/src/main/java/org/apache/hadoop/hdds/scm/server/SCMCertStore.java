@@ -29,7 +29,10 @@ import java.util.ArrayList;
 
 import java.util.List;
 import java.util.Date;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,6 +40,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -66,12 +70,14 @@ public final class SCMCertStore implements CertificateStore {
       LoggerFactory.getLogger(SCMCertStore.class);
   private SCMMetadataStore scmMetadataStore;
   private final Lock lock;
-  private AtomicLong crlSequenceId;
+  private final AtomicLong crlSequenceId;
+  private final Map<UUID, CRLStatus> crlStatusMap;
 
   private SCMCertStore(SCMMetadataStore dbStore, long sequenceId) {
     this.scmMetadataStore = dbStore;
     lock = new ReentrantLock();
     crlSequenceId = new AtomicLong(sequenceId);
+    crlStatusMap = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -294,13 +300,16 @@ public final class SCMCertStore implements CertificateStore {
   /**
    * Reinitialise the underlying store with SCMMetaStore
    * during SCM StateMachine reload.
-   * @param metadataStore
+   * @param metadataStore SCMMetadataStore
    */
   @Override
   public void reinitialize(SCMMetadataStore metadataStore) {
     this.scmMetadataStore = metadataStore;
   }
 
+  /**
+   * Builder for SCMCertStore.
+   */
   public static class Builder {
 
     private SCMMetadataStore metadataStore;
@@ -359,5 +368,15 @@ public final class SCMCertStore implements CertificateStore {
   @Override
   public long getLatestCrlId() {
     return crlSequenceId.get();
+  }
+
+  @Override
+  public CRLStatus getCRLStatusForDN(UUID uuid) {
+    return crlStatusMap.get(uuid);
+  }
+
+  @Override
+  public void setCRLStatusForDN(UUID uuid, CRLStatus crlStatus) {
+    crlStatusMap.put(uuid, crlStatus);
   }
 }

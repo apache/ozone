@@ -55,11 +55,13 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -72,6 +74,7 @@ import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -246,6 +249,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.info("Hdds Datanode login successful.");
       }
 
+      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+          datanodeDetails.getUuidString());
+      if (layoutStorage.getState() != INITIALIZED) {
+        layoutStorage.initialize();
+      }
+
       // initialize datanode CRL store
       dnCRLStore = new DatanodeCRLStoreImpl(conf);
 
@@ -253,7 +262,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         initializeCertificateClient(conf);
       }
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, this::terminateDatanode);
+          dnCertClient, this::terminateDatanode, dnCRLStore);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
@@ -295,10 +304,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
-    Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();
+    Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
 
-    for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
-      HddsVolume hddsVolume = entry.getValue();
+    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
+      HddsVolume hddsVolume = (HddsVolume) entry.getValue();
       boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
           clusterId, LOG);
       if (!result) {

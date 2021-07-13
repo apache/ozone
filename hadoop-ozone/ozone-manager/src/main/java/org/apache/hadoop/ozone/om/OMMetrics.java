@@ -154,6 +154,8 @@ public class OMMetrics {
   private @Metric MutableCounterLong numTrashFails;
   private @Metric MutableCounterLong numTrashRootsEnqueued;
   private @Metric MutableCounterLong numTrashRootsProcessed;
+  private @Metric MutableCounterLong numTrashAtomicDirRenames;
+  private @Metric MutableCounterLong numTrashAtomicDirDeletes;
 
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
@@ -502,7 +504,6 @@ public class OMMetrics {
   }
 
   public void incNumKeyRenameFails() {
-    numKeyOps.incr();
     numKeyRenameFails.incr();
   }
 
@@ -909,6 +910,13 @@ public class OMMetrics {
     return numTrashFilesDeletes.value();
   }
 
+  public long getNumTrashAtomicDirRenames() {
+    return numTrashAtomicDirRenames.value();
+  }
+
+  public long getNumTrashAtomicDirDeletes() {
+    return numTrashAtomicDirDeletes.value();
+  }
 
   public void incNumTrashActiveCycles() {
     numTrashActiveCycles.incr();
@@ -924,6 +932,14 @@ public class OMMetrics {
 
   public void incNumTrashFails() {
     numTrashFails.incr();
+  }
+
+  public void incNumTrashAtomicDirRenames() {
+    numTrashAtomicDirRenames.incr();
+  }
+
+  public void incNumTrashAtomicDirDeletes() {
+    numTrashAtomicDirDeletes.incr();
   }
 
   public void unRegister() {

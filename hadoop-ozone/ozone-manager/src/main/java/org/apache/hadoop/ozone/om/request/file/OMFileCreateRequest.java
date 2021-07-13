@@ -55,7 +55,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -67,6 +66,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
 /**
  * Handles create file request.
@@ -234,23 +234,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
       List<OzoneAcl> inheritAcls = pathInfo.getAcls();
 
       // Check if a file or directory exists with same key name.
-      if (omDirectoryResult == FILE_EXISTS) {
-        if (!isOverWrite) {
-          throw new OMException("File " + keyName + " already exists",
-              OMException.ResultCodes.FILE_ALREADY_EXISTS);
-        }
-      } else if (omDirectoryResult == DIRECTORY_EXISTS) {
-        throw new OMException("Can not write to directory: " + keyName,
-            OMException.ResultCodes.NOT_A_FILE);
-      } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException(
-            "Can not create file: " + keyName + " as there " +
-                "is already file in the given path",
-            OMException.ResultCodes.NOT_A_FILE);
-      }
+      checkDirectoryResult(keyName, isOverWrite, omDirectoryResult);
 
       if (!isRecursive) {
-        checkAllParentsExist(ozoneManager, keyArgs, pathInfo);
+        checkAllParentsExist(keyArgs, pathInfo);
       }
 
       // do open key
@@ -282,7 +269,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // check bucket and volume quota
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
-          * omKeyInfo.getFactor().getNumber();
+          * omKeyInfo.getReplicationConfig().getRequiredNodes();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
@@ -309,7 +296,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
-          .setCmdType(Type.CreateFile);
+          .setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
           omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
 
@@ -318,7 +305,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumCreateFileFails();
-      omResponse.setCmdType(Type.CreateFile);
+      omResponse.setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
             omResponse, exception));
     } finally {
@@ -355,8 +342,40 @@ public class OMFileCreateRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  private void checkAllParentsExist(OzoneManager ozoneManager,
-      KeyArgs keyArgs,
+  /**
+   * Verify om directory result.
+   *
+   * @param keyName           key name
+   * @param isOverWrite       flag represents whether file can be overwritten
+   * @param omDirectoryResult directory result
+   * @throws OMException if file or directory or file exists in the given path
+   */
+  protected void checkDirectoryResult(String keyName, boolean isOverWrite,
+      OMFileRequest.OMDirectoryResult omDirectoryResult) throws OMException {
+    if (omDirectoryResult == FILE_EXISTS) {
+      if (!isOverWrite) {
+        throw new OMException("File " + keyName + " already exists",
+            OMException.ResultCodes.FILE_ALREADY_EXISTS);
+      }
+    } else if (omDirectoryResult == DIRECTORY_EXISTS) {
+      throw new OMException("Can not write to directory: " + keyName,
+          OMException.ResultCodes.NOT_A_FILE);
+    } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+      throw new OMException(
+          "Can not create file: " + keyName + " as there " +
+              "is already file in the given path",
+          OMException.ResultCodes.NOT_A_FILE);
+    }
+  }
+
+  /**
+   * Verify the existence of parent directory.
+   *
+   * @param keyArgs  key arguments
+   * @param pathInfo om path info
+   * @throws IOException directory not found
+   */
+  protected void checkAllParentsExist(KeyArgs keyArgs,
       OMFileRequest.OMPathInfo pathInfo) throws IOException {
     String keyName = keyArgs.getKeyName();
 
@@ -367,4 +386,5 @@ public class OMFileCreateRequest extends OMKeyRequest {
           OMException.ResultCodes.DIRECTORY_NOT_FOUND);
     }
   }
+
 }

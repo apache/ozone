@@ -69,7 +69,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
@@ -157,7 +157,7 @@ public class TestBlockManager {
             pipelineManager,
             scmMetadataStore.getContainerTable());
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager.getContainers(),
+        containerManager.getContainers(), containerManager,
         pipelineManager, eventQueue, serviceManager, scmContext) {
       @Override
       public void emitSafeModeStatus() {

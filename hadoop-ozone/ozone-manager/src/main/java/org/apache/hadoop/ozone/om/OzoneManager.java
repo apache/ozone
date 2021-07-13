@@ -36,6 +36,7 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -83,6 +84,8 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.io.Text;
@@ -139,6 +142,8 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -160,6 +165,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
@@ -208,10 +215,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -220,6 +230,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
@@ -234,6 +247,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -275,6 +290,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
+  private UpgradeFinalizer<OzoneManager> upgradeFinalizer;
 
   /**
    * OM super user / admin list.
@@ -321,6 +337,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
+  private OMLayoutVersionManager versionManager;
 
   private boolean allowListAllVolumes;
   // Adding parameters needed for VolumeRequests here, so that during request
@@ -339,6 +356,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private ExitManager exitManager;
 
+  private OzoneManagerPrepareState prepareState;
+
   private enum State {
     INITIALIZED,
     RUNNING,
@@ -347,8 +366,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   // Used in MiniOzoneCluster testing
   private State omState;
-
   private Thread emptier;
+
+  private static final int MSECS_PER_MINUTE = 60 * 1000;
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf) throws IOException,
@@ -365,6 +385,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     omStorage = new OMStorage(conf);
     omId = omStorage.getOmId();
+
+    versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
+    upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
 
     loginOMUserIfSecurityEnabled(conf);
 
@@ -384,6 +407,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           ResultCodes.OM_NOT_INITIALIZED);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
+
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
@@ -449,8 +473,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Get admin list
     omAdminUsernames = getOzoneAdminsFromConfig(configuration);
-
-    instantiateServices();
+    instantiateServices(false);
 
     // Create special volume s3v which is required for S3G.
     addS3GVolumeToDB();
@@ -532,7 +555,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * When OM state is reloaded, these services are re-initialized with the
    * new OM state.
    */
-  private void instantiateServices() throws IOException {
+  private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
@@ -546,6 +569,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         omStorage.getOmId());
+
+    if (withNewSnapshot) {
+      Integer layoutVersionInDB = getLayoutVersionInDB();
+      if (layoutVersionInDB != null &&
+          versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
+        LOG.info("New OM snapshot received with higher layout version {}. " +
+            "Attempting to finalize current OM to that version.",
+            layoutVersionInDB);
+        OmUpgradeConfig uConf = configuration.getObject(OmUpgradeConfig.class);
+        upgradeFinalizer.finalizeAndWaitForCompletion(
+            "om-ratis-snapshot", this,
+            uConf.getRatisBasedFinalizationTimeout());
+        if (versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
+          throw new IOException("Unable to finalize OM to the desired layout " +
+              "version " + layoutVersionInDB + " present in the snapshot DB.");
+        } else {
+          updateLayoutVersionInDB(versionManager, metadataManager);
+        }
+      }
+
+      instantiatePrepareStateAfterSnapshot();
+    } else {
+      // Prepare state depends on the transaction ID of metadataManager after a
+      // restart.
+      instantiatePrepareStateOnStartup();
+    }
 
     if (isAclEnabled) {
       accessAuthorizer = getACLAuthorizerInstance(configuration);
@@ -1098,20 +1147,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
+    initFSOLayout();
+
     omClientProtocolMetrics.register();
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
+    metadataManager.start(configuration);
+
+    validatesBucketLayoutMismatches();
+
     // Start Ratis services
     if (omRatisServer != null) {
       omRatisServer.start();
     }
 
-    metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
+    upgradeFinalizer.runPrefinalizeStateActions(omStorage, this);
+    Integer layoutVersionInDB = getLayoutVersionInDB();
+    if (layoutVersionInDB == null ||
+        versionManager.getMetadataLayoutVersion() != layoutVersionInDB) {
+      LOG.info("Version File has different layout " +
+              "version ({}) than OM DB ({}). That is expected if this " +
+              "OM has never been finalized to a newer layout version.",
+          versionManager.getMetadataLayoutVersion(), layoutVersionInDB);
+    }
 
     // Perform this to make it work with old clients.
     if (certClient != null) {
@@ -1147,28 +1210,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
     }
+
     omRpcServer.start();
     isOmRpcServerRunning = true;
+
     startTrashEmptier(configuration);
 
     registerMXBean();
 
     startJVMPauseMonitor();
     setStartTime();
-    omState = State.RUNNING;
 
+    omState = State.RUNNING;
   }
 
   /**
    * Restarts the service. This method re-initializes the rpc server.
    */
   public void restart() throws IOException {
+    initFSOLayout();
+
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
-    instantiateServices();
+    instantiateServices(false);
+
+    validatesBucketLayoutMismatches();
 
     startSecretManagerIfNecessary();
 
@@ -1223,13 +1292,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException
    */
   private void startTrashEmptier(Configuration conf) throws IOException {
-    long hadoopTrashInterval =
-        conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    float hadoopTrashInterval =
+        conf.getFloat(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
     // check whether user has configured ozone specific trash-interval
     // if not fall back to hadoop configuration
     long trashInterval =
-            conf.getLong(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
-                hadoopTrashInterval);
+        (long)(conf.getFloat(
+            OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
+            * MSECS_PER_MINUTE);
     if (trashInterval == 0) {
       LOG.info("Trash Interval set to 0. Files deleted will not move to trash");
       return;
@@ -1319,14 +1389,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return transactionInfo.getTransactionIndex();
   }
 
+  /**
+   *
+   * @return Gets the stored layout version from the DB meta table.
+   * @throws IOException on Error.
+   */
+  private Integer getLayoutVersionInDB() throws IOException {
+    String layoutVersion =
+        metadataManager.getMetaTable().get(LAYOUT_VERSION_KEY);
+    return (layoutVersion == null) ? null : Integer.parseInt(layoutVersion);
+  }
+
   public RatisSnapshotInfo getSnapshotInfo() {
     return omRatisSnapshotInfo;
   }
 
-  @VisibleForTesting
   public long getRatisSnapshotIndex() throws IOException {
-    return TransactionInfo.readTransactionInfo(metadataManager)
-        .getTransactionIndex();
+    TransactionInfo dbTxnInfo =
+        TransactionInfo.readTransactionInfo(metadataManager);
+    if (dbTxnInfo == null) {
+      // If there are no transactions in the database, it has applied index 0
+      // only.
+      return 0;
+    } else {
+      return dbTxnInfo.getTransactionIndex();
+    }
   }
 
   /**
@@ -1766,6 +1853,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setAclRights(aclType)
         .setOwnerName(volumeOwner)
         .build();
+
+    return checkAcls(obj, context, throwIfPermissionDenied);
+  }
+
+  /**
+   * CheckAcls for the ozone object.
+   *
+   * @return true if permission granted, false if permission denied.
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
+   *                     and throwOnPermissionDenied set to true.
+   */
+  public boolean checkAcls(OzoneObj obj, RequestContext context,
+                           boolean throwIfPermissionDenied)
+      throws OMException {
+
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
         LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
@@ -1784,6 +1886,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return true;
     }
   }
+
+
 
   /**
    * Return true if Ozone acl's are enabled, else false.
@@ -2692,6 +2796,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public StatusAndMessages finalizeUpgrade(String upgradeClientID)
+      throws IOException {
+    return upgradeFinalizer.finalize(upgradeClientID, this);
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean takeover, boolean readonly
+  ) throws IOException {
+    if (readonly) {
+      return new StatusAndMessages(upgradeFinalizer.getStatus(),
+          Collections.emptyList());
+    }
+    return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
+  }
+
+  @Override
   /**
    * {@inheritDoc}
    */
@@ -3438,7 +3559,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   void reloadOMState(long newSnapshotIndex, long newSnapshotTermIndex)
       throws IOException {
 
-    instantiateServices();
+    instantiateServices(true);
 
     // Restart required services
     metadataManager.start(configuration);
@@ -3574,13 +3695,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param callerUgi Caller UserGroupInformation
    */
   public boolean isAdmin(UserGroupInformation callerUgi) {
-    if (callerUgi == null || omAdminUsernames == null) {
+    if (callerUgi == null) {
       return false;
+    } else {
+      return isAdmin(callerUgi.getShortUserName())
+          || isAdmin(callerUgi.getUserName());
     }
+  }
 
-    return omAdminUsernames.contains(callerUgi.getShortUserName())
-        || omAdminUsernames.contains(callerUgi.getUserName())
-        || omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD);
+  public boolean isAdmin(String username) {
+    if (omAdminUsernames == null) {
+      return false;
+    } else {
+      return omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD) ||
+          omAdminUsernames.contains(username);
+    }
   }
 
   /**
@@ -3710,6 +3839,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
+  public String getOMMetadataLayout() {
+    return configuration
+        .getTrimmed(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_DEFAULT);
+  }
+
   /**
    * Create volume which is required for S3Gateway operations.
    * @throws IOException
@@ -3807,6 +3941,106 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omVolumeArgs.build();
   }
 
+  public OMLayoutVersionManager getVersionManager() {
+    return versionManager;
+  }
+
+  public OzoneManagerPrepareState getPrepareState() {
+    return prepareState;
+  }
+
+  /**
+   * Determines if the prepare gate should be enabled on this OM after OM
+   * is restarted.
+   * This must be done after metadataManager is instantiated
+   * and before the RPC server is started.
+   */
+  private void instantiatePrepareStateOnStartup()
+      throws IOException {
+    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    if (txnInfo == null) {
+      // No prepare request could be received if there are not transactions.
+      prepareState = new OzoneManagerPrepareState(configuration);
+    } else {
+      prepareState = new OzoneManagerPrepareState(configuration,
+          txnInfo.getTransactionIndex());
+      TransactionInfo dbPrepareValue =
+          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
+
+      boolean hasMarkerFile =
+          (prepareState.getState().getStatus() ==
+              PrepareStatus.PREPARE_COMPLETED);
+      boolean hasDBMarker = (dbPrepareValue != null);
+
+      if (hasDBMarker) {
+        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
+
+        if (hasMarkerFile) {
+          long prepareFileIndex = prepareState.getState().getIndex();
+          // If marker and DB prepare index do not match, use the DB value
+          // since this is synced through Ratis, to avoid divergence.
+          if (prepareFileIndex != dbPrepareIndex) {
+            LOG.warn("Prepare marker file index {} does not match DB prepare " +
+                "index {}. Writing DB index to prepare file and maintaining " +
+                "prepared state.", prepareFileIndex, dbPrepareIndex);
+            prepareState.finishPrepare(dbPrepareIndex);
+          }
+          // Else, marker and DB are present and match, so OM is prepared.
+        } else {
+          // Prepare cancelled with startup flag to remove marker file.
+          // Persist this to the DB.
+          // If the startup flag is used it should be used on all OMs to avoid
+          // divergence.
+          metadataManager.getTransactionInfoTable().delete(PREPARE_MARKER_KEY);
+        }
+      } else if (hasMarkerFile) {
+        // Marker file present but no DB entry present.
+        // This should never happen. If a prepare request fails partway
+        // through, OM should replay it so both the DB and marker file exist.
+        throw new OMException("Prepare marker file found on startup without " +
+            "a corresponding database entry. Corrupt prepare state.",
+            ResultCodes.PREPARE_FAILED);
+      }
+      // Else, no DB or marker file, OM is not prepared.
+    }
+  }
+
+  /**
+   * Determines if the prepare gate should be enabled on this OM after OM
+   * receives a snapshot.
+   */
+  private void instantiatePrepareStateAfterSnapshot()
+      throws IOException {
+    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
+        .get(TRANSACTION_INFO_KEY);
+    if (txnInfo == null) {
+      // No prepare request could be received if there are not transactions.
+      prepareState = new OzoneManagerPrepareState(configuration);
+    } else {
+      prepareState = new OzoneManagerPrepareState(configuration,
+          txnInfo.getTransactionIndex());
+      TransactionInfo dbPrepareValue =
+          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
+
+      boolean hasDBMarker = (dbPrepareValue != null);
+
+      if (hasDBMarker) {
+        // Snapshot contained a prepare request to apply.
+        // Update the in memory prepare gate and marker file index.
+        // If we have already done this, the operation is idempotent.
+        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
+        prepareState.restorePrepareFromIndex(dbPrepareIndex,
+            txnInfo.getTransactionIndex());
+      } else {
+        // No DB marker.
+        // Deletes marker file if exists, otherwise does nothing if we were not
+        // already prepared.
+        prepareState.cancelPrepare();
+      }
+    }
+  }
+
   public int getMinMultipartUploadPartSize() {
     return minMultipartUploadPartSize;
   }
@@ -3816,4 +4050,94 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.minMultipartUploadPartSize = partSizeForTest;
   }
 
+
+  /**
+   * Write down Layout version of a finalized feature to DB on finalization.
+   * @param lvm OMLayoutVersionManager
+   * @param omMetadataManager omMetadataManager instance
+   * @throws IOException on Error.
+   */
+  private void updateLayoutVersionInDB(OMLayoutVersionManager lvm,
+                                       OMMetadataManager omMetadataManager)
+      throws IOException {
+    omMetadataManager.getMetaTable().put(LAYOUT_VERSION_KEY,
+        String.valueOf(lvm.getMetadataLayoutVersion()));
+  }
+
+  private void initFSOLayout() {
+    // TODO: Temporary workaround for OM upgrade path and will be replaced once
+    //  upgrade HDDS-3698 story reaches consensus. Instead of cluster level
+    //  configuration, OM needs to check this property on every bucket level.
+    String metaLayout = getOMMetadataLayout();
+    boolean omMetadataLayoutPrefix = StringUtils.equalsIgnoreCase(metaLayout,
+        OZONE_OM_METADATA_LAYOUT_PREFIX);
+
+    boolean omMetadataLayoutSimple = StringUtils.equalsIgnoreCase(metaLayout,
+        OZONE_OM_METADATA_LAYOUT_DEFAULT);
+
+    if (!(omMetadataLayoutPrefix || omMetadataLayoutSimple)) {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Invalid Configuration. Failed to start OM in ");
+      msg.append(metaLayout);
+      msg.append(" layout format. Supported values are either ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_DEFAULT);
+      msg.append(" or ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_PREFIX);
+
+      LOG.error(msg.toString());
+      throw new IllegalArgumentException(msg.toString());
+    }
+
+    if (omMetadataLayoutPrefix && !getEnableFileSystemPaths()) {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Invalid Configuration. Failed to start OM in ");
+      msg.append(OZONE_OM_METADATA_LAYOUT_PREFIX);
+      msg.append(" layout format as '");
+      msg.append(OZONE_OM_ENABLE_FILESYSTEM_PATHS);
+      msg.append("' is false!");
+
+      LOG.error(msg.toString());
+      throw new IllegalArgumentException(msg.toString());
+    }
+
+    OzoneManagerRatisUtils.setBucketFSOptimized(omMetadataLayoutPrefix);
+    String status = omMetadataLayoutPrefix ? "enabled" : "disabled";
+    LOG.info("Configured {}={} and {} optimized OM FS operations",
+        OZONE_OM_METADATA_LAYOUT, metaLayout, status);
+  }
+
+  private void validatesBucketLayoutMismatches() throws IOException {
+    String clusterLevelMetaLayout = getOMMetadataLayout();
+
+    TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+        iterator = metadataManager.getBucketTable().iterator();
+
+    while (iterator.hasNext()) {
+      Map<String, String> bucketMeta = iterator.next().getValue().getMetadata();
+      verifyBucketMetaLayout(clusterLevelMetaLayout, bucketMeta);
+    }
+  }
+
+  private void verifyBucketMetaLayout(String clusterLevelMetaLayout,
+      Map<String, String> bucketMetadata) throws IOException {
+    String bucketMetaLayout = bucketMetadata.get(OZONE_OM_METADATA_LAYOUT);
+    if (StringUtils.isBlank(bucketMetaLayout)) {
+      // Defaulting to SIMPLE
+      bucketMetaLayout = OZONE_OM_METADATA_LAYOUT_DEFAULT;
+    }
+    boolean supportedMetadataLayout =
+        StringUtils.equalsIgnoreCase(clusterLevelMetaLayout, bucketMetaLayout);
+
+    if (!supportedMetadataLayout) {
+      StringBuilder msg = new StringBuilder();
+      msg.append("Failed to start OM in ");
+      msg.append(clusterLevelMetaLayout);
+      msg.append(" layout format as existing bucket has a different layout ");
+      msg.append(bucketMetaLayout);
+      msg.append(" metadata format");
+
+      LOG.error(msg.toString());
+      throw new IOException(msg.toString());
+    }
+  }
 }

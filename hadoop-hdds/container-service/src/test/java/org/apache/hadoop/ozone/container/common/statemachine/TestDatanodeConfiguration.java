@@ -20,12 +20,21 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.Test;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_DELETE_THREADS_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_DELETE_THREADS_MAX_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_MIN_GAP_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_MIN_GAP_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.REPLICATION_MAX_STREAMS_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
 
 import static org.junit.Assert.assertEquals;
 
@@ -40,11 +49,22 @@ public class TestDatanodeConfiguration {
     int validReplicationLimit = 123;
     int validDeleteThreads = 42;
     long validDiskCheckIntervalMinutes = 60;
+    int validFailedVolumesTolerated = 10;
+    long validDiskCheckMinGap = 2;
+    long validDiskCheckTimeout = 1;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, validReplicationLimit);
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, validDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
         validDiskCheckIntervalMinutes);
+    conf.setInt(FAILED_DATA_VOLUMES_TOLERATED_KEY,
+        validFailedVolumesTolerated);
+    conf.setInt(FAILED_METADATA_VOLUMES_TOLERATED_KEY,
+        validFailedVolumesTolerated);
+    conf.setTimeDuration(DISK_CHECK_MIN_GAP_KEY,
+        validDiskCheckMinGap, TimeUnit.MINUTES);
+    conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
+        validDiskCheckTimeout, TimeUnit.MINUTES);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -54,6 +74,14 @@ public class TestDatanodeConfiguration {
     assertEquals(validDeleteThreads, subject.getContainerDeleteThreads());
     assertEquals(validDiskCheckIntervalMinutes,
         subject.getPeriodicDiskCheckIntervalMinutes());
+    assertEquals(validFailedVolumesTolerated,
+        subject.getFailedDataVolumesTolerated());
+    assertEquals(validFailedVolumesTolerated,
+        subject.getFailedMetadataVolumesTolerated());
+    assertEquals(validDiskCheckMinGap,
+        subject.getDiskCheckMinGap().toMinutes());
+    assertEquals(validDiskCheckTimeout,
+        subject.getDiskCheckTimeout().toMinutes());
   }
 
   @Test
@@ -62,11 +90,22 @@ public class TestDatanodeConfiguration {
     int invalidReplicationLimit = -5;
     int invalidDeleteThreads = 0;
     long invalidDiskCheckIntervalMinutes = -1;
+    int invalidFailedVolumesTolerated = -2;
+    long invalidDiskCheckMinGap = -1;
+    long invalidDiskCheckTimeout = -1;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, invalidReplicationLimit);
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, invalidDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
         invalidDiskCheckIntervalMinutes);
+    conf.setInt(FAILED_DATA_VOLUMES_TOLERATED_KEY,
+        invalidFailedVolumesTolerated);
+    conf.setInt(FAILED_METADATA_VOLUMES_TOLERATED_KEY,
+        invalidFailedVolumesTolerated);
+    conf.setTimeDuration(DISK_CHECK_MIN_GAP_KEY,
+        invalidDiskCheckMinGap, TimeUnit.MINUTES);
+    conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
+        invalidDiskCheckTimeout, TimeUnit.MINUTES);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -78,6 +117,14 @@ public class TestDatanodeConfiguration {
         subject.getContainerDeleteThreads());
     assertEquals(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT,
         subject.getPeriodicDiskCheckIntervalMinutes());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedDataVolumesTolerated());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedMetadataVolumesTolerated());
+    assertEquals(DISK_CHECK_MIN_GAP_DEFAULT,
+        subject.getDiskCheckMinGap().toMillis());
+    assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,
+        subject.getDiskCheckTimeout().toMillis());
   }
 
   @Test
@@ -95,6 +142,14 @@ public class TestDatanodeConfiguration {
         subject.getContainerDeleteThreads());
     assertEquals(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT,
         subject.getPeriodicDiskCheckIntervalMinutes());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedDataVolumesTolerated());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedMetadataVolumesTolerated());
+    assertEquals(DISK_CHECK_MIN_GAP_DEFAULT,
+        subject.getDiskCheckMinGap().toMillis());
+    assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,
+        subject.getDiskCheckTimeout().toMillis());
   }
 
 }

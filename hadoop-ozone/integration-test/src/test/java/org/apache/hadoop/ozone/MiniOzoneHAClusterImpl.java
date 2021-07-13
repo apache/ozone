@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -35,7 +36,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -239,8 +242,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     scmhaService.removeInstance(scm);
   }
 
-  public void restartStorageContainerManager(StorageContainerManager scm,
-      boolean waitForSCM) throws IOException, TimeoutException,
+  public void restartStorageContainerManager(
+      StorageContainerManager scm, boolean waitForSCM)
+      throws IOException, TimeoutException,
       InterruptedException, AuthenticationException {
     LOG.info("Restarting SCM in cluster " + this.getClass());
     OzoneConfiguration scmConf = scm.getConfiguration();
@@ -390,14 +394,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     protected void initOMRatisConf() {
       conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
       conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
-      
+
       // If test change the following config values we will respect,
       // otherwise we will set lower timeout values.
       long defaultDuration = OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
-              .getDuration();
+          .getDuration();
       long curRatisRpcTimeout = conf.getTimeDuration(
           OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
-              defaultDuration, TimeUnit.MILLISECONDS);
+          defaultDuration, TimeUnit.MILLISECONDS);
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           defaultDuration == curRatisRpcTimeout ?
               RATIS_RPC_TIMEOUT : curRatisRpcTimeout, TimeUnit.MILLISECONDS);
@@ -446,8 +450,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             // Set metadata/DB dir base path
             String metaDirPath = path + "/" + nodeId;
             config.set(OZONE_METADATA_DIRS, metaDirPath);
-           // OMStorage omStore = new OMStorage(config);
-           // initializeOmStorage(omStore);
+
+            // Set non standard layout version if needed.
+            omLayoutVersion.ifPresent(integer ->
+                config.set(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
+                    String.valueOf(integer)));
+
             OzoneManager.omInit(config);
             OzoneManager om = OzoneManager.createOm(config);
             if (certClient != null) {
@@ -463,7 +471,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             } else {
               inactiveOMs.add(om);
               LOG.info("Intialized OzoneManager at {}. This OM is currently "
-                      + "inactive (not running).", om.getOmRpcServerAddr());
+                  + "inactive (not running).", om.getOmRpcServerAddr());
             }
           }
 
@@ -483,7 +491,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           omList.clear();
           ++retryCount;
           LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
-                  retryCount);
+              retryCount);
         }
       }
       return omList;
@@ -512,6 +520,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmConfig.set(OZONE_METADATA_DIRS, metaDirPath);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
             scmConfig.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+
+            scmLayoutVersion.ifPresent(integer ->
+                scmConfig.set(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
+                    String.valueOf(integer)));
 
             configureSCM();
             if (i == 1) {
@@ -656,11 +668,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
-  @FunctionalInterface
-  public interface CheckedConsumer<T> {
-    void apply(T t) throws IOException;
-  }
-
   /**
    * MiniOzoneHAService is a helper class used for both SCM and OM HA.
    * This class keeps track of active and inactive OM/SCM services
@@ -677,8 +684,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private List<Type> inactiveServices;
 
     MiniOzoneHAService(String name, List<Type> activeList,
-        List<Type> inactiveList, String serviceId,
-        Function<Type, String> idProvider) {
+                       List<Type> inactiveList, String serviceId,
+                       Function<Type, String> idProvider) {
       this.serviceName = name;
       this.serviceMap = Maps.newHashMap();
       if (activeList != null) {
@@ -731,12 +738,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     public void startInactiveService(String id,
-        CheckedConsumer<Type> serviceStarter) throws IOException {
+        CheckedConsumer<Type, IOException> serviceStarter) throws IOException {
       Type service = serviceMap.get(id);
       if (!inactiveServices.contains(service)) {
         throw new IOException(serviceName + " is already active.");
       } else {
-        serviceStarter.apply(service);
+        serviceStarter.execute(service);
         activeServices.add(service);
         inactiveServices.remove(service);
       }

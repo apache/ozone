@@ -61,7 +61,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -258,8 +258,10 @@ public class TestDeleteWithSlowFollower {
         (ContainerStateMachine) RatisTestHelper
             .getStateMachine(leader, pipeline);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
-        setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        setBucketName(bucketName)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID =
@@ -309,7 +311,6 @@ public class TestDeleteWithSlowFollower {
       }
     } catch (IOException ioe) {
       Assert.fail("Exception should not be thrown.");
-
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();
@@ -346,6 +347,5 @@ public class TestDeleteWithSlowFollower {
             == ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
       }
     }
-
   }
 }

@@ -444,10 +444,16 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
       false;
 
+  public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
   public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =
       "ozone.client.key.provider.cache.expiry";
   public static final long OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
       TimeUnit.DAYS.toMillis(10); // 10 days
+
+  public static final String OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION =
+      "ozone.client.key.latest.version.location";
+  public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
+      true;
 
   /**
    * There is no need to instantiate this class.

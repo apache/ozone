@@ -22,6 +22,9 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compile:
     runs-on: ubuntu-18.04
@@ -62,13 +65,13 @@ jobs:
         if: matrix.java == '8'
         with:
           name: ozone-bin
-          path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
+          path: hadoop-ozone/dist/target/ozone*.tar.gz
           retention-days: 1
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   basic:
     runs-on: ubuntu-18.04
@@ -113,8 +116,8 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   dependency:
     needs: compile
@@ -131,7 +134,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir dist
-          tar  -C dist --strip-components 1 -xzf hadoop-ozone*.tar.gz
+          tar  -C dist --strip-components 1 -xzf ozone*.tar.gz
       - name: Execute tests
         run: |
           export OZONE_DIST_DIR=`pwd`/dist
@@ -146,7 +149,7 @@ jobs:
   acceptance:
     needs: compile
     runs-on: ubuntu-18.04
-    timeout-minutes: 120
+    timeout-minutes: 120 # Todo HDDS-5270
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -171,7 +174,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
           sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
       - name: Execute tests
         run: |
@@ -210,7 +213,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
@@ -224,7 +227,7 @@ jobs:
         continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
-    timeout-minutes: 120
+    timeout-minutes: 150
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -244,10 +247,10 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          key: maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8-${{ matrix.profile }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}
             maven-repo-
       - name: Execute tests
         run: mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
@@ -264,8 +267,8 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   coverage:
     runs-on: ubuntu-18.04
@@ -282,7 +285,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ github.job }}
           restore-keys: |
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
@@ -294,7 +297,7 @@ jobs:
       - name: Untar binaries
         run: |
           mkdir -p hadoop-ozone/dist/target
-          tar xzvf target/artifacts/ozone-bin/hadoop-ozone*.tar.gz -C hadoop-ozone/dist/target
+          tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Setup java 11
@@ -315,6 +318,6 @@ jobs:
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-hdds*
-          rm -rf ~/.m2/repository/org/apache/hadoop/hadoop-ozone*
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()

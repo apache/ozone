@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,10 +44,10 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -69,16 +70,20 @@ public class ContainerOperationClient implements ScmClient {
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
   private final boolean containerTokenEnabled;
+  private final OzoneConfiguration configuration;
+  private XceiverClientManager xceiverClientManager;
 
-  public XceiverClientManager getXceiverClientManager() {
+  public synchronized XceiverClientManager getXceiverClientManager()
+      throws IOException {
+    if (this.xceiverClientManager == null) {
+      this.xceiverClientManager = newXCeiverClientManager(configuration);
+    }
     return xceiverClientManager;
   }
 
-  private final XceiverClientManager xceiverClientManager;
-
-  public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
+  public ContainerOperationClient(OzoneConfiguration conf) {
+    this.configuration = conf;
     storageContainerLocationClient = newContainerRpcClient(conf);
-    this.xceiverClientManager = newXCeiverClientManager(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
@@ -125,13 +130,14 @@ public class ContainerOperationClient implements ScmClient {
   public ContainerWithPipeline createContainer(String owner)
       throws IOException {
     XceiverClientSpi client = null;
+    XceiverClientManager clientManager = getXceiverClientManager();
     try {
       ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.
               allocateContainer(replicationType, replicationFactor, owner);
 
       Pipeline pipeline = containerWithPipeline.getPipeline();
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = clientManager.acquireClient(pipeline);
 
       Preconditions.checkState(
           pipeline.isOpen(),
@@ -143,7 +149,7 @@ public class ContainerOperationClient implements ScmClient {
       return containerWithPipeline;
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -231,6 +237,7 @@ public class ContainerOperationClient implements ScmClient {
   public ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, String owner) throws IOException {
     XceiverClientSpi client = null;
+    XceiverClientManager clientManager = getXceiverClientManager();
     try {
       // allocate container on SCM.
       ContainerWithPipeline containerWithPipeline =
@@ -238,13 +245,13 @@ public class ContainerOperationClient implements ScmClient {
               owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = clientManager.acquireClient(pipeline);
       createContainer(client,
           containerWithPipeline.getContainerInfo().getContainerID());
       return containerWithPipeline;
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -333,7 +340,12 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public void close() {
     try {
-      xceiverClientManager.close();
+      if (xceiverClientManager != null) {
+        xceiverClientManager.close();
+      }
+      if (storageContainerLocationClient != null) {
+        storageContainerLocationClient.close();
+      }
     } catch (Exception ex) {
       LOG.error("Can't close " + this.getClass().getSimpleName(), ex);
     }
@@ -351,10 +363,11 @@ public class ContainerOperationClient implements ScmClient {
   public void deleteContainer(long containerId, Pipeline pipeline,
       boolean force) throws IOException {
     XceiverClientSpi client = null;
+    XceiverClientManager clientManager = getXceiverClientManager();
     try {
       String encodedToken = getEncodedContainerToken(containerId);
 
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = clientManager.acquireClient(pipeline);
       ContainerProtocolCalls
           .deleteContainer(client, containerId, force, encodedToken);
       storageContainerLocationClient
@@ -365,7 +378,7 @@ public class ContainerOperationClient implements ScmClient {
       }
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -409,11 +422,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public ContainerDataProto readContainer(long containerID,
       Pipeline pipeline) throws IOException {
+    XceiverClientManager clientManager = getXceiverClientManager();
     String encodedToken = getEncodedContainerToken(containerID);
-
     XceiverClientSpi client = null;
     try {
-      client = xceiverClientManager.acquireClientForReadData(pipeline);
+      client = clientManager.acquireClientForReadData(pipeline);
       ReadContainerResponseProto response = ContainerProtocolCalls
           .readContainer(client, containerID, encodedToken);
       if (LOG.isDebugEnabled()) {
@@ -423,7 +436,7 @@ public class ContainerOperationClient implements ScmClient {
       return response.getContainerData();
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -539,6 +552,25 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public boolean startContainerBalancer(Optional<Double>threshold,
+                Optional<Integer> idleiterations,
+                Optional<Integer> maxDatanodesToBalance,
+                Optional<Long> maxSizeToMoveInGB) throws IOException {
+    return storageContainerLocationClient.startContainerBalancer(threshold,
+        idleiterations, maxDatanodesToBalance, maxSizeToMoveInGB);
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+    storageContainerLocationClient.stopContainerBalancer();
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() throws IOException {
+    return storageContainerLocationClient.getContainerBalancerStatus();
+  }
+
+  @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
   }
@@ -572,5 +604,19 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
+  }
+
+  @Override
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException {
+    return storageContainerLocationClient.finalizeScmUpgrade(upgradeClientID);
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException {
+    return storageContainerLocationClient.queryUpgradeFinalizationProgress(
+        upgradeClientID, force, readonly);
   }
 }

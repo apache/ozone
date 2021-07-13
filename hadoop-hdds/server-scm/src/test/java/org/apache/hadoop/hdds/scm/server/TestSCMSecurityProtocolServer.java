@@ -26,6 +26,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import java.io.IOException;
+
 /**
  * Test class for {@link SCMSecurityProtocolServer}.
  * */
@@ -55,7 +57,7 @@ public class TestSCMSecurityProtocolServer {
   }
 
   @Test
-  public void testStart() {
+  public void testStart() throws IOException {
     securityProtocolServer.start();
   }
 

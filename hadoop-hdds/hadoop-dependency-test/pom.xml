@@ -18,11 +18,11 @@
 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-hdds</artifactId>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
     <version>1.2.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+  <artifactId>hdds-hadoop-dependency-test</artifactId>
   <version>1.2.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Hadoop test dependencies
   </description>
@@ -53,6 +53,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>compile</scope>
     </dependency>
   </dependencies>
 </project>

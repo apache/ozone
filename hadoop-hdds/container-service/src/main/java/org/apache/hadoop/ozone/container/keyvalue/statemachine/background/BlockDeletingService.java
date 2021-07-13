@@ -109,6 +109,9 @@ public class BlockDeletingService extends BackgroundService {
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
   }
 
+  /**
+   * Pair of container data and the number of blocks to delete.
+   */
   public static class ContainerBlockInfo {
     private final ContainerData containerData;
     private final Long numBlocksToDelete;

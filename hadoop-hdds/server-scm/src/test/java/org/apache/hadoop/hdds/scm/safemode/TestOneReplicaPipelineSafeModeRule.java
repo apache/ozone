@@ -47,7 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -111,7 +111,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         HddsProtos.ReplicationFactor.ONE);
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containers,
+        new SCMSafeModeManager(ozoneConfiguration, containers, null,
             pipelineManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();

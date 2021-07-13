@@ -16,8 +16,8 @@
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.hadoop</groupId>
-  <artifactId>hadoop-main-ozone</artifactId>
+  <groupId>org.apache.ozone</groupId>
+  <artifactId>ozone-main</artifactId>
   <version>1.2.0-SNAPSHOT</version>
   <description>Apache Ozone Main</description>
   <name>Apache Ozone Main</name>
@@ -62,7 +62,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </organization>
 
   <properties>
-    <hadoop.version>3.2.2</hadoop.version>
+    <hadoop.version>3.3.1</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
@@ -143,7 +143,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
     <!-- define the protobuf JAR version                               -->
-    <protobuf.version>2.5.0</protobuf.version>
+    <hadooprpc.protobuf.version>2.5.0</hadooprpc.protobuf.version>
 
     <findbugs.version>3.0.0</findbugs.version>
     <spotbugs.version>3.1.12</spotbugs.version>
@@ -161,7 +161,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hikari.version>2.4.12</hikari.version>
     <mssql.version>6.2.1.jre7</mssql.version>
     <okhttp.version>2.7.5</okhttp.version>
-    <mockito1-hadoop.version>1.8.5</mockito1-hadoop.version>
     <mockito1-powermock.version>1.10.19</mockito1-powermock.version>
     <mockito2.version>2.28.2</mockito2.version>
     <hamcrest.version>1.3</hamcrest.version>
@@ -172,7 +171,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
-    <protobuf-compile.version>3.12.0</protobuf-compile.version>
+    <grpc.protobuf-compile.version>3.12.0</grpc.protobuf-compile.version>
     <grpc-compile.version>1.33.0</grpc-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
 
@@ -1022,23 +1021,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
       <dependency>
         <groupId>io.netty</groupId>
-        <artifactId>netty-all</artifactId>
+        <artifactId>netty-bom</artifactId>
         <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-transport</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-codec</artifactId>
-        <version>${netty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-handler</artifactId>
-        <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <dependency>
@@ -1316,7 +1302,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>${protobuf.version}</version>
+        <version>${hadooprpc.protobuf.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-daemon</groupId>
@@ -1461,12 +1447,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
 
       <dependency>
-        <groupId>org.fusesource.leveldbjni</groupId>
-        <artifactId>leveldbjni-all</artifactId>
-        <version>1.8</version>
-      </dependency>
-
-      <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>azure-storage</artifactId>
         <version>7.0.0</version>
@@ -1584,7 +1564,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
-        <version>3.8.0</version>
+        <version>3.12.2</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1952,7 +1932,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <properties>
             <property>
               <name>listener</name>
-              <value>org.apache.hadoop.test.TimedOutTestsListener</value>
+              <value>org.apache.ozone.test.TimedOutTestsListener</value>
             </property>
           </properties>
           <includes>

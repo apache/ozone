@@ -47,7 +47,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
 /**
@@ -186,8 +185,7 @@ public class KeyValueContainerCheck {
     }
 
     dbType = onDiskContainerData.getContainerDBType();
-    if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB) &&
-        !dbType.equals(CONTAINER_DB_TYPE_LEVELDB)) {
+    if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB)) {
       String errStr = "Unknown DBType [" + dbType
           + "] in Container File for  [" + containerID + "]";
       throw new IOException(errStr);

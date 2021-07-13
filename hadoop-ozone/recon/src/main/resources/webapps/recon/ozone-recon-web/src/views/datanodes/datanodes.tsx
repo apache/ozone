@@ -46,6 +46,7 @@ interface IDatanodeResponse {
   storageReport: IStorageReport;
   pipelines: IPipeline[];
   containers: number;
+  openContainers: number;
   leaderCount: number;
   uuid: string;
   version: string;
@@ -69,6 +70,7 @@ interface IDatanode {
   storageRemaining: number;
   pipelines: IPipeline[];
   containers: number;
+  openContainers: number;
   leaderCount: number;
   uuid: string;
   version: string;
@@ -137,7 +139,7 @@ const COLUMNS = [
     filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
     onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
+    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState),
     fixed: 'left'
   },
   {
@@ -225,6 +227,14 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
+  },
+  {
+    title: 'Open Containers',
+    dataIndex: 'openContainers',
+    key: 'openContainers',
+    isVisible: true,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.openContainers - b.openContainers
   },
   {
     title: 'Version',
@@ -327,6 +337,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageRemaining: datanode.storageReport.remaining,
           pipelines: datanode.pipelines,
           containers: datanode.containers,
+          openContainers: datanode.openContainers,
           leaderCount: datanode.leaderCount,
           version: datanode.version,
           setupTime: datanode.setupTime,

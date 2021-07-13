@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.slf4j.Logger;
@@ -241,6 +241,9 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           32, StorageUnit.KB);
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
           1, StorageUnit.MB);
+      conf.setStorageSize(
+          ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+          0, org.apache.hadoop.hdds.conf.StorageUnit.MB);
       conf.setTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT, 1000,
           TimeUnit.MILLISECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 10,

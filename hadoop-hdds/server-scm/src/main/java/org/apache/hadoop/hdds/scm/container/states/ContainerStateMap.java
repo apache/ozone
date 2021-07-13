@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -117,7 +118,8 @@ public class ContainerStateMap {
       containerMap.put(id, info);
       lifeCycleStateMap.insert(info.getState(), id);
       ownerMap.insert(info.getOwner(), id);
-      factorMap.insert(info.getReplicationFactor(), id);
+      factorMap.insert(
+          ReplicationConfig.getLegacyFactor(info.getReplicationConfig()), id);
       typeMap.insert(info.getReplicationType(), id);
       replicaMap.put(id, ConcurrentHashMap.newKeySet());
 
@@ -145,7 +147,8 @@ public class ContainerStateMap {
       final ContainerInfo info = containerMap.remove(id);
       lifeCycleStateMap.remove(info.getState(), id);
       ownerMap.remove(info.getOwner(), id);
-      factorMap.remove(info.getReplicationFactor(), id);
+      factorMap.remove(
+          ReplicationConfig.getLegacyFactor(info.getReplicationConfig()), id);
       typeMap.remove(info.getReplicationType(), id);
       // Flush the cache of this container type.
       flushCache(info);
@@ -455,7 +458,8 @@ public class ContainerStateMap {
       final ContainerQueryKey key = new ContainerQueryKey(
           containerInfo.getState(),
           containerInfo.getOwner(),
-          containerInfo.getReplicationFactor(),
+          ReplicationConfig.getLegacyFactor(
+              containerInfo.getReplicationConfig()),
           containerInfo.getReplicationType());
       resultCache.remove(key);
     }

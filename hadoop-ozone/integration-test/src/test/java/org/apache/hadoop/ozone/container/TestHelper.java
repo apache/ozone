@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
@@ -338,8 +338,7 @@ public final class TestHelper {
   }
 
   public static HddsDatanodeService getDatanodeService(OmKeyLocationInfo info,
-      MiniOzoneCluster cluster)
-      throws IOException {
+      MiniOzoneCluster cluster) throws IOException {
     DatanodeDetails dnDetails =  info.getPipeline().
         getFirstNode();
     return cluster.getHddsDatanodes().get(cluster.
@@ -385,5 +384,4 @@ public final class TestHelper {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
         1000, 30_000);
   }
-
 }
