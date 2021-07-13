@@ -109,8 +109,8 @@ public class OmKeyLocationInfoGroup {
     return locationVersionMap.values().stream().mapToLong(List::size).sum();
   }
 
-  public Collection<OmKeyLocationInfo> getLocationList(Long versionToFetch) {
-    return locationVersionMap.get(versionToFetch);
+  public List<OmKeyLocationInfo> getLocationList(Long versionToFetch) {
+    return new ArrayList<>(locationVersionMap.get(versionToFetch));
   }
 
   public KeyLocationList getProtobuf(boolean ignorePipeline,

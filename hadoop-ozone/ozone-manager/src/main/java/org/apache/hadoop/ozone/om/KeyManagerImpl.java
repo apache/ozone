@@ -745,34 +745,40 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     Set<Long> containerIDs = new HashSet<>();
-    keyList.forEach(
-        keyInfo -> keyInfo.getKeyLocationVersions().forEach(
-            key -> key.getLocationLists().forEach(
-                OmKeyLocationInfoList -> OmKeyLocationInfoList.forEach(
-                    k -> containerIDs.add(k.getContainerID())
-                )
-            )
-        )
-    );
+    for (OmKeyInfo keyInfo : keyList) {
+      List<OmKeyLocationInfoGroup> locationInfoGroups =
+          keyInfo.getKeyLocationVersions();
+
+      for (OmKeyLocationInfoGroup key : locationInfoGroups) {
+        for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+            containerIDs.add(omKeyLocationInfo.getContainerID());
+          }
+        }
+      }
+    }
 
     Map<Long, ContainerWithPipeline> containerWithPipelineMap =
         refreshPipeline(containerIDs);
 
-    keyList.forEach(
-        keyInfo -> keyInfo.getKeyLocationVersions().forEach(
-            key -> key.getLocationLists().forEach(
-                OmKeyLocationInfoList -> OmKeyLocationInfoList.forEach(
-                    k -> {
-                      ContainerWithPipeline cp =
-                          containerWithPipelineMap.get(k.getContainerID());
-                      if (cp != null && !cp.getPipeline().equals(k.getPipeline())) {
-                        k.setPipeline(cp.getPipeline());
-                      }
-                    }
-                )
-            )
-        )
-    );
+    for (OmKeyInfo keyInfo : keyList) {
+      List<OmKeyLocationInfoGroup> locationInfoGroups =
+          keyInfo.getKeyLocationVersions();
+      for (OmKeyLocationInfoGroup key : locationInfoGroups) {
+        for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+            ContainerWithPipeline cp = containerWithPipelineMap.get(
+                omKeyLocationInfo.getContainerID());
+            if (cp != null &&
+                !cp.getPipeline().equals(omKeyLocationInfo.getPipeline())) {
+              omKeyLocationInfo.setPipeline(cp.getPipeline());
+            }
+          }
+        }
+      }
+    }
   }
 
   /**
