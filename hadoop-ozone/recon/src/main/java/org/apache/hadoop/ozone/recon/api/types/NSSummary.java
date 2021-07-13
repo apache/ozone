@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import org.apache.hadoop.ozone.recon.ReconConstants;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Class to encapsulate namespace metadata summaries from OM.
@@ -28,43 +30,57 @@ import java.util.Arrays;
 
 public class NSSummary {
   private int numOfFiles;
-  private int sizeOfFiles;
+  private long sizeOfFiles;
   private int[] fileSizeBucket;
+  private List<Long> childDir;
 
   public NSSummary() {
     this.numOfFiles = 0;
-    this.sizeOfFiles = 0;
+    this.sizeOfFiles = 0L;
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
+    this.childDir = new ArrayList<>();
   }
 
-  public NSSummary(int numOfFiles, int sizeOfFiles, int[] bucket) {
+  public NSSummary(int numOfFiles,
+                   long sizeOfFiles,
+                   int[] bucket,
+                   List<Long> childDir) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
     setFileSizeBucket(bucket);
+    this.childDir = childDir;
   }
 
   public int getNumOfFiles() {
     return numOfFiles;
   }
 
-  public int getSizeOfFiles() {
+  public long getSizeOfFiles() {
     return sizeOfFiles;
   }
 
   public int[] getFileSizeBucket() {
-    return Arrays.copyOf(this.fileSizeBucket, ReconConstants.NUM_OF_BINS);
+    return Arrays.copyOf(fileSizeBucket, ReconConstants.NUM_OF_BINS);
+  }
+
+  public List<Long> getChildDir() {
+    return childDir;
   }
 
   public void setNumOfFiles(int numOfFiles) {
     this.numOfFiles = numOfFiles;
   }
 
-  public void setSizeOfFiles(int sizeOfFiles) {
+  public void setSizeOfFiles(long sizeOfFiles) {
     this.sizeOfFiles = sizeOfFiles;
   }
 
   public void setFileSizeBucket(int[] fileSizeBucket) {
-    this.fileSizeBucket = Arrays.copyOf(
-            fileSizeBucket, ReconConstants.NUM_OF_BINS);
+    this.fileSizeBucket = Arrays.copyOf(fileSizeBucket,
+            ReconConstants.NUM_OF_BINS);
+  }
+
+  public void setChildDir(List<Long> childDir) {
+    this.childDir = childDir;
   }
 }
