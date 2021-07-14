@@ -45,7 +45,6 @@ import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.datastream.SupportedDataStreamType;
 import org.apache.ratis.grpc.GrpcConfigKeys;
-import org.apache.ratis.grpc.GrpcFactory;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.RaftGroup;
@@ -112,7 +111,6 @@ public final class RatisHelper {
   public static RaftPeer toRaftPeer(DatanodeDetails id, int priority) {
     return raftPeerBuilderFor(id)
         .setPriority(priority)
-        .setDataStreamAddress(toRaftPeerAddress(id, Port.Name.DATASTREAM))
         .build();
   }
 
@@ -174,8 +172,10 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource ozoneConfiguration) throws IOException {
+    final DatanodeDetails leader = pipeline.getLeaderNode();
     return newRaftClient(rpcType,
-        pipeline.getLeaderNode(),
+        toRaftPeerId(leader),
+        toRaftPeer(leader), // TODO: for now, always set leader as primary
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
@@ -195,7 +195,7 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource configuration) {
-    return newRaftClient(rpcType, leader,
+    return newRaftClient(rpcType, leader.getId(), leader, // TODO: for now, always set leader as primary
         newRaftGroup(Collections.singletonList(leader)), retryPolicy,
         tlsConfig, configuration);
   }
@@ -203,51 +203,13 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy,
       ConfigurationSource ozoneConfiguration) {
-    return newRaftClient(rpcType, leader,
+    return newRaftClient(rpcType, leader.getId(), leader, // TODO: for now, always set leader as primary
         newRaftGroup(Collections.singletonList(leader)), retryPolicy, null,
         ozoneConfiguration);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private static RaftClient newRaftClient(RpcType rpcType, DatanodeDetails leaderDn,
-      RaftGroup group, RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
-      ConfigurationSource ozoneConfiguration) {
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("newRaftClient: {}, leader={}, group={}",
-          rpcType, leaderDn, group);
-    }
-    final RaftProperties properties = new RaftProperties();
-
-    RaftConfigKeys.Rpc.setType(properties, rpcType);
-
-    RaftConfigKeys.DataStream.setType(properties, SupportedDataStreamType.NETTY);
-
-    // Set the ratis client headers which are matching with regex.
-    createRaftClientProperties(ozoneConfiguration, properties);
-
-    RaftPeerId leaderId = RatisHelper.toRaftPeerId(leaderDn);
-    RaftPeer leader = RaftPeer.newBuilder()
-        .setId(leaderId.toString())
-        .setAddress(leaderDn.getIpAddress() + ":" + leaderDn.getPort(Port.Name.RATIS).getValue())
-        .setDataStreamAddress(leaderDn.getIpAddress() + ":" + leaderDn.getPort(Port.Name.DATASTREAM).getValue())
-        .build();
-    RaftClient.Builder builder =  RaftClient.newBuilder()
-        .setRaftGroup(group)
-        .setLeaderId(leaderId)
-        .setProperties(properties)
-        .setRetryPolicy(retryPolicy)
-        .setPrimaryDataStreamServer(leader);
-
-    // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
-    if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
-      builder.setParameters(GrpcFactory.newRaftParameters(tlsConfig));
-    }
-    return builder.build();
-  }
-
-
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  private static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
+  private static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader, RaftPeer primary,
       RaftGroup group, RetryPolicy retryPolicy,
       GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration) {
     if (LOG.isTraceEnabled()) {
@@ -265,10 +227,10 @@ public final class RatisHelper {
 
     RaftClient.Builder builder =  RaftClient.newBuilder()
         .setRaftGroup(group)
-        .setLeaderId(leader.getId())
+        .setLeaderId(leader)
+        .setPrimaryDataStreamServer(primary)
         .setProperties(properties)
-        .setRetryPolicy(retryPolicy)
-        .setPrimaryDataStreamServer(leader);
+        .setRetryPolicy(retryPolicy);
 
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
