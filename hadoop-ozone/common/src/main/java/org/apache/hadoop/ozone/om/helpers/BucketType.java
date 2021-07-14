@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  */
 public enum BucketType {
   FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY;
-  public static final BucketType DEFAULT = OBJECT_STORE;
+  public static final BucketType DEFAULT = LEGACY;
   public static BucketType fromProto(
       OzoneManagerProtocolProtos.BucketTypeProto bucketType) {
     if (bucketType == null) {
