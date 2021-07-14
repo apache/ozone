@@ -29,11 +29,6 @@ an older release of Ozone and a later release (which may be the local build).
             - This test suite will not raise an error for *c2*, because it only tests against the last release
             (1.0.0), and not the last commit (*c1*).
 
-2. Downgrade Support
-    - Downgrades will not be supported until upgrading from 1.1.0 to 1.2.0
-
-    - Until 1.1.0 is released, downgrades cannot be tested, so they are commented out of the current non-rolling upgrade tests.
-
 ## Directory Layout
 
 ### upgrades

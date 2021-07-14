@@ -69,29 +69,28 @@ prepare_for_image "$OZONE_UPGRADE_TO"
 export OM_HA_ARGS='--upgrade'
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO PRE-FINALIZED ---"
-OUTPUT_NAME="$OZONE_UPGRADE_TO"
+OUTPUT_NAME="$OZONE_UPGRADE_TO"-pre-finalized
 OZONE_KEEP_RESULTS=true start_docker_env
 callback with_new_version_pre_finalized
 
-# TODO: Start testing downgrades when 1.1.0 is released.
-# prepare_oms
-# stop_docker_env
-# prepare_for_image "$OZONE_UPGRADE_FROM"
-# set_downgrade_om_args
+prepare_oms
+stop_docker_env
+prepare_for_image "$OZONE_UPGRADE_FROM"
+set_downgrade_om_args
 
-# echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM AFTER DOWNGRADE ---"
-# OUTPUT_NAME="$OZONE_UPGRADE_FROM"-downgraded
-# OZONE_KEEP_RESULTS=true start_docker_env
-# callback with_old_version_downgraded
+echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM AFTER DOWNGRADE ---"
+OUTPUT_NAME="$OZONE_UPGRADE_FROM"-downgraded
+OZONE_KEEP_RESULTS=true start_docker_env
+callback with_old_version_downgraded
 
-# prepare_oms
-# stop_docker_env
-# prepare_for_image "$OZONE_UPGRADE_TO"
-# export OM_HA_ARGS='--upgrade'
+prepare_oms
+stop_docker_env
+prepare_for_image "$OZONE_UPGRADE_TO"
+export OM_HA_ARGS='--upgrade'
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
-# OUTPUT_NAME="$OZONE_UPGRADE_TO"-finalized
-# OZONE_KEEP_RESULTS=true start_docker_env
+OUTPUT_NAME="$OZONE_UPGRADE_TO"-finalized
+OZONE_KEEP_RESULTS=true start_docker_env
 
 # Sends commands to finalize OM and SCM.
 execute_robot_test scm upgrade/finalize.robot
