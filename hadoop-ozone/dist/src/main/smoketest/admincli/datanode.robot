@@ -35,12 +35,22 @@ Filter list by UUID
     Should Be Equal As Integers    ${count}    1
 
 Filter list by NodeOperationalState
-    ${output} =         Execute      ozone admin datanode list --NodeOperationalState IN_SERVICE
-    Should contain      ${output}    Datanode:
+    ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
+    ${output} =         Execute      ozone admin datanode list --id "${uuid}" --NodeOperationalState IN_SERVICE
+    Should contain      ${output}    Datanode: ${uuid}
+    ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
+    @{lines} =          Split To Lines   ${datanodes}
+    ${count} =          Get Length   ${lines}
+    Should Be Equal As Integers    ${count}    1
 
 Filter list by NodeState
-    ${output} =         Execute      ozone admin datanode list --NodeState HEALTHY
-    Should contain      ${output}    Datanode:
+    ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
+    ${output} =         Execute      ozone admin datanode list --id "${uuid}" --NodeState HEALTHY
+    Should contain      ${output}    Datanode: ${uuid}
+    ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
+    @{lines} =          Split To Lines   ${datanodes}
+    ${count} =          Get Length   ${lines}
+    Should Be Equal As Integers    ${count}    1
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin datanode
