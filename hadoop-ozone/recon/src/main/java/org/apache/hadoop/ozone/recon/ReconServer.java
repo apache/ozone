@@ -29,9 +29,11 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -56,8 +58,10 @@ public class ReconServer extends GenericCli {
   private Injector injector;
 
   private ReconHttpServer httpServer;
-  private ContainerDBServiceProvider containerDBServiceProvider;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private ReconDBProvider reconDBProvider;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
   private OzoneConfiguration configuration;
 
@@ -93,8 +97,11 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
       loginReconUserIfSecurityEnabled(configuration);
-      this.containerDBServiceProvider =
-          injector.getInstance(ContainerDBServiceProvider.class);
+      this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
+      this.reconContainerMetadataManager =
+          injector.getInstance(ReconContainerMetadataManager.class);
+      this.reconNamespaceSummaryManager =
+          injector.getInstance(ReconNamespaceSummaryManager.class);
 
       ReconSchemaManager reconSchemaManager =
           injector.getInstance(ReconSchemaManager.class);
@@ -159,8 +166,8 @@ public class ReconServer extends GenericCli {
       if (ozoneManagerServiceProvider != null) {
         ozoneManagerServiceProvider.stop();
       }
-      if (containerDBServiceProvider != null) {
-        containerDBServiceProvider.close();
+      if (reconDBProvider != null) {
+        reconDBProvider.close();
       }
       isStarted = false;
     }
@@ -234,8 +241,8 @@ public class ReconServer extends GenericCli {
   }
 
   @VisibleForTesting
-  public ContainerDBServiceProvider getContainerDBServiceProvider() {
-    return containerDBServiceProvider;
+  public ReconContainerMetadataManager getReconContainerMetadataManager() {
+    return reconContainerMetadataManager;
   }
 
   @VisibleForTesting

@@ -85,8 +85,12 @@ public class VersionInfo {
     return info.getProperty("srcChecksum", "Unknown");
   }
 
-  public String getProtocVersion() {
-    return info.getProperty("protocVersion", "Unknown");
+  public String getHadoopProtocVersion() {
+    return info.getProperty("hadoopProtocVersion", "Unknown");
+  }
+
+  public String getGrpcProtocVersion() {
+    return info.getProperty("grpcProtocVersion", "Unknown");
   }
 
   public String getBuildVersion() {

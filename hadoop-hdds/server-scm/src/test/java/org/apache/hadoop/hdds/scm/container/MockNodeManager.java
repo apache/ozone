@@ -24,9 +24,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -48,6 +52,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -235,7 +240,8 @@ public class MockNodeManager implements NodeManager {
       // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
-        DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy());
+        DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
+            UpgradeUtils.defaultLayoutVersionProto());
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();
@@ -243,7 +249,13 @@ public class MockNodeManager implements NodeManager {
         StorageReportProto storage1 = TestUtils.createStorageReport(
             di.getUuid(), "/data1-" + di.getUuidString(),
             capacity, used, remaining, null);
+        MetadataStorageReportProto metaStorage1 =
+            TestUtils.createMetadataStorageReport(
+                "/metadata1-" + di.getUuidString(), capacity, used,
+                remaining, null);
         di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+        di.updateMetaDataStorageReports(
+            new ArrayList<>(Arrays.asList(metaStorage1)));
 
         healthyNodesWithInfo.add(di);
       }
@@ -487,6 +499,18 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
+   * Empty implementation for processLayoutVersionReport.
+   *
+   * @param dnUuid
+   * @param layoutReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails dnUuid,
+                                         LayoutVersionProto layoutReport) {
+    // do nothing
+  }
+
+  /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
    * @param containerIds - Set of containerIDs
@@ -576,7 +600,9 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
-      NodeReportProto nodeReport, PipelineReportsProto pipelineReportsProto) {
+                                    NodeReportProto nodeReport,
+                                    PipelineReportsProto pipelineReportsProto,
+                                    LayoutVersionProto layoutInfo) {
     try {
       node2ContainerMap.insertNewDatanode(datanodeDetails.getUuid(),
           Collections.emptySet());
@@ -613,10 +639,12 @@ public class MockNodeManager implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - Datanode ID.
+   * @param layoutInfo - DataNode Layout info
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                           LayoutVersionProto layoutInfo) {
     return null;
   }
 
