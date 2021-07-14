@@ -43,6 +43,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
       for (ContainerID container : candidateContainers) {
         Set<ContainerReplica> replicas;
         ContainerInfo containerInfo;
+
         try {
           replicas = containerManager.getContainerReplicas(container);
           containerInfo = containerManager.getContainer(container);
@@ -51,20 +52,19 @@ public class FindTargetGreedy implements FindTargetStrategy {
               "obtaining replicas in Container Balancer.", container, e);
           continue;
         }
-        if (replicas.stream().noneMatch(
-            replica -> replica.getDatanodeDetails().equals(target))) {
-//            containerMoveSatisfiesPlacementPolicy(container, replicas, source,
-//                target) &&
 
-          if (canSizeEnterTarget.apply(target, containerInfo.getUsedBytes())) {
-            LOG.info("Container Balancer found target {} and container {} for" +
-                " source {}", target.getUuidString(),
-                containerInfo.containerID(), source.getUuidString());
-            return new ContainerMoveSelection(target, container);
-          } else {
-            LOG.info("ContainerBalancer can't move size {} to target {}.",
-                containerInfo.getUsedBytes(), target.getUuidString());
-          }
+        if (replicas.stream().noneMatch(
+            replica -> replica.getDatanodeDetails().equals(target)) &&
+            containerMoveSatisfiesPlacementPolicy(container, replicas, source,
+            target) &&
+            canSizeEnterTarget.apply(target, containerInfo.getUsedBytes())) {
+          LOG.info("Container Balancer found target {} and container {} for" +
+                  " source {}", target.getUuidString(),
+              containerInfo.containerID(), source.getUuidString());
+          return new ContainerMoveSelection(target, container);
+        } else {
+          LOG.info("ContainerBalancer can't move size {} to target {}",
+              containerInfo.getUsedBytes(), target.getUuidString());
         }
 //        LOG.info("For source {} and potential target {} found container " +
 //                "replicas {}", source.getUuidString(),
@@ -85,7 +85,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
       containerInfo = containerManager.getContainer(containerID);
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not get Container {} from Container Manager while " +
-          "checking if container move satisfies placemenet policy in " +
+          "checking if container move satisfies placement policy in " +
           "Container Balancer.", containerID.toString(), e);
       return false;
     }
@@ -97,9 +97,8 @@ public class FindTargetGreedy implements FindTargetStrategy {
     replicaList.add(target);
     ContainerPlacementStatus placementStatus =
         placementPolicy.validateContainerPlacement(replicaList,
-        containerInfo.getReplicationFactor().getNumber());
+        containerInfo.getReplicationConfig().getRequiredNodes());
 
-//    return placementStatus.isPolicySatisfied();
-    return true;
+    return placementStatus.isPolicySatisfied();
   }
 }

@@ -63,14 +63,14 @@ public class ContainerBalancerSelectionCriteria {
   }
 
   /**
-   * Checks whether container is currently undergoing replication.
+   * Checks whether container is currently undergoing replication or deletion.
    *
    * TODO: Implement method
    * @param containerID Container to check.
-   * @return true if container is replicating, otherwise false.
+   * @return true if container is replicating or deleting, otherwise false.
    */
-  public boolean isContainerReplicating(ContainerID containerID) {
-    return false;
+  private boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
+    return replicationManager.isContainerReplicatingOrDeleting(containerID);
   }
 
   /**
@@ -78,9 +78,9 @@ public class ContainerBalancerSelectionCriteria {
    * required criteria:
    * 1. Container must not be undergoing replication.
    * 2. Container must not already be selected for balancing.
-   * 3. Container size should be above the preferred lower limit (try to move
-   * containers with size closer to 5GB).
-   * 4. Containers must not be in the configured exclude containers list.
+   * 3. Container size should be closer to 5GB.
+   * 4. Container must not be in the configured exclude containers list.
+   * 5. Container should be closed.
    *
    * @param node DatanodeDetails for which to find candidate containers.
    * @return NavigableSet of candidate containers that satisfy the criteria.
@@ -106,8 +106,8 @@ public class ContainerBalancerSelectionCriteria {
     // remove not closed containers
     containerIDSet.removeIf(containerID -> {
       try {
-        LOG.info("Container state for container {} is {}", containerID,
-            containerManagerV2.getContainer(containerID).getState());
+//        LOG.info("Container state for container {} is {}", containerID,
+//            containerManagerV2.getContainer(containerID).getState());
 
         return containerManagerV2.getContainer(containerID).getState() !=
             HddsProtos.LifeCycleState.CLOSED;
@@ -119,7 +119,7 @@ public class ContainerBalancerSelectionCriteria {
       }
     });
 
-    containerIDSet.removeIf(this::isContainerReplicating);
+    containerIDSet.removeIf(this::isContainerReplicatingOrDeleting);
     return containerIDSet;
   }
 
