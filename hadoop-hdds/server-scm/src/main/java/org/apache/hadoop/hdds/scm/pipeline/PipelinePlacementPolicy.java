@@ -291,6 +291,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     if (anchor != null) {
       results.add(anchor);
       exclude.add(anchor);
+      removePeers(anchor, healthyNodes);
     } else {
       LOG.warn("Unable to find healthy node for anchor(first) node.");
       throw new SCMException("Unable to find anchor node.",
@@ -376,6 +377,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     DatanodeDetails selectedNode =
             healthyNodes.get(getRand().nextInt(healthyNodes.size()));
     healthyNodes.remove(selectedNode);
+    removePeers(selectedNode, healthyNodes);
     return selectedNode;
   }
 

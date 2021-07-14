@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -181,4 +182,14 @@ public final class ScmUtils {
             "nodeId. If want to configure same port configure {}", confKey,
         portKey, portKey);
   }
+
+  public static boolean shouldRemovePeers(final ConfigurationSource conf) {
+    int pipelineLimitPerDn =
+        conf.getInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
+    return (1 != pipelineLimitPerDn && conf
+        .getBoolean(ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS,
+            ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT));
+  }
+
 }
