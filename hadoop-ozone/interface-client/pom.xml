@@ -110,7 +110,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <replace token="org.apache.hadoop.ozone.security.proto"
                          value="org.apache.hadoop.ozone.security.proto3"
                          dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
-                </replace>              </tasks>
+                </replace>
+                <move file="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto"
+                      tofile="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto3"/>
+                <move file="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto"
+                      tofile="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto3"/>
+              </tasks>
             </configuration>
             <goals>
               <goal>run</goal>

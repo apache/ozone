@@ -150,6 +150,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                          value="org.apache.hadoop.thirdparty.protobuf"
                          dir="target/generated-sources/java/proto3/org/apache/hadoop/hdds/protocol/proto">
                 </replace>
+                <move file="target/generated-sources/java/proto3/org/apache/hadoop/hdds/protocol/proto"
+                      tofile="target/generated-sources/java/proto3/org/apache/hadoop/hdds/protocol/proto3"/>
               </tasks>
             </configuration>
             <goals>
