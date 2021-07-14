@@ -213,7 +213,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertTrue(reconNodeManager.getAllNodes().isEmpty());
@@ -235,7 +235,8 @@ public class TestReconNodeManager {
     datanodeDetails.setHostName("hostname2");
     // Upon processing the heartbeat, the illegal command should be filtered out
     List<SCMCommand> returnedCmds =
-        reconNodeManager.processHeartbeat(datanodeDetails);
+        reconNodeManager.processHeartbeat(datanodeDetails,
+            defaultLayoutVersionProto());
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());
