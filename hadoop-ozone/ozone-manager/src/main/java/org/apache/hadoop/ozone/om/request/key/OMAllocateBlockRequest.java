@@ -25,6 +25,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -94,14 +95,15 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  one uses direct omclient we might be in trouble.
 
 
+    ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
+        keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
     // as same value. When allocating block requested size is same as
     // scmBlockSize.
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
-            ozoneManager.getBlockTokenSecretManager(), keyArgs.getType(),
-            keyArgs.getFactor(), excludeList, ozoneManager.getScmBlockSize(),
-            ozoneManager.getScmBlockSize(),
+            ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
+            ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());
 

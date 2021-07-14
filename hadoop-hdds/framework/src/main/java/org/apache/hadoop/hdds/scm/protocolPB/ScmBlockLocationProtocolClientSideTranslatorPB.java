@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -170,6 +171,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       requestBuilder.setFactor(
           ((RatisReplicationConfig) replicationConfig).getReplicationFactor());
       break;
+    case EC:
+      requestBuilder.setEcReplicationConfig(
+          ((ECReplicationConfig)replicationConfig).toProto());
     default:
       throw new IllegalArgumentException(
           "Unsupported replication type " + replicationConfig

@@ -57,7 +57,6 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
     .EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -113,12 +112,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
   @SuppressWarnings("parameternumber")
   protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
       OzoneBlockTokenSecretManager secretManager,
-      HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor replicationFactor,
-      ExcludeList excludeList, long requestedSize, long scmBlockSize,
-      int preallocateBlocksMax, boolean grpcBlockTokenEnabled, String omID)
-      throws IOException {
-
+      ReplicationConfig replicationConfig, ExcludeList excludeList,
+      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
+      boolean grpcBlockTokenEnabled, String omID) throws IOException {
     int numBlocks = Math.min((int) ((requestedSize - 1) / scmBlockSize + 1),
         preallocateBlocksMax);
 
@@ -127,8 +123,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationType,
-              replicationFactor, omID, excludeList);
+          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
+              excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
