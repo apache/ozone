@@ -51,7 +51,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String uuid;
 
-  @CommandLine.Option(names = {"--NodeOperationalState"},
+  @CommandLine.Option(names = {"--operational-state"},
       description = "Show info by datanode NodeOperationalState(" +
           "IN_SERVICE, " +
           "DECOMMISSIONING, DECOMMISSIONED, " +
@@ -59,7 +59,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String nodeOperationalState;
 
-  @CommandLine.Option(names = {"--NodeState"},
+  @CommandLine.Option(names = {"--node-state"},
       description = "Show info by datanode NodeState(" +
       " HEALTHY, STALE, DEAD)",
       defaultValue = "")
