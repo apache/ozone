@@ -42,7 +42,7 @@ import java.util.List;
 public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
     implements PlacementPolicy {
   @VisibleForTesting
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);
 
   /**

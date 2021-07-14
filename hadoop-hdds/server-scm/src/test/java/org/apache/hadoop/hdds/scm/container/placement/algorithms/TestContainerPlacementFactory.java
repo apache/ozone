@@ -59,7 +59,8 @@ public class TestContainerPlacementFactory {
   // network topology cluster
   private NetworkTopology cluster;
   // datanodes array list
-  private List<DatanodeInfo> datanodes = new ArrayList<>();
+  private List<DatanodeDetails> datanodes = new ArrayList<>();
+  private List<DatanodeInfo> dnInfos = new ArrayList<>();
   // node storage capacity
   private static final long STORAGE_CAPACITY = 100L;
   // configuration
@@ -90,9 +91,10 @@ public class TestContainerPlacementFactory {
     String hostname = "node";
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
+      DatanodeDetails datanodeDetails = MockDatanodeDetails
+          .createDatanodeDetails(hostname + i, rack + (i / 5));
       DatanodeInfo datanodeInfo = new DatanodeInfo(
-          MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, rack + (i / 5)), NodeStatus.inServiceHealthy(),
+          datanodeDetails, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = TestUtils.createStorageReport(
@@ -107,33 +109,38 @@ public class TestContainerPlacementFactory {
       datanodeInfo.updateMetaDataStorageReports(
           new ArrayList<>(Arrays.asList(metaStorage1)));
 
-      datanodes.add(datanodeInfo);
-      cluster.add(datanodeInfo);
+      datanodes.add(datanodeDetails);
+      cluster.add(datanodeDetails);
+      dnInfos.add(datanodeInfo);
     }
 
     StorageReportProto storage2 = TestUtils.createStorageReport(
-        datanodes.get(2).getUuid(),
-        "/data1-" + datanodes.get(2).getUuidString(),
+        dnInfos.get(2).getUuid(),
+        "/data1-" + dnInfos.get(2).getUuidString(),
         STORAGE_CAPACITY, 90L, 10L, null);
-    datanodes.get(2).updateStorageReports(
+    dnInfos.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
     StorageReportProto storage3 = TestUtils.createStorageReport(
-        datanodes.get(3).getUuid(),
-        "/data1-" + datanodes.get(3).getUuidString(),
+        dnInfos.get(3).getUuid(),
+        "/data1-" + dnInfos.get(3).getUuidString(),
         STORAGE_CAPACITY, 80L, 20L, null);
-    datanodes.get(3).updateStorageReports(
+    dnInfos.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
     StorageReportProto storage4 = TestUtils.createStorageReport(
-        datanodes.get(4).getUuid(),
-        "/data1-" + datanodes.get(4).getUuidString(),
+        dnInfos.get(4).getUuid(),
+        "/data1-" + dnInfos.get(4).getUuidString(),
         STORAGE_CAPACITY, 70L, 30L, null);
-    datanodes.get(4).updateStorageReports(
+    dnInfos.get(4).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage4)));
 
     // create mock node manager
     nodeManager = Mockito.mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
+    for (DatanodeInfo dn: dnInfos) {
+      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+          .thenReturn(dn);
+    }
 
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, nodeManager, cluster, true,
