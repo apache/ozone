@@ -1,3 +1,21 @@
+/*'
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -20,7 +38,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -33,14 +50,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.mockito.Mockito.mock;
 
 /**
  * Test for NSSummary REST APIs.
@@ -174,7 +188,8 @@ public class TestNSSummaryEndpoint {
 
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
-    NSSummaryTask nsSummaryTask = new NSSummaryTask(reconNamespaceSummaryManager);
+    NSSummaryTask nsSummaryTask =
+            new NSSummaryTask(reconNamespaceSummaryManager);
     nsSummaryTask.reprocess(reconOMMetadataManager);
   }
 
@@ -303,7 +318,8 @@ public class TestNSSummaryEndpoint {
     Assert.assertEquals(BUCKET_ONE_DATA_SIZE, quBucketRes.getQuotaUsed());
 
     Response bucketRes2 = nsSummaryEndpoint.getQuotaUsage(BUCKET_TWO_PATH);
-    QuotaUsageResponse quBucketRes2 = (QuotaUsageResponse) bucketRes2.getEntity();
+    QuotaUsageResponse quBucketRes2 =
+            (QuotaUsageResponse) bucketRes2.getEntity();
     Assert.assertEquals(BUCKET_TWO_QUOTA, quBucketRes2.getQuota());
     Assert.assertEquals(BUCKET_TWO_DATA_SIZE, quBucketRes2.getQuotaUsed());
 
@@ -326,10 +342,10 @@ public class TestNSSummaryEndpoint {
   }
 
   /**
-   * Bin 0: 2 -> file1 and file5
-   * Bin 1: 1 -> file2
-   * Bin 2: 2 -> file4 and file6
-   * Bin 3: 1 -> file3
+   * Bin 0: 2 -> file1 and file5.
+   * Bin 1: 1 -> file2.
+   * Bin 2: 2 -> file4 and file6.
+   * Bin 3: 1 -> file3.
    * @throws Exception
    */
   @Test
@@ -337,6 +353,9 @@ public class TestNSSummaryEndpoint {
     Response volRes = nsSummaryEndpoint.getFileSizeDistribution(VOL_PATH);
     FileSizeDistributionResponse volFileSizeDistResObj =
             (FileSizeDistributionResponse) volRes.getEntity();
+    // If the volume has the correct file size distribution,
+    // other lower level should be correct as well, given all
+    // other previous tests have passed.
     int[] volFileSizeDist = volFileSizeDistResObj.getFileSizeDist();
     for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
       if (i == 0 || i == 2) {

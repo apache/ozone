@@ -30,8 +30,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Codec for Namespace Summary.
@@ -48,9 +49,9 @@ public class NSSummaryCodec implements Codec<NSSummary> {
 
   @Override
   public byte[] toPersistedFormat(NSSummary object) throws IOException {
-    List<Long> childDirs = object.getChildDir();
+    Set<Long> childDirs = object.getChildDir();
     String dirName = object.getDirName();
-    int stringLen = dirName.getBytes().length;
+    int stringLen = dirName.getBytes(StandardCharsets.UTF_8).length;
     int numOfChildDirs = childDirs.size();
     final int resSize = NUM_OF_INTS * Integer.BYTES
             + (numOfChildDirs + 1) * Long.BYTES // 1 long field + list size
@@ -66,8 +67,8 @@ public class NSSummaryCodec implements Codec<NSSummary> {
       out.write(integerCodec.toPersistedFormat(fileSizeBucket[i]));
     }
     out.write(integerCodec.toPersistedFormat(numOfChildDirs));
-    for (int i = 0; i < numOfChildDirs; ++i) {
-      out.write(longCodec.toPersistedFormat(childDirs.get(i)));
+    for (long childDirId: childDirs) {
+      out.write(longCodec.toPersistedFormat(childDirId));
     }
     out.write(integerCodec.toPersistedFormat(stringLen));
     out.write(stringCodec.toPersistedFormat(dirName));
@@ -89,7 +90,7 @@ public class NSSummaryCodec implements Codec<NSSummary> {
     res.setFileSizeBucket(fileSizeBucket);
 
     int listSize = in.readInt();
-    List<Long> childDir = new ArrayList<>();
+    Set<Long> childDir = new HashSet<>();
     for (int i = 0; i < listSize; ++i) {
       childDir.add(in.readLong());
     }

@@ -24,11 +24,11 @@ import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Test for NSSummary manager.
@@ -38,8 +38,8 @@ public class TestReconNamespaceSummaryManagerImpl {
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private static int[] testBucket;
-  private static final List<Long> TEST_CHILD_DIR =
-          new ArrayList<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
+  private static final Set<Long> TEST_CHILD_DIR =
+          new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeClass
   public static void setupOnce() throws Exception {

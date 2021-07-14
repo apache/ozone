@@ -38,8 +38,8 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
@@ -101,6 +101,10 @@ public class TestNSSummaryTask {
           ReconConstants.MAX_FILE_SIZE_UPPER_BOUND - 100L;
   private static final long KEY_FOUR_SIZE = 2050L;
   private static final long KEY_FIVE_SIZE = 100L;
+
+  private static Set<Long> bucketOneAns = new HashSet<>();
+  private static Set<Long> bucketTwoAns = new HashSet<>();
+  private static Set<Long> dirOneAns = new HashSet<>();
 
   @Before
   public void setUp() throws Exception {
@@ -172,21 +176,22 @@ public class TestNSSummaryTask {
     }
 
     // Bucket one has one dir, bucket two has none.
-    List<Long> childDirBucketOne = nsSummaryForBucket1.getChildDir();
-    List<Long> childDirBucketTwo = nsSummaryForBucket2.getChildDir();
+    Set<Long> childDirBucketOne = nsSummaryForBucket1.getChildDir();
+    Set<Long> childDirBucketTwo = nsSummaryForBucket2.getChildDir();
     Assert.assertEquals(1, childDirBucketOne.size());
-    Assert.assertEquals(DIR_ONE_OBJECT_ID, (long)childDirBucketOne.get(0));
+    bucketOneAns.add(DIR_ONE_OBJECT_ID);
+    Assert.assertEquals(bucketOneAns, childDirBucketOne);
     Assert.assertEquals(0, childDirBucketTwo.size());
 
     // Dir 1 has two dir: dir2 and dir3.
     NSSummary nsSummaryInDir1 = reconNamespaceSummaryManager
             .getNSSummary(DIR_ONE_OBJECT_ID);
     Assert.assertNotNull(nsSummaryInDir1);
-    List<Long> childDirForDirOne = nsSummaryInDir1.getChildDir();
+    Set<Long> childDirForDirOne = nsSummaryInDir1.getChildDir();
     Assert.assertEquals(2, childDirForDirOne.size());
-    Collections.sort(childDirForDirOne);
-    Assert.assertArrayEquals(new Long[]{DIR_TWO_OBJECT_ID, DIR_THREE_OBJECT_ID},
-            childDirForDirOne.toArray());
+    dirOneAns.add(DIR_TWO_OBJECT_ID);
+    dirOneAns.add(DIR_THREE_OBJECT_ID);
+    Assert.assertEquals(dirOneAns, childDirForDirOne);
 
     NSSummary nsSummaryInDir2 = reconNamespaceSummaryManager
             .getNSSummary(DIR_TWO_OBJECT_ID);
@@ -209,6 +214,7 @@ public class TestNSSummaryTask {
     Assert.assertEquals(DIR_TWO, nsSummaryInDir2.getDirName());
   }
 
+  @SuppressWarnings("checkstyle:methodlength")
   @Test
   public void testProcess() throws Exception {
     NSSummary nonExistentSummary =
@@ -334,12 +340,11 @@ public class TestNSSummaryTask {
     Assert.assertNotNull(nsSummaryForBucket1);
     Assert.assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
 
-    List<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
+    Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
     // after put dir4, bucket1 now has two child dirs: dir1 and dir4
     Assert.assertEquals(2, childDirBucket1.size());
-    Collections.sort(childDirBucket1);
-    Assert.assertArrayEquals(new Long[]{DIR_ONE_OBJECT_ID, DIR_FOUR_OBJECT_ID},
-            childDirBucket1.toArray());
+    bucketOneAns.add(DIR_FOUR_OBJECT_ID);
+    Assert.assertEquals(dirOneAns, childDirBucket1);
 
     NSSummary nsSummaryForBucket2 =
             reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
@@ -363,17 +368,19 @@ public class TestNSSummaryTask {
     }
 
     // after put dir5, bucket 2 now has one dir
-    List<Long> childDirBucket2 = nsSummaryForBucket2.getChildDir();
+    Set<Long> childDirBucket2 = nsSummaryForBucket2.getChildDir();
     Assert.assertEquals(1, childDirBucket2.size());
-    Assert.assertEquals(DIR_FIVE_OBJECT_ID, (long)childDirBucket2.get(0));
+    bucketTwoAns.add(DIR_FIVE_OBJECT_ID);
+    Assert.assertEquals(bucketTwoAns, childDirBucket2);
 
     // after delete dir 3, dir 1 now has only one dir: dir2
     NSSummary nsSummaryForDir1 = reconNamespaceSummaryManager
             .getNSSummary(DIR_ONE_OBJECT_ID);
     Assert.assertNotNull(nsSummaryForDir1);
-    List<Long> childDirForDir1 = nsSummaryForDir1.getChildDir();
+    Set<Long> childDirForDir1 = nsSummaryForDir1.getChildDir();
     Assert.assertEquals(1, childDirForDir1.size());
-    Assert.assertEquals(DIR_TWO_OBJECT_ID, (long)childDirForDir1.get(0));
+    dirOneAns.remove(DIR_THREE_OBJECT_ID);
+    Assert.assertEquals(dirOneAns, childDirForDir1);
 
     // after renaming dir1, check its new name
     Assert.assertEquals(DIR_ONE_RENAME, nsSummaryForDir1.getDirName());

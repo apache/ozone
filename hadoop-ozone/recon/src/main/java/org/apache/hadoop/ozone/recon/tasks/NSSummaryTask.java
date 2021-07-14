@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -237,7 +236,8 @@ public class NSSummaryTask implements ReconOmTask {
     long objectId = directoryInfo.getObjectID();
     // write the dir name to the current directory
     String dirName = directoryInfo.getName();
-    NSSummary curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    NSSummary curNSSummary =
+            reconNamespaceSummaryManager.getNSSummary(objectId);
     if (curNSSummary == null) {
       curNSSummary = new NSSummary();
     }
@@ -250,13 +250,7 @@ public class NSSummaryTask implements ReconOmTask {
     if (nsSummary == null) {
       nsSummary = new NSSummary();
     }
-    List<Long> childDir = nsSummary.getChildDir();
-    // make sure don't write duplicates
-    if (!childDir.contains(objectId)) {
-      childDir.add(objectId);
-    } else {
-      LOG.warn("Duplicate write on the same directory.");
-    }
+    nsSummary.addChildDir(objectId);
     reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
   }
 
@@ -301,12 +295,7 @@ public class NSSummaryTask implements ReconOmTask {
       return;
     }
 
-    List<Long> childDir = nsSummary.getChildDir();
-    if (childDir.contains(objectId)) {
-      childDir.remove(objectId);
-    } else {
-      LOG.warn("Try to delete a non-existent child.");
-    }
+    nsSummary.removeChildDir(objectId);
     reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
   }
 }
