@@ -69,11 +69,11 @@ public class TopologySubcommand extends ScmSubcommand
       description = "Print Topology with full node infos")
   private boolean fullInfo;
 
-  @CommandLine.Option(names = {"-n", "--nodeOperationalState" +
-      " IN_SERVICE DECOMMISSIONING " +
-      " DECOMMISSIONED ENTERING_MAINTENANCE " +
-      " IN_MAINTENANCE"},
-      description = "Print Topology through nodeOperationalState")
+  @CommandLine.Option(names = {"-n", "--nodeOperationalState"},
+      description = "Show info by datanode NodeOperationalState" +
+          "(IN_SERVICE, DECOMMISSIONING, " +
+          "DECOMMISSIONED, ENTERING_MAINTENANCE, " +
+          "IN_MAINTENANCE)")
   private String nodeOperationalState;
 
   @Override
