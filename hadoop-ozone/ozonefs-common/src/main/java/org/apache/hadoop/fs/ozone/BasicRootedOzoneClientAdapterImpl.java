@@ -224,10 +224,12 @@ public class BasicRootedOzoneClientAdapterImpl
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
     } catch (OMException ex) {
       if (createIfNotExist) {
-        // getBucketDetails throws VOLUME_NOT_FOUND when the parent volume
-        // doesn't exist; throws BUCKET_NOT_FOUND when parent volume exists but
-        // the bucket doesn't exist.
-        if (ex.getResult().equals(VOLUME_NOT_FOUND)) {
+        // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
+        // doesn't exist and ACL is enabled; it can only throw BUCKET_NOT_FOUND
+        // when ACL is disabled. Both exceptions need to be handled.
+        switch (ex.getResult()) {
+        case VOLUME_NOT_FOUND:
+        case BUCKET_NOT_FOUND:
           try {
             objectStore.createVolume(volumeStr);
           } catch (OMException newVolEx) {
@@ -236,16 +238,7 @@ public class BasicRootedOzoneClientAdapterImpl
               throw newVolEx;
             }
           }
-          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
-          try {
-            volume.createBucket(bucketStr);
-          } catch (OMException newBucEx) {
-            // Ignore the case where another client created the bucket
-            if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
-              throw newBucEx;
-            }
-          }
-        } else if (ex.getResult().equals(BUCKET_NOT_FOUND)) {
+
           OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {
@@ -256,6 +249,10 @@ public class BasicRootedOzoneClientAdapterImpl
               throw newBucEx;
             }
           }
+          break;
+        default:
+          // Throw unhandled exception
+          throw ex;
         }
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
