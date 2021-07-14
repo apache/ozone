@@ -574,6 +574,7 @@ public class BlockOutputStream extends OutputStream {
         && bufferPool != null && bufferPool.getSize() > 0) {
       try {
         handleFlush(true);
+//        CompletableFuture.allOf(out.closeAsync()).get();
         out.closeAsync().thenApplyAsync(r -> {
           return null;
         }, responseExecutor);

@@ -520,6 +520,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }, executor);
   }
 
+  @Override
   public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
     return CompletableFuture.supplyAsync(() -> {
       if (stream == null) {
