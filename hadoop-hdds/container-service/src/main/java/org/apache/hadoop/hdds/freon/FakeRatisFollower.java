@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.hdds.freon;
 
-import org.apache.commons.logging.Log;
 import org.apache.ratis.proto.RaftProtos.AppendEntriesReplyProto;
 import org.apache.ratis.proto.RaftProtos.AppendEntriesReplyProto.AppendResult;
 import org.apache.ratis.proto.RaftProtos.AppendEntriesRequestProto;
