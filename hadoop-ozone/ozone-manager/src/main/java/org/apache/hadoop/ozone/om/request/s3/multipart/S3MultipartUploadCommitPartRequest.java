@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import jdk.nashorn.internal.runtime.regexp.joni.ast.StringNode;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -167,7 +169,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       int partNumber = keyArgs.getMultipartNumber();
-      partName = ozoneKey + uploadID + "-" + partNumber;
+      partName = getPartName(ozoneKey, uploadID, partNumber);
 
       if (multipartKeyInfo == null) {
         // This can occur when user started uploading part by the time commit
@@ -257,6 +259,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             result);
 
     return omClientResponse;
+  }
+
+  @VisibleForTesting
+  public static String getPartName(String ozoneKey, String uploadID, long partNumber) {
+    return ozoneKey + "-" + uploadID + "-" + partNumber;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
