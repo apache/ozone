@@ -7,10 +7,13 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.BasicResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -35,14 +38,24 @@ import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeBucketToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeVolumeToOm;
 import static org.mockito.Mockito.mock;
 
 /**
  * Test for NSSummary REST APIs.
+ * We tested on a mini file system with the following setting:
+ *                vol
+ *             /       \
+ *        bucket1      bucket2
+ *        /    \         /    \
+ *     file1    dir1    file4  file5
+ *           /   \   \
+ *        dir2  dir3  dir4
+ *         /     \      \
+ *       file2   file3  file6
+ * This is a test for the Rest APIs only. We have tested NSSummaryTask before,
+ * so there is no need to test process() on DB's updates
  */
 public class TestNSSummaryEndpoint {
   @Rule
@@ -56,6 +69,8 @@ public class TestNSSummaryEndpoint {
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
+  private static final String MALFORMED_PATH =
+          "vol1/buck1/a/b/c/d/e/file1.txt/";
   private static final String[] TEST_NAMES =
           new String[]{"vol1", "buck1", "a", "b", "c", "d", "e", "file1.txt"};
   private static final String TEST_KEY_NAMES = "a/b/c/d/e/file1.txt";
@@ -134,14 +149,8 @@ public class TestNSSummaryEndpoint {
   private static final long DIR_ONE_DATA_SIZE = KEY_TWO_SIZE +
           KEY_THREE_SIZE + KEY_SIX_SIZE;
 
-  private boolean isSetUp = false;
-
   @Before
   public void setUp() throws Exception {
-    // initial setting: "sampleVol", "bucketOne", "TestUser"
-    if (isSetUp) {
-      return;
-    }
     omMetadataManager = initializeNewOmMetadataManager(
             temporaryFolder.newFolder());
     ozoneManagerServiceProvider =
@@ -167,7 +176,6 @@ public class TestNSSummaryEndpoint {
     populateOMDB();
     NSSummaryTask nsSummaryTask = new NSSummaryTask(reconNamespaceSummaryManager);
     nsSummaryTask.reprocess(reconOMMetadataManager);
-    isSetUp = true;
   }
 
   @Test
@@ -176,6 +184,8 @@ public class TestNSSummaryEndpoint {
     Assert.assertArrayEquals(TEST_NAMES, names);
     String keyName = NSSummaryEndpoint.getKeyName(names);
     Assert.assertEquals(TEST_KEY_NAMES, keyName);
+    String reformatPath = NSSummaryEndpoint.reformatString(MALFORMED_PATH);
+    Assert.assertEquals(TEST_PATH_UTILITY, reformatPath);
   }
 
   @Test
@@ -280,25 +290,67 @@ public class TestNSSummaryEndpoint {
 
   @Test
   public void testQuotaUsage() throws Exception {
+    // volume level quota usage
+    Response volResponse = nsSummaryEndpoint.getQuotaUsage(VOL_PATH);
+    QuotaUsageResponse quVolRes = (QuotaUsageResponse) volResponse.getEntity();
+    Assert.assertEquals(VOL_QUOTA, quVolRes.getQuota());
+    Assert.assertEquals(TOTAL_DATA_SIZE, quVolRes.getQuotaUsed());
 
-  }
+    // bucket level quota usage
+    Response bucketRes = nsSummaryEndpoint.getQuotaUsage(BUCKET_ONE_PATH);
+    QuotaUsageResponse quBucketRes = (QuotaUsageResponse) bucketRes.getEntity();
+    Assert.assertEquals(BUCKET_ONE_QUOTA, quBucketRes.getQuota());
+    Assert.assertEquals(BUCKET_ONE_DATA_SIZE, quBucketRes.getQuotaUsed());
 
-  @Test
-  public void testFileSizeDist() throws Exception {
+    Response bucketRes2 = nsSummaryEndpoint.getQuotaUsage(BUCKET_TWO_PATH);
+    QuotaUsageResponse quBucketRes2 = (QuotaUsageResponse) bucketRes2.getEntity();
+    Assert.assertEquals(BUCKET_TWO_QUOTA, quBucketRes2.getQuota());
+    Assert.assertEquals(BUCKET_TWO_DATA_SIZE, quBucketRes2.getQuotaUsed());
 
+    // other level not applicable
+    Response naResponse1 = nsSummaryEndpoint.getQuotaUsage(DIR_ONE_PATH);
+    QuotaUsageResponse quotaUsageResponse1 =
+            (QuotaUsageResponse) naResponse1.getEntity();
+    Assert.assertTrue(quotaUsageResponse1.isNamespaceNotApplicable());
+
+    Response naResponse2 = nsSummaryEndpoint.getQuotaUsage(KEY_PATH);
+    QuotaUsageResponse quotaUsageResponse2 =
+            (QuotaUsageResponse) naResponse2.getEntity();
+    Assert.assertTrue(quotaUsageResponse2.isNamespaceNotApplicable());
+
+    // invalid path request
+    Response invalidRes = nsSummaryEndpoint.getQuotaUsage(INVALID_PATH);
+    QuotaUsageResponse invalidResObj =
+            (QuotaUsageResponse) invalidRes.getEntity();
+    Assert.assertTrue(invalidResObj.isPathNotFound());
   }
 
   /**
-   * Initial configs:
-   *                vol
-   *             /       \
-   *        bucket1      bucket2
-   *        /    \         /    \
-   *     file1    dir1    file4  file5
-   *           /   \   \
-   *        dir2  dir3  dir4
-   *         /     \      \
-   *       file2   file3  file6
+   * Bin 0: 2 -> file1 and file5
+   * Bin 1: 1 -> file2
+   * Bin 2: 2 -> file4 and file6
+   * Bin 3: 1 -> file3
+   * @throws Exception
+   */
+  @Test
+  public void testFileSizeDist() throws Exception {
+    Response volRes = nsSummaryEndpoint.getFileSizeDistribution(VOL_PATH);
+    FileSizeDistributionResponse volFileSizeDistResObj =
+            (FileSizeDistributionResponse) volRes.getEntity();
+    int[] volFileSizeDist = volFileSizeDistResObj.getFileSizeDist();
+    for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      if (i == 0 || i == 2) {
+        Assert.assertEquals(2, volFileSizeDist[i]);
+      } else if (i == 1 || i == 3) {
+        Assert.assertEquals(1, volFileSizeDist[i]);
+      } else {
+        Assert.assertEquals(0, volFileSizeDist[i]);
+      }
+    }
+  }
+
+  /**
+   * Write directories and keys info into OM DB.
    * @throws Exception
    */
   private void populateOMDB() throws Exception {
@@ -366,7 +418,7 @@ public class TestNSSummaryEndpoint {
 
   /**
    * Create a new OM Metadata manager instance with one user, one vol, and two
-   * buckets
+   * buckets.
    * @throws IOException ioEx
    */
   private static OMMetadataManager initializeNewOmMetadataManager(
@@ -381,12 +433,15 @@ public class TestNSSummaryEndpoint {
     String volumeKey = omMetadataManager.getVolumeKey(VOL);
     OmVolumeArgs args =
             OmVolumeArgs.newBuilder()
+                    .setObjectID(VOL_OBJECT_ID)
                     .setVolume(VOL)
                     .setAdminName(TEST_USER)
                     .setOwnerName(TEST_USER)
                     .setQuotaInBytes(VOL_QUOTA)
                     .build();
     omMetadataManager.getVolumeTable().put(volumeKey, args);
+
+    OmVolumeArgs res = omMetadataManager.getVolumeTable().get(volumeKey);
 
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
             .setVolumeName(VOL)

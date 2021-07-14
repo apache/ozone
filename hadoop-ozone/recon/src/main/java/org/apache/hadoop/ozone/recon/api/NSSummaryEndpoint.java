@@ -54,6 +54,7 @@ import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -129,7 +130,7 @@ public class NSSummaryEndpoint {
 
   /**
    * DU endpoint.
-   * @param path in a format with leading slash, and without trailing slash
+   * @param path request path
    * @return DU response
    * @throws IOException
    */
@@ -174,7 +175,7 @@ public class NSSummaryEndpoint {
         String subpath = path + OM_KEY_PREFIX + dirName;
 
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-        diskUsage.setSubpath(subpath);
+        diskUsage.setSubpath(reformatString(subpath));
         long dataSize = getTotalSize(subdirObjectId);
         diskUsage.setSize(dataSize);
         duData.add(diskUsage);
@@ -198,7 +199,7 @@ public class NSSummaryEndpoint {
         // build the path for subdirectory
         String subpath = path + OM_KEY_PREFIX + subdirName;
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-        diskUsage.setSubpath(subpath);
+        diskUsage.setSubpath(reformatString(subpath));
         long dataSize = getTotalSize(subdirObjectId);
         diskUsage.setSize(dataSize);
         duData.add(diskUsage);
@@ -210,11 +211,12 @@ public class NSSummaryEndpoint {
       // DU for key is the data size
       duResponse.setCount(1);
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-      String keyName = getKeyName(names);
-      String ozoneKey = omMetadataManager
-              .getOzoneKey(names[0], names[1], keyName);
+      long parentObjectId = getDirObjectId(names, names.length - 1);
+      String fileName = names[names.length - 1];
+      String ozoneKey =
+              omMetadataManager.getOzonePathKey(parentObjectId, fileName);
       OmKeyInfo keyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
-      diskUsage.setSubpath(path);
+      diskUsage.setSubpath(reformatString(path));
       diskUsage.setSize(keyInfo.getDataSize());
       duResponse.setDuData(Collections.singletonList(diskUsage));
       break;
@@ -229,7 +231,7 @@ public class NSSummaryEndpoint {
   /**
    * Quora usage endpoint that summarize the quota allowed and quota used in
    * bytes.
-   * @param path in a format with leading slash, and without trailing slash
+   * @param path request path
    * @return Quota Usage response
    * @throws IOException
    */
@@ -258,11 +260,8 @@ public class NSSummaryEndpoint {
       OmBucketInfo bucketInfo = omMetadataManager
               .getBucketTable().get(bucketKey);
       long bucketObjectId = bucketInfo.getObjectID();
-      NSSummary nsSummary =
-              reconNamespaceSummaryManager.getNSSummary(bucketObjectId);
       long quotaInBytes = bucketInfo.getQuotaInBytes();
-      long quotaUsedInBytes = nsSummary.getSizeOfFiles() // direct keys' size
-              + getTotalSize(bucketObjectId); //keys in all subdirectories
+      long quotaUsedInBytes = getTotalSize(bucketObjectId);
       quotaUsageResponse.setQuota(quotaInBytes);
       quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     } else if (type == EntityType.INVALID) {
@@ -275,7 +274,7 @@ public class NSSummaryEndpoint {
 
   /**
    * Endpoint that returns aggregate file size distribution under a path
-   * @param path in a format with leading slash, and without trailing slash
+   * @param path request path
    * @return File size distribution response
    * @throws IOException
    */
@@ -397,11 +396,23 @@ public class NSSummaryEndpoint {
    * @param names parsed path request in a list of names
    * @return directory object ID
    */
-  private long getDirObjectId(String[] names)
-          throws IOException {
+  private long getDirObjectId(String[] names) throws IOException {
+    return getDirObjectId(names, names.length);
+  }
+
+  /**
+   * Given a valid path request and a cutoff length where should be iterated
+   * up to.
+   * return the directory object ID up to the cutoff length
+   * @param names parsed path request in a list of names
+   * @param cutoff cannot be larger than the names' length. If equals,
+   *               return the directory object id for the whole path
+   * @return directory object ID
+   */
+  private long getDirObjectId(String[] names, int cutoff) throws IOException {
     long dirObjectId = getBucketObjectId(names);
     String dirKey = null;
-    for (int i = 2; i < names.length; ++i) {
+    for (int i = 2; i < cutoff; ++i) {
       dirKey = omMetadataManager.getOzonePathKey(dirObjectId, names[i]);
       OmDirectoryInfo dirInfo =
               omMetadataManager.getDirectoryTable().get(dirKey);
@@ -425,12 +436,28 @@ public class NSSummaryEndpoint {
     return String.join(OM_KEY_PREFIX, keyArr);
   }
 
+  /**
+   * Format the path in a nice format with leading slash and without trailing
+   * slash
+   * @param path
+   * @return
+   */
+  @VisibleForTesting
+  public static String reformatString(String path) {
+    if (!path.startsWith(OM_KEY_PREFIX)) {
+      path = OM_KEY_PREFIX + path;
+    }
+    return removeTrailingSlashIfNeeded(path);
+  }
+
   private boolean checkVolumeExistence(String volName) throws IOException {
     assert (omMetadataManager != null);
     String volDBKey = omMetadataManager.getVolumeKey(volName);
     if (omMetadataManager.getVolumeTable().get(volDBKey) == null) {
       return false;
     }
+    System.out.println("volume exist");
+    System.out.println("break");
     return true;
   }
 

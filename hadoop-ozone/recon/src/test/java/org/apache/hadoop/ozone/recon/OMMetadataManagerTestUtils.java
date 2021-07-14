@@ -225,38 +225,6 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
-  public static void writeBucketToOm(OMMetadataManager omMetadataManager,
-                                      long objectId,
-                                      String volName,
-                                      String bucketName,
-                                      long quotaInBytes) throws IOException {
-    String bucketDBKey = omMetadataManager.getBucketKey(volName, bucketName);
-    omMetadataManager.getBucketTable().put(bucketDBKey,
-            new OmBucketInfo.Builder()
-                    .setObjectID(objectId)
-                    .setBucketName(bucketName)
-                    .setVolumeName(volName)
-                    .setQuotaInBytes(quotaInBytes)
-                    .build());
-  }
-
-  public static void writeVolumeToOm(OMMetadataManager omMetadataManager,
-                                      long objectId,
-                                      long quotaInBytes,
-                                      String volName,
-                                      String user) throws IOException {
-    String volDBKey = omMetadataManager.getVolumeKey(volName);
-    omMetadataManager.getVolumeTable().put(volDBKey,
-            new OmVolumeArgs.Builder()
-                    .setAdminName(user)
-                    .setOwnerName(user)
-                    .setObjectID(objectId)
-                    .setQuotaInBytes(quotaInBytes)
-                    .setVolume(volName)
-                    .build());
-    //assert(omMetadataManager.getVolumeTable().get(volDBKey) != null);
-  }
-
   public static OzoneManagerServiceProviderImpl
       getMockOzoneManagerServiceProvider() throws IOException {
     OzoneManagerServiceProviderImpl omServiceProviderMock =
