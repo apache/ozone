@@ -413,7 +413,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
         }
       }
     } catch (InterruptedException e) {
-      e.printStackTrace();
+      LOG.error("Failed to wait until all Buckets are cleaned", e);
       Thread.currentThread().interrupt();
     }
 
