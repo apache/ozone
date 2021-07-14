@@ -164,7 +164,7 @@ public class DatanodeStateMachine implements Closeable {
     replicatorMetrics = new MeasuredReplicator(replicator);
 
     supervisor =
-        new ReplicationSupervisor(container.getContainerSet(),
+        new ReplicationSupervisor(container.getContainerSet(), context,
             replicatorMetrics, dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
