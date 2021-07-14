@@ -51,11 +51,13 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
-  enum AllowedBucketTypes { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
+  // TODO: LEGACY should be removed and should not be exposed to the end user
+  // we will revisit during the client side defaulting behaviour
+  enum AllowedBucketTypes { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
 
   @Option(names = { "--type", "-t" },
       description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
-      defaultValue = "OBJECT_STORE")
+      defaultValue = "LEGACY")
   private AllowedBucketTypes allowedBucketType;
 
   @CommandLine.Mixin
