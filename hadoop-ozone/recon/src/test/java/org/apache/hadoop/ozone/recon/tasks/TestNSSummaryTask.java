@@ -179,6 +179,7 @@ public class TestNSSummaryTask {
     Set<Long> childDirBucketOne = nsSummaryForBucket1.getChildDir();
     Set<Long> childDirBucketTwo = nsSummaryForBucket2.getChildDir();
     Assert.assertEquals(1, childDirBucketOne.size());
+    bucketOneAns.clear();
     bucketOneAns.add(DIR_ONE_OBJECT_ID);
     Assert.assertEquals(bucketOneAns, childDirBucketOne);
     Assert.assertEquals(0, childDirBucketTwo.size());
@@ -189,6 +190,7 @@ public class TestNSSummaryTask {
     Assert.assertNotNull(nsSummaryInDir1);
     Set<Long> childDirForDirOne = nsSummaryInDir1.getChildDir();
     Assert.assertEquals(2, childDirForDirOne.size());
+    dirOneAns.clear();
     dirOneAns.add(DIR_TWO_OBJECT_ID);
     dirOneAns.add(DIR_THREE_OBJECT_ID);
     Assert.assertEquals(dirOneAns, childDirForDirOne);
@@ -343,8 +345,10 @@ public class TestNSSummaryTask {
     Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
     // after put dir4, bucket1 now has two child dirs: dir1 and dir4
     Assert.assertEquals(2, childDirBucket1.size());
+    bucketOneAns.clear();
+    bucketOneAns.add(DIR_ONE_OBJECT_ID);
     bucketOneAns.add(DIR_FOUR_OBJECT_ID);
-    Assert.assertEquals(dirOneAns, childDirBucket1);
+    Assert.assertEquals(bucketOneAns, childDirBucket1);
 
     NSSummary nsSummaryForBucket2 =
             reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
@@ -379,7 +383,8 @@ public class TestNSSummaryTask {
     Assert.assertNotNull(nsSummaryForDir1);
     Set<Long> childDirForDir1 = nsSummaryForDir1.getChildDir();
     Assert.assertEquals(1, childDirForDir1.size());
-    dirOneAns.remove(DIR_THREE_OBJECT_ID);
+    dirOneAns.clear();
+    dirOneAns.add(DIR_TWO_OBJECT_ID);
     Assert.assertEquals(dirOneAns, childDirForDir1);
 
     // after renaming dir1, check its new name
