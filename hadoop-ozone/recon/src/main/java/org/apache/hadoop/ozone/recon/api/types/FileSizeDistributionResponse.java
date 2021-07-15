@@ -19,6 +19,9 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.ozone.recon.ReconConstants;
+
+import java.util.Arrays;
 
 /**
  * HTTP Response wrapped for a file size distribution request.
@@ -48,7 +51,7 @@ public class FileSizeDistributionResponse {
   }
 
   public int[] getFileSizeDist() {
-    return fileSizeDist;
+    return Arrays.copyOf(this.fileSizeDist, ReconConstants.NUM_OF_BINS);
   }
 
   public boolean isNamespaceNotApplicable() {
@@ -60,7 +63,7 @@ public class FileSizeDistributionResponse {
   }
 
   public void setFileSizeDist(int[] fileSizeDist) {
-    this.fileSizeDist = fileSizeDist;
+    this.fileSizeDist = Arrays.copyOf(fileSizeDist, ReconConstants.NUM_OF_BINS);
   }
 
   public void setNamespaceNotApplicable(boolean namespaceNotApplicable) {

@@ -460,8 +460,6 @@ public class TestNSSummaryEndpoint {
                     .build();
     omMetadataManager.getVolumeTable().put(volumeKey, args);
 
-    OmVolumeArgs res = omMetadataManager.getVolumeTable().get(volumeKey);
-
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
             .setVolumeName(VOL)
             .setBucketName(BUCKET_ONE)
