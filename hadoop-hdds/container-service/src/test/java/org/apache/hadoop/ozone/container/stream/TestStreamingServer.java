@@ -159,8 +159,7 @@ public class TestStreamingServer {
 
   }
 
-  private void streamDir(Path sourceDir, Path destDir, String subdir)
-      throws InterruptedException {
+  private void streamDir(Path sourceDir, Path destDir, String subdir) {
     try (StreamingServer server = new StreamingServer(
         new DirectoryServerSource(sourceDir), 0)) {
       server.start();

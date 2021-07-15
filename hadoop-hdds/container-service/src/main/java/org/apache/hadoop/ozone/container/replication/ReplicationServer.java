@@ -65,6 +65,7 @@ public class ReplicationServer {
       try {
         SslContextBuilder sslContextBuilder = SslContextBuilder
             .forServer(caClient.getPrivateKey(), caClient.getCertificate())
+            .trustManager(caClient.getCACertificate())
             .clientAuth(ClientAuth.REQUIRE);
         final SslContext sslContext = sslContextBuilder.build();
         server = new StreamingServer(new ContainerStreamingSource(containerSet),

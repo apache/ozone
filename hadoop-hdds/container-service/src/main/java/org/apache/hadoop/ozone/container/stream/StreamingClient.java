@@ -106,10 +106,15 @@ public class StreamingClient implements AutoCloseable {
       }
       channel = f.channel();
       final ChannelFuture channelFuture = channel.writeAndFlush(id + "\n");
-      channelFuture.awaitUninterruptibly(timeout, unit);
+      boolean completed = channelFuture.awaitUninterruptibly(timeout, unit);
+      if (!completed) {
+        LOG.warn("Streaming is not completed");
+      }
       if (channelFuture.cause() != null) {
         throw new StreamingException(channelFuture.cause());
       }
+      //using 1 MB second max limit. If download is slower it may be timed out
+      channel.closeFuture().awaitUninterruptibly(timeout, unit);
       if (!dirstreamClientHandler.isAtTheEnd()) {
         throw new StreamingException("Streaming is failed. Not all files " +
             "are streamed. Please check the log of the server." +

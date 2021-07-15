@@ -186,7 +186,7 @@ public class TestReplicationService {
 
     KeyValueContainerData kvd = new KeyValueContainerData(2L, "/tmp/asd");
     kvd.setState(State.OPEN);
-    kvd.assignToVolume(scmUuid.toString(), volume);
+    kvd.assignToVolume(scmUuid, volume);
     kvd.setSchemaVersion(OzoneConsts.SCHEMA_V2);
     KeyValueContainer kvc = new KeyValueContainer(kvd, ozoneConfig);
     kvc.create(sourceVolumes, v, scmUuid.toString());

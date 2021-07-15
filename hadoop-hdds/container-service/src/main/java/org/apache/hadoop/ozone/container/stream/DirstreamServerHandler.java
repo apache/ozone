@@ -110,7 +110,7 @@ public class DirstreamServerHandler extends ChannelInboundHandlerAdapter {
           }
           ctx.writeAndFlush(
               Unpooled.wrappedBuffer(
-                  END_MARKER.getBytes(StandardCharsets.UTF_8)))
+                  (END_MARKER + "\n").getBytes(StandardCharsets.UTF_8)))
               .addListener(b -> {
                 ctx.channel().close();
               });
