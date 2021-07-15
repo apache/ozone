@@ -97,7 +97,7 @@ public class SCMBlockDeletingService extends BackgroundService
     blockDeleteLimitSize =
         conf.getObject(ScmConfig.class).getBlockDeletionLimit();
     Preconditions.checkArgument(blockDeleteLimitSize > 0,
-        "Block deletion limit should be " + "positive.");
+        "Block deletion limit should be positive.");
 
     // register SCMBlockDeletingService to SCMServiceManager
     serviceManager.register(this);

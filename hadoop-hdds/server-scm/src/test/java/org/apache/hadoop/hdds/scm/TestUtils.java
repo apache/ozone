@@ -249,6 +249,15 @@ public final class TestUtils {
   }
 
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
+      long capacity) {
+    return createStorageReport(nodeId, path,
+        capacity,
+        0,
+        capacity,
+        StorageTypeProto.DISK);
+  }
+
+  public static StorageReportProto createStorageReport(UUID nodeId, String path,
        long capacity, long used, long remaining, StorageTypeProto type) {
     return createStorageReport(nodeId, path, capacity, used, remaining,
             type, false);
@@ -284,11 +293,21 @@ public final class TestUtils {
   }
 
   public static MetadataStorageReportProto createMetadataStorageReport(
+      String path, long capacity) {
+    return createMetadataStorageReport(path,
+        capacity,
+        0,
+        capacity,
+        StorageTypeProto.DISK, false);
+  }
+
+  public static MetadataStorageReportProto createMetadataStorageReport(
       String path, long capacity, long used, long remaining,
       StorageTypeProto type) {
     return createMetadataStorageReport(path, capacity, used, remaining,
         type, false);
   }
+
   /**
    * Creates metadata storage report with the given information.
    *

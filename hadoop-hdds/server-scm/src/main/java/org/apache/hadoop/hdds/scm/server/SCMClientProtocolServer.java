@@ -95,6 +95,8 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpc
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+
 /**
  * The RPC server that listens to requests from clients.
  */
@@ -675,6 +677,38 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
+      IOException {
+    // check admin authorization
+    try {
+      getScm().checkAdminAccess(getRemoteUser());
+    } catch (IOException e) {
+      LOG.error("Authorization failed for finalize scm upgrade", e);
+      throw e;
+    }
+    return scm.finalizeUpgrade(upgradeClientID);
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException {
+    if (!readonly) {
+      // check admin authorization
+      try {
+        getScm().checkAdminAccess(getRemoteUser());
+      } catch (IOException e) {
+        LOG.error("Authorization failed for query scm upgrade finalization " +
+            "progress", e);
+        throw e;
+      }
+    }
+
+    return scm.queryUpgradeFinalizationProgress(upgradeClientID, force,
+        readonly);
+  }
+
+  @Override
   public boolean startContainerBalancer(Optional<Double> threshold,
                   Optional<Integer> idleiterations,
                   Optional<Integer> maxDatanodesToBalance,
@@ -751,7 +785,7 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser());
     } catch (IOException e) {
-      LOG.error("Authorisation failed", e);
+      LOG.error("Authorization failed", e);
       throw e;
     }
 
@@ -818,7 +852,7 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser());
     } catch (IOException e) {
-      LOG.error("Authorisation failed", e);
+      LOG.error("Authorization failed", e);
       throw e;
     }
 

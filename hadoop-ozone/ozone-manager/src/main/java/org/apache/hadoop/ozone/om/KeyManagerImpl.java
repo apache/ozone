@@ -750,8 +750,11 @@ public class KeyManagerImpl implements KeyManager {
           keyInfo.getKeyLocationVersions();
 
       for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          containerIDs.add(k.getContainerID());
+        for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+            containerIDs.add(omKeyLocationInfo.getContainerID());
+          }
         }
       }
     }
@@ -763,11 +766,15 @@ public class KeyManagerImpl implements KeyManager {
       List<OmKeyLocationInfoGroup> locationInfoGroups =
           keyInfo.getKeyLocationVersions();
       for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          ContainerWithPipeline cp =
-              containerWithPipelineMap.get(k.getContainerID());
-          if (cp != null && !cp.getPipeline().equals(k.getPipeline())) {
-            k.setPipeline(cp.getPipeline());
+        for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+            ContainerWithPipeline cp = containerWithPipelineMap.get(
+                omKeyLocationInfo.getContainerID());
+            if (cp != null &&
+                !cp.getPipeline().equals(omKeyLocationInfo.getPipeline())) {
+              omKeyLocationInfo.setPipeline(cp.getPipeline());
+            }
           }
         }
       }

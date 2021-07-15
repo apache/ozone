@@ -179,11 +179,10 @@ public class ContainerReader implements Runnable {
 
     if (!isInUpgradeMode) {
       Preconditions.checkArgument(clusterDir.exists(),
-          "Storage Dir:" + clusterDir + " doesn't exists");
+          "Storage Dir: %s doesn't exist", clusterDir);
       Preconditions.checkArgument(storageLoc.equals(clusterDir),
-          "configured storage location path" + storageLoc +
-              " does not container the clusterId:" +
-              hddsVolume.getClusterID());
+          "configured storage location %s does not contain the clusterId: %s",
+              storageLoc, hddsVolume.getClusterID());
       return storageLoc;
     }
 
@@ -192,7 +191,7 @@ public class ContainerReader implements Runnable {
     }
 
     try {
-      LOG.info("Storage dir based on clusterId doesn't exists." +
+      LOG.info("Storage dir based on clusterId doesn't exist." +
           "Renaming storage location:{} to {}", storageLoc, clusterDir);
       NativeIO.renameTo(storageLoc, clusterDir);
       return clusterDir;
@@ -297,7 +296,7 @@ public class ContainerReader implements Runnable {
 
     if (!isInUpgradeMode) {
       Preconditions.checkArgument(newPath.toFile().exists(),
-          "modified path:" + newPath + " doesn't exists");
+          "modified path:%s doesn't exist", newPath);
     }
 
     LOG.debug("new Normalized Path is:{}", newPath);

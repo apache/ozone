@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
 public final class SCMContainerPlacementCapacity
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementCapacity.class);
 
   /**

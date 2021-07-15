@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -453,10 +454,11 @@ public class ReplicationManager implements MetricsSource, SCMService {
       while(iter.hasNext()) {
         try {
           InflightAction a = iter.next();
-          NodeState health = nodeManager.getNodeStatus(a.datanode)
-              .getHealth();
-          if (health != NodeState.HEALTHY || a.time < deadline
-              || filter.test(a)) {
+          NodeStatus status = nodeManager.getNodeStatus(a.datanode);
+          NodeState state = status.getHealth();
+          NodeOperationalState opState = status.getOperationalState();
+          if (state != NodeState.HEALTHY || a.time < deadline ||
+              filter.test(a) || opState != NodeOperationalState.IN_SERVICE) {
             iter.remove();
           }
         } catch (NodeNotFoundException e) {

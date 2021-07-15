@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,7 @@ import java.util.List;
 public final class SCMContainerPlacementRackAware
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackAware.class);
   private final NetworkTopology networkTopology;
   private boolean fallback;
@@ -107,8 +108,8 @@ public final class SCMContainerPlacementRackAware
     if (datanodeCount < nodesRequired + excludedNodesCount) {
       throw new SCMException("No enough datanodes to choose. " +
           "TotalNode = " + datanodeCount +
-          "RequiredNode = " + nodesRequired +
-          "ExcludedNode = " + excludedNodesCount, null);
+          " RequiredNode = " + nodesRequired +
+          " ExcludedNode = " + excludedNodesCount, null);
     }
     List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
     // sanity check of favoredNodes
@@ -282,31 +283,41 @@ public final class SCMContainerPlacementRackAware
         throw new SCMException("No satisfied datanode to meet the" +
             " excludedNodes and affinityNode constrains.", null);
       }
-      if (hasEnoughSpace((DatanodeDetails)node, metadataSizeRequired,
-          dataSizeRequired)) {
-        LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
-                "required data size is {}",
-            node.toString(), metadataSizeRequired, dataSizeRequired);
-        metrics.incrDatanodeChooseSuccessCount();
-        if (isFallbacked) {
-          metrics.incrDatanodeChooseFallbackCount();
-        }
-        return node;
+
+      DatanodeDetails datanodeDetails = (DatanodeDetails)node;
+      DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
+          .getNodeByUuid(datanodeDetails.getUuidString());
+      if (datanodeInfo == null) {
+        LOG.error("Failed to find the DatanodeInfo for datanode {}",
+            datanodeDetails);
       } else {
-        maxRetry--;
-        if (maxRetry == 0) {
-          // avoid the infinite loop
-          String errMsg = "No satisfied datanode to meet the space constrains. "
-              + "metadatadata size required: " + metadataSizeRequired +
-              " data size required: " + dataSizeRequired;
-          LOG.info(errMsg);
-          throw new SCMException(errMsg, null);
+        if (datanodeInfo.getNodeStatus().isNodeWritable() &&
+            (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
+                dataSizeRequired))) {
+          LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
+                  "required data size is {}",
+              node.toString(), metadataSizeRequired, dataSizeRequired);
+          metrics.incrDatanodeChooseSuccessCount();
+          if (isFallbacked) {
+            metrics.incrDatanodeChooseFallbackCount();
+          }
+          return node;
         }
-        if (excludedNodesForCapacity == null) {
-          excludedNodesForCapacity = new ArrayList<>();
-        }
-        excludedNodesForCapacity.add(node.getNetworkFullPath());
       }
+
+      maxRetry--;
+      if (maxRetry == 0) {
+        // avoid the infinite loop
+        String errMsg = "No satisfied datanode to meet the space constrains. "
+            + "metadatadata size required: " + metadataSizeRequired +
+            " data size required: " + dataSizeRequired;
+        LOG.info(errMsg);
+        throw new SCMException(errMsg, null);
+      }
+      if (excludedNodesForCapacity == null) {
+        excludedNodesForCapacity = new ArrayList<>();
+      }
+      excludedNodesForCapacity.add(node.getNetworkFullPath());
     }
   }
 
