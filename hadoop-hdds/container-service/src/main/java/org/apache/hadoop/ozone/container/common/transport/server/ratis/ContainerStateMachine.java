@@ -172,7 +172,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     long pendingRequestsBytesLimit = (long)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
-        StorageUnit.MB);
+        StorageUnit.BYTES);
     int pendingRequestsMegaBytesLimit =
         HddsUtils.roundupMb(pendingRequestsBytesLimit);
     stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),

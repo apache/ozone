@@ -430,7 +430,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     long pendingRequestsBytesLimit = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
-        StorageUnit.MB);
+        StorageUnit.BYTES);
     final int pendingRequestsMegaBytesLimit =
         HddsUtils.roundupMb(pendingRequestsBytesLimit);
     RaftServerConfigKeys.Write.setByteLimit(properties, SizeInBytes
