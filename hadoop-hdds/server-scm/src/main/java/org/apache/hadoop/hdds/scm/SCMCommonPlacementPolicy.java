@@ -187,23 +187,32 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     boolean enoughForMeta = false;
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
-    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-      if (reportProto.getRemaining() > dataSizeRequired) {
-        enoughForData = true;
-        break;
+
+    if (dataSizeRequired > 0) {
+      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
+        if (reportProto.getRemaining() > dataSizeRequired) {
+          enoughForData = true;
+          break;
+        }
       }
+    } else {
+      enoughForData = true;
     }
 
     if (!enoughForData) {
       return false;
     }
 
-    for (MetadataStorageReportProto reportProto
-        : datanodeInfo.getMetadataStorageReports()) {
-      if (reportProto.getRemaining() > metadataSizeRequired) {
-        enoughForMeta = true;
-        break;
+    if (metadataSizeRequired > 0) {
+      for (MetadataStorageReportProto reportProto
+          : datanodeInfo.getMetadataStorageReports()) {
+        if (reportProto.getRemaining() > metadataSizeRequired) {
+          enoughForMeta = true;
+          break;
+        }
       }
+    } else {
+      enoughForMeta = true;
     }
 
     return enoughForData && enoughForMeta;
