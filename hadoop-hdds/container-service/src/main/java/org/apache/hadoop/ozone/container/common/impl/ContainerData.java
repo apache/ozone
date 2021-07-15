@@ -17,6 +17,17 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.yaml.snakeyaml.Yaml;
+
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
@@ -30,15 +41,6 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import static org.apache.hadoop.ozone.OzoneConsts.CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_TYPE;
@@ -49,7 +51,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.METADATA;
 import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_NODE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_PIPELINE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STATE;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * ContainerData is the in-memory representation of container metadata and is
@@ -489,6 +490,7 @@ public abstract class ContainerData {
    * Returns the volume of the Container.
    * @return HddsVolume
    */
+  @JsonIgnore
   public HddsVolume getVolume() {
     return volume;
   }

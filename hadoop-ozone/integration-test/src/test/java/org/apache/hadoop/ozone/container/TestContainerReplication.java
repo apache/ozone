@@ -18,29 +18,17 @@
 
 package org.apache.hadoop.ozone.container;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
-import static org.junit.Assert.assertFalse;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
+import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
@@ -54,24 +42,47 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.slf4j.event.Level;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 
 /**
  * Tests ozone containers replication.
  */
+@RunWith(Parameterized.class)
 public class TestContainerReplication {
   /**
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);;
+  public Timeout testTimeout = Timeout.seconds(300);
 
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
@@ -79,9 +90,28 @@ public class TestContainerReplication {
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
+  private String placementPolicyClass;
+
+  @Parameterized.Parameters
+  public static List<String> parameters() {
+    List<String> classes = new ArrayList<>();
+    classes.add(SCMContainerPlacementRackAware.class.getCanonicalName());
+    classes.add(SCMContainerPlacementCapacity.class.getCanonicalName());
+    classes.add(SCMContainerPlacementRandom.class.getCanonicalName());
+    return classes;
+  }
+
+  public TestContainerReplication(String placementPolicy) {
+    this.placementPolicyClass = placementPolicy;
+  }
 
   @Before
   public void setUp() throws Exception {
+    GenericTestUtils.setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(SCMContainerPlacementCapacity.LOG,
+        Level.DEBUG);
+    GenericTestUtils.setLogLevel(SCMContainerPlacementRackAware.LOG,
+        Level.DEBUG);
     OzoneConfiguration conf = createConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
         5, TimeUnit.SECONDS);
@@ -96,8 +126,10 @@ public class TestContainerReplication {
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
 
+    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(4)
+        .setNumDatanodes(5)
         .setCertificateClient(certificateClientTest)
         .build();
 
@@ -134,6 +166,48 @@ public class TestContainerReplication {
 
     waitForReplicaCount(containerID, 2, cluster);
     waitForReplicaCount(containerID, 3, cluster);
+  }
+
+  @Test
+  public void testSkipDecommissionAndMaintenanceNode() throws Exception {
+    List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
+    assertFalse(keyLocations.isEmpty());
+
+    OmKeyLocationInfo keyLocation = keyLocations.get(0);
+    long containerID = keyLocation.getContainerID();
+    waitForContainerClose(cluster, containerID);
+
+    // Mark other two DN Decommission and Maintenance
+    NodeDecommissionManager decommissionManager =
+        cluster.getStorageContainerManager().getScmDecommissionManager();
+    boolean deCommission = true;
+    for (HddsDatanodeService d1 : cluster.getHddsDatanodes()) {
+      boolean match = false;
+      for (DatanodeDetails d2 : keyLocations.get(0).getPipeline().getNodes()) {
+        if (d1.getDatanodeDetails().equals(d2)) {
+          match = true;
+          break;
+        }
+      }
+      if (!match) {
+        if (deCommission) {
+          decommissionManager.startDecommission(d1.getDatanodeDetails());
+          deCommission = false;
+        } else {
+          decommissionManager.startMaintenance(d1.getDatanodeDetails(), 1);
+        }
+      }
+    }
+
+    cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
+
+    waitForReplicaCount(containerID, 2, cluster);
+    try {
+      waitForReplicaCount(containerID, 3, cluster);
+      fail("Replication should not succeed without extra IN_SERVICE nodes");
+    } catch (TimeoutException e) {
+      Assert.assertTrue(TestHelper.countReplicas(containerID, cluster) == 2);
+    }
   }
 
   private static OzoneConfiguration createConfiguration() {

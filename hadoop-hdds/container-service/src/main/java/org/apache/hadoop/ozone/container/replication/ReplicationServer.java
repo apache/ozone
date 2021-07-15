@@ -22,7 +22,6 @@ import java.io.IOException;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -40,9 +39,6 @@ import javax.net.ssl.SSLException;
  * Separated network server for server2server container replication.
  */
 public class ReplicationServer {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReplicationServer.class);
 
   private SecurityConfig secConf;
 

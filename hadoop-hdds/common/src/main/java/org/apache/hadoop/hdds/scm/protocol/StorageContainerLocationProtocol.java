@@ -36,7 +36,10 @@ import java.util.EnumSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -287,6 +290,26 @@ public interface StorageContainerLocationProtocol extends Closeable {
   boolean getReplicationManagerStatus() throws IOException;
 
   /**
+   * Start ContainerBalancer.
+   */
+  boolean startContainerBalancer(Optional<Double> threshold,
+      Optional<Integer> idleiterations,
+      Optional<Integer> maxDatanodesToBalance,
+      Optional<Long> maxSizeToMoveInGB) throws IOException;
+
+  /**
+   * Stop ContainerBalancer.
+   */
+  void stopContainerBalancer() throws IOException;
+
+  /**
+   * Returns ContainerBalancer status.
+   *
+   * @return True if ContainerBalancer is running, false otherwise.
+   */
+  boolean getContainerBalancerStatus() throws IOException;
+
+  /**
    * Get Datanode usage information by ip or uuid.
    *
    * @param ipaddress datanode IP address String
@@ -310,6 +333,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 
+  StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException;
+
+  StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException;
   /**
    * Obtain a token which can be used to let datanodes verify authentication of
    * commands operating on {@code containerID}.

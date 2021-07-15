@@ -208,9 +208,11 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
         LOG.debug("Performing failover to suggested leader {}, nodeId {}",
             snle.getSuggestedLeader(), newLeader);
       } else {
-        LOG.debug("Suggested leader {} does not match with any of the " +
-                "proxyInfo adress {}", snle.getSuggestedLeader(),
-            Arrays.toString(scmProxyInfoMap.values().toArray()));
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Suggested leader {} does not match with any of the " +
+                          "proxyInfo adress {}", snle.getSuggestedLeader(),
+                  Arrays.toString(scmProxyInfoMap.values().toArray()));
+        }
       }
     }
     assignLeaderToNode(newLeader);

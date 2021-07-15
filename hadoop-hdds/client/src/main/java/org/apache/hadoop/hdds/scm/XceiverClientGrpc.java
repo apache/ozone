@@ -218,9 +218,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       channel.shutdownNow();
       try {
         channel.awaitTermination(60, TimeUnit.MINUTES);
-      } catch (Exception e) {
-        LOG.error("Unexpected exception while waiting for channel termination",
+      } catch (InterruptedException e) {
+        LOG.error("InterruptedException while waiting for channel termination",
             e);
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
   }
@@ -261,6 +263,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
     try{
@@ -271,6 +275,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     } catch (InterruptedException e) {
       LOG.error("Command execution was interrupted.");
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
       LOG.error("Failed to execute command " + request, e);
     }
@@ -461,7 +467,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
-    checkOpen(dn, request.getEncodedToken());
+    checkOpen(dn);
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
@@ -523,7 +529,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
-  private synchronized void checkOpen(DatanodeDetails dn, String encodedToken)
+  private synchronized void checkOpen(DatanodeDetails dn)
       throws IOException{
     if (closed) {
       throw new IOException("This channel is not connected.");
@@ -533,12 +539,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // If the channel doesn't exist for this specific datanode or the channel
     // is closed, just reconnect
     if (!isConnected(channel)) {
-      reconnect(dn, encodedToken);
+      reconnect(dn);
     }
 
   }
 
-  private void reconnect(DatanodeDetails dn, String encodedToken)
+  private void reconnect(DatanodeDetails dn)
       throws IOException {
     ManagedChannel channel;
     try {

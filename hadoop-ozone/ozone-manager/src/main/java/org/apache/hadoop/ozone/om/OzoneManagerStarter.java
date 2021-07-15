@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -99,6 +100,27 @@ public class OzoneManagerStarter extends GenericCli {
   }
 
   /**
+   * This function implements a sub-command to allow the OM to be
+   * Removed from prepare mode after an upgrade or downgrade.
+   */
+  @CommandLine.Command(name = "--upgrade",
+      aliases = "--downgrade",
+      customSynopsis = "ozone om [global options] --upgrade",
+      description = "Cancels prepare state in this OM on startup",
+      mixinStandardHelpOptions = true,
+      versionProvider = HddsVersionProvider.class)
+  public void startOmUpgrade() throws Exception {
+    try {
+      commonInit();
+      receiver.startAndCancelPrepare(conf);
+    } catch (Exception ex) {
+      LOG.error("Cancelling prepare to start OM in upgrade mode failed " +
+          "with exception", ex);
+      throw ex;
+    }
+  }
+
+  /**
    * This function should be called by each command to ensure the configuration
    * is set and print the startup banner message.
    */
@@ -132,6 +154,14 @@ public class OzoneManagerStarter extends GenericCli {
         AuthenticationException {
       return OzoneManager.omInit(conf);
     }
-  }
 
+    @Override
+    public void startAndCancelPrepare(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      OzoneManager om = OzoneManager.createOm(conf);
+      om.getPrepareState().cancelPrepare();
+      om.start();
+      om.join();
+    }
+  }
 }

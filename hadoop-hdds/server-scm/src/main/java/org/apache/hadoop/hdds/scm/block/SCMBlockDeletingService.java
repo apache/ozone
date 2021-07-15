@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,7 +29,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -99,7 +97,7 @@ public class SCMBlockDeletingService extends BackgroundService
     blockDeleteLimitSize =
         conf.getObject(ScmConfig.class).getBlockDeletionLimit();
     Preconditions.checkArgument(blockDeleteLimitSize > 0,
-        "Block deletion limit should be " + "positive.");
+        "Block deletion limit should be positive.");
 
     // register SCMBlockDeletingService to SCMServiceManager
     serviceManager.register(this);
@@ -110,21 +108,6 @@ public class SCMBlockDeletingService extends BackgroundService
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
     queue.add(new DeletedBlockTransactionScanner());
     return queue;
-  }
-
-  void handlePendingDeletes(PendingDeleteStatusList deletionStatusList) {
-    DatanodeDetails dnDetails = deletionStatusList.getDatanodeDetails();
-    for (PendingDeleteStatusList.PendingDeleteStatus deletionStatus :
-        deletionStatusList.getPendingDeleteStatuses()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            "Block deletion txnID lagging in datanode {} for containerID {}."
-                + " Datanode delete txnID: {}, SCM txnID: {}",
-            dnDetails.getUuid(), deletionStatus.getContainerId(),
-            deletionStatus.getDnDeleteTransactionId(),
-            deletionStatus.getScmDeleteTransactionId());
-      }
-    }
   }
 
   private class DeletedBlockTransactionScanner implements BackgroundTask {
@@ -155,8 +138,6 @@ public class SCMBlockDeletingService extends BackgroundService
         try {
           DatanodeDeletedBlockTransactions transactions =
               deletedBlockLog.getTransactions(blockDeleteLimitSize);
-          Map<Long, Long> containerIdToMaxTxnId =
-              transactions.getContainerIdToTxnIdMap();
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
@@ -186,11 +167,6 @@ public class SCMBlockDeletingService extends BackgroundService
             }
           }
           // TODO: Fix ME!!!
-          Map<ContainerID, Long> transactionMap = new HashMap<>();
-          for (Map.Entry<Long, Long> tx : containerIdToMaxTxnId.entrySet()) {
-            transactionMap.put(ContainerID.valueOf(tx.getKey()), tx.getValue());
-          }
-          containerManager.updateDeleteTransactionId(transactionMap);
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),

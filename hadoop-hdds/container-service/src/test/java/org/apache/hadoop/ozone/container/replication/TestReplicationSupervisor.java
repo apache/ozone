@@ -170,7 +170,6 @@ public class TestReplicationSupervisor {
       supervisor.stop();
     }
   }
-  
 
   /**
    * A fake replicator that simulates successful download of containers.
