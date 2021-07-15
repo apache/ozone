@@ -114,6 +114,7 @@ public class ReconNodeManager extends SCMNodeManager {
                     HDDSLayoutVersionManager.maxLayoutVersion())
                 .build());
         nodeCount++;
+        inMemDatanodeDetails.put(datanodeDetails.getUuid(), datanodeDetails);
       }
       LOG.info("Loaded {} nodes from node DB.", nodeCount);
     } catch (IOException ioEx) {
@@ -231,13 +232,14 @@ public class ReconNodeManager extends SCMNodeManager {
       cmds.add(new ReregisterCommand());
       LOG.info("Sending ReregisterCommand() for " +
           datanodeDetails.getHostName());
+      datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
+      return cmds;
     }
     // Update heartbeat map with current time
     datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
     cmds.addAll(super.processHeartbeat(datanodeDetails, layoutInfo));
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
-        .distinct()
         .collect(toList());
   }
 
@@ -256,9 +258,9 @@ public class ReconNodeManager extends SCMNodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo) {
-    inMemDatanodeDetails.put(datanodeDetails.getUuid(), datanodeDetails);
     if (isNodeRegistered(datanodeDetails)) {
       try {
+        inMemDatanodeDetails.put(datanodeDetails.getUuid(), datanodeDetails);
         nodeDB.put(datanodeDetails.getUuid(), datanodeDetails);
         LOG.info("Updating nodeDB for " + datanodeDetails.getHostName());
       } catch (IOException e) {
