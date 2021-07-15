@@ -152,6 +152,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 </replace>
                 <move file="target/generated-sources/java/proto3/org/apache/hadoop/hdds/protocol/proto"
                       tofile="target/generated-sources/java/proto3/org/apache/hadoop/hdds/protocol/proto3"/>
+                <move file="target/generated-sources/java/proto3"
+                      tofile="target/generated-sources/java"/>
               </tasks>
             </configuration>
             <goals>
