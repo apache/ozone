@@ -892,7 +892,8 @@ public class SCMNodeManager implements NodeManager {
   public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
     HashSet<DatanodeDetails> dns = new HashSet<>();
     Preconditions.checkNotNull(dn);
-    Set<PipelineID> pipelines = nodeStateManager.getPipelineByDnID(dn.getUuid());
+    Set<PipelineID> pipelines =
+        nodeStateManager.getPipelineByDnID(dn.getUuid());
     if (pipelines != null || !pipelines.isEmpty()) {
       pipelines.forEach(id -> {
         try {

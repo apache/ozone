@@ -58,7 +58,8 @@ public class  TestMultiRaftSetup {
           HddsProtos.ReplicationFactor.THREE);
 
   public void init(int dnCount, OzoneConfiguration conf) throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(dnCount).build();
+    cluster =
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(dnCount).build();
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
     pipelineDestroyTimeoutInMillis = 1000;
@@ -83,7 +84,8 @@ public class  TestMultiRaftSetup {
   public void testMultiRaftSamePeers() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS, false);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS,
+        false);
     init(3, conf);
     waitForPipelineCreated(2);
     Assert.assertEquals(2, pipelineManager.getPipelines(ReplicationConfig
