@@ -105,8 +105,9 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
     channel.shutdown();
     try {
       channel.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       LOG.error("failed to shutdown replication channel", e);
+      Thread.currentThread().interrupt();
     }
   }
 

@@ -215,8 +215,9 @@ public class BaseFreonGenerator {
     executor.shutdown();
     try {
       executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
-    } catch (Exception ex) {
-      ex.printStackTrace();
+    } catch (InterruptedException ex) {
+      LOG.error("Error attempting to shutdown", ex);
+      Thread.currentThread().interrupt();
     }
   }
 
