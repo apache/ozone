@@ -69,12 +69,18 @@ public class TopologySubcommand extends ScmSubcommand
       description = "Print Topology with full node infos")
   private boolean fullInfo;
 
-  @CommandLine.Option(names = {"-n", "--nodeOperationalState"},
-      description = "Show info by datanode NodeOperationalState" +
+  @CommandLine.Option(names = {"-n", "--operational-state"},
+      description = "Only show datanodes in a specific operational state " +
           "(IN_SERVICE, DECOMMISSIONING, " +
           "DECOMMISSIONED, ENTERING_MAINTENANCE, " +
           "IN_MAINTENANCE)")
   private String nodeOperationalState;
+
+  @CommandLine.Option(names = {"--node-state"},
+      description = "Only show datanodes in a specific node state(" +
+          " HEALTHY, STALE, DEAD)",
+      defaultValue = "")
+  private String nodeState;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -84,6 +90,16 @@ public class TopologySubcommand extends ScmSubcommand
       if (nodes != null && nodes.size() > 0) {
         // show node state
         System.out.println("State = " + state.toString());
+        if (nodeOperationalState != null) {
+          nodes = nodes.stream().filter(
+              info -> info.getNodeOperationalStates(0).toString()
+                  .equals(nodeOperationalState)).collect(Collectors.toList());
+        }
+        if (nodeState != null) {
+          nodes = nodes.stream().filter(
+              info -> info.getNodeStates(0).toString()
+                  .equals(nodeState)).collect(Collectors.toList());
+        }
         if (order) {
           printOrderedByLocation(nodes);
         } else {
@@ -106,11 +122,6 @@ public class TopologySubcommand extends ScmSubcommand
         new HashMap<>();
     HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
         new HashMap<>();
-    if (nodeOperationalState != null) {
-      nodes = nodes.stream().filter(
-          info -> info.getNodeOperationalStates(0).toString()
-              .equals(nodeOperationalState)).collect(Collectors.toList());
-    }
     for (HddsProtos.Node node : nodes) {
       String location = node.getNodeID().getNetworkLocation();
       if (location != null && !tree.containsKey(location)) {
@@ -151,11 +162,6 @@ public class TopologySubcommand extends ScmSubcommand
   // Format "ipAddress(hostName):PortName1=PortValue1    OperationalState
   //     networkLocation
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
-    if (nodeOperationalState != null) {
-      nodes = nodes.stream().filter(
-          info -> info.getNodeOperationalStates(0).toString()
-              .equals(nodeOperationalState)).collect(Collectors.toList());
-    }
     nodes.forEach(node -> {
       System.out.print(" " + getAdditionNodeOutput(node) +
           node.getNodeID().getIpAddress() + "(" +
