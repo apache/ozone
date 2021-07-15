@@ -24,8 +24,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,16 +31,10 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import javax.annotation.Nonnull;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
@@ -76,6 +68,7 @@ public class TestReplicationSupervisor {
   public void normal() {
     // GIVEN
     ReplicationSupervisor supervisor = new ReplicationSupervisor(set,
+        null,
         new FakeReplicator(),
         newDirectExecutorService());
 
@@ -99,6 +92,7 @@ public class TestReplicationSupervisor {
   public void duplicateMessage() {
     // GIVEN
     ReplicationSupervisor supervisor = new ReplicationSupervisor(set,
+        null,
         new FakeReplicator(),
         newDirectExecutorService());
 
@@ -124,6 +118,7 @@ public class TestReplicationSupervisor {
   public void failureHandling() {
     // GIVEN
     ReplicationSupervisor supervisor = new ReplicationSupervisor(set,
+        null,
         task -> {
           throw new RuntimeException();
         },
@@ -149,6 +144,7 @@ public class TestReplicationSupervisor {
   public void stalledDownload() {
     // GIVEN
     ReplicationSupervisor supervisor = new ReplicationSupervisor(set,
+        null,
         task -> {
 
         },

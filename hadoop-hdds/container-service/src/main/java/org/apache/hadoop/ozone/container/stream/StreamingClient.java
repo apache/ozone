@@ -30,21 +30,19 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.CharsetUtil;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Client to stream huge binaries from a streamling server.
  */
 public class StreamingClient implements AutoCloseable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(StreamingClient.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(StreamingClient.class);
+
   private final Bootstrap bootstrap;
   private final DirstreamClientHandler dirstreamClientHandler;
   private EventLoopGroup group;

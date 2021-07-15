@@ -17,7 +17,10 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import com.google.common.base.Supplier;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,7 +35,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -130,12 +132,19 @@ public class TestReplicationService {
         destDnUUID, clientConfig, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
 
+    SslContext sslContext = SslContextBuilder.forClient()
+        .trustManager(InsecureTrustManagerFactory.INSTANCE)
+        .clientAuth(ClientAuth.REQUIRE)
+        .keyManager(certificateClient.getPrivateKey(),
+            certificateClient.getCertificate())
+        .build();
+
     DownloadAndImportReplicator replicator = new DownloadAndImportReplicator(
         clientConfig,
         () -> scmUuid,
         destinationContainerSet,
         volumeSet,
-        certificateClient.);
+        sslContext);
 
     DatanodeDetails source =
         DatanodeDetails.newBuilder()
