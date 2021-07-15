@@ -36,7 +36,7 @@ Filter list by UUID
 
 Filter list by NodeOperationalState
     ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
-    ${output} =         Execute      ozone admin datanode list --NodeOperationalState IN_SERVICE
+    ${output} =         Execute      ozone admin datanode list --operational-state IN_SERVICE
     Should contain      ${output}    Datanode: ${uuid}
     ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
     @{lines} =          Split To Lines   ${datanodes}
@@ -45,7 +45,7 @@ Filter list by NodeOperationalState
 
 Filter list by NodeState
     ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
-    ${output} =         Execute      ozone admin datanode list --NodeState HEALTHY
+    ${output} =         Execute      ozone admin datanode list --node-state HEALTHY
     Should contain      ${output}    Datanode: ${uuid}
     ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
     @{lines} =          Split To Lines   ${datanodes}
