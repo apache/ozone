@@ -894,7 +894,7 @@ public class SCMNodeManager implements NodeManager {
     Preconditions.checkNotNull(dn);
     Set<PipelineID> pipelines =
         nodeStateManager.getPipelineByDnID(dn.getUuid());
-    if (pipelines != null || !pipelines.isEmpty()) {
+    if (!pipelines.isEmpty()) {
       pipelines.forEach(id -> {
         try {
           Pipeline pipeline =

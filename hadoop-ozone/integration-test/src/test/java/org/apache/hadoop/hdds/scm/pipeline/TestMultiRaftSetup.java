@@ -48,7 +48,6 @@ public class  TestMultiRaftSetup {
 
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
-  private ContainerWithPipeline ratisContainer;
   private NodeManager nodeManager;
   private PipelineManager pipelineManager;
 
