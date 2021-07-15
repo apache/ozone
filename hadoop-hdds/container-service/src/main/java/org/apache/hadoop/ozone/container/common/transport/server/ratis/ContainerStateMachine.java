@@ -387,7 +387,16 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private ContainerCommandRequestProto message2ContainerCommandRequestProto(
       Message message) throws InvalidProtocolBufferException {
-    return ContainerCommandRequestMessage.toProto(message.getContent(), gid);
+    ContainerCommandRequestProto proto;
+    try {
+      proto = ContainerCommandRequestMessage.toProto(message.getContent(), gid);
+    } catch (Exception e) {
+      // TODO: this is a temporary workaround
+      // FORWARD message may contain Proto as payload, try parse it directly.
+      // If this still doesn't work, throw the exception
+      proto = ContainerCommandRequestProto.parseFrom(message.getContent());
+    }
+    return proto;
   }
 
   private ContainerCommandResponseProto dispatchCommand(
