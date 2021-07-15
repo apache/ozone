@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.client;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.helpers.BucketType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import java.util.HashMap;
 import java.util.List;
@@ -65,7 +65,7 @@ public final class BucketArgs {
   /**
    * Bucket Type.
    */
-  private BucketType bucketType = BucketType.DEFAULT;
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
   /**
    * Private constructor, constructed via builder.
@@ -78,13 +78,13 @@ public final class BucketArgs {
    * @param sourceBucket
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
-   * @param bucketType Bucket Types.
+   * @param bucketLayout Bucket Layouts.
    */
   @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
-      long quotaInBytes, long quotaInNamespace, BucketType bucketType) {
+      long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -94,7 +94,7 @@ public final class BucketArgs {
     this.sourceBucket = sourceBucket;
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
-    this.bucketType = bucketType;
+    this.bucketLayout = bucketLayout;
   }
 
   /**
@@ -174,8 +174,8 @@ public final class BucketArgs {
   /**
    * Returns the Bucket Type.
    */
-  public BucketType getBucketType() {
-    return bucketType;
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
   }
 
   /**
@@ -191,7 +191,7 @@ public final class BucketArgs {
     private String sourceBucket;
     private long quotaInBytes;
     private long quotaInNamespace;
-    private BucketType bucketType;
+    private BucketLayout bucketLayout;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -244,8 +244,8 @@ public final class BucketArgs {
       return this;
     }
 
-    public BucketArgs.Builder setBucketType(BucketType type) {
-      bucketType = type;
+    public BucketArgs.Builder setBucketLayout(BucketLayout type) {
+      bucketLayout = type;
       return this;
     }
 
@@ -257,7 +257,7 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace, bucketType);
+          quotaInNamespace, bucketLayout);
     }
   }
 }

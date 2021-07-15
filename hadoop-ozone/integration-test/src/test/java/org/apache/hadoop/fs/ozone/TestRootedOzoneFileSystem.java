@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -152,7 +152,7 @@ public class TestRootedOzoneFileSystem {
   // Store path commonly used by tests that test functionality within a bucket
   private static Path bucketPath;
   private static String rootPath;
-  private static BucketType bucketType;
+  private static BucketLayout bucketLayout;
 
   @BeforeClass
   public static void init() throws Exception {
@@ -163,11 +163,11 @@ public class TestRootedOzoneFileSystem {
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
-      bucketType = BucketType.FILE_SYSTEM_OPTIMIZED;
+      bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
       TestOMRequestUtils.configureFSOptimizedPaths(conf,
           true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     } else {
-      bucketType = BucketType.LEGACY;
+      bucketLayout = BucketLayout.LEGACY;
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }
@@ -179,7 +179,7 @@ public class TestRootedOzoneFileSystem {
     
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketType);
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
@@ -1099,7 +1099,7 @@ public class TestRootedOzoneFileSystem {
     // Create a new bucket in the same volume
     final String bucketName2 = "trashroottest2";
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setBucketType(bucketType);
+    builder.setBucketLayout(bucketLayout);
     volume1.createBucket(bucketName2, builder.build());
     Path bucketPath2 = new Path(volumePath, bucketName2);
     Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
@@ -1121,7 +1121,7 @@ public class TestRootedOzoneFileSystem {
 
     // Create a new volume and a new bucket
     OzoneBucket bucket3 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketType);
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     OzoneVolume volume3 = objectStore.getVolume(bucket3.getVolumeName());
     // Need to setOwner to current test user so it has permission to list vols
     volume3.setOwner(username);
@@ -1249,7 +1249,7 @@ public class TestRootedOzoneFileSystem {
     }
     // create second bucket and write a key in it.
     OzoneBucket bucket2 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketType);
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     String volumeName2 = bucket2.getVolumeName();
     Path volumePath2 = new Path(OZONE_URI_DELIMITER, volumeName2);
     String bucketName2 = bucket2.getName();

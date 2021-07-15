@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
-import org.apache.hadoop.ozone.om.helpers.BucketType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -137,9 +137,9 @@ public class OzoneBucket extends WithMetadata {
    */
   private long quotaInNamespace;
   /**
-   * Bucket Type.
+   * Bucket Layout.
    */
-  private BucketType bucketType = BucketType.DEFAULT;
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ClientProtocol proxy) {
@@ -213,12 +213,12 @@ public class OzoneBucket extends WithMetadata {
       Map<String, String> metadata, String encryptionKeyName,
       String sourceVolume, String sourceBucket, long usedBytes,
       long usedNamespace, long quotaInBytes, long quotaInNamespace,
-      BucketType bucketType) {
+      BucketLayout bucketLayout) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, modificationTime, metadata, encryptionKeyName,
         sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
         quotaInNamespace);
-    this.bucketType = bucketType;
+    this.bucketLayout = bucketLayout;
   }
 
   /**
@@ -584,7 +584,7 @@ public class OzoneBucket extends WithMetadata {
       throws IOException {
 
     return new KeyIteratorFactory()
-        .getKeyIterator(keyPrefix, prevKey, bucketType);
+        .getKeyIterator(keyPrefix, prevKey, bucketLayout);
   }
 
   /**
@@ -1191,8 +1191,8 @@ public class OzoneBucket extends WithMetadata {
 
   private class KeyIteratorFactory {
     KeyIterator getKeyIterator(String keyPrefix, String prevKey,
-        BucketType bType) throws IOException {
-      if (bType.equals(BucketType.FILE_SYSTEM_OPTIMIZED)) {
+        BucketLayout bType) throws IOException {
+      if (bType.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         return new KeyIteratorWithFSO(keyPrefix, prevKey);
       } else {
         return new KeyIterator(keyPrefix, prevKey);
@@ -1200,7 +1200,7 @@ public class OzoneBucket extends WithMetadata {
     }
   }
 
-  public BucketType getBucketType() {
-    return bucketType;
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
   }
 }

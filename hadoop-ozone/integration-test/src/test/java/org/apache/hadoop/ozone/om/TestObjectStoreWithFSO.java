@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -112,7 +112,7 @@ public class TestObjectStoreWithFSO {
     cluster.waitForClusterToBeReady();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil
-        .createVolumeAndBucket(cluster, BucketType.FILE_SYSTEM_OPTIMIZED);
+        .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -622,7 +622,7 @@ public class TestObjectStoreWithFSO {
   }
 
   @Test
-  public void testCreateBucketWithBucketType() throws Exception {
+  public void testCreateBucketWithBucketLayout() throws Exception {
     String sampleVolumeName = UUID.randomUUID().toString();
     String sampleBucketName = UUID.randomUUID().toString();
     OzoneClient client = cluster.getClient();
@@ -630,48 +630,48 @@ public class TestObjectStoreWithFSO {
     store.createVolume(sampleVolumeName);
     OzoneVolume volume = store.getVolume(sampleVolumeName);
 
-    // Case 1: Bucket Type: FSO
+    // Case 1: Bucket layout: FILE_SYSTEM_OPTIMIZED
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setBucketType(BucketType.FILE_SYSTEM_OPTIMIZED);
+    builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volume.createBucket(sampleBucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert
-        .assertEquals(BucketType.FILE_SYSTEM_OPTIMIZED, bucket.getBucketType());
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        bucket.getBucketLayout());
 
-    // Case 2: Bucket Type: OBJECT_STORE
+    // Case 2: Bucket layout: OBJECT_STORE
     sampleBucketName = UUID.randomUUID().toString();
-    builder.setBucketType(BucketType.OBJECT_STORE);
+    builder.setBucketLayout(BucketLayout.OBJECT_STORE);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketType.OBJECT_STORE, bucket.getBucketType());
+    Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
 
-    // Case 3: Bucket Type: Empty and layout: PREFIX
+    // Case 3: Bucket layout: Empty and OM Metadata layout: PREFIX
     builder = BucketArgs.newBuilder();
     sampleBucketName = UUID.randomUUID().toString();
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert
-        .assertEquals(BucketType.FILE_SYSTEM_OPTIMIZED, bucket.getBucketType());
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        bucket.getBucketLayout());
 
-    // Case 4: Bucket Type: DEFAULT
+    // Case 4: Bucket layout: DEFAULT
     sampleBucketName = UUID.randomUUID().toString();
-    builder.setBucketType(BucketType.DEFAULT);
+    builder.setBucketLayout(BucketLayout.DEFAULT);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert
-        .assertEquals(BucketType.FILE_SYSTEM_OPTIMIZED, bucket.getBucketType());
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        bucket.getBucketLayout());
 
-    // Case 5: Bucket Type: LEGACY
+    // Case 5: Bucket layout: LEGACY
     sampleBucketName = UUID.randomUUID().toString();
-    builder.setBucketType(BucketType.LEGACY);
+    builder.setBucketLayout(BucketLayout.LEGACY);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertNotEquals(BucketType.LEGACY, bucket.getBucketType());
+    Assert.assertNotEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)

@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.om.helpers.BucketType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
@@ -53,12 +53,12 @@ public class CreateBucketHandler extends BucketHandler {
 
   // TODO: LEGACY should be removed and should not be exposed to the end user
   // we will revisit during the client side defaulting behaviour
-  enum AllowedBucketTypes { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
 
   @Option(names = { "--type", "-t" },
       description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
       defaultValue = "LEGACY")
-  private AllowedBucketTypes allowedBucketType;
+  private AllowedBucketLayouts allowedBucketLayout;
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
@@ -71,9 +71,10 @@ public class CreateBucketHandler extends BucketHandler {
       throws IOException {
 
     BucketArgs.Builder bb;
-    BucketType bucketType = BucketType.valueOf(allowedBucketType.toString());
+    BucketLayout bucketLayout =
+        BucketLayout.valueOf(allowedBucketLayout.toString());
     bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-        .setVersioning(false).setBucketType(bucketType);
+        .setVersioning(false).setBucketLayout(bucketLayout);
 
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 

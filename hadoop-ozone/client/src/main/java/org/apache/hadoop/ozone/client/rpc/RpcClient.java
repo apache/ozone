@@ -492,7 +492,7 @@ public class RpcClient implements ClientProtocol {
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
-        .setBucketType(bucketArgs.getBucketType());
+        .setBucketLayout(bucketArgs.getBucketLayout());
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
@@ -716,7 +716,7 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInNamespace(),
-        bucketInfo.getBucketType()
+        bucketInfo.getBucketLayout()
     );
   }
 

@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -50,11 +50,11 @@ public final class TestDataUtil {
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
       String volumeName, String bucketName) throws IOException {
     return createVolumeAndBucket(cluster, volumeName, bucketName,
-        BucketType.LEGACY);
+        BucketLayout.LEGACY);
   }
 
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
-      String volumeName, String bucketName, BucketType bucketType)
+      String volumeName, String bucketName, BucketLayout bucketLayout)
       throws IOException {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
     String adminName = "admin" + RandomStringUtils.randomNumeric(5);
@@ -72,7 +72,7 @@ public final class TestDataUtil {
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setStorageType(StorageType.DISK);
-    builder.setBucketType(bucketType);
+    builder.setBucketLayout(bucketLayout);
     omBucketArgs = builder.build();
 
     volume.createBucket(bucketName, omBucketArgs);
@@ -105,18 +105,18 @@ public final class TestDataUtil {
 
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster)
       throws IOException {
-    return createVolumeAndBucket(cluster, BucketType.LEGACY);
+    return createVolumeAndBucket(cluster, BucketLayout.LEGACY);
   }
 
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
-      BucketType bucketType) throws IOException {
+      BucketLayout bucketLayout) throws IOException {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
         String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
         String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
         return createVolumeAndBucket(cluster, volumeName, bucketName,
-            bucketType);
+            bucketLayout);
       } catch (OMException e) {
         if (e.getResult() != OMException.ResultCodes.VOLUME_ALREADY_EXISTS
             && e.getResult() != OMException.ResultCodes.BUCKET_ALREADY_EXISTS) {

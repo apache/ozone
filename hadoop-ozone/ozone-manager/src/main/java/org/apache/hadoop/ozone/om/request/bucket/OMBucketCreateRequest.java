@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -143,13 +143,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest());
     String omLayout = ozoneManager.getOMMetadataLayout();
     OmBucketInfo omBucketInfo = null;
-    if (bucketInfo.getBucketType() == null || bucketInfo.getBucketType()
-        .equals(BucketTypeProto.LEGACY)) {
-      BucketType defaultType = BucketType.LEGACY;
+    if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
+        .equals(BucketLayoutProto.LEGACY)) {
+      BucketLayout defaultType = BucketLayout.LEGACY;
       if (StringUtils
           .equalsIgnoreCase(OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX,
               omLayout)) {
-        defaultType = BucketType.FILE_SYSTEM_OPTIMIZED;
+        defaultType = BucketLayout.FILE_SYSTEM_OPTIMIZED;
       }
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
     } else {
