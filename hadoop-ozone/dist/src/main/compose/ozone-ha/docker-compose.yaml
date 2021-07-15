@@ -107,6 +107,13 @@ services:
     ports:
       - 9878:9878
     command: ["ozone","s3g"]
+  httpfs:
+    <<: *common-config
+    environment:
+      <<: *replication
+    ports:
+      - 14000:14000
+    command: [ "ozone","httpfs" ]
   recon:
     <<: *common-config
     ports:

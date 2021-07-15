@@ -49,6 +49,7 @@ function ozone_usage
   ozone_add_subcommand "om" daemon "Ozone Manager"
   ozone_add_subcommand "scm" daemon "run the Storage Container Manager service"
   ozone_add_subcommand "s3g" daemon "run the S3 compatible REST gateway"
+  ozone_add_subcommand "httpfs" daemon "run the HTTPFS compatible REST gateway"
   ozone_add_subcommand "csi" daemon "run the standalone CSI daemon"
   ozone_add_subcommand "recon" daemon "run the Recon service"
   ozone_add_subcommand "sh" client "command line interface for object store operations"
@@ -185,6 +186,11 @@ function ozonecmd_case
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
       OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
+    ;;
+    httpfs)
+      OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
+      OZONE_CLASSNAME='org.apache.hadoop.fs.http.server.HttpFSServerWebApp'
+      OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
     csi)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
