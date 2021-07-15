@@ -111,11 +111,23 @@ public class PutKeyHandler extends KeyHandler {
 
     int chunkSize = (int) getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
-    try (InputStream input = new FileInputStream(dataFile);
-        OutputStream output = bucket.createKey(keyName, dataFile.length(),
-            replicationConfig, keyMetadata)) {
-      IOUtils.copyBytes(input, output, chunkSize);
+
+    // This can be determined using OZONE_SCM_CHUNK_SIZE_DEFAULT.
+    if(dataFile.length() < 100) {
+      try (InputStream input = new FileInputStream(dataFile);
+           OutputStream output = bucket.createKey(keyName, dataFile.length(),
+               replicationConfig, keyMetadata)) {
+        IOUtils.copyBytes(input, output, chunkSize);
+      }
+    } else {
+      out().printf("Use Streaming to put this key");
+      try (InputStream input = new FileInputStream(dataFile);
+           OutputStream output = bucket.createStreamKey(keyName,
+               dataFile.length(), replicationConfig, keyMetadata)) {
+        IOUtils.copyBytes(input, output, chunkSize);
+      }
     }
+
   }
 
 }
