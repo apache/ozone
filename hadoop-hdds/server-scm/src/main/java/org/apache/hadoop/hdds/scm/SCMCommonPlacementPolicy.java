@@ -162,7 +162,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     if (nodesWithSpace.size() < nodesRequired) {
       String msg = String.format("Unable to find enough nodes that meet the " +
               "space requirement of %d bytes for metadata and %d bytes for " +
-              "data in healthy node set. Nodes required: %d Found: %d",
+              "data in healthy node set. Required %d. Found %d.",
           metadataSizeRequired, dataSizeRequired, nodesRequired,
           nodesWithSpace.size());
       LOG.error(msg);
