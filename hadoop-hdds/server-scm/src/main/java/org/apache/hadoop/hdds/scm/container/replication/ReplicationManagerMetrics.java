@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -38,121 +39,116 @@ public final class ReplicationManagerMetrics {
   @Metric("Tracked inflight container deletion requests.")
   private MutableGaugeLong inflightDeletion;
 
-  @Metric("Number of replicate commands sent.")
-  private MutableCounterLong numReplicateCmdsSent;
+  @Metric("Number of replication commands sent.")
+  private MutableCounterLong numReplicationCmdsSent;
 
-  @Metric("Number of replicate commands completed.")
-  private MutableCounterLong numReplicateCmdsCompleted;
+  @Metric("Number of replication commands completed.")
+  private MutableCounterLong numReplicationCmdsCompleted;
 
-  @Metric("Number of replicate commands timeout.")
-  private MutableCounterLong numReplicateCmdsTimeout;
+  @Metric("Number of replication commands timeout.")
+  private MutableCounterLong numReplicationCmdsTimeout;
 
-  @Metric("Number of delete commands sent.")
-  private MutableCounterLong numDeleteCmdsSent;
+  @Metric("Number of deletion commands sent.")
+  private MutableCounterLong numDeletionCmdsSent;
 
-  @Metric("Number of delete commands completed.")
-  private MutableCounterLong numDeleteCmdsCompleted;
+  @Metric("Number of deletion commands completed.")
+  private MutableCounterLong numDeletionCmdsCompleted;
 
-  @Metric("Number of delete commands timeout.")
-  private MutableCounterLong numDeleteCmdsTimeout;
+  @Metric("Number of deletion commands timeout.")
+  private MutableCounterLong numDeletionCmdsTimeout;
 
-  @Metric("Number of replicate bytes total.")
-  private MutableCounterLong numReplicateBytesTotal;
+  @Metric("Number of replication bytes total.")
+  private MutableCounterLong numReplicationBytesTotal;
 
-  @Metric("Number of replicate bytes completed.")
-  private MutableCounterLong numReplicateBytesCompleted;
+  @Metric("Number of replication bytes completed.")
+  private MutableCounterLong numReplicationBytesCompleted;
 
-  public ReplicationManagerMetrics() {
+  private ReplicationManager replicationManager;
+
+  public ReplicationManagerMetrics(ReplicationManager manager) {
+    this.replicationManager = manager;
   }
 
-  public static ReplicationManagerMetrics create() {
+  public static ReplicationManagerMetrics create(ReplicationManager manager) {
     return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
         "SCM Replication manager (closed container replication) related "
             + "metrics",
-        new ReplicationManagerMetrics());
+        new ReplicationManagerMetrics(manager));
   }
 
   public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
-  public void setInflightReplication(long replications) {
-    this.inflightReplication.set(replications);
+  public void incrNumReplicationCmdsSent() {
+    this.numReplicationCmdsSent.incr();
   }
 
-  public void setInflightDeletion(long deletions) {
-    this.inflightDeletion.set(deletions);
+  public void incrNumReplicationCmdsCompleted() {
+    this.numReplicationCmdsCompleted.incr();
   }
 
-  public void incrNumReplicateCmdsSent() {
-    this.numReplicateCmdsSent.incr();
+  public void incrNumReplicationCmdsTimeout() {
+    this.numReplicationCmdsTimeout.incr();
   }
 
-  public void incrNumReplicateCmdsCompleted() {
-    this.numReplicateCmdsCompleted.incr();
+  public void incrNumDeletionCmdsSent() {
+    this.numDeletionCmdsSent.incr();
   }
 
-  public void incrNumReplicateCmdsTimeout() {
-    this.numReplicateCmdsTimeout.incr();
+  public void incrNumDeletionCmdsCompleted() {
+    this.numDeletionCmdsCompleted.incr();
   }
 
-  public void incrNumDeleteCmdsSent() {
-    this.numDeleteCmdsSent.incr();
+  public void incrNumDeletionCmdsTimeout() {
+    this.numDeletionCmdsTimeout.incr();
   }
 
-  public void incrNumDeleteCmdsCompleted() {
-    this.numDeleteCmdsCompleted.incr();
+  public void incrNumReplicationBytesTotal(long bytes) {
+    this.numReplicationBytesTotal.incr(bytes);
   }
 
-  public void incrNumDeleteCmdsTimeout() {
-    this.numDeleteCmdsTimeout.incr();
-  }
-
-  public void incrNumReplicateBytesTotal(long bytes) {
-    this.numReplicateBytesTotal.incr(bytes);
-  }
-
-  public void incrNumReplicateBytesCompleted(long bytes) {
-    this.numReplicateBytesCompleted.incr(bytes);
+  public void incrNumReplicationBytesCompleted(long bytes) {
+    this.numReplicationBytesCompleted.incr(bytes);
   }
 
   public long getInflightReplication() {
-    return this.inflightReplication.value();
+    return replicationManager.getInflightReplication().size();
   }
 
   public long getInflightDeletion() {
-    return this.inflightDeletion.value();
+    return replicationManager.getInflightDeletion().size();
   }
 
-  public long getNumReplicateCmdsSent() {
-    return this.numReplicateCmdsSent.value();
+  public long getNumReplicationCmdsSent() {
+    return this.numReplicationCmdsSent.value();
   }
 
-  public long getNumReplicateCmdsCompleted() {
-    return this.numReplicateCmdsCompleted.value();
+  public long getNumReplicationCmdsCompleted() {
+    return this.numReplicationCmdsCompleted.value();
   }
 
-  public long getNumReplicateCmdsTimeout() {
-    return this.numReplicateCmdsTimeout.value();
+  public long getNumReplicationCmdsTimeout() {
+    return this.numReplicationCmdsTimeout.value();
   }
 
-  public long getNumDeleteCmdsSent() {
-    return this.numDeleteCmdsSent.value();
+  public long getNumDeletionCmdsSent() {
+    return this.numDeletionCmdsSent.value();
   }
 
-  public long getNumDeleteCmdsCompleted() {
-    return this.numDeleteCmdsCompleted.value();
+  public long getNumDeletionCmdsCompleted() {
+    return this.numDeletionCmdsCompleted.value();
   }
 
-  public long getNumDeleteCmdsTimeout() {
-    return this.numDeleteCmdsTimeout.value();
+  public long getNumDeletionCmdsTimeout() {
+    return this.numDeletionCmdsTimeout.value();
   }
 
-  public long getNumReplicateBytesTotal() {
-    return this.numReplicateBytesTotal.value();
+  public long getNumReplicationBytesTotal() {
+    return this.numReplicationBytesTotal.value();
   }
 
-  public long getNumReplicateBytesCompleted() {
-    return this.numReplicateBytesCompleted.value();
+  public long getNumReplicationBytesCompleted() {
+    return this.numReplicationBytesCompleted.value();
   }
 }

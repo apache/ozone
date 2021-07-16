@@ -214,7 +214,7 @@ public class ReplicationManager implements SCMService {
   public synchronized void start() {
 
     if (!isRunning()) {
-      metrics = ReplicationManagerMetrics.create();
+      metrics = ReplicationManagerMetrics.create(this);
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
       replicationMonitor = new Thread(this::run);
@@ -353,21 +353,19 @@ public class ReplicationManager implements SCMService {
         updateInflightAction(container, inflightReplication,
             action -> replicas.stream()
                 .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
-            ()-> metrics.incrNumReplicateCmdsTimeout(),
+            ()-> metrics.incrNumReplicationCmdsTimeout(),
             () -> {
-              metrics.incrNumReplicateCmdsCompleted();
-              metrics.incrNumReplicateBytesCompleted(container.getUsedBytes());
+              metrics.incrNumReplicationCmdsCompleted();
+              metrics.incrNumReplicationBytesCompleted(
+                  container.getUsedBytes());
             });
 
         updateInflightAction(container, inflightDeletion,
             action -> replicas.stream()
                 .noneMatch(r ->
                     r.getDatanodeDetails().equals(action.datanode)),
-            () -> metrics.incrNumDeleteCmdsTimeout(),
-            () -> metrics.incrNumDeleteCmdsCompleted());
-
-        metrics.setInflightReplication(inflightReplication.size());
-        metrics.setInflightDeletion(inflightDeletion.size());
+            () -> metrics.incrNumDeletionCmdsTimeout(),
+            () -> metrics.incrNumDeletionCmdsCompleted());
 
         /*
          * If container is under deleting and all it's replicas are deleted,
@@ -1047,8 +1045,6 @@ public class ReplicationManager implements SCMService {
     LOG.info("Sending replicate container command for container {}" +
             " to datanode {} from datanodes {}",
         container.containerID(), datanode, sources);
-    metrics.incrNumReplicateCmdsSent();
-    metrics.incrNumReplicateBytesTotal(container.getUsedBytes());
 
     final ContainerID id = container.containerID();
     final ReplicateContainerCommand replicateCommand =
@@ -1056,6 +1052,9 @@ public class ReplicationManager implements SCMService {
     inflightReplication.computeIfAbsent(id, k -> new ArrayList<>());
     sendAndTrackDatanodeCommand(datanode, replicateCommand,
         action -> inflightReplication.get(id).add(action));
+
+    metrics.incrNumReplicationCmdsSent();
+    metrics.incrNumReplicationBytesTotal(container.getUsedBytes());
   }
 
   /**
@@ -1072,7 +1071,6 @@ public class ReplicationManager implements SCMService {
 
     LOG.info("Sending delete container command for container {}" +
             " to datanode {}", container.containerID(), datanode);
-    metrics.incrNumDeleteCmdsSent();
 
     final ContainerID id = container.containerID();
     final DeleteContainerCommand deleteCommand =
@@ -1080,6 +1078,8 @@ public class ReplicationManager implements SCMService {
     inflightDeletion.computeIfAbsent(id, k -> new ArrayList<>());
     sendAndTrackDatanodeCommand(datanode, deleteCommand,
         action -> inflightDeletion.get(id).add(action));
+
+    metrics.incrNumDeletionCmdsSent();
   }
 
   /**
@@ -1291,5 +1291,13 @@ public class ReplicationManager implements SCMService {
 
   public ReplicationManagerMetrics getMetrics() {
     return this.metrics;
+  }
+
+  public Map<ContainerID, List<InflightAction>> getInflightReplication() {
+    return inflightReplication;
+  }
+
+  public Map<ContainerID, List<InflightAction>> getInflightDeletion() {
+    return inflightDeletion;
   }
 }
