@@ -529,9 +529,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
           if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
             iter.remove();
             updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
-                id, a.datanode, inflightActions);
+                container, a.datanode, inflightActions);
           }
-        } catch (NodeNotFoundException e) {
+        } catch (NodeNotFoundException | ContainerNotFoundException e) {
           // Should not happen, but if it does, just remove the action as the
           // node somehow does not exist;
           iter.remove();
@@ -549,16 +549,18 @@ public class ReplicationManager implements MetricsSource, SCMService {
    * @param isUnhealthy is the datanode unhealthy
    * @param isCompleted is the action completed
    * @param isTimeout is the action timeout
-   * @param id Container to update
+   * @param container Container to update
    * @param dn datanode which is removed from the inflightActions
    * @param inflightActions inflightReplication (or) inflightDeletion
    */
   private void updateMoveIfNeeded(final boolean isUnhealthy,
                    final boolean isCompleted, final boolean isTimeout,
-                   final ContainerID id, final DatanodeDetails dn,
+                   final ContainerInfo container, final DatanodeDetails dn,
                    final Map<ContainerID,
-                       List<InflightAction>> inflightActions) {
+                       List<InflightAction>> inflightActions)
+      throws ContainerNotFoundException {
     // make sure inflightMove contains the container
+    ContainerID id = container.containerID();
     if (!inflightMove.containsKey(id)) {
       return;
     }
@@ -603,7 +605,6 @@ public class ReplicationManager implements MetricsSource, SCMService {
       return;
     }
 
-    //if replication is completed , nothing to do
     if (!(isInflightReplication && isCompleted)) {
       if (isInflightReplication) {
         if (isUnhealthy) {
@@ -627,6 +628,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
       }
       inflightMove.remove(id);
       inflightMoveFuture.remove(id);
+    } else {
+      handleMove(container,
+          containerManager.getContainerReplicas(id));
     }
   }
 
@@ -1169,78 +1173,61 @@ public class ReplicationManager implements MetricsSource, SCMService {
         }
       }
       eligibleReplicas.removeAll(unhealthyReplicas);
-
-      excess -= handleMoveIfNeeded(container, eligibleReplicas);
-
       removeExcessReplicasIfNeeded(excess, container, eligibleReplicas);
     }
   }
 
   /**
-   * if the container is in inflightMove, handle move if needed.
+   * if the container is in inflightMove, handle move.
    *
    * @param cif ContainerInfo
-   * @param eligibleReplicas An list of replicas, which may have excess replicas
-   * @return minus how many replica is removed through sending delete command
+   * @param replicaSet An Set of replicas, which may have excess replicas
    */
-  private int handleMoveIfNeeded(final ContainerInfo cif,
-                   final List<ContainerReplica> eligibleReplicas) {
-    int minus = 0;
+  private void handleMove(final ContainerInfo cif,
+                   final Set<ContainerReplica> replicaSet) {
     final ContainerID cid = cif.containerID();
-    if (!inflightMove.containsKey(cid)) {
-      return minus;
-    }
+    if (inflightMove.containsKey(cid)) {
+      Pair<DatanodeDetails, DatanodeDetails> movePair =
+          inflightMove.get(cid);
+      final DatanodeDetails srcDn = movePair.getKey();
+      ContainerReplicaCount replicaCount =
+          getContainerReplicaCount(cif, replicaSet);
 
-    Pair<DatanodeDetails, DatanodeDetails> movePair =
-        inflightMove.get(cid);
+      if(!replicaSet.stream()
+          .anyMatch(r -> r.getDatanodeDetails().equals(srcDn))){
+        // if the target is present but source disappears somehow,
+        // we can consider move is successful.
+        inflightMoveFuture.get(cid).complete(MoveResult.COMPLETED);
+        inflightMove.remove(cid);
+        inflightMoveFuture.remove(cid);
+        return;
+      }
 
-    final DatanodeDetails srcDn = movePair.getKey();
-    final DatanodeDetails targetDn = movePair.getValue();
-    boolean isSourceDnInReplicaSet;
-    boolean isTargetDnInReplicaSet;
-
-    isSourceDnInReplicaSet = eligibleReplicas.stream()
-        .anyMatch(r -> r.getDatanodeDetails().equals(srcDn));
-    isTargetDnInReplicaSet = eligibleReplicas.stream()
-        .anyMatch(r -> r.getDatanodeDetails().equals(targetDn));
-
-    // if target datanode is not in replica set , nothing to do
-    if (isTargetDnInReplicaSet) {
-      Set<ContainerReplica> eligibleReplicaSet =
-          eligibleReplicas.stream().collect(Collectors.toSet());
       int replicationFactor =
           cif.getReplicationConfig().getRequiredNodes();
       ContainerPlacementStatus currentCPS =
-          getPlacementStatus(eligibleReplicaSet, replicationFactor);
-      eligibleReplicaSet.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
-      ContainerPlacementStatus afterMoveCPS =
-          getPlacementStatus(eligibleReplicaSet, replicationFactor);
+          getPlacementStatus(replicaSet, replicationFactor);
+      Set<ContainerReplica> newReplicaSet = replicaSet.
+          stream().collect(Collectors.toSet());
+      newReplicaSet.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
+      ContainerPlacementStatus newCPS =
+          getPlacementStatus(newReplicaSet, replicationFactor);
 
-      if (isSourceDnInReplicaSet &&
-          isPlacementStatusActuallyEqual(currentCPS, afterMoveCPS)) {
+      if (replicaCount.isOverReplicated() &&
+          isPlacementStatusActuallyEqual(currentCPS, newCPS)) {
         sendDeleteCommand(cif, srcDn, true);
-        eligibleReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
-        minus++;
       } else {
-        if (!isSourceDnInReplicaSet) {
-          // if the target is present, and source disappears somehow,
-          // we can consider move is successful.
-          inflightMoveFuture.get(cid).complete(MoveResult.COMPLETED);
-        } else {
-          // if source and target datanode are both in the replicaset,
-          // but we can not delete source datanode for now (e.g.,
-          // there is only 3 replicas or not policy-statisfied , etc.),
-          // we just complete the future without sending a delete command.
-          LOG.info("can not remove source replica after successfully " +
-              "replicated to target datanode");
-          inflightMoveFuture.get(cid).complete(MoveResult.DELETE_FAIL_POLICY);
-        }
+        // if source and target datanode are both in the replicaset,
+        // but we can not delete source datanode for now (e.g.,
+        // there is only 3 replicas or not policy-statisfied , etc.),
+        // we just complete the future without sending a delete command.
+        LOG.info("can not remove source replica after successfully " +
+            "replicated to target datanode");
+        inflightMoveFuture.get(cid).complete(MoveResult.DELETE_FAIL_POLICY);
         inflightMove.remove(cid);
         inflightMoveFuture.remove(cid);
       }
     }
-
-    return minus;
   }
 
   /**

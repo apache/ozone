@@ -1143,6 +1143,47 @@ public class TestReplicationManager {
   }
 
   /**
+   * make sure RM does not delete replica if placement policy is not satisfied.
+   */
+  @Test
+  public void testMoveNotDeleteSrcIfPolicyNotSatisfied()
+      throws SCMException, NodeNotFoundException,
+      InterruptedException, ExecutionException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    ContainerID id = container.containerID();
+    ContainerReplica dn1 = addReplica(container,
+        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    ContainerReplica dn2 = addReplica(container,
+        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container,
+        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    DatanodeDetails dn4 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
+    CompletableFuture<MoveResult> cf =
+        replicationManager.move(id, dn1.getDatanodeDetails(), dn4);
+    Assert.assertTrue(scmLogs.getOutput().contains(
+        "receive a move request about container"));
+    Assert.assertTrue(datanodeCommandHandler.received(
+        SCMCommandProto.Type.replicateContainerCommand, dn4));
+    Assert.assertEquals(1, datanodeCommandHandler.getInvocationCount(
+        SCMCommandProto.Type.replicateContainerCommand));
+
+    //replicate container to dn4
+    addReplicaToDn(container, dn4, CLOSED);
+    //now, replication succeeds, but replica in dn2 lost,
+    //and there are only tree replicas totally, so rm should
+    //not delete the replica on dn1
+    containerStateManager.removeContainerReplica(id, dn2);
+    replicationManager.processContainersNow();
+    Thread.sleep(100L);
+
+    Assert.assertFalse(datanodeCommandHandler.received(
+        SCMCommandProto.Type.deleteContainerCommand, dn1.getDatanodeDetails()));
+
+    Assert.assertTrue(cf.isDone() && cf.get() == MoveResult.DELETE_FAIL_POLICY);
+  }
+
+
+  /**
    * test src and target datanode become unhealthy when moving.
    */
   @Test
