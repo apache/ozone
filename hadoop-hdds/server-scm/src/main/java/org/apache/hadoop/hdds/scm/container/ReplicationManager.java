@@ -1168,7 +1168,7 @@ public class ReplicationManager implements SCMService {
   /**
    * Wrapper class to hold the InflightAction with its start time.
    */
-  private static final class InflightAction {
+  static final class InflightAction {
 
     private final DatanodeDetails datanode;
     private final long time;
@@ -1177,6 +1177,11 @@ public class ReplicationManager implements SCMService {
                            final long time) {
       this.datanode = datanode;
       this.time = time;
+    }
+
+    @VisibleForTesting
+    public DatanodeDetails getDatanode() {
+      return datanode;
     }
   }
 
