@@ -78,6 +78,7 @@ public class DatanodeConfiguration {
   private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
+  static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -91,6 +92,30 @@ public class DatanodeConfiguration {
           "on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+
+  /**
+   * The maximum number of threads used to handle delete block commands.
+   */
+  @Config(key = "block.delete.threads.max",
+      type = ConfigType.INT,
+      defaultValue = "5",
+      tags = {DATANODE},
+      description = "The maximum number of threads used to handle delete " +
+          " blocks on a datanode"
+  )
+  private int blockDeleteThreads = BLOCK_DELETE_THREADS_DEFAULT;
+
+  /**
+   * The maximum number of commands in queued list.
+   */
+  @Config(key = "block.delete.queue.limit",
+      type = ConfigType.INT,
+      defaultValue = "3600",
+      tags = {DATANODE},
+      description = "The maximum number of block delete commands queued on "+
+          " a datanode"
+  )
+  private int blockDeleteQueueLimit = 3600;
 
   @Config(key = "block.deleting.service.interval",
           defaultValue = "60s",
@@ -291,5 +316,21 @@ public class DatanodeConfiguration {
 
   public void setDiskCheckTimeout(Duration duration) {
     this.diskCheckTimeout = duration.toMillis();
+  }
+
+  public int getBlockDeleteThreads() {
+    return blockDeleteThreads;
+  }
+
+  public void setBlockDeleteThreads(int threads) {
+    this.blockDeleteThreads = threads;
+  }
+
+  public int getBlockDeleteQueueLimit() {
+    return blockDeleteQueueLimit;
+  }
+
+  public void setBlockDeleteQueueLimit(int queueLimit) {
+    this.blockDeleteQueueLimit = queueLimit;
   }
 }

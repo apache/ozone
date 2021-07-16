@@ -56,9 +56,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -82,6 +82,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_I
 import static org.apache.hadoop.hdds
     .HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone
     .OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -103,8 +104,8 @@ public class TestBlockDeletion {
   private static long maxTransactionId = 0;
   private static File baseDir;
 
-  @BeforeClass
-  public static void init() throws Exception {
+  @Before
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
@@ -138,11 +139,12 @@ public class TestBlockDeletion {
         3, TimeUnit.SECONDS);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         false);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.setInt(OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 100);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setQuietMode(false);
     conf.setTimeDuration("hdds.scm.replication.event.timeout", 100,
         TimeUnit.MILLISECONDS);
+    conf.setInt("hdds.datanode.block.delete.threads.max", 5);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setHbInterval(200)
@@ -154,8 +156,8 @@ public class TestBlockDeletion {
     containerIdsWithDeletedBlocks = new HashSet<>();
   }
 
-  @AfterClass
-  public static void cleanup() throws IOException {
+  @After
+  public void cleanup() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -434,5 +436,70 @@ public class TestBlockDeletion {
         containerIdsWithDeletedBlocks.add(blockID.getContainerID());
       }, omKeyLocationInfoGroups);
     }
+  }
+
+  @Test
+  public void testBlockDeleteCommandParallelProcess() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = RandomStringUtils.random(64 * 1024);
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    int keyCount = 1000;
+    List<String> keys = new ArrayList<>();
+    for (int j = 0; j < keyCount; j++) {
+      String keyName = UUID.randomUUID().toString();
+      OzoneOutputStream out = bucket.createKey(keyName,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS,
+          ReplicationFactor.THREE, new HashMap<>());
+      out.write(value.getBytes(UTF_8));
+      out.close();
+      keys.add(keyName);
+    }
+
+    // close the containers which hold the blocks for the key
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
+    Thread.sleep(2000);
+
+    for (int j = 0; j < keyCount; j++) {
+      OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+          .setBucketName(bucketName).setKeyName(keys.get(j)).setDataSize(0)
+          .setReplicationConfig(
+              new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+          .setRefreshPipeline(true)
+          .build();
+      om.deleteKey(keyArgs);
+    }
+
+    // Wait for block delete command sent from OM
+    GenericTestUtils.waitFor(() -> {
+      try {
+        if (scm.getScmBlockManager().getDeletedBlockLog()
+            .getNumOfValidTransactions() > 0) {
+          return true;
+        }
+      } catch (IOException e) {
+      }
+      return false;
+    }, 100, 5000);
+
+    long start = System.currentTimeMillis();
+    // Wait for all blocks been deleted.
+    GenericTestUtils.waitFor(() -> {
+      try {
+        if (scm.getScmBlockManager().getDeletedBlockLog()
+            .getNumOfValidTransactions() == 0) {
+          return true;
+        }
+      } catch (IOException e) {
+      }
+      return false;
+    }, 100, 30000);
+    long end = System.currentTimeMillis();
+    System.out.println("Block deletion costs " + (end - start) + "ms");
   }
 }
