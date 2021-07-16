@@ -17,111 +17,80 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import javax.net.ssl.SSLException;
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.stream.StreamingServer;
 
-import org.apache.ratis.thirdparty.io.grpc.Server;
-import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
-import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
-import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
-import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
-import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.net.ssl.SSLException;
 
 /**
  * Separated network server for server2server container replication.
  */
 public class ReplicationServer {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReplicationServer.class);
-
-  private Server server;
-
   private SecurityConfig secConf;
 
   private CertificateClient caClient;
 
-  private ContainerController controller;
+  private ContainerSet containerSet;
 
   private int port;
 
+  private StreamingServer server;
+
   public ReplicationServer(
-      ContainerController controller,
+      ContainerSet containerSet,
       ReplicationConfig replicationConfig,
       SecurityConfig secConf,
       CertificateClient caClient
   ) {
     this.secConf = secConf;
     this.caClient = caClient;
-    this.controller = controller;
+    this.containerSet = containerSet;
     this.port = replicationConfig.getPort();
     init();
   }
 
   public void init() {
-    NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
-        .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .addService(ServerInterceptors.intercept(new GrpcReplicationService(
-            new OnDemandContainerReplicationSource(controller)
-        ), new GrpcServerInterceptor()));
-
     if (secConf.isSecurityEnabled()) {
       try {
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(
-            caClient.getPrivateKey(), caClient.getCertificate());
-
-        sslContextBuilder = GrpcSslContexts.configure(
-            sslContextBuilder, secConf.getGrpcSslProvider());
-
-        sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        sslContextBuilder.trustManager(caClient.getCACertificate());
-
-        nettyServerBuilder.sslContext(sslContextBuilder.build());
+        SslContextBuilder sslContextBuilder = SslContextBuilder
+            .forServer(caClient.getPrivateKey(), caClient.getCertificate())
+            .trustManager(caClient.getCACertificate())
+            .clientAuth(ClientAuth.REQUIRE);
+        final SslContext sslContext = sslContextBuilder.build();
+        server = new StreamingServer(new ContainerStreamingSource(containerSet),
+            this.port, sslContext);
       } catch (SSLException ex) {
         throw new IllegalArgumentException(
             "Unable to setup TLS for secure datanode replication GRPC "
                 + "endpoint.", ex);
       }
+    } else {
+      server = new StreamingServer(new ContainerStreamingSource(containerSet),
+          this.port);
     }
-
-    server = nettyServerBuilder.build();
   }
 
   public void start() throws IOException {
     server.start();
-
-    if (port == 0) {
-      LOG.info("{} is started using port {}", getClass().getSimpleName(),
-          server.getPort());
-    }
-
-    port = server.getPort();
-
   }
 
   public void stop() {
-    try {
-      server.shutdown().awaitTermination(10L, TimeUnit.SECONDS);
-    } catch (InterruptedException ex) {
-      LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
-      Thread.currentThread().interrupt();
-    }
+    server.stop();
   }
 
   public int getPort() {
-    return port;
+    return server.getPort();
   }
 
   /**
@@ -144,5 +113,4 @@ public class ReplicationServer {
       return this;
     }
   }
-
 }

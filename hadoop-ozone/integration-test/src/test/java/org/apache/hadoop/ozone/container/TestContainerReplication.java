@@ -18,24 +18,7 @@
 
 package org.apache.hadoop.ozone.container;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -44,18 +27,22 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-
+import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -66,6 +53,25 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.event.Level;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 
 /**
  * Tests ozone containers replication.
@@ -107,9 +113,33 @@ public class TestContainerReplication {
     GenericTestUtils.setLogLevel(SCMContainerPlacementRackAware.LOG,
         Level.DEBUG);
     OzoneConfiguration conf = createConfiguration();
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
+        5, TimeUnit.SECONDS);
+
+    OzoneManager.setTestSecureOmFlag(true);
+    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
+    conf.setBoolean("ozone.security.enabled", true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
+        OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+
+    CertificateClientTestImpl certificateClientTest =
+        new CertificateClientTestImpl(conf);
+
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
 
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
+        .setCertificateClient(certificateClientTest)
+        .build();
+
+    OzoneBlockTokenSecretManager secretManager =
+        new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
+            60 * 60, certificateClientTest.getCertificate().
+            getSerialNumber().toString());
+    secretManager.start(certificateClientTest);
+    cluster.getOzoneManager().startSecretManager();
+
     cluster.waitForClusterToBeReady();
 
     client = OzoneClientFactory.getRpcClient(conf);

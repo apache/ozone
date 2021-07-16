@@ -19,37 +19,35 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-
-import java.io.IOException;
-import java.util.Collections;
-
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.yaml.snakeyaml.nodes.Tag;
 
-
 import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Math.max;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
-import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
-import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
+import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
+import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -63,9 +61,6 @@ public class KeyValueContainerData extends ContainerData {
 
   // Fields need to be stored in .container file.
   private static final List<String> KV_YAML_FIELDS;
-
-  // Path to Container metadata Level DB/RocksDB Store and .container file.
-  private String metadataPath;
 
   //Type of DB used to store key to chunks mapping
   private String containerDBType = CONTAINER_DB_TYPE_ROCKSDB;
@@ -93,27 +88,32 @@ public class KeyValueContainerData extends ContainerData {
     KV_YAML_FIELDS.add(SCHEMA_VERSION);
   }
 
+  public KeyValueContainerData(long id) {
+    this(id, ChunkLayOutVersion.FILE_PER_BLOCK, 0, "", "");
+  }
+
+  public KeyValueContainerData(long id, String metadataPath) {
+    this(id, ChunkLayOutVersion.FILE_PER_BLOCK, 0, "", "");
+    setMetadataPath(metadataPath);
+  }
+
   /**
    * Constructs KeyValueContainerData object.
-   * @param id - ContainerId
+   *
+   * @param id            - ContainerId
    * @param layOutVersion chunk layout
-   * @param size - maximum size of the container in bytes
+   * @param size          - maximum size of the container in bytes
    */
-  public KeyValueContainerData(long id, ChunkLayOutVersion layOutVersion,
-      long size, String originPipelineId, String originNodeId) {
+  public KeyValueContainerData(
+      long id, ChunkLayOutVersion layOutVersion,
+      long size, String originPipelineId, String originNodeId
+  ) {
     super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
         size, originPipelineId, originNodeId);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
   }
 
-  public KeyValueContainerData(ContainerData source) {
-    super(source);
-    Preconditions.checkArgument(source.getContainerType()
-        == ContainerProtos.ContainerType.KeyValueContainer);
-    this.numPendingDeletionBlocks = new AtomicLong(0);
-    this.deleteTransactionId = 0;
-  }
 
   /**
    * @param version The schema version indicating the table layout of the
@@ -149,29 +149,12 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
-   * Returns container metadata path.
-   * @return - Physical path where container file and checksum is stored.
-   */
-  public String getMetadataPath() {
-    return metadataPath;
-  }
-
-  /**
-   * Sets container metadata path.
-   *
-   * @param path - String.
-   */
-  public void setMetadataPath(String path) {
-    this.metadataPath = path;
-  }
-
-  /**
    * Returns the path to base dir of the container.
    * @return Path to base dir
    */
   @Override
   public String getContainerPath() {
-    return new File(metadataPath).getParent();
+    return new File(getMetadataPath()).getParent();
   }
 
   /**
@@ -295,12 +278,39 @@ public class KeyValueContainerData extends ContainerData {
 
     // Set Bytes used and block count key.
     metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED,
-            getBytesUsed());
+        getBytesUsed());
     metadataTable.putWithBatch(batchOperation, BLOCK_COUNT,
-            getKeyCount() - deletedBlockCount);
+        getKeyCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, PENDING_DELETE_BLOCK_COUNT,
-            (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
+        (long) (getNumPendingDeletionBlocks() - deletedBlockCount));
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
+  }
+
+  public void assignToVolume(String clusterId, HddsVolume containerVolume) {
+    String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+
+    File containerMetaDataPath = KeyValueContainerLocationUtil
+        .getContainerMetaDataPath(hddsVolumeDir, clusterId, getContainerID());
+    setMetadataPath(containerMetaDataPath.getPath());
+
+    File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
+        hddsVolumeDir, clusterId, getContainerID());
+
+    //Set containerData for the KeyValueContainer.
+    setChunksPath(chunksPath.getPath());
+    setDbFile(getContainerDBFile());
+    setVolume(containerVolume);
+
+  }
+
+  /**
+   * Returns container DB file.
+   *
+   * @return
+   */
+  public File getContainerDBFile() {
+    return new File(getMetadataPath(),
+        getContainerID() + OzoneConsts.DN_CONTAINER_DB);
   }
 }

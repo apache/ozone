@@ -75,8 +75,7 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     subcommands = {
         ListSubcommand.class,
-        InfoSubcommand.class,
-        ExportSubcommand.class,
+        InfoSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ContainerCommands implements Callable<Void>, SubcommandWithParent {

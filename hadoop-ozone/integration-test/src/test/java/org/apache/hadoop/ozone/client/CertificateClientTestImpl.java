@@ -28,7 +28,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
@@ -49,10 +49,10 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   private final SecurityConfig securityConfig;
   private final KeyPair keyPair;
-  private final OzoneConfiguration config;
+  private final ConfigurationSource config;
   private final X509Certificate x509Certificate;
 
-  public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
+  public CertificateClientTestImpl(ConfigurationSource conf) throws Exception {
     securityConfig = new SecurityConfig(conf);
     HDDSKeyGenerator keyGen =
         new HDDSKeyGenerator(securityConfig.getConfiguration());

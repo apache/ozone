@@ -16,47 +16,38 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
-
+import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-
-import com.codahale.metrics.Timer;
 import org.jetbrains.annotations.NotNull;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 /**
  * Utility to replicated closed container with datanode code.
@@ -108,10 +99,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
       final ContainerWithPipeline containerWithPipeline =
           containerOperationClient
-              .getContainerWithPipeline(container.getContainerID());
+              .getContainerWithPipeline(
+                  container.containerID().getId());
 
       if (container.getState() == LifeCycleState.CLOSED) {
-
         final List<DatanodeDetails> datanodesWithContainer =
             containerWithPipeline.getPipeline().getNodes();
 
@@ -127,7 +118,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               datanodesWithContainer));
         }
       }
-
+      if (replicationTasks.size() >= getTestNo()) {
+        break;
+      }
     }
 
     //important: override the max number of tasks.
@@ -169,38 +162,19 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
 
-    ContainerSet containerSet = new ContainerSet();
+    String fakeClusterId = UUID.randomUUID().toString();
 
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    ContainerSet containerSet = new ContainerSet();
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
-    Map<ContainerType, Handler> handlers = new HashMap<>();
-
-    for (ContainerType containerType : ContainerType.values()) {
-      final Handler handler =
-          Handler.getHandlerForContainerType(
-              containerType,
-              conf,
-              fakeDatanodeUuid,
-              containerSet,
-              volumeSet,
-              metrics,
-              containerReplicaProto -> {
-              });
-      handler.setClusterID(UUID.randomUUID().toString());
-      handlers.put(containerType, handler);
-    }
-
-    ContainerController controller =
-        new ContainerController(containerSet, handlers);
-
     ContainerReplicator replicator =
-        new DownloadAndImportReplicator(containerSet,
-            controller,
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
+        new DownloadAndImportReplicator(conf,
+            () -> fakeClusterId,
+            containerSet,
+            volumeSet,
+            null);
 
     supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
   }

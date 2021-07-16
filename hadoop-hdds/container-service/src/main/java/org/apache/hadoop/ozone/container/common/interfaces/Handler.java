@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.container.common.interfaces;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -31,12 +29,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
 /**
  * Dispatcher sends ContainerCommandRequests to Handler. Each Container Type
@@ -105,23 +101,6 @@ public abstract class Handler {
   public abstract ContainerCommandResponseProto handle(
       ContainerCommandRequestProto msg, Container container,
       DispatcherContext dispatcherContext);
-
-  /**
-   * Imports container from a raw input stream.
-   */
-  public abstract Container importContainer(
-      ContainerData containerData, InputStream rawContainerStream,
-      TarContainerPacker packer)
-      throws IOException;
-
-  /**
-   * Exports container to the output stream.
-   */
-  public abstract void exportContainer(
-      Container container,
-      OutputStream outputStream,
-      TarContainerPacker packer)
-      throws IOException;
 
   /**
    * Stop the Handler.

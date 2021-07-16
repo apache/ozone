@@ -23,58 +23,43 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume
-    .RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyOptions;
 
 import java.io.File;
-
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -149,96 +134,6 @@ public class TestKeyValueContainer {
         "DB does not exist");
   }
 
-  @Test
-  public void testContainerImportExport() throws Exception {
-    long containerId = keyValueContainer.getContainerData().getContainerID();
-    createContainer();
-    long numberOfKeysToWrite = 12;
-    closeContainer();
-    populate(numberOfKeysToWrite);
-
-    //destination path
-    File folderToExport = folder.newFile("exported.tar.gz");
-
-    TarContainerPacker packer = new TarContainerPacker();
-
-    //export the container
-    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
-      keyValueContainer
-          .exportContainerData(fos, packer);
-    }
-
-    //delete the original one
-    keyValueContainer.delete();
-
-    //create a new one
-    KeyValueContainerData containerData =
-        new KeyValueContainerData(containerId,
-            keyValueContainerData.getLayOutVersion(),
-            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
-            datanodeId.toString());
-    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
-
-    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-
-    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
-    try (FileInputStream fis = new FileInputStream(folderToExport)) {
-      container.importContainerData(fis, packer);
-    }
-
-    assertEquals("value1", containerData.getMetadata().get("key1"));
-    assertEquals(keyValueContainerData.getContainerDBType(),
-        containerData.getContainerDBType());
-    assertEquals(keyValueContainerData.getState(),
-        containerData.getState());
-    assertEquals(numberOfKeysToWrite,
-        containerData.getKeyCount());
-    assertEquals(keyValueContainerData.getLayOutVersion(),
-        containerData.getLayOutVersion());
-    assertEquals(keyValueContainerData.getMaxSize(),
-        containerData.getMaxSize());
-    assertEquals(keyValueContainerData.getBytesUsed(),
-        containerData.getBytesUsed());
-
-    //Can't overwrite existing container
-    try {
-      try (FileInputStream fis = new FileInputStream(folderToExport)) {
-        container.importContainerData(fis, packer);
-      }
-      fail("Container is imported twice. Previous files are overwritten");
-    } catch (IOException ex) {
-      //all good
-      assertTrue(container.getContainerFile().exists());
-    }
-
-    //Import failure should cleanup the container directory
-    containerData =
-        new KeyValueContainerData(containerId + 1,
-            keyValueContainerData.getLayOutVersion(),
-            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
-            datanodeId.toString());
-    container = new KeyValueContainer(containerData, CONF);
-
-    containerVolume = volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
-    try {
-      FileInputStream fis = new FileInputStream(folderToExport);
-      fis.close();
-      container.importContainerData(fis, packer);
-      fail("Container import should fail");
-    } catch (Exception ex) {
-      assertTrue(ex instanceof IOException);
-    } finally {
-      File directory =
-          new File(container.getContainerData().getContainerPath());
-      assertFalse(directory.exists());
-    }
-  }
-
   /**
    * Create the container on disk.
    */
@@ -279,35 +174,6 @@ public class TestKeyValueContainer {
         ContainerProtos.ContainerDataProto.State.CLOSED);
   }
 
-  @Test
-  public void concurrentExport() throws Exception {
-    createContainer();
-    populate(100);
-    closeContainer();
-
-    AtomicReference<String> failed = new AtomicReference<>();
-
-    TarContainerPacker packer = new TarContainerPacker();
-    List<Thread> threads = IntStream.range(0, 20)
-        .mapToObj(i -> new Thread(() -> {
-          try {
-            File file = folder.newFile("concurrent" + i + ".tar.gz");
-            try (OutputStream out = new FileOutputStream(file)) {
-              keyValueContainer.exportContainerData(out, packer);
-            }
-          } catch (Exception e) {
-            failed.compareAndSet(null, e.getMessage());
-          }
-        }))
-        .collect(Collectors.toList());
-
-    threads.forEach(Thread::start);
-    for (Thread thread : threads) {
-      thread.join();
-    }
-
-    assertNull(failed.get());
-  }
 
   @Test
   public void testDuplicateContainer() throws Exception {

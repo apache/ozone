@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,7 +54,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -892,34 +889,6 @@ public class KeyValueHandler extends Handler {
     String msg = "Requested operation not allowed as ContainerState is " +
         containerState;
     throw new StorageContainerException(msg, result);
-  }
-
-  @Override
-  public Container importContainer(ContainerData originalContainerData,
-      final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
-
-    KeyValueContainerData containerData =
-        new KeyValueContainerData(originalContainerData);
-
-    KeyValueContainer container = new KeyValueContainer(containerData,
-        conf);
-
-    populateContainerPathFields(container);
-    container.importContainerData(rawContainerStream, packer);
-    sendICR(container);
-    return container;
-
-  }
-
-  @Override
-  public void exportContainer(final Container container,
-      final OutputStream outputStream,
-      final TarContainerPacker packer)
-      throws IOException{
-    final KeyValueContainer kvc = (KeyValueContainer) container;
-    kvc.exportContainerData(outputStream, packer);
   }
 
   @Override

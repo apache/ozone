@@ -17,25 +17,18 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Iterator;
+import java.util.Map;
+
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.time.Instant;
-import java.util.Iterator;
-import java.util.Map;
 
 /**
  * Control plane for container management in datanode.
@@ -128,22 +121,6 @@ public class ContainerController {
   public void closeContainer(final long containerId) throws IOException {
     final Container container = containerSet.getContainer(containerId);
     getHandler(container).closeContainer(container);
-  }
-
-  public Container importContainer(
-      final ContainerData containerData,
-      final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
-    return handlers.get(containerData.getContainerType())
-        .importContainer(containerData, rawContainerStream, packer);
-  }
-
-  public void exportContainer(final ContainerType type,
-      final long containerId, final OutputStream outputStream,
-      final TarContainerPacker packer) throws IOException {
-    handlers.get(type).exportContainer(
-        containerSet.getContainer(containerId), outputStream, packer);
   }
 
   /**

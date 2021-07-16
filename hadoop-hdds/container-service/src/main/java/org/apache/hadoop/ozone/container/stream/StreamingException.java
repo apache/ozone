@@ -24,7 +24,7 @@ import java.io.IOException;
  */
 public class StreamingException extends RuntimeException {
 
-  public StreamingException(InterruptedException ex) {
+  public StreamingException(Exception ex) {
     super(ex);
   }
 
@@ -34,5 +34,9 @@ public class StreamingException extends RuntimeException {
 
   public StreamingException(String s) {
     super(s);
+  }
+
+  public StreamingException(Throwable cause) {
+    super(cause);
   }
 }

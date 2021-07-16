@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
@@ -43,7 +41,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -56,7 +53,6 @@ import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -115,35 +111,27 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           maxSize);
-      String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
       long containerID = containerData.getContainerID();
 
-      containerMetaDataPath = KeyValueContainerLocationUtil
-          .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerID);
-      containerData.setMetadataPath(containerMetaDataPath.getPath());
+      containerData.assignToVolume(clusterId, containerVolume);
 
-      File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-          hddsVolumeDir, clusterId, containerID);
-
+      containerMetaDataPath = new File(containerData.getMetadataPath());
       // Check if it is new Container.
       ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
-
-      //Create Metadata path chunks path and metadata db
-      File dbFile = getContainerDBFile();
 
       // This method is only called when creating new containers.
       // Therefore, always use the newest schema version.
       containerData.setSchemaVersion(
           DatanodeMetadataFeatures.getSchemaVersion());
       KeyValueContainerUtil.createContainerMetaData(containerID,
-              containerMetaDataPath, chunksPath, dbFile,
-              containerData.getSchemaVersion(), config);
+          containerMetaDataPath,
+          new File(containerData.getChunksPath()),
+          containerData.getDbFile(),
+          containerData.getSchemaVersion(),
+          config);
 
-      //Set containerData for the KeyValueContainer.
-      containerData.setChunksPath(chunksPath.getPath());
-      containerData.setDbFile(dbFile);
-      containerData.setVolume(containerVolume);
+
 
       // Create .container file
       File containerFile = getContainerFile();
@@ -216,6 +204,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     File tempContainerFile = null;
     long containerId = containerData.getContainerID();
     try {
+      Files.createDirectories(containerFile.getParentFile().toPath());
       tempContainerFile = createTempFile(containerFile);
       ContainerDataYaml.createContainerFile(
           ContainerType.KeyValueContainer, containerData, tempContainerFile);
@@ -376,9 +365,19 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
   }
 
+  public void release() throws StorageContainerException {
+    writeLock();
+    try {
+      compactDB();
+      BlockUtils.removeDB(containerData, config);
+    } finally {
+      writeUnlock();
+    }
+  }
+
   private void compactDB() throws StorageContainerException {
     try {
-      try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+      try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
         db.getStore().compactDB();
       }
     } catch (StorageContainerException ex) {
@@ -432,7 +431,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     // to flush the update container data to disk.
     long containerId = containerData.getContainerID();
     if(!containerData.isValid()) {
-      LOG.debug("Invalid container data. ContainerID: {}", containerId);
+      LOG.warn("Invalid container data. ContainerID: {}", containerId);
       throw new StorageContainerException("Invalid container data. " +
           "ContainerID: " + containerId, INVALID_CONTAINER_STATE);
     }
@@ -465,112 +464,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     containerData.updateDeleteTransactionId(deleteTransactionId);
   }
 
-  @Override
-  public void importContainerData(InputStream input,
-      ContainerPacker<KeyValueContainerData> packer) throws IOException {
-    writeLock();
-    try {
-      if (getContainerFile().exists()) {
-        String errorMessage = String.format(
-            "Can't import container (cid=%d) data to a specific location"
-                + " as the container descriptor (%s) has already been exist.",
-            getContainerData().getContainerID(),
-            getContainerFile().getAbsolutePath());
-        throw new StorageContainerException(errorMessage,
-            CONTAINER_ALREADY_EXISTS);
-      }
-      //copy the values from the input stream to the final destination
-      // directory.
-      byte[] descriptorContent = packer.unpackContainerData(this, input);
-
-      Preconditions.checkNotNull(descriptorContent,
-          "Container descriptor is missing from the container archive: "
-              + getContainerData().getContainerID());
-
-      //now, we have extracted the container descriptor from the previous
-      //datanode. We can load it and upload it with the current data
-      // (original metadata + current filepath fields)
-      KeyValueContainerData originalContainerData =
-          (KeyValueContainerData) ContainerDataYaml
-              .readContainer(descriptorContent);
-
-
-      containerData.setState(originalContainerData.getState());
-      containerData
-          .setContainerDBType(originalContainerData.getContainerDBType());
-      containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
-
-      //rewriting the yaml file with new checksum calculation.
-      update(originalContainerData.getMetadata(), true);
-
-      //fill in memory stat counter (keycount, byte usage)
-      KeyValueContainerUtil.parseKVContainerData(containerData, config);
-
-    } catch (Exception ex) {
-      if (ex instanceof StorageContainerException &&
-          ((StorageContainerException) ex).getResult() ==
-              CONTAINER_ALREADY_EXISTS) {
-        throw ex;
-      }
-      //delete all the temporary data in case of any exception.
-      try {
-        FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
-        FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-        FileUtils.deleteDirectory(
-            new File(getContainerData().getContainerPath()));
-      } catch (Exception deleteex) {
-        LOG.error(
-            "Can not cleanup destination directories after a container import"
-                + " error (cid" +
-                containerData.getContainerID() + ")", deleteex);
-      }
-      throw ex;
-    } finally {
-      writeUnlock();
-    }
-  }
-
-  @Override
-  public void exportContainerData(OutputStream destination,
-      ContainerPacker<KeyValueContainerData> packer) throws IOException {
-    writeLock();
-    try {
-      // Closed/ Quasi closed containers are considered for replication by
-      // replication manager if they are under-replicated.
-      ContainerProtos.ContainerDataProto.State state =
-          getContainerData().getState();
-      if (!(state == ContainerProtos.ContainerDataProto.State.CLOSED ||
-          state == ContainerDataProto.State.QUASI_CLOSED)) {
-        throw new IllegalStateException(
-            "Only (quasi)closed containers can be exported, but " +
-                "ContainerId=" + getContainerData().getContainerID() +
-                " is in state " + state);
-      }
-
-      try {
-        compactDB();
-        // Close DB (and remove from cache) to avoid concurrent modification
-        // while packing it.
-        BlockUtils.removeDB(containerData, config);
-      } finally {
-        readLock();
-        writeUnlock();
-      }
-
-      packer.pack(this, destination);
-    } finally {
-      if (lock.isWriteLockedByCurrentThread()) {
-        writeUnlock();
-      } else {
-        readUnlock();
-      }
-    }
-  }
 
   /**
    * Acquire read lock.
    */
-  @Override
   public void readLock() {
     this.lock.readLock().lock();
 
@@ -579,7 +476,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Release read lock.
    */
-  @Override
   public void readUnlock() {
     this.lock.readLock().unlock();
   }
@@ -587,7 +483,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Check if the current thread holds read lock.
    */
-  @Override
   public boolean hasReadLock() {
     return this.lock.readLock().tryLock();
   }
@@ -595,7 +490,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Acquire write lock.
    */
-  @Override
   public void writeLock() {
     // TODO: The lock for KeyValueContainer object should not be exposed
     // publicly.
@@ -605,7 +499,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Release write lock.
    */
-  @Override
   public void writeUnlock() {
     this.lock.writeLock().unlock();
 
@@ -614,7 +507,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   /**
    * Check if the current thread holds write lock.
    */
-  @Override
   public boolean hasWriteLock() {
     return this.lock.writeLock().isHeldByCurrentThread();
   }
@@ -744,7 +636,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         || containerData.getState() == ContainerDataProto.State.QUASI_CLOSED;
   }
 
-  @Override
   public boolean scanData(DataTransferThrottler throttler, Canceler canceler) {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
@@ -759,6 +650,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
     return checker.fullCheck(throttler, canceler);
   }
+
 
   private enum ContainerCheckLevel {
     NO_CHECK, FAST_CHECK, FULL_CHECK

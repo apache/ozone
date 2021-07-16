@@ -20,28 +20,26 @@ package org.apache.hadoop.ozone.container.common.impl;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.yaml.snakeyaml.Yaml;
+
+import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.List;
-
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
-    ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
-import org.yaml.snakeyaml.Yaml;
-
-import javax.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_ID;
@@ -68,7 +66,7 @@ public abstract class ContainerData {
   private final long containerID;
 
   // Layout version of the container data
-  private final int layOutVersion;
+  private int layOutVersion;
 
   // Metadata of the container will be a key value pair.
   // This can hold information like volume name, owner etc.,
@@ -84,6 +82,9 @@ public abstract class ContainerData {
 
   private boolean committedSpace;
 
+  // Path to Container metadata Level DB/RocksDB Store and .container file.
+  private String metadataPath;
+
   //ID of the pipeline where this container is created
   private String originPipelineId;
   //ID of the datanode where this container is created
@@ -98,6 +99,8 @@ public abstract class ContainerData {
   private final AtomicLong keyCount;
 
   private HddsVolume volume;
+
+  private File containerFile;
 
   private String checksum;
 
@@ -632,4 +635,38 @@ public abstract class ContainerData {
     incrWriteBytes(bytesWritten);
   }
 
+  public void setLayoutVersion(int version) {
+    this.layOutVersion = version;
+  }
+
+  public File getContainerFile() {
+    return ContainerData.getContainerFile(getMetadataPath(), getContainerID());
+  }
+
+  public static File getContainerFile(String metadataPath, long containerId) {
+    return new File(metadataPath,
+        containerId + OzoneConsts.CONTAINER_EXTENSION);
+  }
+
+  /**
+   * Returns container metadata path.
+   * @return - Physical path where container file and checksum is stored.
+   */
+  public String getMetadataPath() {
+    return metadataPath;
+  }
+
+  /**
+   * Sets container metadata path.
+   *
+   * @param path - String.
+   */
+  public void setMetadataPath(String path) {
+    this.metadataPath = path;
+  }
+
+
+  public static List<String> getYamlFields() {
+    return YAML_FIELDS;
+  }
 }

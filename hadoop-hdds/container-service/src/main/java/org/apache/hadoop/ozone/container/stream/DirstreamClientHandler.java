@@ -83,7 +83,12 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
         buffer.skipBytes(1);
         String[] parts = currentFileName.toString().split(" ", 2);
         remaining = Long.parseLong(parts[0]);
-        Path destFilePath = destination.mapToDestination(parts[1]);
+        final String logicalFileName = parts[1];
+        if (currentFileName.toString().equals(END_MARKER)) {
+          //no more read
+          return;
+        }
+        Path destFilePath = destination.mapToDestination(logicalFileName);
         final Path destfileParent = destFilePath.getParent();
         if (destfileParent == null) {
           throw new IllegalArgumentException("Streaming destination " +

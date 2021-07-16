@@ -16,15 +16,12 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
@@ -34,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -49,13 +47,11 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Dele
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -63,12 +59,18 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * State Machine Class.
@@ -155,17 +157,30 @@ public class DatanodeStateMachine implements Closeable {
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
+    SslContext sslContext = null;
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    if (securityConfig.isSecurityEnabled()) {
+
+      sslContext = SslContextBuilder.forClient()
+          .trustManager(InsecureTrustManagerFactory.INSTANCE)
+          .clientAuth(ClientAuth.REQUIRE)
+          .keyManager(certClient.getPrivateKey(), certClient.getCertificate())
+          .build();
+
+    }
+
     ContainerReplicator replicator =
-        new DownloadAndImportReplicator(container.getContainerSet(),
-            container.getController(),
-            new SimpleContainerDownloader(conf, dnCertClient),
-            new TarContainerPacker());
+        new DownloadAndImportReplicator(conf,
+            container::getClusterId,
+            container.getContainerSet(),
+            container.getVolumeSet(),
+            sslContext);
 
     replicatorMetrics = new MeasuredReplicator(replicator);
 
     supervisor =
-        new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, dnConf.getReplicationMaxStreams());
+        new ReplicationSupervisor(container.getContainerSet(), replicator,
+            dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
