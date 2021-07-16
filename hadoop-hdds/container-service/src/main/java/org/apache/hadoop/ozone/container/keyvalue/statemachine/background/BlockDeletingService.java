@@ -421,10 +421,8 @@ public class BlockDeletingService extends BackgroundService {
         Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
             .getHandler(container.getContainerType()));
 
-        totalBlocks =
-            deleteTransactions(delBlocks, handler, blockDataTable, container);
 
-        // Once blocks are deleted... remove the blockID from blockDataTable
+        // remove the blockID from blockDataTable,and then delete the blocks
         // and also remove the transactions from txnTable.
         try(BatchOperation batch = meta.getStore().getBatchHandler()
             .initBatchOperation()) {
@@ -435,6 +433,8 @@ public class BlockDeletingService extends BackgroundService {
               meta.getStore().getBlockDataTable().deleteWithBatch(batch, bID);
             }
           }
+          totalBlocks =
+              deleteTransactions(delBlocks, handler, blockDataTable, container);
           meta.getStore().getBatchHandler().commitBatchOperation(batch);
           containerData.updateAndCommitDBCounters(meta, batch,
               totalBlocks);
