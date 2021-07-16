@@ -95,14 +95,14 @@ public class TestBlockDeletion {
   public static final Logger LOG =
       LoggerFactory.getLogger(TestBlockDeletion.class);
 
-  private static OzoneConfiguration conf = null;
-  private static ObjectStore store;
-  private static MiniOzoneCluster cluster = null;
-  private static StorageContainerManager scm = null;
-  private static OzoneManager om = null;
-  private static Set<Long> containerIdsWithDeletedBlocks;
-  private static long maxTransactionId = 0;
-  private static File baseDir;
+  private OzoneConfiguration conf = null;
+  private ObjectStore store;
+  private MiniOzoneCluster cluster = null;
+  private StorageContainerManager scm = null;
+  private OzoneManager om = null;
+  private Set<Long> containerIdsWithDeletedBlocks;
+  private long maxTransactionId = 0;
+  private File baseDir;
 
   @Before
   public void init() throws Exception {
