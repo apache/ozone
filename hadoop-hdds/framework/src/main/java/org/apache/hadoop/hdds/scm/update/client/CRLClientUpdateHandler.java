@@ -151,9 +151,10 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
     executorService.shutdown();
     try {
       executorService.awaitTermination(10, TimeUnit.SECONDS);
-    } catch (Exception e) {
-      LOG.error("Unexpected exception while waiting for executor service" +
+    } catch (InterruptedException e) {
+      LOG.error("InterruptedException while waiting for executor service" +
           " to shutdown", e);
+      Thread.currentThread().interrupt();
     }
   }
 
