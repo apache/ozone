@@ -1423,6 +1423,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     try {
+      LOG.info("Stopping SCM HA services.");
       scmHAManager.shutdown();
     } catch (Exception ex) {
       LOG.error("SCM HA Manager stop failed", ex);
@@ -1432,6 +1433,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
     try {
+      LOG.info("Stopping SCM MetadataStore.");
       scmMetadataStore.stop();
     } catch (Exception ex) {
       LOG.error("SCM Metadata store stop failed", ex);
