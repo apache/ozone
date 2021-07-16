@@ -110,7 +110,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneClusterImpl.class);
 
-  private final OzoneConfiguration conf;
+  private OzoneConfiguration conf;
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
@@ -187,6 +187,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   @Override
   public OzoneConfiguration getConf() {
     return conf;
+  }
+
+  @Override
+  public void setConf(OzoneConfiguration newConf) {
+    this.conf = newConf;
   }
 
   @Override

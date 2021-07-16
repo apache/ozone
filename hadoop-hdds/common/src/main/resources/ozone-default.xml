@@ -2228,6 +2228,15 @@
       client ozone manager protocol.
     </description>
   </property>
+  <property>
+    <name>ozone.om.security.admin.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access ozone
+      manager admin protocol.
+    </description>
+  </property>
 
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>

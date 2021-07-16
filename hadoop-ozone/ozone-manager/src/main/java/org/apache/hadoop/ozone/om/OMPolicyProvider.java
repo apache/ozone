@@ -21,12 +21,14 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Unstable;
+import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL;
 
@@ -56,6 +58,8 @@ public final class OMPolicyProvider extends PolicyProvider {
       new Service[]{
           new Service(OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL,
               OzoneManagerProtocol.class),
+          new Service(OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL,
+              OMInterServiceProtocol.class)
       };
 
   @SuppressFBWarnings("EI_EXPOSE_REP")

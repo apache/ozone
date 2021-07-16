@@ -118,7 +118,7 @@ public class TestOMFailovers {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {
-      super(configuration, null, null);
+      super(configuration, null, null, OzoneManagerProtocolPB.class);
     }
 
     @Override
