@@ -1120,6 +1120,7 @@ public class TestReplicationManager {
         replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(scmLogs.getOutput().contains(
         "receive a move request about container"));
+    Thread.sleep(100L);
     Assert.assertTrue(datanodeCommandHandler.received(
         SCMCommandProto.Type.replicateContainerCommand, dn3));
     Assert.assertEquals(1, datanodeCommandHandler.getInvocationCount(
@@ -1162,6 +1163,7 @@ public class TestReplicationManager {
         replicationManager.move(id, dn1.getDatanodeDetails(), dn4);
     Assert.assertTrue(scmLogs.getOutput().contains(
         "receive a move request about container"));
+    Thread.sleep(100L);
     Assert.assertTrue(datanodeCommandHandler.received(
         SCMCommandProto.Type.replicateContainerCommand, dn4));
     Assert.assertEquals(1, datanodeCommandHandler.getInvocationCount(
