@@ -16,8 +16,9 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -56,7 +58,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
@@ -76,34 +84,112 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ConfigurationSource conf;
   private int invocationCount;
   private long totalTime;
-  private boolean cmdExecuted;
+  private final ExecutorService executor;
+  private final LinkedBlockingQueue<DeleteTask> deleteCommandQueues;
+  private Daemon handlerThread;
 
   public DeleteBlocksCommandHandler(ContainerSet cset,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, int threadPoolSize, int queueLimit) {
     this.containerSet = cset;
     this.conf = conf;
+    this.executor = new ThreadPoolExecutor(
+        0, threadPoolSize, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(),
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("DeleteBlocksCommandHandlerThread-%d")
+            .build());
+    this.deleteCommandQueues = new LinkedBlockingQueue<DeleteTask>(queueLimit);
+    handlerThread = new Daemon(new TaskProcessWorker());
+    handlerThread.start();
   }
 
   @Override
   public void handle(SCMCommand command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
-    cmdExecuted = false;
-    long startTime = Time.monotonicNow();
-    ContainerBlocksDeletionACKProto blockDeletionACK = null;
-    try {
-      if (command.getType() != SCMCommandProto.Type.deleteBlocksCommand) {
-        LOG.warn("Skipping handling command, expected command "
-                + "type {} but found {}",
-            SCMCommandProto.Type.deleteBlocksCommand, command.getType());
-        return;
-      }
-      LOG.debug("Processing block deletion command.");
+    if (command.getType() != SCMCommandProto.Type.deleteBlocksCommand) {
+      LOG.warn("Skipping handling command, expected command "
+              + "type {} but found {}",
+          SCMCommandProto.Type.deleteBlocksCommand, command.getType());
+      return;
+    }
 
+    try {
+      DeleteTask task = new DeleteTask((DeleteBlocksCommand) command, container,
+          context, connectionManager);
+      deleteCommandQueues.add(task);
+    } catch (Exception e) {
+      LOG.warn("Command is discarded because of the command queue is full");
+      return;
+    }
+  }
+
+  /**
+   * A delete task.
+   */
+  public final class DeleteTask {
+    private DeleteBlocksCommand cmd;
+    private StateContext context;
+    private OzoneContainer container;
+    private SCMConnectionManager connectionManager;
+
+    public DeleteTask(DeleteBlocksCommand command, OzoneContainer container,
+        StateContext context, SCMConnectionManager connectionManager) {
+      this.cmd = command;
+      this.context = context;
+      this.container = container;
+      this.connectionManager = connectionManager;
+    }
+    public DeleteBlocksCommand getCmd() {
+      return this.cmd;
+    }
+    public StateContext getContext() {
+      return this.context;
+    }
+    public OzoneContainer getContainer() {
+      return this.container;
+    }
+    public SCMConnectionManager getConnectionManager() {
+      return this.connectionManager;
+    }
+  }
+
+  /**
+   * Process tasks.
+   */
+  public final class TaskProcessWorker implements Runnable {
+
+    @Override
+    public void run() {
+      while (true) {
+        while (!deleteCommandQueues.isEmpty()) {
+          DeleteTask task = deleteCommandQueues.poll();
+          try {
+            taskProcess(task.getCmd(), task.getContainer(), task.getContext(),
+                task.getConnectionManager());
+          } catch (Throwable e) {
+            LOG.error("taskProcess failed.", e);
+          }
+        }
+        try {
+          Thread.sleep(2000);
+        } catch (InterruptedException e) {
+        }
+      }
+    }
+  }
+
+  private void taskProcess(DeleteBlocksCommand cmd, OzoneContainer container,
+      StateContext context, SCMConnectionManager connectionManager) {
+    LOG.debug("Processing block deletion command.");
+    ContainerBlocksDeletionACKProto blockDeletionACK = null;
+    long startTime = Time.monotonicNow();
+    boolean cmdExecuted = false;
+    try {
       // move blocks to deleting state.
       // this is a metadata update, the actual deletion happens in another
       // recycling thread.
-      DeleteBlocksCommand cmd = (DeleteBlocksCommand) command;
-      List<DeletedBlocksTransaction> containerBlocks = cmd.blocksTobeDeleted();
+      List<DeletedBlocksTransaction> containerBlocks =
+          cmd.blocksTobeDeleted();
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
@@ -115,56 +201,71 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder();
-      containerBlocks.forEach(entry -> {
-        DeleteBlockTransactionResult.Builder txResultBuilder =
-            DeleteBlockTransactionResult.newBuilder();
-        txResultBuilder.setTxID(entry.getTxID());
-        long containerId = entry.getContainerID();
-        int newDeletionBlocks = 0;
-        try {
-          Container cont = containerSet.getContainer(containerId);
-          if (cont == null) {
-            throw new StorageContainerException("Unable to find the container "
-                + containerId, CONTAINER_NOT_FOUND);
-          }
-          ContainerProtos.ContainerType containerType = cont.getContainerType();
-          switch (containerType) {
-          case KeyValueContainer:
-            KeyValueContainerData containerData = (KeyValueContainerData)
-                cont.getContainerData();
-            cont.writeLock();
-            try {
-              if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
-                markBlocksForDeletionSchemaV1(containerData, entry);
-              } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
-                markBlocksForDeletionSchemaV2(containerData, entry,
-                    newDeletionBlocks, entry.getTxID());
-              } else {
-                throw new UnsupportedOperationException(
-                    "Only schema version 1 and schema version 2 are "
-                        + "supported.");
-              }
-            } finally {
-              cont.writeUnlock();
+      List<Future> futures = new ArrayList<>();
+      for (int i = 0; i < containerBlocks.size(); i++) {
+        DeletedBlocksTransaction tx = containerBlocks.get(i);
+        Future future = executor.submit(() -> {
+          DeleteBlockTransactionResult.Builder txResultBuilder =
+              DeleteBlockTransactionResult.newBuilder();
+          txResultBuilder.setTxID(tx.getTxID());
+          long containerId = tx.getContainerID();
+          int newDeletionBlocks = 0;
+          String dnID = context.getParent().getDatanodeDetails()
+              .getUuid().toString();
+          try {
+            Container cont = containerSet.getContainer(containerId);
+            if (cont == null) {
+              throw new StorageContainerException("Unable to find the " +
+                  "container " + containerId, CONTAINER_NOT_FOUND);
             }
+            ContainerType containerType = cont.getContainerType();
+            switch (containerType) {
+            case KeyValueContainer:
+              KeyValueContainerData containerData = (KeyValueContainerData)
+                  cont.getContainerData();
+              cont.writeLock();
+              try {
+                if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
+                  markBlocksForDeletionSchemaV1(containerData, tx);
+                } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
+                  markBlocksForDeletionSchemaV2(containerData, tx,
+                      newDeletionBlocks, tx.getTxID());
+                } else {
+                  throw new UnsupportedOperationException(
+                      "Only schema version 1 and schema version 2 are "
+                          + "supported.");
+                }
+              } finally {
+                cont.writeUnlock();
+              }
+              txResultBuilder.setContainerID(containerId)
+                  .setSuccess(true);
+              break;
+            default:
+              LOG.error(
+                  "Delete Blocks Command Handler is not implemented for " +
+                      "containerType {}", containerType);
+            }
+          } catch (IOException e) {
+            LOG.warn("Failed to delete blocks for container={}, TXID={}",
+                tx.getContainerID(), tx.getTxID(), e);
             txResultBuilder.setContainerID(containerId)
-                .setSuccess(true);
-            break;
-          default:
-            LOG.error(
-                "Delete Blocks Command Handler is not implemented for " +
-                    "containerType {}", containerType);
+                .setSuccess(false);
           }
-        } catch (IOException e) {
-          LOG.warn("Failed to delete blocks for container={}, TXID={}",
-              entry.getContainerID(), entry.getTxID(), e);
-          txResultBuilder.setContainerID(containerId)
-              .setSuccess(false);
+          resultBuilder.addResults(txResultBuilder.build()).setDnId(dnID);
+        });
+        futures.add(future);
+      }
+
+      // Wait for tasks to finish
+      futures.forEach(f -> {
+        try {
+          f.get();
+        } catch (Exception e) {
+          LOG.error("task failed.", e);
         }
-        resultBuilder.addResults(txResultBuilder.build())
-            .setDnId(context.getParent().getDatanodeDetails()
-                .getUuid().toString());
       });
+
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated
@@ -182,11 +283,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     } finally {
       final ContainerBlocksDeletionACKProto deleteAck =
           blockDeletionACK;
+      final boolean status = cmdExecuted;
       Consumer<CommandStatus> statusUpdater = (cmdStatus) -> {
-        cmdStatus.setStatus(cmdExecuted);
-        ((DeleteBlockCommandStatus) cmdStatus).setBlocksDeletionAck(deleteAck);
+        cmdStatus.setStatus(status);
+        ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(deleteAck);
       };
-      updateCommandStatus(context, command, statusUpdater, LOG);
+      updateCommandStatus(context, cmd, statusUpdater, LOG);
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;
       invocationCount++;
@@ -353,5 +455,31 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       return totalTime / invocationCount;
     }
     return 0;
+  }
+
+  @Override
+  public void stop() {
+    if (executor != null) {
+      try {
+        executor.shutdown();
+        if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
+          executor.shutdownNow();
+        }
+      } catch (InterruptedException ie) {
+        // Ignore, we don't really care about the failure.
+        Thread.currentThread().interrupt();
+      }
+    }
+
+    if (handlerThread != null) {
+      try {
+        handlerThread.interrupt();
+        handlerThread.join(3000);
+      } catch (InterruptedException ie) {
+        // Ignore, we don't really care about the failure.
+        Thread.currentThread().interrupt();
+      }
+      handlerThread = null;
+    }
   }
 }
