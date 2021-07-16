@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -55,7 +56,9 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.RocksDBException;
 
 import java.io.File;
 
@@ -432,6 +435,29 @@ public class TestKeyValueContainer {
           "without force option is not allowed", ex);
       assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex
           .getResult());
+    }
+  }
+
+  @Test
+  public void testContainerRocksDB()
+      throws StorageContainerException, RocksDBException {
+    closeContainer();
+    keyValueContainer = new KeyValueContainer(
+        keyValueContainerData, CONF);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    try(ReferenceCountedDB db =
+        BlockUtils.getDB(keyValueContainerData, CONF)) {
+      RDBStore store = (RDBStore) db.getStore().getStore();
+      long defaultCacheSize = 64 * OzoneConsts.MB;
+      long cacheSize = Long.parseLong(store
+          .getProperty("rocksdb.block-cache-capacity"));
+      Assert.assertEquals(defaultCacheSize, cacheSize);
+      for (ColumnFamilyHandle handle : store.getColumnFamilyHandles()) {
+        cacheSize = Long.parseLong(
+            store.getProperty(handle, "rocksdb.block-cache-capacity"));
+        Assert.assertEquals(defaultCacheSize, cacheSize);
+      }
     }
   }
 

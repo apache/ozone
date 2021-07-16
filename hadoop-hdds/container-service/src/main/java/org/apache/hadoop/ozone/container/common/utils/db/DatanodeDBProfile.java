@@ -136,8 +136,7 @@ public abstract class DatanodeDBProfile {
           .getStorageSize(HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
               HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      blockBasedTableConfig
-          .setBlockCache(new LRUCache(cacheSize * SizeUnit.MB));
+      blockBasedTableConfig.setBlockCache(new LRUCache(cacheSize));
       return blockBasedTableConfig;
     }
   }
