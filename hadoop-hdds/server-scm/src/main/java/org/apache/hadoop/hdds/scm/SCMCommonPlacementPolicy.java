@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -236,6 +237,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       // invoke the choose function defined in the derived classes.
       DatanodeDetails nodeId = chooseNode(healthyNodes);
       if (nodeId != null) {
+        removePeers(nodeId, healthyNodes);
         results.add(nodeId);
       }
     }
@@ -313,5 +315,15 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     }
     return new ContainerPlacementStatusDefault(
         (int)currentRackCount, requiredRacks, numRacks);
+  }
+
+  /**
+   * Removes the datanode peers from all the existing pipelines for this dn.
+   */
+  public void removePeers(DatanodeDetails dn,
+      List<DatanodeDetails> healthyList) {
+    if (ScmUtils.shouldRemovePeers(conf)) {
+      healthyList.removeAll(nodeManager.getPeerList(dn));
+    }
   }
 }
