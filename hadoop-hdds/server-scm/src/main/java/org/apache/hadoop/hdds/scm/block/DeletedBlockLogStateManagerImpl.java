@@ -153,16 +153,6 @@ public class DeletedBlockLogStateManagerImpl
       }
 
       @Override
-      public Long key() throws IOException {
-        throw new UnsupportedOperationException("key");
-      }
-
-      @Override
-      public TypedTable.KeyValue<Long, DeletedBlocksTransaction> value() {
-        throw new UnsupportedOperationException("value");
-      }
-
-      @Override
       public void removeFromDB() throws IOException {
         throw new UnsupportedOperationException("read-only");
       }

@@ -841,7 +841,8 @@ public final class OMFileRequest {
     iterator.seek(seekDirInDB);
 
     if (iterator.hasNext()) {
-      OmDirectoryInfo dirInfo = iterator.value().getValue();
+      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+      OmDirectoryInfo dirInfo = entry.getValue();
       return isImmediateChild(dirInfo.getParentObjectID(),
               omKeyInfo.getObjectID());
     }
@@ -877,7 +878,8 @@ public final class OMFileRequest {
     iterator.seek(seekFileInDB);
 
     if (iterator.hasNext()) {
-      OmKeyInfo fileInfo = iterator.value().getValue();
+      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+      OmKeyInfo fileInfo = entry.getValue();
       return isImmediateChild(fileInfo.getParentObjectID(),
               omKeyInfo.getObjectID()); // found a sub path file
     }

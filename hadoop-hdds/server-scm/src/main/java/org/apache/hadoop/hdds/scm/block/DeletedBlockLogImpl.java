@@ -134,7 +134,8 @@ public class DeletedBlockLogImpl
               ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> txIter =
               getIterator()) {
         txIter.seekToLast();
-        txnId = txIter.key() != null ? txIter.key() : 0L;
+        Table.KeyValue<Long, DeletedBlocksTransaction> entry = txIter.next();
+        txnId = entry.getKey() != null ? entry.getKey() : 0L;
         if (txnId > 0) {
           scmMetadataStore.getDeletedBlocksTXTable().put(largestTxnIdHolderKey,
               DUMMY_TXN_BUILDER.setTxID(txnId).build());
