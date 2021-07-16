@@ -29,7 +29,6 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Properties;
@@ -93,8 +92,9 @@ public final class DatabaseHelper {
 
   private static boolean createAuditTable(String dbName) throws Exception {
     try (Connection connection = getConnection(dbName);
-         Statement st = connection.createStatement()) {
-      st.executeUpdate(properties.get(ParserConsts.CREATE_AUDIT_TABLE));
+        PreparedStatement st = connection.prepareStatement(
+            properties.get(ParserConsts.CREATE_AUDIT_TABLE))) {
+      st.executeUpdate();
     }
     return true;
   }
@@ -200,8 +200,8 @@ public final class DatabaseHelper {
     StringBuilder result = new StringBuilder();
     ResultSetMetaData rsm;
     try (Connection connection = getConnection(dbName);
-         Statement st = connection.createStatement();
-         ResultSet rs = st.executeQuery(sql)) {
+        PreparedStatement ps = connection.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery()) {
       if (rs != null) {
         rsm = rs.getMetaData();
         int cols = rsm.getColumnCount();
