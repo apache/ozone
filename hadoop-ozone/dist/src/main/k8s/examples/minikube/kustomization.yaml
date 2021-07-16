@@ -13,21 +13,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-source:
-  - path: ../../definitions
-import:
-  - path: ozone
-    transformations:
-    - type: Image
-      image: "@docker.image@"
-    - type: ozone/persistence
-  - path: ozone/freon
-    destination: freon
-    transformations:
-    - type: Image
-      image: "@docker.image@"
-    - type: kustomize
-transformations:
-  - type: Namespace
-  - type: kustomize
 
+resources:
+- config-configmap.yaml
+- datanode-service.yaml
+- datanode-statefulset.yaml
+- om-service.yaml
+- om-statefulset.yaml
+- s3g-service.yaml
+- s3g-statefulset.yaml
+- scm-service.yaml
+- scm-statefulset.yaml
+- datanode-public-service.yaml
+- om-public-service.yaml
+- s3g-public-service.yaml
+- scm-public-service.yaml
