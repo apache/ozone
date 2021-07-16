@@ -78,8 +78,7 @@ public class TopologySubcommand extends ScmSubcommand
 
   @CommandLine.Option(names = {"--node-state"},
       description = "Only show datanodes in a specific node state(" +
-          " HEALTHY, STALE, DEAD)",
-      defaultValue = "")
+          " HEALTHY, STALE, DEAD)")
   private String nodeState;
 
   @Override
