@@ -158,6 +158,11 @@ public class ReplicationManager implements MetricsSource, SCMService {
   private int minHealthyForMaintenance;
 
   /**
+   * Max number of containers to process per round.
+   */
+  private int maxContainersToProcess;
+
+  /**
    * SCMService related variables.
    * After leaving safe mode, replicationMonitor needs to wait for a while
    * before really take effect.
@@ -193,6 +198,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
     this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
+    this.maxContainersToProcess = rmConf.getContainerProcessingLimit();
 
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -275,15 +281,31 @@ public class ReplicationManager implements MetricsSource, SCMService {
    */
   private synchronized void run() {
     try {
+      long startID = 0L;
       while (running) {
         final long start = Time.monotonicNow();
-        final List<ContainerInfo> containers =
-            containerManager.getContainers();
+        List<ContainerInfo> containers =
+            containerManager.getContainers(ContainerID.valueOf(startID),
+                maxContainersToProcess);
+
+        // round back to start from 0L
+        if (containers.isEmpty() && startID != 0L) {
+          startID = 0L;
+          containers = containerManager.getContainers(
+              ContainerID.valueOf(startID), maxContainersToProcess);
+        }
+
         containers.forEach(this::processContainer);
 
         LOG.info("Replication Monitor Thread took {} milliseconds for" +
-                " processing {} containers.", Time.monotonicNow() - start,
-            containers.size());
+                " processing {} containers start from {}.",
+            Time.monotonicNow() - start, containers.size(), startID);
+
+        if (containers.size() < maxContainersToProcess) {
+          startID = 0L;
+        } else {
+          startID = 1 + containers.get(containers.size()-1).getContainerID();
+        }
 
         wait(rmConf.getInterval());
       }
@@ -1238,6 +1260,22 @@ public class ReplicationManager implements MetricsSource, SCMService {
 
     public int getMaintenanceReplicaMinimum() {
       return maintenanceReplicaMinimum;
+    }
+
+    @Config(key = "container.processing.limit",
+        type = ConfigType.INT,
+        defaultValue = "10000",
+        tags = {SCM, OZONE},
+        description = "The max number of containers that can be processed " +
+            " per round.")
+    private int containerProcessingLimit = 10000;
+
+    public void setContainerProcessingLimit(int containerProcessingLimit) {
+      this.containerProcessingLimit = containerProcessingLimit;
+    }
+
+    public int getContainerProcessingLimit() {
+      return this.containerProcessingLimit;
     }
   }
 
