@@ -224,7 +224,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             }
             return getClient().async().send(message);
           }
-
         }
 
     );

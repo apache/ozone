@@ -62,7 +62,6 @@ public class MockDatanodeStorage {
       DatanodeBlockID blockID,
       ChunkInfo chunkInfo) {
     return data.get(createKey(blockID, chunkInfo));
-
   }
 
   private String createKey(DatanodeBlockID blockId, ChunkInfo chunkInfo) {

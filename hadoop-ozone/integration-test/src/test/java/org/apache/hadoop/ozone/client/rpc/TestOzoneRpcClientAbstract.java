@@ -1597,11 +1597,11 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   /**
-   * Tests reading a corrputed chunk file throws checksum exception.
+   * Tests reading a corrupted chunk file throws checksum exception.
    * @throws IOException
    */
   @Test
-  public void testReadKeyWithCorruptedDataWithMutiNodes() throws IOException {
+  public void testReadKeyWithCorruptedDataWithMultiNodes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -1703,10 +1703,10 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertNotNull("Block not found", blockData);
 
       // Get the location of the chunk file
-      String containreBaseDir =
+      String containerBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, clusterId, containerID);
+          .getChunksLocationPath(containerBaseDir, clusterId, containerID);
       byte[] corruptData = "corrupted data".getBytes(UTF_8);
       // Corrupt the contents of chunk files
       for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {

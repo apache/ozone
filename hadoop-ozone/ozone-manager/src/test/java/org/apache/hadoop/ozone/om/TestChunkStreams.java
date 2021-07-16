@@ -17,8 +17,10 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -33,9 +35,16 @@ import static org.junit.Assert.assertEquals;
  * This class tests KeyInputStream and KeyOutputStream.
  */
 public class TestChunkStreams {
+  private OzoneClientConfig clientConfig;
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
+
+  @Before
+  public void setup() {
+    clientConfig = new OzoneClientConfig();
+    clientConfig.setChecksumVerify(true);
+  }
 
   @Test
   public void testReadGroupInputStream() throws Exception {
@@ -47,7 +56,7 @@ public class TestChunkStreams {
       for (int i = 0; i < 5; i++) {
         int tempOffset = offset;
         BlockInputStream in =
-            new BlockInputStream(null, 100, null, null, true, null) {
+            new BlockInputStream(null, 100, null, null, clientConfig, null) {
               private long pos = 0;
               private ByteArrayInputStream in =
                   new ByteArrayInputStream(buf, tempOffset, 100);
@@ -103,7 +112,7 @@ public class TestChunkStreams {
       for (int i = 0; i < 5; i++) {
         int tempOffset = offset;
         BlockInputStream in =
-            new BlockInputStream(null, 100, null, null, true, null) {
+            new BlockInputStream(null, 100, null, null, clientConfig, null) {
               private long pos = 0;
               private ByteArrayInputStream in =
                   new ByteArrayInputStream(buf, tempOffset, 100);

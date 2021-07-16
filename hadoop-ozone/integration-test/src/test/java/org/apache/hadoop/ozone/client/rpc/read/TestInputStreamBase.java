@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -42,7 +44,6 @@ import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -73,6 +74,7 @@ public abstract class TestInputStreamBase {
   private String keyString;
 
   private ChunkLayOutVersion chunkLayout;
+  private final long smallBlockThreshold;
   private static final Random RAND = new Random();
 
   protected static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
@@ -85,12 +87,18 @@ public abstract class TestInputStreamBase {
   public Timeout timeout = Timeout.seconds(300);
 
   @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  public static Collection<Object[]> layouts() {
+    return Arrays.asList(new Object[][] {
+        {ChunkLayOutVersion.FILE_PER_CHUNK, BYTES_PER_CHECKSUM},
+        {ChunkLayOutVersion.FILE_PER_CHUNK, CHUNK_SIZE},
+        {ChunkLayOutVersion.FILE_PER_BLOCK, BYTES_PER_CHECKSUM},
+        {ChunkLayOutVersion.FILE_PER_BLOCK, CHUNK_SIZE}
+    });
   }
 
-  public TestInputStreamBase(ChunkLayOutVersion layout) {
+  public TestInputStreamBase(ChunkLayOutVersion layout, long blockThreshold) {
     this.chunkLayout = layout;
+    this.smallBlockThreshold = blockThreshold;
   }
 
   /**
@@ -101,6 +109,7 @@ public abstract class TestInputStreamBase {
   public void init() throws Exception {
     OzoneClientConfig config = new OzoneClientConfig();
     config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
+    config.setSmallBlockThreshold(smallBlockThreshold);
     conf.setFromObject(config);
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
@@ -228,15 +237,16 @@ public abstract class TestInputStreamBase {
           dataLength - readBlockLength);
       Assert.assertEquals(blockStreamLength, blockStream.getLength());
 
-      int expectedNumChunkStreams =
-          BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
+      int expectedNumChunkStreams = isSmallBlockRead(blockStreamLength) ?
+          1 : BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
       blockStream.initialize();
       List<ChunkInputStream> chunkStreams = blockStream.getChunkStreams();
       Assert.assertEquals(expectedNumChunkStreams, chunkStreams.size());
 
       int readChunkLength = 0;
       for (ChunkInputStream chunkStream : chunkStreams) {
-        int chunkStreamLength = Math.min(CHUNK_SIZE,
+        int chunkStreamLength = Math.min(isSmallBlockRead(blockStreamLength) ?
+            blockStreamLength : CHUNK_SIZE,
             blockStreamLength - readChunkLength);
         Assert.assertEquals(chunkStreamLength, chunkStream.getRemaining());
 
@@ -245,5 +255,13 @@ public abstract class TestInputStreamBase {
 
       readBlockLength += blockStreamLength;
     }
+  }
+
+  boolean isSmallBlockRead(int blockLen){
+    return smallBlockThreshold >= blockLen;
+  }
+
+  long getSmallBlockThreshold() {
+    return this.smallBlockThreshold;
   }
 }

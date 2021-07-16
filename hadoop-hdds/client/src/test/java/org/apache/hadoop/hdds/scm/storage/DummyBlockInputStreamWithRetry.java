@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -49,12 +50,12 @@ final class DummyBlockInputStreamWithRetry
       long blockLen,
       Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
-      boolean verifyChecksum,
+      OzoneClientConfig clientConfig,
       XceiverClientFactory xceiverClientManager,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunkMap,
       AtomicBoolean isRerfreshed) {
-    super(blockId, blockLen, pipeline, token, verifyChecksum,
+    super(blockId, blockLen, pipeline, token, clientConfig,
         xceiverClientManager, blockID -> {
           isRerfreshed.set(true);
           return Pipeline.newBuilder()

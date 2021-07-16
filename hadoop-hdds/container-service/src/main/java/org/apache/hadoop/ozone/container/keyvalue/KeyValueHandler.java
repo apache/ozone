@@ -807,10 +807,12 @@ public class KeyValueHandler extends Handler {
       checkContainerIsHealthy(kvContainer, blockID, Type.GetSmallFile);
       BlockData responseData = blockManager.getBlock(kvContainer, blockID);
 
-      ContainerProtos.ChunkInfo chunkInfoProto = null;
+      final ContainerProtos.ChecksumData.Builder checksumBuilder =
+          ContainerProtos.ChecksumData.newBuilder();
       List<ByteString> dataBuffers = new ArrayList<>();
       DispatcherContext dispatcherContext =
           new DispatcherContext.Builder().build();
+      ContainerProtos.ChunkInfo firstChunk = null;
       for (ContainerProtos.ChunkInfo chunk : responseData.getChunks()) {
         // if the block is committed, all chunks must have been committed.
         // Tmp chunk files won't exist here.
@@ -827,12 +829,26 @@ public class KeyValueHandler extends Handler {
         ChunkBuffer data = chunkManager.readChunk(kvContainer, blockID,
             chunkInfo, dispatcherContext);
         dataBuffers.addAll(data.toByteStringList(byteBufferToByteString));
-        chunkInfoProto = chunk;
+        for (ByteString ck : chunk.getChecksumData().getChecksumsList()) {
+          checksumBuilder.addChecksums(ck);
+        }
+        if (firstChunk == null) {
+          firstChunk = chunk;
+        }
       }
+      ContainerProtos.ChunkInfo.Builder chunkInfoBuilder =
+          ContainerProtos.ChunkInfo.newBuilder();
+      checksumBuilder.setBytesPerChecksum(
+          firstChunk.getChecksumData().getBytesPerChecksum())
+          .setType(firstChunk.getChecksumData().getType());
+      chunkInfoBuilder.setChecksumData(checksumBuilder)
+          .setChunkName(firstChunk.getChunkName())
+          .setLen(responseData.getSize())
+          .setOffset(0);
       metrics.incContainerBytesStats(Type.GetSmallFile,
           BufferUtils.getBuffersLen(dataBuffers));
       return getGetSmallFileResponseSuccess(request, dataBuffers,
-          chunkInfoProto);
+          chunkInfoBuilder.build());
     } catch (StorageContainerException e) {
       return ContainerUtils.logAndReturnError(LOG, e, request);
     } catch (IOException ex) {

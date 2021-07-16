@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -92,6 +94,9 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
     case GetBlock:
       return result(request,
           r -> r.setGetBlock(getBlock(request.getGetBlock())));
+    case GetSmallFile:
+      return result(request,
+          r -> r.setGetSmallFile(getSmallFile(request.getGetSmallFile())));
     default:
       throw new IllegalArgumentException(
           "Mock version of datanode call " + request.getCmdType()
@@ -112,6 +117,21 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   private GetBlockResponseProto getBlock(GetBlockRequestProto getBlock) {
     return GetBlockResponseProto.newBuilder()
         .setBlockData(datanodeStorage.getBlock(getBlock.getBlockID()))
+        .build();
+  }
+
+  private GetSmallFileResponseProto getSmallFile(
+      ContainerProtos.GetSmallFileRequestProto request) {
+    GetBlockRequestProto blockRequest = request.getBlock();
+    ChunkInfo chunkInfo = datanodeStorage
+        .getBlock(blockRequest.getBlockID()).getChunks(0);
+    return GetSmallFileResponseProto.newBuilder().setData(
+        ReadChunkResponseProto.newBuilder()
+            .setChunkData(chunkInfo)
+            .setData(datanodeStorage
+                .readChunkData(blockRequest.getBlockID(), chunkInfo))
+            .setBlockID(blockRequest.getBlockID())
+            .build())
         .build();
   }
 

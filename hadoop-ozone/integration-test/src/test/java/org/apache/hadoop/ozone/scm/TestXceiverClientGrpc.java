@@ -182,7 +182,7 @@ public class TestXceiverClientGrpc {
       throws IOException {
     BlockID bid = new BlockID(1, 1);
     bid.setBlockCommitSequenceId(1);
-    ContainerProtocolCalls.readSmallFile(client, bid, null);
+    ContainerProtocolCalls.readSmallFile(client, bid, null, null);
   }
 
   private XceiverClientReply buildValidResponse() {
