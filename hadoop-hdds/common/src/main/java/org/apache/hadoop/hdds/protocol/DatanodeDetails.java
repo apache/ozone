@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.protocol;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -507,6 +508,14 @@ public class DatanodeDetails extends NodeImpl implements
   @Override
   public int hashCode() {
     return uuid.hashCode();
+  }
+
+  // Skip The OpStates which may change in Runtime.
+  public int getSignature() {
+    return Objects
+        .hash(uuid, uuidString, ipAddress, hostName, ports,
+            certSerialId, version, setupTime, revision, buildDate,
+            initialVersion, currentVersion);
   }
 
   /**
