@@ -90,9 +90,9 @@ public class TestS3MultipartUploadCompleteRequest
     List<Part> partList = new ArrayList<>();
 
     String partName = getPartName(volumeName, bucketName, keyName,
-            multipartUploadID, 1);
+        multipartUploadID, 1);
     partList.add(Part.newBuilder().setPartName(partName).setPartNumber(1)
-            .build());
+        .build());
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
         bucketName, keyName, multipartUploadID, partList);
@@ -155,7 +155,7 @@ public class TestS3MultipartUploadCompleteRequest
     List<Part> partList = new ArrayList<>();
 
     String partName= getPartName(volumeName, bucketName, keyName,
-            multipartUploadID, 23);
+        multipartUploadID, 23);
 
     partList.add(Part.newBuilder().setPartName(partName).setPartNumber(23)
             .build());
@@ -271,9 +271,9 @@ public class TestS3MultipartUploadCompleteRequest
       String keyName, String uploadID, int partNumber) {
 
     String dbOzoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-            keyName);
+        keyName);
     return S3MultipartUploadCommitPartRequest.getPartName(dbOzoneKey, uploadID,
-            partNumber);
+        partNumber);
   }
 
   protected String getOzoneDBKey(String volumeName, String bucketName,

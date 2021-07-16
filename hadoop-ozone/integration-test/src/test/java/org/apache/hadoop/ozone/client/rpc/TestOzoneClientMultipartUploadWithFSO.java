@@ -306,7 +306,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     // of content in ozone s3. This will make S3 Mpu completeMPU pass when
     // comparing part names and large file uploads work using aws cp.
     Assert.assertEquals("Part names should be same", partName,
-            commitUploadPartInfo.getPartName());
+        commitUploadPartInfo.getPartName());
   }
 
   @Test

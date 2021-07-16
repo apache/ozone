@@ -262,7 +262,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
   @VisibleForTesting
   public static String getPartName(String ozoneKey, String uploadID,
-                                   long partNumber) {
+      long partNumber) {
     return ozoneKey + "-" + uploadID + "-" + partNumber;
   }
 
