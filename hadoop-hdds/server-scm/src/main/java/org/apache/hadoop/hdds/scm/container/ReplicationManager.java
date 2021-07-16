@@ -755,7 +755,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
         excludeList.addAll(replicationInFlight);
         final List<DatanodeDetails> selectedDatanodes = containerPlacement
             .chooseDatanodes(excludeList, null, replicasNeeded,
-                container.getUsedBytes());
+                0, container.getUsedBytes());
         if (repDelta > 0) {
           LOG.info("Container {} is under replicated. Expected replica count" +
                   " is {}, but found {}.", id, replicationFactor,
