@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -28,6 +28,8 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 
+import static java.util.Collections.emptyMap;
+
 /**
  * A Java proxy invocation handler to trace all the methods of the delegate
  * class.
@@ -41,18 +43,19 @@ public class TraceAllMethod<T> implements InvocationHandler {
    */
   private final Map<String, Map<Class<?>[], Method>> methods = new HashMap<>();
 
-  private T delegate;
+  private final T delegate;
 
-  private String name;
+  private final String name;
 
   public TraceAllMethod(T delegate, String name) {
     this.delegate = delegate;
     this.name = name;
-    for (Method method : delegate.getClass().getDeclaredMethods()) {
-      if (!methods.containsKey(method.getName())) {
-        methods.put(method.getName(), new HashMap<>());
+    for (Method method : delegate.getClass().getMethods()) {
+      if (method.getDeclaringClass().equals(Object.class)) {
+        continue;
       }
-      methods.get(method.getName()).put(method.getParameterTypes(), method);
+      methods.computeIfAbsent(method.getName(), any -> new HashMap<>())
+          .put(method.getParameterTypes(), method);
     }
   }
 
@@ -68,7 +71,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
     Span span = GlobalTracer.get().buildSpan(
         name + "." + method.getName())
         .start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       try {
         return delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {
@@ -84,8 +87,8 @@ public class TraceAllMethod<T> implements InvocationHandler {
   }
 
   private Method findDelegatedMethod(Method method) {
-    for (Entry<Class<?>[], Method> entry : methods.get(method.getName())
-        .entrySet()) {
+    for (Entry<Class<?>[], Method> entry : methods.getOrDefault(
+        method.getName(), emptyMap()).entrySet()) {
       if (Arrays.equals(entry.getKey(), method.getParameterTypes())) {
         return entry.getValue();
       }
