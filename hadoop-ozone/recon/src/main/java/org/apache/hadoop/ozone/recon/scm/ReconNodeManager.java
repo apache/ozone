@@ -114,7 +114,6 @@ public class ReconNodeManager extends SCMNodeManager {
                     HDDSLayoutVersionManager.maxLayoutVersion())
                 .build());
         nodeCount++;
-        inMemDatanodeDetails.put(datanodeDetails.getUuid(), datanodeDetails);
       }
       LOG.info("Loaded {} nodes from node DB.", nodeCount);
     } catch (IOException ioEx) {
@@ -258,9 +257,9 @@ public class ReconNodeManager extends SCMNodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo) {
+    inMemDatanodeDetails.put(datanodeDetails.getUuid(), datanodeDetails);
     if (isNodeRegistered(datanodeDetails)) {
       try {
-        inMemDatanodeDetails.put(datanodeDetails.getUuid(), datanodeDetails);
         nodeDB.put(datanodeDetails.getUuid(), datanodeDetails);
         LOG.info("Updating nodeDB for " + datanodeDetails.getHostName());
       } catch (IOException e) {
