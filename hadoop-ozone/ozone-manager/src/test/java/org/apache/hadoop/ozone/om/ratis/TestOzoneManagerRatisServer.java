@@ -115,7 +115,7 @@ public class TestOzoneManagerRatisServer {
     secConfig = new SecurityConfig(conf);
     certClient = new OMCertificateClient(secConfig);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-      omNodeDetails, Collections.emptyList(), secConfig, certClient, false);
+      omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();
   }
 
@@ -155,7 +155,7 @@ public class TestOzoneManagerRatisServer {
 
     // Start new Ratis server. It should pick up and load the new SnapshotInfo
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-        omNodeDetails, Collections.emptyList(), secConfig, certClient, false);
+        omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();
     TermIndex lastAppliedTermIndex =
         omRatisServer.getLastAppliedTermIndex();
@@ -225,7 +225,7 @@ public class TestOzoneManagerRatisServer {
     omRatisServer.stop();
     OzoneManagerRatisServer newOmRatisServer = OzoneManagerRatisServer
         .newOMRatisServer(newConf, ozoneManager, nodeDetails,
-            Collections.emptyList(), secConfig, certClient, false);
+            Collections.emptyMap(), secConfig, certClient, false);
     newOmRatisServer.start();
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));

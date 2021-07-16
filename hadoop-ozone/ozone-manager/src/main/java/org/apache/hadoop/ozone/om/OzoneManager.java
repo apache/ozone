@@ -333,7 +333,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneManagerRatisServer omRatisServer;
   private OzoneManagerSnapshotProvider omSnapshotProvider;
   private OMNodeDetails omNodeDetails;
-  private List<OMNodeDetails> peerNodes;
+  private Map<String, OMNodeDetails> peerNodesMap;
   private File omRatisSnapshotDir;
   private final RatisSnapshotInfo omRatisSnapshotInfo;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
@@ -396,7 +396,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OMHANodeDetails omhaNodeDetails =
         OMHANodeDetails.loadOMHAConfig(configuration);
 
-    this.peerNodes = omhaNodeDetails.getPeerNodeDetails();
+    this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
 
     omStorage = new OMStorage(conf);
@@ -1142,9 +1142,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             omRatisSnapshotDir.toPath());
       }
 
-      if (peerNodes != null && !peerNodes.isEmpty()) {
+      if (peerNodesMap != null && !peerNodesMap.isEmpty()) {
         this.omSnapshotProvider = new OzoneManagerSnapshotProvider(
-            configuration, omRatisSnapshotDir, peerNodes);
+            configuration, omRatisSnapshotDir, peerNodesMap);
       }
     }
   }
@@ -1400,26 +1400,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void updatePeerList(List<String> omNodeIds) {
     List<String> ratisServerPeerIdsList = omRatisServer.getPeerIds();
     for (String omNodeId : omNodeIds) {
-      if (getOMNodeId().equals(omNodeId)) {
-        continue;
-      }
-      boolean isPresentInOMPeers = false;
-      for (OMNodeDetails peerNode : peerNodes) {
-        if (peerNode.getNodeId().contains(omNodeId)) {
-          isPresentInOMPeers = true;
-          if (!ratisServerPeerIdsList.contains(omNodeId)) {
-            // This can happen on a bootstrapping OM. The peer information
-            // would be present in OzoneManager but OMRatisServer peer list
-            // would not have the peers list. OMRatisServer peer list of
-            // bootstrapping node should be updated after it get the RaftConf
-            // through Ratis.
-            omRatisServer.addRaftPeer(peerNode);
-          }
-        }
-      }
-      // Add the node to OM peers list if it is not present already
-      if (!isPresentInOMPeers) {
+      // Check if the OM NodeID is already present in the peer list or its
+      // the local NodeID.
+      if (!peerNodesMap.containsKey(omNodeId) &&
+          !getOMNodeId().equals(omNodeId)) {
         addOMNodeToPeers(omNodeId);
+      } else {
+        // Check if the OMNodeID is present in the RatisServer's peer list
+        if (!ratisServerPeerIdsList.contains(omNodeId)) {
+          // This can happen on a bootstrapping OM. The peer information
+          // would be present in OzoneManager but OMRatisServer peer list
+          // would not have the peers list. OMRatisServer peer list of
+          // bootstrapping node should be updated after it gets the RaftConf
+          // through Ratis.
+          omRatisServer.addRaftPeer(peerNodesMap.get(omNodeId));
+        }
       }
     }
   }
@@ -1446,10 +1441,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     }
 
-    peerNodes.add(newOMNodeDetails);
+    peerNodesMap.put(newOMNodeId, newOMNodeDetails);
     if (omSnapshotProvider == null) {
       omSnapshotProvider = new OzoneManagerSnapshotProvider(
-          configuration, omRatisSnapshotDir, peerNodes);
+          configuration, omRatisSnapshotDir, peerNodesMap);
     } else {
       omSnapshotProvider.addNewPeerNode(newOMNodeDetails);
     }
@@ -1467,12 +1462,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (getOMNodeId().equals(omNodeId)) {
       return true;
     }
-    if (peerNodes != null && !peerNodes.isEmpty()) {
-      for (OMNodeDetails peerNode : peerNodes) {
-        if (peerNode.getNodeId().contains(omNodeId)) {
-          return true;
-        }
-      }
+    if (peerNodesMap != null && !peerNodesMap.isEmpty()) {
+      return peerNodesMap.containsKey(omNodeId);
     }
     return false;
   }
@@ -1532,7 +1523,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         RatisDropwizardExports.
             registerRatisMetricReporters(ratisMetricsMap);
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
-            configuration, this, omNodeDetails, peerNodes,
+            configuration, this, omNodeDetails, peerNodesMap,
             secConfig, certClient, shouldBootstrap);
       }
       LOG.info("OzoneManager Ratis server initialized at port {}",
@@ -2921,7 +2912,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .build());
       }
 
-      for (OMNodeDetails peerNode : peerNodes) {
+      for (OMNodeDetails peerNode : peerNodesMap.values()) {
         ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
             .setNodeType(HddsProtos.NodeType.OM)
             .setHostname(peerNode.getHostName())
@@ -3787,7 +3778,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @VisibleForTesting
   public List<OMNodeDetails> getPeerNodes() {
-    return peerNodes;
+    return new ArrayList<>(peerNodesMap.values());
   }
 
   @VisibleForTesting

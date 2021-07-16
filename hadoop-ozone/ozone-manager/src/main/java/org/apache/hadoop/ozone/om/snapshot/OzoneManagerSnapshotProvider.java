@@ -72,15 +72,13 @@ public class OzoneManagerSnapshotProvider {
   private static final String OM_SNAPSHOT_DB = "om.snapshot.db";
 
   public OzoneManagerSnapshotProvider(MutableConfigurationSource conf,
-      File omRatisSnapshotDir, List<OMNodeDetails> peerNodes) {
+      File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
 
     LOG.info("Initializing OM Snapshot Provider");
     this.omSnapshotDir = omRatisSnapshotDir;
 
     this.peerNodesMap = new HashMap<>();
-    for (OMNodeDetails peerNode : peerNodes) {
-      this.peerNodesMap.put(peerNode.getNodeId(), peerNode);
-    }
+    peerNodesMap.putAll(peerNodeDetails);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")

@@ -175,7 +175,7 @@ public final class OzoneManagerRatisServer {
    */
   public static OzoneManagerRatisServer newOMRatisServer(
       ConfigurationSource ozoneConf, OzoneManager omProtocol,
-      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes,
+      OMNodeDetails omNodeDetails, Map<String, OMNodeDetails> peerNodes,
       SecurityConfig secConfig, CertificateClient certClient,
       boolean isBootstrapping) throws IOException {
 
@@ -201,18 +201,19 @@ public final class OzoneManagerRatisServer {
       // On regular startup, add all OMs to Ratis ring
       raftPeers.add(localRaftPeer);
 
-      for (OMNodeDetails peerInfo : peerNodes) {
-        String peerNodeId = peerInfo.getNodeId();
+      for (Map.Entry<String, OMNodeDetails> peerInfo : peerNodes.entrySet()) {
+        String peerNodeId = peerInfo.getKey();
+        OMNodeDetails peerNode = peerInfo.getValue();
         RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
         RaftPeer raftPeer;
-        if (peerInfo.isHostUnresolved()) {
+        if (peerNode.isHostUnresolved()) {
           raftPeer = RaftPeer.newBuilder()
               .setId(raftPeerId)
-              .setAddress(peerInfo.getRatisHostPortStr())
+              .setAddress(peerNode.getRatisHostPortStr())
               .build();
         } else {
           InetSocketAddress peerRatisAddr = new InetSocketAddress(
-              peerInfo.getInetAddress(), peerInfo.getRatisPort());
+              peerNode.getInetAddress(), peerNode.getRatisPort());
           raftPeer = RaftPeer.newBuilder()
               .setId(raftPeerId)
               .setAddress(peerRatisAddr)
