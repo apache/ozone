@@ -629,7 +629,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
       inflightMove.remove(id);
       inflightMoveFuture.remove(id);
     } else {
-      handleMove(container,
+      deleteSrcDnForMove(container,
           containerManager.getContainerReplicas(id));
     }
   }
@@ -1179,11 +1179,12 @@ public class ReplicationManager implements MetricsSource, SCMService {
 
   /**
    * if the container is in inflightMove, handle move.
+   * This function assumes replication has been completed
    *
    * @param cif ContainerInfo
    * @param replicaSet An Set of replicas, which may have excess replicas
    */
-  private void handleMove(final ContainerInfo cif,
+  private void deleteSrcDnForMove(final ContainerInfo cif,
                    final Set<ContainerReplica> replicaSet) {
     final ContainerID cid = cif.containerID();
     if (inflightMove.containsKey(cid)) {
