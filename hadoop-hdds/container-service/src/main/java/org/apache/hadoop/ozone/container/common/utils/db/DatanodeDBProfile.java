@@ -25,7 +25,6 @@ import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.DBOptions;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.LRUCache;
-import org.rocksdb.util.SizeUnit;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -65,8 +64,9 @@ public abstract class DatanodeDBProfile {
     }
   }
 
-
-
+  /**
+   * DBProfile for SSD datanode disks.
+   */
   public static class SSD extends DatanodeDBProfile {
     private static final StorageBasedProfile SSD_STORAGE_BASED_PROFILE =
         new StorageBasedProfile(DBProfile.SSD);
@@ -83,8 +83,9 @@ public abstract class DatanodeDBProfile {
     }
   }
 
-
-
+  /**
+   * DBProfile for HDD datanode disks.
+   */
   public static class Disk extends DatanodeDBProfile {
     private static final StorageBasedProfile DISK_STORAGE_BASED_PROFILE =
         new StorageBasedProfile(DBProfile.DISK);
@@ -101,8 +102,9 @@ public abstract class DatanodeDBProfile {
     }
   }
 
-
-
+  /**
+   * Base profile for datanode storage disks.
+   */
   private static final class StorageBasedProfile {
     private final AtomicReference<ColumnFamilyOptions> cfOptions =
         new AtomicReference<>();
