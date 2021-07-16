@@ -126,7 +126,7 @@ public final class OzoneAclUtil {
   public static boolean checkAclRights(List<OzoneAcl> acls,
       RequestContext context) throws OMException {
     String[] userGroups = context.getClientUgi().getGroupNames();
-    String userName = context.getClientUgi().getUserName();
+    String userName = context.getClientUgi().getShortUserName();
     ACLType aclToCheck = context.getAclRights();
     for (OzoneAcl acl : acls) {
       if (checkAccessInAcl(acl, userGroups, userName, aclToCheck)) {
@@ -151,6 +151,31 @@ public final class OzoneAclUtil {
     return ((bitset.get(acl.ordinal())
         || bitset.get(ALL.ordinal()))
         && !bitset.get(NONE.ordinal()));
+  }
+
+  /**
+   * Helper function to inherit access ACL to child object.
+   * OzoneUtils.addAcl().
+   * @param acls
+   * @param parentAcls
+   * @return true if acls inherited ACCESS acls from parentAcls successfully,
+   * false otherwise.
+   */
+  public static boolean inheritAccessAcls(List<OzoneAcl> acls,
+                                           List<OzoneAcl> parentAcls) {
+    List<OzoneAcl> inheritedAcls = null;
+    if (parentAcls != null && !parentAcls.isEmpty()) {
+      inheritedAcls = parentAcls.stream()
+              .filter(a -> a.getAclScope() == ACCESS)
+              .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
+                      acl.getAclBitSet(), ACCESS))
+              .collect(Collectors.toList());
+    }
+    if (inheritedAcls != null && !inheritedAcls.isEmpty()) {
+      inheritedAcls.stream().forEach(acl -> addAcl(acls, acl));
+      return true;
+    }
+    return false;
   }
 
   /**
