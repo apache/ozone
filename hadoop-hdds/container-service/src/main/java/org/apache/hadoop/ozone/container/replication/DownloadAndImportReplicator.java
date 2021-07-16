@@ -122,7 +122,15 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
                 containerID, bytes);
         task.setTransferredBytes(bytes);
 
-        importContainer(containerID, path);
+        if (bytes <= 0) {
+          task.setStatus(Status.FAILED);
+          LOG.warn("Container {} is downloaded with size {}",
+              containerID, bytes);
+        } else {
+          importContainer(containerID, path);
+          LOG.info("Container {} is replicated successfully", containerID);
+          task.setStatus(Status.DONE);
+        }
         LOG.info("Container {} is replicated successfully", containerID);
         task.setStatus(Status.DONE);
       } catch (Exception e) {
