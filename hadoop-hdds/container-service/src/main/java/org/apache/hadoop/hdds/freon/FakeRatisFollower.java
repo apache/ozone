@@ -26,12 +26,16 @@ import org.apache.ratis.proto.RaftProtos.RequestVoteReplyProto;
 import org.apache.ratis.proto.RaftProtos.RequestVoteRequestProto;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Helper class to use it to replace original Ratis GRPC outgoing calls.
  */
 public final class FakeRatisFollower {
 
+  private static final Logger LOG =
+          LoggerFactory.getLogger(FakeRatisFollower.class);
   private static int simulatedLatency = 0;
 
   static {
@@ -118,7 +122,8 @@ public final class FakeRatisFollower {
       try {
         Thread.sleep(simulatedLatency);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        LOG.error("Interrupted exception while sleeping.", e);
+        Thread.currentThread().interrupt();
       }
     }
   }

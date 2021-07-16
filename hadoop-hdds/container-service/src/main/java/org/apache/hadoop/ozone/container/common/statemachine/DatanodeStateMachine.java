@@ -164,7 +164,7 @@ public class DatanodeStateMachine implements Closeable {
     replicatorMetrics = new MeasuredReplicator(replicator);
 
     supervisor =
-        new ReplicationSupervisor(container.getContainerSet(),
+        new ReplicationSupervisor(container.getContainerSet(), context,
             replicatorMetrics, dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
@@ -284,6 +284,7 @@ public class DatanodeStateMachine implements Closeable {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
             //triggerHeartbeat is called during the sleep
+            Thread.currentThread().interrupt();
           }
         }
       }
@@ -558,6 +559,7 @@ public class DatanodeStateMachine implements Closeable {
             }
           } catch (InterruptedException e) {
             // Ignore this exception.
+            Thread.currentThread().interrupt();
           }
         }
       }

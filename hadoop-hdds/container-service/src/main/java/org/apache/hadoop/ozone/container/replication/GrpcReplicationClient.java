@@ -116,8 +116,9 @@ public class GrpcReplicationClient implements AutoCloseable{
     channel.shutdown();
     try {
       channel.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       LOG.error("failed to shutdown replication channel", e);
+      Thread.currentThread().interrupt();
     }
   }
 

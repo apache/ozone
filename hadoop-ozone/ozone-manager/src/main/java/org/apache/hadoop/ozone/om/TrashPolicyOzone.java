@@ -238,6 +238,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           executor.awaitTermination(60, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
           LOG.error("Error attempting to shutdown", e);
+          Thread.currentThread().interrupt();
         }
       }
     }

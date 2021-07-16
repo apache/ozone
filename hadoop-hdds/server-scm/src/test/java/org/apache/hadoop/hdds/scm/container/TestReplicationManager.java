@@ -130,7 +130,7 @@ public class TestReplicationManager {
     Mockito.when(containerPlacementPolicy.chooseDatanodes(
         Mockito.any(),
         Mockito.any(),
-        Mockito.anyInt(), Mockito.anyLong()))
+        Mockito.anyInt(), Mockito.anyLong(), Mockito.anyLong()))
         .thenAnswer(invocation -> {
           int count = (int) invocation.getArguments()[2];
           return IntStream.range(0, count)
