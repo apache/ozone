@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -72,7 +73,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
-import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.GeneratedMessage;
@@ -166,6 +166,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
+  private final Clock clock;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -182,7 +183,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
                             final EventPublisher eventPublisher,
                             final SCMContext scmContext,
                             final SCMServiceManager serviceManager,
-                            final NodeManager nodeManager) {
+                            final NodeManager nodeManager,
+                            final java.time.Clock clock) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
@@ -193,6 +195,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
     this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
+    this.clock = clock;
 
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -276,13 +279,13 @@ public class ReplicationManager implements MetricsSource, SCMService {
   private synchronized void run() {
     try {
       while (running) {
-        final long start = Time.monotonicNow();
+        final long start = clock.millis();
         final List<ContainerInfo> containers =
             containerManager.getContainers();
         containers.forEach(this::processContainer);
 
         LOG.info("Replication Monitor Thread took {} milliseconds for" +
-                " processing {} containers.", Time.monotonicNow() - start,
+                " processing {} containers.", clock.millis() - start,
             containers.size());
 
         wait(rmConf.getInterval());
@@ -446,7 +449,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
       final Map<ContainerID, List<InflightAction>> inflightActions,
       final Predicate<InflightAction> filter) {
     final ContainerID id = container.containerID();
-    final long deadline = Time.monotonicNow() - rmConf.getEventTimeout();
+    final long deadline = clock.millis() - rmConf.getEventTimeout();
     if (inflightActions.containsKey(id)) {
       final List<InflightAction> actions = inflightActions.get(id);
 
@@ -1087,7 +1090,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
     final CommandForDatanode<T> datanodeCommand =
         new CommandForDatanode<>(datanode.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-    tracker.accept(new InflightAction(datanode, Time.monotonicNow()));
+    tracker.accept(new InflightAction(datanode, clock.millis()));
   }
 
   /**
@@ -1279,7 +1282,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
-          lastTimeToBeReadyInMillis = Time.monotonicNow();
+          lastTimeToBeReadyInMillis = clock.millis();
           serviceStatus = ServiceStatus.RUNNING;
         }
       } else {
@@ -1296,7 +1299,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
     try {
       // If safe mode is off, then this SCMService starts to run with a delay.
       return serviceStatus == ServiceStatus.RUNNING &&
-          Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
+          clock.millis() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
     } finally {
       serviceLock.unlock();
     }
