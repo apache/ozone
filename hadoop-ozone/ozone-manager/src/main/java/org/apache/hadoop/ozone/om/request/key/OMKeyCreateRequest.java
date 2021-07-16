@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -105,6 +106,14 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             "are not allowed." + keyPath,
             OMException.ResultCodes.INVALID_KEY_NAME);
       }
+    }
+
+    try {
+      Paths.get(keyPath);
+    } catch (InvalidPathException ex) {
+      throw new OMException("Invalid KeyPath, malformed input or input " +
+          "contains unmappable characters: " + keyPath,
+          OMException.ResultCodes.INVALID_KEY_NAME);
     }
 
     // We cannot allocate block for multipart upload part when
