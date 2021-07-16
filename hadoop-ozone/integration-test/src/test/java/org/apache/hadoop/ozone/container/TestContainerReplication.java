@@ -18,16 +18,21 @@
 
 package org.apache.hadoop.ozone.container;
 
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
+import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -43,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -54,22 +60,38 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.event.Level;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
@@ -91,6 +113,7 @@ public class TestContainerReplication {
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private String placementPolicyClass;
+  private MiniKdc miniKdc;
 
   @Parameterized.Parameters
   public static List<String> parameters() {
@@ -118,11 +141,20 @@ public class TestContainerReplication {
 
     OzoneManager.setTestSecureOmFlag(true);
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
-    conf.setBoolean("ozone.security.enabled", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 
+    Properties securityProperties = MiniKdc.createConf();
+    miniKdc = new MiniKdc(securityProperties, new File("/tmp/minikdc"));
+    miniKdc.start();
+
+
+    File keytabDir = new File(GenericTestUtils.getRandomizedTempPath());
+    Files.createDirectories(keytabDir.toPath());
+    generatePrincipals(conf, keytabDir);
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
 
@@ -146,10 +178,74 @@ public class TestContainerReplication {
     createTestData();
   }
 
+
+  private void generatePrincipals(MutableConfigurationSource conf, File workDir) throws Exception {
+    String host = InetAddress.getLocalHost().getCanonicalHostName().toLowerCase();
+
+    String curUser = UserGroupInformation.getCurrentUser().getUserName();
+    conf.set(OZONE_ADMINISTRATORS, curUser);
+
+    String realm = miniKdc.getRealm();
+    String hostAndRealm = host + "@" + realm;
+
+    createPrincipal(conf,
+        new File(workDir, "scm.keytab"),
+        "scm",
+        hostAndRealm,
+        HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
+        HDDS_SCM_KERBEROS_PRINCIPAL_KEY);
+
+    createPrincipal(conf,
+        new File(workDir, "om.keytab"),
+        "om",
+        hostAndRealm,
+        OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
+        OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+
+
+    createPrincipal(conf,
+        new File(workDir, "om_http.keytab"),
+        "HTTP_OM",
+        hostAndRealm,
+        OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE,
+        OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY);
+
+
+    createPrincipal(conf,
+        new File(workDir, "scm_http.keytab"),
+        "HTTP_SCM",
+        hostAndRealm,
+        HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY,
+        HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY);
+
+    createPrincipal(conf,
+        new File(workDir, "dn.keytab"),
+        "dn",
+        hostAndRealm,
+        DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY,
+        DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY);
+
+  }
+
+  private void createPrincipal(
+      MutableConfigurationSource conf,
+      File keytabFile,
+      String principal,
+      String hostAndRealm,
+      String keytabConfig,
+      String principalConfig) throws Exception {
+    conf.set(keytabConfig, keytabFile.getAbsolutePath());
+    conf.set(principalConfig, principal + "/" + hostAndRealm);
+    miniKdc.createPrincipal(keytabFile.getAbsoluteFile(), principal + "/" + hostAndRealm);
+  }
+
   @After
   public void tearDown() {
     if (cluster != null) {
       cluster.shutdown();
+    }
+    if (miniKdc != null) {
+      miniKdc.stop();
     }
   }
 
