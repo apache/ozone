@@ -154,8 +154,6 @@ public class TestReplicationManager {
         Mockito.any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
 
-    SCMServiceManager serviceManager = new SCMServiceManager();
-
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
     createReplicationManager(new ReplicationManagerConfiguration());
   }
