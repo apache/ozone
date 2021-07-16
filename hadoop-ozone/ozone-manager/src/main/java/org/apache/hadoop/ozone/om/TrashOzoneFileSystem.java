@@ -157,7 +157,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath dstPath = new OFSPath(dst);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketLayout())) {
       return renameFSO(srcPath, dstPath);
     }
     Preconditions.checkArgument(srcPath.getBucketName().
@@ -191,7 +191,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath srcPath = new OFSPath(path);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketLayout())) {
       return deleteFSO(srcPath);
     }
     DeleteIterator iterator = new DeleteIterator(path, true);
