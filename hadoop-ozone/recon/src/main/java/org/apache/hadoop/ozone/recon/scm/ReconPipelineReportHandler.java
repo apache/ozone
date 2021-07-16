@@ -63,8 +63,16 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
     PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
     if (!reconPipelineManager.containsPipeline(pipelineID)) {
       LOG.info("Unknown pipeline {}. Trying to get from SCM.", pipelineID);
-      Pipeline pipelineFromScm =
-          scmServiceProvider.getPipeline(report.getPipelineID());
+      Pipeline pipelineFromScm = null;
+
+      try {
+        pipelineFromScm =
+            scmServiceProvider.getPipeline(report.getPipelineID());
+      } catch (PipelineNotFoundException pnfe) {
+        LOG.error("Could not find pipeline at SCM: {}.", pipelineID, pnfe);
+        return;
+      }
+
       LOG.info("Adding new pipeline {} to Recon pipeline metadata.",
           pipelineFromScm);
       reconPipelineManager.addPipeline(pipelineFromScm);
