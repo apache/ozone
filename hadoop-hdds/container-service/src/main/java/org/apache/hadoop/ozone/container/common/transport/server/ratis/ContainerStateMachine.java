@@ -524,7 +524,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     return CompletableFuture.supplyAsync(() -> {
       if (stream == null) {
         return JavaUtils.completeExceptionally(
-            new IllegalStateException("DataStream: " + stream + "is Null"));
+            new IllegalStateException("DataStream is null"));
       }
       if (stream.getDataChannel().isOpen()) {
         return JavaUtils.completeExceptionally(
