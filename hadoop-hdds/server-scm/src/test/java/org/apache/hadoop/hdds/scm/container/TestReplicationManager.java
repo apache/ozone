@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -50,6 +51,8 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -89,6 +92,7 @@ public class TestReplicationManager {
   private ContainerManagerV2 containerManager;
   private OzoneConfiguration conf;
   private SCMNodeManager scmNodeManager;
+  private TestClock clock;
 
   @Before
   public void setup()
@@ -150,19 +154,8 @@ public class TestReplicationManager {
         Mockito.any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
 
-    SCMServiceManager serviceManager = new SCMServiceManager();
-
-    replicationManager = new ReplicationManager(
-        conf,
-        containerManager,
-        containerPlacementPolicy,
-        eventQueue,
-        SCMContext.emptyContext(),
-        serviceManager,
-        nodeManager);
-
-    serviceManager.notifyStatusChanged();
-    Thread.sleep(100L);
+    clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
+    createReplicationManager(new ReplicationManagerConfiguration());
   }
 
   private void createReplicationManager(ReplicationManagerConfiguration rmConf)
@@ -174,7 +167,6 @@ public class TestReplicationManager {
     config.setFromObject(rmConf);
 
     SCMServiceManager serviceManager = new SCMServiceManager();
-
     replicationManager = new ReplicationManager(
         config,
         containerManager,
@@ -182,7 +174,8 @@ public class TestReplicationManager {
         eventQueue,
         SCMContext.emptyContext(),
         serviceManager,
-        nodeManager);
+        nodeManager,
+        clock);
 
     serviceManager.notifyStatusChanged();
     Thread.sleep(100L);
@@ -1091,6 +1084,25 @@ public class TestReplicationManager {
     // There should be replica scheduled, but as all nodes are stale, nothing
     // gets scheduled.
     assertReplicaScheduled(0);
+  }
+
+  @Test
+  public void testReplicateCommandTimeout() throws
+      SCMException, InterruptedException {
+    long timeout = new ReplicationManagerConfiguration().getEventTimeout();
+
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    assertReplicaScheduled(1);
+
+    // Already a pending replica, so nothing scheduled
+    assertReplicaScheduled(0);
+
+    // Advance the clock past the timeout, and there should be a replica
+    // scheduled
+    clock.fastForward(timeout + 1000);
+    assertReplicaScheduled(1);
   }
 
   private ContainerInfo createContainer(LifeCycleState containerState)
