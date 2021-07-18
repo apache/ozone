@@ -89,6 +89,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedSupplier;
+import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -515,6 +516,22 @@ public class ContainerStateMachine extends BaseStateMachine {
         return new LocalStream(new StreamDataChannel(Paths.get(path)));
       } catch (IOException e) {
         throw new CompletionException("Failed to create data stream", e);
+      }
+    }, executor);
+  }
+
+  public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
+    return CompletableFuture.supplyAsync(() -> {
+      if (stream == null) {
+        return JavaUtils.completeExceptionally(
+            new IllegalStateException("DataStream is null"));
+      }
+      if (stream.getDataChannel().isOpen()) {
+        return JavaUtils.completeExceptionally(
+            new IllegalStateException(
+                "DataStream: " + stream + " is not closed properly"));
+      } else {
+        return CompletableFuture.completedFuture(null);
       }
     }, executor);
   }
