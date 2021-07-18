@@ -325,7 +325,7 @@ public class TestBlockDeletion {
     });
 
     cluster.shutdownHddsDatanode(0);
-    scm.getReplicationManager().processContainersNow();
+    scm.getReplicationManager().processAll();
     // Wait for container state change to DELETING
     Thread.sleep(100);
     containerInfos = scm.getContainerManager().getContainers();
@@ -336,7 +336,7 @@ public class TestBlockDeletion {
         LogCapturer.captureLogs(ReplicationManager.LOG);
     logCapturer.clearOutput();
 
-    scm.getReplicationManager().processContainersNow();
+    scm.getReplicationManager().processAll();
     Thread.sleep(100);
     // Wait for delete replica command resend
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
@@ -344,7 +344,7 @@ public class TestBlockDeletion {
     cluster.restartHddsDatanode(0, true);
     Thread.sleep(100);
 
-    scm.getReplicationManager().processContainersNow();
+    scm.getReplicationManager().processAll();
     // Wait for container state change to DELETED
     Thread.sleep(100);
     containerInfos = scm.getContainerManager().getContainers();
