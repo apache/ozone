@@ -29,7 +29,7 @@ import java.time.ZoneId;
  * System.currentTimeMills.
  */
 
-public class MonotonicClock extends Clock {
+public final class MonotonicClock extends Clock {
 
   private final ZoneId zoneId;
 
