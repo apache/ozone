@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 @ConfigGroup(prefix = "ozone.replication")
 public class ReplicationConfigValidator {
 
-  @Config(key = "enabled",
+  @Config(key = "allowed-configs",
       defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4))$",
       type = ConfigType.STRING,
       description = "Regular expression to restrict enabled " +
@@ -50,7 +50,7 @@ public class ReplicationConfigValidator {
 
   public ReplicationConfig validate(ReplicationConfig replicationConfig) {
     if (validationRegexp != null) {
-      if (!validationRegexp.matcher(replicationConfig.toString()).find()) {
+      if (!validationRegexp.matcher(replicationConfig.toString()).matches()) {
         throw new IllegalArgumentException("Invalid replication config " +
             replicationConfig.toString() +
             " Replication config should match " + validationPattern);

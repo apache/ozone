@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.junit.Assert;
 import org.junit.Test;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -47,7 +46,7 @@ public class TestReplicationConfigValidator {
   @Test
   public void testWithoutValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
-    config.set("ozone.replication.enabled", "");
+    config.set("ozone.replication.allowed-configs", "");
 
     final ReplicationConfigValidator validator =
         config.getObject(ReplicationConfigValidator.class);
@@ -57,21 +56,18 @@ public class TestReplicationConfigValidator {
 
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
   public void testCustomValidation() {
     MutableConfigurationSource config = new InMemoryConfiguration();
-    config.set("ozone.replication.enabled", "RATIS/THREE");
+    config.set("ozone.replication.allowed-configs", "RATIS/THREE");
 
     final ReplicationConfigValidator validator =
         config.getObject(ReplicationConfigValidator.class);
 
     validator.validate(new RatisReplicationConfig(THREE));
 
-    try {
-      validator.validate(new RatisReplicationConfig(ONE));
-      Assert.fail("Exception is expected");
-    } catch (IllegalArgumentException ex) {
-      //expected
-    }
+    validator.validate(new RatisReplicationConfig(ONE));
+    //exception is expected
+
   }
 }
