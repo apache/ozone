@@ -42,6 +42,7 @@ import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -1373,7 +1374,7 @@ public class RpcClient implements ClientProtocol {
       keyOutputStream = new ECKeyOutputStream.Builder().setHandler(openKey)
           .setXceiverClientManager(xceiverClientManager)
           .setOmClient(ozoneManagerClient).setRequestID(requestId)
-          .setReplicationConfig(replicationConfig)
+          .setReplicationConfig((ECReplicationConfig) replicationConfig)
           .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
           .setConfig(clientConfig).build();
     } else {

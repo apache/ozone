@@ -28,16 +28,27 @@ import java.util.regex.Pattern;
  * Replication configuration for EC replication.
  */
 public class ECReplicationConfig implements ReplicationConfig {
-  
+
   private static final Pattern STRING_FORMAT = Pattern.compile("(\\d+)-(\\d+)");
-  
+
+  public static final String RS_CODEC = "rs";
+  public static final String XOR_CODEC = "xor";
+
   private int data;
 
   private int parity;
 
+  private String codec = RS_CODEC;
+
   public ECReplicationConfig(int data, int parity) {
     this.data = data;
     this.parity = parity;
+  }
+
+  public ECReplicationConfig(int data, int parity, String codec) {
+    this.data = data;
+    this.parity = parity;
+    this.codec = codec;
   }
 
   public ECReplicationConfig(String string) {
@@ -59,6 +70,7 @@ public class ECReplicationConfig implements ReplicationConfig {
       HddsProtos.ECReplicationConfig ecReplicationConfig) {
     this.data = ecReplicationConfig.getData();
     this.parity = ecReplicationConfig.getParity();
+    this.codec = ecReplicationConfig.getCodec();
   }
 
   @Override
@@ -75,6 +87,7 @@ public class ECReplicationConfig implements ReplicationConfig {
     return HddsProtos.ECReplicationConfig.newBuilder()
         .setData(data)
         .setParity(parity)
+        .setCodec(codec)
         .build();
   }
 
@@ -104,6 +117,13 @@ public class ECReplicationConfig implements ReplicationConfig {
     }
     ECReplicationConfig that = (ECReplicationConfig) o;
     return data == that.data && parity == that.parity;
+  }
+
+  public String getCodecName() {
+    if (codec == null || codec.length() == 0) {
+      return RS_CODEC;
+    }
+    return codec;
   }
 
   @Override

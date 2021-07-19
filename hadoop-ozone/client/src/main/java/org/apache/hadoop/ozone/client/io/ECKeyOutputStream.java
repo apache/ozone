@@ -32,14 +32,8 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.apache.hadoop.io.erasurecode.CodecUtil;
-import org.apache.hadoop.io.erasurecode.ECSchema;
-import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
-import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
-import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -49,6 +43,9 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ozone.erasurecode.CodecRegistry;
+import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
+import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,8 +57,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private int ecChunkSize = 1024;
-  private final int numDataBlks;
-  private final int numParityBlks;
+  private ECReplicationConfig ecReplicationConfig;
   private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
   private final RawErasureEncoder encoder;
   // TODO: EC: Currently using the below EC Schema. This has to be modified and
@@ -108,7 +104,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public ECKeyOutputStream(OzoneClientConfig config, OpenKeySession handler,
       XceiverClientFactory xceiverClientManager, OzoneManagerProtocol omClient,
-      int chunkSize, String requestId, ReplicationConfig replicationConfig,
+      int chunkSize, String requestId, ECReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion) {
     this.config = config;
@@ -117,10 +113,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.config.setStreamBufferFlushSize(ecChunkSize);
     this.config.setStreamBufferSize(ecChunkSize);
     assert replicationConfig instanceof ECReplicationConfig;
-    this.numDataBlks = ((ECReplicationConfig) replicationConfig).getData();
-    this.numParityBlks = ((ECReplicationConfig) replicationConfig).getParity();
+    this.ecReplicationConfig = replicationConfig;
     ecChunkBufferCache =
-        new ECChunkBuffers(ecChunkSize, numDataBlks, numParityBlks);
+        new ECChunkBuffers(ecChunkSize,
+            ecReplicationConfig.getData(),
+            ecReplicationConfig.getParity());
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new ECBlockOutputStreamEntryPool(config, omClient, requestId,
@@ -133,13 +130,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.isException = false;
     this.writeOffset = 0;
     OzoneConfiguration conf = new OzoneConfiguration();
-    ECSchema schema =
-        new ECSchema(DEFAULT_CODEC_NAME, numDataBlks, numParityBlks);
-    ErasureCodecOptions options = new ErasureCodecOptions(schema);
-    RSErasureCodec codec = new RSErasureCodec(conf, options);
-    this.encoder = CodecUtil.createRawEncoder(conf,
-        SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
-        codec.getCoderOptions());
+    this.encoder = CodecRegistry.getInstance()
+        .getCodecFactory(ecReplicationConfig.getCodecName())
+        .createEncoder(replicationConfig);
   }
 
   /**
@@ -217,7 +210,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private void checkAndWriteParityCells() throws IOException {
     //check data blocks finished
     //If index is > datanum blks
-    if (blockOutputStreamEntryPool.getCurrIdx() == numDataBlks) {
+    if (blockOutputStreamEntryPool.getCurrIdx() ==
+        ecReplicationConfig.getData()) {
       //Lets encode and write
       //encoder.encode();
       writeParityCells();
@@ -228,9 +222,10 @@ public class ECKeyOutputStream extends KeyOutputStream {
       ecChunkBufferCache.clear();
 
       // check if block ends?
-      if (currentBlockGroupLen == numDataBlks * blockOutputStreamEntryPool
-          .getStreamEntries().get(blockOutputStreamEntryPool.getCurrIdx())
-          .getLength()) {
+      if (currentBlockGroupLen ==
+          ecReplicationConfig.getData() * blockOutputStreamEntryPool
+              .getStreamEntries().get(blockOutputStreamEntryPool.getCurrIdx())
+              .getLength()) {
         blockOutputStreamEntryPool.endECBlock();
         currentBlockGroupLen = 0;
       }
@@ -240,6 +235,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
   void writeParityCells() throws IOException {
     final ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
     //encode the data cells
+    final int numDataBlks = ecReplicationConfig.getData();
+    final int numParityBlks = ecReplicationConfig.getParity();
     for (int i = 0; i < numDataBlks; i++) {
       buffers[i].flip();
     }
@@ -247,7 +244,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
     encoder.encode(buffers, parityBuffers);
     for (int i =
-         numDataBlks; i < (this.numDataBlks + this.numParityBlks); i++) {
+         numDataBlks; i < (numDataBlks + numParityBlks); i++) {
       handleWrite(parityBuffers[i - numDataBlks].array(), 0, ecChunkSize, true,
           true);
     }
@@ -274,7 +271,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     if (isFullCell) {
       ByteBuffer bytesToWrite = isParity ?
           ecChunkBufferCache.getParityBuffers()[blockOutputStreamEntryPool
-              .getCurrIdx() - numDataBlks] :
+              .getCurrIdx() - ecReplicationConfig.getData()] :
           ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
               .getCurrIdx()];
       try {
@@ -286,7 +283,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
       }
 
       blockOutputStreamEntryPool
-          .updateToNextStream(numDataBlks + numParityBlks);
+          .updateToNextStream(ecReplicationConfig.getData() +
+              ecReplicationConfig.getParity());
     }
   }
 
@@ -500,7 +498,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     private boolean isMultipartKey;
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
-    private ReplicationConfig replicationConfig;
+    private ECReplicationConfig replicationConfig;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -553,7 +551,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     public ECKeyOutputStream.Builder setReplicationConfig(
-        ReplicationConfig replConfig) {
+        ECReplicationConfig replConfig) {
       this.replicationConfig = replConfig;
       return this;
     }
@@ -582,16 +580,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private static class ECChunkBuffers {
     private final ByteBuffer[] dataBuffers;
     private final ByteBuffer[] parityBuffers;
-    private final int dataBlks;
-    private final int parityBlks;
     private int cellSize;
 
     ECChunkBuffers(int cellSize, int numData, int numParity) {
       this.cellSize = cellSize;
-      this.parityBlks = numParity;
-      this.dataBlks = numData;
-      dataBuffers = new ByteBuffer[this.dataBlks];
-      parityBuffers = new ByteBuffer[this.parityBlks];
+      dataBuffers = new ByteBuffer[numData];
+      parityBuffers = new ByteBuffer[numParity];
       allocateBuffers(cellSize, dataBuffers);
       allocateBuffers(cellSize, parityBuffers);
     }

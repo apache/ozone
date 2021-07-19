@@ -17,28 +17,29 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 
 /**
- * A utility class that maintains encoding state during an encode call.
+ * A dummy raw encoder that does no real computation.
+ * Instead, it just returns zero bytes.
+ * This encoder can be used to isolate the performance issue to HDFS side logic
+ * instead of codec, and is intended for test only.
  */
 @InterfaceAudience.Private
-abstract class EncodingState {
-  RawErasureEncoder encoder;
-  int encodeLength;
+public class DummyRawEncoder extends RawErasureEncoder {
 
-  /**
-   * Check and validate decoding parameters, throw exception accordingly.
-   * @param inputs input buffers to check
-   * @param outputs output buffers to check
-   */
-  <T> void checkParameters(T[] inputs, T[] outputs) {
-    if (inputs.length != encoder.getNumDataUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid inputs length " + inputs.length + " !=" + encoder.getNumDataUnits());
-    }
-    if (outputs.length != encoder.getNumParityUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid outputs length " + outputs.length + " !=" + encoder.getNumParityUnits());
-    }
+  public DummyRawEncoder(ECReplicationConfig ecReplicationConfig) {
+    super(ecReplicationConfig);
+  }
+
+  @Override
+  protected void doEncode(ByteArrayEncodingState encodingState) {
+    // Nothing to do. Output buffers have already been reset
+  }
+
+  @Override
+  protected void doEncode(ByteBufferEncodingState encodingState) {
+    // Nothing to do. Output buffers have already been reset
   }
 }
