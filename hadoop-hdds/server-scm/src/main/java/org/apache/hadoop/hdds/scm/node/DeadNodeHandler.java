@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -84,6 +85,11 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         removeContainerReplicas(datanodeDetails);
       }
 
+      //move dead datanode out of ClusterNetworkTopology
+      NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
+      if (nt.contains(datanodeDetails)) {
+        nt.remove(datanodeDetails);
+      }
     } catch (NodeNotFoundException ex) {
       // This should not happen, we cannot get a dead node event for an
       // unregistered datanode!

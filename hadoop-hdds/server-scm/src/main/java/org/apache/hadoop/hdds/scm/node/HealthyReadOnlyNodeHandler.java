@@ -23,6 +23,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -65,6 +66,11 @@ public class HealthyReadOnlyNodeHandler
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
             "datanode {}: ", id, datanodeDetails, ex);
       }
+    }
+    //add node back if it is not present in networkTopology
+    NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
+    if (!nt.contains(datanodeDetails)) {
+      nt.add(datanodeDetails);
     }
   }
 }
