@@ -32,7 +32,10 @@ Create new bucket
     Create bucket
 
 Create bucket which already exists
-    Create bucket with name     ${BUCKET}
+    Create bucket with name     ${PREFIX}-bucket
+    ${result} =                 Execute AWSS3APICli     list-buckets | jq -r '.Buckets[].Name'
+                                Should contain          ${result}    ${PREFIX}-bucket
+    Create bucket with name     ${PREFIX}-bucket
 
 Create bucket with invalid bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255
