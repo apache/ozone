@@ -376,8 +376,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     initializeEventHandlers();
 
     containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration, scmContext, ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
-        clusterMap, true, placementMetrics));
+        containerManager, replicationManager, configuration, scmContext,
+        ContainerPlacementPolicyFactory
+            .getPolicy(conf, scmNodeManager, clusterMap, true,
+                placementMetrics));
     LOG.info(containerBalancer.toString());
 
     // Emit initial safe mode status, as now handlers are registered.
@@ -455,15 +457,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
 
-    containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration, scmContext);
-    LOG.info(containerBalancer.toString());
-
-    // Emit initial safe mode status, as now handlers are registered.
-    scmSafeModeManager.emitSafeModeStatus();
-
-    registerMXBean();
-    registerMetricsSource(this);
   }
 
   private void initializeCertificateClient() {
