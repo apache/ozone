@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -126,6 +127,25 @@ public class OzoneBucketStub extends OzoneBucket {
   public OzoneKeyDetails getKey(String key) throws IOException {
     if (keyDetails.containsKey(key)) {
       return keyDetails.get(key);
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public OzoneKey headObject(String key) throws IOException {
+    if (keyDetails.containsKey(key)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(key);
+      return new OzoneKey(ozoneKeyDetails.getVolumeName(),
+          ozoneKeyDetails.getBucketName(),
+          ozoneKeyDetails.getName(),
+          ozoneKeyDetails.getDataSize(),
+          ozoneKeyDetails.getCreationTime().toEpochMilli(),
+          ozoneKeyDetails.getModificationTime().toEpochMilli(),
+          ReplicationConfig.fromTypeAndFactor(
+              ozoneKeyDetails.getReplicationType(),
+              ReplicationFactor.valueOf(ozoneKeyDetails.getReplicationFactor())
+          ));
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }

@@ -529,6 +529,21 @@ public class OzoneBucket extends WithMetadata {
     return proxy.getKeyDetails(volumeName, name, key);
   }
 
+  /**
+   *
+   * Return basic information about the key.
+   *
+   * If Key exists, return basic information about the key.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @param key
+   * @return OzoneKey which gives basic information about the key.
+   * @throws IOException
+   */
+  public OzoneKey headObject(String key) throws IOException {
+    return proxy.headObject(volumeName, name, key);
+  }
+
   public long getUsedBytes() {
     return usedBytes;
   }
