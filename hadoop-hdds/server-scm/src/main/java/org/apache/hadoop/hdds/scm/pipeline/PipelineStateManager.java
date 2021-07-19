@@ -98,6 +98,19 @@ public class PipelineStateManager implements StateManager {
   }
 
   @Override
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  public int getPipelineCount(ReplicationConfig replicationConfig,
+      PipelineState state) {
+    return pipelineStateMap.getPipelineCount(replicationConfig, state);
+  }
+
+  @Override
   public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws IOException {
     return pipelineStateMap.getContainers(pipelineID);

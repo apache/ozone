@@ -40,6 +40,11 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       throws IOException;
 
   Pipeline createPipeline(
+      ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes) throws IOException;
+
+
+  Pipeline createPipeline(
       ReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes
   );
@@ -63,6 +68,17 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       Pipeline.PipelineState state,
       Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines
+  );
+
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  int getPipelineCount(
+      ReplicationConfig replicationConfig, Pipeline.PipelineState state
   );
 
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)

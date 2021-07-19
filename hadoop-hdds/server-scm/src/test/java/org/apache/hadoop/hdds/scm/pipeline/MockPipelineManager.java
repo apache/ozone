@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -34,7 +35,7 @@ import java.util.stream.Stream;
 /**
  * Mock PipelineManager implementation for testing.
  */
-public final class MockPipelineManager implements PipelineManager {
+public class MockPipelineManager implements PipelineManager {
 
   private PipelineStateManager stateManager;
 
@@ -42,12 +43,20 @@ public final class MockPipelineManager implements PipelineManager {
     return new MockPipelineManager();
   }
 
-  private MockPipelineManager() {
+  MockPipelineManager() {
     this.stateManager = new PipelineStateManager();
   }
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
+      throws IOException {
+    return createPipeline(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     final List<DatanodeDetails> nodes = Stream.generate(
         MockDatanodeDetails::randomDatanodeDetails)
@@ -114,6 +123,19 @@ public final class MockPipelineManager implements PipelineManager {
       final Collection<PipelineID> excludePipelines) {
     return stateManager.getPipelines(replicationConfig, state,
         excludeDns, excludePipelines);
+  }
+
+  @Override
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  public int getPipelineCount(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state) {
+    return stateManager.getPipelineCount(replicationConfig, state);
   }
 
   @Override

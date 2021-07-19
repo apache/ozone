@@ -131,6 +131,8 @@ public interface ReplicationConfig {
       return new RatisReplicationConfig(replication);
     case STAND_ALONE:
       return new StandaloneReplicationConfig(replication);
+    case EC:
+      return new ECReplicationConfig(replication);
     default:
       throw new UnsupportedOperationException(
           "String based replication config initialization is not supported for "

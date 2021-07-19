@@ -209,11 +209,17 @@ public class TestPipelineManagerImpl {
     Assert.assertFalse(pipelineManager
         .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    Assert.assertEquals(1, pipelineManager
+        .getPipelineCount(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.DORMANT));
 
     pipelineManager.activatePipeline(pipeline.getId());
     Assert.assertTrue(pipelineManager
         .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    Assert.assertEquals(1, pipelineManager
+        .getPipelineCount(new RatisReplicationConfig(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN));
     buffer.flush();
     Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
     pipelineManager.close();
@@ -348,7 +354,7 @@ public class TestPipelineManagerImpl {
   public void testPipelineReport() throws Exception {
     PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
+        new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
             new EventQueue(), serviceManager, scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(new RatisReplicationConfig(ReplicationFactor.THREE));
@@ -465,7 +471,8 @@ public class TestPipelineManagerImpl {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
-            pipelineManager, new EventQueue(), serviceManager, scmContext);
+            null, pipelineManager, new EventQueue(),
+            serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,
             SCMContext.emptyContext(), conf);

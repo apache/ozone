@@ -24,8 +24,8 @@ source "$SCRIPT_DIR/../testlib.sh"
 tests=$(find_tests)
 cd "$SCRIPT_DIR"
 
-run_test_scripts ${tests}
-RESULT=$?
+RESULT=0
+run_test_scripts ${tests} || RESULT=$?
 
 generate_report "upgrade" "${ALL_RESULT_DIR}"
 

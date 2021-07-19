@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -560,8 +561,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -618,8 +624,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize());
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -653,8 +664,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()));
 
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgsBuilder.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgsBuilder.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -681,6 +697,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     req.setKeyArgs(keyArgs);
 
@@ -751,7 +768,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
-        .setKeyName(args.getKeyName()).build();
+        .setKeyName(args.getKeyName())
+        .setRecursive(args.isRecursive()).build();
     req.setKeyArgs(keyArgs);
 
     OMRequest omRequest = createOMRequest(Type.DeleteKey)
@@ -1214,6 +1232,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     GetFileStatusRequest req =
         GetFileStatusRequest.newBuilder()
@@ -1267,6 +1286,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     LookupFileRequest lookupFileRequest = LookupFileRequest.newBuilder()
             .setKeyArgs(keyArgs)
@@ -1431,6 +1451,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
     ListStatusRequest listStatusRequest =
         ListStatusRequest.newBuilder()

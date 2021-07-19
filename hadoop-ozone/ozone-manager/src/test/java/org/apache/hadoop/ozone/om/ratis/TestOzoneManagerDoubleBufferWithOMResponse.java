@@ -194,8 +194,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     checkDeletedBuckets(deleteBucketQueue);
 
     // Check lastAppliedIndex is updated correctly or not.
-    Assert.assertEquals(bucketCount + deleteCount + 1, lastAppliedIndex);
-
+    GenericTestUtils.waitFor(() ->
+        bucketCount + deleteCount + 1 == lastAppliedIndex,
+        100, 30000);
 
     TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);

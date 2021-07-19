@@ -64,5 +64,8 @@ public class OMKeyAclResponse extends OMClientResponse {
         omKeyInfo);
   }
 
+  public OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
+  }
 }
 

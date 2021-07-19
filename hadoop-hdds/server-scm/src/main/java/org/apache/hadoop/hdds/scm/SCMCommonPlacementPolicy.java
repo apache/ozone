@@ -24,7 +24,9 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -36,6 +38,9 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT;
 
 /**
  * This policy implements a set of invariants which are common
@@ -169,13 +174,35 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       long sizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
+    long metaSizeRequired = (long) conf.getStorageSize(
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
+        StorageUnit.BYTES);
+
+    boolean enoughForData = false;
+    boolean enoughForMeta = false;
+
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
     for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
       if (reportProto.getRemaining() > sizeRequired) {
-        return true;
+        enoughForData = true;
+        break;
       }
     }
-    return false;
+
+    if (!enoughForData) {
+      return false;
+    }
+
+    for (MetadataStorageReportProto reportProto
+        : datanodeInfo.getMetadataStorageReports()) {
+      if (reportProto.getRemaining() > metaSizeRequired) {
+        enoughForMeta = true;
+        break;
+      }
+    }
+
+    return enoughForData && enoughForMeta;
   }
 
   /**

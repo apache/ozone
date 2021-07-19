@@ -34,6 +34,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -41,6 +42,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -218,6 +220,31 @@ public class TestRatisPipelineProvider {
         "at least 1 node should have been from members of closed pipelines",
         nodes.stream().anyMatch(membersOfClosedPipelines::contains));
   }
+
+  @Test
+  // Test excluded nodes work correctly. Note that for Ratis, the
+  // PipelinePlacementPolicy, which Ratis is hardcoded to use, does not consider
+  // favored nodes.
+  public void testCreateFactorTHREEPipelineWithExcludedDatanodes()
+      throws Exception {
+    init(1);
+    int healthyCount = nodeManager.getNodes(NodeStatus.inServiceHealthy())
+        .size();
+    // Add all but 3 nodes to the exclude list and ensure that the 3 picked
+    // nodes are not in the excluded list.
+    List<DatanodeDetails> excludedNodes = nodeManager
+        .getNodes(NodeStatus.inServiceHealthy()).stream()
+        .limit(healthyCount - 3).collect(Collectors.toList());
+
+    Pipeline pipeline1 = provider.create(
+        new RatisReplicationConfig(ReplicationFactor.THREE), excludedNodes,
+        Collections.EMPTY_LIST);
+
+    for (DatanodeDetails dn : pipeline1.getNodes()) {
+      assertFalse(excludedNodes.contains(dn));
+    }
+  }
+
 
   private void addPipeline(
       List<DatanodeDetails> dns,

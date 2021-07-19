@@ -357,7 +357,7 @@ public final class HASecurityUtils {
         .setLeaderId(null)
         .setProperties(properties)
         .setRetryPolicy(
-            RetryPolicies.retryUpToMaximumCountWithFixedSleep(15,
+            RetryPolicies.retryUpToMaximumCountWithFixedSleep(120,
                 TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
 
     if (tlsConfig != null) {
