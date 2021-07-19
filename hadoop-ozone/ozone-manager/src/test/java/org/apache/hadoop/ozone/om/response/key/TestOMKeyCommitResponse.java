@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -60,7 +62,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     String ozoneKey = getOzoneKey();
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey);
+            omKeyInfo, omResponse, openKey, ozoneKey, null);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -71,6 +73,33 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     Assert.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
+
+    for (int i = 0; i < 5; i++) {
+      RepeatedOmKeyInfo deleteKeys =
+              omMetadataManager.getDeletedTable().get(ozoneKey);
+      if (i == 0) {
+        Assert.assertNull(deleteKeys);
+      } else {
+        Assert.assertNotNull(deleteKeys);
+      }
+      OmKeyInfo oldKey = omMetadataManager.getKeyTable().get(ozoneKey);
+      deleteKeys = OmUtils.prepareKeyForDelete(oldKey, deleteKeys, 100+i, true);
+
+      // Run write more than twice to test overwrite
+      OMKeyCommitResponse omKeyCommitResponse2 = getOmKeyCommitResponse(
+              omKeyInfo, omResponse, openKey, ozoneKey, deleteKeys);
+
+      omKeyCommitResponse2.addToDBBatch(omMetadataManager, batchOperation);
+
+      // Do manual commit and see whether addToBatch is successful or not.
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+      Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+      Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
+      deleteKeys = omMetadataManager.getDeletedTable().get(ozoneKey);
+      // Number of keys to be deleted increases on overwrite.
+      Assert.assertEquals(i+1, deleteKeys.getOmKeyInfoList().size());
+    }
   }
 
   @Test
@@ -93,7 +122,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     String ozoneKey = getOzoneKey();
 
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey);
+            omKeyInfo, omResponse, openKey, ozoneKey, null);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
@@ -106,7 +135,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
-
 
     // As omResponse is error it is a no-op. So, entry should still be in
     // openKey table.
@@ -131,9 +159,9 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   @NotNull
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey) {
+          String ozoneKey, RepeatedOmKeyInfo deleteKeys) {
     Assert.assertNotNull(omBucketInfo);
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
-            omBucketInfo);
+            omBucketInfo, deleteKeys);
   }
 }

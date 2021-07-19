@@ -31,6 +31,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -43,8 +46,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
@@ -156,6 +157,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      // validateBucketAndVolume guarantees bucket existence and it's not null
+      assert omBucketInfo != null;
 
       // Check for directory exists with same name, if it exists throw error.
       if (ozoneManager.getEnableFileSystemPaths()) {
@@ -192,6 +196,21 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      // TODO(HDDS-5461):  Currently, old versions are all moved to the delete
+      //  table. To preserve old version(s) in the key table on overwrite,
+      //  merge old versions to omKeyInfo here instead of moving the to the
+      //  delete table.
+      //  If bucket versioning is turned on somehow, overwritten blocks will
+      //  leak and never collected by block deletion service. Keep it off.
+      RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbOzoneKey,
+          omMetadataManager, omBucketInfo.getIsVersionEnabled(), trxnLogIndex,
+          ozoneManager.isRatisEnabled());
+      if (omMetadataManager.getKeyTable().isExist(dbOzoneKey)
+              && omBucketInfo.getIsVersionEnabled()) {
+        // TODO: delete this warning after versioning supported.
+        LOG.warn("Overwritten blocks of {}/{}/{} may have leaked.",
+                volumeName, bucketName, keyName);
+      }
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKey),
@@ -213,7 +232,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject());
+          omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
+          keysToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -238,6 +258,40 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             exception, omKeyInfo, result);
 
     return omClientResponse;
+  }
+
+  /**
+   * Prepare key for deletion service on overwrite.
+   *
+   * @param dbOzoneKey key to point to an object in RocksDB
+   * @param omMetadataManager
+   * @param isVersionEnabled
+   * @param trxnLogIndex
+   * @param isRatisEnabled
+   * @return Old keys eligible for deletion.
+   * @throws IOException
+   */
+  protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
+          String dbOzoneKey, OMMetadataManager omMetadataManager,
+          boolean isVersionEnabled, long trxnLogIndex,
+          boolean isRatisEnabled) throws IOException {
+    if (isVersionEnabled) {
+      // Nothing to clean up in case versioning is on.
+      return null;
+    }
+    // Past keys that was deleted but still in deleted table,
+    // waiting for deletion service.
+    RepeatedOmKeyInfo keysToDelete =
+            omMetadataManager.getDeletedTable().getReadCopy(dbOzoneKey);
+    // Current key to be overwritten
+    OmKeyInfo keyToDelete =
+            omMetadataManager.getKeyTable().getReadCopy(dbOzoneKey);
+
+    if (keyToDelete != null) {
+      keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+                trxnLogIndex, isRatisEnabled);
+    }
+    return keysToDelete;
   }
 
   /**

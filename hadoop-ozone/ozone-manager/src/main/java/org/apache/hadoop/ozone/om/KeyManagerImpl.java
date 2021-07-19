@@ -461,7 +461,8 @@ public class KeyManagerImpl implements KeyManager {
     try {
       bucketInfo = getBucketInfo(volumeName, bucketName);
       encInfo = getFileEncryptionInfo(bucketInfo);
-      keyInfo = prepareKeyInfo(args, dbKeyName, size, locations, encInfo);
+      keyInfo = prepareKeyInfo(args, dbKeyName, size, locations, encInfo,
+          bucketInfo.getIsVersionEnabled());
     } catch (OMException e) {
       throw e;
     } catch (IOException ex) {
@@ -507,18 +508,27 @@ public class KeyManagerImpl implements KeyManager {
 
   private OmKeyInfo prepareKeyInfo(
       OmKeyArgs keyArgs, String dbKeyName, long size,
-      List<OmKeyLocationInfo> locations, FileEncryptionInfo encInfo)
+      List<OmKeyLocationInfo> locations, FileEncryptionInfo encInfo,
+      boolean isVersionEnabled)
       throws IOException {
     OmKeyInfo keyInfo = null;
     if (keyArgs.getIsMultipartKey()) {
       keyInfo = prepareMultipartKeyInfo(keyArgs, size, locations, encInfo);
     } else if (metadataManager.getKeyTable().isExist(dbKeyName)) {
       keyInfo = metadataManager.getKeyTable().get(dbKeyName);
-      // the key already exist, the new blocks will be added as new version
-      // when locations.size = 0, the new version will have identical blocks
-      // as its previous version
-      keyInfo.addNewVersion(locations, true);
-      keyInfo.setDataSize(size + keyInfo.getDataSize());
+      // Key exists: overwrite here
+      // If the key already exists, the new blocks will replace old blocks,
+      // as new version when locations.size = 0
+      keyInfo.addNewVersion(locations, true, isVersionEnabled);
+      long newSize = size;
+      if (isVersionEnabled) {
+        newSize += keyInfo.getDataSize();
+      }
+      keyInfo.setDataSize(newSize);
+      // if object version is turned on,
+      //  previous versions must be preserved as as old versions.
+      //  keyInfo.addNewVersion(locations, true);
+      //  keyInfo.setDataSize(size + keyInfo.getDataSize());
     }
     if(keyInfo != null) {
       keyInfo.setMetadata(keyArgs.getMetadata());
@@ -603,7 +613,8 @@ public class KeyManagerImpl implements KeyManager {
     String openKey = metadataManager
         .getOpenKey(volumeName, bucketName, keyName, clientID);
     Preconditions.checkNotNull(locationInfoList);
-    try {
+    try (BatchOperation batchOperation =
+                 metadataManager.getStore().initBatchOperation()){
       metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
       OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
@@ -618,12 +629,6 @@ public class KeyManagerImpl implements KeyManager {
 
       //update the block length for each block
       keyInfo.updateLocationInfoList(locationInfoList, false);
-      metadataManager.getStore().move(
-          openKey,
-          objectKey,
-          keyInfo,
-          metadataManager.getOpenKeyTable(getBucketLayout()),
-          metadataManager.getKeyTable());
     } catch (OMException e) {
       throw e;
     } catch (IOException ex) {

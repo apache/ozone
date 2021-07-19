@@ -272,11 +272,12 @@ public final class OmKeyInfo extends WithParentObjectId {
    *
    * @param newLocationList the list of new blocks to be added.
    * @param updateTime - if true, updates modification time.
+   * @param keepOldVersions - if false, old blocks won't be kept.
    * @throws IOException
    */
   public synchronized long addNewVersion(
-      List<OmKeyLocationInfo> newLocationList, boolean updateTime)
-      throws IOException {
+      List<OmKeyLocationInfo> newLocationList, boolean updateTime,
+      boolean keepOldVersions) {
     long latestVersionNum;
     if (keyLocationVersions.size() == 0) {
       // no version exist, these blocks are the very first version.
@@ -286,8 +287,17 @@ public final class OmKeyInfo extends WithParentObjectId {
       // it is important that the new version are always at the tail of the list
       OmKeyLocationInfoGroup currentLatestVersion =
           keyLocationVersions.get(keyLocationVersions.size() - 1);
+
+      // The new version is created based on the latest version number
+      // and will not include key locations of old versions, until object
+      // versioning is supported and enabled.
       OmKeyLocationInfoGroup newVersion =
           currentLatestVersion.generateNextVersion(newLocationList);
+      if (!keepOldVersions) {
+        // Even though old versions are cleared here, they will be
+        // moved to delete table at the time of key commit
+        keyLocationVersions.clear();
+      }
       keyLocationVersions.add(newVersion);
       latestVersionNum = newVersion.getVersion();
     }

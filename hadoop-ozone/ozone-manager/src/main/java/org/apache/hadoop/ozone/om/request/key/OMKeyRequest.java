@@ -625,13 +625,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
       //TODO args.getMetadata
     }
     if (dbKeyInfo != null) {
-      // TODO: Need to be fixed, as when key already exists, we are
-      //  appending new blocks to existing key.
-      // The key already exist, the new blocks will be added as new version
-      // when locations.size = 0, the new version will have identical blocks
-      // as its previous version
-      dbKeyInfo.addNewVersion(locations, false);
-      dbKeyInfo.setDataSize(size + dbKeyInfo.getDataSize());
+      // The key already exist, the new blocks will replace old ones
+      // as new versions unless the bucket does not have versioning
+      // turned on. If the versioning is on, the new version will have
+      // identical blocks as its previous version.
+      // versioning \ key | exist | none
+      //   enabled        | add(n)| new(0)
+      //   disabled       | new(n)| new(0)
+      dbKeyInfo.addNewVersion(locations, false,
+              omBucketInfo.getIsVersionEnabled());
+      long newSize = size;
+      if (omBucketInfo.getIsVersionEnabled()) {
+        newSize += dbKeyInfo.getDataSize();
+      }
+      dbKeyInfo.setDataSize(newSize);
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());

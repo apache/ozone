@@ -442,12 +442,20 @@ public final class OmUtils {
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
    *                     For regular Key deletes, this value should be set to
-   *                     the same updaeID as is in keyInfo.
+   *                     the same updateID as is in keyInfo.
    * @return {@link RepeatedOmKeyInfo}
    */
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
       RepeatedOmKeyInfo repeatedOmKeyInfo, long trxnLogIndex,
       boolean isRatisEnabled) {
+
+    // Set the updateID
+    keyInfo.setUpdateID(trxnLogIndex, isRatisEnabled);
+    return prepareKeyForDeleteWithoutUpdateID(keyInfo, repeatedOmKeyInfo);
+  }
+
+  public static RepeatedOmKeyInfo prepareKeyForDeleteWithoutUpdateID(
+      OmKeyInfo keyInfo, RepeatedOmKeyInfo repeatedOmKeyInfo) {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
@@ -457,9 +465,6 @@ public final class OmUtils {
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
       keyInfo.clearFileEncryptionInfo();
     }
-
-    // Set the updateID
-    keyInfo.setUpdateID(trxnLogIndex, isRatisEnabled);
 
     if(repeatedOmKeyInfo == null) {
       //The key doesn't exist in deletedTable, so create a new instance.
