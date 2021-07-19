@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -65,6 +66,8 @@ import org.apache.hadoop.util.Time;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import org.junit.AfterClass;
@@ -279,7 +282,8 @@ public class TestEndPoint {
                       Arrays.asList(getMetadataStorageReports(
                           nodeToRegister.getUuid()))),
               TestUtils.getRandomContainerReports(10),
-              TestUtils.getRandomPipelineReports());
+              TestUtils.getRandomPipelineReports(),
+              defaultLayoutVersionProto());
       Assert.assertNotNull(responseProto);
       Assert.assertEquals(nodeToRegister.getUuidString(),
           responseProto.getDatanodeUUID());
@@ -301,8 +305,7 @@ public class TestEndPoint {
         null);
   }
 
-  private EndpointStateMachine registerTaskHelper(
-      InetSocketAddress scmAddress,
+  private EndpointStateMachine registerTaskHelper(InetSocketAddress scmAddress,
       int rpcTimeout, boolean clearDatanodeDetails
   ) throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
@@ -321,9 +324,15 @@ public class TestEndPoint {
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
         TestUtils.getRandomPipelineReports());
+    HDDSLayoutVersionManager versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
     RegisterEndpointTask endpointTask =
         new RegisterEndpointTask(rpcEndPoint, conf, ozoneContainer,
-            mock(StateContext.class));
+            mock(StateContext.class), versionManager);
     if (!clearDatanodeDetails) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       endpointTask.setDatanodeDetails(datanodeDetails);
@@ -493,7 +502,8 @@ public class TestEndPoint {
               stateMachine);
 
       HeartbeatEndpointTask endpointTask =
-          new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext);
+          new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext,
+              stateMachine.getLayoutVersionManager());
       endpointTask.setDatanodeDetailsProto(datanodeDetailsProto);
       endpointTask.call();
       Assert.assertNotNull(endpointTask.getDatanodeDetailsProto());

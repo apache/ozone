@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
@@ -52,8 +53,6 @@ public class FileSizeCountTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(FileSizeCountTask.class);
 
-  // 1125899906842624L = 1PB
-  private static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
 
@@ -63,15 +62,6 @@ public class FileSizeCountTask implements ReconOmTask {
                                utilizationSchemaDefinition) {
     this.fileCountBySizeDao = fileCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
-  }
-
-  private static int nextClosestPowerIndexOfTwo(long dataSize) {
-    int index = 0;
-    while(dataSize != 0) {
-      dataSize >>= 1;
-      index += 1;
-    }
-    return index;
   }
 
   /**
@@ -166,17 +156,6 @@ public class FileSizeCountTask implements ReconOmTask {
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  private long getFileSizeUpperBound(long fileSize) {
-    if (fileSize >= MAX_FILE_SIZE_UPPER_BOUND) {
-      return Long.MAX_VALUE;
-    }
-    int index = nextClosestPowerIndexOfTwo(fileSize);
-    // The smallest file size being tracked for count
-    // is 1 KB i.e. 1024 = 2 ^ 10.
-    int binIndex = index < 10 ? 0 : index - 10;
-    return (long) Math.pow(2, (10 + binIndex));
-  }
-
   /**
    * Populate DB with the counts of file sizes calculated
    * using the dao.
@@ -220,7 +199,7 @@ public class FileSizeCountTask implements ReconOmTask {
   private FileSizeCountKey getFileSizeCountKey(OmKeyInfo omKeyInfo) {
     return new FileSizeCountKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(),
-        getFileSizeUpperBound(omKeyInfo.getDataSize()));
+            ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
   }
 
   /**

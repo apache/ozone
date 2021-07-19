@@ -108,7 +108,6 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-
   public Token<OzoneTokenIdentifier> getToken() {
     CancelDelegationTokenRequestProto cancelDelegationTokenRequest =
         getOmRequest().getCancelDelegationTokenRequest();
@@ -116,4 +115,5 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     return OMPBHelper.convertToDelegationToken(
         cancelDelegationTokenRequest.getToken());
   }
+
 }
