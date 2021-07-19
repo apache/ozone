@@ -669,12 +669,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
             .setUpdateID(transactionLogIndex);
-    ECReplicationConfig ecReplicationConfig =
-        omBucketInfo.getEcReplicationConfig();
-    if (ecReplicationConfig != null) {
+    if (omBucketInfo != null && omBucketInfo.getEcReplicationConfig() != null) {
       // if bucket has the ec replication config, then we will inherit it from
       // bucket.
-      builder.setReplicationConfig(ecReplicationConfig);
+      builder.setReplicationConfig(omBucketInfo.getEcReplicationConfig());
     } else {
       // Otherwise use the client passed replication config.
       builder.setReplicationConfig(replicationConfig);

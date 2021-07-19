@@ -152,9 +152,8 @@ public class TestOmBucketInfo {
     recovered = OmBucketInfo.getFromProtobuf(protobuf);
     Assert.assertEquals(EC,
         recovered.getEcReplicationConfig().getReplicationType());
-    Assert.assertTrue(
-        recovered.getEcReplicationConfig() instanceof ECReplicationConfig);
     ECReplicationConfig config = recovered.getEcReplicationConfig();
+    Assert.assertNotNull(config);
     Assert.assertEquals(3, config.getData());
     Assert.assertEquals(2, config.getParity());
   }
