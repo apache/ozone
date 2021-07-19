@@ -33,13 +33,13 @@ Run printTopology -o
                         Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net) IN_SERVICE
 Run printTopology --operational-state IN_SERVICE
     ${output} =         Execute          ozone admin printTopology --operational-state IN_SERVICE
-                        ${printTopology} =      Get Lines Containing String    ${output} Location:
+                        ${printTopology} =      Get Lines Containing String    ${output} IN_SERVICE
                         @{lines} =          Split To Lines   ${printTopology}
                         ${count} =          Get Length   ${lines}
                         Should Be Equal As Integers    ${count}    6
 Run printTopology --node-state HEALTHY
     ${output} =         Execute          ozone admin printTopology --node-state HEALTHY
-                        ${printTopology} =      Get Lines Containing String    ${output} Location:
+                        ${printTopology} =      Get Lines Containing String    ${output} HEALTHY
                         @{lines} =          Split To Lines   ${printTopology}
                         ${count} =          Get Length   ${lines}
                         Should Be Equal As Integers    ${count}    6
