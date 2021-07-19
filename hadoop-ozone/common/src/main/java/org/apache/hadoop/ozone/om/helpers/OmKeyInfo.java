@@ -480,7 +480,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   }
 
   /**
-   * For network transmit to return latest version.
+   * For network transmit to return KeyInfo.
    * @param clientVersion
    * @param latestVersion
    * @return key info.
@@ -490,7 +490,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   }
 
   /**
-   * For network transmit.
+   * For network transmit to return KeyInfo.
    *
    * @param fullKeyName the user given full key name
    * @param clientVersion
