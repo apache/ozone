@@ -152,5 +152,6 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
     return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
         omDoubleBufferHelper);
   }
+
 }
 

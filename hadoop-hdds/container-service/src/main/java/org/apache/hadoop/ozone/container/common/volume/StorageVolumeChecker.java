@@ -22,11 +22,11 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -68,6 +68,7 @@ public class StorageVolumeChecker {
 
   private final AtomicLong numVolumeChecks = new AtomicLong(0);
   private final AtomicLong numAllVolumeChecks = new AtomicLong(0);
+  private final AtomicLong numAllVolumeSetsChecks = new AtomicLong(0);
   private final AtomicLong numSkippedChecks = new AtomicLong(0);
 
   /**
@@ -82,9 +83,9 @@ public class StorageVolumeChecker {
   private final long minDiskCheckGapMs;
 
   /**
-   * Timestamp of the last check of all volumes.
+   * Timestamp of the last check of all volume sets.
    */
-  private long lastAllVolumesCheck;
+  private long lastAllVolumeSetsCheckComplete;
 
   private final Timer timer;
 
@@ -112,7 +113,7 @@ public class StorageVolumeChecker {
 
     minDiskCheckGapMs = dnConf.getDiskCheckMinGap().toMillis();
 
-    lastAllVolumesCheck = timer.monotonicNow() - minDiskCheckGapMs;
+    lastAllVolumeSetsCheckComplete = timer.monotonicNow() - minDiskCheckGapMs;
 
     registeredVolumeSets = new ArrayList<>();
 
@@ -150,10 +151,25 @@ public class StorageVolumeChecker {
   }
 
   public synchronized void checkAllVolumeSets() {
+    final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
+    if (gap < minDiskCheckGapMs) {
+      numSkippedChecks.incrementAndGet();
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(
+            "Skipped checking all volumes, time since last check {} is less " +
+                "than the minimum gap between checks ({} ms).",
+            gap, minDiskCheckGapMs);
+      }
+      return;
+    }
+
     try {
       for (MutableVolumeSet volSet : registeredVolumeSets) {
         volSet.checkAllVolumes();
       }
+
+      lastAllVolumeSetsCheckComplete = timer.monotonicNow();
+      numAllVolumeSetsChecks.incrementAndGet();
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
     }
@@ -173,21 +189,8 @@ public class StorageVolumeChecker {
   public Set<? extends StorageVolume> checkAllVolumes(
       Collection<? extends StorageVolume> volumes)
       throws InterruptedException {
-    final long gap = timer.monotonicNow() - lastAllVolumesCheck;
-    if (gap < minDiskCheckGapMs) {
-      numSkippedChecks.incrementAndGet();
-      if (LOG.isTraceEnabled()) {
-        LOG.trace(
-            "Skipped checking all volumes, time since last check {} is less " +
-                "than the minimum gap between checks ({} ms).",
-            gap, minDiskCheckGapMs);
-      }
-      return Collections.emptySet();
-    }
-
-    lastAllVolumesCheck = timer.monotonicNow();
-    final Set<StorageVolume> healthyVolumes = new HashSet<>();
-    final Set<StorageVolume> failedVolumes = new HashSet<>();
+    final Set<StorageVolume> healthyVolumes = ConcurrentHashMap.newKeySet();
+    final Set<StorageVolume> failedVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> allVolumes = new HashSet<>();
 
     final AtomicLong numVolumes = new AtomicLong(volumes.size());
@@ -196,8 +199,8 @@ public class StorageVolumeChecker {
     for (StorageVolume v : volumes) {
       Optional<ListenableFuture<VolumeCheckResult>> olf =
           delegateChecker.schedule(v, null);
-      LOG.info("Scheduled health check for volume {}", v);
       if (olf.isPresent()) {
+        LOG.info("Scheduled health check for volume {}", v);
         allVolumes.add(v);
         Futures.addCallback(olf.get(),
             new ResultHandler(v, healthyVolumes, failedVolumes,
@@ -264,7 +267,8 @@ public class StorageVolumeChecker {
     if (olf.isPresent()) {
       numVolumeChecks.incrementAndGet();
       Futures.addCallback(olf.get(),
-          new ResultHandler(volume, new HashSet<>(), new HashSet<>(),
+          new ResultHandler(volume,
+              ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
               new AtomicLong(1), callback),
           checkVolumeResultHandlerExecutorService
       );
@@ -276,7 +280,7 @@ public class StorageVolumeChecker {
   /**
    * A callback to process the results of checking a volume.
    */
-  private class ResultHandler
+  private static class ResultHandler
       implements FutureCallback<VolumeCheckResult> {
     private final StorageVolume volume;
     private final Set<StorageVolume> failedVolumes;
@@ -345,15 +349,11 @@ public class StorageVolumeChecker {
     }
 
     private void markHealthy() {
-      synchronized (StorageVolumeChecker.this) {
-        healthyVolumes.add(volume);
-      }
+      healthyVolumes.add(volume);
     }
 
     private void markFailed() {
-      synchronized (StorageVolumeChecker.this) {
-        failedVolumes.add(volume);
-      }
+      failedVolumes.add(volume);
     }
 
     private void cleanup() {
@@ -410,10 +410,17 @@ public class StorageVolumeChecker {
   }
 
   /**
-   * Return the number of {@link #checkAllVolumes} invocations.
+   * Return the number of {@link #checkAllVolumes(Collection)} ()} invocations.
    */
   public long getNumAllVolumeChecks() {
     return numAllVolumeChecks.get();
+  }
+
+  /**
+   * Return the number of {@link #checkAllVolumeSets()} invocations.
+   */
+  public long getNumAllVolumeSetsChecks() {
+    return numAllVolumeSetsChecks.get();
   }
 
   /**

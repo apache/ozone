@@ -40,17 +40,19 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import org.junit.After;
@@ -74,6 +76,7 @@ public class AbstractReconContainerManagerTest {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private DBStore store;
+  private HDDSLayoutVersionManager layoutVersionManager;
   private SCMHAManager scmhaManager;
   private SCMContext scmContext;
   private SequenceIdGenerator sequenceIdGen;
@@ -93,8 +96,13 @@ public class AbstractReconContainerManagerTest {
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
+    layoutVersionManager = mock(HDDSLayoutVersionManager.class);
+    when(layoutVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    when(layoutVersionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, scmContext);
+        eventQueue, clusterMap, scmContext, layoutVersionManager);
     pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf,
         nodeManager,
@@ -102,6 +110,7 @@ public class AbstractReconContainerManagerTest {
         eventQueue,
         scmhaManager,
         scmContext);
+
     containerManager = new ReconContainerManager(
         conf,
         store,
@@ -109,7 +118,7 @@ public class AbstractReconContainerManagerTest {
         pipelineManager,
         getScmServiceProvider(),
         mock(ContainerHealthSchemaManager.class),
-        mock(ContainerDBServiceProvider.class),
+        mock(ReconContainerMetadataManager.class),
         scmhaManager,
         sequenceIdGen);
   }

@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +68,21 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
   public OMBucketSetPropertyRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager)
+      throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
+        setBucketPropertyRequestBuilder = getOmRequest()
+        .getSetBucketPropertyRequest().toBuilder()
+        .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   @Override
@@ -168,7 +184,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
-
+      bucketInfoBuilder.setModificationTime(
+          setBucketPropertyRequest.getModificationTime());
       // Set acls from dbBucketInfo if it has any.
       if (dbBucketInfo.getAcls() != null) {
         bucketInfoBuilder.setAcls(dbBucketInfo.getAcls());
@@ -278,4 +295,5 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     return true;
   }
+
 }

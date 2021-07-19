@@ -22,10 +22,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -34,8 +35,11 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.Assert;
 import org.junit.Test;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.mockito.Matchers.anyObject;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
@@ -47,19 +51,29 @@ public class TestSCMContainerPlacementCapacity {
   @Test
   public void chooseDatanodes() throws SCMException {
     //given
-    ConfigurationSource conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // We are using small units here
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        1, StorageUnit.BYTES);
 
     List<DatanodeInfo> datanodes = new ArrayList<>();
     for (int i = 0; i < 7; i++) {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
-          NodeStatus.inServiceHealthy());
+          NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = TestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
+      MetadataStorageReportProto metaStorage1 =
+          TestUtils.createMetadataStorageReport(
+              "/metadata1-" + datanodeInfo.getUuidString(),
+          100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
+      datanodeInfo.updateMetaDataStorageReports(
+          new ArrayList<>(Arrays.asList(metaStorage1)));
 
       datanodes.add(datanodeInfo);
     }
@@ -113,7 +127,7 @@ public class TestSCMContainerPlacementCapacity {
 
       //when
       List<DatanodeDetails> datanodeDetails = scmContainerPlacementRandom
-          .chooseDatanodes(existingNodes, null, 1, 15);
+          .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
       Assert.assertEquals(1, datanodeDetails.size());

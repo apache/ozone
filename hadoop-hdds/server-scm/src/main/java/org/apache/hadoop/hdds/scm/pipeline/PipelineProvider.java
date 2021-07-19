@@ -26,16 +26,20 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Interface for creating pipelines.
  */
 public abstract class PipelineProvider<REPLICATION_CONFIG
     extends ReplicationConfig> {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(PipelineProvider.class);
   private final NodeManager nodeManager;
   private final StateManager stateManager;
 
@@ -70,7 +74,30 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
 
   protected abstract void shutdown();
 
-  List<DatanodeDetails> pickNodesNeverUsed(REPLICATION_CONFIG replicationConfig)
+  List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+    List<DatanodeDetails> healthyDNs = pickNodesNotUsed(replicationConfig);
+    List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
+        .filter(dn -> SCMCommonPlacementPolicy
+            .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
+        .collect(Collectors.toList());
+
+    int nodesRequired = replicationConfig.getRequiredNodes();
+    if (healthyDNsWithSpace.size() < nodesRequired) {
+      String msg = String.format("Unable to find enough nodes that meet the " +
+              "space requirement of %d bytes for metadata and %d bytes for " +
+              "data in healthy node set. Nodes required: %d Found: %d",
+          metadataSizeRequired, dataSizeRequired, nodesRequired,
+          healthyDNsWithSpace.size());
+      LOG.error(msg);
+      throw new SCMException(msg,
+          SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
+    }
+
+    return healthyDNsWithSpace;
+  }
+
+  List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig)
       throws SCMException {
     Set<DatanodeDetails> dnsUsed = new HashSet<>();
     stateManager.getPipelines(replicationConfig).stream().filter(

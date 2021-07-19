@@ -75,9 +75,14 @@ public abstract class AbstractSpaceUsageSource implements SpaceUsageSource {
     return path;
   }
 
+  /**
+   * Get available space, excluding system reserved space.
+   * See {@link File#getUsableSpace()} and {@link File#getFreeSpace()}.
+   * @return available space for data
+   */
   @Override
   public long getAvailable() {
-    return file.getFreeSpace();
+    return file.getUsableSpace();
   }
 
   @Override
