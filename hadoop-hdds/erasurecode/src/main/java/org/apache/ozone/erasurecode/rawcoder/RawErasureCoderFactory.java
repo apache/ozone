@@ -17,28 +17,40 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 
 /**
- * A utility class that maintains encoding state during an encode call.
+ * Raw erasure coder factory that can be used to create raw encoder and decoder.
+ * It helps in configuration since only one factory class is needed to be
+ * configured.
  */
 @InterfaceAudience.Private
-abstract class EncodingState {
-  RawErasureEncoder encoder;
-  int encodeLength;
+public interface RawErasureCoderFactory {
 
   /**
-   * Check and validate decoding parameters, throw exception accordingly.
-   * @param inputs input buffers to check
-   * @param outputs output buffers to check
+   * Create raw erasure encoder.
+   * @param ecReplicationConfig the config used to create the encoder
+   * @return raw erasure encoder
    */
-  <T> void checkParameters(T[] inputs, T[] outputs) {
-    if (inputs.length != encoder.getNumDataUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid inputs length " + inputs.length + " !=" + encoder.getNumDataUnits());
-    }
-    if (outputs.length != encoder.getNumParityUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid outputs length " + outputs.length + " !=" + encoder.getNumParityUnits());
-    }
-  }
+  RawErasureEncoder createEncoder(ECReplicationConfig ecReplicationConfig);
+
+  /**
+   * Create raw erasure decoder.
+   * @param ecReplicationConfig the config used to create the encoder
+   * @return raw erasure decoder
+   */
+  RawErasureDecoder createDecoder(ECReplicationConfig ecReplicationConfig);
+
+  /**
+   * Get the name of the coder.
+   * @return coder name
+   */
+  String getCoderName();
+
+  /**
+   * Get the name of its codec.
+   * @return codec name
+   */
+  String getCodecName();
 }

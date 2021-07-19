@@ -18,7 +18,7 @@
 package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.io.erasurecode.ECChunk;
+import org.apache.ozone.erasurecode.ECChunk;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

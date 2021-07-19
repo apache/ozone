@@ -57,6 +57,9 @@ public class ECReplicationConfig implements ReplicationConfig {
   private static final Pattern STRING_FORMAT
       = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)((?:k|K))?");
 
+  public static final String RS_CODEC = "rs";
+  public static final String XOR_CODEC = "xor";
+
   private int data;
 
   private int parity;
@@ -78,16 +81,6 @@ public class ECReplicationConfig implements ReplicationConfig {
     this.ecChunkSize = ecChunkSize;
   }
 
-  /**
-   * Create an ECReplicationConfig object from a string representing the
-   * various parameters. Acceptable patterns are like:
-   *     rs-3-2-1024k
-   *     RS-3-2-2048
-   *     XOR-10-4-4096K
-   * IllegalArgumentException will be thrown if the passed string does not
-   * match the defined pattern.
-   * @param string
-   */
   public ECReplicationConfig(String string) {
     final Matcher matcher = STRING_FORMAT.matcher(string);
     if (!matcher.matches()) {
@@ -146,6 +139,7 @@ public class ECReplicationConfig implements ReplicationConfig {
         .setParity(parity)
         .setCodec(codec.toString())
         .setEcChunkSize(ecChunkSize)
+        .setCodec(codec.toString())
         .build();
   }
 
@@ -176,6 +170,13 @@ public class ECReplicationConfig implements ReplicationConfig {
     ECReplicationConfig that = (ECReplicationConfig) o;
     return data == that.data && parity == that.parity
         && codec == that.getCodec() && ecChunkSize == that.getEcChunkSize();
+  }
+
+  public String getCodecName() {
+    if (codec == null || codec.toString().length() == 0) {
+      return RS_CODEC;
+    }
+    return codec.name();
   }
 
   @Override
