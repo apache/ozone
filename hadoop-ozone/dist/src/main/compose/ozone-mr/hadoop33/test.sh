@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,9 +15,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-HADOOP_IMAGE=flokkr/hadoop
-HADOOP_VERSION=3.3.1
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_TESTKRB5_IMAGE=${docker.ozone-testkr5b.image}
-OZONE_OPTS=
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../../testlib.sh"
+
+start_docker_env
+
+execute_robot_test scm createmrenv.robot
+
+# reinitialize the directories to use
+export OZONE_DIR=/opt/ozone
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../../testlib.sh"
+
+for scheme in o3fs ofs; do
+  execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoopfs-${scheme}" ozonefs/hadoopo3fs.robot
+  execute_robot_test rm -v "SCHEME:${scheme}" -N "mapreduce-${scheme}" mapreduce.robot
+done
+
+stop_docker_env
+
+generate_report
