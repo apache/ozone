@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -56,10 +57,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +69,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.List;
 import java.util.HashSet;
@@ -94,17 +95,17 @@ public class TestBlockDeletion {
   public static final Logger LOG =
       LoggerFactory.getLogger(TestBlockDeletion.class);
 
-  private static OzoneConfiguration conf = null;
-  private static ObjectStore store;
-  private static MiniOzoneCluster cluster = null;
-  private static StorageContainerManager scm = null;
-  private static OzoneManager om = null;
-  private static Set<Long> containerIdsWithDeletedBlocks;
-  private static long maxTransactionId = 0;
-  private static File baseDir;
+  private OzoneConfiguration conf = null;
+  private ObjectStore store;
+  private MiniOzoneCluster cluster = null;
+  private StorageContainerManager scm = null;
+  private OzoneManager om = null;
+  private Set<Long> containerIdsWithDeletedBlocks;
+  private long maxTransactionId = 0;
+  private File baseDir;
 
-  @BeforeClass
-  public static void init() throws Exception {
+  @Before
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
@@ -154,8 +155,8 @@ public class TestBlockDeletion {
     containerIdsWithDeletedBlocks = new HashSet<>();
   }
 
-  @AfterClass
-  public static void cleanup() throws IOException {
+  @After
+  public void cleanup() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -265,7 +266,6 @@ public class TestBlockDeletion {
     }, 500, 10000);
   }
 
-  @Ignore
   @Test
   public void testContainerStatisticsAfterDelete() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -323,6 +323,16 @@ public class TestBlockDeletion {
       Assert.assertEquals(0, container.getUsedBytes());
       Assert.assertEquals(0, container.getNumberOfKeys());
     });
+    // Verify that pending block delete num are as expected with resent cmds
+    cluster.getHddsDatanodes().forEach(dn -> {
+      Map<Long, Container<?>> containerMap = dn.getDatanodeStateMachine()
+          .getContainer().getContainerSet().getContainerMap();
+      containerMap.values().forEach(container -> {
+        KeyValueContainerData containerData =
+            (KeyValueContainerData)container.getContainerData();
+        Assert.assertEquals(0, containerData.getNumPendingDeletionBlocks());
+      });
+    });
 
     cluster.shutdownHddsDatanode(0);
     scm.getReplicationManager().processContainersNow();
@@ -352,10 +362,11 @@ public class TestBlockDeletion {
       Assert.assertEquals(HddsProtos.LifeCycleState.DELETED,
           container.getState());
       try {
-        Assert.assertNull(scm.getScmMetadataStore().getContainerTable()
-            .get(container.containerID()));
+        Assert.assertTrue(scm.getScmMetadataStore().getContainerTable()
+            .get(container.containerID()).getState() ==
+            HddsProtos.LifeCycleState.DELETED);
       } catch (IOException e) {
-        Assert.fail("Getting container from SCM DB should not fail");
+        Assert.fail("Container from SCM DB should be marked as DELETED");
       }
     });
   }

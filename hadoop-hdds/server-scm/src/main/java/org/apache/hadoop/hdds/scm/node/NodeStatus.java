@@ -69,6 +69,11 @@ public class NodeStatus {
         HddsProtos.NodeState.DEAD);
   }
 
+  public boolean isNodeWritable() {
+    return health == HddsProtos.NodeState.HEALTHY &&
+        operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
+  }
+
   public HddsProtos.NodeState getHealth() {
     return health;
   }
