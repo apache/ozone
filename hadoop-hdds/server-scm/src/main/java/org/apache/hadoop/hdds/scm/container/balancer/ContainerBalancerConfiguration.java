@@ -5,16 +5,15 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.scm.container.balancer;
@@ -23,9 +22,15 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This class contains configuration values for the ContainerBalancer.
@@ -69,8 +74,13 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "idle.iterations", type = ConfigType.INT,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
-      description = "The idle iteration count of Container Balancer")
+      description = "The idle iteration count of Container Balancer.")
   private int idleIterations = 10;
+
+  @Config(key = "exclude.containers", type = ConfigType.STRING, defaultValue =
+      "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
+      "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
+  private String excludeContainers = "";
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -171,6 +181,24 @@ public final class ContainerBalancerConfiguration {
 
   public void setMaxSizeLeavingSource(long maxSizeLeavingSource) {
     this.maxSizeLeavingSource = maxSizeLeavingSource;
+  }
+
+  public Set<ContainerID> getExcludeContainers() {
+    if (excludeContainers.isEmpty()) {
+      return new HashSet<>();
+    }
+    return Arrays.stream(excludeContainers.split(", |,"))
+        .map(s -> ContainerID.valueOf(Long.parseLong(s)))
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Sets containers to exclude from balancing.
+   * @param excludeContainers String of {@link ContainerID} to exclude. For
+   *                          example, "1, 4, 5" or "1,4,5".
+   */
+  public void setExcludeContainers(String excludeContainers) {
+    this.excludeContainers = excludeContainers;
   }
 
   @Override

@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,6 +52,19 @@ public class FindTargetGreedy implements FindTargetStrategy {
     this.placementPolicy = placementPolicy;
   }
 
+  /**
+   * Find a {@link ContainerMoveSelection} consisting of a target and
+   * container to move for a source datanode. Favours more under-utilized nodes.
+   * @param source Datanode to find a target for
+   * @param potentialTargets Collection of potential target datanodes
+   * @param candidateContainers Set of candidate containers satisfying
+   *                            selection criteria
+   *                            {@link ContainerBalancerSelectionCriteria}
+   * @param canSizeEnterTarget A functional interface whose apply
+   * (DatanodeDetails, Long) method returns true if the size specified in the
+   * second argument can enter the specified DatanodeDetails node
+   * @return Found target and container
+   */
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
       DatanodeDetails source, Collection<DatanodeDetails> potentialTargets,
@@ -58,17 +89,8 @@ public class FindTargetGreedy implements FindTargetStrategy {
             containerMoveSatisfiesPlacementPolicy(container, replicas, source,
             target) &&
             canSizeEnterTarget.apply(target, containerInfo.getUsedBytes())) {
-          LOG.info("Container Balancer found target {} and container {} for" +
-                  " source {}", target.getUuidString(),
-              containerInfo.containerID(), source.getUuidString());
           return new ContainerMoveSelection(target, container);
-        } else {
-          LOG.info("ContainerBalancer can't move size {} to target {}",
-              containerInfo.getUsedBytes(), target.getUuidString());
         }
-//        LOG.info("For source {} and potential target {} found container " +
-//                "replicas {}", source.getUuidString(),
-//            target.getUuidString(), replicas);
       }
     }
     LOG.info("Container Balancer could not find a target for source datanode " +
@@ -76,6 +98,15 @@ public class FindTargetGreedy implements FindTargetStrategy {
     return null;
   }
 
+  /**
+   * Checks if container being present in target instead of source satisfies
+   * the placement policy.
+   * @param containerID Container to be moved from source to target
+   * @param replicas Set of replicas of the given container
+   * @param source Source datanode for container move
+   * @param target Target datanode for container move
+   * @return
+   */
   @Override
   public boolean containerMoveSatisfiesPlacementPolicy(
       ContainerID containerID, Set<ContainerReplica> replicas,

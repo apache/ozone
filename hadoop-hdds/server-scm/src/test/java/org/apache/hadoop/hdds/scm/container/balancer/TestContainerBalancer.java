@@ -5,16 +5,15 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.scm.container.balancer;
@@ -24,20 +23,23 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Before;
@@ -53,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.when;
 
@@ -66,12 +69,10 @@ public class TestContainerBalancer {
 
   private ReplicationManager replicationManager;
   private ContainerManagerV2 containerManager;
-  private ContainerStateManager containerStateManager;
   private ContainerBalancer containerBalancer;
   private MockNodeManager mockNodeManager;
   private OzoneConfiguration conf;
   private PlacementPolicy placementPolicy;
-  private ContainerPlacementStatus placementStatus;
   private ContainerBalancerConfiguration balancerConfiguration;
   private List<DatanodeUsageInfo> nodesInCluster;
   private List<Double> nodeUtilizations;
@@ -80,40 +81,34 @@ public class TestContainerBalancer {
   private Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap =
       new HashMap<>();
   private Map<ContainerID, ContainerInfo> cidToInfoMap = new HashMap<>();
-  private Map<DatanodeUsageInfo, Set<ContainerID>> datanodeToCidMap =
+  private Map<DatanodeUsageInfo, Set<ContainerID>> datanodeToContainersMap =
       new HashMap<>();
-  private static final ThreadLocalRandom random = ThreadLocalRandom.current();
+  private static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
 
   /**
    * Sets up configuration values and creates a mock cluster.
    */
   @Before
-  public void setup() throws ContainerNotFoundException {
+  public void setup() throws SCMException {
     conf = new OzoneConfiguration();
     containerManager = Mockito.mock(ContainerManagerV2.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    placementPolicy = Mockito.mock(PlacementPolicy.class);
-    placementStatus = Mockito.mock(ContainerPlacementStatus.class);
 
     balancerConfiguration = new ContainerBalancerConfiguration();
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setIdleIteration(1);
     balancerConfiguration.setMaxDatanodesToBalance(10);
-    balancerConfiguration.setMaxSizeToMove(500 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(8 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMove(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
     conf.setFromObject(balancerConfiguration);
 
-    // create datanodes with the generated nodeUtilization values
-    this.averageUtilization = generateData();
-    
-    mockNodeManager = new MockNodeManager(datanodeToCidMap);
+    averageUtilization = createCluster();
+    mockNodeManager = new MockNodeManager(datanodeToContainersMap);
 
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.anyListOf(DatanodeDetails.class),
-        Mockito.anyInt()))
-        .thenAnswer(invocation -> new ContainerPlacementStatusDefault(2, 2, 3));
-
-    Mockito.when(placementStatus.isPolicySatisfied()).thenReturn(true);
+    placementPolicy = ContainerPlacementPolicyFactory
+        .getPolicy(conf, mockNodeManager,
+            mockNodeManager.getClusterNetworkTopologyMap(), true,
+            SCMContainerPlacementMetrics.create());
 
     Mockito.when(replicationManager
         .isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
@@ -150,9 +145,8 @@ public class TestContainerBalancer {
 
     // check for random threshold values
     for (int i = 0; i < 50; i++) {
-      double randomThreshold = Math.random();
+      double randomThreshold = RANDOM.nextDouble();
 
-//      double randomThreshold = 0.34347427272493825;
       balancerConfiguration.setThreshold(randomThreshold);
       containerBalancer.start(balancerConfiguration);
 
@@ -169,7 +163,6 @@ public class TestContainerBalancer {
           containerBalancer.getUnBalancedNodes();
 
       containerBalancer.stop();
-
       Assert.assertEquals(
           expectedUnBalancedNodes.size(),
           unBalancedNodesAccordingToBalancer.size());
@@ -179,7 +172,6 @@ public class TestContainerBalancer {
             unBalancedNodesAccordingToBalancer.get(j).getDatanodeDetails());
       }
     }
-
   }
 
   /**
@@ -260,6 +252,7 @@ public class TestContainerBalancer {
     } catch (InterruptedException e) {}
 
     containerBalancer.stop();
+    // check whether all selected containers are closed
     for (ContainerMoveSelection moveSelection:
          containerBalancer.getSourceToTargetMap().values()) {
       Assert.assertSame(
@@ -283,6 +276,155 @@ public class TestContainerBalancer {
 
     Assert.assertFalse(containerBalancer.isBalancerRunning());
     containerBalancer.stop();
+  }
+
+  @Test
+  public void targetDatanodeShouldNotAlreadyContainSelectedContainer() {
+    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setMaxSizeToMove(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxDatanodesToBalance(20);
+    containerBalancer.start(balancerConfiguration);
+
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {}
+
+    containerBalancer.stop();
+    Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
+        containerBalancer.getSourceToTargetMap();
+    for (DatanodeDetails source : sourceToTargetMap.keySet()) {
+      ContainerMoveSelection moveSelection = sourceToTargetMap.get(source);
+      ContainerID container = moveSelection.getContainerID();
+      DatanodeDetails target = moveSelection.getTargetNode();
+      Assert.assertTrue(cidToReplicasMap.get(container)
+          .stream()
+          .map(ContainerReplica::getDatanodeDetails)
+          .noneMatch(target::equals));
+    }
+  }
+
+  @Test
+  public void containerMoveSelectionShouldFollowPlacementPolicy() {
+    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setMaxSizeToMove(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxDatanodesToBalance(20);
+    containerBalancer.start(balancerConfiguration);
+
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {}
+
+    containerBalancer.stop();
+    Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
+        containerBalancer.getSourceToTargetMap();
+
+    // for each move selection, check if {replicas - source + target}
+    // satisfies placement policy
+    for (DatanodeDetails source : sourceToTargetMap.keySet()) {
+      ContainerMoveSelection moveSelection = sourceToTargetMap.get(source);
+      ContainerID container = moveSelection.getContainerID();
+      DatanodeDetails target = moveSelection.getTargetNode();
+
+      List<DatanodeDetails> replicas = cidToReplicasMap.get(container)
+          .stream()
+          .map(ContainerReplica::getDatanodeDetails)
+          .collect(Collectors.toList());
+      replicas.remove(source);
+      replicas.add(target);
+
+      ContainerInfo containerInfo = cidToInfoMap.get(container);
+      ContainerPlacementStatus placementStatus =
+          placementPolicy.validateContainerPlacement(replicas,
+              containerInfo.getReplicationConfig().getRequiredNodes());
+      Assert.assertTrue(placementStatus.isPolicySatisfied());
+    }
+  }
+
+  @Test
+  public void targetDatanodeShouldBeInServiceHealthy()
+      throws NodeNotFoundException {
+    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setMaxDatanodesToBalance(20);
+    balancerConfiguration.setMaxSizeToMove(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    containerBalancer.start(balancerConfiguration);
+
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {
+    }
+
+    containerBalancer.stop();
+    for (ContainerMoveSelection moveSelection :
+        containerBalancer.getSourceToTargetMap().values()) {
+      DatanodeDetails target = moveSelection.getTargetNode();
+      NodeStatus status = mockNodeManager.getNodeStatus(target);
+      Assert.assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
+          status.getOperationalState());
+      Assert.assertTrue(status.isHealthy());
+    }
+  }
+
+  @Test
+  public void selectedContainerShouldNotAlreadyHaveBeenSelected() {
+    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setMaxDatanodesToBalance(20);
+    balancerConfiguration.setMaxSizeToMove(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+
+    containerBalancer.start(balancerConfiguration);
+
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {}
+
+    containerBalancer.stop();
+    Set<ContainerID> containers = new HashSet<>();
+    for (ContainerMoveSelection moveSelection :
+        containerBalancer.getSourceToTargetMap().values()) {
+      ContainerID container = moveSelection.getContainerID();
+      Assert.assertFalse(containers.contains(container));
+      containers.add(container);
+    }
+  }
+
+  @Test
+  public void balancerShouldNotSelectConfiguredExcludeContainers() {
+    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setMaxDatanodesToBalance(20);
+    balancerConfiguration.setMaxSizeToMove(50 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setExcludeContainers("1, 4, 5");
+
+    containerBalancer.start(balancerConfiguration);
+
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {}
+
+    containerBalancer.stop();
+    Set<ContainerID> excludeContainers =
+        balancerConfiguration.getExcludeContainers();
+    for (ContainerMoveSelection moveSelection :
+        containerBalancer.getSourceToTargetMap().values()) {
+      ContainerID container = moveSelection.getContainerID();
+      Assert.assertFalse(excludeContainers.contains(container));
+    }
   }
 
   /**
@@ -349,7 +491,7 @@ public class TestContainerBalancer {
 
     for (double utilization : nodeUtilizations) {
       // select a random index from 0 to capacities.length
-      int index = random.nextInt(0, capacities.length);
+      int index = RANDOM.nextInt(0, capacities.length);
       long capacity = capacities[index];
       long used = (long) (capacity * utilization);
       totalCapacity += capacity;
@@ -363,34 +505,78 @@ public class TestContainerBalancer {
     return totalUsed / totalCapacity;
   }
 
-//  private void createContainersForNodes() {
-//    for (int i = 0; i < nodeUtilizations.size(); i++) {
-//      Set<ContainerID> containerIDSet = new HashSet<>();
-//
-//      // each datanode contains container proportional to its utilization value
-//      // here, more container
-//      int numContainersPerNode = (int) (nodeUtilizations.get(i) * 10d);
-//      for (int j = 0; j < numContainersPerNode; j++) {
-//        ContainerInfo container = createContainer(numContainersPerNode * i + j);
-//        cidToInfoMap.put(container.containerID(), container);
-//        containerIDSet.add(container.containerID());
-//      }
-//
-//      try {
-//        mockNodeManager
-//            .setContainers(nodesInCluster.get(i).getDatanodeDetails(),
-//                containerIDSet);
-//      } catch (NodeNotFoundException e) {
-//        LOG.warn("Could not find Datanode {} while creating containers for " +
-//                "it. Removing it from the list of nodes in cluster.",
-//            nodesInCluster.get(i).getDatanodeDetails().getUuidString(), e);
-//        nodesInCluster.remove(i);
-//        nodeUtilizations.remove(i);
-//        containerIDSet
-//            .forEach(containerID -> cidToInfoMap.remove(containerID));
-//      }
-//    }
-//  }
+  /**
+   * Create an unbalanced cluster by generating some data. Nodes in the
+   * cluster have utilization values determined by generateUtilizations method.
+   * @return average utilization (used space / capacity) of the cluster
+   */
+  private double createCluster() {
+    generateData();
+    createReplicasForContainers();
+    long clusterCapacity = 0, clusterUsedSpace = 0;
+
+    // for each node utilization, calculate that datanode's used space and
+    // capacity
+    for (int i = 0; i < nodeUtilizations.size(); i++) {
+      long datanodeUsedSpace = 0, datanodeCapacity = 0;
+      Set<ContainerID> containerIDSet =
+          datanodeToContainersMap.get(nodesInCluster.get(i));
+
+      for (ContainerID containerID : containerIDSet) {
+        datanodeUsedSpace += cidToInfoMap.get(containerID).getUsedBytes();
+      }
+
+      // use node utilization and used space to determine node capacity
+      if (nodeUtilizations.get(i) == 0) {
+        datanodeCapacity = OzoneConsts.GB * RANDOM.nextInt(10, 60);
+      } else {
+        datanodeCapacity = (long) (datanodeUsedSpace / nodeUtilizations.get(i));
+      }
+      SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
+          datanodeCapacity - datanodeUsedSpace);
+      nodesInCluster.get(i).setScmNodeStat(stat);
+      clusterUsedSpace += datanodeUsedSpace;
+      clusterCapacity += datanodeCapacity;
+    }
+    return (double) clusterUsedSpace / clusterCapacity;
+  }
+
+  /**
+   * Create some datanodes and containers for each node.
+   */
+  private void generateData() {
+    this.numberOfNodes = 10;
+    generateUtilizations(numberOfNodes);
+    nodesInCluster = new ArrayList<>(nodeUtilizations.size());
+
+    // create datanodes and add containers to them
+    for (int i = 0; i < numberOfNodes; i++) {
+      Set<ContainerID> containerIDSet = new HashSet<>();
+      DatanodeUsageInfo usageInfo =
+          new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(),
+              new SCMNodeStat());
+
+      // create containers with varying used space
+      int sizeMultiple = 0;
+      for (int j = 0; j < i; j++) {
+        sizeMultiple %= 5;
+        sizeMultiple++;
+        ContainerInfo container =
+            createContainer((long) i * i + j, sizeMultiple);
+
+        cidToInfoMap.put(container.containerID(), container);
+        containerIDSet.add(container.containerID());
+
+        // create initial replica for this container and add it
+        Set<ContainerReplica> containerReplicaSet = new HashSet<>();
+        containerReplicaSet.add(createReplica(container.containerID(),
+            usageInfo.getDatanodeDetails(), container.getUsedBytes()));
+        cidToReplicasMap.put(container.containerID(), containerReplicaSet);
+      }
+      nodesInCluster.add(usageInfo);
+      datanodeToContainersMap.put(usageInfo, containerIDSet);
+    }
+  }
 
   private ContainerInfo createContainer(long id, int multiple) {
     return new ContainerInfo.Builder()
@@ -403,53 +589,43 @@ public class TestContainerBalancer {
         .build();
   }
 
-  private double generateData() {
-    this.numberOfNodes = 10;
-    generateUtilizations(numberOfNodes);
-    nodesInCluster = new ArrayList<>(nodeUtilizations.size());
-    long clusterCapacity = 0, clusterUsedSpace = 0;
+  /**
+   * Create the required number of replicas for each container. Note that one
+   * replica already exists and nodes with utilization value 0 should not
+   * have any replicas.
+   */
+  private void createReplicasForContainers() {
+    for (ContainerInfo container : cidToInfoMap.values()) {
 
-    // for each utilization value, create a datanode and add containers to it
-    // such that the datanode has that utilization value
-    for (int i = 0; i < nodeUtilizations.size(); i++) {
-      Set<ContainerID> containerIDSet = new HashSet<>();
+      // one replica already exists; create the remaining ones
+      for (int i = 0;
+           i < container.getReplicationConfig().getRequiredNodes() - 1; i++) {
 
-      // each datanode contains number of containers proportional to its
-      // utilization value
-      int numContainersPerNode = (int) (nodeUtilizations.get(i) * 10d);
-      int sizeMultiple = 0;
-      long datanodeUsedSpace = 0, datanodeCapacity = 0;
-
-      // create containers with varying used space size
-      for (int j = 0; j < numContainersPerNode; j++) {
-        sizeMultiple %= 5;
-        sizeMultiple++;
-        ContainerInfo container =
-            createContainer((long) numContainersPerNode * i + j, sizeMultiple);
-        datanodeUsedSpace += container.getUsedBytes();
-        cidToInfoMap.put(container.containerID(), container);
-        containerIDSet.add(container.containerID());
-        cidToReplicasMap.put(container.containerID(), new HashSet<>());
+        // randomly pick a datanode for this replica
+        int datanodeIndex = RANDOM.nextInt(0, numberOfNodes);
+        if (nodeUtilizations.get(i) != 0.0d) {
+          DatanodeDetails node =
+              nodesInCluster.get(datanodeIndex).getDatanodeDetails();
+          Set<ContainerReplica> replicas =
+              cidToReplicasMap.get(container.containerID());
+          replicas.add(createReplica(container.containerID(), node,
+              container.getUsedBytes()));
+          cidToReplicasMap.put(container.containerID(), replicas);
+        }
       }
-
-      // create a datanode using node utilization to calculate capacity
-      if (nodeUtilizations.get(i) == 0) {
-        datanodeCapacity = OzoneConsts.GB * random.nextInt(10,60);
-      } else {
-        datanodeCapacity = (long) (datanodeUsedSpace / nodeUtilizations.get(i));
-      }
-      SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
-          datanodeCapacity - datanodeUsedSpace);
-      nodesInCluster.add(
-          new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(),
-              stat));
-      datanodeToCidMap
-          .put(nodesInCluster.get(nodesInCluster.size() - 1), containerIDSet);
-
-      clusterCapacity += datanodeCapacity;
-      clusterUsedSpace += datanodeUsedSpace;
     }
-    return (double) clusterUsedSpace / clusterCapacity;
   }
 
+  private ContainerReplica createReplica(ContainerID containerID,
+                                         DatanodeDetails datanodeDetails,
+                                         long usedBytes) {
+    return ContainerReplica.newBuilder()
+        .setContainerID(containerID)
+        .setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(datanodeDetails)
+        .setOriginNodeId(datanodeDetails.getUuid())
+        .setSequenceId(1000L)
+        .setBytesUsed(usedBytes)
+        .build();
+  }
 }

@@ -5,16 +5,15 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.scm.container.balancer;
@@ -139,8 +138,6 @@ public class ContainerBalancer {
       ozoneConfiguration = new OzoneConfiguration();
       this.config = balancerConfiguration;
       LOG.info("Starting Container Balancer...{}", this);
-//      LOG.info("Max size entering node config is {}",
-//          config.getMaxSizeEnteringTarget());
 
       //we should start a new balancer thread async
       //and response to cli as soon as possible
@@ -186,9 +183,6 @@ public class ContainerBalancer {
    * within threshold utilized nodes. Decides whether balancing needs to
    * continue or should be stopped.
    *
-   * TODO: update method for changes made to configs max datanodes balanced-
-   * TODO: -per iteration and max size moved per iteration.
-   *
    * @return true if successfully initialized, otherwise false.
    */
   private boolean initializeIteration() {
@@ -210,9 +204,9 @@ public class ContainerBalancer {
     this.clusterRemaining = 0L;
 
     this.selectedContainers = new HashSet<>();
-    overUtilizedNodes = new ArrayList<>();
-    underUtilizedNodes = new ArrayList<>();
-    withinThresholdUtilizedNodes = new ArrayList<>();
+    this.overUtilizedNodes = new ArrayList<>();
+    this.underUtilizedNodes = new ArrayList<>();
+    this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
 
     clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
@@ -263,39 +257,10 @@ public class ContainerBalancer {
     }
     Collections.reverse(underUtilizedNodes);
 
-//    long countDatanodesBalanced = 0;
-//    // count number of nodes that were balanced in previous iteration
-//    for (DatanodeUsageInfo node : unBalancedNodes) {
-//      if (!containsNode(overUtilizedNodes, node) &&
-//          !containsNode(underUtilizedNodes, node)) {
-//        countDatanodesBalanced += 1;
-//      }
-//    }
-//    // calculate total number of nodes that have been balanced so far
-//    countDatanodesBalanced =
-//        metrics.incrementDatanodesNumBalanced(countDatanodesBalanced);
-
     unBalancedNodes = new ArrayList<>(
         overUtilizedNodes.size() + underUtilizedNodes.size());
-
-//    if (countDatanodesBalanced + countDatanodesToBalance >
-//        maxDatanodesToBalance) {
-//      LOG.info("Approaching Max Datanodes To Balance limit in Container " +
-//          "Balancer. Stopping Balancer.");
-//      stop();
-//      return false;
-//    }
-//
     unBalancedNodes.addAll(overUtilizedNodes);
     unBalancedNodes.addAll(underUtilizedNodes);
-
-//    // for now, we just sleep to simulate the execution of balancer
-//    // this if for acceptance test now. modify this later when balancer
-//    // if fully completed
-//    try {
-//      Thread.sleep(50);
-//    } catch (InterruptedException e) {}
-//    /////////////////////////////
 
     if (unBalancedNodes.isEmpty()) {
       LOG.info("Did not find any unbalanced Datanodes.");
@@ -307,7 +272,6 @@ public class ContainerBalancer {
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager);
-//    selectionCriteria.setSelectedContainers(selectedContainers);
     sourceToTargetMap = new HashMap<>(overUtilizedNodes.size() +
         withinThresholdUtilizedNodes.size());
 
@@ -330,7 +294,7 @@ public class ContainerBalancer {
   }
 
   private boolean doIteration() {
-    List<DatanodeDetails> potentialTargets = findPotentialTargets();
+    List<DatanodeDetails> potentialTargets = getPotentialTargets();
     Set<DatanodeDetails> selectedTargets =
         new HashSet<>(potentialTargets.size());
 
@@ -430,14 +394,37 @@ public class ContainerBalancer {
     return moveSelection;
   }
 
+  /**
+   * Checks if limits maxDatanodesToBalance and maxSizeToMove have not been hit.
+   * @return true if conditions pass and balancing can continue, else false
+   */
   private boolean checkConditionsForBalancing() {
-    return countDatanodesBalanced + 2 < maxDatanodesToBalance &&
-        totalSizeMoved + (long) ozoneConfiguration.getStorageSize(
-            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-            StorageUnit.BYTES) < maxSizeToMove;
+    if (countDatanodesBalanced + 2 > maxDatanodesToBalance) {
+      LOG.info("Hit max datanodes to balance limit. {} datanodes have already" +
+              " been balanced and the limit is {}.", countDatanodesBalanced,
+          maxDatanodesToBalance);
+      return false;
+    }
+    if (totalSizeMoved + (long) ozoneConfiguration.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES) > maxSizeToMove) {
+      LOG.info("Hit max size to move limit. {} bytes have already been moved " +
+          "and the limit is {} bytes.", totalSizeMoved, maxSizeToMove);
+      return false;
+    }
+    return true;
   }
 
+  /**
+   * Update targets and selection criteria at the end of an iteration.
+   * @param potentialTargets potential target datanodes
+   * @param selectedTargets selected target datanodes
+   * @param moveSelection the target datanode and container that has been just
+   *                      selected
+   * @param source the source datanode
+   * @return list of updated potential targets
+   */
   private List<DatanodeDetails> updateTargetsAndSelectionCriteria(
       List<DatanodeDetails> potentialTargets,
       Set<DatanodeDetails> selectedTargets,
@@ -453,6 +440,7 @@ public class ContainerBalancer {
         .filter(node -> sizeEnteringNode.get(node) <=
             config.getMaxSizeEnteringTarget()).collect(Collectors.toList());
   }
+
   /**
    * Performs binary search to determine if the specified listToSearch
    * contains the specified node.
@@ -541,6 +529,13 @@ public class ContainerBalancer {
     return false;
   }
 
+  /**
+   * Checks if specified size can enter specified target datanode
+   * according to configuration.
+   * @param target target datanode in which size is entering
+   * @param size size in bytes
+   * @return true if size can enter target, else false
+   */
   boolean canSizeEnterTarget(DatanodeDetails target,
                                     long size) {
     if (sizeEnteringNode.containsKey(target)) {
@@ -550,7 +545,12 @@ public class ContainerBalancer {
     return false;
   }
 
-  private List<DatanodeDetails> findPotentialTargets() {
+  /**
+   * Get potential targets for container move. Potential targets are under
+   * utilized and within threshold utilized nodes.
+   * @return A list of potential target DatanodeDetails.
+   */
+  private List<DatanodeDetails> getPotentialTargets() {
     List<DatanodeDetails> potentialTargets = new ArrayList<>(
         underUtilizedNodes.size() + withinThresholdUtilizedNodes.size());
 
@@ -561,6 +561,13 @@ public class ContainerBalancer {
     return potentialTargets;
   }
 
+  /**
+   * Updates conditions for balancing, such as total size moved by balancer,
+   * total size that has entered a datanode, and total size that has left a
+   * datanode in this iteration.
+   * @param source source datanode
+   * @param moveSelection selected target datanode and container
+   */
   private void incSizeSelectedForMoving(DatanodeDetails source,
                                        ContainerMoveSelection moveSelection) {
     DatanodeDetails target =
@@ -594,13 +601,6 @@ public class ContainerBalancer {
       sizeEnteringNode.put(target, size);
     }
   }
-
-//  public List<DatanodeDetails> updatePotentialTargets(
-//      List<DatanodeDetails> potentialTargets) {
-//    return potentialTargets.stream()
-//        .filter(node -> sizeEnteringNode.get(node) <=
-//            config.getMaxSizeEnteringTarget()).collect(Collectors.toList());
-//  }
 
   /**
    * Stops ContainerBalancer.
@@ -678,11 +678,22 @@ public class ContainerBalancer {
     this.unBalancedNodes = unBalancedNodes;
   }
 
+  /**
+   * Sets the {@link FindTargetStrategy}.
+   * @param findTargetStrategy the strategy using which balancer selects a
+   *                           target datanode and container for a source
+   */
   public void setFindTargetStrategy(
       FindTargetStrategy findTargetStrategy) {
     this.findTargetStrategy = findTargetStrategy;
   }
 
+  /**
+   * Gets source datanodes mapped to their selected
+   * {@link ContainerMoveSelection}, consisting of target datanode and
+   * container to move.
+   * @return Map of {@link DatanodeDetails} to {@link ContainerMoveSelection}
+   */
   public Map<DatanodeDetails, ContainerMoveSelection> getSourceToTargetMap() {
     return sourceToTargetMap;
   }

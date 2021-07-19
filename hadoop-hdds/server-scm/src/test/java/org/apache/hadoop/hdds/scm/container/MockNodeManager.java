@@ -187,8 +187,8 @@ public class MockNodeManager implements NodeManager {
               usageInfoToCidsMap.get(usageInfo));
         } catch (NodeNotFoundException e) {
           LOG.warn("Could not find Datanode {} for adding containers to it. " +
-                  "Skipping this node."
-              , usageInfo.getDatanodeDetails().getUuidString());
+                  "Skipping this node.", usageInfo
+              .getDatanodeDetails().getUuidString());
           continue;
         }
         nodeMetricMap
@@ -413,7 +413,15 @@ public class MockNodeManager implements NodeManager {
   @Override
   public NodeStatus getNodeStatus(DatanodeDetails dd)
       throws NodeNotFoundException {
-    return null;
+    if (healthyNodes.contains(dd)) {
+      return NodeStatus.inServiceHealthy();
+    } else if (staleNodes.contains(dd)) {
+      return NodeStatus.inServiceStale();
+    } else if (deadNodes.contains(dd)) {
+      return NodeStatus.inServiceDead();
+    } else {
+      throw new NodeNotFoundException();
+    }
   }
 
   /**

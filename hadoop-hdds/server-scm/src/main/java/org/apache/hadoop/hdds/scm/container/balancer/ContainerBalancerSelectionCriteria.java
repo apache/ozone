@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -47,7 +47,6 @@ public class ContainerBalancerSelectionCriteria {
   private ReplicationManager replicationManager;
   private ContainerManagerV2 containerManagerV2;
   private Set<ContainerID> selectedContainers;
-  private Set<ContainerID> includeContainers;
   private Set<ContainerID> excludeContainers;
 
   public ContainerBalancerSelectionCriteria(
@@ -60,12 +59,12 @@ public class ContainerBalancerSelectionCriteria {
     this.replicationManager = replicationManager;
     this.containerManagerV2 = containerManagerV2;
     selectedContainers = new HashSet<>();
+    excludeContainers = balancerConfiguration.getExcludeContainers();
   }
 
   /**
    * Checks whether container is currently undergoing replication or deletion.
    *
-   * TODO: Implement method
    * @param containerID Container to check.
    * @return true if container is replicating or deleting, otherwise false.
    */
@@ -106,14 +105,11 @@ public class ContainerBalancerSelectionCriteria {
     // remove not closed containers
     containerIDSet.removeIf(containerID -> {
       try {
-//        LOG.info("Container state for container {} is {}", containerID,
-//            containerManagerV2.getContainer(containerID).getState());
-
         return containerManagerV2.getContainer(containerID).getState() !=
             HddsProtos.LifeCycleState.CLOSED;
       } catch (ContainerNotFoundException e) {
         LOG.warn("Could not retrieve ContainerInfo for container {} for " +
-            "checking lifecycle state in ContainerBalancer. Excluding this " +
+            "checking LifecycleState in ContainerBalancer. Excluding this " +
             "container.", containerID.toString(), e);
         return true;
       }
@@ -123,6 +119,14 @@ public class ContainerBalancerSelectionCriteria {
     return containerIDSet;
   }
 
+  /**
+   * Checks if the first container has more used space than second.
+   * @param first first container to compare
+   * @param second second container to compare
+   * @return An integer greater than 0 if first is more used, 0 if they're
+   * the same containers or a container is not found, and a value less than 0
+   * if first is not more used than second.
+   */
   private int isContainerMoreUsed(ContainerID first,
                                   ContainerID second) {
     if (first.equals(second)) {
@@ -143,13 +147,13 @@ public class ContainerBalancerSelectionCriteria {
     }
   }
 
+  /**
+   * Compares containers on the basis of used space.
+   * @return First container is more used if it has used space greater than
+   * second container.
+   */
   private Comparator<ContainerID> orderContainersByUsedBytes() {
     return this::isContainerMoreUsed;
-  }
-
-  public void setIncludeContainers(
-      Set<ContainerID> includeContainers) {
-    this.includeContainers = includeContainers;
   }
 
   public void setExcludeContainers(
