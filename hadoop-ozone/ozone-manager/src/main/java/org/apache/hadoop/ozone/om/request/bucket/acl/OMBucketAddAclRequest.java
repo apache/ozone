@@ -122,8 +122,7 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMBucketAclResponse(
-        createErrorOMResponse(omResponse, exception));
+    return super.onFailure(omResponse, exception);
   }
 
   @Override
@@ -134,7 +133,9 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
         exception, getOmRequest().getUserInfo()));
 
     if (operationResult) {
-      LOG.debug("Add acl: {} to path: {} success!", getAcls(), getPath());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Add acl: {} to path: {} success!", getAcls(), getPath());
+      }
     } else {
       omMetrics.incNumBucketUpdateFails();
       if (exception == null) {

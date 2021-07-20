@@ -119,8 +119,7 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMBucketAclResponse(
-        createErrorOMResponse(omResponse, exception));
+    return super.onFailure(omResponse, exception);
   }
 
   @Override
@@ -131,7 +130,9 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
         exception, getOmRequest().getUserInfo()));
 
     if (operationResult) {
-      LOG.debug("Remove acl: {} for path: {} success!", getAcls(), getPath());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Remove acl: {} for path: {} success!", getAcls(), getPath());
+      }
     } else {
       omMetrics.incNumBucketUpdateFails();
       if (exception == null) {
