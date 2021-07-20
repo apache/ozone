@@ -154,7 +154,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   /**
-   * Process delete command.
+   * Process delete commands.
    */
   public final class DeleteCmdWorker implements Runnable {
 
@@ -178,9 +178,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
+  /**
+   * Process one delete transaction.
+   */
   public final class ProcessTransactionTask implements Runnable {
-    DeletedBlocksTransaction tx;
-    ContainerBlocksDeletionACKProto.Builder result;
+    private DeletedBlocksTransaction tx;
+    private ContainerBlocksDeletionACKProto.Builder result;
 
     public ProcessTransactionTask(DeletedBlocksTransaction transaction,
         ContainerBlocksDeletionACKProto.Builder resultBuilder) {
