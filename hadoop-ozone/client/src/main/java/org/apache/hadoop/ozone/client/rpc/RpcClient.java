@@ -1461,8 +1461,6 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(false)
-        .setSortDatanodesInPipeline(false)
         .setLatestVersionLocation(true)
         .setHeadOp(true)
         .build();

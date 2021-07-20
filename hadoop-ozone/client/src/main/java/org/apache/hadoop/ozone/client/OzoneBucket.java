@@ -531,9 +531,10 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    *
-   * Return basic information about the key.
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object.
    *
-   * If Key exists, return basic information about the key.
+   * If Key exists, return returns OzoneKey.
    * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
    *
    * @param key
