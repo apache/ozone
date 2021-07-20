@@ -17,16 +17,14 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.junit.Before;
-
 /**
  * Test pure Java XOR encoding and decoding.
  */
 public class TestXORRawCoder extends TestXORRawCoderBase {
 
-  @Before
-  public void setup() {
-    this.encoderFactoryClass = XORRawErasureCoderFactory.class;
-    this.decoderFactoryClass = XORRawErasureCoderFactory.class;
+  public TestXORRawCoder() {
+    super(XORRawErasureCoderFactory.class, XORRawErasureCoderFactory.class);
   }
+
+
 }

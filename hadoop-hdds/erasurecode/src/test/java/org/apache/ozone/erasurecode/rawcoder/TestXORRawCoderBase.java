@@ -24,15 +24,21 @@ import org.junit.Test;
  */
 public abstract class TestXORRawCoderBase extends TestRawCoderBase {
 
+  public TestXORRawCoderBase(
+      Class<? extends RawErasureCoderFactory> encoderFactoryClass,
+      Class<? extends RawErasureCoderFactory> decoderFactoryClass) {
+    super(encoderFactoryClass, decoderFactoryClass);
+  }
+
   @Test
   public void testCoding10x1ErasingD0() {
-    prepare(null, 10, 1, new int[] {0}, new int[0]);
+    prepare(null, 10, 1, new int[]{0}, new int[0]);
     testCodingDoMixAndTwice();
   }
 
   @Test
   public void testCoding10x1ErasingP0() {
-    prepare(null, 10, 1, new int[0], new int[] {0});
+    prepare(null, 10, 1, new int[0], new int[]{0});
     testCodingDoMixAndTwice();
   }
 

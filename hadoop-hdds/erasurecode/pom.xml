@@ -44,6 +44,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
     </dependency>
+      <dependency>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-annotations</artifactId>
+          <scope>compile</scope>
+      </dependency>
   </dependencies>
 
   <build>
