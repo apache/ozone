@@ -117,7 +117,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
           container, context, connectionManager);
       deleteCommandQueues.add(cmd);
-    } catch (Exception e) {
+    } catch (IllegalStateException e) {
       LOG.warn("Command is discarded because of the command queue is full");
       return;
     }
@@ -170,6 +170,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             LOG.error("taskProcess failed.", e);
           }
         }
+
         try {
           Thread.sleep(2000);
         } catch (InterruptedException e) {
