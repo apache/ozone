@@ -29,10 +29,13 @@ import java.nio.ByteBuffer;
  * Test dummy raw coder.
  */
 public class TestDummyRawCoder extends TestRawCoderBase {
+
+  public TestDummyRawCoder() {
+    super(DummyRawErasureCoderFactory.class, DummyRawErasureCoderFactory.class);
+  }
+
   @Before
   public void setup() {
-    encoderFactoryClass = DummyRawErasureCoderFactory.class;
-    decoderFactoryClass = DummyRawErasureCoderFactory.class;
     setAllowDump(false);
     setChunkSize(baseChunkSize);
   }
@@ -61,7 +64,7 @@ public class TestDummyRawCoder extends TestRawCoderBase {
     markChunks(dataChunks);
     ECChunk[] parityChunks = prepareParityChunksForEncoding();
     try {
-      encoder.encode(dataChunks, parityChunks);
+      encode(dataChunks, parityChunks);
     } catch (IOException e) {
       Assert.fail("Unexpected IOException: " + e.getMessage());
     }
@@ -75,7 +78,7 @@ public class TestDummyRawCoder extends TestRawCoderBase {
     ensureOnlyLeastRequiredChunks(inputChunks);
     ECChunk[] recoveredChunks = prepareOutputChunksForDecoding();
     try {
-      decoder.decode(inputChunks, getErasedIndexesForDecoding(),
+      decode(inputChunks, getErasedIndexesForDecoding(),
           recoveredChunks);
     } catch (IOException e) {
       Assert.fail("Unexpected IOException: " + e.getMessage());

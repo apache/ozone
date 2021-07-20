@@ -61,24 +61,33 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Used for testing Ozone client without external network calls.
  */
 public class TestOzoneECClient {
+
   private int chunkSize = 1024;
+
   private int dataBlocks = 3;
+
   private int parityBlocks = 2;
+
   private OzoneClient client;
+
   private ObjectStore store;
+
   private String keyName = UUID.randomUUID().toString();
   private String volumeName = UUID.randomUUID().toString();
   private String bucketName = UUID.randomUUID().toString();
+
   private byte[][] inputChunks = new byte[dataBlocks][chunkSize];
+
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
   private MockOmTransport transportStub = null;
   private ECSchema schema = new ECSchema("rs", dataBlocks, parityBlocks);
   private ErasureCodecOptions options = new ErasureCodecOptions(schema);
   private OzoneConfiguration conf = new OzoneConfiguration();
+
   private final RawErasureEncoder encoder =
       new RSRawErasureCoderFactory().createEncoder(
-          new ECReplicationConfig(3, 2));
+          new ECReplicationConfig(dataBlocks, parityBlocks));
 
   @Before
   public void init() throws IOException {

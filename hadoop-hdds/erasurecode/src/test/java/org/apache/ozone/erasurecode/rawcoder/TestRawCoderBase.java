@@ -31,10 +31,17 @@ import java.io.IOException;
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public abstract class TestRawCoderBase extends TestCoderBase {
-  protected Class<? extends RawErasureCoderFactory> encoderFactoryClass;
-  protected Class<? extends RawErasureCoderFactory> decoderFactoryClass;
-  protected RawErasureEncoder encoder;
-  protected RawErasureDecoder decoder;
+  private final Class<? extends RawErasureCoderFactory> encoderFactoryClass;
+  private final Class<? extends RawErasureCoderFactory> decoderFactoryClass;
+  private RawErasureEncoder encoder;
+  private RawErasureDecoder decoder;
+
+  public TestRawCoderBase(
+      Class<? extends RawErasureCoderFactory> encoderFactoryClass,
+      Class<? extends RawErasureCoderFactory> decoderFactoryClass) {
+    this.encoderFactoryClass = encoderFactoryClass;
+    this.decoderFactoryClass = decoderFactoryClass;
+  }
 
   /**
    * Doing twice to test if the coders can be repeatedly reused. This matters
@@ -333,5 +340,14 @@ public abstract class TestRawCoderBase extends TestCoderBase {
         Assert.assertEquals(0, chunk.getBuffer().remaining());
       }
     }
+  }
+
+  public void encode(ECChunk[] inputs, ECChunk[] outputs) throws IOException {
+    this.encoder.encode(inputs, outputs);
+  }
+
+  public void decode(ECChunk[] inputs, int[] erasedIndexes,
+      ECChunk[] outputs) throws IOException {
+    this.decoder.decode(inputs, erasedIndexes, outputs);
   }
 }

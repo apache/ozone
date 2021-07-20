@@ -189,11 +189,8 @@ share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
 share/ozone/lib/ozone-datanode.jar
 share/ozone/lib/ozone-filesystem-common.jar
-<<<<<<< HEAD
 share/ozone/lib/ozone-filesystem-hadoop2.jar
 share/ozone/lib/ozone-filesystem-hadoop3.jar
-=======
->>>>>>> checkstyle + findbugs + cleanup
 share/ozone/lib/ozone-filesystem.jar
 share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar

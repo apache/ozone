@@ -17,6 +17,7 @@
  */
 package org.apache.ozone.erasurecode.rawcoder.util;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
@@ -28,7 +29,7 @@ public final class GF256 {
 
   private GF256() { }
 
-  public static final byte[] GF_BASE = new byte[] {
+  private static final byte[] GF_BASE = new byte[]{
       (byte) 0x01, (byte) 0x02, (byte) 0x04, (byte) 0x08, (byte) 0x10,
       (byte) 0x20, (byte) 0x40, (byte) 0x80, (byte) 0x1d, (byte) 0x3a,
       (byte) 0x74, (byte) 0xe8, (byte) 0xcd, (byte) 0x87, (byte) 0x13,
@@ -83,7 +84,7 @@ public final class GF256 {
       (byte) 0x01
   };
 
-  public static final byte[] GF_LOG_BASE = new byte[] {
+  private static final byte[] GF_LOG_BASE = new byte[]{
       (byte) 0x00, (byte) 0xff, (byte) 0x01, (byte) 0x19, (byte) 0x02,
       (byte) 0x32, (byte) 0x1a, (byte) 0xc6, (byte) 0x03, (byte) 0xdf,
       (byte) 0x33, (byte) 0xee, (byte) 0x1b, (byte) 0x68, (byte) 0xc7,
@@ -138,6 +139,7 @@ public final class GF256 {
       (byte) 0xaf
   };
 
+  @SuppressFBWarnings("MS_EXPOSE_REP")
   private static byte[][] theGfMulTab; // multiply result table in GF 256 space
 
   /**
