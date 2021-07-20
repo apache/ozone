@@ -33,22 +33,20 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 public final class ScmBlockDeletingServiceMetrics {
 
   private static ScmBlockDeletingServiceMetrics instance;
-  final public static String SOURCE_NAME =
+  public final static String SOURCE_NAME =
       SCMBlockDeletingService.class.getSimpleName();
 
   /**
-   * Without command retry and command loss, for a brand new cluster
+   * Without command retry and command loss, for a brand new cluster.
    * deleteTxSent = deleteTxSuccess + deleteTxFailure
    * deleteTxCreated = deleteTxCompleted
    * deleteTxSent = deleteTxCreated * replication factor
-   * <p>
    * deleteTxCmdSent = deleteTxCmdSuccess + deleteTxCmdFailure
-   * <p>
-   * With command retry and command loss
+   *
+   * With command retry and command loss.
    * deleteTxSent >= deleteTxSuccess + deleteTxFailure
    * deleteTxCreated = deleteTxCompleted
    * deleteTxSent >= deleteTxCreated * replication factor
-   * <p>
    * deleteTxCmdSent >= deleteTxCmdSuccess + deleteTxCmdFailure
    */
   @Metric(about = "The number of individual delete transaction commands sent " +

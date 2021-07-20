@@ -90,6 +90,7 @@ public class DeletedBlockLogImplV2
   private final SequenceIdGenerator sequenceIdGen;
   private final ScmBlockDeletingServiceMetrics metrics;
 
+  @SuppressWarnings("parameternumber")
   public DeletedBlockLogImplV2(ConfigurationSource conf,
       ContainerManagerV2 containerManager,
       SCMRatisServer ratisServer,

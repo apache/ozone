@@ -317,11 +317,4 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public static Logger getLogger() {
     return LOG;
   }
-
-  /**
-   * Get metrics
-   */
-  public ScmBlockDeletingServiceMetrics getMetrics() {
-    return metrics;
-  }
 }
