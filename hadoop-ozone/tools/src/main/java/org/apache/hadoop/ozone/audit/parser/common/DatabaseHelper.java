@@ -29,6 +29,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Properties;
@@ -92,9 +93,8 @@ public final class DatabaseHelper {
 
   private static boolean createAuditTable(String dbName) throws Exception {
     try (Connection connection = getConnection(dbName);
-        PreparedStatement st = connection.prepareStatement(
-            properties.get(ParserConsts.CREATE_AUDIT_TABLE))) {
-      st.executeUpdate();
+        Statement st = connection.createStatement()) {
+      st.executeUpdate(properties.get(ParserConsts.CREATE_AUDIT_TABLE));
     }
     return true;
   }
