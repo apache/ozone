@@ -80,42 +80,14 @@ public final class BucketArgs {
    * @param sourceBucket
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
-   * @param bucketLayout Bucket Layouts.
+   * @param bucketLayout bucket layout.
+   * @param ecReplicationConfig EC replication config.
    */
   @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
-      long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout) {
-    this.acls = acls;
-    this.versioning = versioning;
-    this.storageType = storageType;
-    this.metadata = metadata;
-    this.bucketEncryptionKey = bucketEncryptionKey;
-    this.sourceVolume = sourceVolume;
-    this.sourceBucket = sourceBucket;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-    this.bucketLayout = bucketLayout;
-  }
-
-  /**
-   * Private constructor, constructed via builder.
-   * @param versioning Bucket version flag.
-   * @param storageType Storage type to be used.
-   * @param acls list of ACLs.
-   * @param metadata map of bucket metadata
-   * @param bucketEncryptionKey bucket encryption key name
-   * @param sourceVolume
-   * @param sourceBucket
-   * @param quotaInBytes Bucket quota in bytes.
-   * @param quotaInNamespace Bucket quota in counts.
-   */
-  @SuppressWarnings("parameternumber")
-  private BucketArgs(Boolean versioning, StorageType storageType,
-      List<OzoneAcl> acls, Map<String, String> metadata,
-      String bucketEncryptionKey, String sourceVolume, String sourceBucket,
-      long quotaInBytes, long quotaInNamespace,
+      long quotaInBytes, long quotaInNamespace,BucketLayout bucketLayout,
       ECReplicationConfig ecReplicationConfig) {
     this.acls = acls;
     this.versioning = versioning;
@@ -126,6 +98,7 @@ public final class BucketArgs {
     this.sourceBucket = sourceBucket;
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
+    this.bucketLayout = bucketLayout;
     this.ecReplicationConfig = ecReplicationConfig;
   }
 
@@ -302,14 +275,9 @@ public final class BucketArgs {
      * @return instance of BucketArgs.
      */
     public BucketArgs build() {
-      if(ecReplicationConfig!=null){
-        return new BucketArgs(versioning, storageType, acls, metadata,
-            bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-            quotaInNamespace, ecReplicationConfig);
-      }
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace, bucketLayout);
+          quotaInNamespace, bucketLayout, ecReplicationConfig);
     }
   }
 }

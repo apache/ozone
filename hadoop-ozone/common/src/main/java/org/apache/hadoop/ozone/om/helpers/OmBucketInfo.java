@@ -110,63 +110,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param usedBytes - Bucket Quota Usage in bytes.
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
-   * @param bucketLayout Bucket Layout.
-   */
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  private OmBucketInfo(String volumeName,
-      String bucketName,
-      List<OzoneAcl> acls,
-      boolean isVersionEnabled,
-      StorageType storageType,
-      long creationTime,
-      long modificationTime,
-      long objectID,
-      long updateID,
-      Map<String, String> metadata,
-      BucketEncryptionKeyInfo bekInfo,
-      String sourceVolume,
-      String sourceBucket,
-      long usedBytes,
-      long usedNamespace,
-      long quotaInBytes,
-      long quotaInNamespace,
-      BucketLayout bucketLayout) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.acls = acls;
-    this.isVersionEnabled = isVersionEnabled;
-    this.storageType = storageType;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.objectID = objectID;
-    this.updateID = updateID;
-    this.metadata = metadata;
-    this.bekInfo = bekInfo;
-    this.sourceVolume = sourceVolume;
-    this.sourceBucket = sourceBucket;
-    this.usedBytes = usedBytes;
-    this.usedNamespace = usedNamespace;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-    this.bucketLayout = bucketLayout;
-  }
-
-  /**
-   * Private constructor, constructed via builder.
-   * @param volumeName - Volume name.
-   * @param bucketName - Bucket name.
-   * @param acls - list of ACLs.
-   * @param isVersionEnabled - Bucket version flag.
-   * @param storageType - Storage type to be used.
-   * @param creationTime - Bucket creation time.
-   * @param modificationTime - Bucket modification time.
-   * @param metadata - metadata.
-   * @param bekInfo - bucket encryption key info.
-   * @param sourceVolume - source volume for bucket links, null otherwise
-   * @param sourceBucket - source bucket for bucket links, null otherwise
-   * @param usedBytes - Bucket Quota Usage in bytes.
-   * @param quotaInBytes Bucket quota in bytes.
-   * @param quotaInNamespace Bucket quota in counts.
+   * @param bucketLayout bucket layout.
    * @param ecReplicationConfig EC replication config.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -598,19 +542,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(acls);
       Preconditions.checkNotNull(isVersionEnabled);
       Preconditions.checkNotNull(storageType);
-
-      if (this.ecReplicationConfig != null) {
-        return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
-            storageType, creationTime, modificationTime, objectID, updateID,
-            metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-            usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout,
-            ecReplicationConfig);
-      } else {
-        return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
-            storageType, creationTime, modificationTime, objectID, updateID,
-            metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-            usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout);
-      }
+      return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
+          storageType, creationTime, modificationTime, objectID, updateID,
+          metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
+          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, ecReplicationConfig);
     }
   }
 
