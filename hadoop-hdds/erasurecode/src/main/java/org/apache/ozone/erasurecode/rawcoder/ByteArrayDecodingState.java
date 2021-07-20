@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
  * A utility class that maintains decoding state during a decode call using
  * byte array inputs.
  */
+@SuppressWarnings("checkstyle:VisibilityModifier")
 class ByteArrayDecodingState extends DecodingState {
   byte[][] inputs;
   int[] inputOffsets;

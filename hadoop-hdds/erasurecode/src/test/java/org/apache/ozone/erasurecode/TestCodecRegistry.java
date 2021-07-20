@@ -40,7 +40,7 @@ public class TestCodecRegistry {
   @Test
   public void testGetCodecs() {
     Set<String> codecs = CodecRegistry.getInstance().getCodecNames();
-    assertEquals(3, codecs.size());
+    assertEquals(2, codecs.size());
     assertTrue(codecs.contains(ECReplicationConfig.RS_CODEC));
     assertTrue(codecs.contains(ECReplicationConfig.XOR_CODEC));
   }
@@ -100,12 +100,12 @@ public class TestCodecRegistry {
     List<RawErasureCoderFactory> rsCoders = CodecRegistry.getInstance().
         getCoders(ECReplicationConfig.RS_CODEC);
     assertEquals(1, rsCoders.size());
-    assertTrue(rsCoders.get(1) instanceof RSRawErasureCoderFactory);
+    assertTrue(rsCoders.get(0) instanceof RSRawErasureCoderFactory);
 
     // check RS coder names
     String[] rsCoderNames = CodecRegistry.getInstance().
         getCoderNames(ECReplicationConfig.RS_CODEC);
     assertEquals(1, rsCoderNames.length);
-    assertEquals(RSRawErasureCoderFactory.CODER_NAME, rsCoderNames[1]);
+    assertEquals(RSRawErasureCoderFactory.CODER_NAME, rsCoderNames[0]);
   }
 }

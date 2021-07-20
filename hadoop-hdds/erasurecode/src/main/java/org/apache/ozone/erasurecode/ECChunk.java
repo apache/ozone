@@ -30,7 +30,8 @@ public class ECChunk {
   private boolean allZero = false;
 
   /**
-   * Wrapping a ByteBuffer
+   * Wrapping a ByteBuffer.
+   *
    * @param buffer buffer to be wrapped by the chunk
    */
   public ECChunk(ByteBuffer buffer) {
@@ -45,7 +46,8 @@ public class ECChunk {
   }
 
   /**
-   * Wrapping a bytes array
+   * Wrapping a bytes array.
+   *
    * @param buffer buffer to be wrapped by the chunk
    */
   public ECChunk(byte[] buffer) {
@@ -65,7 +67,8 @@ public class ECChunk {
   }
 
   /**
-   * Convert to ByteBuffer
+   * Convert to ByteBuffer.
+   *
    * @return ByteBuffer
    */
   public ByteBuffer getBuffer() {
@@ -73,7 +76,8 @@ public class ECChunk {
   }
 
   /**
-   * Convert an array of this chunks to an array of ByteBuffers
+   * Convert an array of this chunks to an array of ByteBuffers.
+   *
    * @param chunks chunks to convert into buffers
    * @return an array of ByteBuffers
    */

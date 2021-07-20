@@ -25,31 +25,31 @@ import org.junit.Test;
 public abstract class TestXORRawCoderBase extends TestRawCoderBase {
 
   @Test
-  public void testCoding_10x1_erasing_d0() {
+  public void testCoding10x1ErasingD0() {
     prepare(null, 10, 1, new int[] {0}, new int[0]);
     testCodingDoMixAndTwice();
   }
 
   @Test
-  public void testCoding_10x1_erasing_p0() {
+  public void testCoding10x1ErasingP0() {
     prepare(null, 10, 1, new int[0], new int[] {0});
     testCodingDoMixAndTwice();
   }
 
   @Test
-  public void testCoding_10x1_erasing_d5() {
+  public void testCoding10x1ErasingD5() {
     prepare(null, 10, 1, new int[]{5}, new int[0]);
     testCodingDoMixAndTwice();
   }
 
   @Test
-  public void testCodingNegative_10x1_erasing_too_many() {
+  public void testCodingNegative10x1ErasingTooMany() {
     prepare(null, 10, 1, new int[]{2}, new int[]{0});
     testCodingWithErasingTooMany();
   }
 
   @Test
-  public void testCodingNegative_10x1_erasing_d5() {
+  public void testCodingNegative10x1ErasingD5() {
     prepare(null, 10, 1, new int[]{5}, new int[0]);
     testCodingWithBadInput(true);
     testCodingWithBadOutput(false);

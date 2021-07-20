@@ -64,6 +64,7 @@ share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
 share/ozone/lib/hdds-container-service.jar
 share/ozone/lib/hdds-docs.jar
+share/ozone/lib/hdds-erasurecode.jar
 share/ozone/lib/hdds-hadoop-dependency-client.jar
 share/ozone/lib/hdds-hadoop-dependency-server.jar
 share/ozone/lib/hdds-interface-admin.jar
@@ -188,8 +189,11 @@ share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
 share/ozone/lib/ozone-datanode.jar
 share/ozone/lib/ozone-filesystem-common.jar
+<<<<<<< HEAD
 share/ozone/lib/ozone-filesystem-hadoop2.jar
 share/ozone/lib/ozone-filesystem-hadoop3.jar
+=======
+>>>>>>> checkstyle + findbugs + cleanup
 share/ozone/lib/ozone-filesystem.jar
 share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar

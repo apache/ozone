@@ -20,6 +20,7 @@ package org.apache.ozone.erasurecode.rawcoder;
 /**
  * A utility class that maintains decoding state during a decode call.
  */
+@SuppressWarnings("checkstyle:VisibilityModifier")
 class DecodingState {
   RawErasureDecoder decoder;
   int decodeLength;

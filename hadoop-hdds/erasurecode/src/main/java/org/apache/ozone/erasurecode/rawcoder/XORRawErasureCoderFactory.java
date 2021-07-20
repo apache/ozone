@@ -30,12 +30,14 @@ public class XORRawErasureCoderFactory implements RawErasureCoderFactory {
 
 
   @Override
-  public RawErasureEncoder createEncoder(ECReplicationConfig replicationConfig) {
+  public RawErasureEncoder createEncoder(
+      ECReplicationConfig replicationConfig) {
     return new XORRawEncoder(replicationConfig);
   }
 
   @Override
-  public RawErasureDecoder createDecoder(ECReplicationConfig replicationConfig) {
+  public RawErasureDecoder createDecoder(
+      ECReplicationConfig replicationConfig) {
     return new XORRawDecoder(replicationConfig);
   }
 

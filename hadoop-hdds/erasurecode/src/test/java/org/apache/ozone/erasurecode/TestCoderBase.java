@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,8 @@
  */
 package org.apache.ozone.erasurecode;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -29,37 +30,30 @@ import static org.junit.Assert.assertTrue;
  * Test base of common utilities for tests not only raw coders but also block
  * coders.
  */
+@SuppressWarnings({"checkstyle:VisibilityModifier", "checkstyle:HiddenField"})
 public abstract class TestCoderBase {
-  protected static Random RAND = new Random();
-
+  protected static final Random RAND = new Random();
+  private static int fixedDataGenerator = 0;
   protected boolean allowDump = true;
-
-  private Configuration conf;
   protected int numDataUnits;
   protected int numParityUnits;
   protected int baseChunkSize = 1024;
-  private int chunkSize = baseChunkSize;
-  private BufferAllocator allocator;
-
-  private byte[] zeroChunkBytes;
-
-  private boolean startBufferWithZero = true;
-
   // Indexes of erased data units.
-  protected int[] erasedDataIndexes = new int[] {0};
-
+  protected int[] erasedDataIndexes = new int[]{0};
   // Indexes of erased parity units.
-  protected int[] erasedParityIndexes = new int[] {0};
-
+  protected int[] erasedParityIndexes = new int[]{0};
   // Data buffers are either direct or on-heap, for performance the two cases
   // may go to different coding implementations.
   protected boolean usingDirectBuffer = true;
-
   protected boolean usingFixedData = true;
+  protected byte[][] fixedData;
+  private int chunkSize = baseChunkSize;
+  private BufferAllocator allocator;
+  private byte[] zeroChunkBytes;
+  private boolean startBufferWithZero = true;
   // Using this the generated data can be repeatable across multiple calls to
   // encode(), in order for troubleshooting.
-  private static int FIXED_DATA_GENERATOR = 0;
-  protected byte[][] fixedData;
+  private ConfigurationSource conf;
 
   protected int getChunkSize() {
     return chunkSize;
@@ -91,24 +85,23 @@ public abstract class TestCoderBase {
 
   /**
    * Prepare before running the case.
-   * @param conf
-   * @param numDataUnits
-   * @param numParityUnits
-   * @param erasedDataIndexes
-   * @param erasedParityIndexes
+   *
    * @param usingFixedData Using fixed or pre-generated data to test instead of
    *                       generating data
    */
-  protected void prepare(Configuration conf, int numDataUnits,
-                         int numParityUnits, int[] erasedDataIndexes,
-                         int[] erasedParityIndexes, boolean usingFixedData) {
-    this.conf = conf != null ? conf : new Configuration();
+  protected void prepare(ConfigurationSource conf,
+      int numDataUnits,
+      int numParityUnits,
+      int[] erasedDataIndexes,
+      int[] erasedParityIndexes,
+      boolean usingFixedData) {
+    this.conf = conf != null ? conf : new OzoneConfiguration();
     this.numDataUnits = numDataUnits;
     this.numParityUnits = numParityUnits;
     this.erasedDataIndexes = erasedDataIndexes != null ?
-        erasedDataIndexes : new int[] {0};
+        erasedDataIndexes : new int[]{0};
     this.erasedParityIndexes = erasedParityIndexes != null ?
-        erasedParityIndexes : new int[] {0};
+        erasedParityIndexes : new int[]{0};
     this.usingFixedData = usingFixedData;
     if (usingFixedData) {
       prepareFixedData();
@@ -117,47 +110,54 @@ public abstract class TestCoderBase {
 
   /**
    * Prepare before running the case.
+   *
    * @param conf
    * @param numDataUnits
    * @param numParityUnits
    * @param erasedDataIndexes
    * @param erasedParityIndexes
    */
-  protected void prepare(Configuration conf, int numDataUnits,
-                         int numParityUnits, int[] erasedDataIndexes,
-                         int[] erasedParityIndexes) {
+  protected void prepare(ConfigurationSource conf, int numDataUnits,
+      int numParityUnits, int[] erasedDataIndexes,
+      int[] erasedParityIndexes) {
     prepare(conf, numDataUnits, numParityUnits, erasedDataIndexes,
         erasedParityIndexes, false);
   }
 
   /**
    * Prepare before running the case.
+   *
    * @param numDataUnits
    * @param numParityUnits
    * @param erasedDataIndexes
    * @param erasedParityIndexes
    */
-  protected void prepare(int numDataUnits, int numParityUnits,
-                         int[] erasedDataIndexes, int[] erasedParityIndexes) {
+  protected void prepare(
+      int numDataUnits,
+      int numParityUnits,
+      int[] erasedDataIndexes,
+      int[] erasedParityIndexes) {
     prepare(null, numDataUnits, numParityUnits, erasedDataIndexes,
         erasedParityIndexes, false);
   }
 
   /**
    * Get the conf the test.
+   *
    * @return configuration
    */
-  protected Configuration getConf() {
+  protected ConfigurationSource getConf() {
     return this.conf;
   }
 
   /**
-   * Compare and verify if erased chunks are equal to recovered chunks
+   * Compare and verify if erased chunks are equal to recovered chunks.
+   *
    * @param erasedChunks
    * @param recoveredChunks
    */
   protected void compareAndVerify(ECChunk[] erasedChunks,
-                                  ECChunk[] recoveredChunks) {
+      ECChunk[] recoveredChunks) {
     byte[][] erased = toArrays(erasedChunks);
     byte[][] recovered = toArrays(recoveredChunks);
     boolean result = Arrays.deepEquals(erased, recovered);
@@ -178,11 +178,11 @@ public abstract class TestCoderBase {
     int idx = 0;
 
     for (int i = 0; i < erasedDataIndexes.length; i++) {
-      erasedIndexesForDecoding[idx ++] = erasedDataIndexes[i];
+      erasedIndexesForDecoding[idx++] = erasedDataIndexes[i];
     }
 
     for (int i = 0; i < erasedParityIndexes.length; i++) {
-      erasedIndexesForDecoding[idx ++] = erasedParityIndexes[i] + numDataUnits;
+      erasedIndexesForDecoding[idx++] = erasedParityIndexes[i] + numDataUnits;
     }
 
     return erasedIndexesForDecoding;
@@ -190,22 +190,23 @@ public abstract class TestCoderBase {
 
   /**
    * Return input chunks for decoding, which is dataChunks + parityChunks.
+   *
    * @param dataChunks
    * @param parityChunks
    * @return
    */
   protected ECChunk[] prepareInputChunksForDecoding(ECChunk[] dataChunks,
-                                                  ECChunk[] parityChunks) {
+      ECChunk[] parityChunks) {
     ECChunk[] inputChunks = new ECChunk[numDataUnits + numParityUnits];
-    
+
     int idx = 0;
 
     for (int i = 0; i < numDataUnits; i++) {
-      inputChunks[idx ++] = dataChunks[i];
+      inputChunks[idx++] = dataChunks[i];
     }
 
     for (int i = 0; i < numParityUnits; i++) {
-      inputChunks[idx ++] = parityChunks[i];
+      inputChunks[idx++] = parityChunks[i];
     }
 
     return inputChunks;
@@ -215,24 +216,25 @@ public abstract class TestCoderBase {
    * Erase some data chunks to test the recovering of them. As they're erased,
    * we don't need to read them and will not have the buffers at all, so just
    * set them as null.
+   *
    * @param dataChunks
    * @param parityChunks
    * @return clone of erased chunks
    */
   protected ECChunk[] backupAndEraseChunks(ECChunk[] dataChunks,
-                                      ECChunk[] parityChunks) {
+      ECChunk[] parityChunks) {
     ECChunk[] toEraseChunks = new ECChunk[erasedDataIndexes.length +
         erasedParityIndexes.length];
 
     int idx = 0;
 
     for (int i = 0; i < erasedDataIndexes.length; i++) {
-      toEraseChunks[idx ++] = dataChunks[erasedDataIndexes[i]];
+      toEraseChunks[idx++] = dataChunks[erasedDataIndexes[i]];
       dataChunks[erasedDataIndexes[i]] = null;
     }
 
     for (int i = 0; i < erasedParityIndexes.length; i++) {
-      toEraseChunks[idx ++] = parityChunks[erasedParityIndexes[i]];
+      toEraseChunks[idx++] = parityChunks[erasedParityIndexes[i]];
       parityChunks[erasedParityIndexes[i]] = null;
     }
 
@@ -336,7 +338,7 @@ public abstract class TestCoderBase {
     ByteBuffer buffer = allocator.allocate(allocLen);
     buffer.limit(startOffset + bufferLen);
     fillDummyData(buffer, startOffset);
-    startBufferWithZero = ! startBufferWithZero;
+    startBufferWithZero = !startBufferWithZero;
 
     return buffer;
   }
@@ -422,9 +424,9 @@ public abstract class TestCoderBase {
   protected byte[] generateFixedData(int len) {
     byte[] buffer = new byte[len];
     for (int i = 0; i < buffer.length; i++) {
-      buffer[i] = (byte) FIXED_DATA_GENERATOR++;
-      if (FIXED_DATA_GENERATOR == 256) {
-        FIXED_DATA_GENERATOR = 0;
+      buffer[i] = (byte) fixedDataGenerator++;
+      if (fixedDataGenerator == 256) {
+        fixedDataGenerator = 0;
       }
     }
     return buffer;
@@ -478,7 +480,8 @@ public abstract class TestCoderBase {
   }
 
   /**
-   * Dump all the settings used in the test case if isAllowingVerboseDump is enabled.
+   * Dump all the settings used in the test case if isAllowingVerboseDump
+   * is enabled.
    */
   protected void dumpSetting() {
     if (allowDump) {
@@ -488,9 +491,9 @@ public abstract class TestCoderBase {
       sb.append(" chunkSize=").append(chunkSize).append("\n");
 
       sb.append(" erasedDataIndexes=").
-              append(Arrays.toString(erasedDataIndexes));
+          append(Arrays.toString(erasedDataIndexes));
       sb.append(" erasedParityIndexes=").
-              append(Arrays.toString(erasedParityIndexes));
+          append(Arrays.toString(erasedParityIndexes));
       sb.append(" usingDirectBuffer=").append(usingDirectBuffer);
       sb.append(" allowVerboseDump=").append(allowDump);
       sb.append("\n");
@@ -501,8 +504,6 @@ public abstract class TestCoderBase {
 
   /**
    * Dump chunks prefixed with a header if isAllowingVerboseDump is enabled.
-   * @param header
-   * @param chunks
    */
   protected void dumpChunks(String header, ECChunk[] chunks) {
     if (allowDump) {
@@ -511,8 +512,7 @@ public abstract class TestCoderBase {
   }
 
   /**
-   * Make some chunk messy or not correct any more
-   * @param chunks
+   * Make some chunk messy or not correct any more.
    */
   protected void corruptSomeChunk(ECChunk[] chunks) {
     int idx = new Random().nextInt(chunks.length);

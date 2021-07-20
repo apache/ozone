@@ -31,8 +31,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Abstract native raw encoder for all native coders to extend with.
  */
 @InterfaceAudience.Private
+@SuppressWarnings("checkstyle:VisibilityModifier")
 abstract class AbstractNativeRawEncoder extends RawErasureEncoder {
-  public static Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(AbstractNativeRawEncoder.class);
 
   // Protect ISA-L coder data structure in native layer from being accessed and
@@ -40,7 +41,7 @@ abstract class AbstractNativeRawEncoder extends RawErasureEncoder {
   protected final ReentrantReadWriteLock encoderLock =
       new ReentrantReadWriteLock();
 
-  public AbstractNativeRawEncoder(ECReplicationConfig replicationConfig) {
+  AbstractNativeRawEncoder(ECReplicationConfig replicationConfig) {
     super(replicationConfig);
   }
 

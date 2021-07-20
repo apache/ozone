@@ -15,31 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.erasurecode.rawcoder;
-
-import org.junit.Test;
 
 /**
- * Tests for the raw erasure coder benchmark tool.
+ * Unit tests for EC related classes.
  */
-public class TestRawErasureCoderBenchmark {
+package org.apache.ozone.erasurecode;
 
-  @Test
-  public void testDummyCoder() throws Exception {
-    // Dummy coder
-    RawErasureCoderBenchmark.performBench("encode",
-        RawErasureCoderBenchmark.CODER.DUMMY_CODER, 2, 100, 1024);
-    RawErasureCoderBenchmark.performBench("decode",
-        RawErasureCoderBenchmark.CODER.DUMMY_CODER, 5, 150, 100);
-  }
-
-  @Test
-  public void testRSCoder() throws Exception {
-    // RS Java coder
-    RawErasureCoderBenchmark.performBench("encode",
-        RawErasureCoderBenchmark.CODER.RS_CODER, 3, 200, 200);
-    RawErasureCoderBenchmark.performBench("decode",
-        RawErasureCoderBenchmark.CODER.RS_CODER, 4, 135, 20);
-  }
-
-}

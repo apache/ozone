@@ -65,9 +65,7 @@ public final class RawErasureCoderBenchmark {
 
   enum CODER {
     DUMMY_CODER("Dummy coder"),
-    LEGACY_RS_CODER("Legacy Reed-Solomon Java coder"),
-    RS_CODER("Reed-Solomon Java coder"),
-    ISAL_CODER("ISA-L coder");
+    RS_CODER("Reed-Solomon Java coder");
 
     private final String name;
 
@@ -91,7 +89,7 @@ public final class RawErasureCoderBenchmark {
     for (CODER coder : CODER.values()) {
       sb.append(coder.ordinal()).append(":").append(coder).append("\n");
     }
-    System.out.println(sb. toString());
+    System.out.println(sb);
   }
 
   private static void usage(String message) {
@@ -336,7 +334,7 @@ public final class RawErasureCoderBenchmark {
       totalDataSizeKB = round * bufferSizeKB;
     }
 
-    public BenchData(boolean useDirectBuffer) {
+    BenchData(boolean useDirectBuffer) {
       for (int i = 0; i < outputs.length; i++) {
         outputs[i] = useDirectBuffer ? ByteBuffer.allocateDirect(chunkSize) :
             ByteBuffer.allocate(chunkSize);
@@ -363,7 +361,7 @@ public final class RawErasureCoderBenchmark {
     private final BenchData benchData;
     private final ByteBuffer testData;
 
-    public BenchmarkCallable(boolean isEncode, RawErasureEncoder encoder,
+    BenchmarkCallable(boolean isEncode, RawErasureEncoder encoder,
         RawErasureDecoder decoder, ByteBuffer testData) {
       if (isEncode) {
         Preconditions.checkArgument(encoder != null);

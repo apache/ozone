@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,15 +32,19 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @InterfaceAudience.Private
 abstract class AbstractNativeRawDecoder extends RawErasureDecoder {
-  public static Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(AbstractNativeRawDecoder.class);
 
   // Protect ISA-L coder data structure in native layer from being accessed and
   // updated concurrently by the init, release and decode functions.
-  protected final ReentrantReadWriteLock decoderLock =
+  private final ReentrantReadWriteLock decoderLock =
       new ReentrantReadWriteLock();
 
-  public AbstractNativeRawDecoder(ECReplicationConfig replicationConfig) {
+  // To link with the underlying data structure in the native layer.
+  // No get/set as only used by native codes.
+  private long nativeCoder;
+
+  AbstractNativeRawDecoder(ECReplicationConfig replicationConfig) {
     super(replicationConfig);
   }
 
@@ -78,9 +82,9 @@ abstract class AbstractNativeRawDecoder extends RawErasureDecoder {
   }
 
   protected abstract void performDecodeImpl(ByteBuffer[] inputs,
-                                            int[] inputOffsets, int dataLen,
-                                            int[] erased, ByteBuffer[] outputs,
-                                            int[] outputOffsets)
+      int[] inputOffsets, int dataLen,
+      int[] erased, ByteBuffer[] outputs,
+      int[] outputOffsets)
       throws IOException;
 
   @Override
@@ -102,8 +106,4 @@ abstract class AbstractNativeRawDecoder extends RawErasureDecoder {
   public boolean preferDirectBuffer() {
     return true;
   }
-
-  // To link with the underlying data structure in the native layer.
-  // No get/set as only used by native codes.
-  private long nativeCoder;
 }
