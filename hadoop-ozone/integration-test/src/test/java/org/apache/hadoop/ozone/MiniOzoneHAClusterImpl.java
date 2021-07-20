@@ -815,14 +815,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private void waitForConfigUpdateOnAllOMs(String newOMNodeId)
       throws Exception {
-    OzoneManagerRatisServer newOMRatisServer =
-        omhaService.getServiceById(newOMNodeId).getOmRatisServer();
+    OzoneManager newOMNode = omhaService.getServiceById(newOMNodeId);
+    OzoneManagerRatisServer newOMRatisServer = newOMNode.getOmRatisServer();
     GenericTestUtils.waitFor(() -> {
       // Each existing active OM should contain the new OM in its peerList.
-      // Also, the new OM should contain each existing active OM in it's
-      // RatisServer peerList.
+      // Also, the new OM should contain each existing active OM in it's OM
+      // peer list and RatisServer peerList.
       for (OzoneManager om : omhaService.getActiveServices()) {
         if (!om.doesPeerExist(newOMNodeId)) {
+          return false;
+        }
+        if (!newOMNode.doesPeerExist(om.getOMNodeId())) {
           return false;
         }
         if (!newOMRatisServer.doesPeerExist(om.getOMNodeId())) {

@@ -1402,8 +1402,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     for (String omNodeId : omNodeIds) {
       // Check if the OM NodeID is already present in the peer list or its
       // the local NodeID.
-      if (!peerNodesMap.containsKey(omNodeId) &&
-          !getOMNodeId().equals(omNodeId)) {
+      if (!peerNodesMap.containsKey(omNodeId) && !isCurrentNode(omNodeId)) {
         addOMNodeToPeers(omNodeId);
       } else {
         // Check if the OMNodeID is present in the RatisServer's peer list
@@ -1413,10 +1412,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           // would not have the peers list. OMRatisServer peer list of
           // bootstrapping node should be updated after it gets the RaftConf
           // through Ratis.
-          omRatisServer.addRaftPeer(peerNodesMap.get(omNodeId));
+          if (isCurrentNode(omNodeId)) {
+            // OM Ratis server has the current node also in the peer list as
+            // this is the Raft Group peers list. Hence, add the current node
+            // also to Ratis peers list if not present.
+            omRatisServer.addRaftPeer(omNodeDetails);
+          } else {
+            omRatisServer.addRaftPeer(peerNodesMap.get(omNodeId));
+          }
         }
       }
     }
+  }
+
+  /**
+   * Check if the given nodeId is the current nodeId.
+   */
+  private boolean isCurrentNode(String omNodeID) {
+    return getOMNodeId().equals(omNodeID);
   }
 
   /**
@@ -1441,7 +1454,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     }
 
-    peerNodesMap.put(newOMNodeId, newOMNodeDetails);
     if (omSnapshotProvider == null) {
       omSnapshotProvider = new OzoneManagerSnapshotProvider(
           configuration, omRatisSnapshotDir, peerNodesMap);
@@ -1449,7 +1461,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omSnapshotProvider.addNewPeerNode(newOMNodeDetails);
     }
     omRatisServer.addRaftPeer(newOMNodeDetails);
-    LOG.info("Added new OM {} to the Peer list.", newOMNodeId);
+    peerNodesMap.put(newOMNodeId, newOMNodeDetails);
+    LOG.info("Added OM {} to the Peer list.", newOMNodeId);
   }
 
   /**

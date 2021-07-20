@@ -350,9 +350,6 @@ public final class OzoneManagerRatisServer {
    */
   @VisibleForTesting
   public boolean doesPeerExist(String peerId) {
-    if (peerId.equals(raftPeerId.toString())) {
-      return true;
-    }
     for (RaftPeer raftPeer : raftPeers) {
       if (raftPeer.getId().toString().equals(peerId)) {
         return true;
