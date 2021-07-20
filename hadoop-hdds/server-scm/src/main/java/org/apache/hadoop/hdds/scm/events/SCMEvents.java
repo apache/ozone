@@ -171,8 +171,18 @@ public final class SCMEvents {
    * This event will be triggered whenever a datanode is moved from non-healthy
    * state to healthy state.
    */
-  public static final TypedEvent<DatanodeDetails> NON_HEALTHY_TO_HEALTHY_NODE =
-      new TypedEvent<>(DatanodeDetails.class, "NON_HEALTHY_TO_HEALTHY_NODE");
+  public static final TypedEvent<DatanodeDetails>
+      HEALTHY_READONLY_TO_HEALTHY_NODE =
+      new TypedEvent<>(DatanodeDetails.class,
+          "HEALTHY_READONLY_TO_HEALTHY_NODE");
+
+  /**
+   * This event will be triggered whenever a datanode is moved to a
+   * healthy-readonly state.
+   */
+  public static final TypedEvent<DatanodeDetails>
+      HEALTHY_READONLY_NODE =
+      new TypedEvent<>(DatanodeDetails.class, "HEALTHY_READONLY_NODE");
 
   /**
    * This event will be triggered by CommandStatusReportHandler whenever a

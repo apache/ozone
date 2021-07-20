@@ -348,6 +348,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, TransactionInfo> getTransactionInfoTable();
 
   /**
+   * Gets the OM Meta table.
+   * @return meta table reference.
+   */
+  Table<String, String> getMetaTable();
+
+  /**
    * Returns number of rows in a table.  This should not be used for very
    * large tables.
    * @param table

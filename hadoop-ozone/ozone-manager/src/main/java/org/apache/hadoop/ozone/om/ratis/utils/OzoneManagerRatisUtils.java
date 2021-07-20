@@ -72,6 +72,9 @@ import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
@@ -222,6 +225,12 @@ public final class OzoneManagerRatisUtils {
       return new S3GetSecretRequest(omRequest);
     case RecoverTrash:
       return new OMTrashRecoverRequest(omRequest);
+    case FinalizeUpgrade:
+      return new OMFinalizeUpgradeRequest(omRequest);
+    case Prepare:
+      return new OMPrepareRequest(omRequest);
+    case CancelPrepare:
+      return new OMCancelPrepareRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
     default:

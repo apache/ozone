@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -38,9 +37,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT;
 
 /**
  * This policy implements a set of invariants which are common
@@ -120,14 +116,16 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @param excludedNodes - datanodes with existing replicas
    * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired  - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return list of datanodes chosen.
    * @throws SCMException SCM exception.
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, final long sizeRequired) throws SCMException {
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     if (excludedNodes != null) {
@@ -149,19 +147,30 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
-    List<DatanodeDetails> healthyList = healthyNodes.stream().filter(d ->
-        hasEnoughSpace(d, sizeRequired)).collect(Collectors.toList());
 
-    if (healthyList.size() < nodesRequired) {
-      msg = String.format("Unable to find enough nodes that meet the space " +
-              "requirement of %d bytes in healthy node set." +
-              " Nodes required: %d Found: %d",
-          sizeRequired, nodesRequired, healthyList.size());
+    return filterNodesWithSpace(healthyNodes, nodesRequired,
+        metadataSizeRequired, dataSizeRequired);
+  }
+
+  public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
+    List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
+        .collect(Collectors.toList());
+
+    if (nodesWithSpace.size() < nodesRequired) {
+      String msg = String.format("Unable to find enough nodes that meet the " +
+              "space requirement of %d bytes for metadata and %d bytes for " +
+              "data in healthy node set. Required %d. Found %d.",
+          metadataSizeRequired, dataSizeRequired, nodesRequired,
+          nodesWithSpace.size());
       LOG.error(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
-    return healthyList;
+
+    return nodesWithSpace;
   }
 
   /**
@@ -170,36 +179,40 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @param datanodeDetails DatanodeDetails
    * @return true if we have enough space.
    */
-  public boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
-      long sizeRequired) {
+  public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
+      long metadataSizeRequired, long dataSizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
-
-    long metaSizeRequired = (long) conf.getStorageSize(
-        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
-        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
-        StorageUnit.BYTES);
 
     boolean enoughForData = false;
     boolean enoughForMeta = false;
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
-    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-      if (reportProto.getRemaining() > sizeRequired) {
-        enoughForData = true;
-        break;
+
+    if (dataSizeRequired > 0) {
+      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
+        if (reportProto.getRemaining() > dataSizeRequired) {
+          enoughForData = true;
+          break;
+        }
       }
+    } else {
+      enoughForData = true;
     }
 
     if (!enoughForData) {
       return false;
     }
 
-    for (MetadataStorageReportProto reportProto
-        : datanodeInfo.getMetadataStorageReports()) {
-      if (reportProto.getRemaining() > metaSizeRequired) {
-        enoughForMeta = true;
-        break;
+    if (metadataSizeRequired > 0) {
+      for (MetadataStorageReportProto reportProto
+          : datanodeInfo.getMetadataStorageReports()) {
+        if (reportProto.getRemaining() > metadataSizeRequired) {
+          enoughForMeta = true;
+          break;
+        }
       }
+    } else {
+      enoughForMeta = true;
     }
 
     return enoughForData && enoughForMeta;

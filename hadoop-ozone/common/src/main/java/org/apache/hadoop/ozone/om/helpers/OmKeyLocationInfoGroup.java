@@ -20,6 +20,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,9 +90,19 @@ public class OmKeyLocationInfoGroup {
     return version;
   }
 
+  /**
+   * Use this expensive method only when absolutely needed!
+   * It creates a new list so it is not an O(1) operation.
+   * Use getLocationLists() instead.
+   * @return a list of OmKeyLocationInfo
+   */
   public List<OmKeyLocationInfo> getLocationList() {
     return locationVersionMap.values().stream().flatMap(List::stream)
         .collect(Collectors.toList());
+  }
+
+  public Collection<List<OmKeyLocationInfo>> getLocationLists() {
+    return locationVersionMap.values();
   }
 
   public long getLocationListCount() {
