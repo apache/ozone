@@ -126,7 +126,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   /**
    * A delete command info.
    */
-  public final class DeleteCmdInfo {
+  public static final class DeleteCmdInfo {
     private DeleteBlocksCommand cmd;
     private StateContext context;
     private OzoneContainer container;
