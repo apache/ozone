@@ -33,7 +33,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 public final class ScmBlockDeletingServiceMetrics {
 
   private static ScmBlockDeletingServiceMetrics instance;
-  public final static String SOURCE_NAME =
+  public static final String SOURCE_NAME =
       SCMBlockDeletingService.class.getSimpleName();
 
   /**
