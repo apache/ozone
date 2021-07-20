@@ -135,7 +135,8 @@ public final class ShutdownHookManager {
             getSimpleName() + "' failed, " + ex.toString(), ex);
         Thread.currentThread().interrupt();
       } catch (ExecutionException ex) {
-        ex.printStackTrace();
+        LOG.warn("ShutdownHook '" + entry.getHook().getClass().
+            getSimpleName() + "' failed, " + ex.toString(), ex);
       }
     }
     return timeouts;
