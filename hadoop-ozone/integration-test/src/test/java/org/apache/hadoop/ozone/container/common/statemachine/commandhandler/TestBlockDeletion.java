@@ -95,7 +95,7 @@ public class TestBlockDeletion {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(TestBlockDeletion.class);
-  
+
   private OzoneConfiguration conf = null;
   private ObjectStore store;
   private MiniOzoneCluster cluster = null;
