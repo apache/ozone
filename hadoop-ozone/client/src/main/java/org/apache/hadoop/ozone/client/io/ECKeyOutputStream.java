@@ -25,7 +25,6 @@ import java.util.List;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -44,7 +43,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ozone.erasurecode.CodecRegistry;
-import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,7 +110,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.config.setStreamBufferMaxSize(ecChunkSize);
     this.config.setStreamBufferFlushSize(ecChunkSize);
     this.config.setStreamBufferSize(ecChunkSize);
-    assert replicationConfig instanceof ECReplicationConfig;
     this.ecReplicationConfig = replicationConfig;
     ecChunkBufferCache =
         new ECChunkBuffers(ecChunkSize,
@@ -129,7 +126,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.feInfo = info.getFileEncryptionInfo();
     this.isException = false;
     this.writeOffset = 0;
-    OzoneConfiguration conf = new OzoneConfiguration();
     this.encoder = CodecRegistry.getInstance()
         .getCodecFactory(ecReplicationConfig.getCodecName())
         .createEncoder(replicationConfig);

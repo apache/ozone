@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
  * byte array inputs.
  */
 @InterfaceAudience.Private
+@SuppressWarnings("checkstyle:VisibilityModifier")
 class ByteArrayEncodingState extends EncodingState {
   byte[][] inputs;
   byte[][] outputs;

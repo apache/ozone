@@ -29,12 +29,14 @@ public class RSRawErasureCoderFactory implements RawErasureCoderFactory {
   public static final String CODER_NAME = "rs_java";
 
   @Override
-  public RawErasureEncoder createEncoder(ECReplicationConfig ecReplicationConfig) {
+  public RawErasureEncoder createEncoder(
+      ECReplicationConfig ecReplicationConfig) {
     return new RSRawEncoder(ecReplicationConfig);
   }
 
   @Override
-  public RawErasureDecoder createDecoder(ECReplicationConfig ecReplicationConfig) {
+  public RawErasureDecoder createDecoder(
+      ECReplicationConfig ecReplicationConfig) {
     return new RSRawDecoder(ecReplicationConfig);
   }
 

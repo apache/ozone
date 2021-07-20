@@ -29,6 +29,7 @@ import java.io.IOException;
 /**
  * Raw coder test base with utilities.
  */
+@SuppressWarnings("checkstyle:VisibilityModifier")
 public abstract class TestRawCoderBase extends TestCoderBase {
   protected Class<? extends RawErasureCoderFactory> encoderFactoryClass;
   protected Class<? extends RawErasureCoderFactory> decoderFactoryClass;
@@ -190,13 +191,15 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     //}
 
     // Backup and erase some chunks
-    ECChunk[] backupChunks = backupAndEraseChunks(clonedDataChunks, parityChunks);
+    ECChunk[] backupChunks =
+        backupAndEraseChunks(clonedDataChunks, parityChunks);
 
     // Decode
     ECChunk[] inputChunks = prepareInputChunksForDecoding(
         clonedDataChunks, parityChunks);
 
-    // Remove unnecessary chunks, allowing only least required chunks to be read.
+    // Remove unnecessary chunks,
+    //     allowing only least required chunks to be read.
     ensureOnlyLeastRequiredChunks(inputChunks);
 
     ECChunk[] recoveredChunks = prepareOutputChunksForDecoding();
@@ -262,8 +265,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
   }
 
   /**
-   * Create the raw erasure encoder to test
-   * @return
+   * Create the raw erasure encoder to test.
    */
   protected RawErasureEncoder createEncoder() {
     ECReplicationConfig replicationConfig =
@@ -277,8 +279,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
   }
 
   /**
-   * create the raw erasure decoder to test
-   * @return
+   * Create the raw erasure decoder to test.
    */
   protected RawErasureDecoder createDecoder() {
     ECReplicationConfig replicationConfig =

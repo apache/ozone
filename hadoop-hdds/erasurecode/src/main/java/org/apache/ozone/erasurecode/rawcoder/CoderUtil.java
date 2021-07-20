@@ -99,7 +99,8 @@ public final class CoderUtil {
 
 
   /**
-   * Convert an array of this chunks to an array of ByteBuffers
+   * Convert an array of this chunks to an array of ByteBuffers.
+   *
    * @param chunks chunks to convertToByteArrayState into buffers
    * @return an array of ByteBuffers
    */

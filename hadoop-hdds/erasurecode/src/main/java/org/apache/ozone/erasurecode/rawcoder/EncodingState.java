@@ -24,6 +24,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * A utility class that maintains encoding state during an encode call.
  */
 @InterfaceAudience.Private
+@SuppressWarnings("checkstyle:VisibilityModifier")
 abstract class EncodingState {
   RawErasureEncoder encoder;
   int encodeLength;
@@ -35,10 +36,12 @@ abstract class EncodingState {
    */
   <T> void checkParameters(T[] inputs, T[] outputs) {
     if (inputs.length != encoder.getNumDataUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid inputs length " + inputs.length + " !=" + encoder.getNumDataUnits());
+      throw new HadoopIllegalArgumentException("Invalid inputs length "
+          + inputs.length + " !=" + encoder.getNumDataUnits());
     }
     if (outputs.length != encoder.getNumParityUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid outputs length " + outputs.length + " !=" + encoder.getNumParityUnits());
+      throw new HadoopIllegalArgumentException("Invalid outputs length "
+          + outputs.length + " !=" + encoder.getNumParityUnits());
     }
   }
 }

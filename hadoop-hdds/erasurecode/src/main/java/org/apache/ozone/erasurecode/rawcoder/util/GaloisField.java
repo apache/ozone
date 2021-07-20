@@ -28,14 +28,14 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * be unsigned integers. It's ported from HDFS-RAID, slightly adapted.
  */
 @InterfaceAudience.Private
-public class GaloisField {
+public final class GaloisField {
 
   // Field size 256 is good for byte based system
   private static final int DEFAULT_FIELD_SIZE = 256;
   // primitive polynomial 1 + X^2 + X^3 + X^4 + X^8 (substitute 2)
   private static final int DEFAULT_PRIMITIVE_POLYNOMIAL = 285;
-  static private final Map<Integer, GaloisField> instances =
-      new HashMap<Integer, GaloisField>();
+  private static final Map<Integer, GaloisField> INSTANCES =
+      new HashMap<>();
   private final int[] logTable;
   private final int[] powTable;
   private final int[][] mulTable;
@@ -93,7 +93,7 @@ public class GaloisField {
   }
 
   /**
-   * Get the object performs Galois field arithmetics
+   * Get the object performs Galois field arithmetics.
    *
    * @param fieldSize           size of the field
    * @param primitivePolynomial a primitive polynomial corresponds to the size
@@ -103,25 +103,25 @@ public class GaloisField {
     int key = ((fieldSize << 16) & 0xFFFF0000)
         + (primitivePolynomial & 0x0000FFFF);
     GaloisField gf;
-    synchronized (instances) {
-      gf = instances.get(key);
+    synchronized (INSTANCES) {
+      gf = INSTANCES.get(key);
       if (gf == null) {
         gf = new GaloisField(fieldSize, primitivePolynomial);
-        instances.put(key, gf);
+        INSTANCES.put(key, gf);
       }
     }
     return gf;
   }
 
   /**
-   * Get the object performs Galois field arithmetic with default setting
+   * Get the object performs Galois field arithmetic with default setting.
    */
   public static GaloisField getInstance() {
     return getInstance(DEFAULT_FIELD_SIZE, DEFAULT_PRIMITIVE_POLYNOMIAL);
   }
 
   /**
-   * Return number of elements in the field
+   * Return number of elements in the field.
    *
    * @return number of elements in the field
    */
@@ -130,7 +130,7 @@ public class GaloisField {
   }
 
   /**
-   * Return the primitive polynomial in GF(2)
+   * Return the primitive polynomial in GF(2).
    *
    * @return primitive polynomial as a integer
    */
@@ -139,7 +139,7 @@ public class GaloisField {
   }
 
   /**
-   * Compute the sum of two fields
+   * Compute the sum of two fields.
    *
    * @param x input field
    * @param y input field
@@ -151,7 +151,7 @@ public class GaloisField {
   }
 
   /**
-   * Compute the multiplication of two fields
+   * Compute the multiplication of two fields.
    *
    * @param x input field
    * @param y input field
@@ -163,7 +163,7 @@ public class GaloisField {
   }
 
   /**
-   * Compute the division of two fields
+   * Compute the division of two fields.
    *
    * @param x input field
    * @param y input field
@@ -175,7 +175,7 @@ public class GaloisField {
   }
 
   /**
-   * Compute power n of a field
+   * Compute power n of a field.
    *
    * @param x input field
    * @param n power
@@ -236,7 +236,7 @@ public class GaloisField {
   }
 
   /**
-   * A "bulk" version to the solving of Vandermonde System
+   * A "bulk" version to the solving of Vandermonde System.
    */
   public void solveVandermondeSystem(int[] x, byte[][] y, int[] outputOffsets,
                                      int len, int dataLen) {

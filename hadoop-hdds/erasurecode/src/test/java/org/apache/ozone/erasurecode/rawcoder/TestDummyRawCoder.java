@@ -38,13 +38,13 @@ public class TestDummyRawCoder extends TestRawCoderBase {
   }
 
   @Test
-  public void testCoding_6x3_erasing_d0_d2() {
+  public void testCoding6x3ErasingD0Dd2() {
     prepare(null, 6, 3, new int[]{0, 2}, new int[0], false);
     testCodingDoMixed();
   }
 
   @Test
-  public void testCoding_6x3_erasing_d0_p0() {
+  public void testCoding6x3ErasingD0P0() {
     prepare(null, 6, 3, new int[]{0}, new int[]{0}, false);
     testCodingDoMixed();
   }

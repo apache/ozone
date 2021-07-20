@@ -32,7 +32,7 @@ public final class RSUtil {
 
   // We always use the byte system (with symbol size 8, field size 256,
   // primitive polynomial 285, and primitive root 2).
-  public static GaloisField GF = GaloisField.getInstance();
+  public static final GaloisField GF = GaloisField.getInstance();
   public static final int PRIMITIVE_ROOT = 2;
 
   public static int[] getPrimitivePower(int numDataUnits, int numParityUnits) {

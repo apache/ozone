@@ -29,12 +29,14 @@ public class DummyRawErasureCoderFactory implements RawErasureCoderFactory {
   public static final String DUMMY_CODEC_NAME = "dummy";
 
   @Override
-  public RawErasureEncoder createEncoder(ECReplicationConfig ecReplicationConfig) {
+  public RawErasureEncoder createEncoder(
+      ECReplicationConfig ecReplicationConfig) {
     return new DummyRawEncoder(ecReplicationConfig);
   }
 
   @Override
-  public RawErasureDecoder createDecoder(ECReplicationConfig ecReplicationConfig) {
+  public RawErasureDecoder createDecoder(
+      ECReplicationConfig ecReplicationConfig) {
     return new DummyRawDecoder(ecReplicationConfig);
   }
 

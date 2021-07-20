@@ -80,20 +80,14 @@ public final class CodecRegistry {
           if (coder.getCoderName().equals(coderFactory.getCoderName())) {
             hasConflit = true;
             LOG.error("Coder {} cannot be registered because its coder name " +
-                    "{} has conflict with {}", coderFactory.getClass().getName(),
+                    "{} has conflict with {}",
+                coderFactory.getClass().getName(),
                 coderFactory.getCoderName(), coder.getClass().getName());
             break;
           }
         }
         if (!hasConflit) {
-          // set native coders as default if user does not
-          // specify a fallback order
-          //if (coderFactory instanceof NativeRSRawErasureCoderFactory ||
-          //        coderFactory instanceof NativeXORRawErasureCoderFactory) {
-          //coders.add(0, coderFactory);
-          //} else {
           coders.add(coderFactory);
-          //}
           LOG.debug("Codec registered: codec = {}, coder = {}",
               coderFactory.getCodecName(), coderFactory.getCoderName());
         }
@@ -163,6 +157,7 @@ public final class CodecRegistry {
     for (RawErasureCoderFactory factory : getCoders(codecName)) {
       return factory;
     }
-    throw new IllegalArgumentException("There is no registered codec factory for codec " + codecName);
+    throw new IllegalArgumentException("There is no registered codec " +
+        "factory for codec " + codecName);
   }
 }
