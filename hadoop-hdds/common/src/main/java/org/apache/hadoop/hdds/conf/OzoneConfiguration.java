@@ -242,6 +242,7 @@ public class OzoneConfiguration extends Configuration
     Configuration.addDefaultResource("hdfs-default.xml");
     Configuration.addDefaultResource("hdfs-site.xml");
     Configuration.addDefaultResource("ozone-default.xml");
+    Configuration.addDefaultResource("ozone-site.xml");
   }
 
   /**
