@@ -120,12 +120,6 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return super.onFailure(omResponse, exception);
-  }
-
-  @Override
   void onComplete(boolean operationResult, IOException exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
