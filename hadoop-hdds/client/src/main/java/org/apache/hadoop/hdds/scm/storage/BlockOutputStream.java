@@ -441,6 +441,9 @@ public class BlockOutputStream extends OutputStream {
     CompletableFuture[] EMPTY_COMPLETABLE_FUTURE_ARRAY = {};
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).get();
+      if (close) {
+        out.closeAsync().get();
+      }
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
@@ -574,10 +577,6 @@ public class BlockOutputStream extends OutputStream {
         && bufferPool != null && bufferPool.getSize() > 0) {
       try {
         handleFlush(true);
-//        CompletableFuture.allOf(out.closeAsync()).get();
-        out.closeAsync().thenApplyAsync(r -> {
-          return null;
-        }, responseExecutor);
       } catch (ExecutionException e) {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
