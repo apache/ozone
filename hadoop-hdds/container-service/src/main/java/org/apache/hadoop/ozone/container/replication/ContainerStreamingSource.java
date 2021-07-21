@@ -26,11 +26,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.stream.StreamingException;
 import org.apache.hadoop.ozone.container.stream.StreamingSource;
 
 /**
@@ -53,18 +55,20 @@ public class ContainerStreamingSource implements StreamingSource {
     final KeyValueContainer container =
         (KeyValueContainer) containerSet.getContainer(containerId);
 
-    try {
-      container.release();
-    } catch (StorageContainerException e) {
-      throw new RuntimeException("Container couldn't be released: " + id, e);
-    }
 
     if (container.getContainerState() != State.CLOSED
         && container.getContainerState() != State.QUASI_CLOSED) {
-      throw new RuntimeException(
+      throw new StreamingException(
           "Only (quasi)closed containers can be exported, but ContainerId=: "
               + id + " is in state " + container.getContainerState());
     }
+
+    try {
+      container.release();
+    } catch (StorageContainerException e) {
+      throw new StreamingException("Container couldn't be released: " + id, e);
+    }
+
 
     try {
 
@@ -85,15 +89,17 @@ public class ContainerStreamingSource implements StreamingSource {
       final Path dataPath =
           Paths.get(container.getContainerData().getChunksPath());
 
-      Files.walk(dataPath)
-          .filter(Files::isRegularFile)
+      final Stream<Path> walk = Files.walk(dataPath);
+
+      walk.filter(Files::isRegularFile)
           .forEach(path -> {
             filesToStream
                 .put("DATA/" + dataPath.relativize(path), path);
           });
 
+      walk.close();
     } catch (IOException e) {
-      throw new RuntimeException("Couldn't stream countainer " + containerId,
+      throw new StreamingException("Couldn't stream container " + containerId,
           e);
     }
     return filesToStream;

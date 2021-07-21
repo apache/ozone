@@ -88,14 +88,11 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
       this.volumeChoosingPolicy = volumeChoosingPolicyType.newInstance();
 
-    } catch (InstantiationException ex) {
+    } catch (InstantiationException | IllegalAccessException ex) {
       throw new IllegalArgumentException(
           "Couldn't create volume choosing policy: " + volumeChoosingPolicyType,
           ex);
-    } catch (IllegalAccessException e) {
-      e.printStackTrace();
     }
-
   }
 
   @Override

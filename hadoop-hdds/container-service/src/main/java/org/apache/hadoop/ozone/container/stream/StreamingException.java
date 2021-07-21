@@ -24,10 +24,6 @@ import java.io.IOException;
  */
 public class StreamingException extends RuntimeException {
 
-  public StreamingException(Exception ex) {
-    super(ex);
-  }
-
   public StreamingException(String s, IOException e) {
     super(s, e);
   }

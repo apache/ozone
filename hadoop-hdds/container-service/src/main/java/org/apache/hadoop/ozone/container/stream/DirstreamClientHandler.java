@@ -47,7 +47,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
 
   private final StreamingDestination destination;
   private boolean headerMode = true;
-  private StringBuilder currentFileName = new StringBuilder();
+  private StringBuilder fileNameBuffer = new StringBuilder();
   private RandomAccessFile destFile;
 
   private FileChannel destFileChannel;
@@ -77,14 +77,15 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
       if (eolPosition > 0) {
         headerMode = false;
         final ByteBuf name = buffer.readBytes(eolPosition);
-        currentFileName.append(name
+        fileNameBuffer.append(name
             .toString(StandardCharsets.UTF_8));
         name.release();
         buffer.skipBytes(1);
-        String[] parts = currentFileName.toString().split(" ", 2);
+        final String currentFileName = fileNameBuffer.toString();
+        String[] parts = currentFileName.split(" ", 2);
         remaining = Long.parseLong(parts[0]);
         final String logicalFileName = parts[1];
-        if (currentFileName.toString().equals(END_MARKER)) {
+        if (currentFileName.equals(END_MARKER)) {
           //no more read
           return;
         }
@@ -100,7 +101,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
         destFileChannel = this.destFile.getChannel();
 
       } else {
-        currentFileName
+        fileNameBuffer
             .append(buffer.toString(StandardCharsets.UTF_8));
       }
     }
@@ -111,7 +112,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
             buffer.readBytes(destFileChannel, readableBytes);
       } else {
         remaining -= buffer.readBytes(destFileChannel, (int) remaining);
-        currentFileName = new StringBuilder();
+        fileNameBuffer = new StringBuilder();
         headerMode = true;
         destFile.close();
         if (readableBytes > 0) {
@@ -148,6 +149,6 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
   }
 
   public String getCurrentFileName() {
-    return currentFileName.toString();
+    return fileNameBuffer.toString();
   }
 }

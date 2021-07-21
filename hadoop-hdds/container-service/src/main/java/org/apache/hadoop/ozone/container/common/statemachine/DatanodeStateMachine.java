@@ -21,7 +21,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
@@ -162,7 +161,7 @@ public class DatanodeStateMachine implements Closeable {
     if (securityConfig.isSecurityEnabled()) {
 
       sslContext = SslContextBuilder.forClient()
-          .trustManager(InsecureTrustManagerFactory.INSTANCE)
+          .trustManager(certClient.getCACertificate())
           .clientAuth(ClientAuth.REQUIRE)
           .keyManager(certClient.getPrivateKey(), certClient.getCertificate())
           .build();
