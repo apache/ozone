@@ -129,6 +129,7 @@ public class BlockDataStreamOutput extends OutputStream {
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
   private final DataStreamOutput out;
+  private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   int writeSize = 0;
 
@@ -440,13 +441,11 @@ public class BlockDataStreamOutput extends OutputStream {
     CompletableFuture[] EMPTY_COMPLETABLE_FUTURE_ARRAY = {};
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).get();
-      if (close) {
-        out.closeAsync().get();
-      }
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
     }
+    dataStreamCloseReply = out.closeAsync();
 
     CompletableFuture<ContainerProtos.
         ContainerCommandResponseProto> flushFuture = null;
@@ -576,6 +575,7 @@ public class BlockDataStreamOutput extends OutputStream {
         && bufferPool != null && bufferPool.getSize() > 0) {
       try {
         handleFlush(true);
+        dataStreamCloseReply.get();
       } catch (ExecutionException e) {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
