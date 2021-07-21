@@ -1120,8 +1120,8 @@ public class TestReplicationManager {
 
     //replicate container to dn3
     addReplicaToDn(container, dn3, CLOSED);
-    replicationManager.processContainersNow();
-    Thread.sleep(100L);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
 
     Assert.assertTrue(datanodeCommandHandler.received(
         SCMCommandProto.Type.deleteContainerCommand, dn1.getDatanodeDetails()));
@@ -1129,8 +1129,8 @@ public class TestReplicationManager {
         SCMCommandProto.Type.deleteContainerCommand));
     containerStateManager.removeContainerReplica(id, dn1);
 
-    replicationManager.processContainersNow();
-    Thread.sleep(100L);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
 
     Assert.assertTrue(cf.isDone() && cf.get() == MoveResult.COMPLETED);
   }
@@ -1167,8 +1167,8 @@ public class TestReplicationManager {
     //and there are only tree replicas totally, so rm should
     //not delete the replica on dn1
     containerStateManager.removeContainerReplica(id, dn2);
-    replicationManager.processContainersNow();
-    Thread.sleep(100L);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
 
     Assert.assertFalse(datanodeCommandHandler.received(
         SCMCommandProto.Type.deleteContainerCommand, dn1.getDatanodeDetails()));
@@ -1198,8 +1198,8 @@ public class TestReplicationManager {
         "receive a move request about container"));
 
     nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, STALE));
-    replicationManager.processContainersNow();
-    Thread.sleep(100L);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
 
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
@@ -1207,12 +1207,12 @@ public class TestReplicationManager {
     nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
     cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     addReplicaToDn(container, dn3, CLOSED);
-    replicationManager.processContainersNow();
-    Thread.sleep(100L);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
     nodeManager.setNodeStatus(dn1.getDatanodeDetails(),
         new NodeStatus(IN_SERVICE, STALE));
-    replicationManager.processContainersNow();
-    Thread.sleep(100L);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
 
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
@@ -1310,9 +1310,9 @@ public class TestReplicationManager {
         new NodeStatus(IN_SERVICE, HEALTHY), State.CLOSED);
     ContainerReplica dn6 = addReplica(container,
         new NodeStatus(IN_SERVICE, HEALTHY), State.CLOSED);
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     //waiting for inflightDeletion generation
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION);
@@ -1324,9 +1324,9 @@ public class TestReplicationManager {
     containerStateManager.removeContainerReplica(id, dn5);
     containerStateManager.removeContainerReplica(id, dn4);
     //replication manager should generate inflightReplication
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     //waiting for inflightReplication generation
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION);
