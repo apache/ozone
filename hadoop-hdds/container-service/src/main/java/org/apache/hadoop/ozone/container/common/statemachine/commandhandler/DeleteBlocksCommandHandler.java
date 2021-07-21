@@ -174,6 +174,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         try {
           Thread.sleep(2000);
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
         }
       }
     }
