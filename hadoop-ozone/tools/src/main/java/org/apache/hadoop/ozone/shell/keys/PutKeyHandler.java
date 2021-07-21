@@ -120,7 +120,7 @@ public class PutKeyHandler extends KeyHandler {
         IOUtils.copyBytes(input, output, chunkSize);
       }
     } else {
-      out().printf("Use Streaming to put this key");
+      out().println("Use Streaming to put this key");
       try (InputStream input = new FileInputStream(dataFile);
            OutputStream output = bucket.createStreamKey(keyName,
                dataFile.length(), replicationConfig, keyMetadata)) {
