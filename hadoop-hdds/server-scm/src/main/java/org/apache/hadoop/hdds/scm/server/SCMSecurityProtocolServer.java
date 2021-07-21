@@ -364,6 +364,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       getGrpcUpdateServer().notifyCrlUpdate();
       return crlId;
     } catch (InterruptedException | ExecutionException e) {
+      Thread.currentThread().interrupt();
       throw new SCMException("Fail to revoke certs",
           SCMException.ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
     }
