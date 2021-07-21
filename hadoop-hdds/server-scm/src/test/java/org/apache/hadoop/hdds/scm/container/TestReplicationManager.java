@@ -214,9 +214,9 @@ public class TestReplicationManager {
   public void testOpenContainer() throws SCMException, InterruptedException {
     final ContainerInfo container = getContainer(LifeCycleState.OPEN);
     containerStateManager.loadContainer(container);
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(0, datanodeCommandHandler.getInvocation());
 
   }
@@ -249,9 +249,9 @@ public class TestReplicationManager {
     final int currentCloseCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentCloseCommandCount + 3, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand));
 
@@ -260,9 +260,9 @@ public class TestReplicationManager {
       containerStateManager.updateContainerReplica(id, replica);
     }
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentCloseCommandCount + 6, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand));
   }
@@ -295,9 +295,9 @@ public class TestReplicationManager {
     final int currentCloseCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
     // Two of the replicas are in OPEN state
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentCloseCommandCount + 2, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand));
     Assert.assertTrue(datanodeCommandHandler.received(
@@ -333,9 +333,9 @@ public class TestReplicationManager {
 
     // All the QUASI_CLOSED replicas have same originNodeId, so the
     // container will not be closed. ReplicationManager should take no action.
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(0, datanodeCommandHandler.getInvocation());
   }
 
@@ -374,9 +374,9 @@ public class TestReplicationManager {
 
     // All the QUASI_CLOSED replicas have same originNodeId, so the
     // container will not be closed. ReplicationManager should take no action.
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(0, datanodeCommandHandler.getInvocation());
 
     // Make the first replica unhealthy
@@ -385,9 +385,9 @@ public class TestReplicationManager {
         replicaOne.getDatanodeDetails());
     containerStateManager.updateContainerReplica(id, unhealthyReplica);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assert.assertTrue(datanodeCommandHandler.received(
@@ -398,9 +398,9 @@ public class TestReplicationManager {
     containerStateManager.removeContainerReplica(id, replicaOne);
 
     // The container is under replicated as unhealthy replica is removed
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
 
     // We should get replicate command
     Assert.assertEquals(currentReplicateCommandCount + 1,
@@ -436,9 +436,9 @@ public class TestReplicationManager {
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
   }
@@ -473,9 +473,9 @@ public class TestReplicationManager {
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     Assert.assertTrue(datanodeCommandHandler.received(
@@ -505,9 +505,9 @@ public class TestReplicationManager {
     final int currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentReplicateCommandCount + 1,
         datanodeCommandHandler.getInvocationCount(
             SCMCommandProto.Type.replicateContainerCommand));
@@ -553,7 +553,7 @@ public class TestReplicationManager {
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
     GenericTestUtils.waitFor(
         () -> (currentReplicateCommandCount + 1) == datanodeCommandHandler
@@ -579,9 +579,9 @@ public class TestReplicationManager {
      * iteration it should delete the unhealthy replica.
      */
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     // ReplicaTwo should be deleted, that is the unhealthy one
@@ -597,9 +597,9 @@ public class TestReplicationManager {
      * is under replicated now
      */
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentReplicateCommandCount + 2,
         datanodeCommandHandler.getInvocationCount(
             SCMCommandProto.Type.replicateContainerCommand));
@@ -629,9 +629,9 @@ public class TestReplicationManager {
     final int currentCloseCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
 
     // All the replicas have same BCSID, so all of them will be closed.
     Assert.assertEquals(currentCloseCommandCount + 3, datanodeCommandHandler
@@ -659,9 +659,9 @@ public class TestReplicationManager {
       containerStateManager.updateContainerReplica(id, replica);
     }
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(0, datanodeCommandHandler.getInvocation());
   }
 
@@ -687,10 +687,9 @@ public class TestReplicationManager {
         Mockito.mock(CloseContainerEventHandler.class);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
 
-    replicationManager.processContainersNow();
-
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Mockito.verify(closeContainerHandler, Mockito.times(1))
         .onMessage(id, eventQueue);
   }
@@ -738,9 +737,9 @@ public class TestReplicationManager {
     int currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     // At this stage, due to the mocked calls to validteContainerPlacement
     // the mis-replicated racks will not have improved, so expect to see nothing
     // scheduled.
@@ -760,9 +759,9 @@ public class TestReplicationManager {
     currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     // At this stage, due to the mocked calls to validteContainerPlacement
     // the mis-replicated racks will not have improved, so expect to see nothing
     // scheduled.
@@ -806,9 +805,9 @@ public class TestReplicationManager {
     int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     // The unhealthy replica should be removed, but not the other replica
     // as each time we test with 3 replicas, Mockitor ensures it returns
     // mis-replicated
@@ -850,9 +849,9 @@ public class TestReplicationManager {
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
   }
@@ -890,9 +889,9 @@ public class TestReplicationManager {
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentDeleteCommandCount + 2, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
   }
@@ -1057,9 +1056,9 @@ public class TestReplicationManager {
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentDeleteCommandCount + 2, datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
     // Get the DECOM and Maint replica and ensure none of them are scheduled
@@ -1401,9 +1400,9 @@ public class TestReplicationManager {
     final int currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
 
-    replicationManager.processContainersNow();
+    replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
+    eventQueue.processAll(1000);
     Assert.assertEquals(currentReplicateCommandCount + delta,
         datanodeCommandHandler.getInvocationCount(
             SCMCommandProto.Type.replicateContainerCommand));
