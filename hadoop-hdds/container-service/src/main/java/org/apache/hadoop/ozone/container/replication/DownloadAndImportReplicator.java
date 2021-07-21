@@ -142,8 +142,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       ) {
         client.stream("" + containerData.getContainerID());
 
-        LOG.info("Container " + containerData.getContainerID()
-            + " is downloaded successfully");
+        LOG.info("Container {} is downloaded successfully", containerID);
         KeyValueContainerData loadedContainerData =
             updateContainerData(containerData);
         LOG.info("Container {} is downloaded, starting to import.",
