@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -34,6 +33,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
  * This class encapsulates all state management for buffering and writing
  * through to the container.
  */
-public class BlockOutputStream extends OutputStream {
+public abstract class BlockOutputStream extends OutputStream {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
@@ -108,11 +108,6 @@ public class BlockOutputStream extends OutputStream {
   // committed on all datanodes. This list will be a  place holder for buffers
   // which got written between successive putBlock calls.
   private List<ChunkBuffer> bufferList;
-
-  // This object will maintain the commitIndexes and byteBufferList in order
-  // Also, corresponding to the logIndex, the corresponding list of buffers will
-  // be released from the buffer pool.
-  private final CommitWatcher commitWatcher;
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -154,7 +149,7 @@ public class BlockOutputStream extends OutputStream {
     this.token = token;
 
     //number of buffers used before doing a flush
-    refreshCurrentBuffer(bufferPool);
+    refreshCurrentBuffer();
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
         .getStreamBufferSize());
 
@@ -165,7 +160,6 @@ public class BlockOutputStream extends OutputStream {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    commitWatcher = new CommitWatcher(bufferPool, xceiverClient);
     bufferList = null;
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
@@ -175,8 +169,8 @@ public class BlockOutputStream extends OutputStream {
         config.getBytesPerChecksum());
   }
 
-  private void refreshCurrentBuffer(BufferPool pool) {
-    currentBuffer = pool.getCurrentBuffer();
+  void refreshCurrentBuffer() {
+    currentBuffer = bufferPool.getCurrentBuffer();
     currentBufferRemaining =
         currentBuffer != null ? currentBuffer.remaining() : 0;
   }
@@ -185,9 +179,7 @@ public class BlockOutputStream extends OutputStream {
     return blockID.get();
   }
 
-  public long getTotalAckDataLength() {
-    return commitWatcher.getTotalAckDataLength();
-  }
+  public abstract long getTotalAckDataLength();
 
   public long getWrittenDataLength() {
     return writtenDataLength;
@@ -214,11 +206,6 @@ public class BlockOutputStream extends OutputStream {
 
   public IOException getIoException() {
     return ioException.get();
-  }
-
-  @VisibleForTesting
-  public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
-    return commitWatcher.getCommitIndex2flushedDataMap();
   }
 
   @Override
@@ -345,9 +332,7 @@ public class BlockOutputStream extends OutputStream {
   private void handleFullBuffer() throws IOException {
     try {
       checkOpen();
-      if (!commitWatcher.getFutureMap().isEmpty()) {
-        waitOnFlushFutures();
-      }
+      waitFullBuffer();
     } catch (ExecutionException e) {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
@@ -357,28 +342,33 @@ public class BlockOutputStream extends OutputStream {
     watchForCommit(true);
   }
 
+  abstract void waitFullBuffer()
+      throws ExecutionException, InterruptedException;
+
+  abstract void releaseBuffersOnException();
 
   // It may happen that once the exception is encountered , we still might
   // have successfully flushed up to a certain index. Make sure the buffers
   // only contain data which have not been sufficiently replicated
   private void adjustBuffersOnException() {
-    commitWatcher.releaseBuffersOnException();
-    refreshCurrentBuffer(bufferPool);
+    releaseBuffersOnException();
+    refreshCurrentBuffer();
   }
+
+  abstract XceiverClientReply sendWatchForCommit(boolean bufferFull)
+      throws IOException;
 
   /**
    * calls watchForCommit API of the Ratis Client. For Standalone client,
    * it is a no op.
    * @param bufferFull flag indicating whether bufferFull condition is hit or
    *              its called as part flush/close
-   * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
   private void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
     try {
-      XceiverClientReply reply = bufferFull ?
-          commitWatcher.watchOnFirstIndex() : commitWatcher.watchOnLastIndex();
+      final XceiverClientReply reply = sendWatchForCommit(bufferFull);
       if (reply != null) {
         List<DatanodeDetails> dnList = reply.getDatanodes();
         if (!dnList.isEmpty()) {
@@ -393,9 +383,11 @@ public class BlockOutputStream extends OutputStream {
       setIoException(ioe);
       throw getIoException();
     }
-    refreshCurrentBuffer(bufferPool);
-
+    refreshCurrentBuffer();
   }
+
+  abstract void updateCommitInfo(
+      XceiverClientReply reply, List<ChunkBuffer> byteBufferList);
 
   /**
    * @param close whether putBlock is happening as part of closing the stream
@@ -441,16 +433,14 @@ public class BlockOutputStream extends OutputStream {
           blockID.set(responseBlockID);
           if (LOG.isDebugEnabled()) {
             LOG.debug(
-                "Adding index " + asyncReply.getLogIndex() + " commitMap size "
-                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                "Adding index " + asyncReply.getLogIndex() + " flushLength "
                     + flushPos + " numBuffers " + byteBufferList.size()
                     + " blockID " + blockID + " bufferPool size" + bufferPool
                     .getSize() + " currentBufferIndex " + bufferPool
                     .getCurrentBufferIndex());
           }
           // for standalone protocol, logIndex will always be 0.
-          commitWatcher
-              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
+          updateCommitInfo(asyncReply, byteBufferList);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -468,9 +458,12 @@ public class BlockOutputStream extends OutputStream {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    commitWatcher.getFutureMap().put(flushPos, flushFuture);
+    putFlushFuture(flushPos, flushFuture);
     return flushFuture;
   }
+
+  abstract void putFlushFuture(long flushPos,
+      CompletableFuture<ContainerCommandResponseProto> flushFuture);
 
   @Override
   public void flush() throws IOException {
@@ -514,7 +507,7 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
-      refreshCurrentBuffer(bufferPool);
+      refreshCurrentBuffer();
       Preconditions.checkArgument(currentBuffer.position() > 0);
       if (currentBuffer.hasRemaining()) {
         writeChunk(currentBuffer);
@@ -561,14 +554,8 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void waitOnFlushFutures()
-      throws InterruptedException, ExecutionException {
-    CompletableFuture<Void> combinedFuture = CompletableFuture.allOf(
-        commitWatcher.getFutureMap().values().toArray(
-            new CompletableFuture[commitWatcher.getFutureMap().size()]));
-    // wait for all the transactions to complete
-    combinedFuture.get();
-  }
+  abstract void waitOnFlushFutures()
+      throws InterruptedException, ExecutionException;
 
   private void validateResponse(
       ContainerProtos.ContainerCommandResponseProto responseProto)
@@ -601,13 +588,16 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
+  abstract void cleanup();
+
   public void cleanup(boolean invalidateClient) {
     if (xceiverClientFactory != null) {
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
     }
     xceiverClientFactory = null;
     xceiverClient = null;
-    commitWatcher.cleanup();
+    cleanup();
+
     if (bufferList !=  null) {
       bufferList.clear();
     }

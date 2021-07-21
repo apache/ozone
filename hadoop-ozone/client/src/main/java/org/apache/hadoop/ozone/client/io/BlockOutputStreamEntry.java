@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -95,9 +96,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
    */
   private void checkStream() throws IOException {
     if (this.outputStream == null) {
-      this.outputStream =
-          new BlockOutputStream(blockID, xceiverClientManager,
-              pipeline, bufferPool, config, token);
+      this.outputStream = new RatisBlockOutputStream(blockID,
+          xceiverClientManager, pipeline, bufferPool, config, token);
     }
   }
 
