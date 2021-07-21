@@ -97,8 +97,6 @@ public class TestPeriodicVolumeChecker {
       volumeChecker.setDelegateChecker(
           new TestStorageVolumeChecker.DummyChecker());
 
-      // 1 for volumeSet and 1 for metadataVolumeSet
-      // in MutableVolumeSet constructor
       Assert.assertEquals(0, volumeChecker.getNumAllVolumeChecks());
       Assert.assertEquals(0, volumeChecker.getNumAllVolumeSetsChecks());
 
@@ -106,7 +104,6 @@ public class TestPeriodicVolumeChecker {
       timer.advance(gap.toMillis() / 3);
       volumeChecker.checkAllVolumeSets();
 
-      // 2 for volumeSet and 2 for metadataVolumeSet
       Assert.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
       Assert.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
       Assert.assertEquals(0, volumeChecker.getNumSkippedChecks());
