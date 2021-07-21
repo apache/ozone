@@ -88,7 +88,7 @@ Create bucket with name
     [Arguments]          ${bucket}
     ${result} =          Execute AWSS3APICli  create-bucket --bucket ${bucket}
                          Should contain              ${result}         Location
-                         Should contain              ${result}         ${ENDPOINT_URL}/${bucket}
+                         Should contain              ${result}         ${bucket}
 
 Setup s3 tests
     Run Keyword        Generate random prefix
