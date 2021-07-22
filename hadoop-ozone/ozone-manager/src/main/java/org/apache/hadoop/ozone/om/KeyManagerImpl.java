@@ -2472,8 +2472,7 @@ public class KeyManagerImpl implements KeyManager {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
                       immediateChild, omKeyInfo.getAcls());
-                  cacheKeyMap.put(entryInDb,
-                      new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
+                  cacheKeyMap.put(entryInDb, new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
                 } else {
                   // If entryKeyName matches dir name, we have the info
                   cacheKeyMap.put(entryInDb,
@@ -2822,13 +2821,12 @@ public class KeyManagerImpl implements KeyManager {
     TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator();
 
-    iterator.seek(seekDirInDB);
+    Table.KeyValue<String, OmDirectoryInfo> entry = iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
-      if (deletedKeySet.contains(dirInfo.getPath()) && iterator.hasNext()) {
-        iterator.next(); // move to next entry in the table
+      if (deletedKeySet.contains(dirInfo.getPath())) {
+        entry = iterator.next(); // move to next entry in the table
         // entry is actually deleted in cache and can exists in DB
         continue;
       }
@@ -2848,7 +2846,7 @@ public class KeyManagerImpl implements KeyManager {
         countEntries++;
       }
       // move to next entry in the DirTable
-      iterator.next();
+      entry = iterator.next();
     }
 
     return countEntries;
@@ -2866,8 +2864,8 @@ public class KeyManagerImpl implements KeyManager {
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
       OmKeyInfo keyInfo = entry.getValue();
-      if (deletedKeySet.contains(keyInfo.getPath()) && iterator.hasNext()) {
-        iterator.next(); // move to next entry in the table
+      if (iterator.hasNext() && deletedKeySet.contains(keyInfo.getPath())) {
+        entry = iterator.next(); // move to next entry in the table
         // entry is actually deleted in cache and can exists in DB
         continue;
       }
@@ -2883,7 +2881,7 @@ public class KeyManagerImpl implements KeyManager {
       cacheKeyMap.put(fullKeyPath,
               new OzoneFileStatus(keyInfo, scmBlockSize, false));
       countEntries++;
-      iterator.next(); // move to next entry in the table
+      entry = iterator.next(); // move to next entry in the table
     }
     return countEntries;
   }
@@ -3201,10 +3199,9 @@ public class KeyManagerImpl implements KeyManager {
     TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
         iterator = dirTable.iterator();
 
-    iterator.seek(seekDirInDB);
+    Table.KeyValue<String, OmDirectoryInfo> entry = iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
       if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
           parentInfo.getObjectID())) {
@@ -3220,7 +3217,7 @@ public class KeyManagerImpl implements KeyManager {
 
       // move to next entry in the DirTable
       if(iterator.hasNext()) {
-        iterator.next();
+        entry = iterator.next();
       }
     }
 
@@ -3241,10 +3238,9 @@ public class KeyManagerImpl implements KeyManager {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = fileTable.iterator();
 
-    iterator.seek(seekFileInDB);
+    Table.KeyValue<String, OmKeyInfo> entry = iterator.seek(seekFileInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
-      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
       OmKeyInfo fileInfo = entry.getValue();
       if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
           parentInfo.getObjectID())) {
@@ -3259,7 +3255,7 @@ public class KeyManagerImpl implements KeyManager {
       countEntries++;
       // move to next entry in the KeyTable
       if(iterator.hasNext()) {
-        iterator.next();
+        entry = iterator.next();
       }
     }
 
