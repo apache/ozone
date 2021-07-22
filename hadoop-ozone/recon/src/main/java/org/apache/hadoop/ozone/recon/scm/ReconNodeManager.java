@@ -27,8 +27,10 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -36,8 +38,10 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
@@ -46,6 +50,7 @@ import com.google.common.collect.ImmutableSet;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,9 +76,10 @@ public class ReconNodeManager extends SCMNodeManager {
                           SCMStorageConfig scmStorageConfig,
                           EventPublisher eventPublisher,
                           NetworkTopology networkTopology,
-                          Table<UUID, DatanodeDetails> nodeDB) {
+                          Table<UUID, DatanodeDetails> nodeDB,
+                          HDDSLayoutVersionManager scmLayoutVersionManager) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
-        SCMContext.emptyContext());
+        SCMContext.emptyContext(), scmLayoutVersionManager);
     this.nodeDB = nodeDB;
     loadExistingNodes();
   }
@@ -85,13 +91,26 @@ public class ReconNodeManager extends SCMNodeManager {
           iterator = nodeDB.iterator();
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
-        register(datanodeDetails, null, null);
+        register(datanodeDetails, null, null,
+            LayoutVersionProto.newBuilder()
+                .setMetadataLayoutVersion(
+                    HDDSLayoutVersionManager.maxLayoutVersion())
+                .setSoftwareLayoutVersion(
+                    HDDSLayoutVersionManager.maxLayoutVersion())
+                .build());
         nodeCount++;
       }
       LOG.info("Loaded {} nodes from node DB.", nodeCount);
     } catch (IOException ioEx) {
       LOG.error("Exception while loading existing nodes.", ioEx);
     }
+  }
+
+  @Override
+  public VersionResponse getVersion(SCMVersionRequestProto versionRequest) {
+    return VersionResponse.newBuilder()
+        .setVersion(0)
+        .build();
   }
 
   /**
@@ -121,7 +140,8 @@ public class ReconNodeManager extends SCMNodeManager {
       super.onMessage(commandForDatanode, ignored);
     } else {
       LOG.debug("Ignoring unsupported command {} for Datanode {}.",
-          cmdType, commandForDatanode.getDatanodeId());
+          commandForDatanode.getCommand().getType(),
+          commandForDatanode.getDatanodeId());
     }
   }
 
@@ -129,14 +149,15 @@ public class ReconNodeManager extends SCMNodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - DatanodeDetailsProto.
+   * @param layoutInfo - Layout Version Proto
    * @return SCMheartbeat response.
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                           LayoutVersionProto layoutInfo) {
     // Update heartbeat map with current time
     datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
-
-    List<SCMCommand> cmds = super.processHeartbeat(datanodeDetails);
+    List<SCMCommand> cmds = super.processHeartbeat(datanodeDetails, layoutInfo);
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
         .collect(toList());

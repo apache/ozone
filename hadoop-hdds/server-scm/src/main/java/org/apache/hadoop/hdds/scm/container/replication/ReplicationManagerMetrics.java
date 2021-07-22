@@ -39,6 +39,9 @@ public final class ReplicationManagerMetrics {
   @Metric("Tracked inflight container deletion requests.")
   private MutableGaugeLong inflightDeletion;
 
+  @Metric("Tracked inflight container move requests.")
+  private MutableGaugeLong inflightMove;
+
   @Metric("Number of replication commands sent.")
   private MutableCounterLong numReplicationCmdsSent;
 
@@ -118,6 +121,10 @@ public final class ReplicationManagerMetrics {
 
   public long getInflightDeletion() {
     return replicationManager.getInflightDeletion().size();
+  }
+
+  public long getInflightMove() {
+    return replicationManager.getInflightMove().size();
   }
 
   public long getNumReplicationCmdsSent() {

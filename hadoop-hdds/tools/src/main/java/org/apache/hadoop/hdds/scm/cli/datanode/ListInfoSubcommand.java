@@ -51,6 +51,20 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String uuid;
 
+  @CommandLine.Option(names = {"--operational-state"},
+      description = "Show info by datanode NodeOperationalState(" +
+          "IN_SERVICE, " +
+          "DECOMMISSIONING, DECOMMISSIONED, " +
+          "ENTERING_MAINTENANCE, IN_MAINTENANCE).",
+      defaultValue = "")
+  private String nodeOperationalState;
+
+  @CommandLine.Option(names = {"--node-state"},
+      description = "Show info by datanode NodeState(" +
+      " HEALTHY, STALE, DEAD)",
+      defaultValue = "")
+  private String nodeState;
+
   private List<Pipeline> pipelines;
 
 
@@ -68,6 +82,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
       if (!Strings.isNullOrEmpty(uuid)) {
         allNodes = allNodes.filter(p ->
             p.getDatanodeDetails().getUuidString().equals(uuid));
+      }
+      if (!Strings.isNullOrEmpty(nodeOperationalState)) {
+        allNodes = allNodes.filter(p -> p.getOpState().toString()
+            .compareToIgnoreCase(nodeOperationalState) == 0);
+      }
+      if (!Strings.isNullOrEmpty(nodeState)) {
+        allNodes = allNodes.filter(p -> p.getHealthState().toString()
+            .compareToIgnoreCase(nodeState) == 0);
       }
       allNodes.forEach(this::printDatanodeInfo);
     }
