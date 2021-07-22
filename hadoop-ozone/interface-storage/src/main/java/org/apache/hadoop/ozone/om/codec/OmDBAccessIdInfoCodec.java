@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,27 +29,27 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Codec to encode OmDBTenantInfo as byte array.
  */
-public class OmDBTenantInfoCodec implements Codec<OmDBTenantInfo> {
+public class OmDBAccessIdInfoCodec implements Codec<OmDBAccessIdInfo> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmDBTenantInfoCodec.class);
+      LoggerFactory.getLogger(OmDBAccessIdInfoCodec.class);
 
   @Override
-  public byte[] toPersistedFormat(OmDBTenantInfo object) throws IOException {
+  public byte[] toPersistedFormat(OmDBAccessIdInfo object) throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
     return object.convertToByteArray();
   }
 
   @Override
-  public OmDBTenantInfo fromPersistedFormat(byte[] rawData)
+  public OmDBAccessIdInfo fromPersistedFormat(byte[] rawData)
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OmDBTenantInfo.getFromByteArray(rawData);
+    return OmDBAccessIdInfo.getFromByteArray(rawData);
   }
 
   @Override
-  public OmDBTenantInfo copyObject(OmDBTenantInfo object) {
-    // TODO: Not really a "copy". from OMTransactionInfoCodec
+  public OmDBAccessIdInfo copyObject(OmDBAccessIdInfo object) {
+    // TODO: Not really a "copy". See OMTransactionInfoCodec
     return object;
   }
 }

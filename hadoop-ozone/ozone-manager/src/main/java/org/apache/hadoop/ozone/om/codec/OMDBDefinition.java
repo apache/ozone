@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -180,6 +181,7 @@ public class OMDBDefinition implements DBDefinition {
 
   // Tables for S3 multi-tenancy
 
+  // TODO: this table will be removed with the disappearance of CreateUser API.
   public static final DBColumnFamilyDefinition<String, String>
             TENANT_USER_TABLE =
             new DBColumnFamilyDefinition<>(
@@ -188,6 +190,15 @@ public class OMDBDefinition implements DBDefinition {
                     new StringCodec(),
                     String.class,
                     new StringCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDBAccessIdInfo>
+            TENANT_ACCESS_ID_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE,
+                    String.class,  // accessId
+                    new StringCodec(),
+                    OmDBAccessIdInfo.class,  // tenantId + secret + principal
+                    new OmDBAccessIdInfoCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDBTenantInfo>
             TENANT_STATE_TABLE =
