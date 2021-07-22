@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -169,8 +170,10 @@ public class BlockDataStreamOutput extends OutputStream {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
+    ContainerCommandRequestMessage message = ContainerCommandRequestMessage.toMessage(builder.build(), null);
+
     out = Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
-            .stream(builder.build().toByteString().asReadOnlyByteBuffer());
+            .stream(message.getContent().asReadOnlyByteBuffer());
     this.bufferPool = bufferPool;
     this.token = token;
 

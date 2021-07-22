@@ -387,16 +387,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private ContainerCommandRequestProto message2ContainerCommandRequestProto(
       Message message) throws InvalidProtocolBufferException {
-    ContainerCommandRequestProto proto;
-    try {
-      proto = ContainerCommandRequestMessage.toProto(message.getContent(), gid);
-    } catch (Exception e) {
-      // TODO: this is a temporary workaround
-      // FORWARD message may contain Proto as payload, try parse it directly.
-      // If this still doesn't work, throw the exception
-      proto = ContainerCommandRequestProto.parseFrom(message.getContent());
-    }
-    return proto;
+    return ContainerCommandRequestMessage.toProto(message.getContent(), gid);
   }
 
   private ContainerCommandResponseProto dispatchCommand(
@@ -511,8 +502,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     return CompletableFuture.supplyAsync(() -> {
       try {
         ContainerCommandRequestProto requestProto =
-            getContainerCommandRequestProto(gid,
-                request.getMessage().getContent());
+            message2ContainerCommandRequestProto(request.getMessage());
         DispatcherContext context =
             new DispatcherContext.Builder()
                 .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
