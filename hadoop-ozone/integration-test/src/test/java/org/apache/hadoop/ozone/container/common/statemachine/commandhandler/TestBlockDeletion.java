@@ -454,7 +454,7 @@ public class TestBlockDeletion {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    int keyCount = 100;
+    int keyCount = 10;
     List<String> keys = new ArrayList<>();
     for (int j = 0; j < keyCount; j++) {
       String keyName = UUID.randomUUID().toString();
