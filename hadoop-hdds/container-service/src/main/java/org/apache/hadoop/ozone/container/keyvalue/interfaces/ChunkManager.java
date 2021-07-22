@@ -104,6 +104,12 @@ public interface ChunkManager {
     // no-op
   }
 
+  default String streamInit(Container container, BlockID blockID,
+                    DispatcherContext dispatcherContext)
+      throws StorageContainerException {
+    return null;
+  }
+
   static long getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
       long defaultReadBufferCapacity) {
     long bufferCapacity = 0;

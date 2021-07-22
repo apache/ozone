@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
+import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
@@ -220,6 +221,11 @@ public class TestBlockOutputStreamCorrectness {
     public Map<DatanodeDetails, ContainerCommandResponseProto>
         sendCommandOnAllNodes(ContainerCommandRequestProto request
     ) throws IOException, InterruptedException {
+      return null;
+    }
+
+    @Override
+    public DataStreamApi getDataStreamApi() {
       return null;
     }
   }

@@ -774,7 +774,8 @@ public class DatanodeDetails extends NodeImpl implements
      * Ports that are supported in DataNode.
      */
     public enum Name {
-      STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER;
+      STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
+      DATASTREAM;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());
