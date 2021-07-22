@@ -37,7 +37,7 @@ public final class OmDBAccessIdInfo {
    */
   private final String sharedSecret;
   // Implies above names should NOT contain the split key.
-  public static final String TENANT_INFO_SPLIT_KEY = ";";
+  public static final String SERIALIZATION_SPLIT_KEY = ";";
 
   public OmDBAccessIdInfo(String tenantName,
       String kerberosPrincipal, String sharedSecret) {
@@ -46,10 +46,10 @@ public final class OmDBAccessIdInfo {
     this.sharedSecret = sharedSecret;
   }
 
-  private OmDBAccessIdInfo(String tenantInfoString) {
-    String[] tInfo = tenantInfoString.split(TENANT_INFO_SPLIT_KEY);
+  private OmDBAccessIdInfo(String accessIdInfoString) {
+    String[] tInfo = accessIdInfoString.split(SERIALIZATION_SPLIT_KEY);
     Preconditions.checkState(tInfo.length == 3,
-        "Incorrect tenantInfoString");
+        "Incorrect accessIdInfoString");
 
     tenantName = tInfo[0];
     kerberosPrincipal = tInfo[1];
@@ -60,10 +60,10 @@ public final class OmDBAccessIdInfo {
     return tenantName;
   }
 
-  private String generateTenantInfo() {
+  private String serialize() {
     StringBuilder sb = new StringBuilder();
-    sb.append(tenantName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(kerberosPrincipal).append(TENANT_INFO_SPLIT_KEY);
+    sb.append(tenantName).append(SERIALIZATION_SPLIT_KEY);
+    sb.append(kerberosPrincipal).append(SERIALIZATION_SPLIT_KEY);
     sb.append(sharedSecret);
     return sb.toString();
   }
@@ -73,13 +73,11 @@ public final class OmDBAccessIdInfo {
    * @return byte[]
    */
   public byte[] convertToByteArray() {
-    return StringUtils.string2Bytes(generateTenantInfo());
+    return StringUtils.string2Bytes(serialize());
   }
 
   /**
    * Convert byte array to OmDBTenantInfo.
-   * @param bytes
-   * @return OmDBTenantInfo
    */
   public static OmDBAccessIdInfo getFromByteArray(byte[] bytes) {
     String tInfo = StringUtils.bytes2String(bytes);
