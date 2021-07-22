@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,13 +64,17 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
     PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
     if (!reconPipelineManager.containsPipeline(pipelineID)) {
       LOG.info("Unknown pipeline {}. Trying to get from SCM.", pipelineID);
-      Pipeline pipelineFromScm = null;
+      Pipeline pipelineFromScm;
 
       try {
         pipelineFromScm =
             scmServiceProvider.getPipeline(report.getPipelineID());
-      } catch (PipelineNotFoundException pnfe) {
-        LOG.error("Could not find pipeline at SCM: {}.", pipelineID, pnfe);
+      } catch (IOException ex) {
+        assert (ex instanceof RemoteException);
+        IOException exception = ((RemoteException) ex)
+                .unwrapRemoteException(PipelineNotFoundException.class);
+        assert (exception instanceof PipelineNotFoundException);
+        LOG.error("Could not find pipeline {} at SCM.", pipelineID);
         return;
       }
 
@@ -78,7 +83,7 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
       reconPipelineManager.addPipeline(pipelineFromScm);
     }
 
-    Pipeline pipeline = null;
+    Pipeline pipeline;
     try {
       pipeline = reconPipelineManager.getPipeline(pipelineID);
     } catch (PipelineNotFoundException ex) {
