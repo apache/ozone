@@ -25,9 +25,9 @@ import org.apache.hadoop.hdds.StringUtils;
  */
 public final class OmDBAccessIdInfo {
   /**
-   * Name of the tenant (tenantId).
+   * Name of the tenant.
    */
-  private final String tenantName;
+  private final String tenantId;
   /**
    * Kerberos principal this accessId belongs to.
    */
@@ -36,12 +36,13 @@ public final class OmDBAccessIdInfo {
    * Shared secret of the accessId. TODO: Encryption?
    */
   private final String sharedSecret;
-  // Implies above names should NOT contain the split key.
+
+  // This implies above String fields should NOT contain the split key.
   public static final String SERIALIZATION_SPLIT_KEY = ";";
 
-  public OmDBAccessIdInfo(String tenantName,
+  public OmDBAccessIdInfo(String tenantId,
       String kerberosPrincipal, String sharedSecret) {
-    this.tenantName = tenantName;
+    this.tenantId = tenantId;
     this.kerberosPrincipal = kerberosPrincipal;
     this.sharedSecret = sharedSecret;
   }
@@ -51,25 +52,25 @@ public final class OmDBAccessIdInfo {
     Preconditions.checkState(tInfo.length == 3,
         "Incorrect accessIdInfoString");
 
-    tenantName = tInfo[0];
+    tenantId = tInfo[0];
     kerberosPrincipal = tInfo[1];
     sharedSecret = tInfo[2];
   }
 
-  public String getTenantName() {
-    return tenantName;
+  public String getTenantId() {
+    return tenantId;
   }
 
   private String serialize() {
     StringBuilder sb = new StringBuilder();
-    sb.append(tenantName).append(SERIALIZATION_SPLIT_KEY);
+    sb.append(tenantId).append(SERIALIZATION_SPLIT_KEY);
     sb.append(kerberosPrincipal).append(SERIALIZATION_SPLIT_KEY);
     sb.append(sharedSecret);
     return sb.toString();
   }
 
   /**
-   * Convert OmDBTenantInfo to byteArray to be persisted to DB.
+   * Convert OmDBAccessIdInfo to byteArray to be persisted to DB.
    * @return byte[]
    */
   public byte[] convertToByteArray() {
@@ -77,7 +78,7 @@ public final class OmDBAccessIdInfo {
   }
 
   /**
-   * Convert byte array to OmDBTenantInfo.
+   * Convert byte array to OmDBAccessIdInfo.
    */
   public static OmDBAccessIdInfo getFromByteArray(byte[] bytes) {
     String tInfo = StringUtils.bytes2String(bytes);
@@ -93,35 +94,34 @@ public final class OmDBAccessIdInfo {
   }
 
   /**
-   * Builder for OmDBTenantInfo.
+   * Builder for OmDBAccessIdInfo.
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
-    private String tenantName;
-    private String bucketNamespaceName;
-    private String accountNamespaceName;
+    private String tenantId;
+    private String kerberosPrincipal;
+    private String sharedSecret;
 
     private Builder() {
     }
 
-    public Builder setTenantName(String tenantName) {
-      this.tenantName = tenantName;
+    public Builder setTenantName(String tenantId) {
+      this.tenantId = tenantId;
       return this;
     }
 
-    public Builder setBucketNamespaceName(String bucketNamespaceName) {
-      this.bucketNamespaceName = bucketNamespaceName;
+    public Builder setBucketNamespaceName(String kerberosPrincipal) {
+      this.kerberosPrincipal = kerberosPrincipal;
       return this;
     }
 
-    public Builder setAccountNamespaceName(String accountNamespaceName) {
-      this.accountNamespaceName = accountNamespaceName;
+    public Builder setAccountNamespaceName(String sharedSecret) {
+      this.sharedSecret = sharedSecret;
       return this;
     }
 
     public OmDBAccessIdInfo build() {
-      return new OmDBAccessIdInfo(
-          tenantName, bucketNamespaceName, accountNamespaceName);
+      return new OmDBAccessIdInfo(tenantId, kerberosPrincipal, sharedSecret);
     }
   }
 }
