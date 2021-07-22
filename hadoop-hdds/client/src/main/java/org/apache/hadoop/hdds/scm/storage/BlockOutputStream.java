@@ -53,11 +53,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
-
-import org.apache.ratis.client.api.DataStreamOutput;
-import org.apache.ratis.io.StandardWriteOption;
-import org.apache.ratis.io.WriteOption;
-import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,9 +124,6 @@ public class BlockOutputStream extends OutputStream {
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
-  private final DataStreamOutput out;
-  List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  int writeSize = 0;
 
   /**
    * Creates a new BlockOutputStream.
@@ -158,19 +150,6 @@ public class BlockOutputStream extends OutputStream {
         BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .addMetadata(keyValue);
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
-    ContainerProtos.WriteChunkRequestProto.Builder writeChunkRequest =
-        ContainerProtos.WriteChunkRequestProto.newBuilder()
-            .setBlockID(blockID.getDatanodeBlockIDProtobuf());
-
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.StreamInit)
-            .setContainerID(blockID.getContainerID())
-            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
-
-    out = Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
-            .stream(builder.build().toByteString().asReadOnlyByteBuffer());
     this.bufferPool = bufferPool;
     this.token = token;
 
@@ -438,17 +417,6 @@ public class BlockOutputStream extends OutputStream {
       byteBufferList = null;
     }
 
-    CompletableFuture[] EMPTY_COMPLETABLE_FUTURE_ARRAY = {};
-    try {
-      CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).get();
-      if (close) {
-        out.closeAsync().get();
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to write all chunks through stream: " + e);
-      throw new IOException(e);
-    }
-
     CompletableFuture<ContainerProtos.
         ContainerCommandResponseProto> flushFuture = null;
     try {
@@ -488,9 +456,9 @@ public class BlockOutputStream extends OutputStream {
       }, responseExecutor).exceptionally(e -> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("putBlock failed for blockID {} with exception {}",
-              blockID, e.getLocalizedMessage());
+                  blockID, e.getLocalizedMessage());
         }
-        CompletionException ce = new CompletionException(e);
+        CompletionException ce =  new CompletionException(e);
         setIoException(ce);
         throw ce;
       });
@@ -627,9 +595,9 @@ public class BlockOutputStream extends OutputStream {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
       ioException.compareAndSet(null, exception);
     } else {
-      LOG.debug("Previous request had already failed with " + ioe.toString()
-          + " so subsequent request also encounters"
-          + " Storage Container Exception ", e);
+      LOG.debug("Previous request had already failed with {} " +
+              "so subsequent request also encounters " +
+              "Storage Container Exception {}", ioe, e);
     }
   }
 
@@ -692,30 +660,32 @@ public class BlockOutputStream extends OutputStream {
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
 
-    writeSize += data.asReadOnlyByteBuffer().remaining();
-    WriteOption[] options = new WriteOption[0];
-    if (writeSize >= 16 * 1000 * 1000) {
-      writeSize = 0;
-      options = new WriteOption[1];
-      options[0] = StandardWriteOption.SYNC;
+    try {
+      XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
+          blockID.get(), data, token);
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
+          asyncReply.getResponse();
+      future.thenApplyAsync(e -> {
+        try {
+          validateResponse(e);
+        } catch (IOException sce) {
+          future.completeExceptionally(sce);
+        }
+        return e;
+      }, responseExecutor).exceptionally(e -> {
+        String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
+            "into block " + blockID;
+        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+        CompletionException ce = new CompletionException(msg, e);
+        setIoException(ce);
+        throw ce;
+      });
+    } catch (IOException | ExecutionException e) {
+      throw new IOException(EXCEPTION_MSG + e.toString(), e);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      handleInterruptedException(ex, false);
     }
-
-    CompletableFuture<DataStreamReply> future = out.writeAsync(data.asReadOnlyByteBuffer(), options)
-        .whenCompleteAsync((r,e) -> {
-          if (e != null || !r.isSuccess()) {
-            if (e == null) {
-              e = new IOException("result is not success");
-            }
-            String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
-                "into block " + blockID;
-            LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-            CompletionException ce = new CompletionException(msg, e);
-            setIoException(ce);
-            throw ce;
-          }
-        }, responseExecutor);
-
-    futures.add(future);
     containerBlockData.addChunks(chunkInfo);
   }
 
