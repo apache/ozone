@@ -251,12 +251,8 @@ public class KeyValueHandler extends Handler {
       WriteChunkRequestProto writeChunk = request.getWriteChunk();
       BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
 
-      if (dispatcherContext == null) {
-        dispatcherContext = new DispatcherContext.Builder().build();
-      }
-
       path = chunkManager
-          .streamInit(kvContainer, blockID, dispatcherContext);
+          .streamInit(kvContainer, blockID);
 
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);

@@ -90,8 +90,8 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
-  public String streamInit(Container container, BlockID blockID,
-      DispatcherContext dispatcherContext) throws StorageContainerException {
+  public String streamInit(Container container, BlockID blockID)
+      throws StorageContainerException {
     checkLayoutVersion(container);
     File chunkFile = getChunkFile(container, blockID, null);
     return chunkFile.getAbsolutePath();

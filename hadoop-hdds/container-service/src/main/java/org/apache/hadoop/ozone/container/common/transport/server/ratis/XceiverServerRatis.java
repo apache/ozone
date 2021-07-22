@@ -232,10 +232,17 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // set the configs enable and set the stateMachineData sync timeout
     RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
 
-    dataStreamPort = conf.getInt(
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT,
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
     // set the datastream config
+    if (conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT_DEFAULT)) {
+      dataStreamPort = 0;
+    } else {
+      dataStreamPort = conf.getInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
+    }
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
     RaftConfigKeys.DataStream.setType(properties,
         SupportedDataStreamType.NETTY);

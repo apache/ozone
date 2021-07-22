@@ -104,8 +104,7 @@ public interface ChunkManager {
     // no-op
   }
 
-  default String streamInit(Container container, BlockID blockID,
-                    DispatcherContext dispatcherContext)
+  default String streamInit(Container container, BlockID blockID)
       throws StorageContainerException {
     return null;
   }

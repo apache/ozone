@@ -57,6 +57,12 @@ public final class OzoneConfigKeys {
   public static final boolean DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
       false;
 
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT =
+      "dfs.container.ratis.datastream.ipc.random.port";
+  public static final boolean
+      DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT_DEFAULT =
+      false;
+
   public static final String DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
       "dfs.container.chunk.write.sync";
   public static final boolean DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT = false;

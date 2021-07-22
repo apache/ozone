@@ -74,10 +74,10 @@ public class ChunkManagerDispatcher implements ChunkManager {
         .writeChunk(container, blockID, info, data, dispatcherContext);
   }
 
-  public String streamInit(Container container, BlockID blockID,
-      DispatcherContext dispatcherContext) throws StorageContainerException {
+  public String streamInit(Container container, BlockID blockID)
+      throws StorageContainerException {
     return selectHandler(container)
-        .streamInit(container, blockID, dispatcherContext);
+        .streamInit(container, blockID);
   }
 
   @Override
