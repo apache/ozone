@@ -518,8 +518,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     return CompletableFuture.supplyAsync(() -> {
       try {
         ContainerCommandRequestProto requestProto =
-            getContainerCommandRequestProto(gid,
-                request.getMessage().getContent());
+            message2ContainerCommandRequestProto(request.getMessage());
         DispatcherContext context =
             new DispatcherContext.Builder()
                 .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
@@ -536,6 +535,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }, executor);
   }
 
+  @Override
   public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
     return CompletableFuture.supplyAsync(() -> {
       if (stream == null) {
