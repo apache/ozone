@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -439,35 +438,6 @@ public class ContainerBalancer {
     return potentialTargets.stream()
         .filter(node -> sizeEnteringNode.get(node) <=
             config.getMaxSizeEnteringTarget()).collect(Collectors.toList());
-  }
-
-  /**
-   * Performs binary search to determine if the specified listToSearch
-   * contains the specified node.
-   *
-   * @param listToSearch List of DatanodeUsageInfo to be searched.
-   * @param node DatanodeUsageInfo to be searched for.
-   * @return true if the specified node is present in listToSearch, otherwise
-   * false.
-   */
-  private boolean containsNode(
-      List<DatanodeUsageInfo> listToSearch, DatanodeUsageInfo node) {
-    int index = 0;
-    Comparator<DatanodeUsageInfo> comparator =
-        DatanodeUsageInfo.getMostUsedByRemainingRatio();
-    int size = listToSearch.size();
-    if (size == 0) {
-      return false;
-    }
-
-    if (comparator.compare(listToSearch.get(0),
-        listToSearch.get(size - 1)) < 0) {
-      index =
-          Collections.binarySearch(listToSearch, node, comparator.reversed());
-    } else {
-      index = Collections.binarySearch(listToSearch, node, comparator);
-    }
-    return index >= 0 && listToSearch.get(index).equals(node);
   }
 
   /**

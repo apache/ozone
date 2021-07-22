@@ -295,8 +295,7 @@ public class TestContainerBalancer {
     containerBalancer.stop();
     Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
         containerBalancer.getSourceToTargetMap();
-    for (DatanodeDetails source : sourceToTargetMap.keySet()) {
-      ContainerMoveSelection moveSelection = sourceToTargetMap.get(source);
+    for (ContainerMoveSelection moveSelection : sourceToTargetMap.values()) {
       ContainerID container = moveSelection.getContainerID();
       DatanodeDetails target = moveSelection.getTargetNode();
       Assert.assertTrue(cidToReplicasMap.get(container)
@@ -326,8 +325,9 @@ public class TestContainerBalancer {
 
     // for each move selection, check if {replicas - source + target}
     // satisfies placement policy
-    for (DatanodeDetails source : sourceToTargetMap.keySet()) {
-      ContainerMoveSelection moveSelection = sourceToTargetMap.get(source);
+    for (Map.Entry<DatanodeDetails, ContainerMoveSelection> entry :
+        sourceToTargetMap.entrySet()) {
+      ContainerMoveSelection moveSelection = entry.getValue();
       ContainerID container = moveSelection.getContainerID();
       DatanodeDetails target = moveSelection.getTargetNode();
 
@@ -335,7 +335,7 @@ public class TestContainerBalancer {
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
-      replicas.remove(source);
+      replicas.remove(entry.getKey());
       replicas.add(target);
 
       ContainerInfo containerInfo = cidToInfoMap.get(container);

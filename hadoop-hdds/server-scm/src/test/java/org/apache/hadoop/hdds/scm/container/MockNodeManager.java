@@ -182,19 +182,20 @@ public class MockNodeManager implements NodeManager {
       Map<DatanodeUsageInfo, Set<ContainerID>> usageInfoToCidsMap)
       throws IllegalArgumentException {
     if (!usageInfoToCidsMap.isEmpty()) {
-
       // for each usageInfo, register it, add containers, and update metrics
-      for (DatanodeUsageInfo usageInfo : usageInfoToCidsMap.keySet()) {
+      for (Map.Entry<DatanodeUsageInfo, Set<ContainerID>> entry:
+          usageInfoToCidsMap.entrySet()) {
+        DatanodeUsageInfo usageInfo = entry.getKey();
         register(usageInfo.getDatanodeDetails(), null, null);
         try {
-          setContainers(usageInfo.getDatanodeDetails(),
-              usageInfoToCidsMap.get(usageInfo));
+          setContainers(usageInfo.getDatanodeDetails(), entry.getValue());
         } catch (NodeNotFoundException e) {
           LOG.warn("Could not find Datanode {} for adding containers to it. " +
                   "Skipping this node.", usageInfo
               .getDatanodeDetails().getUuidString());
           continue;
         }
+
         nodeMetricMap
             .put(usageInfo.getDatanodeDetails(), usageInfo.getScmNodeStat());
         aggregateStat.add(usageInfo.getScmNodeStat());
