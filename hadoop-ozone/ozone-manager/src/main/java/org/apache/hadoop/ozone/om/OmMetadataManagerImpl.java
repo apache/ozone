@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -212,6 +213,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   // Tables for S3 multi-tenancy
   private Table tenantUserTable;
   private Table tenantAccessIdTable;
+  private Table principalToAccessIdsTable;
   private Table tenantStateTable;
   private Table tenantGroupTable;
   private Table tenantRoleTable;
@@ -417,6 +419,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(TRANSACTION_INFO_TABLE)
         .addTable(TENANT_USER_TABLE)
         .addTable(TENANT_ACCESS_ID_TABLE)
+        .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
         .addTable(TENANT_GROUP_TABLE)
         .addTable(TENANT_ROLE_TABLE)
@@ -516,6 +519,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
         String.class, OmDBAccessIdInfo.class);
     checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE);
+
+    // Kerberos principal -> OmDBKerberosPrincipalInfo (A list of accessIds)
+    principalToAccessIdsTable = this.store.getTable(
+        PRINCIPAL_TO_ACCESS_IDS_TABLE,
+        String.class, OmDBKerberosPrincipalInfo.class);
+    checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE);
 
     // tenant name -> tenant (tenant states)
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
@@ -1279,6 +1288,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmDBAccessIdInfo> getTenantAccessIdTable() {
     return tenantAccessIdTable;
+  }
+
+  @Override
+  public Table<String, OmDBAccessIdInfo> getPrincipalToAccessIdsTable() {
+    return principalToAccessIdsTable;
   }
 
   @Override

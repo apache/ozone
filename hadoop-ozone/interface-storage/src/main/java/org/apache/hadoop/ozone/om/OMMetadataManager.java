@@ -353,6 +353,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
 
+  Table<String, OmDBAccessIdInfo> getPrincipalToAccessIdsTable();
+
   Table<String, OmDBTenantInfo> getTenantStateTable();
 
   Table<String, String> getTenantGroupTable();
