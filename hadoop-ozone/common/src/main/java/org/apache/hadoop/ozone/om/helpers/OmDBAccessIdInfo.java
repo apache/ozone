@@ -21,53 +21,39 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
 
 /**
- * This class is used for storing Ozone tenant info.
- * TODO: Copied from OmDBTenantInfo. Not done yet.
+ * This class is used for storing Ozone tenant accessId info.
  */
 public final class OmDBAccessIdInfo {
   /**
-   * Name of the tenant.
+   * Name of the tenant (tenantId).
    */
   private final String tenantName;
   /**
-   * Name of the tenant's bucket namespace.
+   * Kerberos principal this accessId belongs to.
    */
-  private final String bucketNamespaceName;
+  private final String kerberosPrincipal;
   /**
-   * Name of the tenant's account namespace.
+   * Shared secret of the accessId. TODO: Encryption?
    */
-  private final String accountNamespaceName;
-  /**
-   * Name of the user policy group.
-   */
-  private final String userPolicyGroupName;
-  /**
-   * Name of the bucket policy group.
-   */
-  private final String bucketPolicyGroupName;
+  private final String sharedSecret;
   // Implies above names should NOT contain the split key.
   public static final String TENANT_INFO_SPLIT_KEY = ";";
 
   public OmDBAccessIdInfo(String tenantName,
-      String bucketNamespaceName, String accountNamespaceName,
-      String userPolicyGroupName, String bucketPolicyGroupName) {
+      String kerberosPrincipal, String sharedSecret) {
     this.tenantName = tenantName;
-    this.bucketNamespaceName = bucketNamespaceName;
-    this.accountNamespaceName = accountNamespaceName;
-    this.userPolicyGroupName = userPolicyGroupName;
-    this.bucketPolicyGroupName = bucketPolicyGroupName;
+    this.kerberosPrincipal = kerberosPrincipal;
+    this.sharedSecret = sharedSecret;
   }
 
   private OmDBAccessIdInfo(String tenantInfoString) {
     String[] tInfo = tenantInfoString.split(TENANT_INFO_SPLIT_KEY);
-    Preconditions.checkState(tInfo.length == 5,
+    Preconditions.checkState(tInfo.length == 3,
         "Incorrect tenantInfoString");
 
     tenantName = tInfo[0];
-    bucketNamespaceName = tInfo[1];
-    accountNamespaceName = tInfo[2];
-    userPolicyGroupName = tInfo[3];
-    bucketPolicyGroupName = tInfo[4];
+    kerberosPrincipal = tInfo[1];
+    sharedSecret = tInfo[2];
   }
 
   public String getTenantName() {
@@ -77,10 +63,8 @@ public final class OmDBAccessIdInfo {
   private String generateTenantInfo() {
     StringBuilder sb = new StringBuilder();
     sb.append(tenantName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(bucketNamespaceName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(accountNamespaceName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(userPolicyGroupName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(bucketPolicyGroupName);
+    sb.append(kerberosPrincipal).append(TENANT_INFO_SPLIT_KEY);
+    sb.append(sharedSecret);
     return sb.toString();
   }
 
@@ -102,20 +86,12 @@ public final class OmDBAccessIdInfo {
     return new OmDBAccessIdInfo(tInfo);
   }
 
-  public String getBucketNamespaceName() {
-    return bucketNamespaceName;
+  public String getKerberosPrincipal() {
+    return kerberosPrincipal;
   }
 
-  public String getAccountNamespaceName() {
-    return accountNamespaceName;
-  }
-
-  public String getUserPolicyGroupName() {
-    return userPolicyGroupName;
-  }
-
-  public String getBucketPolicyGroupName() {
-    return bucketPolicyGroupName;
+  public String getSharedSecret() {
+    return sharedSecret;
   }
 
   /**
@@ -126,8 +102,6 @@ public final class OmDBAccessIdInfo {
     private String tenantName;
     private String bucketNamespaceName;
     private String accountNamespaceName;
-    private String userPolicyGroupName;
-    private String bucketPolicyGroupName;
 
     private Builder() {
     }
@@ -147,19 +121,9 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
-    public Builder setUserPolicyGroupName(String userPolicyGroupName) {
-      this.userPolicyGroupName = userPolicyGroupName;
-      return this;
-    }
-
-    public Builder setBucketPolicyGroupName(String bucketPolicyGroupName) {
-      this.bucketPolicyGroupName = bucketPolicyGroupName;
-      return this;
-    }
-
     public OmDBAccessIdInfo build() {
-      return new OmDBAccessIdInfo(tenantName, bucketNamespaceName,
-          accountNamespaceName, userPolicyGroupName, bucketPolicyGroupName);
+      return new OmDBAccessIdInfo(
+          tenantName, bucketNamespaceName, accountNamespaceName);
     }
   }
 }
