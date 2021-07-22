@@ -55,7 +55,7 @@
   </property>
   <property>
     <name>dfs.container.ratis.datastream.ipc</name>
-    <value>9890</value>
+    <value>9855</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>The datastream ipc port number of container.</description>
   </property>
