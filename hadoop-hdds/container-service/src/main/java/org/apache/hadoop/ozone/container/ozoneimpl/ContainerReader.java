@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -80,7 +81,6 @@ public class ContainerReader implements Runnable {
   private final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
-  private final boolean isInUpgradeMode;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
@@ -92,10 +92,6 @@ public class ContainerReader implements Runnable {
     this.containerSet = cset;
     this.config = conf;
     this.volumeSet = volSet;
-    this.isInUpgradeMode =
-        conf.getBoolean(ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE,
-            ScmConfigKeys.HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT);
-    LOG.info("Running in upgrade mode:{}", this.isInUpgradeMode);
   }
 
 
@@ -119,30 +115,38 @@ public class ContainerReader implements Runnable {
         "cannot be null");
 
     //filtering storage directory
-    File[] storageDir = hddsVolumeRootDir.listFiles(new FileFilter() {
-      @Override
-      public boolean accept(File pathname) {
-        return pathname.isDirectory();
-      }
-    });
+    File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);
 
-    if (storageDir == null) {
+    if (storageDirs == null) {
       LOG.error("IO error for the volume {}, skipped loading",
           hddsVolumeRootDir);
       volumeSet.failVolume(hddsVolumeRootDir.getPath());
       return;
     }
 
-    if (storageDir.length > 1) {
-      LOG.error("Volume {} is in Inconsistent state", hddsVolumeRootDir);
-      volumeSet.failVolume(hddsVolumeRootDir.getPath());
-      return;
-    }
+    // If there are no storage dirs yet, the volume needs to be formatted
+    // by HddsUtil#checkVolume once we have a cluster ID from SCM. No
+    // operations to perform here in that case.
+    if (storageDirs.length > 0) {
+      File clusterDir = getClusterDir();
+      if (storageDirs.length == 1 && !clusterDir.exists()) {
+        // If the one directory is not the cluster ID directory, assume it is
+        // the old SCM ID directory.
+        // Create a symlink named after cluster directory to use.
+        Files.createSymbolicLink(clusterDir.toPath(), storageDirs[0].toPath());
+      } else {
+        // There are 1 or more storage directories. We only care about the
+        // cluster ID directory.
+        if (!clusterDir.exists()) {
+          LOG.error("Volume {} is in Inconsistent state. Expected directory" +
+              "{} not found.", hddsVolumeRootDir, clusterDir);
+          volumeSet.failVolume(hddsVolumeRootDir.getPath());
+          return;
+        }
+      }
 
-    LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-    for (File storageLoc : storageDir) {
-      File location = preProcessStorageLoc(storageLoc);
-      File currentDir = new File(location, Storage.STORAGE_DIR_CURRENT);
+      LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
+      File currentDir = new File(clusterDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null) {
         for (File containerTopDir : containerTopDirs) {
@@ -156,7 +160,7 @@ public class ContainerReader implements Runnable {
                   long containerID =
                       ContainerUtils.getContainerID(containerDir);
                   if (containerFile.exists()) {
-                    verifyContainerFile(storageLoc, containerID, containerFile);
+                    verifyContainerFile(clusterDir, containerID, containerFile);
                   } else {
                     LOG.error("Missing .container file for ContainerID: {}",
                         containerDir.getName());
@@ -172,34 +176,6 @@ public class ContainerReader implements Runnable {
       }
     }
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
-  }
-
-  public File preProcessStorageLoc(File storageLoc) throws Exception {
-    File clusterDir = getClusterDir();
-
-    if (!isInUpgradeMode) {
-      Preconditions.checkArgument(clusterDir.exists(),
-          "Storage Dir: %s doesn't exist", clusterDir);
-      Preconditions.checkArgument(storageLoc.equals(clusterDir),
-          "configured storage location %s does not contain the clusterId: %s",
-              storageLoc, hddsVolume.getClusterID());
-      return storageLoc;
-    }
-
-    if (clusterDir.exists()) {
-      return storageLoc;
-    }
-
-    try {
-      LOG.info("Storage dir based on clusterId doesn't exist." +
-          "Renaming storage location:{} to {}", storageLoc, clusterDir);
-      NativeIO.renameTo(storageLoc, clusterDir);
-      return clusterDir;
-    } catch (Throwable t) {
-      LOG.error("DN Layout upgrade failed. Renaming of storage" +
-          "location:{} to {} failed", storageLoc, clusterDir, t);
-      throw t;
-    }
   }
 
   private void verifyContainerFile(File storageLoc, long containerID,
@@ -220,37 +196,6 @@ public class ContainerReader implements Runnable {
   }
 
   /**
-   * This function upgrades the container layout in following steps.
-   * a) Converts the chunk and metadata path to the new clusterID
-   *    based location.
-   * b) Re-computes the new container checksum.
-   * b) Persists the new container layout to disk.
-   * @param storageLoc
-   * @param kvContainerData
-   * @return upgraded KeyValueContainer
-   * @throws IOException
-   */
-  public KeyValueContainer upgradeContainerLayout(File storageLoc,
-      KeyValueContainerData kvContainerData) throws IOException {
-    kvContainerData.setMetadataPath(
-        findNormalizedPath(storageLoc,
-            kvContainerData.getMetadataPath()));
-    kvContainerData.setChunksPath(
-        findNormalizedPath(storageLoc,
-            kvContainerData.getChunksPath()));
-
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-        kvContainerData.getContainerType());
-    kvContainerData.computeAndSetChecksum(yaml);
-
-    KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
-    KeyValueContainer kvContainer = new KeyValueContainer(
-        kvContainerData, config);
-    kvContainer.update(Collections.emptyMap(), true);
-    return kvContainer;
-  }
-
-  /**
    * verify ContainerData loaded from disk and fix-up stale members.
    * Specifically blockCommitSequenceId, delete related metadata
    * and bytesUsed
@@ -265,15 +210,9 @@ public class ContainerReader implements Runnable {
         KeyValueContainerData kvContainerData = (KeyValueContainerData)
             containerData;
         containerData.setVolume(hddsVolume);
-        KeyValueContainer kvContainer = null;
-        if (isInUpgradeMode) {
-          kvContainer =
-              upgradeContainerLayout(storageLoc, kvContainerData);
-        } else {
-          KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
-          kvContainer = new KeyValueContainer(
-              kvContainerData, config);
-        }
+        KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
+        KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
+            config);
         containerSet.addContainer(kvContainer);
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
@@ -287,19 +226,5 @@ public class ContainerReader implements Runnable {
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
     }
-  }
-
-  public String findNormalizedPath(File storageLoc, String path) {
-    Path p = Paths.get(path);
-    Path relativePath = storageLoc.toPath().relativize(p);
-    Path newPath = getClusterDir().toPath().resolve(relativePath);
-
-    if (!isInUpgradeMode) {
-      Preconditions.checkArgument(newPath.toFile().exists(),
-          "modified path:%s doesn't exist", newPath);
-    }
-
-    LOG.debug("new Normalized Path is:{}", newPath);
-    return newPath.toAbsolutePath().toString();
   }
 }

@@ -27,9 +27,11 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
+import sun.jvm.hotspot.debugger.posix.elf.ELFSectionHeader;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -168,6 +170,13 @@ public final class HddsVolumeUtil {
 
   /**
    * Check Volume is in consistent state or not.
+   * Prior to SCM HA, volumes used the format {@code <volume>/hdds/<scm-id>}.
+   * Post SCM HA, new volumes will use the format {@code <volume>/hdds/<cluster
+   * -id>}.
+   * Existing volumes using SCM ID would have been reformatted to have {@code
+   * <volume>/hdds/<cluster-id>} as a symlink pointing to {@code <volume
+   * >/hdds/<scm-id>}.
+   *
    * @param hddsVolume
    * @param scmId
    * @param clusterId
@@ -180,6 +189,8 @@ public final class HddsVolumeUtil {
     String volumeRoot = hddsRoot.getPath();
     File clusterDir = new File(hddsRoot, clusterId);
     File scmDir = new File(hddsRoot, scmId);
+    String errorPrefix = "Volume " + volumeRoot + " is in an inconsistent " +
+        "state.";
 
     try {
       hddsVolume.format(clusterId);
@@ -197,41 +208,60 @@ public final class HddsVolumeUtil {
       return false;
     } else if (hddsFiles.length == 1) {
       // DN started for first time or this is a newly added volume.
-      // So we create scm directory.
+      // The one file is the version file.
+      // So we create cluster ID directory.
       if (!clusterDir.mkdir()) {
-        logger.error("Unable to create scmDir {}", clusterDir);
+        logger.error("Unable to create cluster directory {}", clusterDir);
         return false;
       }
       return true;
     } else if(hddsFiles.length == 2) {
-      if (scmDir.exists()) {
-        String msg = "Volume " + volumeRoot +
-            " is in Inconsistent state, and contains the" +
-            "SCM Directory:" + scmDir.getAbsolutePath() +
-            " which is a older format, please upgrade the volume.";
-        logger.error(msg);
-        ExitUtil.terminate(-2, msg);
+      // If there are 2 files, they should be the version file and the
+      // cluster ID directory.
+      if (!clusterDir.exists()) {
+        logger.error("{} 2 files found but cluster ID directory {} does not " +
+            "exist.", errorPrefix, clusterDir);
         return false;
       }
-      // The files should be Version and SCM directory
-      if (clusterDir.exists()) {
+    } else if(hddsFiles.length == 3) {
+      // If there are 3 files, they should be version file, SCM ID directory,
+      // and cluster ID symlink to SCM ID directory.
+      if (!clusterDir.exists()) {
+        logger.error("{} 3 files found but cluster ID directory {} does not " +
+            "exist.", errorPrefix, clusterDir);
+        return false;
+      }
+
+      if (!scmDir.exists()) {
+        logger.error("{} 3 files found but SCM ID directory {} does not exist.",
+            errorPrefix, scmDir);
+        return false;
+      }
+
+      boolean symlinkCorrect;
+      try {
+        symlinkCorrect = Files.isSymbolicLink(clusterDir.toPath()) &&
+            Files.readSymbolicLink(clusterDir.toPath()).equals(scmDir.toPath());
+      } catch (IOException ex) {
+        symlinkCorrect = false;
+        logger.error("Error while reading {} as a symlink.",
+            clusterDir.toPath(), ex);
+      }
+
+      if (symlinkCorrect) {
         return true;
       } else {
-        logger.error("Volume {} is in Inconsistent state, expected cluster " +
-                "directory {} does not exist", volumeRoot, clusterDir
-            .getAbsolutePath());
+        logger.error("{} 3 files found but failed to cluster ID directory {} " +
+            " as a symlink to SCM ID directory {}.", errorPrefix, clusterDir,
+            scmDir);
         return false;
       }
-    } else {
-      // The hdds root dir should always have 2 files. One is Version file
-      // and other is SCM directory.
-      logger.error("The hdds root dir {} should always have 2 files. " +
-              "One is Version file and other is Cluster directory. " +
-              "Please remove any other extra files from the directory " +
-              "so that DataNode startup can proceed.",
-              hddsRoot.getAbsolutePath());
-      return false;
     }
 
+    logger.error("The HDDS root directory {} should contain a VERSION file," +
+        " a cluster ID directory, and optionally an SCM ID directory. " +
+    "Please remove any other extra files from the directory " +
+        "so that DataNode startup can proceed.", hddsRoot.getAbsolutePath());
+    return false;
   }
 }
