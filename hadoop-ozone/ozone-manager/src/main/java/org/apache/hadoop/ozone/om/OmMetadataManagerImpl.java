@@ -183,6 +183,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   // Tables for S3 multi-tenancy
   public static final String TENANT_USER_TABLE = "tenantUserTable";
   public static final String TENANT_ACCESS_ID_TABLE = "tenantAccessIdTable";
+  public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
+      "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String TENANT_GROUP_TABLE = "tenantGroupTable";
   public static final String TENANT_ROLE_TABLE = "tenantRoleTable";

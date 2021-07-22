@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -197,8 +198,18 @@ public class OMDBDefinition implements DBDefinition {
                     OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE,
                     String.class,  // accessId
                     new StringCodec(),
-                    OmDBAccessIdInfo.class,  // tenantId + secret + principal
+                    OmDBAccessIdInfo.class,  // tenantId, secret, principal
                     new OmDBAccessIdInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String,
+            OmDBKerberosPrincipalInfo>
+            PRINCIPAL_TO_ACCESS_IDS_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE,
+                    String.class,  // Kerberos principal
+                    new StringCodec(),
+                    OmDBKerberosPrincipalInfo.class,  // List of accessIds
+                    new OmDBKerberosPrincipalInfoCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDBTenantInfo>
             TENANT_STATE_TABLE =
