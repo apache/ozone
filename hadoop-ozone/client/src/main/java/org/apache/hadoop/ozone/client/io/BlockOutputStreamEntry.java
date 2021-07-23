@@ -191,6 +191,10 @@ public class BlockOutputStreamEntry extends OutputStream {
 
   }
 
+  boolean isInitialized() {
+    return outputStream != null;
+  }
+
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */

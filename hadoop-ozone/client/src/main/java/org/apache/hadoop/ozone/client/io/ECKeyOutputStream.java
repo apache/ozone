@@ -192,7 +192,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
     int maxLenToCurrChunkBuffer = (int) Math.min(len, ecChunkSize);
     int currentWriterChunkLenToWrite =
         Math.min(currentChunkBufferRemainingLength, maxLenToCurrChunkBuffer);
-    handleWrite(b, off, currentWriterChunkLenToWrite,
+    handleWrite(blockOutputStreamEntryPool.getCurrIdx(), b, off,
+        currentWriterChunkLenToWrite,
         currentChunkBufferLen + currentWriterChunkLenToWrite == ecChunkSize,
         false);
     checkAndWriteParityCells();
@@ -201,14 +202,16 @@ public class ECKeyOutputStream extends KeyOutputStream {
     int iters = remLen / ecChunkSize;
     int lastCellSize = remLen % ecChunkSize;
     while (iters > 0) {
-      handleWrite(b, off, ecChunkSize, true, false);
+      handleWrite(blockOutputStreamEntryPool.getCurrIdx(), b, off, ecChunkSize,
+          true, false);
       off += ecChunkSize;
       iters--;
       checkAndWriteParityCells();
     }
 
     if (lastCellSize > 0) {
-      handleWrite(b, off, lastCellSize, false, false);
+      handleWrite(blockOutputStreamEntryPool.getCurrIdx(), b, off, lastCellSize,
+          false, false);
       checkAndWriteParityCells();
     }
     writeOffset += len;
@@ -220,44 +223,51 @@ public class ECKeyOutputStream extends KeyOutputStream {
     if (blockOutputStreamEntryPool.getCurrIdx() == numDataBlks) {
       //Lets encode and write
       //encoder.encode();
-      writeParityCells();
-      // By this time, we should have finished full stripe. So, lets call
-      // executePutBlock for all.
-      // TODO: we should alter the put block calls to share CRC to each stream.
-      blockOutputStreamEntryPool.executePutBlockForAll();
-      ecChunkBufferCache.clear();
-
-      // check if block ends?
-      if (currentBlockGroupLen == numDataBlks * blockOutputStreamEntryPool
-          .getStreamEntries().get(blockOutputStreamEntryPool.getCurrIdx())
-          .getLength()) {
-        blockOutputStreamEntryPool.endECBlock();
-        currentBlockGroupLen = 0;
-      }
+      handleParityWrites();
     }
+  }
+
+  private void handleParityWrites() throws IOException {
+    writeParityCells();
+    // By this time, we should have finished full stripe. So, lets call
+    // executePutBlock for all.
+    // TODO: we should alter the put block calls to share CRC to each stream.
+    blockOutputStreamEntryPool.executePutBlockForAll();
+    ecChunkBufferCache.clear();
+
+    // check if block ends?
+    if (shouldEndBlockGroup()) {
+      blockOutputStreamEntryPool.endECBlock();
+      currentBlockGroupLen = 0;
+    }
+  }
+
+  private boolean shouldEndBlockGroup() {
+    return currentBlockGroupLen == numDataBlks * blockOutputStreamEntryPool
+        .getStreamEntries().get(blockOutputStreamEntryPool.getCurrIdx())
+        .getLength();
   }
 
   void writeParityCells() throws IOException {
     final ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
-    //encode the data cells
-    for (int i = 0; i < numDataBlks; i++) {
-      buffers[i].flip();
-    }
 
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
+
     encoder.encode(buffers, parityBuffers);
     for (int i =
          numDataBlks; i < (this.numDataBlks + this.numParityBlks); i++) {
-      handleWrite(parityBuffers[i - numDataBlks].array(), 0, ecChunkSize, true,
-          true);
+      // Move the stream entry cursor to parity block index
+      blockOutputStreamEntryPool.setCurrIdx(i);
+      handleWrite(i, parityBuffers[i - numDataBlks].array(), 0,
+          ecChunkSize, true, true);
     }
   }
 
-  private void handleWrite(byte[] b, int off, long len, boolean isFullCell,
-      boolean isParity) throws IOException {
+  private void handleWrite(int currIdx, byte[] b, int off, long len,
+      boolean isFullCell, boolean isParity) throws IOException {
     if (!isParity) {
       ecChunkBufferCache
-          .addToDataBuffer(blockOutputStreamEntryPool.getCurrIdx(), b, off,
+          .addToDataBuffer(currIdx, b, off,
               (int) len);
     }
     BlockOutputStreamEntry current =
@@ -273,10 +283,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
     len -= writeLengthToCurrStream;
     if (isFullCell) {
       ByteBuffer bytesToWrite = isParity ?
-          ecChunkBufferCache.getParityBuffers()[blockOutputStreamEntryPool
-              .getCurrIdx() - numDataBlks] :
-          ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
-              .getCurrIdx()];
+          ecChunkBufferCache.getParityBuffers()[currIdx - numDataBlks] :
+          ecChunkBufferCache.getDataBuffers()[currIdx];
       try {
         writeToOutputStream(current, len, bytesToWrite.array(),
             bytesToWrite.array().length, 0, current.getWrittenDataLength(),
@@ -284,7 +292,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
       } catch (Exception e) {
         markStreamClosed();
       }
-
+      if(!isParity){
+        ecChunkBufferCache.getDataBuffers()[currIdx].flip();
+      }
       blockOutputStreamEntryPool
           .updateToNextStream(numDataBlks + numParityBlks);
     }
@@ -462,6 +472,28 @@ public class ECKeyOutputStream extends KeyOutputStream {
     closed = true;
     try {
       handleFlushOrCloseAllStreams(StreamAction.CLOSE);
+      if(isPartialStripe()){
+        ByteBuffer bytesToWrite =
+            ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
+                .getCurrIdx()];
+
+        // Finish writing the current partial cached chunk
+        if (bytesToWrite.position() % ecChunkSize != 0) {
+          final BlockOutputStreamEntry current =
+              blockOutputStreamEntryPool.getCurrentStreamEntry();
+          try {
+            byte[] array = bytesToWrite.array();
+            writeToOutputStream(current, bytesToWrite.position(), array,
+                bytesToWrite.position(), 0, current.getWrittenDataLength(),
+                false);
+          } catch (Exception e) {
+            markStreamClosed();
+          }
+        }
+        addPadding();
+        handleParityWrites();
+      }
+
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
@@ -471,6 +503,53 @@ public class ECKeyOutputStream extends KeyOutputStream {
       blockOutputStreamEntryPool.cleanupAll();
     }
     ecChunkBufferCache.release();
+  }
+
+  private void addPadding() {
+    final long lastStripeSize =
+        currentBlockGroupLen % (numDataBlks * ecChunkSize);
+
+    final long parityCellSize =
+        lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize;
+    ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
+
+    for (int i = 0; i < numDataBlks; i++) {
+      // Pad zero bytes to make all cells exactly the size of parityCellSize
+      // If internal block is smaller than parity block, pad zero bytes.
+      // Also pad zero bytes to all parity cells
+      final int position = buffers[i].position();
+      assert position <= parityCellSize : "If an internal block is smaller"
+          + " than parity block, then its last cell should be small than last"
+          + " parity cell";
+      for (int j = 0; j < parityCellSize - position; j++) {
+        buffers[i].put((byte) 0);
+      }
+      buffers[i].flip();
+    }
+
+    buffers = ecChunkBufferCache.getParityBuffers();
+    for (int i = 0; i < (numParityBlks); i++) {
+      // Pad zero bytes to make all cells exactly the size of parityCellSize
+      // If internal block is smaller than parity block, pad zero bytes.
+      // Also pad zero bytes to all parity cells
+      final int position = buffers[i].position();
+      assert position <= parityCellSize : "If an internal block is smaller"
+          + " than parity block, then its last cell should be small than last"
+          + " parity cell";
+      for (int j = 0; j < parityCellSize - position; j++) {
+        buffers[i].put((byte) 0);
+      }
+      buffers[i].flip();
+    }
+  }
+
+  private boolean isPartialStripe() {
+    final long lastStripeSize =
+        currentBlockGroupLen % (numDataBlks * ecChunkSize);
+    if (lastStripeSize == 0) {
+      return false;
+    }
+    return true;
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
