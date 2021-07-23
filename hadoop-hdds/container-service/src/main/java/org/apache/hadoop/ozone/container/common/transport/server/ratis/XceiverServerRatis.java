@@ -148,6 +148,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // Timeout used while calling submitRequest directly.
   private long requestTimeout;
   private boolean shouldDeleteRatisLogDirectory;
+  private boolean streamEnable;
 
   private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -176,10 +177,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             .setStateMachineRegistry(this::getStateMachine)
             .setParameters(parameters);
     this.server = builder.build();
+    this.streamEnable = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
     this.requestTimeout = conf.getTimeDuration(
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
+
   }
 
   private void assignPorts() {
@@ -212,6 +217,33 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         chunkExecutors, this, conf);
   }
 
+  private void setUpRatisStream(RaftProperties properties) {
+    // set the datastream config
+    if (conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT_DEFAULT)) {
+      dataStreamPort = 0;
+    } else {
+      dataStreamPort = conf.getInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
+    }
+    NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
+    RaftConfigKeys.DataStream.setType(properties,
+        SupportedDataStreamType.NETTY);
+    int dataStreamAsyncRequestThreadPoolSize =
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getStreamRequestThreads();
+    RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
+        dataStreamAsyncRequestThreadPoolSize);
+    int dataStreamWriteRequestThreadPoolSize =
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getStreamWriteThreads();
+    RaftServerConfigKeys.DataStream.setAsyncWriteThreadPoolSize(properties,
+        dataStreamWriteRequestThreadPoolSize);
+  }
+
   @SuppressWarnings("checkstyle:methodlength")
   private RaftProperties newRaftProperties() {
     final RaftProperties properties = new RaftProperties();
@@ -231,31 +263,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // set the configs enable and set the stateMachineData sync timeout
     RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
-
-    // set the datastream config
-    if (conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT_DEFAULT)) {
-      dataStreamPort = 0;
-    } else {
-      dataStreamPort = conf.getInt(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
+    streamEnable = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
+    if (streamEnable) {
+      setUpRatisStream(properties);
     }
-    NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
-    RaftConfigKeys.DataStream.setType(properties,
-        SupportedDataStreamType.NETTY);
-    int dataStreamAsyncRequestThreadPoolSize = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_REQUEST_THREADS,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_REQUEST_THREADS_DEFAULT);
-    RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
-        dataStreamAsyncRequestThreadPoolSize);
-    int dataStreamWriteRequestThreadPoolSize = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_WRITE_THREADS,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_WRITE_THREADS_DEFAULT);
-    RaftServerConfigKeys.DataStream.setAsyncWriteThreadPoolSize(properties,
-        dataStreamWriteRequestThreadPoolSize);
 
     timeUnit = OzoneConfigKeys.
         DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
@@ -512,16 +525,18 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       server.start();
 
       RaftServerRpc serverRpc = server.getServerRpc();
-      DataStreamServerRpc dataStreamServerRpc = server.getDataStreamServerRpc();
       clientPort = getRealPort(serverRpc.getClientServerAddress(),
           Port.Name.RATIS);
       adminPort = getRealPort(serverRpc.getAdminServerAddress(),
           Port.Name.RATIS_ADMIN);
       serverPort = getRealPort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
-      dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
-          Port.Name.DATASTREAM);
-
+      if (streamEnable) {
+        DataStreamServerRpc dataStreamServerRpc =
+            server.getDataStreamServerRpc();
+        dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
+            Port.Name.DATASTREAM);
+      }
       isStarted = true;
     }
   }

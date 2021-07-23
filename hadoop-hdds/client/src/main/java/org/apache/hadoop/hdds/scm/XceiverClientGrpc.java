@@ -288,7 +288,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   //  and remove XceiverClientSpi
   @Override
   public DataStreamApi getDataStreamApi() {
-    return null;
+    throw new UnsupportedOperationException(
+        "Operation Not supported for XceiverClientGrpc");
   }
 
   @Override

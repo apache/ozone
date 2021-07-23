@@ -88,20 +88,14 @@ public final class OzoneConfigKeys {
   /**
    * Ratis Port where containers listen to datastream requests.
    */
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLE
+      = "dfs.container.ratis.datastream.enable";
+  public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT
+      = false;
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT
       = "dfs.container.ratis.datastream.ipc";
   public static final int DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT
       = 9855;
-
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_REQUEST_THREADS
-      = "dfs.container.ratis.datastream.request.threads";
-  public static final int DFS_CONTAINER_RATIS_DATASTREAM_REQUEST_THREADS_DEFAULT
-      = 20;
-
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_WRITE_THREADS
-      = "dfs.container.ratis.datastream.write.threads";
-  public static final int DFS_CONTAINER_RATIS_DATASTREAM_WRITE_THREADS_DEFAULT
-      = 20;
 
   /**
    * When set to true, allocate a random free port for ozone container, so that

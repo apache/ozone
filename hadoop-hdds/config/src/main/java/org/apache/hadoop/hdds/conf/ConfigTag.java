@@ -46,5 +46,6 @@ public enum ConfigTag {
   DELETION,
   HA,
   BALANCER,
-  UPGRADE
+  UPGRADE,
+  DATASTREAM
 }
