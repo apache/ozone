@@ -25,48 +25,37 @@ import java.util.Arrays;
 
 /**
  * HTTP Response wrapped for a file size distribution request.
- * 'dist': the array that stores the file size distribution for all keys
- * under the request path.
- * 'pathNotFound': invalid path request.
- * 'typeNA': the path exists, but refers to a namespace type (key) that are not
- * applicable to file size distribution request.
  */
 public class FileSizeDistributionResponse {
-
+  /**
+   * The array that stores the file size distribution for all keys
+   * under the request path.
+   */
   @JsonProperty("dist")
   private int[] fileSizeDist;
-  @JsonProperty("pathNotFound")
-  private boolean pathNotFound;
-  @JsonProperty("typeNA")
-  private boolean namespaceNotApplicable;
+
+  /** Path status. */
+  @JsonProperty("status")
+  private PathStatus status;
 
   public FileSizeDistributionResponse() {
-    this.pathNotFound = false;
-    this.namespaceNotApplicable = false;
+    this.status = PathStatus.OK;
     this.fileSizeDist = null;
   }
 
-  public boolean isPathNotFound() {
-    return pathNotFound;
+  public PathStatus getStatus() {
+    return status;
   }
 
   public int[] getFileSizeDist() {
     return Arrays.copyOf(this.fileSizeDist, ReconConstants.NUM_OF_BINS);
   }
 
-  public boolean isNamespaceNotApplicable() {
-    return namespaceNotApplicable;
-  }
-
-  public void setPathNotFound(boolean pathNotFound) {
-    this.pathNotFound = pathNotFound;
+  public void setStatus(PathStatus status) {
+    this.status = status;
   }
 
   public void setFileSizeDist(int[] fileSizeDist) {
     this.fileSizeDist = Arrays.copyOf(fileSizeDist, ReconConstants.NUM_OF_BINS);
-  }
-
-  public void setNamespaceNotApplicable(boolean namespaceNotApplicable) {
-    this.namespaceNotApplicable = namespaceNotApplicable;
   }
 }

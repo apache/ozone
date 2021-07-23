@@ -24,31 +24,30 @@ import java.util.List;
 
 /**
  * HTTP Response wrapped for Disk Usage requests.
- * 'duData' encapsulates an instance for a subpath.
- * 'count' is the number of subpaths under the request path.
- * 'pathNotFound' set to true if path is invalid.
  */
 public class DUResponse {
-  @JsonProperty("pathNotFound")
-  private boolean pathNotFound;
+  /** Path status. */
+  @JsonProperty("status")
+  private PathStatus status;
 
+  /** The number of subpaths under the request path. */
   @JsonProperty("count")
   private int count;
 
+  /** Encapsulates a DU instance for a subpath. */
   @JsonProperty("duData")
   private List<DiskUsage> duData;
 
   public DUResponse() {
-    this.pathNotFound = false;
+    this.status = PathStatus.OK;
   }
 
-  public boolean isPathNotFound() {
-    return this.pathNotFound;
+  public PathStatus getStatus() {
+    return this.status;
   }
 
-  public void setPathNotFound(boolean pathNotFound) {
-    this.pathNotFound = pathNotFound;
-    this.duData = null;
+  public void setStatus(PathStatus status) {
+    this.status = status;
   }
 
   public int getCount() {
@@ -71,11 +70,13 @@ public class DUResponse {
    * DU info for a path (path name, data size).
    */
   public static class DiskUsage {
-    @JsonProperty("size")
-    private long size;
-
+    /** The subpath name. */
     @JsonProperty("subpath")
     private String subpath;
+
+    /** Disk usage without replication under the subpath. */
+    @JsonProperty("size")
+    private long size;
 
     public long getSize() {
       return size;

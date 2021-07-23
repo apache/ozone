@@ -21,73 +21,73 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * HTTP Response wrapped for a 'basic' request.
- * 'type': the namespace the request path is on.
- * 'bucket': Total number of buckets for volume, 0 for other types.
- * 'dir': Total number of directories for a bucket or directory, 0 for others.
- * 'key': Total number of keys for a bucket or directory, 0 for others.
- * 'pathNotFound': set to true if request path is valid
  */
 public class BasicResponse {
+  /** The namespace the request path is on. */
   @JsonProperty("type")
   private EntityType entityType;
 
+  /** Total number of buckets for volume, 0 for other types. */
   @JsonProperty("bucket")
-  private int totalBucket;
+  private int numTotalBucket;
 
+  /** Total number of directories for a bucket or directory, 0 for others. */
   @JsonProperty("dir")
-  private int totalDir;
+  private int numTotalDir;
 
+  /** Total number of keys for a bucket or directory, 0 for others. */
   @JsonProperty("key")
-  private int totalKey;
+  private int numTotalKey;
 
-  @JsonProperty("pathNotFound")
-  private boolean pathNotFound;
+  /** Path Status. */
+  @JsonProperty("status")
+  private PathStatus status;
 
   public BasicResponse(EntityType entityType) {
     this.entityType = entityType;
-    this.totalBucket = 0;
-    this.totalDir = 0;
-    this.totalKey = 0;
-    this.pathNotFound = false;
+    this.numTotalBucket = 0;
+    this.numTotalDir = 0;
+    this.numTotalKey = 0;
+    this.status = PathStatus.OK;
   }
 
   public EntityType getEntityType() {
     return this.entityType;
   }
 
-  public int getTotalBucket() {
-    return this.totalBucket;
+  public int getNumTotalBucket() {
+    return this.numTotalBucket;
   }
 
-  public int getTotalDir() {
-    return this.totalDir;
+  public int getNumTotalDir() {
+    return this.numTotalDir;
   }
 
-  public int getTotalKey() {
-    return this.totalKey;
+  public int getNumTotalKey() {
+    return this.numTotalKey;
   }
 
-  public boolean isPathNotFound() {
-    return this.pathNotFound;
+  public PathStatus getStatus() {
+    return this.status;
   }
 
   public void setEntityType(EntityType entityType) {
     this.entityType = entityType;
   }
 
-  public void setTotalBucket(int totalBucket) {
-    this.totalBucket = totalBucket;
+  public void setNumTotalBucket(int numTotalBucket) {
+    this.numTotalBucket = numTotalBucket;
   }
 
-  public void setTotalDir(int totalDir) {
-    this.totalDir = totalDir;
+  public void setNumTotalDir(int numTotalDir) {
+    this.numTotalDir = numTotalDir;
   }
 
-  public void setTotalKey(int totalKey) {
-    this.totalKey = totalKey;
+  public void setNumTotalKey(int numTotalKey) {
+    this.numTotalKey = numTotalKey;
   }
 
-  public void setPathNotFound(boolean pathNotFound) {
-    this.pathNotFound = pathNotFound;
+  public void setStatus(PathStatus status) {
+    this.status = status;
   }
 }

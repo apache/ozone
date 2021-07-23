@@ -188,7 +188,7 @@ public class NSSummaryTask implements ReconOmTask {
       }
 
       // actually fileTable with FSO
-      Table keyTable = omMetadataManager.getKeyTable();
+      Table keyTable = omMetadataManager.getFileTable();
 
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
               keyTableIter = keyTable.iterator();

@@ -401,6 +401,8 @@ public class OzoneManagerServiceProviderImpl
         // Get updates from OM and apply to local Recon OM DB.
         getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
             omdbUpdatesHandler);
+        LOG.info("The number of events generated: {}",
+                omdbUpdatesHandler.getEvents().size());
         // Update timestamp of successful delta updates query.
         ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
             OmSnapshotTaskName.OmDeltaRequest.name(),

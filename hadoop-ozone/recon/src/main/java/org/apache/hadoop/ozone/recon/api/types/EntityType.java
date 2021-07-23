@@ -26,5 +26,5 @@ public enum EntityType {
   BUCKET,
   DIRECTORY,
   KEY,
-  INVALID, // if path is invalid
+  UNKNOWN, // if path is invalid
 }

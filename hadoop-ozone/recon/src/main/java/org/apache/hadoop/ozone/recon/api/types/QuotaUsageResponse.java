@@ -22,26 +22,23 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * HTTP Response wrapped for a quota usage request.
- * 'allowed': the quota in bytes that the namespace allows.
- * 'used': the quota that the namespace has consumed in bytes.
- * 'pathNotFound': invalid path request.
- * 'typeNA': the path exists, but refers to a namespace type (directory, key)
- * that are not applicable to a quota usage request.
  */
 public class QuotaUsageResponse {
 
+  /** The quota in bytes that the namespace allows. */
   @JsonProperty("allowed")
   private long quota;
+
+  /** The quota that the namespace has consumed in bytes. */
   @JsonProperty("used")
   private long quotaUsed;
-  @JsonProperty("pathNotFound")
-  private boolean pathNotFound;
-  @JsonProperty("typeNA")
-  private boolean namespaceNotApplicable;
+
+  /** Path status. */
+  @JsonProperty("status")
+  private PathStatus status;
 
   public QuotaUsageResponse() {
-    pathNotFound = false;
-    namespaceNotApplicable = false;
+    status = PathStatus.OK;
     quota = 0L;
     quotaUsed = 0L;
   }
@@ -54,12 +51,8 @@ public class QuotaUsageResponse {
     return quotaUsed;
   }
 
-  public boolean isNamespaceNotApplicable() {
-    return namespaceNotApplicable;
-  }
-
-  public boolean isPathNotFound() {
-    return pathNotFound;
+  public PathStatus getStatus() {
+    return status;
   }
 
   public void setQuota(long quota) {
@@ -70,11 +63,7 @@ public class QuotaUsageResponse {
     this.quotaUsed = quotaUsed;
   }
 
-  public void setNamespaceNotApplicable(boolean namespaceNotApplicable) {
-    this.namespaceNotApplicable = namespaceNotApplicable;
-  }
-
-  public void setPathNotFound(boolean pathNotFound) {
-    this.pathNotFound = pathNotFound;
+  public void setStatus(PathStatus status) {
+    this.status = status;
   }
 }

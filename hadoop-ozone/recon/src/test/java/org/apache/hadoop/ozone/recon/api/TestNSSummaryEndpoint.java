@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.recon.api.types.BasicResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.PathStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -209,37 +210,37 @@ public class TestNSSummaryEndpoint {
     Response volResponse = nsSummaryEndpoint.getBasicInfo(VOL_PATH);
     BasicResponse volResponseObj = (BasicResponse) volResponse.getEntity();
     Assert.assertEquals(EntityType.VOLUME, volResponseObj.getEntityType());
-    Assert.assertEquals(2, volResponseObj.getTotalBucket());
-    Assert.assertEquals(4, volResponseObj.getTotalDir());
-    Assert.assertEquals(6, volResponseObj.getTotalKey());
+    Assert.assertEquals(2, volResponseObj.getNumTotalBucket());
+    Assert.assertEquals(4, volResponseObj.getNumTotalDir());
+    Assert.assertEquals(6, volResponseObj.getNumTotalKey());
 
     // Test bucket 1's basics
     Response bucketOneResponse =
             nsSummaryEndpoint.getBasicInfo(BUCKET_ONE_PATH);
     BasicResponse bucketOneObj = (BasicResponse) bucketOneResponse.getEntity();
     Assert.assertEquals(EntityType.BUCKET, bucketOneObj.getEntityType());
-    Assert.assertEquals(4, bucketOneObj.getTotalDir());
-    Assert.assertEquals(4, bucketOneObj.getTotalKey());
+    Assert.assertEquals(4, bucketOneObj.getNumTotalDir());
+    Assert.assertEquals(4, bucketOneObj.getNumTotalKey());
 
     // Test bucket 2's basics
     Response bucketTwoResponse =
             nsSummaryEndpoint.getBasicInfo(BUCKET_TWO_PATH);
     BasicResponse bucketTwoObj = (BasicResponse) bucketTwoResponse.getEntity();
     Assert.assertEquals(EntityType.BUCKET, bucketTwoObj.getEntityType());
-    Assert.assertEquals(0, bucketTwoObj.getTotalDir());
-    Assert.assertEquals(2, bucketTwoObj.getTotalKey());
+    Assert.assertEquals(0, bucketTwoObj.getNumTotalDir());
+    Assert.assertEquals(2, bucketTwoObj.getNumTotalKey());
 
     // Test intermediate directory basics
     Response dirOneResponse = nsSummaryEndpoint.getBasicInfo(DIR_ONE_PATH);
     BasicResponse dirOneObj = (BasicResponse) dirOneResponse.getEntity();
     Assert.assertEquals(EntityType.DIRECTORY, dirOneObj.getEntityType());
-    Assert.assertEquals(3, dirOneObj.getTotalDir());
-    Assert.assertEquals(3, dirOneObj.getTotalKey());
+    Assert.assertEquals(3, dirOneObj.getNumTotalDir());
+    Assert.assertEquals(3, dirOneObj.getNumTotalKey());
 
     // Test invalid path
     Response invalidResponse = nsSummaryEndpoint.getBasicInfo(INVALID_PATH);
     BasicResponse invalidObj = (BasicResponse) invalidResponse.getEntity();
-    Assert.assertTrue(invalidObj.isPathNotFound());
+    Assert.assertEquals(PathStatus.PATH_NOT_FOUND, invalidObj.getStatus());
 
     // Test key
     Response keyResponse = nsSummaryEndpoint.getBasicInfo(KEY_PATH);
@@ -300,7 +301,7 @@ public class TestNSSummaryEndpoint {
     // invalid path check
     Response invalidResponse = nsSummaryEndpoint.getDiskUsage(INVALID_PATH);
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
-    Assert.assertTrue(invalidObj.isPathNotFound());
+    Assert.assertEquals(PathStatus.PATH_NOT_FOUND, invalidObj.getStatus());
   }
 
   @Test
@@ -327,18 +328,20 @@ public class TestNSSummaryEndpoint {
     Response naResponse1 = nsSummaryEndpoint.getQuotaUsage(DIR_ONE_PATH);
     QuotaUsageResponse quotaUsageResponse1 =
             (QuotaUsageResponse) naResponse1.getEntity();
-    Assert.assertTrue(quotaUsageResponse1.isNamespaceNotApplicable());
+    Assert.assertEquals(PathStatus.TYPE_NOT_APPLICABLE,
+            quotaUsageResponse1.getStatus());
 
     Response naResponse2 = nsSummaryEndpoint.getQuotaUsage(KEY_PATH);
     QuotaUsageResponse quotaUsageResponse2 =
             (QuotaUsageResponse) naResponse2.getEntity();
-    Assert.assertTrue(quotaUsageResponse2.isNamespaceNotApplicable());
+    Assert.assertEquals(PathStatus.TYPE_NOT_APPLICABLE,
+            quotaUsageResponse2.getStatus());
 
     // invalid path request
     Response invalidRes = nsSummaryEndpoint.getQuotaUsage(INVALID_PATH);
     QuotaUsageResponse invalidResObj =
             (QuotaUsageResponse) invalidRes.getEntity();
-    Assert.assertTrue(invalidResObj.isPathNotFound());
+    Assert.assertEquals(PathStatus.PATH_NOT_FOUND, invalidResObj.getStatus());
   }
 
   /**
