@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.upgrade;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -38,16 +39,25 @@ public final class DatanodeMetadataFeatures {
     versionManager = manager;
   }
 
-  public static synchronized String getSchemaVersion() throws IOException {
-    if (versionManager == null) {
-      // version manager can be null for testing. Use the latest version in
-      // this case.
-      return OzoneConsts.SCHEMA_V2;
-    } else if (versionManager.getMetadataLayoutVersion() <
-        HDDSLayoutFeature.DATANODE_SCHEMA_V2.layoutVersion()) {
-      return OzoneConsts.SCHEMA_V1;
+  public static synchronized String getContainerPathID(String scmID,
+      String clusterID) {
+    return chooseFeature(HDDSLayoutFeature.SCM_HA, scmID, clusterID);
+  }
+
+  public static synchronized String getSchemaVersion() {
+    return chooseFeature(HDDSLayoutFeature.DATANODE_SCHEMA_V2,
+        OzoneConsts.SCHEMA_V1, OzoneConsts.SCHEMA_V2);
+  }
+
+  private static <T> T chooseFeature(HDDSLayoutFeature layoutFeature,
+      T oldVersion, T newVersion) {
+    // version manager can be null for testing. Use the latest version in
+    // this case.
+    if (versionManager == null || versionManager.getMetadataLayoutVersion() >=
+        layoutFeature.layoutVersion()) {
+      return newVersion;
     } else {
-      return OzoneConsts.SCHEMA_V2;
+      return oldVersion;
     }
   }
 }

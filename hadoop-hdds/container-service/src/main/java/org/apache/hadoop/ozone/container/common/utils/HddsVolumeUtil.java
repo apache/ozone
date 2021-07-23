@@ -24,10 +24,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
-import sun.jvm.hotspot.debugger.posix.elf.ELFSectionHeader;
 
 import java.io.File;
 import java.io.IOException;
@@ -251,9 +249,9 @@ public final class HddsVolumeUtil {
       if (symlinkCorrect) {
         return true;
       } else {
-        logger.error("{} 3 files found but failed to cluster ID directory {} " +
-            " as a symlink to SCM ID directory {}.", errorPrefix, clusterDir,
-            scmDir);
+        logger.error("{} 3 files found but failed read to cluster ID " +
+                "directory {} as a symlink to SCM ID directory {}.",
+            errorPrefix, clusterDir, scmDir);
         return false;
       }
     }

@@ -89,6 +89,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
       ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
   private String clusterId;
+  private String scmId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
 
@@ -552,6 +553,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       this.clusterId = clusterId;
       for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
         handlerMap.getValue().setClusterID(clusterId);
+      }
+    }
+  }
+
+  @Override
+  public void setScmId(String scmId) {
+    Preconditions.checkNotNull(scmId, "clusterId Cannot be null");
+    if (this.scmId == null) {
+      this.scmId = scmId;
+      for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
+        handlerMap.getValue().setScmID(scmId);
       }
     }
   }

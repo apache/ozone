@@ -88,6 +88,9 @@ stop_docker_env
 prepare_for_image "$OZONE_UPGRADE_TO"
 export OM_HA_ARGS='--upgrade'
 
+# Delete cluster ID symlinks until downgrade hook is finished.
+find "$TEST_DIR" -type l -delete
+
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="$OZONE_UPGRADE_TO"-finalized
 OZONE_KEEP_RESULTS=true start_docker_env

@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.util.AutoCloseableLock;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -262,7 +263,10 @@ public class KeyValueHandler extends Handler {
     boolean created = false;
     try (AutoCloseableLock l = containerCreationLock.acquire()) {
       if (containerSet.getContainer(containerID) == null) {
-        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+        String containerPathID =
+            DatanodeMetadataFeatures.getContainerPathID(scmId, clusterId);
+        LOG.info("-- Creating container with ID {}", containerPathID);
+        newContainer.create(volumeSet, volumeChoosingPolicy, containerPathID);
         created = containerSet.addContainer(newContainer);
       } else {
         // The create container request for an already existing container can

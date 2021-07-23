@@ -79,8 +79,16 @@ public interface ContainerDispatcher {
   Handler getHandler(ContainerProtos.ContainerType containerType);
 
   /**
-   * If scmId is not set, this will set scmId, otherwise it is a no-op.
+   * If cluster ID is not set, this will set cluster ID, otherwise it is a
+   * no-op.
+   * @param clusterId
+   */
+  void setClusterId(String clusterId);
+
+  /**
+   * If scm ID is not set, this will set scm ID, otherwise it is a
+   * no-op.
    * @param scmId
    */
-  void setClusterId(String scmId);
+  void setScmId(String scmId);
 }

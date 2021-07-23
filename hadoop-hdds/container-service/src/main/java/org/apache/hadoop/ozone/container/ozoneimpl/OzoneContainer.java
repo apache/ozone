@@ -283,7 +283,7 @@ public class OzoneContainer {
    *
    * @throws IOException
    */
-  public void start(String clusterId) throws IOException {
+  public void start(String scmId, String clusterId) throws IOException {
     // If SCM HA is enabled, OzoneContainer#start() will be called multi-times
     // from VersionEndpointTask. The first call should do the initializing job,
     // the successive calls should wait until OzoneContainer is initialized.
@@ -311,6 +311,7 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     hddsDispatcher.init();
+    hddsDispatcher.setScmId(scmId);
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
 
