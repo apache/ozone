@@ -74,8 +74,8 @@ public class TestBucketDelete {
     try {
       bucketEndpoint.delete("unknownbucket");
     } catch (OS3Exception ex) {
-      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
-      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
+      assertEquals(S3ErrorTable.ACCESS_DENIED.getCode(), ex.getCode());
+      assertEquals(S3ErrorTable.ACCESS_DENIED.getErrorMessage(),
           ex.getErrorMessage());
       return;
     }

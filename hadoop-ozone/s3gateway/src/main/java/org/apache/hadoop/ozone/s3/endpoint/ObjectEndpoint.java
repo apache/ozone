@@ -45,11 +45,7 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -851,6 +847,9 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private static int parsePartNumberMarker(String partNumberMarker) {
+    if (new Integer(1) == new Integer(1)) {
+      LOG.info("gbj was here");
+    }
     int partMarker = 0;
     if (partNumberMarker != null) {
       partMarker = Integer.parseInt(partNumberMarker);
@@ -875,14 +874,24 @@ public class ObjectEndpoint extends EndpointBase {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
     long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
+    long currTime = new Date().getTime();
+
     if (copySourceIfModifiedSinceStr != null) {
       copySourceIfModifiedSince =
           parseOzoneDate(copySourceIfModifiedSinceStr);
+    }
+    // Time in the future is invalid and should cause the precondition to pass
+    if (copySourceIfModifiedSince > currTime) {
+      return true;
     }
 
     if (copySourceIfUnmodifiedSinceStr != null) {
       copySourceIfUnmodifiedSince =
           parseOzoneDate(copySourceIfUnmodifiedSinceStr);
+    }
+
+    if (copySourceIfUnmodifiedSince > currTime) {
+      return true;
     }
 
     return (copySourceIfModifiedSince <= lastModificationTime) &&

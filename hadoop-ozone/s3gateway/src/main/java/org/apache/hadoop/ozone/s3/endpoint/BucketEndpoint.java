@@ -318,7 +318,7 @@ public class BucketEndpoint extends EndpointBase {
             .BUCKET_NOT_EMPTY, bucketName);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable
-            .NO_SUCH_BUCKET, bucketName);
+            .ACCESS_DENIED, bucketName);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else {
