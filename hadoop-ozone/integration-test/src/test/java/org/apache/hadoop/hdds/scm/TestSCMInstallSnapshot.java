@@ -66,8 +66,8 @@ public class TestSCMInstallSnapshot {
     SCMHAConfiguration scmhaConfiguration = conf.getObject(
         SCMHAConfiguration.class);
     scmhaConfiguration.setRatisSnapshotThreshold(1L);
-    scmhaConfiguration.setRatisSnapshotDir(
-        GenericTestUtils.getRandomizedTempPath() + "/snapshot");
+//    scmhaConfiguration.setRatisSnapshotDir(
+//        GenericTestUtils.getRandomizedTempPath() + "/snapshot");
     conf.setFromObject(scmhaConfiguration);
     cluster = MiniOzoneCluster
         .newBuilder(conf)

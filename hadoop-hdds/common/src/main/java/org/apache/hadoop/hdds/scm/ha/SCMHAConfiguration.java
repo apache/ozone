@@ -195,14 +195,6 @@ public class SCMHAConfiguration {
   )
   private long ratisRoleCheckerInterval = 15 * 1000L;
 
-  @Config(key = "ratis.snapshot.dir",
-      type = ConfigType.STRING,
-      defaultValue = "",
-      tags = {SCM, OZONE, HA, RATIS},
-      description = "The ratis snapshot dir location"
-  )
-  private String ratisSnapshotDir;
-
   @Config(key = "grpc.deadline.interval",
       type = ConfigType.TIME,
       defaultValue = "30m",
@@ -220,16 +212,8 @@ public class SCMHAConfiguration {
     return ratisStorageDir;
   }
 
-  public String getRatisSnapshotDir() {
-    return ratisSnapshotDir;
-  }
-
   public void setRatisStorageDir(String dir) {
     this.ratisStorageDir = dir;
-  }
-
-  public void setRatisSnapshotDir(String dir) {
-    this.ratisSnapshotDir = dir;
   }
 
   public void setRaftLogPurgeGap(int gap) {
@@ -312,9 +296,5 @@ public class SCMHAConfiguration {
 
   public long getRatisNodeFailureTimeout() {
     return ratisNodeFailureTimeout;
-  }
-
-  public long getRatisRoleCheckerInterval() {
-    return ratisRoleCheckerInterval;
   }
 }

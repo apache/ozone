@@ -147,7 +147,7 @@ public final class RatisUtil {
     Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(conf.getRaftSegmentSize()));
     Log.Appender.setBufferElementLimit(properties,
-        conf.getRaftLogAppenderQueueByteLimit());
+        conf.getRaftLogAppenderQueueNum());
     Log.Appender.setBufferByteLimit(properties,
         SizeInBytes.valueOf(conf.getRaftLogAppenderQueueByteLimit()));
     Log.setPreallocatedSize(properties,
