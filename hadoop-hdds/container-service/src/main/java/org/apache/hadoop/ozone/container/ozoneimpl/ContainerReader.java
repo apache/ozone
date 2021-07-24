@@ -129,11 +129,13 @@ public class ContainerReader implements Runnable {
     // operations to perform here in that case.
     if (storageDirs.length > 0) {
       File clusterDir = getClusterDir();
+      File idDir = clusterDir;
       if (storageDirs.length == 1 && !clusterDir.exists()) {
         // If the one directory is not the cluster ID directory, assume it is
         // the old SCM ID directory.
         // Create a symlink named after cluster directory to use.
-        Files.createSymbolicLink(clusterDir.toPath(), storageDirs[0].toPath());
+//        Files.createSymbolicLink(clusterDir.toPath(), storageDirs[0].toPath());
+        idDir = storageDirs[0];
       } else {
         // There are 1 or more storage directories. We only care about the
         // cluster ID directory.
@@ -146,7 +148,7 @@ public class ContainerReader implements Runnable {
       }
 
       LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-      File currentDir = new File(clusterDir, Storage.STORAGE_DIR_CURRENT);
+      File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null) {
         for (File containerTopDir : containerTopDirs) {

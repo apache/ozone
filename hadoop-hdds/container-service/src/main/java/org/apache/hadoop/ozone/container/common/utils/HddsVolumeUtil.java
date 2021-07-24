@@ -214,14 +214,16 @@ public final class HddsVolumeUtil {
       }
       return true;
     } else if(hddsFiles.length == 2) {
-      // If there are 2 files, they should be the version file and the
-      // cluster ID directory.
-      if (!clusterDir.exists()) {
-        logger.error("{} 2 files found but cluster ID directory {} does not " +
-            "exist.", errorPrefix, clusterDir);
-        return false;
-      }
-    } else if(hddsFiles.length == 3) {
+      // TODO: Handle upgrade prefin case
+//      // If there are 2 files, they should be the version file and the
+//      // cluster ID directory.
+//      if (!clusterDir.exists()) {
+//        logger.error("{} 2 files found but cluster ID directory {} does not " +
+//            "exist.", errorPrefix, clusterDir);
+//        return false;
+//      }
+    return true;
+  } else if(hddsFiles.length == 3) {
       // If there are 3 files, they should be version file, SCM ID directory,
       // and cluster ID symlink to SCM ID directory.
       if (!clusterDir.exists()) {
@@ -249,7 +251,7 @@ public final class HddsVolumeUtil {
       if (symlinkCorrect) {
         return true;
       } else {
-        logger.error("{} 3 files found but failed read to cluster ID " +
+        logger.error("{} 3 files found but failed to read cluster ID " +
                 "directory {} as a symlink to SCM ID directory {}.",
             errorPrefix, clusterDir, scmDir);
         return false;
