@@ -101,7 +101,7 @@ enum Type {
   CloseContainer = 17;
   GetCommittedBlockLength = 18;
 
-  StreamInit = 30;
+  StreamInit = 19;
 }
 
 
