@@ -28,7 +28,7 @@ import java.util.List;
 public class DUResponse {
   /** Path status. */
   @JsonProperty("status")
-  private PathStatus status;
+  private NamespaceResponseCode status;
 
   /** The number of subpaths under the request path. */
   @JsonProperty("count")
@@ -39,14 +39,14 @@ public class DUResponse {
   private List<DiskUsage> duData;
 
   public DUResponse() {
-    this.status = PathStatus.OK;
+    this.status = NamespaceResponseCode.OK;
   }
 
-  public PathStatus getStatus() {
+  public NamespaceResponseCode getStatus() {
     return this.status;
   }
 
-  public void setStatus(PathStatus status) {
+  public void setStatus(NamespaceResponseCode status) {
     this.status = status;
   }
 

@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.api.types.PathStatus;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceResponseCode;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -60,7 +60,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 /**
  * REST APIs for namespace metadata summary.
  */
-@Path("/nssummary")
+@Path("/namespace")
 @Produces(MediaType.APPLICATION_JSON)
 public class NSSummaryEndpoint {
   @Inject
@@ -76,7 +76,7 @@ public class NSSummaryEndpoint {
    * @throws IOException IOE
    */
   @GET
-  @Path("/basic")
+  @Path("/summary")
   public Response getBasicInfo(
           @QueryParam("path") String path) throws IOException {
 
@@ -120,7 +120,7 @@ public class NSSummaryEndpoint {
       break;
     case UNKNOWN:
       basicResponse = new BasicResponse(EntityType.UNKNOWN);
-      basicResponse.setStatus(PathStatus.PATH_NOT_FOUND);
+      basicResponse.setStatus(NamespaceResponseCode.PATH_NOT_FOUND);
       break;
     default:
       break;
@@ -228,7 +228,7 @@ public class NSSummaryEndpoint {
       duResponse.setDuData(Collections.singletonList(keyDU));
       break;
     case UNKNOWN:
-      duResponse.setStatus(PathStatus.PATH_NOT_FOUND);
+      duResponse.setStatus(NamespaceResponseCode.PATH_NOT_FOUND);
       break;
     default:
       break;
@@ -244,7 +244,7 @@ public class NSSummaryEndpoint {
    * @throws IOException
    */
   @GET
-  @Path("/qu")
+  @Path("/quota")
   public Response getQuotaUsage(@QueryParam("path") String path)
           throws IOException {
     String[] names = parseRequestPath(path);
@@ -275,9 +275,10 @@ public class NSSummaryEndpoint {
       quotaUsageResponse.setQuota(quotaInBytes);
       quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     } else if (type == EntityType.UNKNOWN) {
-      quotaUsageResponse.setStatus(PathStatus.PATH_NOT_FOUND);
+      quotaUsageResponse.setResponseCode(NamespaceResponseCode.PATH_NOT_FOUND);
     } else { // directory and key are not applicable for this request
-      quotaUsageResponse.setStatus(PathStatus.TYPE_NOT_APPLICABLE);
+      quotaUsageResponse.setResponseCode(
+              NamespaceResponseCode.TYPE_NOT_APPLICABLE);
     }
     return Response.ok(quotaUsageResponse).build();
   }
@@ -324,10 +325,10 @@ public class NSSummaryEndpoint {
       break;
     case KEY:
       // key itself doesn't have file size distribution
-      distReponse.setStatus(PathStatus.TYPE_NOT_APPLICABLE);
+      distReponse.setStatus(NamespaceResponseCode.TYPE_NOT_APPLICABLE);
       break;
     case UNKNOWN:
-      distReponse.setStatus(PathStatus.PATH_NOT_FOUND);
+      distReponse.setStatus(NamespaceResponseCode.PATH_NOT_FOUND);
       break;
     default:
       break;

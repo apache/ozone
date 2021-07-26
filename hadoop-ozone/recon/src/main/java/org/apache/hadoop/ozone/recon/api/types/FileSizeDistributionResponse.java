@@ -36,14 +36,14 @@ public class FileSizeDistributionResponse {
 
   /** Path status. */
   @JsonProperty("status")
-  private PathStatus status;
+  private NamespaceResponseCode status;
 
   public FileSizeDistributionResponse() {
-    this.status = PathStatus.OK;
+    this.status = NamespaceResponseCode.OK;
     this.fileSizeDist = null;
   }
 
-  public PathStatus getStatus() {
+  public NamespaceResponseCode getStatus() {
     return status;
   }
 
@@ -51,7 +51,7 @@ public class FileSizeDistributionResponse {
     return Arrays.copyOf(this.fileSizeDist, ReconConstants.NUM_OF_BINS);
   }
 
-  public void setStatus(PathStatus status) {
+  public void setStatus(NamespaceResponseCode status) {
     this.status = status;
   }
 

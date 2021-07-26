@@ -41,14 +41,14 @@ public class BasicResponse {
 
   /** Path Status. */
   @JsonProperty("status")
-  private PathStatus status;
+  private NamespaceResponseCode status;
 
   public BasicResponse(EntityType entityType) {
     this.entityType = entityType;
     this.numTotalBucket = 0;
     this.numTotalDir = 0;
     this.numTotalKey = 0;
-    this.status = PathStatus.OK;
+    this.status = NamespaceResponseCode.OK;
   }
 
   public EntityType getEntityType() {
@@ -67,7 +67,7 @@ public class BasicResponse {
     return this.numTotalKey;
   }
 
-  public PathStatus getStatus() {
+  public NamespaceResponseCode getStatus() {
     return this.status;
   }
 
@@ -87,7 +87,7 @@ public class BasicResponse {
     this.numTotalKey = numTotalKey;
   }
 
-  public void setStatus(PathStatus status) {
+  public void setStatus(NamespaceResponseCode status) {
     this.status = status;
   }
 }

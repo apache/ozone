@@ -25,33 +25,25 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.http.HttpEntity;
@@ -68,7 +60,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 
@@ -84,10 +75,8 @@ public class TestReconWithOzoneManagerFSO {
   public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
-  private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
   private static String nssummaryServiceURL;
-  private static String taskStatusURL;
   private static ObjectStore store;
   private static String basicEndpoint;
 
@@ -127,7 +116,6 @@ public class TestReconWithOzoneManagerFSO {
                     .includeRecon(true)
                     .build();
     cluster.waitForClusterToBeReady();
-    metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     cluster.getStorageContainerManager().exitSafeMode();
 
@@ -135,10 +123,9 @@ public class TestReconWithOzoneManagerFSO {
             cluster.getReconServer().getHttpServer().getHttpAddress();
     String reconHTTPAddress = address.getHostName() + ":" + address.getPort();
     nssummaryServiceURL = "http://" + reconHTTPAddress +
-            "/api/v1/nssummary";
-    taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
+            "/api/v1/namespace";
 
-    basicEndpoint = "/basic";
+    basicEndpoint = "/summary";
 
     store = cluster.getClient().getObjectStore();
     // initialize HTTPClient
@@ -219,25 +206,7 @@ public class TestReconWithOzoneManagerFSO {
             cluster.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
 
-    // check if OM metadata has vol0/bucket0/key0 info
-    String bucketKey = metadataManager.getBucketKey("vol0", "bucket0");
-    long bucketId = metadataManager.getBucketTable()
-            .get(bucketKey).getObjectID();
-
-    String ozoneKey = metadataManager.getOzonePathKey(bucketId, "key0");
-    OmKeyInfo keyInfo1 = metadataManager.getKeyTable().get(ozoneKey);
-
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
-
-    long omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
-    Assert.assertEquals(1, omMetadataKeyCount);
-
-    // verify if OM has /vol0/bucket0/key0
-    Assert.assertEquals("vol0", keyInfo1.getVolumeName());
-    Assert.assertEquals("bucket0", keyInfo1.getBucketName());
-
-    // HTTP call to /api/nssummary
+    // HTTP call to /api/namespace
     String basicNSSummaryResponse = makeHttpCall(
             nssummaryServiceURL + basicEndpoint, "/vol0");
     Map basicNSSummaryMap =
@@ -246,33 +215,8 @@ public class TestReconWithOzoneManagerFSO {
     String entityType = (String) basicNSSummaryMap.get("type");
     Assert.assertEquals(EntityType.VOLUME.toString(), entityType);
 
-    // HTTP call to /api/task/status
-    long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
-            .getDb().getLatestSequenceNumber();
-
-    String taskStatusResponse = makeHttpCall(taskStatusURL, null);
-    long reconLatestSeqNumber = getReconTaskAttributeFromJson(
-            taskStatusResponse,
-            OmSnapshotRequest.name(),
-            "lastUpdatedSeqNumber");
-
-    // verify sequence number after full snapshot
-    Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-
     //add 4 keys to check for delta updates
     addKeys(1, 5);
-    omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
-    omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
-    Assert.assertEquals(4, omMetadataKeyCount);
-
-    String bucketKey3 = metadataManager.getBucketKey("vol3", "bucket3");
-    long bucketId3 = metadataManager.getBucketTable()
-            .get(bucketKey3).getObjectID();
-    String ozoneKey3 = metadataManager.getOzonePathKey(bucketId3, "key3");
-    OmKeyInfo keyInfo3 = metadataManager.getKeyTable().get(ozoneKey3);
-    Assert.assertEquals("vol3", keyInfo3.getVolumeName());
-    Assert.assertEquals("bucket3", keyInfo3.getBucketName());
-
     // update the next snapshot from om to verify delta updates
     impl.syncDataFromOM();
 
@@ -282,20 +226,6 @@ public class TestReconWithOzoneManagerFSO {
     Assert.assertEquals(EntityType.BUCKET.toString(),
             basicNSSummaryMap2.get("type"));
     Assert.assertEquals(1.0, basicNSSummaryMap2.get("key"));
-  }
-
-  private long getReconTaskAttributeFromJson(String taskStatusResponse,
-                                             String taskName,
-                                             String entityAttribute) {
-    ArrayList<LinkedTreeMap> taskStatusList = new Gson()
-            .fromJson(taskStatusResponse, ArrayList.class);
-    Optional<LinkedTreeMap> taskEntity =
-            taskStatusList
-                    .stream()
-                    .filter(task -> task.get("taskName").equals(taskName))
-                    .findFirst();
-    Assert.assertTrue(taskEntity.isPresent());
-    return (long)(double) taskEntity.get().get(entityAttribute);
   }
 
   private Map getReconNSSummary(String nssummaryResponse) {
@@ -311,15 +241,4 @@ public class TestReconWithOzoneManagerFSO {
       writeKeys("vol"+i, "bucket"+i, "key"+i);
     }
   }
-
-  private long getTableKeyCount(TableIterator<String, ? extends
-          Table.KeyValue<String, OmKeyInfo>> iterator) {
-    long keyCount = 0;
-    while(iterator.hasNext()) {
-      keyCount++;
-      iterator.next();
-    }
-    return keyCount;
-  }
 }
-
