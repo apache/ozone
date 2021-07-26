@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -141,6 +142,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         type = useRatis ? HddsProtos.ReplicationType.RATIS :
             HddsProtos.ReplicationType.STAND_ALONE;
       }
+      ReplicationConfig repConfig = ReplicationConfig.fromProto(
+          type, factor, keyArgs.getEcReplicationConfig());
 
       // TODO: Here we are allocating block with out any check for
       //  bucket/key/volume or not and also with out any authorization checks.
@@ -149,7 +152,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       List<OmKeyLocationInfo> omKeyLocationInfoList =
           allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), type, factor,
+              ozoneManager.getBlockTokenSecretManager(), repConfig,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
