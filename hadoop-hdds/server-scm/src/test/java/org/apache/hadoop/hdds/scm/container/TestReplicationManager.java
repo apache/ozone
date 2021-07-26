@@ -1238,10 +1238,6 @@ public class TestReplicationManager {
         new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
 
     CompletableFuture<MoveResult> cf;
-    //the above move is executed successfully, so there may be some item in
-    //inflightReplication or inflightDeletion. here we stop replication manager
-    //to clear these states, which may impact the tests below.
-    //we don't need a running replicationManamger now
     replicationManager.stop();
     Thread.sleep(100L);
     cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
@@ -1303,12 +1299,9 @@ public class TestReplicationManager {
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
 
-    replicationManager.start();
     //make container over relplicated to test the
     // case that container is in inflightDeletion
     ContainerReplica dn5 = addReplica(container,
-        new NodeStatus(IN_SERVICE, HEALTHY), State.CLOSED);
-    ContainerReplica dn6 = addReplica(container,
         new NodeStatus(IN_SERVICE, HEALTHY), State.CLOSED);
     replicationManager.processAll();
     //waiting for inflightDeletion generation
@@ -1320,7 +1313,6 @@ public class TestReplicationManager {
 
     //make the replica num be 2 to test the case
     //that container is in inflightReplication
-    containerStateManager.removeContainerReplica(id, dn6);
     containerStateManager.removeContainerReplica(id, dn5);
     containerStateManager.removeContainerReplica(id, dn4);
     //replication manager should generate inflightReplication
