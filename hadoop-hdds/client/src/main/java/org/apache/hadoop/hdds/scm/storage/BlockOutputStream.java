@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
  * This class encapsulates all state management for buffering and writing
  * through to the container.
  */
-public abstract class BlockOutputStream extends OutputStream {
+public class BlockOutputStream extends OutputStream {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
@@ -179,7 +179,9 @@ public abstract class BlockOutputStream extends OutputStream {
     return blockID.get();
   }
 
-  public abstract long getTotalAckDataLength();
+  public long getTotalAckDataLength() {
+    return 0;
+  }
 
   public long getWrittenDataLength() {
     return writtenDataLength;
@@ -332,7 +334,7 @@ public abstract class BlockOutputStream extends OutputStream {
   private void handleFullBuffer() throws IOException {
     try {
       checkOpen();
-      waitFullBuffer();
+      waitOnFlushFutures();
     } catch (ExecutionException e) {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
@@ -342,10 +344,8 @@ public abstract class BlockOutputStream extends OutputStream {
     watchForCommit(true);
   }
 
-  abstract void waitFullBuffer()
-      throws ExecutionException, InterruptedException;
-
-  abstract void releaseBuffersOnException();
+  void releaseBuffersOnException() {
+  }
 
   // It may happen that once the exception is encountered , we still might
   // have successfully flushed up to a certain index. Make sure the buffers
@@ -355,8 +355,10 @@ public abstract class BlockOutputStream extends OutputStream {
     refreshCurrentBuffer();
   }
 
-  abstract XceiverClientReply sendWatchForCommit(boolean bufferFull)
-      throws IOException;
+  XceiverClientReply sendWatchForCommit(boolean bufferFull)
+      throws IOException {
+    return null;
+  }
 
   /**
    * calls watchForCommit API of the Ratis Client. For Standalone client,
@@ -386,8 +388,8 @@ public abstract class BlockOutputStream extends OutputStream {
     refreshCurrentBuffer();
   }
 
-  abstract void updateCommitInfo(
-      XceiverClientReply reply, List<ChunkBuffer> byteBufferList);
+  void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
+  }
 
   /**
    * @param close whether putBlock is happening as part of closing the stream
@@ -462,8 +464,9 @@ public abstract class BlockOutputStream extends OutputStream {
     return flushFuture;
   }
 
-  abstract void putFlushFuture(long flushPos,
-      CompletableFuture<ContainerCommandResponseProto> flushFuture);
+  void putFlushFuture(long flushPos,
+      CompletableFuture<ContainerCommandResponseProto> flushFuture) {
+  }
 
   @Override
   public void flush() throws IOException {
@@ -554,8 +557,8 @@ public abstract class BlockOutputStream extends OutputStream {
     }
   }
 
-  abstract void waitOnFlushFutures()
-      throws InterruptedException, ExecutionException;
+  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+  }
 
   private void validateResponse(
       ContainerProtos.ContainerCommandResponseProto responseProto)
@@ -588,7 +591,8 @@ public abstract class BlockOutputStream extends OutputStream {
     }
   }
 
-  abstract void cleanup();
+  void cleanup() {
+  }
 
   public void cleanup(boolean invalidateClient) {
     if (xceiverClientFactory != null) {

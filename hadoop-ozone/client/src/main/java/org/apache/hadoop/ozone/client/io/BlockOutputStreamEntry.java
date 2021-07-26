@@ -96,8 +96,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
    */
   private void checkStream() throws IOException {
     if (this.outputStream == null) {
-      this.outputStream = new RatisBlockOutputStream(blockID,
-          xceiverClientManager, pipeline, bufferPool, config, token);
+      this.outputStream =
+          new RatisBlockOutputStream(blockID, xceiverClientManager,
+              pipeline, bufferPool, config, token);
     }
   }
 

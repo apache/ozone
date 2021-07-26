@@ -102,8 +102,8 @@ public class RatisBlockOutputStream extends BlockOutputStream {
   }
 
   @Override
-  void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> byteBufferList) {
-    commitWatcher.updateCommitInfoMap(reply.getLogIndex(), byteBufferList);
+  void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
+    commitWatcher.updateCommitInfoMap(reply.getLogIndex(), buffers);
   }
 
   @Override
@@ -117,13 +117,6 @@ public class RatisBlockOutputStream extends BlockOutputStream {
     // wait for all the transactions to complete
     CompletableFuture.allOf(commitWatcher.getFutureMap().values().toArray(
         new CompletableFuture[0])).get();
-  }
-
-  @Override
-  void waitFullBuffer() throws ExecutionException, InterruptedException {
-    if (!commitWatcher.getFutureMap().isEmpty()) {
-      waitOnFlushFutures();
-    }
   }
 
   @Override
