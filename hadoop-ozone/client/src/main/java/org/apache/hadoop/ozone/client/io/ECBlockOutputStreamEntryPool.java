@@ -33,7 +33,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 /**
  * This class manages the stream entries list and handles block allocation
@@ -104,19 +103,13 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
 
   @Override
   long getKeyLength() {
-    Stream<BlockOutputStreamEntry> blockOutputStreamEntryStream =
-        getStreamEntries().stream().filter(c -> {
-          return (!((ECBlockOutputStreamEntry) c).isParityStreamEntry());
-        });
-    long totalLength = blockOutputStreamEntryStream
-        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    long totalLength = getStreamEntries().stream().filter(c -> {
+      return (!((ECBlockOutputStreamEntry) c).isParityStreamEntry());
+    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
 
-    Stream<BlockOutputStreamEntry> finishedBlockOutputStreamEntryStream =
-        finishedStreamEntries.stream().filter(c -> {
-          return (!((ECBlockOutputStreamEntry) c).isParityStreamEntry());
-        });
-    totalLength += finishedBlockOutputStreamEntryStream
-        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    totalLength += finishedStreamEntries.stream().filter(c -> {
+      return (!((ECBlockOutputStreamEntry) c).isParityStreamEntry());
+    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
     return totalLength;
   }
 
