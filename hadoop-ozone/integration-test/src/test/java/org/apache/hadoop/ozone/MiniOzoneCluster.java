@@ -326,6 +326,7 @@ public interface MiniOzoneCluster {
     protected Optional<Integer> omLayoutVersion = Optional.empty();
     protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
+    protected boolean security = false;
 
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
@@ -578,6 +579,11 @@ public interface MiniOzoneCluster {
 
     public Builder setDnLayoutVersion(int layoutVersion) {
       dnLayoutVersion = Optional.of(layoutVersion);
+      return this;
+    }
+
+    public Builder setSecurity(boolean sec) {
+      this.security = sec;
       return this;
     }
 

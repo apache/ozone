@@ -19,16 +19,19 @@ package org.apache.hadoop.ozone;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
@@ -56,8 +59,12 @@ import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -69,10 +76,13 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_ADMIN;
@@ -82,17 +92,29 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
@@ -115,6 +137,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
   private ReconServer reconServer;
+  private MiniKdc miniKdc;
 
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
@@ -144,12 +167,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
                        OzoneManager ozoneManager,
                        StorageContainerManager scm,
                        List<HddsDatanodeService> hddsDatanodes,
-                       ReconServer reconServer) {
+                       ReconServer reconServer,
+                       MiniKdc miniKdc) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
+    this.miniKdc = miniKdc;
   }
 
   /**
@@ -470,6 +495,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopDatanodes(hddsDatanodes);
     stopSCM(scm);
     stopRecon(reconServer);
+    stopKDC(miniKdc);
   }
 
   /**
@@ -565,10 +591,29 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
+  private static void stopKDC(MiniKdc miniKdc) {
+    try {
+      if (miniKdc != null) {
+        LOG.info("Stopping KDC");
+        miniKdc.stop();
+      }
+    } catch (Exception e) {
+      LOG.error("Exception while shutting down Recon.", e);
+    }
+  }
+
   /**
    * Builder for configuring the MiniOzoneCluster to run.
    */
   public static class Builder extends MiniOzoneCluster.Builder {
+
+    private MiniKdc miniKdc;
+    private File spnegoKeytab;
+    private File ozoneKeytab;
+    private String httpUserPrincipal;
+    private String ozoneUserPrincipal;
+    private File kdcWorkDir;
+    private static final String COMPONENT = "test";
 
     /**
      * Creates a new Builder.
@@ -583,6 +628,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     public MiniOzoneCluster build() throws IOException {
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
+      if (this.security) {
+        initializeSecurity();
+      }
       StorageContainerManager scm = null;
       OzoneManager om = null;
       ReconServer reconServer = null;
@@ -606,7 +654,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             Collections.singletonList(scm), reconServer);
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf, om, scm,
-            hddsDatanodes, reconServer);
+            hddsDatanodes, reconServer, miniKdc);
 
         cluster.setCAClient(certClient);
         if (startDataNodes) {
@@ -622,6 +670,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           stopDatanodes(hddsDatanodes);
         }
         stopSCM(scm);
+        if (this.security) {
+          stopMiniKdc();
+        }
         removeConfiguration();
 
         if (ex instanceof IOException) {
@@ -944,5 +995,83 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       ConfigurationProvider.setConfiguration(conf);
     }
+
+    protected void initializeSecurity() throws IOException {
+      try {
+        kdcWorkDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
+        startMiniKdc();
+        setSecureConfig();
+        createCredentialsInKDC();
+        generateKeyPair();
+      } catch (Exception ex) {
+        throw new IOException(ex);
+      }
+    }
+
+    private void setSecureConfig() throws IOException {
+      conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+      String host = InetAddress.getLocalHost().getCanonicalHostName()
+          .toLowerCase();
+
+      conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
+      String curUser = UserGroupInformation.getCurrentUser().getUserName();
+      conf.set(OZONE_ADMINISTRATORS, "ozone");
+
+      String realm = miniKdc.getRealm();
+      String hostAndRealm = host + "@" + realm;
+      this.ozoneUserPrincipal = "ozone/" + hostAndRealm;
+      this.httpUserPrincipal = "http/" + hostAndRealm;
+
+      conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, this.ozoneUserPrincipal);
+      conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, this.httpUserPrincipal);
+      conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, this.ozoneUserPrincipal);
+      conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, this.httpUserPrincipal);
+      conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, this.ozoneUserPrincipal);
+      conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, this.httpUserPrincipal);
+      conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, this.ozoneUserPrincipal);
+
+      spnegoKeytab = new File(kdcWorkDir, "http.keytab");
+      ozoneKeytab = new File(kdcWorkDir, "ozone.keytab");
+
+      conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
+          ozoneKeytab.getAbsolutePath());
+      conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY,
+          spnegoKeytab.getAbsolutePath());
+      conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
+          ozoneKeytab.getAbsolutePath());
+      conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE,
+          spnegoKeytab.getAbsolutePath());
+      conf.set(DFS_DATANODE_KEYTAB_FILE_KEY,
+          ozoneKeytab.getAbsolutePath());
+    }
+
+    private void createCredentialsInKDC() throws Exception {
+      createPrincipal(ozoneKeytab, this.ozoneUserPrincipal);
+      createPrincipal(spnegoKeytab, this.httpUserPrincipal);
+    }
+
+    private void createPrincipal(File keytab, String... principal)
+        throws Exception {
+      miniKdc.createPrincipal(keytab, principal);
+    }
+
+    private void generateKeyPair() throws Exception {
+      HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(conf);
+      KeyPair keyPair = keyGenerator.generateKey();
+      KeyCodec pemWriter = new KeyCodec(new SecurityConfig(conf), COMPONENT);
+      pemWriter.writeKey(keyPair, true);
+    }
+
+    private void startMiniKdc() throws Exception {
+      Properties securityProperties = MiniKdc.createConf();
+      kdcWorkDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
+      miniKdc = new MiniKdc(securityProperties, kdcWorkDir);
+      miniKdc.start();
+    }
+
+    private void stopMiniKdc() {
+      miniKdc.stop();
+    }
+
   }
 }
