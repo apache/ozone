@@ -208,11 +208,11 @@ public class DeletedBlockLogImplV2
       for (DeleteBlockTransactionResult transactionResult :
           transactionResults) {
         if (isTransactionFailed(transactionResult)) {
-          metrics.incrementDeleteTxFailure();
+          metrics.incrBlockDeletionTransactionFailure();
           continue;
         }
         try {
-          metrics.incrementDeleteTxSuccess();
+          metrics.incrBlockDeletionTransactionSuccess();
           long txID = transactionResult.getTxID();
           // set of dns which have successfully committed transaction txId.
           dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
@@ -263,7 +263,7 @@ public class DeletedBlockLogImplV2
       }
       try {
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
-        metrics.incrementDeleteTxCompleted(txIDsToBeDeleted.size());
+        metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
       } catch (IOException e) {
         LOG.warn("Could not commit delete block transactions: "
             + txIDsToBeDeleted, e);
@@ -355,7 +355,7 @@ public class DeletedBlockLogImplV2
       }
 
       deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
-      metrics.incrementDeleteTxCreated(txsToBeAdded.size());
+      metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
     } finally {
       lock.unlock();
     }
@@ -418,7 +418,7 @@ public class DeletedBlockLogImplV2
         }
 
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
-        metrics.incrementDeleteTxCompleted(txIDs.size());
+        metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
       }
       return transactions;
     } finally {
@@ -440,9 +440,9 @@ public class DeletedBlockLogImplV2
           deleteBlockStatus.getCmdStatus().getBlockDeletionAck();
       commitTransactions(ackProto.getResultsList(),
           UUID.fromString(ackProto.getDnId()));
-      metrics.incrementDeleteTxCmdSuccess();
+      metrics.incrBlockDeletionCommandSuccess();
     } else if (status == CommandStatus.Status.FAILED){
-      metrics.incrementDeleteTxCmdFailure();
+      metrics.incrBlockDeletionCommandFailure();
     } else {
       LOG.error("Delete Block Command is not executed yet.");
       return;

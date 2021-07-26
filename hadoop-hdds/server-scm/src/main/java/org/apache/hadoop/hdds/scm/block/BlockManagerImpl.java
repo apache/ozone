@@ -289,6 +289,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     blockDeletingService.shutdown();
     if (metrics != null) {
       ScmBlockDeletingServiceMetrics.unRegister();
+      metrics = null;
     }
     if (mxBean != null) {
       MBeans.unregister(mxBean);

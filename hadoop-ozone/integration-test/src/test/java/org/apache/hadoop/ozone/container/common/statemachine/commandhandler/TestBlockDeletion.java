@@ -214,7 +214,7 @@ public class TestBlockDeletion {
     // other container types is going to be added, this test should be checked.
     matchContainerTransactionIds();
 
-    Assert.assertEquals(0L, metrics.getDeleteTxCreated());
+    Assert.assertEquals(0L, metrics.getNumBlockDeletionTransactionCreated());
     om.deleteKey(keyArgs);
     Thread.sleep(5000);
     // The blocks should not be deleted in the DN as the container is open
@@ -226,7 +226,7 @@ public class TestBlockDeletion {
       Assert.assertEquals(e.getClass(), AssertionError.class);
     }
 
-    Assert.assertEquals(0L, metrics.getDeleteTxCmdSent());
+    Assert.assertEquals(0L, metrics.getNumBlockDeletionTransactionSent());
     // close the containers which hold the blocks for the key
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     Thread.sleep(2000);
@@ -271,12 +271,14 @@ public class TestBlockDeletion {
         return false;
       }
     }, 500, 10000);
-    Assert.assertTrue(metrics.getDeleteTxCreated() ==
-            metrics.getDeleteTxCompleted());
-    Assert.assertTrue(metrics.getDeleteTxCmdSent() >=
-        metrics.getDeleteTxCmdSuccess() + metrics.getDeleteTxCmdFailure());
-    Assert.assertTrue(metrics.getDeleteTxSent() >=
-        metrics.getDeleteTxFailure() + metrics.getDeleteTxSuccess());
+    Assert.assertTrue(metrics.getNumBlockDeletionTransactionCreated() ==
+            metrics.getNumBlockDeletionTransactionCompleted());
+    Assert.assertTrue(metrics.getNumBlockDeletionCommandSent() >=
+        metrics.getNumBlockDeletionCommandSuccess() +
+            metrics.getBNumBlockDeletionCommandFailure());
+    Assert.assertTrue(metrics.getNumBlockDeletionTransactionSent() >=
+        metrics.getNumBlockDeletionTransactionFailure() +
+            metrics.getNumBlockDeletionTransactionSuccess());
     LOG.info(metrics.toString());
   }
 

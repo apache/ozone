@@ -158,8 +158,8 @@ public class SCMBlockDeletingService extends BackgroundService
               command.setTerm(scmContext.getTermOfLeader());
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId, command));
-              metrics.incrementDeleteTxCmdSent();
-              metrics.incrementDeleteTxSent(dnTXs.size());
+              metrics.incrBlockDeletionCommandSent();
+              metrics.incrBlockDeletionTransactionSent(dnTXs.size());
               if (LOG.isDebugEnabled()) {
                 LOG.debug(
                     "Added delete block command for datanode {} in the queue,"

@@ -37,43 +37,44 @@ public final class ScmBlockDeletingServiceMetrics {
       SCMBlockDeletingService.class.getSimpleName();
 
   /**
-   * Without command retry and command loss, for a brand new cluster.
+   * Given all commands are finished and no new coming deletes from OM.
+   * If there is no command resent,
    * deleteTxSent = deleteTxSuccess + deleteTxFailure
    * deleteTxCreated = deleteTxCompleted
    * deleteTxSent = deleteTxCreated * replication factor
    * deleteTxCmdSent = deleteTxCmdSuccess + deleteTxCmdFailure
    *
-   * With command retry and command loss.
-   * deleteTxSent >= deleteTxSuccess + deleteTxFailure
+   * If there is command resent,
+   * deleteTxSent > deleteTxSuccess + deleteTxFailure
    * deleteTxCreated = deleteTxCompleted
-   * deleteTxSent >= deleteTxCreated * replication factor
-   * deleteTxCmdSent >= deleteTxCmdSuccess + deleteTxCmdFailure
+   * deleteTxSent > deleteTxCreated * replication factor
+   * deleteTxCmdSent > deleteTxCmdSuccess + deleteTxCmdFailure
    */
   @Metric(about = "The number of individual delete transaction commands sent " +
       "to all DN.")
-  private MutableCounterLong deleteTxCmdSent;
+  private MutableCounterLong numBlockDeletionCommandSent;
 
-  @Metric(about = "The number of success ACK of delete transaction cmds.")
-  private MutableCounterLong deleteTxCmdSuccess;
+  @Metric(about = "The number of success ACK of delete transaction commands.")
+  private MutableCounterLong numBlockDeletionCommandSuccess;
 
-  @Metric(about = "The number of failure ACK of delete transaction cmds.")
-  private MutableCounterLong deleteTxCmdFailure;
+  @Metric(about = "The number of failure ACK of delete transaction commands.")
+  private MutableCounterLong numBlockDeletionCommandFailure;
 
   @Metric(about = "The number of individual delete transactions sent to " +
       "all DN.")
-  private MutableCounterLong deleteTxSent;
+  private MutableCounterLong numBlockDeletionTransactionSent;
 
   @Metric(about = "The number of success execution of delete transactions.")
-  private MutableCounterLong deleteTxSuccess;
+  private MutableCounterLong numBlockDeletionTransactionSuccess;
 
   @Metric(about = "The number of failure execution of delete transactions.")
-  private MutableCounterLong deleteTxFailure;
+  private MutableCounterLong numBlockDeletionTransactionFailure;
 
   @Metric(about = "The number of completed txs which are removed from DB.")
-  private MutableCounterLong deleteTxCompleted;
+  private MutableCounterLong numBlockDeletionTransactionCompleted;
 
   @Metric(about = "The number of created txs which are added into DB.")
-  private MutableCounterLong deleteTxCreated;
+  private MutableCounterLong numBlockDeletionTransactionCreated;
 
   private ScmBlockDeletingServiceMetrics() {
   }
@@ -97,83 +98,89 @@ public final class ScmBlockDeletingServiceMetrics {
     ms.unregisterSource(SOURCE_NAME);
   }
 
-  public void incrementDeleteTxCmdSent() {
-    this.deleteTxCmdSent.incr();
+  public void incrBlockDeletionCommandSent() {
+    this.numBlockDeletionCommandSent.incr();
   }
 
-  public void incrementDeleteTxCmdSuccess() {
-    this.deleteTxCmdSuccess.incr();
+  public void incrBlockDeletionCommandSuccess() {
+    this.numBlockDeletionCommandSuccess.incr();
   }
 
-  public void incrementDeleteTxCmdFailure() {
-    this.deleteTxCmdFailure.incr();
+  public void incrBlockDeletionCommandFailure() {
+    this.numBlockDeletionCommandFailure.incr();
   }
 
-  public void incrementDeleteTxSent(long count) {
-    this.deleteTxSent.incr(count);
+  public void incrBlockDeletionTransactionSent(long count) {
+    this.numBlockDeletionTransactionSent.incr(count);
   }
 
-  public void incrementDeleteTxFailure() {
-    this.deleteTxFailure.incr();
+  public void incrBlockDeletionTransactionFailure() {
+    this.numBlockDeletionTransactionFailure.incr();
   }
 
-  public void incrementDeleteTxSuccess() {
-    this.deleteTxSuccess.incr();
+  public void incrBlockDeletionTransactionSuccess() {
+    this.numBlockDeletionTransactionSuccess.incr();
   }
 
-  public void incrementDeleteTxCompleted(long count) {
-    this.deleteTxCompleted.incr(count);
+  public void incrBlockDeletionTransactionCompleted(long count) {
+    this.numBlockDeletionTransactionCompleted.incr(count);
   }
 
-  public void incrementDeleteTxCreated(long count) {
-    this.deleteTxCreated.incr(count);
+  public void incrBlockDeletionTransactionCreated(long count) {
+    this.numBlockDeletionTransactionCreated.incr(count);
   }
 
-  public long getDeleteTxCmdSent() {
-    return deleteTxCmdSent.value();
+  public long getNumBlockDeletionCommandSent() {
+    return numBlockDeletionCommandSent.value();
   }
 
-  public long getDeleteTxCmdSuccess() {
-    return deleteTxCmdSuccess.value();
+  public long getNumBlockDeletionCommandSuccess() {
+    return numBlockDeletionCommandSuccess.value();
   }
 
-  public long getDeleteTxCmdFailure() {
-    return deleteTxCmdFailure.value();
+  public long getBNumBlockDeletionCommandFailure() {
+    return numBlockDeletionCommandFailure.value();
   }
 
-  public long getDeleteTxSent() {
-    return deleteTxSent.value();
+  public long getNumBlockDeletionTransactionSent() {
+    return numBlockDeletionTransactionSent.value();
   }
 
-  public long getDeleteTxFailure() {
-    return deleteTxFailure.value();
+  public long getNumBlockDeletionTransactionFailure() {
+    return numBlockDeletionTransactionFailure.value();
   }
 
-  public long getDeleteTxSuccess() {
-    return deleteTxSuccess.value();
+  public long getNumBlockDeletionTransactionSuccess() {
+    return numBlockDeletionTransactionSuccess.value();
   }
 
-  public long getDeleteTxCompleted() {
-    return deleteTxCompleted.value();
+  public long getNumBlockDeletionTransactionCompleted() {
+    return numBlockDeletionTransactionCompleted.value();
   }
 
-  public long getDeleteTxCreated() {
-    return deleteTxCreated.value();
+  public long getNumBlockDeletionTransactionCreated() {
+    return numBlockDeletionTransactionCreated.value();
   }
 
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
-    buffer.append("DeleteTxCreated = " + deleteTxCreated.value()).append("\t")
-        .append("DeleteTxCompleted = " + deleteTxCompleted.value()).append("\t")
-        .append("DeleteTxCmdSent = " + deleteTxCmdSent.value()).append("\t")
-        .append("DeleteTxCmdSuccess = " + deleteTxCmdSuccess.value())
-        .append("\t")
-        .append("DeleteTxCmdFailure = " + deleteTxCmdFailure.value())
-        .append("\t")
-        .append("DeleteTxSent = " + deleteTxSent.value()).append("\t")
-        .append("DeleteTxSuccess = " + deleteTxSuccess.value()).append("\t")
-        .append("DeleteTxFailure = " + deleteTxFailure.value());
+    buffer.append("numBlockDeletionTransactionCreated = "
+        + numBlockDeletionTransactionCreated.value()).append("\t")
+        .append("numBlockDeletionTransactionCompleted = "
+            + numBlockDeletionTransactionCompleted.value()).append("\t")
+        .append("numBlockDeletionCommandSent = "
+            + numBlockDeletionCommandSent.value()).append("\t")
+        .append("numBlockDeletionCommandSuccess = "
+            + numBlockDeletionCommandSuccess.value()).append("\t")
+        .append("numBlockDeletionCommandFailure = "
+            + numBlockDeletionCommandFailure.value()).append("\t")
+        .append("numBlockDeletionTransactionSent = "
+            + numBlockDeletionTransactionSent.value()).append("\t")
+        .append("numBlockDeletionTransactionSuccess = "
+            + numBlockDeletionTransactionSuccess.value()).append("\t")
+        .append("numBlockDeletionTransactionFailure = "
+            + numBlockDeletionTransactionFailure.value());
     return buffer.toString();
   }
 }
