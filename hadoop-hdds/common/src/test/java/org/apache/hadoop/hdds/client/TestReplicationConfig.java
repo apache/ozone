@@ -30,16 +30,21 @@ import org.junit.Test;
 public class TestReplicationConfig {
 
   @Test
-  public void testGetDefaultShouldCreateReplicationConfigFromConf() {
+  public void testGetDefaultShouldCreateReplicationConfigFromDefaultConf() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
     Assert.assertEquals(
         org.apache.hadoop.hdds.client.ReplicationType.RATIS.name(),
         replicationConfig.getReplicationType().name());
     Assert.assertEquals(3, replicationConfig.getRequiredNodes());
+  }
+
+  @Test
+  public void testGetDefaultShouldCreateReplicationConfFromCustomConfValues() {
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE, "STAND_ALONE");
     conf.set(OzoneConfigKeys.OZONE_REPLICATION, "1");
-    replicationConfig = ReplicationConfig.getDefault(conf);
+    ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
     Assert.assertEquals(
         org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE.name(),
         replicationConfig.getReplicationType().name());
