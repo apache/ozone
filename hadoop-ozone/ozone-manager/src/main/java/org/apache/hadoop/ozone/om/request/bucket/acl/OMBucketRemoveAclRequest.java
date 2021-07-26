@@ -124,9 +124,7 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
         exception, getOmRequest().getUserInfo()));
 
     if (operationResult) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Remove acl: {} for path: {} success!", getAcls(), getPath());
-      }
+      LOG.debug("Remove acl: {} for path: {} success!", getAcls(), getPath());
     } else {
       omMetrics.incNumBucketUpdateFails();
       if (exception == null) {

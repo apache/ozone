@@ -127,9 +127,7 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
         exception, getOmRequest().getUserInfo()));
 
     if (operationResult) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Add acl: {} to path: {} success!", getAcls(), getPath());
-      }
+      LOG.debug("Add acl: {} to path: {} success!", getAcls(), getPath());
     } else {
       omMetrics.incNumBucketUpdateFails();
       if (exception == null) {
