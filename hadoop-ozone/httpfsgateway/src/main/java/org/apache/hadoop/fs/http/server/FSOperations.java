@@ -46,7 +46,6 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
-import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hadoop.lib.service.FileSystemAccess;
 import org.apache.hadoop.util.StringUtils;
 import org.json.simple.JSONArray;
@@ -65,9 +64,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.HTTPFS_BUFFER_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.HTTP_BUFFER_SIZE_DEFAULT;
-
 /**
  * FileSystem operation executors used by {@link HttpFSServer}.
  */
@@ -75,6 +71,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.HTTP_BUFFER_SIZE_DEFAULT;
 public final class FSOperations {
 
   private static int bufferSize = 4096;
+  private static final String HTTPFS_BUFFER_SIZE_KEY = "httpfs.buffer.size";
+  private static final int HTTP_BUFFER_SIZE_DEFAULT = 4096;
 
   private FSOperations() {
     // not called
@@ -156,13 +154,13 @@ public final class FSOperations {
           hdfsFileStatus.getFileId());
       json.put(HttpFSFileSystem.STORAGEPOLICY_JSON,
           hdfsFileStatus.getStoragePolicy());
-      if (hdfsFileStatus.getErasureCodingPolicy() != null) {
-        json.put(HttpFSFileSystem.ECPOLICYNAME_JSON,
-            hdfsFileStatus.getErasureCodingPolicy().getName());
-        json.put(HttpFSFileSystem.ECPOLICY_JSON,
-            JsonUtil.getEcPolicyAsMap(
-                hdfsFileStatus.getErasureCodingPolicy()));
-      }
+//      if (hdfsFileStatus.getErasureCodingPolicy() != null) {
+//        json.put(HttpFSFileSystem.ECPOLICYNAME_JSON,
+//            hdfsFileStatus.getErasureCodingPolicy().getName());
+//        json.put(HttpFSFileSystem.ECPOLICY_JSON,
+//            JsonUtil.getEcPolicyAsMap(
+//                hdfsFileStatus.getErasureCodingPolicy()));
+//      }
     }
     if (fileStatus.getPermission().getAclBit()) {
       json.put(HttpFSFileSystem.ACL_BIT_JSON, true);

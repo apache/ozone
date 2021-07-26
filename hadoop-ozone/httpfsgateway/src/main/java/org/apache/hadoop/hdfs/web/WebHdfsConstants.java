@@ -15,24 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.http.server;
+package org.apache.hadoop.hdfs.web;
 
-import org.apache.hadoop.security.token.delegation.web.KerberosDelegationTokenAuthenticationHandler;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.io.Text;
 
-import javax.servlet.ServletException;
-import java.util.Properties;
+@InterfaceAudience.Private
+public class WebHdfsConstants {
+  public static final String WEBHDFS_SCHEME = "webhdfs";
+  public static final String SWEBHDFS_SCHEME = "swebhdfs";
+  public static final Text WEBHDFS_TOKEN_KIND = new Text("WEBHDFS delegation");
+  public static final Text SWEBHDFS_TOKEN_KIND = new Text("SWEBHDFS delegation");
 
-public class HttpFSKerberosAuthenticationHandlerForTesting
-  extends KerberosDelegationTokenAuthenticationHandler {
-
-  @Override
-  public void init(Properties config) throws ServletException {
-    //NOP overwrite to avoid Kerberos initialization
-    initTokenManager(config);
+  private WebHdfsConstants() {
   }
 
-  @Override
-  public void destroy() {
-    //NOP overwrite to avoid Kerberos initialization
+  enum PathType {
+    FILE, DIRECTORY, SYMLINK;
+
+    static PathType valueOf(HdfsFileStatus status) {
+      if (status.isDirectory()) {
+        return DIRECTORY;
+      }
+      if (status.isSymlink()) {
+        return SYMLINK;
+      }
+      return FILE;
+    }
   }
 }
