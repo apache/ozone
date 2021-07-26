@@ -78,9 +78,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.GeneratedMessage;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
@@ -172,6 +170,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
     REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
     // replication fail because node is unhealthy
     REPLICATION_FAIL_NODE_UNHEALTHY,
+    // deletion fail because of node is not in service
+    DELETION_FAIL_NODE_NOT_IN_SERVICE,
     // replication succeed, but deletion fail because of timeout
     DELETION_FAIL_TIME_OUT,
     // replication succeed, but deletion fail because because
@@ -310,16 +310,6 @@ public class ReplicationManager implements MetricsSource, SCMService {
   }
 
   /**
-   * Process all the containers immediately.
-   */
-  @VisibleForTesting
-  @SuppressFBWarnings(value="NN_NAKED_NOTIFY",
-      justification="Used only for testing")
-  public synchronized void processContainersNow() {
-    notifyAll();
-  }
-
-  /**
    * Stops Replication Monitor thread.
    */
   public synchronized void stop() {
@@ -339,21 +329,28 @@ public class ReplicationManager implements MetricsSource, SCMService {
   }
 
   /**
+   * Process all the containers now, and wait for the processing to complete.
+   * This in intended to be used in tests.
+   */
+  public synchronized void processAll() {
+    final long start = clock.millis();
+    final List<ContainerInfo> containers =
+        containerManager.getContainers();
+    containers.forEach(this::processContainer);
+
+    LOG.info("Replication Monitor Thread took {} milliseconds for" +
+            " processing {} containers.", clock.millis() - start,
+        containers.size());
+  }
+
+  /**
    * ReplicationMonitor thread runnable. This wakes up at configured
    * interval and processes all the containers in the system.
    */
   private synchronized void run() {
     try {
       while (running) {
-        final long start = clock.millis();
-        final List<ContainerInfo> containers =
-            containerManager.getContainers();
-        containers.forEach(this::processContainer);
-
-        LOG.info("Replication Monitor Thread took {} milliseconds for" +
-                " processing {} containers.", clock.millis() - start,
-            containers.size());
-
+        processAll();
         wait(rmConf.getInterval());
       }
     } catch (Throwable t) {
@@ -532,7 +529,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
           if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
             iter.remove();
             updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
-                container, a.datanode, inflightActions);
+                isNotInService, container, a.datanode, inflightActions);
           }
         } catch (NodeNotFoundException | ContainerNotFoundException e) {
           // Should not happen, but if it does, just remove the action as the
@@ -558,6 +555,7 @@ public class ReplicationManager implements MetricsSource, SCMService {
    */
   private void updateMoveIfNeeded(final boolean isUnhealthy,
                    final boolean isCompleted, final boolean isTimeout,
+                   final boolean isNotInService,
                    final ContainerInfo container, final DatanodeDetails dn,
                    final Map<ContainerID,
                        List<InflightAction>> inflightActions)
@@ -613,6 +611,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
         if (isUnhealthy) {
           inflightMoveFuture.get(id).complete(
               MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
+        } else if (isNotInService) {
+          inflightMoveFuture.get(id).complete(
+              MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
         } else {
           inflightMoveFuture.get(id).complete(
               MoveResult.REPLICATION_FAIL_TIME_OUT);
@@ -624,6 +625,9 @@ public class ReplicationManager implements MetricsSource, SCMService {
         } else if (isTimeout) {
           inflightMoveFuture.get(id).complete(
               MoveResult.DELETION_FAIL_TIME_OUT);
+        } else if (isNotInService) {
+          inflightMoveFuture.get(id).complete(
+              MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE);
         } else {
           inflightMoveFuture.get(id).complete(
               MoveResult.COMPLETED);
@@ -1294,7 +1298,8 @@ public class ReplicationManager implements MetricsSource, SCMService {
   private boolean isPlacementStatusActuallyEqual(
                       ContainerPlacementStatus cps1,
                       ContainerPlacementStatus cps2) {
-    return cps1.actualPlacementCount() == cps2.actualPlacementCount() ||
+    return (!cps1.isPolicySatisfied() &&
+        cps1.actualPlacementCount() == cps2.actualPlacementCount()) ||
         cps1.isPolicySatisfied() && cps2.isPolicySatisfied();
   }
 

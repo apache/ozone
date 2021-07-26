@@ -35,6 +35,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -134,7 +135,11 @@ public final class ShutdownHookManager {
         future.cancel(true);
         LOG.warn("ShutdownHook '" + entry.getHook().getClass().
             getSimpleName() + "' timeout, " + ex.toString(), ex);
-      } catch (Throwable ex) {
+      } catch (InterruptedException ex) {
+        LOG.warn("ShutdownHook '" + entry.getHook().getClass().
+            getSimpleName() + "' failed, " + ex.toString(), ex);
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException ex) {
         LOG.warn("ShutdownHook '" + entry.getHook().getClass().
             getSimpleName() + "' failed, " + ex.toString(), ex);
       }

@@ -126,6 +126,7 @@ public class StreamingClient implements AutoCloseable {
         try {
           channel.closeFuture().await(timeout, unit);
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           LOG.error("Couldn't close the replication stream channel", e);
         }
       }
