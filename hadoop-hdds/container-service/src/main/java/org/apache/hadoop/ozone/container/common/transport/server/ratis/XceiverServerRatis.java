@@ -158,6 +158,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
     assignPorts();
+    this.streamEnable = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
     RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
@@ -177,9 +180,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             .setStateMachineRegistry(this::getStateMachine)
             .setParameters(parameters);
     this.server = builder.build();
-    this.streamEnable = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
     this.requestTimeout = conf.getTimeDuration(
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
@@ -263,9 +263,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // set the configs enable and set the stateMachineData sync timeout
     RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
-    streamEnable = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
     if (streamEnable) {
       setUpRatisStream(properties);
     }
