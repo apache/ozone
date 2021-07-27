@@ -173,11 +173,8 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource ozoneConfiguration) throws IOException {
-    // TODO: For now, always set first node as primary. In the future we should
-    //  use the local or closest node in the pipline.
-    final DatanodeDetails leader = pipeline.getLeaderNode();
     return newRaftClient(rpcType,
-        toRaftPeerId(leader),
+        toRaftPeerId(pipeline.getLeaderNode()),
         toRaftPeer(pipeline.getFirstNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
