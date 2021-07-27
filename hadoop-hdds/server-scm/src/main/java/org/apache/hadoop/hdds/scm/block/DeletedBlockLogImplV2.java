@@ -74,7 +74,7 @@ public class DeletedBlockLogImplV2
     implements DeletedBlockLog, EventHandler<DeleteBlockStatus> {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(DeletedBlockLogImpl.class);
+      LoggerFactory.getLogger(DeletedBlockLogImplV2.class);
 
   private final int maxRetry;
   private final ContainerManagerV2 containerManager;
