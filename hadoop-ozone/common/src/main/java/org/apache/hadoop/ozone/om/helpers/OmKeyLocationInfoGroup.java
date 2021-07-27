@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
  */
 public class OmKeyLocationInfoGroup {
   private final long version;
+  // TODO: HDDS-5472 Store one version of locationInfo for each
+  //   OmKeyLocationInfoGroup
   private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
   private  boolean isMultipartKey;
 
