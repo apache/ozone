@@ -17,16 +17,8 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT;
 
-import java.net.InetSocketAddress;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -43,7 +35,6 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.http.client.config.RequestConfig;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -71,33 +62,8 @@ public class TestReconWithOzoneManagerFSO {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    int socketTimeout = (int) conf.getTimeDuration(
-            OZONE_RECON_OM_SOCKET_TIMEOUT,
-            conf.get(
-                    ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT,
-                    OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT),
-            TimeUnit.MILLISECONDS);
-    int connectionTimeout = (int) conf.getTimeDuration(
-            OZONE_RECON_OM_CONNECTION_TIMEOUT,
-            conf.get(
-                    ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT,
-                    OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT),
-            TimeUnit.MILLISECONDS);
-    int connectionRequestTimeout = (int)conf.getTimeDuration(
-            OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT,
-            conf.get(
-                    ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT,
-                    OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
-            TimeUnit.MILLISECONDS
-    );
     conf.setBoolean("ozone.om.enable.filesystem.paths", true);
     conf.set("ozone.om.metadata.layout", "PREFIX");
-
-    RequestConfig config = RequestConfig.custom()
-            .setConnectTimeout(socketTimeout)
-            .setConnectionRequestTimeout(connectionTimeout)
-            .setSocketTimeout(connectionRequestTimeout).build();
-
     cluster =
             MiniOzoneCluster.newBuilder(conf)
                     .setNumDatanodes(1)
@@ -106,10 +72,6 @@ public class TestReconWithOzoneManagerFSO {
     cluster.waitForClusterToBeReady();
 
     cluster.getStorageContainerManager().exitSafeMode();
-
-    InetSocketAddress address =
-            cluster.getReconServer().getHttpServer().getHttpAddress();
-    String reconHTTPAddress = address.getHostName() + ":" + address.getPort();
 
     store = cluster.getClient().getObjectStore();
   }
