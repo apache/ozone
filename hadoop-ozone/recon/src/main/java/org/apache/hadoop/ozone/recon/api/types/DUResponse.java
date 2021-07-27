@@ -35,7 +35,7 @@ public class DUResponse {
   private int count;
 
   /** Encapsulates a DU instance for a subpath. */
-  @JsonProperty("duData")
+  @JsonProperty("data")
   private List<DiskUsage> duData;
 
   public DUResponse() {
