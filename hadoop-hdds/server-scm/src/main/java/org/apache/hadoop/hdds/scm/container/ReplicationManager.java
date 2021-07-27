@@ -78,9 +78,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.GeneratedMessage;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
@@ -312,16 +310,6 @@ public class ReplicationManager implements MetricsSource, SCMService {
   }
 
   /**
-   * Process all the containers immediately.
-   */
-  @VisibleForTesting
-  @SuppressFBWarnings(value="NN_NAKED_NOTIFY",
-      justification="Used only for testing")
-  public synchronized void processContainersNow() {
-    notifyAll();
-  }
-
-  /**
    * Stops Replication Monitor thread.
    */
   public synchronized void stop() {
@@ -341,21 +329,28 @@ public class ReplicationManager implements MetricsSource, SCMService {
   }
 
   /**
+   * Process all the containers now, and wait for the processing to complete.
+   * This in intended to be used in tests.
+   */
+  public synchronized void processAll() {
+    final long start = clock.millis();
+    final List<ContainerInfo> containers =
+        containerManager.getContainers();
+    containers.forEach(this::processContainer);
+
+    LOG.info("Replication Monitor Thread took {} milliseconds for" +
+            " processing {} containers.", clock.millis() - start,
+        containers.size());
+  }
+
+  /**
    * ReplicationMonitor thread runnable. This wakes up at configured
    * interval and processes all the containers in the system.
    */
   private synchronized void run() {
     try {
       while (running) {
-        final long start = clock.millis();
-        final List<ContainerInfo> containers =
-            containerManager.getContainers();
-        containers.forEach(this::processContainer);
-
-        LOG.info("Replication Monitor Thread took {} milliseconds for" +
-                " processing {} containers.", clock.millis() - start,
-            containers.size());
-
+        processAll();
         wait(rmConf.getInterval());
       }
     } catch (Throwable t) {

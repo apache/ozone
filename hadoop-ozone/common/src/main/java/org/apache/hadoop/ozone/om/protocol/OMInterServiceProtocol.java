@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,18 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common.volume;
+package org.apache.hadoop.ozone.om.protocol;
 
-import org.apache.hadoop.ozone.lock.ReadWriteLockable;
-
+import java.io.Closeable;
 import java.io.IOException;
-import java.util.List;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Set of volumes.
+ * Protocol for inter OM communication.
  */
-public interface VolumeSet extends ReadWriteLockable {
-  List<StorageVolume> getVolumesList();
+@KerberosInfo(
+    serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
+public interface OMInterServiceProtocol extends Closeable {
 
-  void checkAllVolumes(StorageVolumeChecker checker) throws IOException;
+  /**
+   * Bootstrap OM by adding to existing OM Ratis ring.
+   */
+  void bootstrap(OMNodeDetails newOMNode) throws IOException;
 }
