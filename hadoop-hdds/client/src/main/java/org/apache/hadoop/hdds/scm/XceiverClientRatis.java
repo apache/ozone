@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.client.RaftClient;
-import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
@@ -359,10 +358,5 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       sendCommandOnAllNodes(ContainerCommandRequestProto request) {
     throw new UnsupportedOperationException(
             "Operation Not supported for ratis client");
-  }
-
-  @Override
-  public DataStreamApi getDataStreamApi() {
-    return this.getClient().getDataStreamApi();
   }
 }

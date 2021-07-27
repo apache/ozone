@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.ratis.client.api.DataStreamApi;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -176,11 +175,6 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   @Override
   public Map<DatanodeDetails, ContainerCommandResponseProto>
       sendCommandOnAllNodes(ContainerCommandRequestProto request) {
-    return null;
-  }
-
-  @Override
-  public DataStreamApi getDataStreamApi() {
     return null;
   }
 }

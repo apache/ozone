@@ -146,7 +146,7 @@ public class TestEndPoint {
         serverAddress, 1000)) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       conf.setBoolean(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT, true);
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
       OzoneContainer ozoneContainer = new OzoneContainer(
           datanodeDetails, conf, getContext(datanodeDetails), null);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
@@ -172,7 +172,7 @@ public class TestEndPoint {
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
     conf.setBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT, true);
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {

@@ -775,7 +775,7 @@ public class DatanodeDetails extends NodeImpl implements
      */
     public enum Name {
       STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
-      DATASTREAM;
+      RATIS_DATASTREAM;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());

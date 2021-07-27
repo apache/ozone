@@ -120,7 +120,8 @@ public final class RatisHelper {
         .setAddress(toRaftPeerAddress(dn, Port.Name.RATIS_SERVER))
         .setAdminAddress(toRaftPeerAddress(dn, Port.Name.RATIS_ADMIN))
         .setClientAddress(toRaftPeerAddress(dn, Port.Name.RATIS))
-        .setDataStreamAddress(toRaftPeerAddress(dn, Port.Name.DATASTREAM));
+        .setDataStreamAddress(
+            toRaftPeerAddress(dn, Port.Name.RATIS_DATASTREAM));
   }
 
   private static List<RaftPeer> toRaftPeers(Pipeline pipeline) {
@@ -172,12 +173,12 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource ozoneConfiguration) throws IOException {
-    // TODO: For now, always set leader as primary. In the future we should
+    // TODO: For now, always set first node as primary. In the future we should
     //  use the local or closest node in the pipline.
     final DatanodeDetails leader = pipeline.getLeaderNode();
     return newRaftClient(rpcType,
         toRaftPeerId(leader),
-        toRaftPeer(leader),
+        toRaftPeer(pipeline.getFirstNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }

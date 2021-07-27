@@ -57,10 +57,10 @@ public final class OzoneConfigKeys {
   public static final boolean DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
       false;
 
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT =
-      "dfs.container.ratis.datastream.ipc.random.port";
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
+      "dfs.container.ratis.datastream.random.port";
   public static final boolean
-      DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT_DEFAULT =
+      DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
@@ -92,9 +92,9 @@ public final class OzoneConfigKeys {
       = "dfs.container.ratis.datastream.enable";
   public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT
       = true;
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT
-      = "dfs.container.ratis.datastream.ipc";
-  public static final int DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
+      = "dfs.container.ratis.datastream.port";
+  public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
       = 9855;
 
   /**

@@ -60,13 +60,13 @@
     <description>If enable datastream ipc of container.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.datastream.ipc</name>
+    <name>dfs.container.ratis.datastream.port</name>
     <value>9855</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
-    <description>The datastream ipc port number of container.</description>
+    <description>The datastream port number of container.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.datastream.ipc.random.port</name>
+    <name>dfs.container.ratis.datastream.random.port</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>Allocates a random free port for ozone container datastream.

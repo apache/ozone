@@ -184,7 +184,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
-
   }
 
   private void assignPorts() {
@@ -220,14 +219,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private void setUpRatisStream(RaftProperties properties) {
     // set the datastream config
     if (conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
         OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_DATASTREAM_IPC_RANDOM_PORT_DEFAULT)) {
+            DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
       dataStreamPort = 0;
     } else {
       dataStreamPort = conf.getInt(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_IPC_PORT_DEFAULT);
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
     }
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
     RaftConfigKeys.DataStream.setType(properties,
@@ -532,7 +531,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         DataStreamServerRpc dataStreamServerRpc =
             server.getDataStreamServerRpc();
         dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
-            Port.Name.DATASTREAM);
+            Port.Name.RATIS_DATASTREAM);
       }
       isStarted = true;
     }

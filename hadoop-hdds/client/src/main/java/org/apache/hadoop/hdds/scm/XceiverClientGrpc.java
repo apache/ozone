@@ -58,7 +58,6 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -282,14 +281,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       LOG.error("Failed to execute command " + request, e);
     }
     return responseProtoHashMap;
-  }
-
-  // TODO: We need separate XceiverClientRatis and XceiverClientGrpc instances
-  //  and remove XceiverClientSpi
-  @Override
-  public DataStreamApi getDataStreamApi() {
-    throw new UnsupportedOperationException(
-        "Operation Not supported for XceiverClientGrpc");
   }
 
   @Override
