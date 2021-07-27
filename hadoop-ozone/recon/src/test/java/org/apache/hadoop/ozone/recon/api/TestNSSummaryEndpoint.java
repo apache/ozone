@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.api.types.BasicResponse;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
@@ -207,7 +207,7 @@ public class TestNSSummaryEndpoint {
   public void testBasic() throws Exception {
     // Test volume basics
     Response volResponse = nsSummaryEndpoint.getBasicInfo(VOL_PATH);
-    BasicResponse volResponseObj = (BasicResponse) volResponse.getEntity();
+    NamespaceSummaryResponse volResponseObj = (NamespaceSummaryResponse) volResponse.getEntity();
     Assert.assertEquals(EntityType.VOLUME, volResponseObj.getEntityType());
     Assert.assertEquals(2, volResponseObj.getNumBucket());
     Assert.assertEquals(4, volResponseObj.getNumTotalDir());
@@ -216,7 +216,7 @@ public class TestNSSummaryEndpoint {
     // Test bucket 1's basics
     Response bucketOneResponse =
             nsSummaryEndpoint.getBasicInfo(BUCKET_ONE_PATH);
-    BasicResponse bucketOneObj = (BasicResponse) bucketOneResponse.getEntity();
+    NamespaceSummaryResponse bucketOneObj = (NamespaceSummaryResponse) bucketOneResponse.getEntity();
     Assert.assertEquals(EntityType.BUCKET, bucketOneObj.getEntityType());
     Assert.assertEquals(4, bucketOneObj.getNumTotalDir());
     Assert.assertEquals(4, bucketOneObj.getNumTotalKey());
@@ -224,27 +224,27 @@ public class TestNSSummaryEndpoint {
     // Test bucket 2's basics
     Response bucketTwoResponse =
             nsSummaryEndpoint.getBasicInfo(BUCKET_TWO_PATH);
-    BasicResponse bucketTwoObj = (BasicResponse) bucketTwoResponse.getEntity();
+    NamespaceSummaryResponse bucketTwoObj = (NamespaceSummaryResponse) bucketTwoResponse.getEntity();
     Assert.assertEquals(EntityType.BUCKET, bucketTwoObj.getEntityType());
     Assert.assertEquals(0, bucketTwoObj.getNumTotalDir());
     Assert.assertEquals(2, bucketTwoObj.getNumTotalKey());
 
     // Test intermediate directory basics
     Response dirOneResponse = nsSummaryEndpoint.getBasicInfo(DIR_ONE_PATH);
-    BasicResponse dirOneObj = (BasicResponse) dirOneResponse.getEntity();
+    NamespaceSummaryResponse dirOneObj = (NamespaceSummaryResponse) dirOneResponse.getEntity();
     Assert.assertEquals(EntityType.DIRECTORY, dirOneObj.getEntityType());
     Assert.assertEquals(3, dirOneObj.getNumTotalDir());
     Assert.assertEquals(3, dirOneObj.getNumTotalKey());
 
     // Test invalid path
     Response invalidResponse = nsSummaryEndpoint.getBasicInfo(INVALID_PATH);
-    BasicResponse invalidObj = (BasicResponse) invalidResponse.getEntity();
+    NamespaceSummaryResponse invalidObj = (NamespaceSummaryResponse) invalidResponse.getEntity();
     Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidObj.getStatus());
 
     // Test key
     Response keyResponse = nsSummaryEndpoint.getBasicInfo(KEY_PATH);
-    BasicResponse keyResObj = (BasicResponse) keyResponse.getEntity();
+    NamespaceSummaryResponse keyResObj = (NamespaceSummaryResponse) keyResponse.getEntity();
     Assert.assertEquals(EntityType.KEY, keyResObj.getEntityType());
   }
 

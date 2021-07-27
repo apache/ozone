@@ -20,33 +20,33 @@ package org.apache.hadoop.ozone.recon.api.types;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * HTTP Response wrapped for a 'basic' request.
+ * HTTP Response wrapped for a 'summary' request.
  */
-public class BasicResponse {
+public class NamespaceSummaryResponse {
   /** The namespace the request path is on. */
   @JsonProperty("type")
   private EntityType entityType;
 
-  @JsonProperty("vol")
+  @JsonProperty("numVolume")
   private int numVolume;
 
   /** Total number of buckets for volume, 0 for other types. */
-  @JsonProperty("bucket")
+  @JsonProperty("numBucket")
   private int numBucket;
 
   /** Total number of directories for a bucket or directory, 0 for others. */
-  @JsonProperty("dir")
+  @JsonProperty("numDir")
   private int numTotalDir;
 
   /** Total number of keys for a bucket or directory, 0 for others. */
-  @JsonProperty("key")
+  @JsonProperty("numKey")
   private int numTotalKey;
 
   /** Path Status. */
   @JsonProperty("status")
   private ResponseStatus status;
 
-  public BasicResponse(EntityType entityType) {
+  public NamespaceSummaryResponse(EntityType entityType) {
     this.entityType = entityType;
     this.numVolume = 0;
     this.numBucket = 0;

@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.api.types.BasicResponse;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
@@ -92,16 +92,16 @@ public class NSSummaryEndpoint {
     String normalizedPath = OmUtils.normalizeKey(path, false);
     String[] names = parseRequestPath(normalizedPath);
 
-    EntityType type = getEntityType(path, names);
+    EntityType type = getEntityType(normalizedPath, names);
 
-    BasicResponse basicResponse = null;
+    NamespaceSummaryResponse namespaceSummaryResponse = null;
     switch (type) {
     case ROOT:
-      basicResponse = new BasicResponse(EntityType.ROOT);
+      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.ROOT);
       List<OmVolumeArgs> volumes = listVolumes();
-      basicResponse.setNumVolume(volumes.size());
+      namespaceSummaryResponse.setNumVolume(volumes.size());
       List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
-      basicResponse.setNumBucket(allBuckets.size());
+      namespaceSummaryResponse.setNumBucket(allBuckets.size());
       int totalNumDir = 0;
       int totalNumKey = 0;
       for (OmBucketInfo bucket : allBuckets) {
@@ -109,13 +109,13 @@ public class NSSummaryEndpoint {
         totalNumDir += getTotalDirCount(bucketObjectId);
         totalNumKey += getTotalKeyCount(bucketObjectId);
       }
-      basicResponse.setNumTotalDir(totalNumDir);
-      basicResponse.setNumTotalKey(totalNumKey);
+      namespaceSummaryResponse.setNumTotalDir(totalNumDir);
+      namespaceSummaryResponse.setNumTotalKey(totalNumKey);
       break;
     case VOLUME:
-      basicResponse = new BasicResponse(EntityType.VOLUME);
+      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.VOLUME);
       List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
-      basicResponse.setNumBucket(buckets.size());
+      namespaceSummaryResponse.setNumBucket(buckets.size());
       int totalDir = 0;
       int totalKey = 0;
 
@@ -125,34 +125,34 @@ public class NSSummaryEndpoint {
         totalDir += getTotalDirCount(bucketObjectId);
         totalKey += getTotalKeyCount(bucketObjectId);
       }
-      basicResponse.setNumTotalDir(totalDir);
-      basicResponse.setNumTotalKey(totalKey);
+      namespaceSummaryResponse.setNumTotalDir(totalDir);
+      namespaceSummaryResponse.setNumTotalKey(totalKey);
       break;
     case BUCKET:
-      basicResponse = new BasicResponse(EntityType.BUCKET);
+      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.BUCKET);
       assert (names.length == 2);
       long bucketObjectId = getBucketObjectId(names);
-      basicResponse.setNumTotalDir(getTotalDirCount(bucketObjectId));
-      basicResponse.setNumTotalKey(getTotalKeyCount(bucketObjectId));
+      namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(bucketObjectId));
+      namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(bucketObjectId));
       break;
     case DIRECTORY:
       // path should exist so we don't need any extra verification/null check
       long dirObjectId = getDirObjectId(names);
-      basicResponse = new BasicResponse(EntityType.DIRECTORY);
-      basicResponse.setNumTotalDir(getTotalDirCount(dirObjectId));
-      basicResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
+      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.DIRECTORY);
+      namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(dirObjectId));
+      namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
       break;
     case KEY:
-      basicResponse = new BasicResponse(EntityType.KEY);
+      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.KEY);
       break;
     case UNKNOWN:
-      basicResponse = new BasicResponse(EntityType.UNKNOWN);
-      basicResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
+      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.UNKNOWN);
+      namespaceSummaryResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
       break;
     default:
       break;
     }
-    return Response.ok(basicResponse).build();
+    return Response.ok(namespaceSummaryResponse).build();
   }
 
   /**
@@ -171,7 +171,7 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = OmUtils.normalizeKey(path, false);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = getEntityType(path, names);
+    EntityType type = getEntityType(normalizedPath, names);
 
     DUResponse duResponse = new DUResponse();
     switch (type) {
@@ -309,7 +309,7 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = OmUtils.normalizeKey(path, false);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = getEntityType(path, names);
+    EntityType type = getEntityType(normalizedPath, names);
 
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     if (type == EntityType.ROOT) {
@@ -378,9 +378,9 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = OmUtils.normalizeKey(path, false);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = getEntityType(path, names);
+      EntityType type = getEntityType(normalizedPath, names);
 
-    FileSizeDistributionResponse distReponse =
+    FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();
     switch (type) {
     case ROOT:
@@ -396,7 +396,7 @@ public class NSSummaryEndpoint {
           fileSizeDist[i] += bucketFileSizeDist[i];
         }
       }
-      distReponse.setFileSizeDist(fileSizeDist);
+      distResponse.setFileSizeDist(fileSizeDist);
       break;
     case VOLUME:
       List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
@@ -411,29 +411,29 @@ public class NSSummaryEndpoint {
           volumeFileSizeDist[i] += bucketFileSizeDist[i];
         }
       }
-      distReponse.setFileSizeDist(volumeFileSizeDist);
+      distResponse.setFileSizeDist(volumeFileSizeDist);
       break;
     case BUCKET:
       long bucketObjectId = getBucketObjectId(names);
       int[] bucketFileSizeDist = getTotalFileSizeDist(bucketObjectId);
-      distReponse.setFileSizeDist(bucketFileSizeDist);
+      distResponse.setFileSizeDist(bucketFileSizeDist);
       break;
     case DIRECTORY:
       long dirObjectId = getDirObjectId(names);
       int[] dirFileSizeDist = getTotalFileSizeDist(dirObjectId);
-      distReponse.setFileSizeDist(dirFileSizeDist);
+      distResponse.setFileSizeDist(dirFileSizeDist);
       break;
     case KEY:
       // key itself doesn't have file size distribution
-      distReponse.setStatus(ResponseStatus.TYPE_NOT_APPLICABLE);
+      distResponse.setStatus(ResponseStatus.TYPE_NOT_APPLICABLE);
       break;
     case UNKNOWN:
-      distReponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
+      distResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
       break;
     default:
       break;
     }
-    return Response.ok(distReponse).build();
+    return Response.ok(distResponse).build();
   }
 
   /**

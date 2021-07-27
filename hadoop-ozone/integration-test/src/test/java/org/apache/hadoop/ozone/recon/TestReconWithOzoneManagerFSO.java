@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
-import org.apache.hadoop.ozone.recon.api.types.BasicResponse;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -121,7 +121,7 @@ public class TestReconWithOzoneManagerFSO {
     NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
             omMetadataManagerInstance);
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
-    BasicResponse entity = (BasicResponse) basicInfo.getEntity();
+    NamespaceSummaryResponse entity = (NamespaceSummaryResponse) basicInfo.getEntity();
     Assert.assertSame(entity.getEntityType(), EntityType.DIRECTORY);
     Assert.assertEquals(1, entity.getNumTotalKey());
     Assert.assertEquals(0, entity.getNumTotalDir());
@@ -140,7 +140,7 @@ public class TestReconWithOzoneManagerFSO {
 
     // test root response
     Response rootBasicRes = endpoint.getBasicInfo("/");
-    BasicResponse rootBasicEntity = (BasicResponse) rootBasicRes.getEntity();
+    NamespaceSummaryResponse rootBasicEntity = (NamespaceSummaryResponse) rootBasicRes.getEntity();
     Assert.assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
     // one additional dummy volume at creation
     Assert.assertEquals(13, rootBasicEntity.getNumVolume());

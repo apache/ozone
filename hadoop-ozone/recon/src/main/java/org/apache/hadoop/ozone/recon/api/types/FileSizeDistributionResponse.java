@@ -40,7 +40,7 @@ public class FileSizeDistributionResponse {
 
   public FileSizeDistributionResponse() {
     this.status = ResponseStatus.OK;
-    this.fileSizeDist = null;
+    this.fileSizeDist = new int[ReconConstants.NUM_OF_BINS];
   }
 
   public ResponseStatus getStatus() {
