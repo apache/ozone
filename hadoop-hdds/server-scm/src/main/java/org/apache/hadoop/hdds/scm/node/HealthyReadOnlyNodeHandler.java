@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
 
 /**
  * Handles non healthy to healthy(ReadOnly) node event.
@@ -71,6 +72,11 @@ public class HealthyReadOnlyNodeHandler
     NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
     if (!nt.contains(datanodeDetails)) {
       nt.add(datanodeDetails);
+      // make sure after DN is added back into topology, DatanodeDetails
+      // instance returned from nodeStateManager has parent correctly set.
+      Preconditions.checkNotNull(
+          nodeManager.getNodeByUuid(datanodeDetails.getUuidString())
+              .getParent());
     }
   }
 }

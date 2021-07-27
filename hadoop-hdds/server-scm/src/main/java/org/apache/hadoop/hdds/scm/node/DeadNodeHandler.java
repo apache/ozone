@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Preconditions;
+
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 
 /**
@@ -89,6 +91,11 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
       if (nt.contains(datanodeDetails)) {
         nt.remove(datanodeDetails);
+        //make sure after DN is removed from topology,
+        //DatanodeDetails instance returned from nodeStateManager has no parent.
+        Preconditions.checkState(
+            nodeManager.getNodeByUuid(datanodeDetails.getUuidString())
+                .getParent() == null);
       }
     } catch (NodeNotFoundException ex) {
       // This should not happen, we cannot get a dead node event for an
