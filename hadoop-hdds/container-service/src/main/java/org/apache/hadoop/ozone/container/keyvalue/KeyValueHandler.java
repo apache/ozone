@@ -265,7 +265,6 @@ public class KeyValueHandler extends Handler {
       if (containerSet.getContainer(containerID) == null) {
         String containerPathID =
             DatanodeMetadataFeatures.getContainerPathID(scmId, clusterId);
-        LOG.info("-- Creating container with ID {}", containerPathID);
         newContainer.create(volumeSet, volumeChoosingPolicy, containerPathID);
         created = containerSet.addContainer(newContainer);
       } else {
@@ -296,7 +295,9 @@ public class KeyValueHandler extends Handler {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           container.getContainerData().getMaxSize());
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-      container.populatePathFields(clusterId, containerVolume, hddsVolumeDir);
+      String idDir = DatanodeMetadataFeatures.getContainerPathID(scmId,
+          clusterId);
+      container.populatePathFields(idDir, containerVolume, hddsVolumeDir);
     } finally {
       volumeSet.readUnlock();
     }
