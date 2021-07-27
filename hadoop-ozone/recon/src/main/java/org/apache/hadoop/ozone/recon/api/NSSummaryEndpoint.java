@@ -320,7 +320,14 @@ public class NSSummaryEndpoint {
       long quotaUsedInBytes = 0L;
 
       for (OmVolumeArgs volume: volumes) {
-        quotaInBytes += volume.getQuotaInBytes();
+        final long quota = volume.getQuotaInBytes();
+        assert(quota >= -1L);
+        if (quota == -1L) {
+          // If one volume has unlimited quota, the "root" quota is unlimited.
+          quotaInBytes = -1L;
+          break;
+        }
+        quotaInBytes += quota;
       }
       for (OmBucketInfo bucket: buckets) {
         long bucketObjectId = bucket.getObjectID();
