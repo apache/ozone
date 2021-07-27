@@ -110,12 +110,12 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
-    public Builder setBucketNamespaceName(String kerberosPrincipal) {
+    public Builder setKerberosPrincipal(String kerberosPrincipal) {
       this.kerberosPrincipal = kerberosPrincipal;
       return this;
     }
 
-    public Builder setAccountNamespaceName(String sharedSecret) {
+    public Builder setSharedSecret(String sharedSecret) {
       this.sharedSecret = sharedSecret;
       return this;
     }
