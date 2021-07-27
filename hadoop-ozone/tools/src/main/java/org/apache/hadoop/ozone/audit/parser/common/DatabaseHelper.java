@@ -200,8 +200,8 @@ public final class DatabaseHelper {
     StringBuilder result = new StringBuilder();
     ResultSetMetaData rsm;
     try (Connection connection = getConnection(dbName);
-         Statement st = connection.createStatement();
-         ResultSet rs = st.executeQuery(sql)) {
+        PreparedStatement ps = connection.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery()) {
       if (rs != null) {
         rsm = rs.getMetaData();
         int cols = rsm.getColumnCount();

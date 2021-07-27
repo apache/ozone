@@ -57,13 +57,16 @@ public class ContinueToken {
   public String encodeToString() {
     if (this.lastKey != null) {
 
-      ByteBuffer buffer = ByteBuffer
-          .allocate(4 + lastKey.length()
-              + (lastDir == null ? 0 : lastDir.length()));
-      buffer.putInt(lastKey.length());
-      buffer.put(lastKey.getBytes(StandardCharsets.UTF_8));
+      byte[] rawLastKey = lastKey.getBytes(StandardCharsets.UTF_8);
+      byte[] rawLastDir = (lastDir == null ? new byte[0] :
+          lastDir.getBytes(StandardCharsets.UTF_8));
+
+      ByteBuffer buffer = ByteBuffer.allocate(
+          4 + rawLastKey.length + rawLastDir.length);
+      buffer.putInt(rawLastKey.length);
+      buffer.put(rawLastKey);
       if (lastDir != null) {
-        buffer.put(lastDir.getBytes(StandardCharsets.UTF_8));
+        buffer.put(rawLastDir);
       }
 
       String hex = Hex.encodeHexString(buffer.array());

@@ -117,6 +117,7 @@ public class SCMUpgradeFinalizer extends
           Thread.sleep(5000);
         } catch (InterruptedException e) {
           // Try again on next loop iteration.
+          Thread.currentThread().interrupt();
         }
       } else {
         LOG.info("Open pipeline found after SCM finalization");
@@ -154,6 +155,7 @@ public class SCMUpgradeFinalizer extends
           Thread.sleep(5000);
         }
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         continue;
       }
     }

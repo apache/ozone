@@ -178,6 +178,12 @@ public class TestOzoneManagerStarter {
     }
 
     @Override
+    public void bootstrap(OzoneConfiguration conf) throws IOException,
+        AuthenticationException {
+      //TODO: Add test for bootstrap
+    }
+
+    @Override
     public void startAndCancelPrepare(OzoneConfiguration conf)
         throws IOException, AuthenticationException {
       startAndCancelPrepareCalled = true;
