@@ -65,12 +65,16 @@ public class DataNodeUpgradeFinalizer extends
     while (containerIt.hasNext()) {
       Container ctr = containerIt.next();
       ContainerProtos.ContainerDataProto.State state = ctr.getContainerState();
+      long id = ctr.getContainerData().getContainerID();
       switch (state) {
       case OPEN:
       case CLOSING:
+        LOG.warn("FinalizeUpgrade : Waiting for container {} to close, current "
+            + "state is: {}", id, state);
+        return false;
       case UNHEALTHY:
-        LOG.warn("FinalizeUpgrade : Waiting for container to close, current "
-            + "state is: {}", state);
+        LOG.warn("FinalizeUpgrade: container {} is unhealthy, but " +
+                "finalization can proceed.", id);
         return false;
       default:
         continue;
