@@ -811,7 +811,7 @@ public class RpcClient implements ClientProtocol {
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
       if (!ugi.getShortUserName().equals(loginUser.getShortUserName())) {
         UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
-            ugi.getShortUserName(), UserGroupInformation.getLoginUser());
+            ugi.getShortUserName(), loginUser);
         decrypted = proxyUser.doAs(
             (PrivilegedExceptionAction<KeyProvider.KeyVersion>) () -> {
               return OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
