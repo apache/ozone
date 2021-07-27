@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.recon.api.types.BasicResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceResponseCode;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -84,8 +84,7 @@ public class TestNSSummaryEndpoint {
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
-  private static final String MALFORMED_PATH =
-          "vol1/buck1/a/b/c/d/e/file1.txt/";
+  private static final String PARENT_DIR = "vol1/buck1/a/b/c/d/e";
   private static final String[] TEST_NAMES =
           new String[]{"vol1", "buck1", "a", "b", "c", "d", "e", "file1.txt"};
   private static final String TEST_KEY_NAMES = "a/b/c/d/e/file1.txt";
@@ -200,8 +199,8 @@ public class TestNSSummaryEndpoint {
     Assert.assertArrayEquals(TEST_NAMES, names);
     String keyName = NSSummaryEndpoint.getKeyName(names);
     Assert.assertEquals(TEST_KEY_NAMES, keyName);
-    String reformatPath = NSSummaryEndpoint.reformatString(MALFORMED_PATH);
-    Assert.assertEquals(TEST_PATH_UTILITY, reformatPath);
+    String subpath = NSSummaryEndpoint.buildSubpath(PARENT_DIR, "file1.txt");
+    Assert.assertEquals(TEST_PATH_UTILITY, subpath);
   }
 
   @Test
@@ -210,7 +209,7 @@ public class TestNSSummaryEndpoint {
     Response volResponse = nsSummaryEndpoint.getBasicInfo(VOL_PATH);
     BasicResponse volResponseObj = (BasicResponse) volResponse.getEntity();
     Assert.assertEquals(EntityType.VOLUME, volResponseObj.getEntityType());
-    Assert.assertEquals(2, volResponseObj.getNumTotalBucket());
+    Assert.assertEquals(2, volResponseObj.getNumBucket());
     Assert.assertEquals(4, volResponseObj.getNumTotalDir());
     Assert.assertEquals(6, volResponseObj.getNumTotalKey());
 
@@ -240,7 +239,7 @@ public class TestNSSummaryEndpoint {
     // Test invalid path
     Response invalidResponse = nsSummaryEndpoint.getBasicInfo(INVALID_PATH);
     BasicResponse invalidObj = (BasicResponse) invalidResponse.getEntity();
-    Assert.assertEquals(NamespaceResponseCode.PATH_NOT_FOUND,
+    Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidObj.getStatus());
 
     // Test key
@@ -302,7 +301,7 @@ public class TestNSSummaryEndpoint {
     // invalid path check
     Response invalidResponse = nsSummaryEndpoint.getDiskUsage(INVALID_PATH);
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
-    Assert.assertEquals(NamespaceResponseCode.PATH_NOT_FOUND,
+    Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidObj.getStatus());
   }
 
@@ -330,20 +329,20 @@ public class TestNSSummaryEndpoint {
     Response naResponse1 = nsSummaryEndpoint.getQuotaUsage(DIR_ONE_PATH);
     QuotaUsageResponse quotaUsageResponse1 =
             (QuotaUsageResponse) naResponse1.getEntity();
-    Assert.assertEquals(NamespaceResponseCode.TYPE_NOT_APPLICABLE,
+    Assert.assertEquals(ResponseStatus.TYPE_NOT_APPLICABLE,
             quotaUsageResponse1.getResponseCode());
 
     Response naResponse2 = nsSummaryEndpoint.getQuotaUsage(KEY_PATH);
     QuotaUsageResponse quotaUsageResponse2 =
             (QuotaUsageResponse) naResponse2.getEntity();
-    Assert.assertEquals(NamespaceResponseCode.TYPE_NOT_APPLICABLE,
+    Assert.assertEquals(ResponseStatus.TYPE_NOT_APPLICABLE,
             quotaUsageResponse2.getResponseCode());
 
     // invalid path request
     Response invalidRes = nsSummaryEndpoint.getQuotaUsage(INVALID_PATH);
     QuotaUsageResponse invalidResObj =
             (QuotaUsageResponse) invalidRes.getEntity();
-    Assert.assertEquals(NamespaceResponseCode.PATH_NOT_FOUND,
+    Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidResObj.getResponseCode());
   }
 

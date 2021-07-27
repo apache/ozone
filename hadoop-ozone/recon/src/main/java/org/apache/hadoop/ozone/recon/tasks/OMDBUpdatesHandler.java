@@ -124,8 +124,10 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       }
 
       OMDBUpdateEvent event = builder.build();
-      LOG.info(String.format("Generated OM update Event for table : %s, " +
-              "action = %s", tableName, action));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Generated OM update Event for table : %s, " +
+                "action = %s", tableName, action));
+      }
       if (omdbUpdateEvents.contains(event)) {
         // If the same event is part of this batch, the last one only holds.
         // For example, if there are 2 PUT key1 events, then the first one

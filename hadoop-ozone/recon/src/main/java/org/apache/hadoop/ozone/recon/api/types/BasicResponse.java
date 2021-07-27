@@ -27,9 +27,12 @@ public class BasicResponse {
   @JsonProperty("type")
   private EntityType entityType;
 
+  @JsonProperty("vol")
+  private int numVolume;
+
   /** Total number of buckets for volume, 0 for other types. */
   @JsonProperty("bucket")
-  private int numTotalBucket;
+  private int numBucket;
 
   /** Total number of directories for a bucket or directory, 0 for others. */
   @JsonProperty("dir")
@@ -41,22 +44,27 @@ public class BasicResponse {
 
   /** Path Status. */
   @JsonProperty("status")
-  private NamespaceResponseCode status;
+  private ResponseStatus status;
 
   public BasicResponse(EntityType entityType) {
     this.entityType = entityType;
-    this.numTotalBucket = 0;
+    this.numVolume = 0;
+    this.numBucket = 0;
     this.numTotalDir = 0;
     this.numTotalKey = 0;
-    this.status = NamespaceResponseCode.OK;
+    this.status = ResponseStatus.OK;
   }
 
   public EntityType getEntityType() {
     return this.entityType;
   }
 
-  public int getNumTotalBucket() {
-    return this.numTotalBucket;
+  public int getNumVolume() {
+    return this.numVolume;
+  }
+
+  public int getNumBucket() {
+    return this.numBucket;
   }
 
   public int getNumTotalDir() {
@@ -67,7 +75,7 @@ public class BasicResponse {
     return this.numTotalKey;
   }
 
-  public NamespaceResponseCode getStatus() {
+  public ResponseStatus getStatus() {
     return this.status;
   }
 
@@ -75,8 +83,12 @@ public class BasicResponse {
     this.entityType = entityType;
   }
 
-  public void setNumTotalBucket(int numTotalBucket) {
-    this.numTotalBucket = numTotalBucket;
+  public void setNumVolume(int numVolume) {
+    this.numVolume = numVolume;
+  }
+
+  public void setNumBucket(int numBucket) {
+    this.numBucket = numBucket;
   }
 
   public void setNumTotalDir(int numTotalDir) {
@@ -87,7 +99,7 @@ public class BasicResponse {
     this.numTotalKey = numTotalKey;
   }
 
-  public void setStatus(NamespaceResponseCode status) {
+  public void setStatus(ResponseStatus status) {
     this.status = status;
   }
 }

@@ -35,10 +35,10 @@ public class QuotaUsageResponse {
 
   /** Path status. */
   @JsonProperty("status")
-  private NamespaceResponseCode responseCode;
+  private ResponseStatus responseCode;
 
   public QuotaUsageResponse() {
-    responseCode = NamespaceResponseCode.OK;
+    responseCode = ResponseStatus.OK;
     quota = 0L;
     quotaUsed = 0L;
   }
@@ -51,7 +51,7 @@ public class QuotaUsageResponse {
     return quotaUsed;
   }
 
-  public NamespaceResponseCode getResponseCode() {
+  public ResponseStatus getResponseCode() {
     return responseCode;
   }
 
@@ -63,7 +63,7 @@ public class QuotaUsageResponse {
     this.quotaUsed = quotaUsed;
   }
 
-  public void setResponseCode(NamespaceResponseCode responseCode) {
+  public void setResponseCode(ResponseStatus responseCode) {
     this.responseCode = responseCode;
   }
 }

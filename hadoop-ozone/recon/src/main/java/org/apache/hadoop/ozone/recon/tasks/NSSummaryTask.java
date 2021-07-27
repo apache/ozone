@@ -187,7 +187,7 @@ public class NSSummaryTask implements ReconOmTask {
         writeOmDirectoryInfoOnNamespaceDB(directoryInfo);
       }
 
-      // actually fileTable with FSO
+      // Get fileTable used by FSO
       Table keyTable = omMetadataManager.getFileTable();
 
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>

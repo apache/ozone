@@ -246,6 +246,11 @@ public class ReconServer extends GenericCli {
   }
 
   @VisibleForTesting
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
+  }
+
+  @VisibleForTesting
   ReconHttpServer getHttpServer() {
     return httpServer;
   }

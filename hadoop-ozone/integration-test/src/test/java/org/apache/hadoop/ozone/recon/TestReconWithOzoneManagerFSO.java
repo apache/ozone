@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import static java.net.HttpURLConnection.HTTP_CREATED;
-import static java.net.HttpURLConnection.HTTP_OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
@@ -26,12 +24,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -44,24 +37,22 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
+import org.apache.hadoop.ozone.recon.api.types.BasicResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.google.gson.Gson;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import javax.ws.rs.core.Response;
 
 /**
  * Test Ozone Recon.
@@ -75,10 +66,7 @@ public class TestReconWithOzoneManagerFSO {
   public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
-  private static CloseableHttpClient httpClient;
-  private static String nssummaryServiceURL;
   private static ObjectStore store;
-  private static String basicEndpoint;
 
   @BeforeClass
   public static void init() throws Exception {
@@ -122,56 +110,14 @@ public class TestReconWithOzoneManagerFSO {
     InetSocketAddress address =
             cluster.getReconServer().getHttpServer().getHttpAddress();
     String reconHTTPAddress = address.getHostName() + ":" + address.getPort();
-    nssummaryServiceURL = "http://" + reconHTTPAddress +
-            "/api/v1/namespace";
-
-    basicEndpoint = "/summary";
 
     store = cluster.getClient().getObjectStore();
-    // initialize HTTPClient
-    httpClient = HttpClientBuilder
-            .create()
-            .setDefaultRequestConfig(config)
-            .build();
   }
 
   @AfterClass
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
-    }
-  }
-
-  /**
-   * Returns a {@link CloseableHttpClient} configured by given configuration.
-   * If conf is null, returns a default instance.
-   *
-   * @param url        URL
-   * @return a JSON String Response.
-   */
-  private String makeHttpCall(String url, String pathRequest)
-          throws IOException, URISyntaxException {
-    HttpGet httpGet = new HttpGet(url);
-    if (pathRequest != null) {
-      URI uri = new URIBuilder(httpGet.getURI())
-              .addParameter("path", pathRequest).build();
-      httpGet.setURI(uri);
-    }
-
-    HttpResponse response = httpClient.execute(httpGet);
-    int errorCode = response.getStatusLine().getStatusCode();
-    HttpEntity entity = response.getEntity();
-
-    if ((errorCode == HTTP_OK) || (errorCode == HTTP_CREATED)) {
-      return EntityUtils.toString(entity);
-    }
-
-    if (entity != null) {
-      throw new IOException("Unexpected exception when trying to reach " +
-              "Recon Server, " + EntityUtils.toString(entity));
-    } else {
-      throw new IOException("Unexpected null in http payload," +
-              " while processing request");
     }
   }
 
@@ -198,47 +144,56 @@ public class TestReconWithOzoneManagerFSO {
   }
 
   @Test
-  public void testOmDBSyncing() throws Exception {
+  public void testNamespaceSummaryAPI() throws Exception {
     // add a vol, bucket and key
-    addKeys(0, 1);
-
+    addKeys(0, 10, "dir");
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
             cluster.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
-
-    // HTTP call to /api/namespace
-    String basicNSSummaryResponse = makeHttpCall(
-            nssummaryServiceURL + basicEndpoint, "/vol0");
-    Map basicNSSummaryMap =
-            getReconNSSummary(basicNSSummaryResponse);
-
-    String entityType = (String) basicNSSummaryMap.get("type");
-    Assert.assertEquals(EntityType.VOLUME.toString(), entityType);
-
-    //add 4 keys to check for delta updates
-    addKeys(1, 5);
-    // update the next snapshot from om to verify delta updates
+    ReconNamespaceSummaryManager namespaceSummaryManager =
+            cluster.getReconServer().getReconNamespaceSummaryManager();
+    ReconOMMetadataManager omMetadataManagerInstance =
+            (ReconOMMetadataManager)
+                    cluster.getReconServer().getOzoneManagerServiceProvider()
+                            .getOMMetadataManagerInstance();
+    NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
+            omMetadataManagerInstance);
+    Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
+    BasicResponse entity = (BasicResponse) basicInfo.getEntity();
+    Assert.assertSame(entity.getEntityType(), EntityType.DIRECTORY);
+    Assert.assertEquals(1, entity.getNumTotalKey());
+    Assert.assertEquals(0, entity.getNumTotalDir());
+    for (int i = 0; i < 10; i++) {
+      Assert.assertNotNull(impl.getOMMetadataManagerInstance()
+              .getVolumeTable().get("/vol"+ i));
+    }
+    addKeys(10, 12, "dir");
     impl.syncDataFromOM();
 
-    String basicNSSummaryResponse2 = makeHttpCall(
-            nssummaryServiceURL + basicEndpoint, "/vol3/bucket3");
-    Map basicNSSummaryMap2 = getReconNSSummary(basicNSSummaryResponse2);
-    Assert.assertEquals(EntityType.BUCKET.toString(),
-            basicNSSummaryMap2.get("type"));
-    Assert.assertEquals(1.0, basicNSSummaryMap2.get("key"));
-  }
+    // test Recon is sync'ed with OM.
+    for (int i = 10; i < 12; i++) {
+      Assert.assertNotNull(impl.getOMMetadataManagerInstance()
+              .getVolumeTable().getSkipCache("/vol"+ i));
+    }
 
-  private Map getReconNSSummary(String nssummaryResponse) {
-    return new Gson().fromJson(nssummaryResponse, HashMap.class);
+    // test root response
+    Response rootBasicRes = endpoint.getBasicInfo("/");
+    BasicResponse rootBasicEntity = (BasicResponse) rootBasicRes.getEntity();
+    Assert.assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
+    // one additional dummy volume at creation
+    Assert.assertEquals(13, rootBasicEntity.getNumVolume());
+    Assert.assertEquals(12, rootBasicEntity.getNumBucket());
+    Assert.assertEquals(12, rootBasicEntity.getNumTotalDir());
+    Assert.assertEquals(12, rootBasicEntity.getNumTotalKey());
   }
 
   /**
    * Helper function to add voli/bucketi/keyi to containeri to OM Metadata.
    * For test purpose each container will have only one key.
    */
-  private void addKeys(int start, int end) throws Exception {
+  private void addKeys(int start, int end, String dirPrefix) throws Exception {
     for(int i = start; i < end; i++) {
-      writeKeys("vol"+i, "bucket"+i, "key"+i);
+      writeKeys("vol"+i, "bucket"+i, dirPrefix + i + "/key"+i);
     }
   }
 }

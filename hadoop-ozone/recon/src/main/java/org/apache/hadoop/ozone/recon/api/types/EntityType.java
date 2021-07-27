@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.recon.api.types;
  * Enum class for namespace type.
  */
 public enum EntityType {
+  ROOT,
   VOLUME,
   BUCKET,
   DIRECTORY,
