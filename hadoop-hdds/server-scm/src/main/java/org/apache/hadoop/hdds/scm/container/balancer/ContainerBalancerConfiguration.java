@@ -27,9 +27,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -49,16 +51,17 @@ public final class ContainerBalancerConfiguration {
           " of the entire cluster) no more than the threshold value.")
   private String threshold = "0.1";
 
-  @Config(key = "datanodes.balanced.max.per.iteration", type = ConfigType.INT,
+  @Config(key = "datanodes.involved.max.per.iteration", type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.BALANCER}, description = "The " +
-      "maximum number of datanodes that should be balanced in one iteration.")
-  private int maxDatanodesToBalance = 5;
+      "maximum number of datanodes that should be involved in balancing in " +
+      "one iteration.")
+  private int maxDatanodesToInvolvePerIteration = 5;
 
   @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
       defaultValue = "10GB", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in bytes that will be moved " +
           "by Container Balancer in one iteration.")
-  private long maxSizeToMove = 10 * OzoneConsts.GB;
+  private long maxSizeToMovePerIteration = 10 * OzoneConsts.GB;
 
   @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
       defaultValue = "5GB", tags = {ConfigTag.BALANCER}, description = "The " +
@@ -81,6 +84,12 @@ public final class ContainerBalancerConfiguration {
       "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
+
+  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
+      timeUnit = TimeUnit.MINUTES, tags = {ConfigTag.BALANCER}, description =
+      "The amount of time in minutes to allow a single container to move " +
+          "from source to target.")
+  private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -128,23 +137,24 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the value of maximum number of datanodes that will be balanced by
-   * Container Balancer in one iteration.
+   * Gets the value of maximum number of datanodes that will be involved in
+   * balancing by Container Balancer in one iteration.
    *
    * @return maximum number of datanodes
    */
-  public int getMaxDatanodesToBalance() {
-    return maxDatanodesToBalance;
+  public int getMaxDatanodesToInvolvePerIteration() {
+    return maxDatanodesToInvolvePerIteration;
   }
 
   /**
-   * Sets the value of maximum number of datanodes that will be balanced by
-   * Container Balancer in one iteration.
+   * Sets the value of maximum number of datanodes that will be involved in
+   * balancing by Container Balancer in one iteration.
    *
-   * @param maxDatanodesToBalance maximum number of datanodes
+   * @param maxDatanodesToInvolvePerIteration maximum number of datanodes
    */
-  public void setMaxDatanodesToBalance(int maxDatanodesToBalance) {
-    this.maxDatanodesToBalance = maxDatanodesToBalance;
+  public void setMaxDatanodesToInvolvePerIteration(
+      int maxDatanodesToInvolvePerIteration) {
+    this.maxDatanodesToInvolvePerIteration = maxDatanodesToInvolvePerIteration;
   }
 
   /**
@@ -153,18 +163,18 @@ public final class ContainerBalancerConfiguration {
    *
    * @return maximum size in Bytes
    */
-  public long getMaxSizeToMove() {
-    return maxSizeToMove;
+  public long getMaxSizeToMovePerIteration() {
+    return maxSizeToMovePerIteration;
   }
 
   /**
    * Sets the value of maximum size that will be moved by Container Balancer
    * in one iteration.
    *
-   * @param maxSizeToMove maximum number of Bytes
+   * @param maxSizeToMovePerIteration maximum number of Bytes
    */
-  public void setMaxSizeToMove(long maxSizeToMove) {
-    this.maxSizeToMove = maxSizeToMove;
+  public void setMaxSizeToMovePerIteration(long maxSizeToMovePerIteration) {
+    this.maxSizeToMovePerIteration = maxSizeToMovePerIteration;
   }
 
   public long getMaxSizeEnteringTarget() {
@@ -201,6 +211,14 @@ public final class ContainerBalancerConfiguration {
     this.excludeContainers = excludeContainers;
   }
 
+  public Duration getMoveTimeout() {
+    return Duration.ofMillis(moveTimeout);
+  }
+
+  public void setMoveTimeout(Duration duration) {
+    this.moveTimeout = duration.toMillis();
+  }
+
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
@@ -208,7 +226,8 @@ public final class ContainerBalancerConfiguration {
             "%-30s %s%n" +
             "%-30s %d%n" +
             "%-30s %dB%n", "Key", "Value", "Threshold",
-        threshold, "Max Datanodes to Balance", maxDatanodesToBalance,
-        "Max Size to Move", maxSizeToMove);
+        threshold, "Max Datanodes to Involve",
+        maxDatanodesToInvolvePerIteration,
+        "Max Size to Move", maxSizeToMovePerIteration);
   }
 }

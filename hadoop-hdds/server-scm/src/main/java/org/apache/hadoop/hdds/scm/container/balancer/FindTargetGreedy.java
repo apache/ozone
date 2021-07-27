@@ -105,7 +105,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
    * @param replicas Set of replicas of the given container
    * @param source Source datanode for container move
    * @param target Target datanode for container move
-   * @return
+   * @return true if placement policy is satisfied, otherwise false
    */
   @Override
   public boolean containerMoveSatisfiesPlacementPolicy(
