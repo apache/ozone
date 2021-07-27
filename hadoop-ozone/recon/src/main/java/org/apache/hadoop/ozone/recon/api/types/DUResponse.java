@@ -71,7 +71,7 @@ public class DUResponse {
    */
   public static class DiskUsage {
     /** The subpath name. */
-    @JsonProperty("subpath")
+    @JsonProperty("path")
     private String subpath;
 
     /** Disk usage without replication under the subpath. */
