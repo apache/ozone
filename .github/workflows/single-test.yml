@@ -1,4 +1,4 @@
-name: it-client
+name: hdds-5358-S3SecretRevoke
 on:
   schedule:
    - cron: '*/1 * * * *'
@@ -22,7 +22,7 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -Dtest=TestOzoneRpcClient
+        run: hadoop-ozone/dev-support/checks/integration.sh -Dtest=TestSecureOzoneCluster#testGetS3SecretAndRevokeS3Secret
         env:
           ITERATIONS: 60
       - name: Summary of failures
