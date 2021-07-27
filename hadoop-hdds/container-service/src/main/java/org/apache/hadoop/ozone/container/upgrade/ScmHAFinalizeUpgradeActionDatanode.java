@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Action to run upgrade flow for SCM HA exactly once.
@@ -77,7 +78,9 @@ public class ScmHAFinalizeUpgradeActionDatanode
         LOG.info("Creating symlink {} -> {} as part of SCM HA " +
                 "finalization for datanode.", clusterIDDir.getAbsolutePath(),
             scmIDDir.getAbsolutePath());
-        Files.createSymbolicLink(clusterIDDir.toPath(), scmIDDir.toPath());
+        Path relativeScmIDDir =
+            hddsVolumeDir.toPath().relativize(scmIDDir.toPath());
+        Files.createSymbolicLink(clusterIDDir.toPath(), relativeScmIDDir);
       } else {
         LOG.info("Volume already contains cluster ID directory {}. No " +
             "action required for SCM HA finalization.", clusterIDDir);
