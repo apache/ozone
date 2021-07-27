@@ -131,18 +131,6 @@ public class MutableVolumeSet implements VolumeSet {
     initializeVolumeSet();
   }
 
-  public MutableVolumeSet(ConfigurationSource conf) throws IOException {
-    this.datanodeUuid = null;
-    this.clusterID = null;
-    this.conf = conf;
-    this.volumeSetRWLock = new ReentrantReadWriteLock();
-    this.volumeChecker = new StorageVolumeChecker(conf, new Timer());
-    this.volumeType = StorageVolume.VolumeType.DATA_VOLUME;
-    this.volumeFactory = new HddsVolumeFactory(conf, null,
-        this, null, null);
-    initializeVolumeSet();
-  }
-
   public void setFailedVolumeListener(Runnable runnable) {
     failedVolumeListener = runnable;
   }

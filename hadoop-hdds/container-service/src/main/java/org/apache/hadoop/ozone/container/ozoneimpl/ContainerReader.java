@@ -19,19 +19,12 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Collections;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -45,7 +38,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * Class used to read .container files from Volume and build container map.
@@ -165,7 +157,7 @@ public class ContainerReader implements Runnable {
                   long containerID =
                       ContainerUtils.getContainerID(containerDir);
                   if (containerFile.exists()) {
-                    verifyContainerFile(clusterIDDir, containerID, containerFile);
+                    verifyContainerFile(containerID, containerFile);
                   } else {
                     LOG.error("Missing .container file for ContainerID: {}",
                         containerDir.getName());
@@ -183,7 +175,7 @@ public class ContainerReader implements Runnable {
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
-  private void verifyContainerFile(File storageLoc, long containerID,
+  private void verifyContainerFile(long containerID,
                                    File containerFile) {
     try {
       ContainerData containerData = ContainerDataYaml.readContainerFile(
@@ -193,7 +185,7 @@ public class ContainerReader implements Runnable {
             "Skipping loading of this container.", containerFile);
         return;
       }
-      verifyAndFixupContainerData(storageLoc, containerData);
+      verifyAndFixupContainerData(containerData);
     } catch (IOException ex) {
       LOG.error("Failed to parse ContainerFile for ContainerID: {}",
           containerID, ex);
@@ -207,8 +199,8 @@ public class ContainerReader implements Runnable {
    * @param containerData
    * @throws IOException
    */
-  public void verifyAndFixupContainerData(File storageLoc,
-      ContainerData containerData) throws IOException {
+  public void verifyAndFixupContainerData(ContainerData containerData)
+      throws IOException {
     switch (containerData.getContainerType()) {
     case KeyValueContainer:
       if (containerData instanceof KeyValueContainerData) {
