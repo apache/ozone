@@ -18,14 +18,17 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -80,14 +83,14 @@ public class TestRatisPipelineCreateAndDestroy {
     // make sure two pipelines are created
     waitForPipelines(2);
     Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+        new RatisReplicationConfig(
+            ReplicationFactor.ONE)).size());
 
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+        .getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
     // make sure two pipelines are created
     waitForPipelines(2);
@@ -102,14 +105,14 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+        new RatisReplicationConfig(
+            ReplicationFactor.ONE)).size());
 
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+        .getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
 
     // make sure two pipelines are created
@@ -126,16 +129,16 @@ public class TestRatisPipelineCreateAndDestroy {
     List<HddsDatanodeService> dns = new ArrayList<>(cluster.getHddsDatanodes());
 
     List<Pipeline> pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        pipelineManager.getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE));
     for (HddsDatanodeService dn : dns) {
       cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
     }
 
     // try creating another pipeline now
     try {
-      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.createPipeline(new RatisReplicationConfig(
+          ReplicationFactor.THREE));
       Assert.fail("pipeline creation should fail after shutting down pipeline");
     } catch (IOException ioe) {
       // As now all datanodes are shutdown, they move to stale state, there
@@ -153,14 +156,16 @@ public class TestRatisPipelineCreateAndDestroy {
 
     // destroy the existing pipelines
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
 
     if (cluster.getStorageContainerManager()
         .getScmNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) >=
         HddsProtos.ReplicationFactor.THREE.getNumber()) {
       // make sure pipelines is created after node start
-      pipelineManager.triggerPipelineCreation();
+      cluster.getStorageContainerManager()
+          .getSCMServiceManager()
+          .notifyEventTriggered(Event.PRE_CHECK_COMPLETED);
       waitForPipelines(1);
     }
   }
@@ -168,8 +173,8 @@ public class TestRatisPipelineCreateAndDestroy {
   private void waitForPipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(new RatisReplicationConfig(
+            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
         .size() >= numPipelines, 100, 60000);
   }
 }

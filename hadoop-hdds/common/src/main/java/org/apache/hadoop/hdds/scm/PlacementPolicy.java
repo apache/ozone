@@ -35,13 +35,14 @@ public interface PlacementPolicy {
    * @param excludedNodes - list of nodes to be excluded.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return list of datanodes chosen.
    * @throws IOException
    */
   List<DatanodeDetails> chooseDatanodes(List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> favoredNodes, int nodesRequired, long sizeRequired)
-      throws IOException;
+      List<DatanodeDetails> favoredNodes, int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws IOException;
 
   /**
    * Given a list of datanode and the number of replicas required, return

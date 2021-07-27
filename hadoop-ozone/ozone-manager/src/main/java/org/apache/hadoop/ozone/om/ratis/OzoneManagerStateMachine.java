@@ -32,9 +32,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -48,6 +53,8 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.RaftException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -63,6 +70,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
@@ -80,7 +88,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private final OMRatisSnapshotInfo snapshotInfo;
+  private final RatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
@@ -131,7 +139,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    loadSnapshotInfoFromDB();
+    getLifeCycle().startAndTransition(() -> {
+      loadSnapshotInfoFromDB();
+      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
+    });
   }
 
   @Override
@@ -165,6 +177,26 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   /**
+   * Called to notify state machine about configuration changes.
+   * Configurations changes include addition of newly bootstrapped OM.
+   */
+  @Override
+  public void notifyConfigurationChanged(long term, long index,
+      RaftProtos.RaftConfigurationProto newRaftConfiguration) {
+    List<RaftProtos.RaftPeerProto> newPeers =
+        newRaftConfiguration.getPeersList();
+    LOG.info("Received Configuration change notification from Ratis. New Peer" +
+        " list:\n{}", newPeers);
+
+    List<String> newPeerIds = new ArrayList<>();
+    for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
+      newPeerIds.add(RaftPeerId.valueOf(raftPeerProto.getId()).toString());
+    }
+    // Check and update the peer list in OzoneManager
+    ozoneManager.updatePeerList(newPeerIds);
+  }
+
+  /**
    * Validate/pre-process the incoming update request in the state machine.
    * @return the content to be written to the log entry. Null means the request
    * should be rejected.
@@ -191,6 +223,46 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       return ctxt;
     }
     return handleStartTransactionRequests(raftClientRequest, omRequest);
+  }
+
+  @Override
+  public TransactionContext preAppendTransaction(TransactionContext trx)
+      throws IOException {
+    OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
+        trx.getStateMachineLogEntry().getLogData());
+    OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
+
+    OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
+
+    if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
+      // Must authenticate prepare requests here, since we must determine
+      // whether or not to apply the prepare gate before proceeding with the
+      // prepare request.
+      String username = request.getUserInfo().getUserName();
+      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(username)) {
+        String message = "Access denied for user " + username + ". " +
+            "Superuser privilege is required to prepare ozone managers.";
+        OMException cause =
+            new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
+        // Leader should not step down because of this failure.
+        throw new StateMachineException(message, cause, false);
+      } else {
+        prepareState.enablePrepareGate();
+      }
+    }
+
+    // In prepare mode, only prepare and cancel requests are allowed to go
+    // through.
+    if (prepareState.requestAllowed(cmdType)) {
+      return trx;
+    } else {
+      String message = "Cannot apply write request " +
+          request.getCmdType().name() + " when OM is in prepare mode.";
+      OMException cause = new OMException(message,
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
+      // Indicate that the leader should not step down because of this failure.
+      throw new StateMachineException(message, cause, false);
+    }
   }
 
   /*
@@ -347,6 +419,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     long lastAppliedIndex = lastTermIndex.getIndex();
     snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
         lastAppliedIndex);
+    TransactionInfo build = new TransactionInfo.Builder()
+        .setTransactionIndex(lastAppliedIndex)
+        .setCurrentTerm(lastTermIndex.getTerm()).build();
+    Table<String, TransactionInfo> txnInfoTable =
+        ozoneManager.getMetadataManager().getTransactionInfoTable();
+    txnInfoTable.put(TRANSACTION_INFO_KEY, build);
     ozoneManager.getMetadataManager().getStore().flushDB();
     return lastAppliedIndex;
   }
@@ -385,6 +463,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
     return OMRatisHelper.smProtoToString(proto);
+  }
+
+  @Override
+  public void close() throws IOException {
+    // OM should be shutdown as the StateMachine has shutdown.
+    LOG.info("StateMachine has shutdown. Shutdown OzoneManager if not " +
+        "already shutdown.");
+    ozoneManager.shutdown(new RaftException("RaftServer called shutdown on " +
+        "StateMachine"));
   }
 
   /**
@@ -505,15 +592,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // This is done, as we have a check in Ratis for not throwing
     // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
     // nextIndex (placeHolderIndex).
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(
             ozoneManager.getMetadataManager());
-    if (omTransactionInfo != null) {
+    if (transactionInfo != null) {
       setLastAppliedTermIndex(TermIndex.valueOf(
-          omTransactionInfo.getTerm(),
-          omTransactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(omTransactionInfo.getTerm(),
-          omTransactionInfo.getTransactionIndex());
+          transactionInfo.getTerm(),
+          transactionInfo.getTransactionIndex()));
+      snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
+          transactionInfo.getTransactionIndex());
     }
     LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
         getLastAppliedTermIndex());

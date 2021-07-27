@@ -21,7 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for a *unstable* .proto interface.
  */
-
+syntax = "proto2";
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 option java_outer_classname = "StorageContainerLocationProtocolProtos";
 option java_generic_services = true;
@@ -67,6 +67,13 @@ message ScmContainerLocationRequest {
   optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
   optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
   optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
+  optional GetExistContainerWithPipelinesInBatchRequestProto getExistContainerWithPipelinesInBatchRequest = 31;
+  optional GetContainerTokenRequestProto containerTokenRequest = 32;
+  optional StartContainerBalancerRequestProto startContainerBalancerRequest = 33;
+  optional StopContainerBalancerRequestProto stopContainerBalancerRequest = 34;
+  optional ContainerBalancerStatusRequestProto containerBalancerStatusRequest = 35;
+  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 36;
+  optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
 }
 
 message ScmContainerLocationResponse {
@@ -105,10 +112,19 @@ message ScmContainerLocationResponse {
   optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
   optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
   optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
+  optional GetExistContainerWithPipelinesInBatchResponseProto getExistContainerWithPipelinesInBatchResponse = 31;
+  optional GetContainerTokenResponseProto containerTokenResponse = 32;
+  optional StartContainerBalancerResponseProto startContainerBalancerResponse = 33;
+  optional StopContainerBalancerResponseProto stopContainerBalancerResponse = 34;
+  optional ContainerBalancerStatusResponseProto containerBalancerStatusResponse = 35;
+  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 36;
+  optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
+
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
     CONTAINER_IS_MISSING = 3;
+    SCM_NOT_LEADER = 4;
   }
 }
 
@@ -139,6 +155,13 @@ enum Type {
   RecommissionNodes = 23;
   StartMaintenanceNodes = 24;
   DatanodeUsageInfo = 25;
+  GetExistContainerWithPipelinesInBatch = 26;
+  GetContainerToken = 27;
+  StartContainerBalancer = 28;
+  StopContainerBalancer = 29;
+  GetContainerBalancerStatus = 30;
+  FinalizeScmUpgrade = 31;
+  QueryUpgradeFinalizationProgress = 32;
 }
 
 /**
@@ -160,6 +183,7 @@ message ContainerResponseProto {
     success = 1;
     errorContainerAlreadyExists = 2;
     errorContainerMissing = 3;
+    scmNotLeader = 4;
   }
   required Error errorCode = 1;
   required ContainerWithPipeline containerWithPipeline = 2;
@@ -191,6 +215,11 @@ message GetContainerWithPipelineBatchRequestProto {
   optional string traceID = 2;
 }
 
+message GetExistContainerWithPipelinesInBatchRequestProto {
+  repeated int64 containerIDs = 1;
+  optional string traceID = 2;
+}
+
 message GetSafeModeRuleStatusesRequestProto {
 }
 
@@ -205,6 +234,10 @@ message GetSafeModeRuleStatusesResponseProto {
 }
 
 message GetContainerWithPipelineBatchResponseProto {
+  repeated ContainerWithPipeline containerWithPipelines = 1;
+}
+
+message GetExistContainerWithPipelinesInBatchResponseProto {
   repeated ContainerWithPipeline containerWithPipelines = 1;
 }
 
@@ -255,15 +288,17 @@ message NodeQueryResponseProto {
 }
 
 /*
-  Usage info request message containing ip and uuid.
+  Datanode usage info request message.
 */
 message DatanodeUsageInfoRequestProto {
   optional string ipaddress = 1;
   optional string uuid = 2;
+  optional bool mostUsed = 3;
+  optional uint32 count = 4;
 }
 
 message DatanodeUsageInfoResponseProto {
-  repeated DatanodeUsageInfo info = 1;
+  repeated DatanodeUsageInfoProto info = 1;
 }
 
 /*
@@ -273,8 +308,14 @@ message DecommissionNodesRequestProto {
   repeated string hosts = 1;
 }
 
+
+message DatanodeAdminErrorResponseProto {
+  required string host = 1;
+  required string error = 2;
+}
+
 message DecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -285,7 +326,7 @@ message RecommissionNodesRequestProto {
 }
 
 message RecommissionNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*
@@ -297,7 +338,7 @@ message StartMaintenanceNodesRequestProto {
 }
 
 message StartMaintenanceNodesResponseProto {
-  // empty response
+  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /**
@@ -401,6 +442,63 @@ message ReplicationManagerStatusRequestProto {
 }
 
 message ReplicationManagerStatusResponseProto {
+  required bool isRunning = 1;
+}
+
+message FinalizeScmUpgradeRequestProto {
+  required string upgradeClientId = 1;
+}
+message FinalizeScmUpgradeResponseProto {
+  required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+message QueryUpgradeFinalizationProgressRequestProto {
+  required string upgradeClientId = 1;
+  optional bool takeover = 2;
+  optional bool readonly = 3;
+}
+message QueryUpgradeFinalizationProgressResponseProto {
+  required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+message ContainerTokenSecretProto {
+    required string ownerId = 1;
+    required ContainerID containerId = 2;
+    required uint64 expiryDate = 3;
+    required string certSerialId = 4;
+}
+
+message GetContainerTokenRequestProto {
+  required ContainerID containerID = 1;
+}
+
+message GetContainerTokenResponseProto {
+  required TokenProto token = 1;
+}
+
+message StartContainerBalancerRequestProto {
+  optional string traceID = 1;
+  optional double threshold = 2;
+  optional int32 idleiterations = 3;
+  optional int32 maxDatanodesToBalance = 4;
+  optional int64 maxSizeToMoveInGB = 5;
+}
+
+message StartContainerBalancerResponseProto {
+  required bool start = 1;
+}
+
+message StopContainerBalancerRequestProto {
+  optional string traceID = 1;
+}
+
+message StopContainerBalancerResponseProto {
+}
+
+message ContainerBalancerStatusRequestProto {
+  optional string traceID = 1;
+}
+
+message ContainerBalancerStatusResponseProto {
   required bool isRunning = 1;
 }
 

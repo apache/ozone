@@ -21,9 +21,11 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -34,32 +36,28 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 public class MockRatisPipelineProvider extends RatisPipelineProvider {
 
   private boolean autoOpenPipeline;
-  private  boolean isHealthy;
 
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher, boolean autoOpen) {
-    super(nodeManager, stateManager, conf, eventPublisher);
+  public MockRatisPipelineProvider(
+      NodeManager nodeManager, StateManager stateManager,
+      ConfigurationSource conf, EventPublisher eventPublisher,
+      boolean autoOpen) {
+    super(nodeManager, stateManager,
+        conf, eventPublisher, SCMContext.emptyContext());
     autoOpenPipeline = autoOpen;
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager,
+      StateManager stateManager,
       ConfigurationSource conf) {
-    super(nodeManager, stateManager, conf, new EventQueue());
+    super(nodeManager, stateManager,
+        conf, new EventQueue(), SCMContext.emptyContext());
   }
 
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager,
-      ConfigurationSource conf, boolean isHealthy) {
-    super(nodeManager, stateManager, conf, new EventQueue());
-    this.isHealthy = isHealthy;
-  }
-
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher) {
-    super(nodeManager, stateManager, conf, eventPublisher);
+  public MockRatisPipelineProvider(
+      NodeManager nodeManager, StateManager stateManager,
+      ConfigurationSource conf, EventPublisher eventPublisher) {
+    super(nodeManager, stateManager,
+        conf, eventPublisher, SCMContext.emptyContext());
     autoOpenPipeline = true;
   }
 
@@ -68,28 +66,31 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public Pipeline create(HddsProtos.ReplicationFactor factor)
+  public Pipeline create(RatisReplicationConfig replicationConfig)
       throws IOException {
     if (autoOpenPipeline) {
-      return super.create(factor);
+      return super.create(replicationConfig);
     } else {
-      Pipeline initialPipeline = super.create(factor);
+      Pipeline initialPipeline = super.create(replicationConfig);
       Pipeline pipeline = Pipeline.newBuilder()
           .setId(initialPipeline.getId())
           // overwrite pipeline state to main ALLOCATED
           .setState(Pipeline.PipelineState.ALLOCATED)
-          .setType(initialPipeline.getType())
-          .setFactor(factor)
+          .setReplicationConfig(ReplicationConfig
+              .fromTypeAndFactor(initialPipeline.getType(),
+                  replicationConfig.getReplicationFactor()))
           .setNodes(initialPipeline.getNodes())
           .build();
-      if (isHealthy) {
-        for (DatanodeDetails datanodeDetails : initialPipeline.getNodes()) {
-          pipeline.reportDatanode(datanodeDetails);
-        }
-        pipeline.setLeaderId(initialPipeline.getFirstNode().getUuid());
-      }
       return pipeline;
     }
+  }
+
+  public static void markPipelineHealthy(Pipeline pipeline)
+      throws IOException {
+    for (DatanodeDetails datanodeDetails : pipeline.getNodes()) {
+      pipeline.reportDatanode(datanodeDetails);
+    }
+    pipeline.setLeaderId(pipeline.getFirstNode().getUuid());
   }
 
   @Override
@@ -98,13 +99,12 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public Pipeline create(HddsProtos.ReplicationFactor factor,
-                         List<DatanodeDetails> nodes) {
+  public Pipeline create(RatisReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(Pipeline.PipelineState.OPEN)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .build();
   }

@@ -17,10 +17,12 @@
 package org.apache.hadoop.ozone.container.testutils;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -157,6 +159,20 @@ public class ReplicationNodeManagerMock implements NodeManager {
    */
   @Override
   public Map<DatanodeDetails, SCMNodeStat> getNodeStats() {
+    return null;
+  }
+
+  /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  @Override
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed) {
     return null;
   }
 
@@ -321,7 +337,8 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public RegisteredCommand register(DatanodeDetails dd,
                                     NodeReportProto nodeReport,
-                                    PipelineReportsProto pipelineReportsProto) {
+                                    PipelineReportsProto pipelineReportsProto,
+                                    LayoutVersionProto layoutInfo) {
     return null;
   }
 
@@ -329,10 +346,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param dd - Datanode Details.
+   * @param layoutInfo - Layout Version Proto
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails dd) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails dd,
+                                           LayoutVersionProto layoutInfo) {
     return null;
   }
 
@@ -372,6 +391,17 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public void processNodeReport(DatanodeDetails dnUuid,
                                 NodeReportProto nodeReport) {
+    // do nothing.
+  }
+
+  /**
+   * Empty implementation for processLayoutVersionReport.
+   * @param dnUuid
+   * @param layoutVersionReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails dnUuid,
+                                LayoutVersionProto layoutVersionReport) {
     // do nothing.
   }
 

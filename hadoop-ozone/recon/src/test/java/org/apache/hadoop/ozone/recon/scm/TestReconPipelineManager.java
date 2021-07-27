@@ -23,9 +23,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -36,12 +41,14 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconPipelineProvider;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import org.junit.After;
@@ -52,6 +59,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
+
 import static org.mockito.Mockito.mock;
 
 /**
@@ -65,6 +74,9 @@ public class TestReconPipelineManager {
   private OzoneConfiguration conf;
   private SCMStorageConfig scmStorageConfig;
   private DBStore store;
+  private HDDSLayoutVersionManager versionManager;
+  private SCMHAManager scmhaManager;
+  private SCMContext scmContext;
 
   @Before
   public void setup() throws IOException {
@@ -74,6 +86,9 @@ public class TestReconPipelineManager {
     conf.set(OZONE_SCM_NAMES, "localhost");
     scmStorageConfig = new ReconStorageConfig(conf);
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    scmhaManager = MockSCMHAManager.getInstance(
+        true, new MockSCMHADBTransactionBuffer(store));
+    scmContext = SCMContext.emptyContext();
   }
 
   @After
@@ -91,30 +106,42 @@ public class TestReconPipelineManager {
 
     // Valid pipeline in Allocated state.
     Pipeline validPipeline = Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setId(pipelinesFromScm.get(0).getId())
         .setNodes(pipelinesFromScm.get(0).getNodes())
         .setState(Pipeline.PipelineState.ALLOCATED)
-        .setType(ReplicationType.STAND_ALONE)
+
         .build();
 
     // Invalid pipeline.
     Pipeline invalidPipeline = Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(ReplicationFactor.ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.singletonList(randomDatanodeDetails()))
         .setState(Pipeline.PipelineState.CLOSED)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .build();
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
 
     try (ReconPipelineManager reconPipelineManager =
-        new ReconPipelineManager(conf, nodeManager,
-            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue)) {
+             ReconPipelineManager.newReconPipelineManager(
+                 conf,
+                 nodeManager,
+                 ReconSCMDBDefinition.PIPELINES.getTable(store),
+                 eventQueue,
+                 scmhaManager,
+                 scmContext)) {
       reconPipelineManager.addPipeline(validPipeline);
       reconPipelineManager.addPipeline(invalidPipeline);
 
@@ -145,12 +172,24 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
 
     ReconPipelineManager reconPipelineManager =
-        new ReconPipelineManager(conf, nodeManager,
-            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+        ReconPipelineManager.newReconPipelineManager(
+            conf,
+            nodeManager,
+            ReconSCMDBDefinition.PIPELINES.getTable(store),
+            eventQueue,
+            scmhaManager,
+            scmContext);
+
     assertFalse(reconPipelineManager.containsPipeline(pipeline.getId()));
     reconPipelineManager.addPipeline(pipeline);
     assertTrue(reconPipelineManager.containsPipeline(pipeline.getId()));
@@ -161,9 +200,15 @@ public class TestReconPipelineManager {
 
     NodeManager nodeManagerMock = mock(NodeManager.class);
 
-    ReconPipelineManager reconPipelineManager = new ReconPipelineManager(
-        conf, nodeManagerMock, ReconSCMDBDefinition.PIPELINES.getTable(store),
-        new EventQueue());
+    ReconPipelineManager reconPipelineManager =
+        ReconPipelineManager.newReconPipelineManager(
+            conf,
+            nodeManagerMock,
+            ReconSCMDBDefinition.PIPELINES.getTable(store),
+            new EventQueue(),
+            scmhaManager,
+            scmContext);
+
     PipelineFactory pipelineFactory = reconPipelineManager.getPipelineFactory();
     assertTrue(pipelineFactory instanceof ReconPipelineFactory);
     ReconPipelineFactory reconPipelineFactory =

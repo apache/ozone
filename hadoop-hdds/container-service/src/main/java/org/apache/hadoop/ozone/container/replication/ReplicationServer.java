@@ -116,6 +116,7 @@ public class ReplicationServer {
       server.shutdown().awaitTermination(10L, TimeUnit.SECONDS);
     } catch (InterruptedException ex) {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -123,6 +124,9 @@ public class ReplicationServer {
     return port;
   }
 
+  /**
+   * Replication-related configuration.
+   */
   @ConfigGroup(prefix = "hdds.datanode.replication")
   public static final class ReplicationConfig {
 

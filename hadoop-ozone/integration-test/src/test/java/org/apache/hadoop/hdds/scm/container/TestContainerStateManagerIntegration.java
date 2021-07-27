@@ -25,6 +25,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.After;
@@ -64,7 +66,7 @@ public class TestContainerStateManagerIntegration {
   private MiniOzoneCluster cluster;
   private XceiverClientManager xceiverClientManager;
   private StorageContainerManager scm;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private ContainerStateManager containerStateManager;
   private int numContainerPerOwnerInPipeline;
 
@@ -107,7 +109,7 @@ public class TestContainerStateManagerIntegration {
     Assert.assertEquals(SCMTestUtils.getReplicationType(conf),
         info.getReplicationType());
     Assert.assertEquals(SCMTestUtils.getReplicationFactor(conf),
-        info.getReplicationFactor());
+        ReplicationConfig.getLegacyFactor(info.getReplicationConfig()));
     Assert.assertEquals(HddsProtos.LifeCycleState.OPEN, info.getState());
 
     // Check there are two containers in ALLOCATED state after allocation
@@ -151,7 +153,8 @@ public class TestContainerStateManagerIntegration {
 
   @Test
   public void testContainerStateManagerRestart() throws IOException,
-      TimeoutException, InterruptedException, AuthenticationException {
+      TimeoutException, InterruptedException, AuthenticationException,
+      InvalidStateTransitionException {
     // Allocate 5 containers in ALLOCATED state and 5 in CREATING state
 
     for (int i = 0; i < 10; i++) {
@@ -172,7 +175,7 @@ public class TestContainerStateManagerIntegration {
     cluster.restartStorageContainerManager(false);
 
     List<ContainerInfo> result = cluster.getStorageContainerManager()
-        .getContainerManager().listContainer(null, 100);
+        .getContainerManager().getContainers(null, 100);
 
     long matchCount = result.stream()
         .filter(info ->
@@ -180,7 +183,7 @@ public class TestContainerStateManagerIntegration {
         .filter(info ->
             info.getReplicationType() == SCMTestUtils.getReplicationType(conf))
         .filter(info ->
-            info.getReplicationFactor() ==
+            ReplicationConfig.getLegacyFactor(info.getReplicationConfig()) ==
                 SCMTestUtils.getReplicationFactor(conf))
         .filter(info ->
             info.getState() == HddsProtos.LifeCycleState.OPEN)
@@ -192,7 +195,7 @@ public class TestContainerStateManagerIntegration {
         .filter(info ->
             info.getReplicationType() == SCMTestUtils.getReplicationType(conf))
         .filter(info ->
-            info.getReplicationFactor() ==
+            ReplicationConfig.getLegacyFactor(info.getReplicationConfig()) ==
                 SCMTestUtils.getReplicationFactor(conf))
         .filter(info ->
             info.getState() == HddsProtos.LifeCycleState.CLOSING)
@@ -252,7 +255,7 @@ public class TestContainerStateManagerIntegration {
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
             container1.getPipeline(),
-            new HashSet<>(Collections.singletonList(new ContainerID(1))));
+            new HashSet<>(Collections.singletonList(ContainerID.valueOf(1))));
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
   }
@@ -277,8 +280,8 @@ public class TestContainerStateManagerIntegration {
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
             container1.getPipeline(),
-            new HashSet<>(Arrays.asList(new ContainerID(1), new
-                ContainerID(2), new ContainerID(3))));
+            new HashSet<>(Arrays.asList(ContainerID.valueOf(1),
+                ContainerID.valueOf(2), ContainerID.valueOf(3))));
     Assert.assertEquals(info.getContainerID(), 4);
   }
 
@@ -325,7 +328,8 @@ public class TestContainerStateManagerIntegration {
   }
 
   @Test
-  public void testUpdateContainerState() throws IOException {
+  public void testUpdateContainerState() throws IOException,
+      InvalidStateTransitionException {
     NavigableSet<ContainerID> containerList = containerStateManager
         .getMatchingContainerIDs(OzoneConsts.OZONE,
             SCMTestUtils.getReplicationType(conf),
@@ -418,7 +422,7 @@ public class TestContainerStateManagerIntegration {
         .setUuid(UUID.randomUUID()).build();
 
     // Test 1: no replica's exist
-    ContainerID containerID = ContainerID.valueof(RandomUtils.nextLong());
+    ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());
     Set<ContainerReplica> replicaSet;
     try {
       containerStateManager.getContainerReplicas(containerID);

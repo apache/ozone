@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -31,12 +32,14 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import com.google.common.cache.Cache;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,7 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -76,6 +79,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
@@ -91,6 +95,7 @@ public class TestOzoneAtRestEncryption {
       storageContainerLocationClient;
 
   private static final String SCM_ID = UUID.randomUUID().toString();
+  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static File testDir;
   private static OzoneConfiguration conf;
   private static final String TEST_KEY = "key1";
@@ -126,6 +131,7 @@ public class TestOzoneAtRestEncryption {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
         .setScmId(SCM_ID)
+        .setClusterId(CLUSTER_ID)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
@@ -145,7 +151,7 @@ public class TestOzoneAtRestEncryption {
     TestOzoneRpcClient.setStorageContainerLocationClient(
         storageContainerLocationClient);
     TestOzoneRpcClient.setStore(store);
-    TestOzoneRpcClient.setScmId(SCM_ID);
+    TestOzoneRpcClient.setClusterId(CLUSTER_ID);
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
@@ -322,7 +328,8 @@ public class TestOzoneAtRestEncryption {
         keyInfo.getLatestVersionLocations().getLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
-      if (!container.getReplicationFactor().equals(replicationFactor) || (
+      if (!ReplicationConfig.getLegacyFactor(container.getReplicationConfig())
+          .equals(replicationFactor) || (
           container.getReplicationType() != replicationType)) {
         return false;
       }
@@ -490,5 +497,27 @@ public class TestOzoneAtRestEncryption {
     Assert.assertArrayEquals("Read data does not match input data at offset " +
         offset + " and length " + readData.length,
         inputDataForComparison, readData);
+  }
+
+  @Test
+  public void testGetKeyProvider() throws Exception {
+    KeyProvider kp1 = store.getKeyProvider();
+    KeyProvider kpSpy = Mockito.spy(kp1);
+    Assert.assertNotEquals(kpSpy, kp1);
+    Cache<URI, KeyProvider> cacheSpy =
+        ((RpcClient)store.getClientProxy()).getKeyProviderCache();
+    cacheSpy.put(store.getKeyProviderUri(), kpSpy);
+    KeyProvider kp2 = store.getKeyProvider();
+    Assert.assertEquals(kpSpy, kp2);
+
+    // Verify the spied key provider is closed upon ozone client close
+    ozClient.close();
+    Mockito.verify(kpSpy).close();
+
+    KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
+    Assert.assertNotEquals(kp3, kpSpy);
+    // Restore ozClient and store
+    TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
+    TestOzoneRpcClient.setStore(ozClient.getObjectStore());
   }
 }

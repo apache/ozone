@@ -221,6 +221,13 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
 
+  // Comma separated acls (users, groups) allowing clients accessing
+  // OM admin protocol.
+  // When hadoop.security.authorization is true, this needs to be set in
+  // hadoop-policy.xml, "*" allows all users/groups to access.
+  public static final String OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL =
+      "ozone.om.security.admin.protocol.acl";
+
   public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
           "ozone.om.keyname.character.check.enabled";
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
@@ -244,4 +251,29 @@ public final class OMConfigKeys {
       "ozone.fs.trash.checkpoint.interval";
 
   public static final long  OZONE_FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
+
+//  This property is used to define the metadata layout of file system
+//  paths. If it is configured as PREFIX in combination with
+//  ozone.om.enable.filesystem.paths to true then this allows to perform
+//  atomic rename and delete of any directory at any level in the namespace.
+//  Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
+
+  public static final String OZONE_OM_METADATA_LAYOUT =
+          "ozone.om.metadata.layout";
+  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "SIMPLE";
+
+  public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
+
+  /**
+   * Configuration properties for Directory Deleting Service.
+   */
+  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL =
+      "ozone.directory.deleting.service.interval";
+  public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
+      = "60s";
+
+  public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
+      "ozone.path.deleting.limit.per.task";
+  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
+
 }

@@ -30,10 +30,10 @@ ${DEEP_DIR}          test/${SCHEME}/dir
 
 *** Keywords ***
 Setup for FS test
+    Assign suite vars for FS test
     Create volumes for FS test
     Run Keyword    Create ${BUCKET_TYPE}s for FS test
     Sanity check for FS test
-    Assign suite vars for FS test
     Log    Completed setup for ${SCHEME} tests with ${BUCKET_TYPE}s in ${VOLUME}/${BUCKET} using FS base URL: ${BASE_URL}
 
 Create volumes for FS test
@@ -59,12 +59,16 @@ Sanity check for FS test
     ${result} =         Execute               ozone sh volume list
                         Should contain        ${result}               ${VOLUME}
                         Should contain        ${result}               ${VOL2}
-                        Should Match Regexp   ${result}               "admin" : "(hadoop|testuser\/scm@EXAMPLE\.COM)"
+                        Should Match Regexp   ${result}               "admin" : "(hadoop|testuser\/scm[^@]*@EXAMPLE\.COM)"
     ${result} =         Execute               ozone sh bucket list ${VOLUME}
                         Should contain        ${result}               ${BUCKET}
                         Should contain        ${result}               ${BUCKET2}
 
 Assign suite vars for FS test
-    ${BASE_URL} =       Format FS URL         ${SCHEME}     ${VOLUME}    ${BUCKET}    /
+    ${random} =         Generate Random String  5  [NUMBERS]
+    Set Suite Variable  ${BUCKET}               ${random}-${BUCKET_TYPE}1-${SCHEME}
+    Set Suite Variable  ${BUCKET2}              ${random}-${BUCKET_TYPE}2-${SCHEME}
+    Set Suite Variable  ${BUCKET_IN_VOL2}       ${random}-${BUCKET_TYPE}3-${SCHEME}
+    ${BASE_URL} =       Format FS URL           ${SCHEME}     ${VOLUME}    ${BUCKET}    /
     Set Suite Variable  ${BASE_URL}
-    Set Suite Variable  ${DEEP_URL}           ${BASE_URL}${DEEP_DIR}
+    Set Suite Variable  ${DEEP_URL}             ${BASE_URL}${DEEP_DIR}

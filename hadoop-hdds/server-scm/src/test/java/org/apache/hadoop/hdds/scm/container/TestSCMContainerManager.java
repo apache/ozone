@@ -42,14 +42,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -66,7 +69,7 @@ import org.junit.rules.ExpectedException;
 public class TestSCMContainerManager {
   private static SCMContainerManager containerManager;
   private static MockNodeManager nodeManager;
-  private static SCMPipelineManager pipelineManager;
+  private static PipelineManagerV2Impl pipelineManager;
   private static File testDir;
   private static XceiverClientManager xceiverClientManager;
   private static Random random;
@@ -92,10 +95,14 @@ public class TestSCMContainerManager {
     }
     nodeManager = new MockNodeManager(true, 10);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
-    pipelineManager =
-        new SCMPipelineManager(conf, nodeManager,
-            scmMetadataStore.getPipelineTable(), new EventQueue());
-    pipelineManager.allowPipelineCreation();
+    pipelineManager = PipelineManagerV2Impl.newPipelineManager(
+        conf,
+        MockSCMHAManager.getInstance(true),
+        nodeManager,
+        scmMetadataStore.getPipelineTable(),
+        new EventQueue(),
+        SCMContext.emptyContext(),
+        new SCMServiceManager());
     containerManager = new SCMContainerManager(conf,
         scmMetadataStore.getContainerTable(),
         scmMetadataStore.getStore(),
@@ -283,7 +290,7 @@ public class TestSCMContainerManager {
   @Test
   public void testgetNoneExistentContainer() {
     try {
-      containerManager.getContainer(ContainerID.valueof(
+      containerManager.getContainer(ContainerID.valueOf(
           random.nextInt() & Integer.MAX_VALUE));
       Assert.fail();
     } catch (ContainerNotFoundException ex) {

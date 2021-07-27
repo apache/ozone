@@ -39,13 +39,13 @@ function ozone_usage
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
   ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
+  ozone_add_subcommand "daemonlog" admin "get/set the log level for each daemon"
   ozone_add_subcommand "freon" client "runs an ozone data generator"
   ozone_add_subcommand "fs" client "run a filesystem command on Ozone file system. Equivalent to 'hadoop fs'"
   ozone_add_subcommand "genconf" client "generate minimally required ozone configs and output to ozone-site.xml in specified path"
   ozone_add_subcommand "genesis" client "runs a collection of ozone benchmarks to help with tuning."
   ozone_add_subcommand "getconf" client "get ozone config values from configuration"
   ozone_add_subcommand "jmxget" admin "get JMX exported values from NameNode or DataNode."
-  ozone_add_subcommand "noz" client "ozone debug tool, convert ozone metadata into relational data"
   ozone_add_subcommand "om" daemon "Ozone Manager"
   ozone_add_subcommand "scm" daemon "run the Storage Container Manager service"
   ozone_add_subcommand "s3g" daemon "run the S3 compatible REST gateway"
@@ -89,7 +89,7 @@ function ozonecmd_case
   case ${subcmd} in
     auditparser)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.audit.parser.AuditParser
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     classpath)
       if [[ "$#" -gt 0 ]]; then
@@ -114,7 +114,7 @@ function ozonecmd_case
       OZONE_DATANODE_OPTS="-Dlog4j.configurationFile=${OZONE_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
       OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS}"
       OZONE_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"
+      OZONE_RUN_ARTIFACT_NAME="ozone-datanode"
     ;;
     envvars)
       echo "JAVA_HOME='${JAVA_HOME}'"
@@ -131,11 +131,10 @@ function ozonecmd_case
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS}"
-      OZONE_OPTS="${OZONE_OPTS} ${OZONE_FREON_OPTS}"
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     genesis)
-      ARTIFACT_LIB_DIR="${OZONE_HOME}/share/ozone/lib/hadoop-ozone-tools"
+      ARTIFACT_LIB_DIR="${OZONE_HOME}/share/ozone/lib/ozone-tools"
       mkdir -p "$ARTIFACT_LIB_DIR"
       if [[ ! -f "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar" ]]; then
         echo "jmh-core jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: GPL + classpath exception)"
@@ -148,11 +147,11 @@ function ozonecmd_case
       fi
 
       OZONE_CLASSNAME=org.apache.hadoop.ozone.genesis.Genesis
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     getconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     om)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -161,18 +160,17 @@ function ozonecmd_case
       OZONE_OM_OPTS="${RATIS_OPTS} ${OZONE_OM_OPTS}"
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties"
       OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS}"
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
+      OZONE_RUN_ARTIFACT_NAME="ozone-manager"
     ;;
     sh | shell)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
       OZONE_SH_OPTS="${OZONE_SH_OPTS} -Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j}"
-      OZONE_OPTS="${OZONE_OPTS} ${OZONE_SH_OPTS}"
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     s3)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.s3.S3Shell
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     scm)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -181,50 +179,54 @@ function ozonecmd_case
       OZONE_SCM_OPTS="${RATIS_OPTS} ${OZONE_SCM_OPTS}"
       OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/scm-audit-log4j2.properties"
       OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS}"
-      OZONE_RUN_ARTIFACT_NAME="hadoop-hdds-server-scm"
+      OZONE_RUN_ARTIFACT_NAME="hdds-server-scm"
     ;;
     s3g)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-s3gateway"
+      OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
     ;;
     csi)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.csi.CsiServer'
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-csi"
+      OZONE_RUN_ARTIFACT_NAME="ozone-csi"
     ;;
     recon)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.recon.ReconServer'
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-recon"
+      OZONE_RUN_ARTIFACT_NAME="ozone-recon"
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    daemonlog)
+      OZONE_CLASSNAME=org.apache.hadoop.log.LogLevel
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     insight)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-insight"
+      OZONE_RUN_ARTIFACT_NAME="ozone-insight"
     ;;
     version)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.util.OzoneVersionInfo
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     genconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.genconf.GenerateOzoneRequiredConfigurations
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     dtutil)
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.hdds.cli.OzoneAdmin
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
@@ -287,14 +289,14 @@ ozone_assemble_classpath
 
 ozone_add_client_opts
 
-ozone_add_default_gc_opts
-
 if [[ ${OZONE_WORKER_MODE} = true ]]; then
   ozone_worker_mode_execute "${OZONE_HOME}/bin/ozone" "${OZONE_USER_PARAMS[@]}"
   exit $?
 fi
 
 ozone_subcommand_opts "${OZONE_SHELL_EXECNAME}" "${OZONE_SUBCMD}"
+
+ozone_add_default_gc_opts
 
 # everything is in globals at this point, so call the generic handler
 ozone_generic_java_subcmd_handler

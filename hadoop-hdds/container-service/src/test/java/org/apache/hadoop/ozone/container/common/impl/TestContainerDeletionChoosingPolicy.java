@@ -25,8 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
@@ -38,8 +39,9 @@ import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -100,6 +102,7 @@ public class TestContainerDeletionChoosingPolicy {
           layout,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
+      data.incrPendingDeletionBlocks(20);
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
@@ -109,27 +112,35 @@ public class TestContainerDeletionChoosingPolicy {
     }
     blockDeletingService = getBlockDeletingService();
 
+    int blockLimitPerInterval = 5;
     ContainerDeletionChoosingPolicy deletionPolicy =
         new RandomContainerDeletionChoosingPolicy();
-    List<ContainerData> result0 =
-        blockDeletingService.chooseContainerForBlockDeletion(5, deletionPolicy);
-    Assert.assertEquals(5, result0.size());
+    List<ContainerBlockInfo> result0 = blockDeletingService
+        .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
 
-    // test random choosing
-    List<ContainerData> result1 = blockDeletingService
-        .chooseContainerForBlockDeletion(numContainers, deletionPolicy);
-    List<ContainerData> result2 = blockDeletingService
-        .chooseContainerForBlockDeletion(numContainers, deletionPolicy);
+    long totPendingBlocks = 0;
+    for (ContainerBlockInfo pr : result0) {
+      totPendingBlocks += pr.getBlocks();
+    }
+    Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 
-    boolean hasShuffled = false;
-    for (int i = 0; i < numContainers; i++) {
-      if (result1.get(i).getContainerID()
-           != result2.get(i).getContainerID()) {
-        hasShuffled = true;
-        break;
+    // test random choosing. We choose 100 times the 3 datanodes twice.
+    //We expect different order at least once.
+    for (int j = 0; j < 100; j++) {
+      List<ContainerBlockInfo> result1 = blockDeletingService
+              .chooseContainerForBlockDeletion(50, deletionPolicy);
+      List<ContainerBlockInfo> result2 = blockDeletingService
+              .chooseContainerForBlockDeletion(50, deletionPolicy);
+      boolean hasShuffled = false;
+      for (int i = 0; i < result1.size(); i++) {
+        if (result1.get(i).getContainerData().getContainerID() != result2.get(i)
+                .getContainerData().getContainerID()) {
+          return;
+        }
       }
     }
-    Assert.assertTrue("Chosen container results were same", hasShuffled);
+    Assert.fail("Chosen container results were same 100 times");
+
   }
 
   @Test
@@ -150,6 +161,7 @@ public class TestContainerDeletionChoosingPolicy {
     int numContainers = 10;
     Random random = new Random();
     Map<Long, Integer> name2Count = new HashMap<>();
+    List<Integer> numberOfBlocks = new ArrayList<Integer>();
     // create [numContainers + 1] containers
     for (int i = 0; i <= numContainers; i++) {
       long containerId = RandomUtils.nextLong();
@@ -161,6 +173,7 @@ public class TestContainerDeletionChoosingPolicy {
               UUID.randomUUID().toString());
       if (i != numContainers) {
         int deletionBlocks = random.nextInt(numContainers) + 1;
+        numberOfBlocks.add(deletionBlocks);
         data.incrPendingDeletionBlocks(deletionBlocks);
         name2Count.put(containerId, deletionBlocks);
       }
@@ -170,29 +183,47 @@ public class TestContainerDeletionChoosingPolicy {
       Assert.assertTrue(
           containerSet.getContainerMapCopy().containsKey(containerId));
     }
-
+    numberOfBlocks.sort(Collections.reverseOrder());
+    int blockLimitPerInterval = 5;
     blockDeletingService = getBlockDeletingService();
     ContainerDeletionChoosingPolicy deletionPolicy =
         new TopNOrderedContainerDeletionChoosingPolicy();
-    List<ContainerData> result0 =
-        blockDeletingService.chooseContainerForBlockDeletion(5, deletionPolicy);
-    Assert.assertEquals(5, result0.size());
+    List<ContainerBlockInfo> result0 = blockDeletingService
+        .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
+    long totPendingBlocks = 0;
+    for (ContainerBlockInfo pr : result0) {
+      totPendingBlocks += pr.getBlocks();
+    }
+    Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 
-    List<ContainerData> result1 = blockDeletingService
+
+    List<ContainerBlockInfo> result1 = blockDeletingService
         .chooseContainerForBlockDeletion(numContainers + 1, deletionPolicy);
     // the empty deletion blocks container should not be chosen
-    Assert.assertEquals(numContainers, result1.size());
+    int containerCount = 0;
+    int c = 0;
+    for (int i = 0; i < numberOfBlocks.size(); i++) {
+      containerCount++;
+      c = c + numberOfBlocks.get(i);
+      if (c >= (numContainers + 1)) {
+        break;
+      }
+    }
+    Assert.assertEquals(containerCount, result1.size());
 
     // verify the order of return list
+    int initialName2CountSize = name2Count.size();
     int lastCount = Integer.MAX_VALUE;
-    for (ContainerData data : result1) {
-      int currentCount = name2Count.remove(data.getContainerID());
+    for (ContainerBlockInfo data : result1) {
+      int currentCount =
+          name2Count.remove(data.getContainerData().getContainerID());
       // previous count should not smaller than next one
       Assert.assertTrue(currentCount > 0 && currentCount <= lastCount);
       lastCount = currentCount;
     }
     // ensure all the container data are compared
-    Assert.assertEquals(0, name2Count.size());
+    Assert.assertEquals(result1.size(),
+        initialName2CountSize - name2Count.size());
   }
 
   private BlockDeletingService getBlockDeletingService() {

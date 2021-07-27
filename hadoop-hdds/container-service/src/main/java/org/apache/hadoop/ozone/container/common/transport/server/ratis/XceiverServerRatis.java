@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,7 +32,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.EnumMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
@@ -59,18 +58,15 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -150,11 +146,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private long requestTimeout;
   private boolean shouldDeleteRatisLogDirectory;
 
-  /**
-   * Maintains a list of active volumes per StorageType.
-   */
-  private EnumMap<StorageType, List<String>> ratisVolumeMap;
-
   private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
       StateContext context, ConfigurationSource conf, Parameters parameters)
@@ -186,7 +177,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
-    initializeRatisVolumeMap();
   }
 
   private void assignPorts() {
@@ -461,19 +451,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // DN Ratis server act as both SSL client and server and we must pass TLS
   // configuration for both.
   private static Parameters createTlsParameters(SecurityConfig conf,
-      CertificateClient caClient) {
+      CertificateClient caClient) throws IOException {
     Parameters parameters = new Parameters();
 
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
+          conf.getConfiguration());
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), true);
+          caList, true);
       GrpcConfigKeys.Server.setTlsConf(parameters, serverConfig);
       GrpcConfigKeys.Admin.setTlsConf(parameters, serverConfig);
 
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          caClient.getCACertificate(), false);
+          caList, false);
       GrpcConfigKeys.Client.setTlsConf(parameters, clientConfig);
     }
 
@@ -521,7 +513,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         }
         isStarted = false;
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        LOG.error("XceiverServerRatis Could not be stopped gracefully.", e);
       }
     }
   }
@@ -594,43 +586,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     } finally {
       span.finish();
     }
-  }
-
-  private void  initializeRatisVolumeMap() throws IOException {
-    ratisVolumeMap = new EnumMap<>(StorageType.class);
-    Collection<String> rawLocations = HddsServerUtil.
-            getOzoneDatanodeRatisDirectory(conf);
-
-    for (String locationString : rawLocations) {
-      try {
-        StorageLocation location = StorageLocation.parse(locationString);
-        StorageType type = location.getStorageType();
-        ratisVolumeMap.computeIfAbsent(type, k -> new ArrayList<String>(1));
-        ratisVolumeMap.get(location.getStorageType()).
-                add(location.getUri().getPath());
-
-      } catch (IOException e) {
-        LOG.error("Failed to parse the storage location: " +
-                locationString, e);
-      }
-    }
-  }
-
-  @Override
-  public List<MetadataStorageReportProto> getStorageReport()
-      throws IOException {
-    List<MetadataStorageReportProto> reportProto = new ArrayList<>();
-    for (StorageType storageType : ratisVolumeMap.keySet()) {
-      for (String path : ratisVolumeMap.get(storageType)) {
-        MetadataStorageReportProto.Builder builder = MetadataStorageReportProto.
-                newBuilder();
-        builder.setStorageLocation(path);
-        builder.setStorageType(StorageLocationReport.
-                getStorageTypeProto(storageType));
-        reportProto.add(builder.build());
-      }
-    }
-    return reportProto;
   }
 
   private RaftClientRequest createRaftClientRequest(
@@ -793,12 +748,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         clientId, server.getId(), nextCallId(), group);
 
     RaftClientReply reply;
+    LOG.debug("Received addGroup request for pipeline {}", pipelineID);
+
     try {
       reply = server.groupManagement(request);
     } catch (Exception e) {
       throw new IOException(e.getMessage(), e);
     }
     processReply(reply);
+    LOG.info("Created group {}", pipelineID);
   }
 
   @Override
@@ -910,7 +868,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private void sendPipelineReport() {
     if (context !=  null) {
       // TODO: Send IncrementalPipelineReport instead of full PipelineReport
-      context.addReport(context.getParent().getContainer().getPipelineReport());
+      context.addIncrementalReport(
+          context.getParent().getContainer().getPipelineReport());
       context.getParent().triggerHeartbeat();
     }
   }
@@ -925,7 +884,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
 
     final int numberOfDisks =
-        MutableVolumeSet.getDatanodeStorageDirs(conf).size();
+        HddsServerUtil.getDatanodeStorageDirs(conf).size();
 
     ThreadPoolExecutor[] executors =
         new ThreadPoolExecutor[threadCountPerDisk * numberOfDisks];

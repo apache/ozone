@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.scm.server;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -55,6 +58,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 /**
  * This class is responsible for dispatching heartbeat from datanode to
@@ -102,8 +107,22 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     } else {
 
+      LayoutVersionProto layoutVersion = null;
+      if (!heartbeat.hasDataNodeLayoutVersion()) {
+        // Backward compatibility to make sure old Datanodes can still talk to
+        // SCM.
+        layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
+            INITIAL_VERSION.layoutVersion());
+      } else {
+        layoutVersion = heartbeat.getDataNodeLayoutVersion();
+      }
+
+      LOG.debug("Processing DataNode Layout Report.");
+      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
+
       // should we dispatch heartbeat through eventPublisher?
-      commands = nodeManager.processHeartbeat(datanodeDetails);
+      commands = nodeManager.processHeartbeat(datanodeDetails,
+          layoutVersion);
       if (heartbeat.hasNodeReport()) {
         LOG.debug("Dispatching Node Report.");
         eventPublisher.fireEvent(
@@ -215,6 +234,18 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
+   * Layout report event payload with origin.
+   */
+  public static class LayoutReportFromDatanode
+      extends ReportFromDatanode<LayoutVersionProto> {
+
+    public LayoutReportFromDatanode(DatanodeDetails datanodeDetails,
+                                  LayoutVersionProto report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
    * Container report event payload with origin.
    */
   public static class ContainerReportFromDatanode
@@ -287,4 +318,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
     }
   }
 
+  /**
+   * CRL Status report event payload with origin.
+   */
+  public static class CRLStatusReportFromDatanode
+      extends ReportFromDatanode<CRLStatusReport> {
+
+    public CRLStatusReportFromDatanode(DatanodeDetails datanodeDetails,
+                                           CRLStatusReport report) {
+      super(datanodeDetails, report);
+    }
+  }
 }

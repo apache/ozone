@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.F
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 
 /**
  * This class tests create/read .container files.
@@ -58,7 +59,7 @@ public class TestContainerDataYaml {
   private static final String CONTAINER_DB_TYPE = "RocksDB";
 
   private final ChunkLayOutVersion layout;
-
+    
   public TestContainerDataYaml(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
@@ -125,9 +126,10 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
-    assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
     assertEquals(SCAN_TIME.toEpochMilli(),
-        kvData.getDataScanTimestamp().longValue());
+                 kvData.lastDataScanTime().get().toEpochMilli());
+    assertEquals(SCAN_TIME.toEpochMilli(),
+                 kvData.getDataScanTimestamp().longValue());
     assertEquals(OzoneConsts.SCHEMA_LATEST,
             kvData.getSchemaVersion());
 
@@ -160,9 +162,10 @@ public class TestContainerDataYaml {
         kvData.getMetadata().get(OzoneConsts.OWNER));
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
-    assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
     assertEquals(SCAN_TIME.toEpochMilli(),
-        kvData.getDataScanTimestamp().longValue());
+                 kvData.lastDataScanTime().get().toEpochMilli());
+    assertEquals(SCAN_TIME.toEpochMilli(),
+                 kvData.getDataScanTimestamp().longValue());
   }
 
   @Test

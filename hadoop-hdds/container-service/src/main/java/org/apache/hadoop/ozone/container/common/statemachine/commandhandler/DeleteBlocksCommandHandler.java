@@ -326,7 +326,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           containerData.getMetadataPath());
     }
 
-    if (delTX.getTxID() < containerData.getDeleteTransactionId()) {
+    if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(String.format("Ignoring delete blocks for containerId: %d."
                 + " Outdated delete transactionId %d < %d", containerId,

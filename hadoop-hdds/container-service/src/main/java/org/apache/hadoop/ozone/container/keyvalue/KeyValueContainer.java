@@ -46,11 +46,13 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.base.Preconditions;
@@ -64,6 +66,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_DB_SYNC;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,29 +101,30 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
-      volumeChoosingPolicy, String scmId) throws StorageContainerException {
+      volumeChoosingPolicy, String clusterId) throws StorageContainerException {
     Preconditions.checkNotNull(volumeChoosingPolicy, "VolumeChoosingPolicy " +
         "cannot be null");
     Preconditions.checkNotNull(volumeSet, "VolumeSet cannot be null");
-    Preconditions.checkNotNull(scmId, "scmId cannot be null");
+    Preconditions.checkNotNull(clusterId, "clusterId cannot be null");
 
     File containerMetaDataPath = null;
     //acquiring volumeset read lock
     long maxSize = containerData.getMaxSize();
     volumeSet.readLock();
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-          .getVolumesList(), maxSize);
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
+          maxSize);
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
       long containerID = containerData.getContainerID();
 
       containerMetaDataPath = KeyValueContainerLocationUtil
-          .getContainerMetaDataPath(hddsVolumeDir, scmId, containerID);
+          .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerID);
       containerData.setMetadataPath(containerMetaDataPath.getPath());
 
       File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-          hddsVolumeDir, scmId, containerID);
+          hddsVolumeDir, clusterId, containerID);
 
       // Check if it is new Container.
       ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
@@ -129,7 +134,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       // This method is only called when creating new containers.
       // Therefore, always use the newest schema version.
-      containerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
+      containerData.setSchemaVersion(
+          DatanodeMetadataFeatures.getSchemaVersion());
       KeyValueContainerUtil.createContainerMetaData(containerID,
               containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);
@@ -173,20 +179,20 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * Set all of the path realted container data fields based on the name
    * conventions.
    *
-   * @param scmId
+   * @param clusterId
    * @param containerVolume
    * @param hddsVolumeDir
    */
-  public void populatePathFields(String scmId,
+  public void populatePathFields(String clusterId,
       HddsVolume containerVolume, String hddsVolumeDir) {
 
     long containerId = containerData.getContainerID();
 
     File containerMetaDataPath = KeyValueContainerLocationUtil
-        .getContainerMetaDataPath(hddsVolumeDir, scmId, containerId);
+        .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerId);
 
     File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-        hddsVolumeDir, scmId, containerId);
+        hddsVolumeDir, clusterId, containerId);
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         containerMetaDataPath, containerId);
 
@@ -225,6 +231,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
     } catch (IOException ex) {
+      onFailure(containerData.getVolume());
       throw new StorageContainerException("Error while creating/ updating " +
           ".container file. ContainerID: " + containerId, ex,
           CONTAINER_FILES_CREATE_ERROR);
@@ -259,6 +266,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } catch (IOException ex) {
       // TODO : An I/O error during delete can leave partial artifacts on the
       // disk. We will need the cleaner thread to cleanup this information.
+      onFailure(containerData.getVolume());
       String errMsg = String.format("Failed to cleanup container. ID: %d",
           containerId);
       LOG.error(errMsg, ex);
@@ -377,6 +385,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB compaction while closing container", ex);
+      onFailure(containerData.getVolume());
       throw new StorageContainerException(ex, ERROR_IN_COMPACT_DB);
     }
   }
@@ -393,6 +402,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB sync while closing container", ex);
+      onFailure(containerData.getVolume());
       throw new StorageContainerException(ex, ERROR_IN_DB_SYNC);
     }
   }
@@ -466,7 +476,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
                 + " as the container descriptor (%s) has already been exist.",
             getContainerData().getContainerID(),
             getContainerFile().getAbsolutePath());
-        throw new IOException(errorMessage);
+        throw new StorageContainerException(errorMessage,
+            CONTAINER_ALREADY_EXISTS);
       }
       //copy the values from the input stream to the final destination
       // directory.
@@ -496,11 +507,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       KeyValueContainerUtil.parseKVContainerData(containerData, config);
 
     } catch (Exception ex) {
+      if (ex instanceof StorageContainerException &&
+          ((StorageContainerException) ex).getResult() ==
+              CONTAINER_ALREADY_EXISTS) {
+        throw ex;
+      }
       //delete all the temporary data in case of any exception.
       try {
         FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
         FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-        FileUtils.deleteDirectory(getContainerFile());
+        FileUtils.deleteDirectory(
+            new File(getContainerData().getContainerPath()));
       } catch (Exception deleteex) {
         LOG.error(
             "Can not cleanup destination directories after a container import"

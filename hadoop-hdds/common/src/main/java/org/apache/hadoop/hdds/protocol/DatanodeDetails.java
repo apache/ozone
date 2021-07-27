@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.protocol;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -199,14 +200,14 @@ public class DatanodeDetails extends NodeImpl implements
    *
    * @param port DataNode port
    */
-  public void setPort(Port port) {
+  public synchronized void setPort(Port port) {
     // If the port is already in the list remove it first and add the
     // new/updated port value.
     ports.remove(port);
     ports.add(port);
   }
 
-  public void setPort(Name name, int port) {
+  public synchronized void setPort(Name name, int port) {
     setPort(new Port(name, port));
   }
 
@@ -215,7 +216,7 @@ public class DatanodeDetails extends NodeImpl implements
    *
    * @return DataNode Ports
    */
-  public List<Port> getPorts() {
+  public synchronized List<Port> getPorts() {
     return ports;
   }
 
@@ -266,7 +267,7 @@ public class DatanodeDetails extends NodeImpl implements
    *
    * @return Port
    */
-  public Port getPort(Port.Name name) {
+  public synchronized Port getPort(Port.Name name) {
     for (Port port : ports) {
       if (port.getName().equals(name)) {
         return port;
@@ -507,6 +508,14 @@ public class DatanodeDetails extends NodeImpl implements
   @Override
   public int hashCode() {
     return uuid.hashCode();
+  }
+
+  // Skip The OpStates which may change in Runtime.
+  public int getSignature() {
+    return Objects
+        .hash(uuid, uuidString, ipAddress, hostName, ports,
+            certSerialId, version, setupTime, revision, buildDate,
+            initialVersion, currentVersion);
   }
 
   /**

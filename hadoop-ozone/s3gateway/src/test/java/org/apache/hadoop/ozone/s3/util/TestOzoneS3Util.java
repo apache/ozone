@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.s3.util;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,11 +59,14 @@ public class TestOzoneS3Util {
     Collection<String> nodeIDList = OmUtils.getOMNodeIds(configuration,
         serviceID);
 
-    configuration.set(OmUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    configuration.set(
+        ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceID, "om1"), "om1:9862");
-    configuration.set(OmUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    configuration.set(
+        ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceID, "om2"), "om2:9862");
-    configuration.set(OmUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    configuration.set(
+        ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceID, "om3"), "om3:9862");
 
     String expectedOmServiceAddress = buildServiceAddress(nodeIDList);
@@ -83,9 +87,11 @@ public class TestOzoneS3Util {
 
     // Don't set om3 node rpc address. Here we are skipping setting of one of
     // the OM address. So buildServiceNameForToken will fail.
-    configuration.set(OmUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    configuration.set(
+        ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceID, "om1"), "om1:9862");
-    configuration.set(OmUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    configuration.set(
+        ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceID, "om2"), "om2:9862");
 
 
@@ -114,7 +120,7 @@ public class TestOzoneS3Util {
     int counter = 0;
     for (String nodeID : nodeIDList) {
       counter++;
-      String addr = configuration.get(OmUtils.addKeySuffixes(
+      String addr = configuration.get(ConfUtils.addKeySuffixes(
           OMConfigKeys.OZONE_OM_ADDRESS_KEY, serviceID, nodeID));
 
       if (counter != nodesLength) {

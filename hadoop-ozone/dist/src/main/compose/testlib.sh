@@ -28,6 +28,8 @@ if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
 fi
 
+: ${SCM:=scm}
+
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
@@ -38,13 +40,19 @@ create_results_dir() {
 }
 
 ## @description find all the test.sh scripts in the immediate child dirs
+all_tests_in_immediate_child_dirs() {
+  find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | sort
+}
+
+## @description Find all test.sh scripts in immediate child dirs,
+## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$")
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
+       untagged="$(all_tests_in_immediate_child_dirs | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -53,9 +61,11 @@ find_tests(){
     if [[ -z "${tests}" ]]; then
        echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
        exit 1
-  fi
+    fi
+  elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
+    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(all_tests_in_immediate_child_dirs | xargs grep -L '^#suite:failing')
   fi
   echo $tests
 }
@@ -74,9 +84,9 @@ wait_for_safemode_exit(){
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
-         status=$(docker-compose exec -T scm bash -c "$command")
+         status=$(docker-compose exec -T ${SCM} bash -c "$command")
      fi
 
      echo "SECONDS: $SECONDS"
@@ -108,11 +118,11 @@ wait_for_om_leader() {
 
   #Don't give it up until 120 seconds
   while [[ $SECONDS -lt 120 ]]; do
-    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T scm bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
-      status=$(docker-compose exec -T scm bash -c "$command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
@@ -136,11 +146,12 @@ start_docker_env(){
 
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
+
   docker-compose --no-ansi down
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
-    OUTPUT_NAME="$COMPOSE_ENV_NAME"
+    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
   fi
@@ -159,7 +170,7 @@ execute_robot_test(){
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
-  OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
@@ -180,6 +191,7 @@ execute_robot_test(){
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      -v SCM:"${SCM}" \
       ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
@@ -251,7 +263,7 @@ wait_for_port(){
 
   while [[ $SECONDS -lt $timeout ]]; do
      set +e
-     docker-compose exec -T scm /bin/bash -c "nc -z $host $port"
+     docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"
      status=$?
      set -e
      if [ $status -eq 0 ] ; then
@@ -314,14 +326,19 @@ copy_results() {
 
 run_test_script() {
   local d="$1"
+  local test_script="$2"
+
+  if [[ -z "$test_script" ]]; then
+    test_script=./test.sh
+  fi
 
   echo "Executing test in ${d}"
 
   #required to read the .env file from the right location
   cd "${d}" || return
 
-  ret=0
-  if ! ./test.sh; then
+  local ret=0
+  if ! "$test_script"; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
   fi
@@ -332,7 +349,7 @@ run_test_script() {
 }
 
 run_test_scripts() {
-  ret=0
+  local ret=0
 
   for t in "$@"; do
     d="$(dirname "${t}")"
@@ -383,15 +400,6 @@ prepare_for_runner_image() {
 
   export OZONE_DIR=/opt/hadoop
   export OZONE_IMAGE="apache/ozone-runner:${v}"
-}
-
-## @description Print the logical version for a specific release
-## @param the release for which logical version should be printed
-get_logical_version() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
 }
 
 ## @description Activate the version-specific behavior for a given release

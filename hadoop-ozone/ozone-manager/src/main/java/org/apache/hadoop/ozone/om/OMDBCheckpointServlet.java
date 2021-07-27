@@ -20,13 +20,16 @@ package org.apache.hadoop.ozone.om;
 
 import javax.servlet.ServletException;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.ozone.OzoneConsts;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.util.Collection;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
@@ -58,13 +61,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
-    try {
-      initialize(om.getMetadataManager().getStore(),
-          om.getMetrics().getDBCheckpointMetrics(),
-          om.getAclsEnabled(),
-          om.getOzoneAdmins(om.getConfiguration()));
-    } catch (IOException e) {
-      LOG.error("Error in getOzoneAdmins: {}", e.getMessage());
+    OzoneConfiguration conf = om.getConfiguration();
+    // Only Ozone Admins and Recon are allowed
+    Collection<String> allowedUsers = om.getOmAdminUsernames();
+    ReconConfig reconConfig = conf.getObject(ReconConfig.class);
+    String reconPrincipal = reconConfig.getKerberosPrincipal();
+    if (!reconPrincipal.isEmpty()) {
+      UserGroupInformation ugi =
+          UserGroupInformation.createRemoteUser(reconPrincipal);
+      allowedUsers.add(ugi.getShortUserName());
     }
+
+    initialize(om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        allowedUsers,
+        om.isSpnegoEnabled());
   }
 }

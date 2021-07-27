@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -125,6 +126,7 @@ public interface ClientProtocol {
    * This is possible for owners of the volume and admin users
    * @throws IOException
    */
+  @Deprecated
   boolean checkVolumeAccess(String volumeName, OzoneAcl acl)
       throws IOException;
 
@@ -228,6 +230,7 @@ public interface ClientProtocol {
    * @param bucketName Name of the Bucket
    * @throws IOException
    */
+  @Deprecated
   void checkBucketAccess(String volumeName, String bucketName)
       throws IOException;
 
@@ -266,11 +269,28 @@ public interface ClientProtocol {
    * @return {@link OzoneOutputStream}
    *
    */
+  @Deprecated
   OzoneOutputStream createKey(String volumeName, String bucketName,
                               String keyName, long size, ReplicationType type,
                               ReplicationFactor factor,
                               Map<String, String> metadata)
       throws IOException;
+
+  /**
+   * Writes a key in an existing bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param metadata custom key value metadata
+   * @return {@link OzoneOutputStream}
+   *
+   */
+  OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata)
+      throws IOException;
+
 
   /**
    * Reads a key from an existing bucket.
@@ -289,9 +309,12 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
    * @throws IOException
    */
-  void deleteKey(String volumeName, String bucketName, String keyName)
+  void deleteKey(String volumeName, String bucketName, String keyName,
+                 boolean recursive)
       throws IOException;
 
   /**
@@ -402,9 +425,23 @@ public interface ClientProtocol {
    * @return {@link OmMultipartInfo}
    * @throws IOException
    */
+  @Deprecated
   OmMultipartInfo initiateMultipartUpload(String volumeName, String
       bucketName, String keyName, ReplicationType type, ReplicationFactor
       factor) throws IOException;
+
+  /**
+   * Initiate Multipart upload.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param replicationConfig
+   * @return {@link OmMultipartInfo}
+   * @throws IOException
+   */
+  OmMultipartInfo initiateMultipartUpload(String volumeName, String
+      bucketName, String keyName, ReplicationConfig replicationConfig)
+      throws IOException;
 
   /**
    * Create a part key for a multipart upload key.
@@ -507,6 +544,13 @@ public interface ClientProtocol {
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
+   * Revoke S3 Secret of given kerberos user.
+   * @param kerberosID
+   * @throws IOException
+   */
+  void revokeS3Secret(String kerberosID) throws IOException;
+
+  /**
    * Get KMS client provider.
    * @return KMS client provider.
    * @throws IOException
@@ -595,6 +639,32 @@ public interface ClientProtocol {
       String keyName, long size, ReplicationType type, ReplicationFactor factor,
       boolean overWrite, boolean recursive) throws IOException;
 
+
+  /**
+   * Creates an output stream for writing to a file.
+   *
+   * @param volumeName Volume name
+   * @param bucketName Bucket name
+   * @param keyName    Absolute path of the file to be written
+   * @param size       Size of data to be written
+   * @param replicationConfig Replication config
+   * @param overWrite  if true existing file at the location will be overwritten
+   * @param recursive  if true file would be created even if parent directories
+   *                   do not exist
+   * @return Output stream for writing to the file
+   * @throws OMException if given key is a directory
+   *                     if file exists and isOverwrite flag is false
+   *                     if an ancestor exists as a file
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      boolean overWrite, boolean recursive) throws IOException;
+
+
   /**
    * List the status for a file or a directory and its contents.
    *
@@ -666,4 +736,20 @@ public interface ClientProtocol {
    */
   void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException;
+
+  /**
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object.
+   *
+   * If Key exists, return returns OzoneKey.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @return OzoneKey which gives basic information about the key.
+   * @throws IOException
+   */
+  OzoneKey headObject(String volumeName, String bucketName,
+      String keyName) throws IOException;
 }

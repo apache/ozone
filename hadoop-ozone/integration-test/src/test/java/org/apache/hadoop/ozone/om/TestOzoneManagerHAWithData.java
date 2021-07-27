@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -46,7 +46,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -75,7 +75,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   @Test
   public void testOneOMNodeDown() throws Exception {
     getCluster().stopOzoneManager(1);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
     createVolumeTest(true);
 
@@ -90,7 +90,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   public void testTwoOMNodesDown() throws Exception {
     getCluster().stopOzoneManager(1);
     getCluster().stopOzoneManager(2);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
     createVolumeTest(false);
 
@@ -272,7 +272,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
     getCluster().stopOzoneManager(leaderOMNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
@@ -304,7 +304,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     getCluster().stopOzoneManager(leaderOMNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
     createKeyTest(true); // failover should happen to new node
 
     long numTimesTriedToSameNode = omFailoverProxyProvider.getWaitTime()
@@ -505,9 +505,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     // Get follower OMs
     OzoneManager followerOM1 = getCluster().getOzoneManager(
-        leaderOM.getPeerNodes().get(0).getOMNodeId());
+        leaderOM.getPeerNodes().get(0).getNodeId());
     OzoneManager followerOM2 = getCluster().getOzoneManager(
-        leaderOM.getPeerNodes().get(1).getOMNodeId());
+        leaderOM.getPeerNodes().get(1).getNodeId());
 
     // Do some transactions so that the log index increases
     String userName = "user" + RandomStringUtils.randomNumeric(5);
@@ -605,7 +605,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     // Stop leader OM, and then validate list parts.
     stopLeaderOM();
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
     validateListParts(ozoneBucket, keyName, uploadID, partsMap);
 

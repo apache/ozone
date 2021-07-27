@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+
 import java.net.InetSocketAddress;
 import java.util.UUID;
 
@@ -30,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -96,7 +99,7 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(NodeReportProto.getDefaultInstance());
+    context.refreshFullReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -128,7 +131,7 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(ContainerReportsProto.getDefaultInstance());
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -160,7 +163,8 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(CommandStatusReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        CommandStatusReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assert.assertTrue(heartbeat.hasDatanodeDetails());
@@ -224,9 +228,10 @@ public class TestHeartbeatEndpointTask {
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
-    context.addReport(NodeReportProto.getDefaultInstance());
-    context.addReport(ContainerReportsProto.getDefaultInstance());
-    context.addReport(CommandStatusReportsProto.getDefaultInstance());
+    context.refreshFullReport(NodeReportProto.getDefaultInstance());
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        CommandStatusReportsProto.getDefaultInstance());
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
@@ -277,10 +282,17 @@ public class TestHeartbeatEndpointTask {
     Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
     Mockito.when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
+    HDDSLayoutVersionManager layoutVersionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(layoutVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(layoutVersionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
         .setDatanodeDetails(datanodeDetails)
         .setContext(context)
+        .setLayoutVersionManager(layoutVersionManager)
         .setEndpointStateMachine(endpointStateMachine)
         .build();
   }

@@ -138,4 +138,27 @@ public class SCMNodeStat implements NodeStat {
   public int hashCode() {
     return Long.hashCode(capacity.get() ^ scmUsed.get() ^ remaining.get());
   }
+
+  /**
+   * Compares this SCMNodeStat with other on the basis of remaining to
+   * capacity ratio.
+   *
+   * @param other The SCMNodeStat object to compare with this object.
+   * @return A value greater than 0 if this has lesser remaining ratio than the
+   * specified other, a value lesser than 0 if this has greater remaining ratio
+   * than the specified other, and 0 if remaining ratios are equal.
+   */
+  public int compareByRemainingRatio(SCMNodeStat other) {
+    Preconditions.checkNotNull(other, "Argument cannot be null");
+
+    // if capacity is zero, replace with 1 for division to work
+    double thisCapacity = Math.max(this.getCapacity().get().doubleValue(), 1d);
+    double otherCapacity = Math.max(
+        other.getCapacity().get().doubleValue(), 1d);
+
+    double thisRemainingRatio = this.getRemaining().get() / thisCapacity;
+    double otherRemainingRatio = other.getRemaining().get() / otherCapacity;
+
+    return Double.compare(otherRemainingRatio, thisRemainingRatio);
+  }
 }

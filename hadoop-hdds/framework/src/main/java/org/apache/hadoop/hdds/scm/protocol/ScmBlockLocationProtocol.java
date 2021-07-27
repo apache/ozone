@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.security.KerberosInfo;
@@ -58,8 +60,30 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
-  List<AllocatedBlock> allocateBlock(long size, int numBlocks,
+  @Deprecated
+  default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationType type, ReplicationFactor factor, String owner,
+      ExcludeList excludeList) throws IOException {
+    return allocateBlock(size, numBlocks, ReplicationConfig
+        .fromTypeAndFactor(type, factor), owner, excludeList);
+  }
+
+  /**
+   * Asks SCM where a block should be allocated. SCM responds with the
+   * set of datanodes that should be used creating this block.
+   *
+   * @param size              - size of the block.
+   * @param numBlocks         - number of blocks.
+   * @param replicationConfig - replicationConfiguration
+   * @param owner             - service owner of the new block
+   * @param excludeList       List of datanodes/containers to exclude during
+   *                          block
+   *                          allocation.
+   * @return allocated block accessing info (key, pipeline).
+   * @throws IOException
+   */
+  List<AllocatedBlock> allocateBlock(long size, int numBlocks,
+      ReplicationConfig replicationConfig, String owner,
       ExcludeList excludeList) throws IOException;
 
   /**
@@ -76,6 +100,11 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * Gets the Clusterid and SCM Id from SCM.
    */
   ScmInfo getScmInfo() throws IOException;
+
+  /**
+   * Request to add SCM instance to HA group.
+   */
+  boolean addSCM(AddSCMRequest request) throws IOException;
 
   /**
    * Sort datanodes with distance to client.

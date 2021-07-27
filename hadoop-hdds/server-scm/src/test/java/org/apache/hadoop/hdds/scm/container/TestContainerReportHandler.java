@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -54,15 +56,15 @@ import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 public class TestContainerReportHandler {
 
   private NodeManager nodeManager;
-  private ContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
 
   @Before
-  public void setup() throws IOException {
+  public void setup() throws IOException, InvalidStateTransitionException {
     final ConfigurationSource conf = new OzoneConfiguration();
     this.nodeManager = new MockNodeManager(true, 10);
-    this.containerManager = Mockito.mock(ContainerManager.class);
+    this.containerManager = Mockito.mock(ContainerManagerV2.class);
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
 
@@ -647,7 +649,8 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Mockito.verify(publisher, Mockito.times(1));
+    Mockito.verify(publisher, Mockito.times(1))
+        .fireEvent(Mockito.any(), Mockito.any(CommandForDatanode.class));
 
     Assert.assertEquals(0, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
@@ -662,14 +665,14 @@ public class TestContainerReportHandler {
     return new ContainerReportFromDatanode(dn, containerReport);
   }
 
-  private static ContainerReportsProto getContainerReportsProto(
+  protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId) {
     return getContainerReportsProto(containerId, state, originNodeId,
         2000000000L, 100000000L);
   }
 
-  private static ContainerReportsProto getContainerReportsProto(
+  protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, final long usedBytes, final long keyCount) {
     final ContainerReportsProto.Builder crBuilder =

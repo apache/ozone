@@ -5,7 +5,7 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * with the License.  You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCRLApprover;
@@ -32,6 +33,8 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.After;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -44,12 +47,17 @@ import java.security.KeyPair;
 import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.DATANODE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
+import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
@@ -67,7 +75,7 @@ public class TestSCMCertStore {
 
   private OzoneConfiguration config;
   private SCMMetadataStore scmMetadataStore;
-  private SCMCertStore scmCertStore;
+  private CertificateStore scmCertStore;
   private SecurityConfig securityConfig;
   private X509Certificate x509Certificate;
   private KeyPair keyPair;
@@ -90,7 +98,10 @@ public class TestSCMCertStore {
   @Before
   public void initDbStore() throws IOException {
     scmMetadataStore = new SCMMetadataStoreImpl(config);
-    scmCertStore = new SCMCertStore(scmMetadataStore, INITIAL_SEQUENCE_ID);
+    scmCertStore = new SCMCertStore.Builder().setRatisServer(null)
+        .setCRLSequenceId(INITIAL_SEQUENCE_ID)
+        .setMetadaStore(scmMetadataStore)
+        .build();
   }
 
   @Before
@@ -116,12 +127,12 @@ public class TestSCMCertStore {
   public void testRevokeCertificates() throws Exception {
 
     BigInteger serialID = x509Certificate.getSerialNumber();
-    scmCertStore.storeValidCertificate(serialID, x509Certificate);
+    scmCertStore.storeValidCertificate(serialID, x509Certificate, SCM);
     Date now = new Date();
 
     assertNotNull(
         scmCertStore.getCertificateByID(serialID,
-        CertificateStore.CertType.VALID_CERTS));
+        VALID_CERTS));
 
     X509CertificateHolder caCertificateHolder =
         new X509CertificateHolder(generateX509Cert().getEncoded());
@@ -136,11 +147,20 @@ public class TestSCMCertStore {
 
     assertNull(
         scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.VALID_CERTS));
+            VALID_CERTS));
 
-    assertNotNull(
-        scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.REVOKED_CERTS));
+    CertInfo certInfo = scmCertStore.getRevokedCertificateInfoByID(serialID);
+
+    assertNotNull(certInfo);
+    assertNotNull(certInfo.getX509Certificate());
+    assertTrue("Timestamp should be greater than 0",
+        certInfo.getTimestamp() > 0L);
+
+    long crlId = scmCertStore.getLatestCrlId();
+    assertEquals(sequenceId.get().longValue(), crlId);
+
+    List<CRLInfo> crls = scmCertStore.getCrls(Arrays.asList(crlId));
+    assertEquals(1, crls.size());
 
     // CRL Info table should have a CRL with sequence id
     assertNotNull(scmMetadataStore.getCRLInfoTable()
@@ -150,8 +170,9 @@ public class TestSCMCertStore {
     assertEquals(INITIAL_SEQUENCE_ID + 1L, (long)
         scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
-    CRLInfo crlInfo =
-        scmMetadataStore.getCRLInfoTable().get(sequenceId.get());
+    CRLInfo crlInfo = crls.get(0);
+
+    assertEquals(crlInfo.getCrlSequenceID(), sequenceId.get().longValue());
 
     Set<? extends X509CRLEntry> revokedCertificates =
         crlInfo.getX509CRL().getRevokedCertificates();
@@ -174,7 +195,7 @@ public class TestSCMCertStore {
     List<BigInteger> newSerialIDs = new ArrayList<>();
     for (int i = 0; i<3; i++) {
       X509Certificate cert = generateX509Cert();
-      scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert);
+      scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert, SCM);
       newSerialIDs.add(cert.getSerialNumber());
     }
 
@@ -186,14 +207,16 @@ public class TestSCMCertStore {
     // This should create a CRL with sequence id INITIAL_SEQUENCE_ID + 2
     // And contain 2 certificates in it
     assertTrue(sequenceId.isPresent());
+    assertEquals(sequenceId.get().longValue(),
+        scmCertStore.getLatestCrlId());
     assertEquals(INITIAL_SEQUENCE_ID + 2L, (long) sequenceId.get());
 
     // Check the sequence ID table for latest sequence id
     assertEquals(INITIAL_SEQUENCE_ID + 2L, (long)
         scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
-    CRLInfo newCrlInfo = scmMetadataStore.getCRLInfoTable()
-        .get(sequenceId.get());
+    CRLInfo newCrlInfo = scmCertStore.getCrls(Arrays.asList(
+        INITIAL_SEQUENCE_ID + 2)).get(0);
     revokedCertificates = newCrlInfo.getX509CRL().getRevokedCertificates();
     assertEquals(2L, revokedCertificates.size());
     assertNotNull(
@@ -206,6 +229,8 @@ public class TestSCMCertStore {
             c.getSerialNumber().equals(newSerialIDs.get(1)))
             .findAny());
 
+    assertEquals(newCrlInfo.getCrlSequenceID(), sequenceId.get().longValue());
+
     // Valid certs table should have 1 cert
     assertEquals(1L,
         getTableSize(scmMetadataStore.getValidCertsTable().iterator()));
@@ -216,17 +241,16 @@ public class TestSCMCertStore {
 
     // Revoked certs table should have 3 certs
     assertEquals(3L,
-        getTableSize(scmMetadataStore.getRevokedCertsTable().iterator()));
+        getTableSize(scmMetadataStore.getRevokedCertsV2Table().iterator()));
   }
 
   @Test
   public void testRevokeCertificatesForFutureTime() throws Exception {
     BigInteger serialID = x509Certificate.getSerialNumber();
-    scmCertStore.storeValidCertificate(serialID, x509Certificate);
+    scmCertStore.storeValidCertificate(serialID, x509Certificate, SCM);
     Date now = new Date();
     // Set revocation time in the future
     Date revocationTime = new Date(now.getTime()+500);
-
 
     X509CertificateHolder caCertificateHolder =
         new X509CertificateHolder(generateX509Cert().getEncoded());
@@ -242,11 +266,10 @@ public class TestSCMCertStore {
 
     assertNotNull(
         scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.VALID_CERTS));
+            VALID_CERTS));
 
     assertNull(
-        scmCertStore.getCertificateByID(serialID,
-            CertificateStore.CertType.REVOKED_CERTS));
+        scmCertStore.getRevokedCertificateInfoByID(serialID));
   }
 
   private X509Certificate generateX509Cert() throws Exception {
@@ -266,4 +289,39 @@ public class TestSCMCertStore {
 
     return size;
   }
+
+  @Test
+  public void testGetAndListCertificates() throws Exception {
+    X509Certificate cert = generateX509Cert();
+    scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert, SCM);
+    checkListCerts(SCM, 1);
+
+    cert = generateX509Cert();
+    scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert, SCM);
+    checkListCerts(SCM, 2);
+
+    cert = generateX509Cert();
+    scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert, SCM);
+    checkListCerts(SCM, 3);
+
+    cert = generateX509Cert();
+    scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert, OM);
+
+    // As for OM and DN all certs in valid certs table are returned.
+    // This test can be fixed once we have code for returning OM/DN certs.
+    checkListCerts(OM, 4);
+
+    cert = generateX509Cert();
+    scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert, DATANODE);
+    checkListCerts(OM, 5);
+
+  }
+
+
+  private void checkListCerts(NodeType role, int expected) throws Exception {
+    List<X509Certificate> certificateList = scmCertStore.listCertificate(role,
+        BigInteger.valueOf(0), 10, VALID_CERTS);
+    Assert.assertEquals(expected, certificateList.size());
+  }
+
 }

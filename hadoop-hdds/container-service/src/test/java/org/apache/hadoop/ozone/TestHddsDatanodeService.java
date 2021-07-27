@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -24,12 +24,13 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
 import org.junit.After;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -67,8 +68,11 @@ public class TestHddsDatanodeService {
     assertNotNull(service.getDatanodeDetails());
     assertNotNull(service.getDatanodeDetails().getHostName());
     assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
+    assertNotNull(service.getCRLStore());
 
     service.stop();
+    // CRL store must be stopped when the service stops
+    assertNull(service.getCRLStore().getStore());
     service.join();
     service.close();
   }

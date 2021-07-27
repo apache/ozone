@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
+import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Before;
 import org.junit.Rule;
@@ -59,7 +59,7 @@ public class TestDatanodeVersionFile {
     clusterID = UUID.randomUUID().toString();
     datanodeUUID = UUID.randomUUID().toString();
     cTime = Time.now();
-    lv = DataNodeLayoutVersion.getLatestVersion().getVersion();
+    lv = HDDSVolumeLayoutVersion.getLatestVersion().getVersion();
 
     dnVersionFile = new DatanodeVersionFile(
         storageID, clusterID, datanodeUUID, cTime, lv);

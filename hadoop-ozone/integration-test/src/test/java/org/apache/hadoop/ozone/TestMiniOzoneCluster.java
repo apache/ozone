@@ -30,9 +30,11 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -122,8 +124,8 @@ public class TestMiniOzoneCluster {
       Pipeline pipeline = Pipeline.newBuilder()
           .setState(Pipeline.PipelineState.OPEN)
           .setId(PipelineID.randomId())
-          .setType(HddsProtos.ReplicationType.STAND_ALONE)
-          .setFactor(HddsProtos.ReplicationFactor.ONE)
+          .setReplicationConfig(new StandaloneReplicationConfig(
+              ReplicationFactor.ONE))
           .setNodes(dns)
           .build();
 
@@ -219,7 +221,7 @@ public class TestMiniOzoneCluster {
 
       for (int i = 0; i < 3; i++) {
         stateMachines.add(new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf, null, null));
+            randomDatanodeDetails(), ozoneConf, null, null, null));
       }
 
       //we need to start all the servers to get the fix ports
@@ -264,11 +266,11 @@ public class TestMiniOzoneCluster {
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
     try (
         DatanodeStateMachine sm1 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null, null);
         DatanodeStateMachine sm2 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null, null);
         DatanodeStateMachine sm3 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null, null);
     ) {
       HashSet<Integer> ports = new HashSet<Integer>();
       assertTrue(ports.add(sm1.getContainer().getReadChannel().getIPCPort()));

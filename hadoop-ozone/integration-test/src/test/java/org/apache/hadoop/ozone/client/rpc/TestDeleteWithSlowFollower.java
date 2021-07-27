@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -37,16 +38,17 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -59,12 +61,13 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.junit.AfterClass;
@@ -117,6 +120,9 @@ public class TestDeleteWithSlowFollower {
         TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_PIPELINE_CREATION_INTERVAL, 1000,
+        TimeUnit.SECONDS);
+
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
@@ -216,21 +222,21 @@ public class TestDeleteWithSlowFollower {
 
     List<Pipeline> pipelineList =
         cluster.getStorageContainerManager().getPipelineManager()
-            .getPipelines(HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.THREE);
+            .getPipelines(new RatisReplicationConfig(
+                HddsProtos.ReplicationFactor.THREE));
     Assert.assertTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
-      if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
+      if (RatisTestHelper.isRatisFollower(dn, pipeline)) {
         follower = dn;
-      } else if (ContainerTestHelper.isRatisLeader(dn, pipeline)) {
+      } else if (RatisTestHelper.isRatisLeader(dn, pipeline)) {
         leader = dn;
       }
     }
     Assert.assertNotNull(follower);
     Assert.assertNotNull(leader);
     //ensure that the chosen follower is still a follower
-    Assert.assertTrue(ContainerTestHelper.isRatisFollower(follower, pipeline));
+    Assert.assertTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
     // shutdown the  follower node
     cluster.shutdownHddsDatanode(follower.getDatanodeDetails());
     key.write(testData);
@@ -249,11 +255,13 @@ public class TestDeleteWithSlowFollower {
     xceiverClient.sendCommand(request.build());
 
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper
+        (ContainerStateMachine) RatisTestHelper
             .getStateMachine(leader, pipeline);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
-        setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        setBucketName(bucketName)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID =
@@ -278,9 +286,17 @@ public class TestDeleteWithSlowFollower {
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
             deleteKey("ratis");
     GenericTestUtils.waitFor(() -> {
-      return
-          dnStateMachine.getCommandDispatcher().getDeleteBlocksCommandHandler()
-              .getInvocationCount() >= 1;
+      try {
+        if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+          cluster.getStorageContainerManager().getScmHAManager()
+              .asSCMHADBTransactionBuffer().flush();
+        }
+        return
+            dnStateMachine.getCommandDispatcher()
+                .getDeleteBlocksCommandHandler().getInvocationCount() >= 1;
+      } catch (IOException e) {
+        return false;
+      }
     }, 500, 100000);
     Assert.assertTrue(containerData.getDeleteTransactionId() > delTrxId);
     Assert.assertTrue(
@@ -295,7 +311,6 @@ public class TestDeleteWithSlowFollower {
       }
     } catch (IOException ioe) {
       Assert.fail("Exception should not be thrown.");
-
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();
@@ -332,6 +347,5 @@ public class TestDeleteWithSlowFollower {
             == ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
       }
     }
-
   }
 }

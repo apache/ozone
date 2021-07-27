@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -38,17 +38,12 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-
-import org.apache.commons.lang3.RandomStringUtils;
-
 
 /**
  * Utility class for benchmark test cases.
@@ -71,32 +66,6 @@ public final class GenesisUtil {
 
   public static Path getTempPath() {
     return Paths.get(System.getProperty(TMP_DIR));
-  }
-
-  public static MetadataStore getMetadataStore(String dbType)
-      throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    MetadataStoreBuilder builder = MetadataStoreBuilder.newBuilder();
-    builder.setConf(conf);
-    builder.setCreateIfMissing(true);
-    builder.setDbFile(
-        getTempPath().resolve(RandomStringUtils.randomNumeric(DB_FILE_LEN))
-            .toFile());
-    switch (dbType) {
-    case DEFAULT_TYPE:
-      break;
-    case CLOSED_TYPE:
-      break;
-    case CACHE_10MB_TYPE:
-      builder.setCacheSize((long) StorageUnit.MB.toBytes(10));
-      break;
-    case CACHE_1GB_TYPE:
-      builder.setCacheSize((long) StorageUnit.GB.toBytes(1));
-      break;
-    default:
-      throw new IllegalStateException("Unknown type: " + dbType);
-    }
-    return builder.build();
   }
 
   public static DatanodeDetails createDatanodeDetails(UUID uuid) {
@@ -132,7 +101,7 @@ public final class GenesisUtil {
       // writes the version file properties
       scmStore.initialize();
     }
-    return new StorageContainerManager(conf, configurator);
+    return StorageContainerManager.createSCM(conf, configurator);
   }
 
   static void configureSCM(OzoneConfiguration conf, int numHandlers) {
@@ -164,8 +133,7 @@ public final class GenesisUtil {
           Pipeline.newBuilder()
               .setState(Pipeline.PipelineState.OPEN)
               .setId(PipelineID.randomId())
-              .setType(HddsProtos.ReplicationType.RATIS)
-              .setFactor(factor)
+              .setReplicationConfig(new RatisReplicationConfig(factor))
               .setNodes(nodes)
               .build();
       pipelineTable.put(pipeline.getId(),
@@ -180,7 +148,6 @@ public final class GenesisUtil {
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     if (omStorage.getState() != Storage.StorageState.INITIALIZED) {
       omStorage.setClusterId(scmStore.getClusterID());
-      omStorage.setScmId(scmStore.getScmId());
       omStorage.setOmId(UUID.randomUUID().toString());
       omStorage.initialize();
     }

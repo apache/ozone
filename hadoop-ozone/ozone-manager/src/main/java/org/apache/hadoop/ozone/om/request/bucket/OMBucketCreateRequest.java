@@ -20,14 +20,17 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 import com.google.common.base.Optional;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -155,6 +158,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest());
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
 
+    // Add metadata layout to bucket info
+    addFSOptimizedBucketDetails(ozoneManager, omBucketInfo);
+
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
@@ -263,17 +269,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
    */
   private void addDefaultAcls(OmBucketInfo omBucketInfo,
       OmVolumeArgs omVolumeArgs) {
-    // Add default acls from volume.
+    // Add default acls for bucket creator.
     List<OzoneAcl> acls = new ArrayList<>();
     if (omBucketInfo.getAcls() != null) {
       acls.addAll(omBucketInfo.getAcls());
     }
 
-    List<OzoneAcl> defaultVolumeAclList = omVolumeArgs.getAclMap()
-        .getDefaultAclList().stream().map(OzoneAcl::fromProtobuf)
-        .collect(Collectors.toList());
-
-    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAclList);
+    // Add default acls from volume.
+    List<OzoneAcl> defaultVolumeAcls = omVolumeArgs.getDefaultAcls();
+    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls);
     omBucketInfo.setAcls(acls);
   }
 
@@ -360,4 +364,31 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
+  /**
+   * OM can support FS optimization only if both are flags are TRUE
+   * (enableFSOptimized=true && enableFSPaths=true) and will write table key
+   * entries in NEW_FORMAT(prefix separated format using objectID). All the
+   * other cases, it will
+   * write table key entries in OLD_FORMAT(existing format).
+   *
+   * @param ozoneManager ozone manager
+   * @param omBucketInfo bucket information
+   */
+  private void addFSOptimizedBucketDetails(OzoneManager ozoneManager,
+                                           OmBucketInfo omBucketInfo) {
+    Map<String, String> metadata = omBucketInfo.getMetadata();
+    if (metadata == null) {
+      metadata = new HashMap<>();
+    }
+    // TODO: Many unit test cases has null config and done a simple null
+    //  check now. It can be done later, to avoid massive test code changes.
+    if(StringUtils.isNotBlank(ozoneManager.getOMMetadataLayout())){
+      String metadataLayout = ozoneManager.getOMMetadataLayout();
+      metadata.put(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, metadataLayout);
+      boolean fsPathsEnabled = ozoneManager.getEnableFileSystemPaths();
+      metadata.put(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+              Boolean.toString(fsPathsEnabled));
+      omBucketInfo.setMetadata(metadata);
+    }
+  }
 }

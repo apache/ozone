@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -18,8 +18,12 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto
@@ -33,7 +37,10 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -43,8 +50,6 @@ import org.apache.hadoop.hdds.scm.server
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -55,7 +60,9 @@ import org.apache.hadoop.hdds.protocol
 import org.apache.hadoop.hdds.protocol
     .proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.StorageReportProto;
+    .StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
@@ -64,6 +71,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
@@ -143,7 +151,7 @@ public final class TestUtils {
    * @return NodeReportProto
    */
   public static NodeReportProto getRandomNodeReport() {
-    return getRandomNodeReport(1);
+    return getRandomNodeReport(1, 1);
   }
 
   /**
@@ -151,12 +159,15 @@ public final class TestUtils {
    *
    * @param numberOfStorageReport number of storage report this node report
    *                              should have
+   * @param numberOfMetadataStorageReport number of metadata storage report
+   *                                      this node report should have
    * @return NodeReportProto
    */
-  public static NodeReportProto getRandomNodeReport(int numberOfStorageReport) {
+  public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
+      int numberOfMetadataStorageReport) {
     UUID nodeId = UUID.randomUUID();
     return getRandomNodeReport(nodeId, File.separator + nodeId,
-        numberOfStorageReport);
+        numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
   /**
@@ -166,42 +177,41 @@ public final class TestUtils {
    * @param nodeId                datanode id
    * @param basePath              base path of storage directory
    * @param numberOfStorageReport number of storage report
+   * @param numberOfMetadataStorageReport number of metadata storage report
    *
    * @return NodeReportProto
    */
   public static NodeReportProto getRandomNodeReport(UUID nodeId,
-      String basePath, int numberOfStorageReport) {
+      String basePath, int numberOfStorageReport,
+      int numberOfMetadataStorageReport) {
     List<StorageReportProto> storageReports = new ArrayList<>();
     for (int i = 0; i < numberOfStorageReport; i++) {
       storageReports.add(getRandomStorageReport(nodeId,
-          basePath + File.separator + i));
+          basePath + File.separator + "data-" + i));
     }
-    return createNodeReport(storageReports);
-  }
-
-  /**
-   * Creates NodeReport with the given storage reports.
-   *
-   * @param reports one or more storage report
-   *
-   * @return NodeReportProto
-   */
-  public static NodeReportProto createNodeReport(
-      StorageReportProto... reports) {
-    return createNodeReport(Arrays.asList(reports));
+    List<MetadataStorageReportProto> metadataStorageReports =
+        new ArrayList<>();
+    for (int i = 0; i < numberOfMetadataStorageReport; i++) {
+      metadataStorageReports.add(getRandomMetadataStorageReport(
+          basePath + File.separator + "metadata-" + i));
+    }
+    return createNodeReport(storageReports, metadataStorageReports);
   }
 
   /**
    * Creates NodeReport with the given storage reports.
    *
    * @param reports storage reports to be included in the node report.
-   *
+   * @param metaReports metadata storage reports to be included
+   *                    in the node report.
    * @return NodeReportProto
    */
   public static NodeReportProto createNodeReport(
-      List<StorageReportProto> reports) {
+      List<StorageReportProto> reports,
+      List<MetadataStorageReportProto> metaReports) {
     NodeReportProto.Builder nodeReport = NodeReportProto.newBuilder();
     nodeReport.addAllStorageReport(reports);
+    nodeReport.addAllMetadataStorageReport(metaReports);
     return nodeReport.build();
   }
 
@@ -219,6 +229,31 @@ public final class TestUtils {
         random.nextInt(1000),
         random.nextInt(500),
         random.nextInt(500),
+        StorageTypeProto.DISK);
+  }
+
+  /**
+   * Generates random metadata storage report.
+   *
+   * @param path path of the storage
+   *
+   * @return MetadataStorageReportProto
+   */
+  public static MetadataStorageReportProto getRandomMetadataStorageReport(
+      String path) {
+    return createMetadataStorageReport(path,
+        random.nextInt(1000),
+        random.nextInt(500),
+        random.nextInt(500),
+        StorageTypeProto.DISK);
+  }
+
+  public static StorageReportProto createStorageReport(UUID nodeId, String path,
+      long capacity) {
+    return createStorageReport(nodeId, path,
+        capacity,
+        0,
+        capacity,
         StorageTypeProto.DISK);
   }
 
@@ -257,6 +292,49 @@ public final class TestUtils {
     return srb.build();
   }
 
+  public static MetadataStorageReportProto createMetadataStorageReport(
+      String path, long capacity) {
+    return createMetadataStorageReport(path,
+        capacity,
+        0,
+        capacity,
+        StorageTypeProto.DISK, false);
+  }
+
+  public static MetadataStorageReportProto createMetadataStorageReport(
+      String path, long capacity, long used, long remaining,
+      StorageTypeProto type) {
+    return createMetadataStorageReport(path, capacity, used, remaining,
+        type, false);
+  }
+
+  /**
+   * Creates metadata storage report with the given information.
+   *
+   * @param path      storage dir
+   * @param capacity  storage size
+   * @param used      space used
+   * @param remaining space remaining
+   * @param type      type of storage
+   *
+   * @return StorageReportProto
+   */
+  public static MetadataStorageReportProto createMetadataStorageReport(
+      String path, long capacity, long used, long remaining,
+      StorageTypeProto type, boolean failed) {
+    Preconditions.checkNotNull(path);
+    MetadataStorageReportProto.Builder srb = MetadataStorageReportProto
+        .newBuilder();
+    srb.setStorageLocation(path)
+        .setCapacity(capacity)
+        .setScmUsed(used)
+        .setFailed(failed)
+        .setRemaining(remaining);
+    StorageTypeProto storageTypeProto =
+        type == null ? StorageTypeProto.DISK : type;
+    srb.setStorageType(storageTypeProto);
+    return srb.build();
+  }
 
   /**
    * Generates random container reports.
@@ -313,11 +391,12 @@ public final class TestUtils {
   public static void openAllRatisPipelines(PipelineManager pipelineManager)
       throws IOException {
     // Pipeline is created by background thread
-    List<Pipeline> pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS);
-    // Trigger the processed pipeline report event
-    for (Pipeline pipeline : pipelines) {
-      pipelineManager.openPipeline(pipeline.getId());
+    for (ReplicationFactor factor : ReplicationFactor.values()) {
+      // Trigger the processed pipeline report event
+      for (Pipeline pipeline : pipelineManager
+          .getPipelines(new RatisReplicationConfig(factor))) {
+        pipelineManager.openPipeline(pipeline.getId());
+      }
     }
   }
 
@@ -429,17 +508,31 @@ public final class TestUtils {
     return report.build();
   }
 
+  /**
+   * Create CRL Status report object.
+   * @param pendingCRLIds List of Pending CRL Ids in the report.
+   * @param receivedCRLId Latest received CRL Id in the report.
+   * @return {@link CRLStatusReport}
+   */
+  public static CRLStatusReport createCRLStatusReport(
+      List<Long> pendingCRLIds, long receivedCRLId) {
+    CRLStatusReport.Builder report = CRLStatusReport.newBuilder();
+    report.addAllPendingCrlIds(pendingCRLIds);
+    report.setReceivedCrlId(receivedCRLId);
+    return report.build();
+  }
+
   public static org.apache.hadoop.hdds.scm.container.ContainerInfo
-      allocateContainer(ContainerManager containerManager)
+      allocateContainer(ContainerManagerV2 containerManager)
       throws IOException {
     return containerManager
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, "root");
+        .allocateContainer(new RatisReplicationConfig(ReplicationFactor.THREE),
+            "root");
 
   }
 
-  public static void closeContainer(ContainerManager containerManager,
-      ContainerID id) throws IOException {
+  public static void closeContainer(ContainerManagerV2 containerManager,
+      ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -453,13 +546,31 @@ public final class TestUtils {
    * @param id
    * @throws IOException
    */
-  public static void quasiCloseContainer(ContainerManager containerManager,
-      ContainerID id) throws IOException {
+  public static void quasiCloseContainer(ContainerManagerV2 containerManager,
+      ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.QUASI_CLOSE);
 
+  }
+
+  /**
+   * Construct and returns StorageContainerManager instance using the given
+   * configuration.
+   *
+   * @param conf OzoneConfiguration
+   * @return StorageContainerManager instance
+   * @throws IOException
+   * @throws AuthenticationException
+   */
+  public static StorageContainerManager getScmSimple(OzoneConfiguration conf)
+      throws IOException, AuthenticationException {
+    SCMConfigurator configurator = new SCMConfigurator();
+    // The default behaviour whether ratis will be enabled or not
+    // in SCM will be inferred from ozone-default.xml.
+    // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    return StorageContainerManager.createSCM(conf, configurator);
   }
 
   /**
@@ -474,7 +585,10 @@ public final class TestUtils {
    */
   public static StorageContainerManager getScm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return getScm(conf, new SCMConfigurator());
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
+    return getScm(conf, configurator);
   }
 
   /**
@@ -504,15 +618,15 @@ public final class TestUtils {
       // writes the version file properties
       scmStore.initialize();
     }
-    return new StorageContainerManager(conf, configurator);
+    return StorageContainerManager.createSCM(conf, configurator);
   }
 
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
         .setContainerID(RandomUtils.nextLong())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(state)
         .setSequenceId(10000L)
         .setOwner("TEST")
@@ -561,11 +675,11 @@ public final class TestUtils {
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     return Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setId(PipelineID.randomId())
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
-        .setType(HddsProtos.ReplicationType.RATIS)
         .build();
   }
 }

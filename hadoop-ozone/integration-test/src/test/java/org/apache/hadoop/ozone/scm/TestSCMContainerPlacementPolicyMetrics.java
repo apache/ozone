@@ -19,10 +19,11 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .SCMContainerPlacementMetrics;
@@ -120,12 +121,12 @@ public class TestSCMContainerPlacementPolicyMetrics {
     PipelineManager manager =
         cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelines = manager.getPipelines().stream().filter(p ->
-        p.getType() == HddsProtos.ReplicationType.RATIS &&
-            p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+        RatisReplicationConfig
+            .hasFactor(p.getReplicationConfig(), ReplicationFactor.THREE))
         .collect(Collectors.toList());
     Pipeline targetPipeline = pipelines.get(0);
     List<DatanodeDetails> nodes = targetPipeline.getNodes();
-    manager.finalizeAndDestroyPipeline(pipelines.get(0), true);
+    manager.closePipeline(pipelines.get(0), true);
 
     // kill datanode to trigger under-replicated container replication
     cluster.shutdownHddsDatanode(nodes.get(0));
@@ -134,7 +135,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
     } catch (InterruptedException e) {
     }
     cluster.getStorageContainerManager().getReplicationManager()
-        .processContainersNow();
+        .processAll();
     try {
       Thread.sleep(30 * 1000);
     } catch (InterruptedException e) {

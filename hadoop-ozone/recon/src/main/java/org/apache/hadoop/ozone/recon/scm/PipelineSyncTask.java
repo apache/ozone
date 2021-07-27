@@ -18,8 +18,16 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import java.util.List;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Node;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
@@ -30,7 +38,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Background pipeline sync task that queries pipelines in SCM, and removes
- * any obsolete pipeline.
+ * any obsolete pipeline. Also syncs operational state of dead nodes with SCM
+ * state.
  */
 public class PipelineSyncTask extends ReconScmTask {
 
@@ -39,15 +48,18 @@ public class PipelineSyncTask extends ReconScmTask {
 
   private StorageContainerServiceProvider scmClient;
   private ReconPipelineManager reconPipelineManager;
+  private ReconNodeManager nodeManager;
   private final long interval;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
+      ReconNodeManager nodeManager,
       StorageContainerServiceProvider scmClient,
       ReconTaskStatusDao reconTaskStatusDao,
       ReconTaskConfig reconTaskConfig) {
     super(reconTaskStatusDao);
     this.scmClient = scmClient;
     this.reconPipelineManager = pipelineManager;
+    this.nodeManager = nodeManager;
     this.interval = reconTaskConfig.getPipelineSyncTaskInterval().toMillis();
   }
 
@@ -58,6 +70,7 @@ public class PipelineSyncTask extends ReconScmTask {
         long start = Time.monotonicNow();
         List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
         reconPipelineManager.initializePipelines(pipelinesFromScm);
+        syncOperationalStateOnDeadNodes();
         LOG.info("Pipeline sync Thread took {} milliseconds.",
             Time.monotonicNow() - start);
         recordSingleRunCompletion();
@@ -65,6 +78,37 @@ public class PipelineSyncTask extends ReconScmTask {
       }
     } catch (Throwable t) {
       LOG.error("Exception in Pipeline sync Thread.", t);
+    }
+  }
+
+  /**
+   * For every dead node in Recon, update Operational state with that on SCM
+   * if different.
+   * @throws IOException on Error
+   * @throws NodeNotFoundException if node not found in Recon.
+   */
+  private void syncOperationalStateOnDeadNodes()
+      throws IOException, NodeNotFoundException {
+    List<DatanodeDetails> deadNodesOnRecon = nodeManager.getNodes(null, DEAD);
+
+    if (!deadNodesOnRecon.isEmpty()) {
+      List<Node> scmNodes = scmClient.getNodes();
+      List<Node> filteredScmNodes = scmNodes.stream()
+              .filter(n -> deadNodesOnRecon.contains(
+                  DatanodeDetails.getFromProtoBuf(n.getNodeID())))
+              .collect(Collectors.toList());
+
+      for (Node deadNode : filteredScmNodes) {
+        DatanodeDetails dnDetails =
+            DatanodeDetails.getFromProtoBuf(deadNode.getNodeID());
+
+        HddsProtos.NodeState scmNodeState = deadNode.getNodeStates(0);
+        if (scmNodeState != DEAD) {
+          LOG.warn("Node {} DEAD in Recon, but SCM reports it as {}",
+              dnDetails.getHostName(), scmNodeState);
+        }
+        nodeManager.updateNodeOperationalStateFromScm(deadNode, dnDetails);
+      }
     }
   }
 }

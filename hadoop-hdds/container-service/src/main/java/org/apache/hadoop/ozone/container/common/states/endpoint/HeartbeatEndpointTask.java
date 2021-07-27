@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine
@@ -50,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
@@ -70,6 +74,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 /**
  * Heartbeat class for SCMs.
@@ -84,14 +89,32 @@ public class HeartbeatEndpointTask
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
+  private HDDSLayoutVersionManager layoutVersionManager;
 
   /**
    * Constructs a SCM heart beat.
    *
+   * @param rpcEndpoint rpc Endpoint
    * @param conf Config.
+   * @param context State context
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-      ConfigurationSource conf, StateContext context) {
+                               ConfigurationSource conf, StateContext context) {
+    this(rpcEndpoint, conf, context,
+        context.getParent().getLayoutVersionManager());
+  }
+
+  /**
+   * Constructs a SCM heart beat.
+   *
+   * @param rpcEndpoint rpc Endpoint
+   * @param conf Config.
+   * @param context State context
+   * @param versionManager Layout version Manager
+   */
+  public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
+                               ConfigurationSource conf, StateContext context,
+                               HDDSLayoutVersionManager versionManager) {
     this.rpcEndpoint = rpcEndpoint;
     this.conf = conf;
     this.context = context;
@@ -99,6 +122,11 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
+    if (versionManager != null) {
+      this.layoutVersionManager = versionManager;
+    } else {
+      this.layoutVersionManager = context.getParent().getLayoutVersionManager();
+    }
   }
 
   /**
@@ -133,8 +161,13 @@ public class HeartbeatEndpointTask
     try {
       Preconditions.checkState(this.datanodeDetailsProto != null);
 
+      LayoutVersionProto layoutinfo = toLayoutVersionProto(
+          layoutVersionManager.getMetadataLayoutVersion(),
+          layoutVersionManager.getSoftwareLayoutVersion());
+
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
-          .setDatanodeDetails(datanodeDetailsProto);
+          .setDatanodeDetails(datanodeDetailsProto)
+          .setDataNodeLayoutVersion(layoutinfo);
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
@@ -150,7 +183,7 @@ public class HeartbeatEndpointTask
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
-      putBackReports(requestBuilder);
+      putBackIncrementalReports(requestBuilder);
       rpcEndpoint.logIfNeeded(ex);
     } finally {
       rpcEndpoint.unlock();
@@ -159,7 +192,8 @@ public class HeartbeatEndpointTask
   }
 
   // TODO: Make it generic.
-  private void putBackReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
+  private void putBackIncrementalReports(
+      SCMHeartbeatRequestProto.Builder requestBuilder) {
     List<GeneratedMessage> reports = new LinkedList<>();
     // We only put back CommandStatusReports and IncrementalContainerReport
     // because those are incremental. Container/Node/PipelineReport are
@@ -271,6 +305,9 @@ public class HeartbeatEndpointTask
         DeleteBlocksCommand db = DeleteBlocksCommand
             .getFromProtobuf(
                 commandResponseProto.getDeleteBlocksCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          db.setTerm(commandResponseProto.getTerm());
+        }
         if (!db.blocksTobeDeleted().isEmpty()) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(DeletedContainerBlocksSummary
@@ -284,6 +321,13 @@ public class HeartbeatEndpointTask
         CloseContainerCommand closeContainer =
             CloseContainerCommand.getFromProtobuf(
                 commandResponseProto.getCloseContainerCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          closeContainer.setTerm(commandResponseProto.getTerm());
+        }
+        if (commandResponseProto.hasEncodedToken()) {
+          closeContainer.setEncodedToken(
+              commandResponseProto.getEncodedToken());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container close request for container {}",
               closeContainer.getContainerID());
@@ -294,6 +338,9 @@ public class HeartbeatEndpointTask
         ReplicateContainerCommand replicateContainerCommand =
             ReplicateContainerCommand.getFromProtobuf(
                 commandResponseProto.getReplicateContainerCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          replicateContainerCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM container replicate request for container {}",
               replicateContainerCommand.getContainerID());
@@ -304,6 +351,9 @@ public class HeartbeatEndpointTask
         DeleteContainerCommand deleteContainerCommand =
             DeleteContainerCommand.getFromProtobuf(
                 commandResponseProto.getDeleteContainerCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          deleteContainerCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM delete container request for container {}",
               deleteContainerCommand.getContainerID());
@@ -314,6 +364,9 @@ public class HeartbeatEndpointTask
         CreatePipelineCommand createPipelineCommand =
             CreatePipelineCommand.getFromProtobuf(
                 commandResponseProto.getCreatePipelineCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          createPipelineCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM create pipeline request {}",
               createPipelineCommand.getPipelineID());
@@ -324,6 +377,9 @@ public class HeartbeatEndpointTask
         ClosePipelineCommand closePipelineCommand =
             ClosePipelineCommand.getFromProtobuf(
                 commandResponseProto.getClosePipelineCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          closePipelineCommand.setTerm(commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM close pipeline request {}",
               closePipelineCommand.getPipelineID());
@@ -334,12 +390,30 @@ public class HeartbeatEndpointTask
         SetNodeOperationalStateCommand setNodeOperationalStateCommand =
             SetNodeOperationalStateCommand.getFromProtobuf(
                 commandResponseProto.getSetNodeOperationalStateCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          setNodeOperationalStateCommand.setTerm(
+              commandResponseProto.getTerm());
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM set operational state command. State: {} " +
               "Expiry: {}", setNodeOperationalStateCommand.getOpState(),
               setNodeOperationalStateCommand.getStateExpiryEpochSeconds());
         }
         this.context.addCommand(setNodeOperationalStateCommand);
+        break;
+      case finalizeNewLayoutVersionCommand:
+        FinalizeNewLayoutVersionCommand finalizeNewLayoutVersionCommand =
+            FinalizeNewLayoutVersionCommand.getFromProtobuf(
+                commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          finalizeNewLayoutVersionCommand.setTerm(
+              commandResponseProto.getTerm());
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM finalize command {}",
+              finalizeNewLayoutVersionCommand.getId());
+        }
+        this.context.addCommand(finalizeNewLayoutVersionCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "
@@ -356,6 +430,7 @@ public class HeartbeatEndpointTask
     private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private StateContext context;
+    private HDDSLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -371,6 +446,17 @@ public class HeartbeatEndpointTask
      */
     public Builder setEndpointStateMachine(EndpointStateMachine rpcEndPoint) {
       this.endPointStateMachine = rpcEndPoint;
+      return this;
+    }
+
+    /**
+     * Sets the LayoutVersionManager.
+     *
+     * @param versionMgr - config
+     * @return Builder
+     */
+    public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {
+      this.versionManager = lvm;
       return this;
     }
 
@@ -421,12 +507,12 @@ public class HeartbeatEndpointTask
 
       if (datanodeDetails == null) {
         LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A vaild Node ID is needed to " +
+        throw new IllegalArgumentException("A valid Node ID is needed to " +
             "construct HeartbeatEndpointTask task");
       }
 
       HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
-          .endPointStateMachine, this.conf, this.context);
+          .endPointStateMachine, this.conf, this.context, this.versionManager);
       task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
       return task;
     }

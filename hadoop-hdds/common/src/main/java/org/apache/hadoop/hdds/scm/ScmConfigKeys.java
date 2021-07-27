@@ -200,6 +200,10 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HTTPS_ADDRESS_KEY =
       "ozone.scm.https-address";
 
+  public static final String OZONE_SCM_ADDRESS_KEY =
+      "ozone.scm.address";
+  public static final String OZONE_SCM_BIND_HOST_DEFAULT =
+      "0.0.0.0";
   public static final String OZONE_SCM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_SCM_HTTP_BIND_PORT_DEFAULT = 9876;
   public static final int OZONE_SCM_HTTPS_BIND_PORT_DEFAULT = 9877;
@@ -285,8 +289,47 @@ public final class ScmConfigKeys {
   // able to send back a new list to the datanodes.
   public static final String OZONE_SCM_NAMES = "ozone.scm.names";
 
-  public static final int OZONE_SCM_DEFAULT_PORT =
-      OZONE_SCM_DATANODE_PORT_DEFAULT;
+  public static final String OZONE_SCM_DEFAULT_SERVICE_ID =
+      "ozone.scm.default.service.id";
+
+  public static final String OZONE_SCM_SERVICE_IDS_KEY =
+      "ozone.scm.service.ids";
+  public static final String OZONE_SCM_NODES_KEY =
+      "ozone.scm.nodes";
+  public static final String OZONE_SCM_NODE_ID_KEY =
+      "ozone.scm.node.id";
+
+  /**
+   * Optional config, if being set will cause scm --init to only take effect on
+   * the specific node and ignore scm --bootstrap cmd.
+   * Similarly, scm --init will be ignored on the non-primordial scm nodes.
+   * With the config set, applications/admins can safely execute init and
+   * bootstrap commands safely on all scm instances, for example kubernetes
+   * deployments.
+   *
+   * If a cluster is upgraded from non-ratis to ratis based SCM, scm --init
+   * needs to re-run for switching from
+   * non-ratis based SCM to ratis-based SCM on the primary node.
+   */
+  public static final String OZONE_SCM_PRIMORDIAL_NODE_ID_KEY =
+      "ozone.scm.primordial.node.id";
+
+  /**
+   * The config when set to true skips the clusterId validation from leader
+   * scm during bootstrap. In SCM HA, the primary node starts up the ratis
+   * server while other bootstrapping nodes will get added to the ratis group.
+   * Now, if all the bootstrapping SCM get stopped post the group formation,
+   * the primary node will now step down from leadership as it will loose
+   * majority. If the bootstrapping nodes are now bootstrapped again,
+   * the bootstrapping node will try to first validate the cluster id from the
+   * leader SCM with the persisted cluster id , but as there is no leader
+   * existing, bootstrapping will keep on failing and retrying until
+   * it shuts down.
+   */
+  public static final String OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY =
+      "ozone.scm.skip.bootstrap.validation";
+  public static final boolean OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_DEFAULT =
+      false;
   // The path where datanode ID is to be written to.
   // if this value is not set then container startup will fail.
   public static final String OZONE_SCM_DATANODE_ID_DIR =
@@ -329,6 +372,13 @@ public final class ScmConfigKeys {
       "ozone.scm.pipeline.per.metadata.disk";
 
   public static final int OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT = 2;
+
+  public static final String OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN =
+      "ozone.scm.datanode.ratis.volume.free-space.min";
+
+  public static final String
+      OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT = "1GB";
+
   // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
       "ozone.scm.pipeline.allocated.timeout";
@@ -364,6 +414,10 @@ public final class ScmConfigKeys {
   public static final String HDDS_SCM_WATCHER_TIMEOUT =
       "hdds.scm.watcher.timeout";
 
+  public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
+      "ozone.scm.sequence.id.batch.size";
+  public static final int OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT = 1000;
+
   public static final String HDDS_SCM_WATCHER_TIMEOUT_DEFAULT =
       "10m";
 
@@ -376,10 +430,45 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
+  // SCM Ratis related
+  public static final String OZONE_SCM_HA_ENABLE_KEY
+      = "ozone.scm.ratis.enable";
+  public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
+      = false;
+  public static final String OZONE_SCM_RATIS_PORT_KEY
+      = "ozone.scm.ratis.port";
+  public static final int OZONE_SCM_RATIS_PORT_DEFAULT
+      = 9894;
+  public static final String OZONE_SCM_GRPC_PORT_KEY
+      = "ozone.scm.grpc.port";
+  public static final int OZONE_SCM_GRPC_PORT_DEFAULT
+      = 9895;
+
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL =
       "ozone.scm.datanode.admin.monitor.interval";
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
+
+  public static final String HDDS_DATANODE_UPGRADE_LAYOUT_INLINE =
+      "hdds.datanode.upgrade.layout.inline";
+  public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
+      true;
+
+  public static final String OZONE_SCM_INFO_WAIT_DURATION =
+      "ozone.scm.info.wait.duration";
+  public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
+      10 * 60;
+
+  public static final String OZONE_SCM_CA_LIST_RETRY_INTERVAL =
+      "ozone.scm.ca.list.retry.interval";
+  public static final long OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT = 10;
+
+
+  public static final String OZONE_SCM_EVENT_PREFIX = "ozone.scm.event.";
+
+  public static final String OZONE_SCM_EVENT_CONTAINER_REPORT_THREAD_POOL_SIZE =
+      OZONE_SCM_EVENT_PREFIX + "ContainerReport.thread.pool.size";
+  public static final int OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT = 10;
 
   /**
    * Never constructed.

@@ -19,17 +19,23 @@ package org.apache.hadoop.hdds;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 
-import static org.apache.hadoop.hdds.HddsUtils.getSCMAddresses;
+import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.hamcrest.core.Is.is;
 import org.junit.Assert;
 import static org.junit.Assert.assertThat;
@@ -82,23 +88,23 @@ public class TestHddsUtils {
 
     // Verify valid IP address setup
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "1.2.3.4");
-    addresses = getSCMAddresses(conf);
+    addresses = getSCMAddressForDatanodes(conf);
     assertThat(addresses.size(), is(1));
     addr = addresses.iterator().next();
     assertThat(addr.getHostName(), is("1.2.3.4"));
-    assertThat(addr.getPort(), is(ScmConfigKeys.OZONE_SCM_DEFAULT_PORT));
+    assertThat(addr.getPort(), is(OZONE_SCM_DATANODE_PORT_DEFAULT));
 
     // Verify valid hostname setup
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1");
-    addresses = getSCMAddresses(conf);
+    addresses = getSCMAddressForDatanodes(conf);
     assertThat(addresses.size(), is(1));
     addr = addresses.iterator().next();
     assertThat(addr.getHostName(), is("scm1"));
-    assertThat(addr.getPort(), is(ScmConfigKeys.OZONE_SCM_DEFAULT_PORT));
+    assertThat(addr.getPort(), is(OZONE_SCM_DATANODE_PORT_DEFAULT));
 
     // Verify valid hostname and port
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234");
-    addresses = getSCMAddresses(conf);
+    addresses = getSCMAddressForDatanodes(conf);
     assertThat(addresses.size(), is(1));
     addr = addresses.iterator().next();
     assertThat(addr.getHostName(), is("scm1"));
@@ -112,7 +118,7 @@ public class TestHddsUtils {
     // Verify multiple hosts and port
     conf.setStrings(
         ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234,scm2:2345,scm3:3456");
-    addresses = getSCMAddresses(conf);
+    addresses = getSCMAddressForDatanodes(conf);
     assertThat(addresses.size(), is(3));
     it = addresses.iterator();
     HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
@@ -126,7 +132,7 @@ public class TestHddsUtils {
     // Verify names with spaces
     conf.setStrings(
         ScmConfigKeys.OZONE_SCM_NAMES, " scm1:1234, scm2:2345 , scm3:3456 ");
-    addresses = getSCMAddresses(conf);
+    addresses = getSCMAddressForDatanodes(conf);
     assertThat(addresses.size(), is(3));
     it = addresses.iterator();
     HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
@@ -140,7 +146,7 @@ public class TestHddsUtils {
     // Verify empty value
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "");
     try {
-      getSCMAddresses(conf);
+      getSCMAddressForDatanodes(conf);
       fail("Empty value should cause an IllegalArgumentException");
     } catch (Exception e) {
       assertTrue(e instanceof IllegalArgumentException);
@@ -149,7 +155,7 @@ public class TestHddsUtils {
     // Verify invalid hostname
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "s..x..:1234");
     try {
-      getSCMAddresses(conf);
+      getSCMAddressForDatanodes(conf);
       fail("An invalid hostname should cause an IllegalArgumentException");
     } catch (Exception e) {
       assertTrue(e instanceof IllegalArgumentException);
@@ -158,7 +164,7 @@ public class TestHddsUtils {
     // Verify invalid port
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm:xyz");
     try {
-      getSCMAddresses(conf);
+      getSCMAddressForDatanodes(conf);
       fail("An invalid port should cause an IllegalArgumentException");
     } catch (Exception e) {
       assertTrue(e instanceof IllegalArgumentException);
@@ -167,11 +173,47 @@ public class TestHddsUtils {
     // Verify a mixed case (valid and invalid value both appears)
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234, scm:xyz");
     try {
-      getSCMAddresses(conf);
+      getSCMAddressForDatanodes(conf);
       fail("An invalid value should cause an IllegalArgumentException");
     } catch (Exception e) {
       assertTrue(e instanceof IllegalArgumentException);
     }
+  }
+
+
+  @Test
+  public void testGetSCMAddressesWithHAConfig() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String scmServiceId = "scmserviceId";
+    String[] nodes = new String[]{"scm1", "scm2", "scm3"};
+    conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId,
+        "scm1,scm2,scm3");
+
+    int port = 9880;
+    List<String> expected = new ArrayList<>();
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "scm");
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
+          scmServiceId, nodeId), ++port);
+      expected.add("scm" + ":" + port);
+    }
+
+    Collection<InetSocketAddress> scmAddressList =
+        HddsUtils.getSCMAddressForDatanodes(conf);
+
+    Assert.assertNotNull(scmAddressList);
+    Assert.assertEquals(3, scmAddressList.size());
+
+    Iterator<InetSocketAddress> it = scmAddressList.iterator();
+    while (it.hasNext()) {
+      InetSocketAddress next = it.next();
+      expected.remove(next.getHostName()  + ":" + next.getPort());
+    }
+
+    Assert.assertTrue(expected.size() == 0);
+
   }
 
 }

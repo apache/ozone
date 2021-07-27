@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -36,15 +37,15 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -139,9 +140,9 @@ public class TestContainerStateMachineFailureOnRead {
   public void testReadStateMachineFailureClosesPipeline() throws Exception {
     // Stop one follower datanode
     List<Pipeline> pipelines =
-        cluster.getStorageContainerManager().getPipelineManager().getPipelines(
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getPipelines(new RatisReplicationConfig(
+                HddsProtos.ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
 
@@ -149,7 +150,7 @@ public class TestContainerStateMachineFailureOnRead {
         cluster.getHddsDatanodes().stream().filter(
             s -> {
               try {
-                return ContainerTestHelper.isRatisFollower(s, ratisPipeline);
+                return RatisTestHelper.isRatisFollower(s, ratisPipeline);
               } catch (Exception e) {
                 e.printStackTrace();
                 return false;
@@ -186,7 +187,7 @@ public class TestContainerStateMachineFailureOnRead {
     Optional<HddsDatanodeService> leaderDn =
         cluster.getHddsDatanodes().stream().filter(dn -> {
           try {
-            return ContainerTestHelper.isRatisLeader(dn, ratisPipeline);
+            return RatisTestHelper.isRatisLeader(dn, ratisPipeline);
           } catch (Exception e) {
             e.printStackTrace();
             return false;

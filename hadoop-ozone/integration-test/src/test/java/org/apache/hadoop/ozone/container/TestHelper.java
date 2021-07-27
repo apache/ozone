@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
@@ -195,7 +195,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -227,8 +227,8 @@ public final class TestHelper {
       throws TimeoutException, InterruptedException, IOException {
     for (Pipeline pipeline1 : pipelineList) {
       // issue pipeline destroy command
-      cluster.getStorageContainerManager().getPipelineManager()
-          .finalizeAndDestroyPipeline(pipeline1, false);
+      cluster.getStorageContainerManager()
+          .getPipelineManager().closePipeline(pipeline1, false);
     }
 
     // wait for the pipeline to get destroyed in the datanodes
@@ -273,7 +273,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -294,7 +294,7 @@ public final class TestHelper {
         // send the order to close the container
         cluster.getStorageContainerManager().getEventQueue()
             .fireEvent(SCMEvents.CLOSE_CONTAINER,
-                ContainerID.valueof(containerID));
+                ContainerID.valueOf(containerID));
       }
     }
     int index = 0;
@@ -338,8 +338,7 @@ public final class TestHelper {
   }
 
   public static HddsDatanodeService getDatanodeService(OmKeyLocationInfo info,
-      MiniOzoneCluster cluster)
-      throws IOException {
+      MiniOzoneCluster cluster) throws IOException {
     DatanodeDetails dnDetails =  info.getPipeline().
         getFirstNode();
     return cluster.getHddsDatanodes().get(cluster.
@@ -360,11 +359,11 @@ public final class TestHelper {
   }
 
   public static int countReplicas(long containerID, MiniOzoneCluster cluster) {
-    ContainerManager containerManager = cluster.getStorageContainerManager()
+    ContainerManagerV2 containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
     try {
       Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(ContainerID.valueof(containerID));
+          .getContainerReplicas(ContainerID.valueOf(containerID));
       LOG.info("Container {} has {} replicas on {}", containerID,
           replicas.size(),
           replicas.stream()
@@ -383,7 +382,6 @@ public final class TestHelper {
   public static void waitForReplicaCount(long containerID, int count,
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
-        1000, 30_000);
+        1000, 30000);
   }
-
 }

@@ -27,17 +27,17 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.util.ExitManager;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.hdds.ExitManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
@@ -57,7 +57,7 @@ import org.slf4j.event.Level;
 @Timeout(500)
 public class TestOMRatisSnapshots {
 
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneOMHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -88,7 +88,7 @@ public class TestOMRatisSnapshots {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId("om-service-test1")
@@ -135,9 +135,9 @@ public class TestOMRatisSnapshots {
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
 
     // Find the inactive OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
@@ -145,11 +145,11 @@ public class TestOMRatisSnapshots {
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
     // Get the latest db checkpoint from the leader OM.
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
     TermIndex leaderOMTermIndex =
-        TermIndex.valueOf(omTransactionInfo.getTerm(),
-            omTransactionInfo.getTransactionIndex());
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
     long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
@@ -200,9 +200,9 @@ public class TestOMRatisSnapshots {
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Find the inactive OM and start it
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     cluster.startInactiveOM(followerNodeId);
 
@@ -255,9 +255,9 @@ public class TestOMRatisSnapshots {
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
 
     // Find the inactive OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
@@ -267,7 +267,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    OMTransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
+    TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
     // Corrupt the leader checkpoint and install that on the OM. The

@@ -34,7 +34,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -98,6 +98,8 @@ public class TestOzoneManagerHttpServer {
     conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
     conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "localhost:0");
     conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "localhost:0");
+    conf.set(OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KEY, "localhost");
+    conf.set(OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY, "localhost");
 
     OzoneManagerHttpServer server = null;
     try {

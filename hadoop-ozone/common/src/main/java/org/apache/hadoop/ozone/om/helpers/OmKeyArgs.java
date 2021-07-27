@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -38,8 +37,7 @@ public final class OmKeyArgs implements Auditable {
   private final String bucketName;
   private final String keyName;
   private long dataSize;
-  private final ReplicationType type;
-  private final ReplicationFactor factor;
+  private final ReplicationConfig replicationConfig;
   private List<OmKeyLocationInfo> locationInfoList;
   private final boolean isMultipartKey;
   private final String multipartUploadID;
@@ -48,20 +46,23 @@ public final class OmKeyArgs implements Auditable {
   private boolean refreshPipeline;
   private boolean sortDatanodesInPipeline;
   private List<OzoneAcl> acls;
+  private boolean latestVersionLocation;
+  private boolean recursive;
+  private boolean headOp;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
-      long dataSize, ReplicationType type, ReplicationFactor factor,
+      long dataSize, ReplicationConfig replicationConfig,
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
-      List<OzoneAcl> acls, boolean sortDatanode) {
+      List<OzoneAcl> acls, boolean sortDatanode,
+      boolean latestVersionLocation, boolean recursive, boolean headOp) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.dataSize = dataSize;
-    this.type = type;
-    this.factor = factor;
+    this.replicationConfig = replicationConfig;
     this.locationInfoList = locationInfoList;
     this.isMultipartKey = isMultipart;
     this.multipartUploadID = uploadID;
@@ -70,6 +71,9 @@ public final class OmKeyArgs implements Auditable {
     this.refreshPipeline = refreshPipeline;
     this.acls = acls;
     this.sortDatanodesInPipeline = sortDatanode;
+    this.latestVersionLocation = latestVersionLocation;
+    this.recursive = recursive;
+    this.headOp = headOp;
   }
 
   public boolean getIsMultipartKey() {
@@ -84,12 +88,8 @@ public final class OmKeyArgs implements Auditable {
     return multipartUploadPartNumber;
   }
 
-  public ReplicationType getType() {
-    return type;
-  }
-
-  public ReplicationFactor getFactor() {
-    return factor;
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   public List<OzoneAcl> getAcls() {
@@ -140,6 +140,18 @@ public final class OmKeyArgs implements Auditable {
     return sortDatanodesInPipeline;
   }
 
+  public boolean getLatestVersionLocation() {
+    return latestVersionLocation;
+  }
+
+  public boolean isRecursive() {
+    return recursive;
+  }
+
+  public boolean isHeadOp() {
+    return headOp;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -147,10 +159,9 @@ public final class OmKeyArgs implements Auditable {
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.KEY, this.keyName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
-    auditMap.put(OzoneConsts.REPLICATION_TYPE,
-        (this.type != null) ? this.type.name() : null);
-    auditMap.put(OzoneConsts.REPLICATION_FACTOR,
-        (this.factor != null) ? this.factor.name() : null);
+    auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+        (this.replicationConfig != null) ?
+            this.replicationConfig.toString() : null);
     return auditMap;
   }
 
@@ -168,8 +179,7 @@ public final class OmKeyArgs implements Auditable {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(dataSize)
-        .setType(type)
-        .setFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setLocationInfoList(locationInfoList)
         .setIsMultipartKey(isMultipartKey)
         .setMultipartUploadID(multipartUploadID)
@@ -177,6 +187,7 @@ public final class OmKeyArgs implements Auditable {
         .addAllMetadata(metadata)
         .setRefreshPipeline(refreshPipeline)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
+        .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls);
   }
 
@@ -188,8 +199,7 @@ public final class OmKeyArgs implements Auditable {
     private String bucketName;
     private String keyName;
     private long dataSize;
-    private ReplicationType type;
-    private ReplicationFactor factor;
+    private ReplicationConfig replicationConfig;
     private List<OmKeyLocationInfo> locationInfoList;
     private boolean isMultipartKey;
     private String multipartUploadID;
@@ -197,7 +207,10 @@ public final class OmKeyArgs implements Auditable {
     private Map<String, String> metadata = new HashMap<>();
     private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
+    private boolean latestVersionLocation;
     private List<OzoneAcl> acls;
+    private boolean recursive;
+    private boolean headOp;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -219,13 +232,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setType(ReplicationType replicationType) {
-      this.type = replicationType;
-      return this;
-    }
-
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
+    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+      this.replicationConfig = replConfig;
       return this;
     }
 
@@ -274,11 +282,27 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setLatestVersionLocation(boolean latest) {
+      this.latestVersionLocation = latest;
+      return this;
+    }
+
+    public Builder setRecursive(boolean isRecursive) {
+      this.recursive = isRecursive;
+      return this;
+    }
+
+    public Builder setHeadOp(boolean isHeadOp) {
+      this.headOp = isHeadOp;
+      return this;
+    }
+
     public OmKeyArgs build() {
-      return new OmKeyArgs(volumeName, bucketName, keyName, dataSize, type,
-          factor, locationInfoList, isMultipartKey, multipartUploadID,
+      return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
+          replicationConfig, locationInfoList, isMultipartKey,
+          multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline);
+          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp);
     }
 
   }

@@ -42,12 +42,19 @@ public class OMCertificateClient extends DefaultCertificateClient {
   public static final String COMPONENT_NAME = "om";
 
   public OMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
+      String certSerialId, String localCrlId) {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
+    this.setLocalCrlId(localCrlId!=null ?
+        Long.parseLong(localCrlId): 0);
+  }
+
+  public OMCertificateClient(SecurityConfig securityConfig,
+      String certSerialId) {
+    this(securityConfig, certSerialId, null);
   }
 
   public OMCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME);
+    this(securityConfig, null, null);
   }
 
   @Override
@@ -123,5 +130,10 @@ public class OMCertificateClient extends DefaultCertificateClient {
   @Override
   public Logger getLogger() {
     return LOG;
+  }
+
+  @Override
+  public String getComponentName() {
+    return COMPONENT_NAME;
   }
 }

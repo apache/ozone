@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -91,7 +91,7 @@ public class TestOzoneManagerRocksDBLogging {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
             .contains("db_impl.cc"),
-        1000, 10000);
+        1000, 30000);
   }
 
 }

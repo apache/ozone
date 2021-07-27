@@ -36,15 +36,17 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.hadoop.fs.TrashPolicy;
+import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 
 import com.google.common.base.Strings;
 
@@ -131,13 +133,12 @@ public class TestOzoneShellHA {
     numOfOMs = 3;
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
-    cluster = MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
-    conf.setQuietMode(false);
     cluster.waitForClusterToBeReady();
   }
 
@@ -232,7 +233,7 @@ public class TestOzoneShellHA {
    * @return the leader OM's Node ID in the MiniOzoneHACluster.
    */
   private String getLeaderOMNodeId() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
+    MiniOzoneOMHAClusterImpl haCluster = (MiniOzoneOMHAClusterImpl) cluster;
     OzoneManager omLeader = haCluster.getOMLeader();
     Assert.assertNotNull("There should be a leader OM at this point.",
         omLeader);
@@ -264,7 +265,7 @@ public class TestOzoneShellHA {
     res[indexOmServiceIds] = getSetConfStringFromConf(
         OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
 
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
     String omNodesVal = conf.get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
@@ -274,7 +275,7 @@ public class TestOzoneShellHA {
     assert(omNodesArr.length == numOfOMs);
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
-          getSetConfStringFromConf(OmUtils.addKeySuffixes(
+          getSetConfStringFromConf(ConfUtils.addKeySuffixes(
               OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodesArr[i]));
     }
 
@@ -362,7 +363,7 @@ public class TestOzoneShellHA {
 
     // Get leader OM node RPC address from ozone.om.address.omServiceId.omNode
     String omLeaderNodeId = getLeaderOMNodeId();
-    String omLeaderNodeAddrKey = OmUtils.addKeySuffixes(
+    String omLeaderNodeAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omLeaderNodeId);
     String omLeaderNodeAddr = conf.get(omLeaderNodeAddrKey);
     String omLeaderNodeAddrWithoutPort = omLeaderNodeAddr.split(":")[0];
@@ -496,6 +497,23 @@ public class TestOzoneShellHA {
     return clientConf;
   }
 
+  /**
+   * Helper function to retrieve Ozone client configuration for ozone
+   * trash testing with TrashPolicyOzone.
+   * @param hostPrefix Scheme + Authority. e.g. ofs://om-service-test1
+   * @param configuration Server config to generate client config from.
+   * @return Config ofs configuration added with fs.trash.classname
+   * = TrashPolicyOzone.
+   */
+  private OzoneConfiguration getClientConfForOzoneTrashPolicy(
+          String hostPrefix, OzoneConfiguration configuration) {
+    OzoneConfiguration clientConf =
+            getClientConfForOFS(hostPrefix, configuration);
+    clientConf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+            TrashPolicy.class);
+    return clientConf;
+  }
+
   @Test
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
@@ -555,8 +573,88 @@ public class TestOzoneShellHA {
       }
     } finally {
       shell.close();
+      fs.close();
     }
   }
+
+  @Test
+  public void testDeleteTrashNoSkipTrash() throws Exception {
+
+    // Test delete from Trash directory removes item from filesystem
+
+    // setup configuration to use TrashPolicyOzone
+    // (default is TrashPolicyDefault)
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf =
+            getClientConfForOzoneTrashPolicy(hostPrefix, conf);
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+
+    int res;
+
+    // create volume: vol1 with bucket: bucket1
+    final String testVolBucket = "/vol1/bucket1";
+    final String testKey = testVolBucket+"/key1";
+
+    final String[] volBucketArgs = new String[] {"-mkdir", "-p", testVolBucket};
+    final String[] keyArgs = new String[] {"-touch", testKey};
+    final String[] listArgs = new String[] {"key", "list", testVolBucket};
+
+    LOG.info("Executing testDeleteTrashNoSkipTrash: FsShell with args {}",
+            Arrays.asList(volBucketArgs));
+    res = ToolRunner.run(shell, volBucketArgs);
+    Assert.assertEquals(0, res);
+
+    // create key: key1 belonging to bucket1
+    res = ToolRunner.run(shell, keyArgs);
+    Assert.assertEquals(0, res);
+
+    // check directory listing for bucket1 contains 1 key
+    out.reset();
+    execute(ozoneShell, listArgs);
+    Assert.assertEquals(1, getNumOfKeys());
+
+    // Test deleting items in trash are discarded (removed from filesystem)
+    // 1.) remove key1 from bucket1 with fs shell rm command
+    // 2.) on rm, item is placed in Trash
+    // 3.) remove Trash directory and all contents, 
+    //     check directory listing = 0 items
+
+    final String[] rmKeyArgs = new String[] {"-rm", "-R", testKey};
+    final String[] rmTrashArgs = new String[] {"-rm", "-R",
+                                               testVolBucket+"/.Trash"};
+    final Path trashPathKey1 = Path.mergePaths(new Path(
+            new OFSPath(testKey).getTrashRoot(), new Path("Current")),
+            new Path(testKey));
+    FileSystem fs = FileSystem.get(clientConf);
+
+    try {
+      // on delete key, item is placed in trash
+      LOG.info("Executing testDeleteTrashNoSkipTrash: FsShell with args {}",
+              Arrays.asList(rmKeyArgs));
+      res = ToolRunner.run(shell, rmKeyArgs);
+      Assert.assertEquals(0, res);
+
+      LOG.info("Executing testDeleteTrashNoSkipTrash: key1 deleted moved to"
+              +" Trash: "+trashPathKey1.toString());
+      fs.getFileStatus(trashPathKey1);
+
+      LOG.info("Executing testDeleteTrashNoSkipTrash: deleting trash FsShell "
+              +"with args{}: ", Arrays.asList(rmTrashArgs));
+      res = ToolRunner.run(shell, rmTrashArgs);
+      Assert.assertEquals(0, res);
+
+      out.reset();
+      // once trash is is removed, trash should be deleted from filesystem
+      execute(ozoneShell, listArgs);
+      Assert.assertEquals(0, getNumOfKeys());
+
+    } finally {
+      shell.close();
+      fs.close();
+    }
+
+  }
+
 
   @Test
   @SuppressWarnings("methodlength")

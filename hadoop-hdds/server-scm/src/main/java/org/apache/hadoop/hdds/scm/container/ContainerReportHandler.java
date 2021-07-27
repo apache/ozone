@@ -25,14 +25,14 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +52,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       LoggerFactory.getLogger(ContainerReportHandler.class);
 
   private final NodeManager nodeManager;
-  private final ContainerManager containerManager;
+  private final ContainerManagerV2 containerManager;
   private final String unknownContainerHandleAction;
 
   /**
@@ -71,9 +71,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    * @param conf OzoneConfiguration instance
    */
   public ContainerReportHandler(final NodeManager nodeManager,
-                                final ContainerManager containerManager,
+                                final ContainerManagerV2 containerManager,
+                                final SCMContext scmContext,
                                 OzoneConfiguration conf) {
-    super(containerManager, LOG);
+    super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
 
@@ -86,8 +87,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   public ContainerReportHandler(final NodeManager nodeManager,
-      final ContainerManager containerManager) {
-    this(nodeManager, containerManager, null);
+      final ContainerManagerV2 containerManager) {
+    this(nodeManager, containerManager, SCMContext.emptyContext(), null);
   }
 
   /**
@@ -111,31 +112,35 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     }
     final ContainerReportsProto containerReport =
         reportFromDatanode.getReport();
-
     try {
-      final List<ContainerReplicaProto> replicas =
-          containerReport.getReportsList();
-      final Set<ContainerID> containersInSCM =
-          nodeManager.getContainers(datanodeDetails);
+      // HDDS-5249 - we must ensure that an ICR and FCR for the same datanode
+      // do not run at the same time or it can result in a data consistency
+      // issue between the container list in NodeManager and the replicas in
+      // ContainerManager.
+      synchronized (datanodeDetails) {
+        final List<ContainerReplicaProto> replicas =
+            containerReport.getReportsList();
+        final Set<ContainerID> containersInSCM =
+            nodeManager.getContainers(datanodeDetails);
 
-      final Set<ContainerID> containersInDn = replicas.parallelStream()
-          .map(ContainerReplicaProto::getContainerID)
-          .map(ContainerID::valueof).collect(Collectors.toSet());
+        final Set<ContainerID> containersInDn = replicas.parallelStream()
+            .map(ContainerReplicaProto::getContainerID)
+            .map(ContainerID::valueOf).collect(Collectors.toSet());
 
-      final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
-      missingReplicas.removeAll(containersInDn);
+        final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
+        missingReplicas.removeAll(containersInDn);
 
-      processContainerReplicas(datanodeDetails, replicas, publisher);
-      processMissingReplicas(datanodeDetails, missingReplicas);
-      updateDeleteTransaction(datanodeDetails, replicas, publisher);
+        processContainerReplicas(datanodeDetails, replicas, publisher);
+        processMissingReplicas(datanodeDetails, missingReplicas);
 
-      /*
-       * Update the latest set of containers for this datanode in
-       * NodeManager
-       */
-      nodeManager.setContainers(datanodeDetails, containersInDn);
+        /*
+         * Update the latest set of containers for this datanode in
+         * NodeManager
+         */
+        nodeManager.setContainers(datanodeDetails, containersInDn);
 
-      containerManager.notifyContainerReportProcessing(true, true);
+        containerManager.notifyContainerReportProcessing(true, true);
+      }
     } catch (NodeNotFoundException ex) {
       containerManager.notifyContainerReportProcessing(true, false);
       LOG.error("Received container report from unknown datanode {}.",
@@ -167,10 +172,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         } else if (unknownContainerHandleAction.equals(
             UNKNOWN_CONTAINER_ACTION_DELETE)) {
           final ContainerID containerId = ContainerID
-              .valueof(replicaProto.getContainerID());
+              .valueOf(replicaProto.getContainerID());
           deleteReplica(containerId, datanodeDetails, publisher, "unknown");
         }
-      } catch (IOException e) {
+      } catch (IOException | InvalidStateTransitionException e) {
         LOG.error("Exception while processing container report for container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
             datanodeDetails, e);
@@ -203,41 +208,6 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         LOG.warn("Cannot remove container replica, container {} not found.",
             id, e);
       }
-    }
-  }
-
-  /**
-   * Updates the Delete Transaction Id for the given datanode.
-   *
-   * @param datanodeDetails DatanodeDetails
-   * @param replicas List of ContainerReplicaProto
-   * @param publisher EventPublisher reference
-   */
-  private void updateDeleteTransaction(final DatanodeDetails datanodeDetails,
-      final List<ContainerReplicaProto> replicas,
-      final EventPublisher publisher) {
-    final PendingDeleteStatusList pendingDeleteStatusList =
-        new PendingDeleteStatusList(datanodeDetails);
-    for (ContainerReplicaProto replica : replicas) {
-      try {
-        final ContainerInfo containerInfo = containerManager.getContainer(
-            ContainerID.valueof(replica.getContainerID()));
-        if (containerInfo.getDeleteTransactionId() >
-            replica.getDeleteTransactionId()) {
-          pendingDeleteStatusList.addPendingDeleteStatus(
-              replica.getDeleteTransactionId(),
-              containerInfo.getDeleteTransactionId(),
-              containerInfo.getContainerID());
-        }
-      } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot update pending delete transaction for " +
-            "container #{}. Reason: container missing.",
-            replica.getContainerID());
-      }
-    }
-    if (pendingDeleteStatusList.getNumPendingDeletes() > 0) {
-      publisher.fireEvent(SCMEvents.PENDING_DELETE_STATUS,
-          pendingDeleteStatusList);
     }
   }
 }

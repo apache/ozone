@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server
       .XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
@@ -223,7 +223,7 @@ public class TestCSMMetrics {
     }
 
     @Override
-    public void setScmId(String scmId) {
+    public void setClusterId(String scmId) {
 
     }
 

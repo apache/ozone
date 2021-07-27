@@ -33,14 +33,12 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
-import org.iq80.leveldb.DBException;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -160,11 +158,8 @@ public class BucketManagerImpl implements BucketManager {
       OmBucketInfo.Builder omBucketInfoBuilder = bucketInfo.toBuilder()
           .setCreationTime(Time.now());
 
-      List<OzoneManagerProtocolProtos.OzoneAclInfo> defaultAclList =
-          volumeArgs.getAclMap().getDefaultAclList();
-      for (OzoneManagerProtocolProtos.OzoneAclInfo a : defaultAclList) {
-        omBucketInfoBuilder.addAcl(OzoneAcl.fromProtobufWithAccessType(a));
-      }
+      OzoneAclUtil.inheritDefaultAcls(omBucketInfoBuilder.getAcls(),
+          volumeArgs.getDefaultAcls());
 
       if (bekb != null) {
         omBucketInfoBuilder.setBucketEncryptionKey(bekb.build());
@@ -180,7 +175,7 @@ public class BucketManagerImpl implements BucketManager {
         LOG.debug("created bucket: {} in volume: {}", bucketName,
             volumeName);
       }
-    } catch (IOException | DBException ex) {
+    } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Bucket creation failed for bucket:{} in volume:{}",
             bucketName, volumeName, ex);
@@ -259,7 +254,7 @@ public class BucketManagerImpl implements BucketManager {
             BUCKET_NOT_FOUND);
       }
       return value;
-    } catch (IOException | DBException ex) {
+    } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Exception while getting bucket info for bucket: {}",
             bucketName, ex);
@@ -330,7 +325,7 @@ public class BucketManagerImpl implements BucketManager {
 
 
       commitBucketInfoToDB(omBucketInfo);
-    } catch (IOException | DBException ex) {
+    } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Setting bucket property failed for bucket:{} in volume:{}",
             bucketName, volumeName, ex);

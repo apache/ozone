@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -34,6 +35,8 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.junit.BeforeClass;
@@ -99,6 +102,7 @@ public class TestOmBlockVersioning {
         .setDataSize(1000)
         .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())
+        .setReplicationConfig(new StandaloneReplicationConfig(ONE))
         .build();
 
     // 1st update, version 0

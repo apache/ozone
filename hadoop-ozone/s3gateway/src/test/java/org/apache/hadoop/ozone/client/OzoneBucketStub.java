@@ -32,9 +32,13 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts.PartInfo;
@@ -57,6 +61,8 @@ public class OzoneBucketStub extends OzoneBucket {
 
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
+  private ArrayList<OzoneAcl> aclList = new ArrayList<>();
+
   /**
    * Constructs OzoneBucket instance.
    *
@@ -73,8 +79,7 @@ public class OzoneBucketStub extends OzoneBucket {
       long creationTime) {
     super(volumeName,
         bucketName,
-        ReplicationFactor.ONE,
-        ReplicationType.STAND_ALONE,
+        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
         storageType,
         versioning,
         creationTime);
@@ -122,6 +127,25 @@ public class OzoneBucketStub extends OzoneBucket {
   public OzoneKeyDetails getKey(String key) throws IOException {
     if (keyDetails.containsKey(key)) {
       return keyDetails.get(key);
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public OzoneKey headObject(String key) throws IOException {
+    if (keyDetails.containsKey(key)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(key);
+      return new OzoneKey(ozoneKeyDetails.getVolumeName(),
+          ozoneKeyDetails.getBucketName(),
+          ozoneKeyDetails.getName(),
+          ozoneKeyDetails.getDataSize(),
+          ozoneKeyDetails.getCreationTime().toEpochMilli(),
+          ozoneKeyDetails.getModificationTime().toEpochMilli(),
+          ReplicationConfig.fromTypeAndFactor(
+              ozoneKeyDetails.getReplicationType(),
+              ReplicationFactor.valueOf(ozoneKeyDetails.getReplicationFactor())
+          ));
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -291,7 +315,27 @@ public class OzoneBucketStub extends OzoneBucket {
       return ozoneMultipartUploadPartListParts;
 
     }
+  }
 
+  @Override
+  public List<OzoneAcl> getAcls() throws IOException {
+    return (List<OzoneAcl>)aclList.clone();
+  }
+
+  @Override
+  public boolean removeAcl(OzoneAcl removeAcl) throws IOException {
+    return aclList.remove(removeAcl);
+  }
+
+  @Override
+  public boolean addAcl(OzoneAcl addAcl) throws IOException {
+    return aclList.add(addAcl);
+  }
+
+  @Override
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    aclList.clear();
+    return aclList.addAll(acls);
   }
 
   /**

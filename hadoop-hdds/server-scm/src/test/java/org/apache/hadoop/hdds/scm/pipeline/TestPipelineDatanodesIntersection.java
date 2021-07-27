@@ -18,8 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -81,7 +82,7 @@ public class TestPipelineDatanodesIntersection {
     NodeManager nodeManager= new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    PipelineStateManager stateManager = new PipelineStateManager();
+    StateManager stateManager = new PipelineStateManager();
     PipelineProvider provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, conf);
 
@@ -91,13 +92,14 @@ public class TestPipelineDatanodesIntersection {
     int createdPipelineCount = 0;
     while (!end && createdPipelineCount <= healthyNodeCount * nodeHeaviness) {
       try {
-        Pipeline pipeline = provider.create(HddsProtos.ReplicationFactor.THREE);
+        Pipeline pipeline = provider.create(new RatisReplicationConfig(
+            ReplicationFactor.THREE));
         stateManager.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
         List<Pipeline> overlapPipelines = RatisPipelineUtils
             .checkPipelineContainSameDatanodes(stateManager, pipeline);
 
-        if (overlapPipelines.isEmpty()){
+        if (overlapPipelines.isEmpty()) {
           intersectionCount++;
           for (Pipeline overlapPipeline : overlapPipelines) {
             LOG.info("This pipeline: " + pipeline.getId().toString() +
@@ -125,8 +127,9 @@ public class TestPipelineDatanodesIntersection {
     end = false;
 
     LOG.info("Among total " +
-        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE).size() + " created pipelines" +
+        stateManager
+            .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+            .size() + " created pipelines" +
         " with " + healthyNodeCount + " healthy datanodes and " +
         nodeHeaviness + " as node heaviness, " +
         intersectionCount + " pipelines has same set of datanodes.");

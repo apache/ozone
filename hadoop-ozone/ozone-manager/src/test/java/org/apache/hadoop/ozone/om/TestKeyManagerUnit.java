@@ -35,12 +35,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -67,7 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
 import org.junit.After;
@@ -297,8 +297,8 @@ public class TestKeyManagerUnit {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(key)
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .build();
     return omtest.initiateMultipartUpload(key1);
@@ -312,8 +312,8 @@ public class TestKeyManagerUnit {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
@@ -344,8 +344,8 @@ public class TestKeyManagerUnit {
 
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnOne.getUuid())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
@@ -353,8 +353,8 @@ public class TestKeyManagerUnit {
 
     final Pipeline pipelineTwo = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnFour.getUuid())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
@@ -401,9 +401,9 @@ public class TestKeyManagerUnit {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(256000)
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
-        .setAcls(Collections.emptyList())
+        .setReplicationConfig(
+                    new RatisReplicationConfig(ReplicationFactor.THREE))
+            .setAcls(Collections.emptyList())
         .build();
     TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);
 
@@ -471,8 +471,8 @@ public class TestKeyManagerUnit {
           .setCreationTime(Time.now())
           .setOmKeyLocationInfos(singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setReplicationFactor(ReplicationFactor.THREE)
-          .setReplicationType(ReplicationType.RATIS)
+          .setReplicationConfig(
+                      new RatisReplicationConfig(ReplicationFactor.THREE))
           .setKeyName(keyPrefix + i)
           .setObjectID(i)
           .setUpdateID(i)

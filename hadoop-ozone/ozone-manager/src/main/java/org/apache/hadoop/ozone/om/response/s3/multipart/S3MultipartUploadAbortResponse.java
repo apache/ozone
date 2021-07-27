@@ -49,15 +49,18 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 public class S3MultipartUploadAbortResponse extends OMClientResponse {
 
   private String multipartKey;
+  private String multipartOpenKey;
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private boolean isRatisEnabled;
   private OmBucketInfo omBucketInfo;
 
   public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse,
-      String multipartKey, @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo) {
+      String multipartKey, String multipartOpenKey,
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.multipartKey = multipartKey;
+    this.multipartOpenKey = multipartOpenKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.isRatisEnabled = isRatisEnabled;
     this.omBucketInfo = omBucketInfo;
@@ -78,7 +81,7 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
 
     // Delete from openKey table and multipart info table.
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        multipartKey);
+        multipartOpenKey);
     omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
         multipartKey);
 

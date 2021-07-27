@@ -17,21 +17,21 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-ozone</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>ozone</artifactId>
+    <version>1.2.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
+  <artifactId>ozone-filesystem-hadoop2</artifactId>
   <name>Apache Ozone FS Hadoop 2.x compatibility</name>
   <packaging>jar</packaging>
-  <version>1.1.0-SNAPSHOT</version>
+  <version>1.2.0-SNAPSHOT</version>
   <properties>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-filesystem-shaded</artifactId>
       <optional>true</optional>
       <exclusions>
         <exclusion>
@@ -39,7 +39,7 @@
           <artifactId>hadoop-common</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.hadoop</groupId>
+          <groupId>org.apache.ozone</groupId>
           <artifactId>hadoop-hdfs-client</artifactId>
         </exclusion>
         <exclusion>
@@ -93,23 +93,13 @@
               <excludes>META-INF/versions/**/*.*</excludes>
               <artifactItems>
                 <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
+                  <groupId>org.apache.ozone</groupId>
+                  <artifactId>ozone-filesystem-shaded</artifactId>
                   <version>${project.version}</version>
                 </artifactItem>
               </artifactItems>
               <outputDirectory>target/classes</outputDirectory>
             </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>signature-check</id>
-            <phase/>
           </execution>
         </executions>
       </plugin>

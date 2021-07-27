@@ -18,12 +18,12 @@
 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-hdds</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>1.2.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-hdds-test-utils</artifactId>
-  <version>1.1.0-SNAPSHOT</version>
+  <artifactId>hdds-test-utils</artifactId>
+  <version>1.2.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Test Utils</description>
   <name>Apache Ozone HDDS Test Utils</name>
   <packaging>jar</packaging>

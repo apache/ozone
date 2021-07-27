@@ -18,32 +18,29 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.Time;
-import org.junit.Assert;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,16 +54,21 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.PrivilegedAction;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerSecureRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -86,18 +88,17 @@ public class TestSecureOzoneContainer {
 
   private OzoneConfiguration conf;
   private SecurityConfig secConfig;
-  private Boolean requireBlockToken;
-  private Boolean hasBlockToken;
-  private Boolean blockTokeExpired;
+  private final boolean requireToken;
+  private final boolean hasToken;
+  private final boolean tokenExpired;
   private CertificateClientTestImpl caClient;
-  private OzoneBlockTokenSecretManager secretManager;
+  private ContainerTokenSecretManager secretManager;
 
-
-  public TestSecureOzoneContainer(Boolean requireBlockToken,
-      Boolean hasBlockToken, Boolean blockTokenExpired) {
-    this.requireBlockToken = requireBlockToken;
-    this.hasBlockToken = hasBlockToken;
-    this.blockTokeExpired = blockTokenExpired;
+  public TestSecureOzoneContainer(Boolean requireToken,
+      Boolean hasToken, Boolean tokenExpired) {
+    this.requireToken = requireToken;
+    this.hasToken = hasToken;
+    this.tokenExpired = tokenExpired;
   }
 
   @Parameterized.Parameters
@@ -119,20 +120,21 @@ public class TestSecureOzoneContainer {
     conf.set(OZONE_METADATA_DIRS, ozoneMetaPath);
     secConfig = new SecurityConfig(conf);
     caClient = new CertificateClientTestImpl(conf);
-    secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        60 * 60 * 24, caClient.getCertificate().
-        getSerialNumber().toString());
+    secretManager = new ContainerTokenSecretManager(
+        new SecurityConfig(conf),
+        TimeUnit.DAYS.toMillis(1),
+        caClient.getCertificate().getSerialNumber().toString());
   }
 
   @Test
   public void testCreateOzoneContainer() throws Exception {
     LOG.info("Test case: requireBlockToken: {} hasBlockToken: {} " +
-        "blockTokenExpired: {}.", requireBlockToken, hasBlockToken,
-        blockTokeExpired);
-    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,
-        requireBlockToken);
+        "blockTokenExpired: {}.", requireToken, hasToken,
+        tokenExpired);
+    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, requireToken);
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, requireToken);
 
-    long containerID = ContainerTestHelper.getTestContainerID();
+    ContainerID containerID = ContainerID.valueOf(getTestContainerID());
     OzoneContainer container = null;
     System.out.println(System.getProperties().getProperty("java.library.path"));
     try {
@@ -141,23 +143,16 @@ public class TestSecureOzoneContainer {
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT, pipeline
           .getFirstNode().getPort(DatanodeDetails.Port.Name.STANDALONE)
           .getValue());
-      conf.setBoolean(
-          OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
+      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       container = new OzoneContainer(dn, conf, getContext(dn), caClient);
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
+      String user = "user1";
       UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
-          "user1",  new String[] {"usergroup"});
-      long expiryDate = (blockTokeExpired) ?
-          Time.now() - 60 * 60 * 2 : Time.now() + 60 * 60 * 24;
-
-      OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier(
-          "testUser", "cid:lud:bcsid",
-          EnumSet.allOf(AccessModeProto.class),
-          expiryDate, "1234", 128L);
+          user,  new String[] {"usergroup"});
 
       int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
       if (port == 0) {
@@ -165,36 +160,40 @@ public class TestSecureOzoneContainer {
                 .DFS_CONTAINER_IPC_PORT, DFS_CONTAINER_IPC_PORT_DEFAULT);
       }
       secretManager.start(caClient);
-      Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(
-          "123", EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
-      if (hasBlockToken) {
-        ugi.addToken(token);
-      }
 
       ugi.doAs((PrivilegedAction<Void>) () -> {
         try {
           XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-          client.connect(token.encodeToUrlString());
-          if (hasBlockToken) {
-            createContainerForTesting(client, containerID, token);
-          } else {
-            createContainerForTesting(client, containerID, null);
+          client.connect();
+
+          Token<?> token = null;
+          if (hasToken) {
+            Instant expiryDate = tokenExpired
+                ? Instant.now().minusSeconds(3600)
+                : Instant.now().plusSeconds(3600);
+            ContainerTokenIdentifier tokenIdentifier =
+                new ContainerTokenIdentifier(user, containerID,
+                    caClient.getCertificate().getSerialNumber().toString(),
+                    expiryDate);
+            token = secretManager.generateToken(tokenIdentifier);
           }
 
+          ContainerCommandRequestProto request =
+              getCreateContainerSecureRequest(containerID.getId(),
+                  client.getPipeline(), token);
+          ContainerCommandResponseProto response = client.sendCommand(request);
+          assertNotNull(response);
+          ContainerProtos.Result expectedResult =
+              !requireToken || (hasToken && !tokenExpired)
+                  ? ContainerProtos.Result.SUCCESS
+                  : ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
+          assertEquals(expectedResult, response.getResult(), this::testCase);
+        } catch (SCMSecurityException e) {
+          assertState(requireToken && hasToken && tokenExpired);
+        } catch (IOException e) {
+          assertState(requireToken && !hasToken);
         } catch (Exception e) {
-          if (requireBlockToken && hasBlockToken && !blockTokeExpired) {
-            LOG.error("Unexpected error. ", e);
-            fail("Client with BlockToken should succeed when block token is" +
-                " required.");
-          }
-          if (requireBlockToken && hasBlockToken && blockTokeExpired) {
-            assertTrue("Receive expected exception",
-                e instanceof SCMSecurityException);
-          }
-          if (requireBlockToken && !hasBlockToken) {
-            assertTrue("Receive expected exception", e instanceof
-                IOException);
-          }
+          fail(e);
         }
         return null;
       });
@@ -205,17 +204,6 @@ public class TestSecureOzoneContainer {
     }
   }
 
-  public static void createContainerForTesting(XceiverClientSpi client,
-      long containerID, Token token) throws Exception {
-    // Create container
-    ContainerProtos.ContainerCommandRequestProto request =
-        ContainerTestHelper.getCreateContainerSecureRequest(
-            containerID, client.getPipeline(), token);
-    ContainerProtos.ContainerCommandResponseProto response =
-        client.sendCommand(request);
-    Assert.assertNotNull(response);
-  }
-
   private StateContext getContext(DatanodeDetails datanodeDetails) {
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
@@ -223,5 +211,22 @@ public class TestSecureOzoneContainer {
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
     return context;
+  }
+
+  private void assertState(boolean condition) {
+    assertTrue(condition, this::testCase);
+  }
+
+  private String testCase() {
+    if (!requireToken) {
+      return "unsecure";
+    }
+    if (!hasToken) {
+      return "unauthorized";
+    }
+    if (tokenExpired) {
+      return "token expired";
+    }
+    return "valid token";
   }
 }

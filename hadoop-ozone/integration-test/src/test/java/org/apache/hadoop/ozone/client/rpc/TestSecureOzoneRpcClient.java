@@ -19,16 +19,14 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -46,10 +44,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -59,7 +55,6 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -79,6 +74,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       storageContainerLocationClient;
 
   private static final String SCM_ID = UUID.randomUUID().toString();
+  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static File testDir;
   private static OzoneConfiguration conf;
   private static OzoneBlockTokenSecretManager secretManager;
@@ -108,16 +104,13 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
         .setScmId(SCM_ID)
+        .setClusterId(CLUSTER_ID)
         .setCertificateClient(certificateClientTest)
         .build();
-    String user = UserGroupInformation.getCurrentUser().getShortUserName();
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
         60 *60, certificateClientTest.getCertificate().
         getSerialNumber().toString());
     secretManager.start(certificateClientTest);
-    Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(
-        user, EnumSet.allOf(AccessModeProto.class), 60*60);
-    UserGroupInformation.getCurrentUser().addToken(token);
     cluster.getOzoneManager().startSecretManager();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
@@ -131,7 +124,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     TestOzoneRpcClient.setStorageContainerLocationClient(
         storageContainerLocationClient);
     TestOzoneRpcClient.setStore(store);
-    TestOzoneRpcClient.setScmId(SCM_ID);
+    TestOzoneRpcClient.setClusterId(CLUSTER_ID);
   }
 
   /**
@@ -190,7 +183,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String value = "sample value";
-    BlockTokenVerifier.setTestStub(true);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -213,7 +205,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
               " with GRPC XceiverServer with Ozone block token.",
           () -> bucket.readKey(keyName));
     }
-    BlockTokenVerifier.setTestStub(false);
   }
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,
@@ -234,7 +225,8 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         keyInfo.getLatestVersionLocations().getLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
-      if (!container.getReplicationFactor().equals(replicationFactor) || (
+      if (!ReplicationConfig.getLegacyFactor(container.getReplicationConfig())
+          .equals(replicationFactor) || (
           container.getReplicationType() != replicationType)) {
         return false;
       }
@@ -242,6 +234,11 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     return true;
   }
 
+  @Test
+  @Override
+  // Restart DN doesn't work with security enabled.
+  public void testZReadKeyWithUnhealthyContainerReplia() throws Exception {
+  }
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */

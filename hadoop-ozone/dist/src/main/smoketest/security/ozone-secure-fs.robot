@@ -23,6 +23,7 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}    http://s3g:9878
+${SCM}             scm
 
 *** Keywords ***
 Setup volume names

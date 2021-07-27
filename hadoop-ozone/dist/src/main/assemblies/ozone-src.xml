@@ -59,7 +59,14 @@
       <includes>
         <include>pom.xml</include>
         <include>README.md</include>
+        <include>HISTORY.md</include>
+        <include>SECURITY.md</include>
+        <include>CONTRIBUTING.md</include>
       </includes>
+    </fileSet>
+    <fileSet>
+      <directory>dev-support</directory>
+      <useDefaultExcludes>true</useDefaultExcludes>
     </fileSet>
     <fileSet>
       <directory>hadoop-hdds</directory>

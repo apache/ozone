@@ -285,7 +285,7 @@ public class OFSPath {
    */
   public static String getTempMountBucketNameOfCurrentUser()
       throws IOException {
-    String username = UserGroupInformation.getCurrentUser().getUserName();
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
     return getTempMountBucketName(username);
   }
 
@@ -298,7 +298,8 @@ public class OFSPath {
       throw new RuntimeException("Volume or bucket doesn't have trash root.");
     }
     try {
-      String username = UserGroupInformation.getCurrentUser().getUserName();
+      final String username =
+              UserGroupInformation.getCurrentUser().getShortUserName();
       final Path pathRoot = new Path(
           OZONE_OFS_URI_SCHEME, authority, OZONE_URI_DELIMITER);
       final Path pathToVolume = new Path(pathRoot, volumeName);

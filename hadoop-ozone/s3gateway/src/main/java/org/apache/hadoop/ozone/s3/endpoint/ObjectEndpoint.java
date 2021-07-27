@@ -55,7 +55,9 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -336,10 +338,10 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private void addLastModifiedDate(
-      ResponseBuilder responseBuilder, OzoneKeyDetails key) {
+      ResponseBuilder responseBuilder, OzoneKey key) {
 
     ZonedDateTime lastModificationTime = key.getModificationTime()
-        .atZone(ZoneId.of("GMT"));
+        .atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE));
 
     responseBuilder
         .header(LAST_MODIFIED,
@@ -357,10 +359,10 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath) throws IOException, OS3Exception {
 
-    OzoneKeyDetails key;
+    OzoneKey key;
 
     try {
-      key = getBucket(bucketName).getKey(keyPath);
+      key = getBucket(bucketName).headObject(keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
@@ -436,6 +438,11 @@ public class ObjectEndpoint extends EndpointBase {
             .NO_SUCH_BUCKET, bucketName);
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
+        // keys. Just return 204
+      } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
+        // With PREFIX metadata layout, a dir deletion without recursive flag
+        // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
+        // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);

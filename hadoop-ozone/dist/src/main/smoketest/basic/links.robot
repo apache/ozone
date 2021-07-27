@@ -24,6 +24,7 @@ Suite Setup         Create volumes
 
 *** Variables ***
 ${prefix}    generated
+${SCM}       scm
 
 *** Keywords ***
 Create volumes

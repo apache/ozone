@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -134,21 +135,21 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String uploadID = keyArgs.getMultipartUploadID();
-      multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName,
-          keyName, uploadID);
+      multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+              omMetadataManager, uploadID);
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
 
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
-      openKey = omMetadataManager.getOpenKey(
-          volumeName, bucketName, keyName, clientID);
+      openKey = getOpenKey(volumeName, bucketName, keyName, omMetadataManager,
+              clientID);
 
       String ozoneKey = omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
 
-      omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+      omKeyInfo = getOmKeyInfo(omMetadataManager, openKey, keyName);
 
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit Multipart Upload key, as " +
@@ -166,7 +167,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      partName = ozoneKey + clientID;
+      int partNumber = keyArgs.getMultipartNumber();
+      partName = getPartName(ozoneKey, uploadID, partNumber);
 
       if (multipartKeyInfo == null) {
         // This can occur when user started uploading part by the time commit
@@ -180,7 +182,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      int partNumber = keyArgs.getMultipartNumber();
       oldPartKeyInfo = multipartKeyInfo.getPartKeyInfo(partNumber);
 
       // Build this multipart upload part info.
@@ -199,7 +200,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           ozoneManager.isRatisEnabled());
 
       // OldPartKeyInfo will be deleted. Its updateID will be set in
-      // S3MultipartUplodaCommitPartResponse before being added to
+      // S3MultipartUploadCommitPartResponse before being added to
       // DeletedKeyTable.
 
       // Add to cache.
@@ -217,7 +218,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
-      int factor = omKeyInfo.getFactor().getNumber();
+      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // Block was pre-requested and UsedBytes updated when createKey and
       // AllocatedBlock. The space occupied by the Key shall be based on
@@ -230,20 +231,19 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omResponse.setCommitMultiPartUploadResponse(
           MultipartCommitUploadPartResponse.newBuilder()
               .setPartName(partName));
-      omClientResponse = new S3MultipartUploadCommitPartResponse(
-          omResponse.build(), multipartKey, openKey,
-          multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-          ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject());
+      omClientResponse =
+          getOmClientResponse(ozoneManager, oldPartKeyInfo, openKey,
+              omKeyInfo, multipartKey, multipartKeyInfo, omResponse.build(),
+              omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new S3MultipartUploadCommitPartResponse(
-          createErrorOMResponse(omResponse, exception), multipartKey, openKey,
-          multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-          ozoneManager.isRatisEnabled(), copyBucketInfo);
+      omClientResponse =
+          getOmClientResponse(ozoneManager, oldPartKeyInfo, openKey,
+              omKeyInfo, multipartKey, multipartKeyInfo,
+              createErrorOMResponse(omResponse, exception), copyBucketInfo);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -253,6 +253,52 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       }
     }
 
+    logResult(ozoneManager, multipartCommitUploadPartRequest, keyArgs,
+            auditMap, volumeName, bucketName, keyName, exception, partName,
+            result);
+
+    return omClientResponse;
+  }
+
+  @VisibleForTesting
+  public static String getPartName(String ozoneKey, String uploadID,
+      long partNumber) {
+    return ozoneKey + "-" + uploadID + "-" + partNumber;
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  protected S3MultipartUploadCommitPartResponse getOmClientResponse(
+      OzoneManager ozoneManager,
+      OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo, String openKey,
+      OmKeyInfo omKeyInfo, String multipartKey,
+      OmMultipartKeyInfo multipartKeyInfo, OMResponse build,
+      OmBucketInfo omBucketInfo) {
+
+    return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
+        multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
+        ozoneManager.isRatisEnabled(), omBucketInfo);
+  }
+
+  protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
+      String openKey, String keyName) throws IOException {
+
+    return omMetadataManager.getOpenKeyTable().get(openKey);
+  }
+
+  protected String getOpenKey(String volumeName, String bucketName,
+      String keyName, OMMetadataManager omMetadataManager, long clientID)
+      throws IOException {
+
+    return omMetadataManager
+        .getOpenKey(volumeName, bucketName, keyName, clientID);
+  }
+
+  @SuppressWarnings("parameternumber")
+  private void logResult(OzoneManager ozoneManager,
+      MultipartCommitUploadPartRequest multipartCommitUploadPartRequest,
+      KeyArgs keyArgs, Map<String, String> auditMap, String volumeName,
+      String bucketName, String keyName, IOException exception,
+      String partName, Result result) {
     // audit log
     // Add MPU related information.
     auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
@@ -278,9 +324,12 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for S3MultipartUploadCommitPartRequest: " +
           "{}", multipartCommitUploadPartRequest);
     }
-
-    return omClientResponse;
   }
 
+  private String getMultipartKey(String volumeName, String bucketName,
+      String keyName, OMMetadataManager omMetadataManager, String uploadID) {
+    return omMetadataManager.getMultipartKey(volumeName, bucketName,
+        keyName, uploadID);
+  }
 }
 

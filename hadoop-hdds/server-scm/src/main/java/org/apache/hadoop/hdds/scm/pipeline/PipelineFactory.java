@@ -19,10 +19,11 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
@@ -39,33 +40,43 @@ public class PipelineFactory {
 
   private Map<ReplicationType, PipelineProvider> providers;
 
-  PipelineFactory(NodeManager nodeManager, PipelineStateManager stateManager,
-      ConfigurationSource conf, EventPublisher eventPublisher) {
+  PipelineFactory(NodeManager nodeManager, StateManager stateManager,
+                  ConfigurationSource conf, EventPublisher eventPublisher,
+                  SCMContext scmContext) {
     providers = new HashMap<>();
     providers.put(ReplicationType.STAND_ALONE,
         new SimplePipelineProvider(nodeManager, stateManager));
     providers.put(ReplicationType.RATIS,
-        new RatisPipelineProvider(nodeManager, stateManager, conf,
-            eventPublisher));
+        new RatisPipelineProvider(nodeManager,
+            stateManager, conf,
+            eventPublisher, scmContext));
   }
 
   protected PipelineFactory() {
   }
 
   @VisibleForTesting
-  void setProvider(ReplicationType replicationType,
-                     PipelineProvider provider) {
+  void setProvider(
+      ReplicationType replicationType,
+      PipelineProvider provider
+  ) {
     providers.put(replicationType, provider);
   }
 
-  public Pipeline create(ReplicationType type, ReplicationFactor factor)
+  public Pipeline create(
+      ReplicationConfig replicationConfig
+  )
       throws IOException {
-    return providers.get(type).create(factor);
+    return providers
+        .get(replicationConfig.getReplicationType())
+        .create(replicationConfig);
   }
 
-  public Pipeline create(ReplicationType type, ReplicationFactor factor,
-      List<DatanodeDetails> nodes) {
-    return providers.get(type).create(factor, nodes);
+  public Pipeline create(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes
+  ) {
+    return providers.get(replicationConfig.getReplicationType())
+        .create(replicationConfig, nodes);
   }
 
   public void close(ReplicationType type, Pipeline pipeline)

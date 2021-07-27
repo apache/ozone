@@ -145,6 +145,15 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.upgrade.layout.inline</name>
+    <value>true</value>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>Determines whether to upgrade the DN layout on restart
+      automatically. If set of false, the tool verifies that the current
+      disk format is correct.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.dir.du.reserved</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -307,6 +316,14 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
+    <name>hdds.crl.status.report.interval</name>
+    <value>60000ms</value>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <description>Time interval of the datanode to send CRL status report. Each
+      datanode periodically sends CRL status report to SCM. Unit could be
+      defined with postfix (ns,ms,s,m,h,d)</description>
+  </property>
+  <property>
     <name>hdds.pipeline.report.interval</name>
     <value>60000ms</value>
     <tag>OZONE, PIPELINE, MANAGEMENT</tag>
@@ -425,7 +442,7 @@
   </property>
   <property>
     <name>ozone.om.service.ids</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       Comma-separated list of OM service Ids. This property allows the client
@@ -434,7 +451,7 @@
   </property>
   <property>
     <name>ozone.om.internal.service.id</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       Service ID of the Ozone Manager. If this is not set fall back to
@@ -443,7 +460,7 @@
   </property>
   <property>
     <name>ozone.om.nodes.EXAMPLEOMSERVICEID</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       Comma-separated list of OM node Ids for a given OM service ID (eg.
@@ -461,7 +478,7 @@
   </property>
   <property>
     <name>ozone.om.node.id</name>
-    <value></value>
+    <value/>
     <tag>OM, HA</tag>
     <description>
       The ID of this OM node. If the OM node ID is not configured it
@@ -681,6 +698,15 @@
     <description>
       The default size of a scm block. This is maps to the default
       Ozone block size.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.sequence.id.batch.size</name>
+    <value>1000</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      SCM allocates sequence id in a batch way. This property determines how many
+      ids will be allocated in a single batch.
     </description>
   </property>
   <property>
@@ -1244,7 +1270,7 @@
 
   <property>
     <name>hdds.datanode.plugins</name>
-    <value></value>
+    <value/>
     <description>
       Comma-separated list of HDDS datanode plug-ins to be activated when
       HDDS service starts as part of datanode.
@@ -1437,6 +1463,37 @@
   </property>
 
   <property>
+    <name>hdds.scm.kerberos.keytab.file</name>
+    <value>/etc/security/keytabs/SCM.keytab</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description> The keytab file used by SCM daemon to login as its service principal.
+    </description>
+  </property>
+  <property>
+    <name>hdds.scm.kerberos.principal</name>
+    <value>SCM/_HOST@REALM</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description>The SCM service principal. e.g. scm/_HOST@REALM.COM</description>
+  </property>
+  <property>
+    <name>hdds.scm.http.auth.kerberos.principal</name>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description>
+      SCM http server service principal if SPNEGO is enabled for SCM http server.
+    </description>
+  </property>
+  <property>
+    <name>hdds.scm.http.auth.kerberos.keytab</name>
+    <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>SCM, SECURITY, KERBEROS</tag>
+    <description>
+      The keytab file used by SCM http server to login as its service
+      principal if SPNEGO is enabled for SCM http server.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -1501,8 +1558,8 @@
 
   <property>
     <name>ozone.s3g.http.auth.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, S3GATEWAY</tag>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
     <description>The server principal used by Ozone S3Gateway server. This is
       typically set to
       HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
@@ -1511,8 +1568,8 @@
 
   <property>
     <name>ozone.s3g.http.auth.kerberos.keytab</name>
-    <value/>
-    <tag>OZONE, S3GATEWAY</tag>
+    <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
     <description>The keytab file used by the S3Gateway server to login as its
       service principal. </description>
   </property>
@@ -1529,7 +1586,7 @@
   <property>
     <name>ozone.security.enabled</name>
     <value>false</value>
-    <tag>OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>True if security is enabled for ozone. When this property is
      true, hadoop.security.authentication should be Kerberos.
     </description>
@@ -1537,11 +1594,21 @@
   <property>
     <name>ozone.security.http.kerberos.enabled</name>
     <value>false</value>
-    <tag>OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>True if Kerberos authentication for Ozone HTTP web consoles
       is enabled using the SPNEGO protocol. When this property is
       true, hadoop.security.authentication should be Kerberos and
       ozone.security.enabled should be set to true.
+    </description>
+  </property>
+  <property>
+    <name>ozone.http.filter.initializers</name>
+    <value/>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
+    <description>Set to org.apache.hadoop.security.AuthenticationFilterInitializer
+      to enable Kerberos authentication for Ozone HTTP web consoles
+      is enabled using the SPNEGO protocol. When this property is
+      set, ozone.security.http.kerberos.enabled should be set to true.
     </description>
   </property>
 
@@ -1742,8 +1809,8 @@
   </property>
   <property>
     <name>ozone.om.kerberos.keytab.file</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
+    <value>/etc/security/keytabs/OM.keytab</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description> The keytab file used by OzoneManager daemon to login as its
       service principal. The principal name is configured with
       ozone.om.kerberos.principal.
@@ -1751,22 +1818,25 @@
   </property>
   <property>
     <name>ozone.om.kerberos.principal</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
+    <value>OM/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>
-      OzoneManager http server kerberos principal.
+      Ozone Manager http server service principal if SPNEGO is enabled for om http server.
     </description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>
-      OzoneManager http server kerberos keytab.
+      The keytab file used by OM http server to login as its service
+      principal if SPNEGO is enabled for om http server.
     </description>
   </property>
   <property>
@@ -1802,6 +1872,12 @@
     <value>false</value>
     <tag>OZONE, HDDS, SECURITY, TOKEN</tag>
     <description>True if block tokens are enabled, else false.</description>
+  </property>
+  <property>
+    <name>hdds.container.token.enabled</name>
+    <value>false</value>
+    <tag>OZONE, HDDS, SECURITY, TOKEN</tag>
+    <description>True if container tokens are enabled, else false.</description>
   </property>
   <property>
     <name>hdds.x509.file.name</name>
@@ -1840,8 +1916,9 @@
     <value>P1865D</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>Max time for which certificate issued by SCM CA are valid.
-      . The formats accepted are based on the ISO-8601 duration format
-      PnDTnHnMn.nS</description>
+      This duration is used for self-signed root cert and scm sub-ca certs
+      issued by root ca. The formats accepted are based on the ISO-8601
+      duration format PnDTnHnMn.nS</description>
   </property>
   <property>
     <name>hdds.x509.signature.algorithm</name>
@@ -1872,6 +1949,108 @@
     <value>9961</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>SCM security server port.</description>
+  </property>
+  <property>
+    <name>ozone.scm.service.ids</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      Comma-separated list of SCM service Ids. This property allows the client
+      to figure out quorum of OzoneManager address.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.default.service.id</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      Service ID of the SCM. If this is not set fall back to
+      ozone.scm.service.ids to find the service ID it belongs to.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.nodes.EXAMPLESCMSERVICEID</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      Comma-separated list of SCM node Ids for a given SCM service ID (eg.
+      EXAMPLESCMSERVICEID). The SCM service ID should be the value (one of the
+      values if there are multiple) set for the parameter ozone.scm.service.ids.
+
+      Unique identifiers for each SCM Node, delimited by commas. This will be
+      used by SCMs in HA setup to determine all the SCMs
+      belonging to the same SCM in the cluster. For example, if you
+      used “scmService1” as the SCM service ID previously, and you wanted to
+      use “scm1”, “scm2” and "scm3" as the individual IDs of the SCMs,
+      you would configure a property ozone.scm.nodes.scmService1, and its value
+      "scm1,scm2,scm3".
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.node.id</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      The ID of this SCM node. If the SCM node ID is not configured it
+      is determined automatically by matching the local node's address
+      with the configured address.
+
+      If node ID is not deterministic from the configuration, then it is set
+      to the scmId from the SCM version file.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.primordial.node.id</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      optional config, if being set will cause scm --init to only take effect on
+      the specific node and ignore scm --bootstrap cmd.
+      Similarly, scm --init will be ignored on the non-primordial scm nodes.
+      The config can either be set equal to the hostname or the node id of any
+      of the scm nodes.
+      With the config set, applications/admins can safely execute init and
+      bootstrap commands safely on all scm instances.
+
+      If a cluster is upgraded from non-ratis to ratis based SCM, scm --init
+      needs to re-run for switching from
+      non-ratis based SCM to ratis-based SCM on the primary node.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.skip.bootstrap.validation</name>
+    <value>false</value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      optional config, the config when set to true skips the clusterId
+      validation from leader scm during bootstrap
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.enable</name>
+    <value>false</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>Property to enable or disable Ratis server on SCM.
+      Please note - this is a temporary property to disable SCM Ratis server.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.port</name>
+    <value>9894</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>
+      The port number of the SCM's Ratis server.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.grpc.port</name>
+    <value>9895</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>
+      The port number of the SCM's grpc server.
+    </description>
   </property>
 
   <property>
@@ -1990,7 +2169,7 @@
   </property>
   <property>
     <name>ozone.freon.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
+    <value>HTTP/_HOST@REALM</value>
     <tag>SECURITY</tag>
     <description>
      Security principal used by freon.
@@ -2049,11 +2228,20 @@
       client ozone manager protocol.
     </description>
   </property>
+  <property>
+    <name>ozone.om.security.admin.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access ozone
+      manager admin protocol.
+    </description>
+  </property>
 
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
-    <tag>HDDS, SECURITY, MANAGEMENT</tag>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>HDDS, SECURITY, MANAGEMENT, KERBEROS</tag>
     <description>
       The kerberos principal for the datanode http server.
     </description>
@@ -2061,7 +2249,7 @@
   <property>
     <name>hdds.datanode.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
-    <tag>HDDS, SECURITY, MANAGEMENT</tag>
+    <tag>HDDS, SECURITY, MANAGEMENT, KERBEROS</tag>
     <description>
       The kerberos keytab file for datanode http server
     </description>
@@ -2116,12 +2304,14 @@
   </property>
   <property>
     <name>ozone.client.failover.max.attempts</name>
-    <value>15</value>
+    <value>500</value>
     <description>
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving up.
+      represents the number of times the client will failover before giving
+      up. This value is kept high so that client does not give up trying to
+      connect to OMs easily.
     </description>
   </property>
   <property>
@@ -2186,31 +2376,31 @@
   </property>
   <property>
     <name>ozone.recon.http.auth.kerberos.keytab</name>
-    <value/>
-    <tag>RECON, SECURITY</tag>
+    <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>RECON, SECURITY, KERBEROS</tag>
     <description>
       The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
   <property>
     <name>ozone.recon.http.auth.kerberos.principal</name>
-    <value/>
-    <tag>RECON</tag>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>RECON, SECURITY, KERBEROS</tag>
     <description>The server principal used by Ozone Recon server. This is
       typically set to HTTP/_HOST@REALM.TLD The SPNEGO server principal
       begins with the prefix HTTP/ by convention.
     </description>
   </property>
   <property>
-    <name>hdds.datanode.http.auth.type </name>
+    <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
-    <tag>DATANODE, SECURITY</tag>
+    <tag>DATANODE, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.auth.type </name>
+    <name>ozone.freon.http.auth.type</name>
     <value>simple</value>
     <tag>FREON, SECURITY</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
@@ -2218,25 +2408,33 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.http.auth.type </name>
+    <name>ozone.om.http.auth.type</name>
     <value>simple</value>
-    <tag>OM, SECURITY</tag>
+    <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
   </property>
   <property>
-    <name>ozone.recon.http.auth.type </name>
+    <name>hdds.scm.http.auth.type</name>
     <value>simple</value>
-    <tag>RECON, SECURITY</tag>
+    <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
   </property>
   <property>
-    <name>ozone.s3g.http.auth.type </name>
+    <name>ozone.recon.http.auth.type</name>
     <value>simple</value>
-    <tag>S3G, SECURITY</tag>
+    <tag>RECON, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.http.auth.type</name>
+    <value>simple</value>
+    <tag>S3G, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
@@ -2390,7 +2588,7 @@
   </property>
   <property>
     <name>ozone.http.basedir</name>
-    <value></value>
+    <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
     <description>
       The base dir for HTTP Jetty server to extract contents. If this property
@@ -2451,14 +2649,14 @@
   <property>
     <name>ssl.server.keystore.keypassword</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>Keystore key password for HTTPS SSL configuration
     </description>
   </property>
   <property>
     <name>ssl.server.keystore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Keystore location for HTTPS SSL configuration
     </description>
@@ -2466,7 +2664,7 @@
   <property>
     <name>ssl.server.keystore.password</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Keystore password for HTTPS SSL configuration
     </description>
@@ -2474,7 +2672,7 @@
   <property>
     <name>ssl.server.truststore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Truststore location for HTTPS SSL configuration
     </description>
@@ -2482,7 +2680,7 @@
   <property>
     <name>ssl.server.truststore.password</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <value></value>
+    <value/>
     <description>
       Truststore password for HTTPS SSL configuration
     </description>
@@ -2518,6 +2716,95 @@
       requests where key paths are not normalized and any intermediate
       directories will not be created or any file checks happens to check
       filesystem semantics.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.key.provider.cache.expiry</name>
+    <tag>OZONE, CLIENT, SECURITY</tag>
+    <value>10d</value>
+    <description>Ozone client security key provider cache expiration time.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.info.wait.duration</name>
+    <tag>OZONE, SCM, OM</tag>
+    <value>10m</value>
+    <description> Maximum amount of duration OM/SCM waits to get Scm Info/Scm
+      signed cert during OzoneManager init/SCM bootstrap.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ca.list.retry.interval</name>
+    <tag>OZONE, SCM, OM, DATANODE</tag>
+    <value>10s</value>
+    <description>SCM client wait duration between each retry to get Scm CA
+      list. OM/Datanode obtain CA list during startup, and wait
+      for the CA List size to be matched with SCM node count size plus
+      1. (Additional one certificate is root CA certificate). If the received
+      CA list size is not matching with expected count, this is the duration
+      used to wait before making next attempt to get CA list.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.key.latest.version.location</name>
+    <tag>OZONE, CLIENT</tag>
+    <value>true</value>
+    <description>Ozone client gets the latest version location.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.metadata.layout</name>
+    <tag>OZONE, OM</tag>
+    <value>SIMPLE</value>
+    <description>
+      This property is used to define the metadata layout of file system
+      paths. If it is configured as PREFIX in combination with
+      ozone.om.enable.filesystem.paths to true then this allows to perform
+      atomic rename and delete of any directory at any level in the namespace.
+      Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
+    </description>
+  </property>
+  <property>
+    <name>ozone.directory.deleting.service.interval</name>
+    <value>1m</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Time interval of the directory deleting service. It runs on OM
+      periodically and cleanup orphan directory and its sub-tree. For every
+      orphan directory it deletes the sub-path tree structure(dirs/files). It
+      sends sub-files to KeyDeletingService to deletes its blocks. Unit could
+      be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>10000</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.event.ContainerReport.thread.pool.size</name>
+    <value>10</value>
+    <tag>OZONE, SCM</tag>
+    <description>Thread pool size configured to process container reports.
+    </description>
+  </property>  
+
+  <property>
+    <name>ozone.scm.datanode.ratis.volume.free-space.min</name>
+    <value>1GB</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>Minimum amount of storage space required for each ratis
+      volume on a datanode to hold a new pipeline.
+      Datanodes with all its ratis volumes with space under this value
+      will not be allocated a pipeline or container replica.
     </description>
   </property>
 </configuration>

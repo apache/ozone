@@ -18,11 +18,12 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ import java.util.NavigableSet;
  * state. All the read and write operations in PipelineStateMap are protected
  * by a read write lock.
  */
-public class PipelineStateManager {
+public class PipelineStateManager implements StateManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineStateManager.class);
@@ -48,72 +49,81 @@ public class PipelineStateManager {
   public PipelineStateManager() {
     this.pipelineStateMap = new PipelineStateMap();
   }
-
+  @Override
   public void addPipeline(Pipeline pipeline) throws IOException {
     pipelineStateMap.addPipeline(pipeline);
     LOG.info("Created pipeline {}", pipeline);
   }
 
-  void addContainerToPipeline(PipelineID pipelineId, ContainerID containerID)
+  @Override
+  public void addContainerToPipeline(PipelineID pipelineId,
+                                     ContainerID containerID)
       throws IOException {
     pipelineStateMap.addContainerToPipeline(pipelineId, containerID);
   }
 
+  @Override
   public Pipeline getPipeline(PipelineID pipelineID)
       throws PipelineNotFoundException {
     return pipelineStateMap.getPipeline(pipelineID);
   }
 
+  @Override
   public List<Pipeline> getPipelines() {
     return pipelineStateMap.getPipelines();
   }
 
-  List<Pipeline> getPipelines(ReplicationType type) {
-    return pipelineStateMap.getPipelines(type);
+  @Override
+  public List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig
+  ) {
+    return pipelineStateMap.getPipelines(replicationConfig);
   }
 
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor) {
-    return pipelineStateMap.getPipelines(type, factor);
+  @Override
+  public List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
+      PipelineState state
+  ) {
+    return pipelineStateMap.getPipelines(replicationConfig, state);
   }
 
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      PipelineState state) {
-    return pipelineStateMap.getPipelines(type, factor, state);
-  }
-
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
+  @Override
+  public List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
       PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
     return pipelineStateMap
-        .getPipelines(type, factor, state, excludeDns, excludePipelines);
+        .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
   }
 
-  List<Pipeline> getPipelines(ReplicationType type, PipelineState... states) {
-    return pipelineStateMap.getPipelines(type, states);
-  }
-
-  NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
+  @Override
+  public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws IOException {
     return pipelineStateMap.getContainers(pipelineID);
   }
 
-  int getNumberOfContainers(PipelineID pipelineID) throws IOException {
+  @Override
+  public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
     return pipelineStateMap.getNumberOfContainers(pipelineID);
   }
 
-  Pipeline removePipeline(PipelineID pipelineID) throws IOException {
+  @Override
+  public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
     Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
     LOG.info("Pipeline {} removed from db", pipeline);
     return pipeline;
   }
 
-  void removeContainerFromPipeline(PipelineID pipelineID,
+  @Override
+  public void removeContainerFromPipeline(PipelineID pipelineID,
       ContainerID containerID) throws IOException {
     pipelineStateMap.removeContainerFromPipeline(pipelineID, containerID);
   }
 
-  Pipeline finalizePipeline(PipelineID pipelineId)
-      throws PipelineNotFoundException {
+  @Override
+  public Pipeline finalizePipeline(PipelineID pipelineId)
+      throws IOException {
     Pipeline pipeline = pipelineStateMap.getPipeline(pipelineId);
     if (!pipeline.isClosed()) {
       pipeline = pipelineStateMap
@@ -123,7 +133,8 @@ public class PipelineStateManager {
     return pipeline;
   }
 
-  Pipeline openPipeline(PipelineID pipelineId) throws IOException {
+  @Override
+  public Pipeline openPipeline(PipelineID pipelineId) throws IOException {
     Pipeline pipeline = pipelineStateMap.getPipeline(pipelineId);
     if (pipeline.isClosed()) {
       throw new IOException("Closed pipeline can not be opened");
@@ -142,6 +153,7 @@ public class PipelineStateManager {
    * @param pipelineID ID of the pipeline to activate.
    * @throws IOException in case of any Exception
    */
+  @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
     pipelineStateMap
@@ -154,14 +166,45 @@ public class PipelineStateManager {
    * @param pipelineID ID of the pipeline to deactivate.
    * @throws IOException in case of any Exception
    */
+  @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
     pipelineStateMap
         .updatePipelineState(pipelineID, PipelineState.DORMANT);
   }
 
+  @Override
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException {
+  }
+
+  @Override
   public void updatePipelineState(PipelineID id, PipelineState newState)
       throws PipelineNotFoundException {
     pipelineStateMap.updatePipelineState(id, newState);
+  }
+
+  @Override
+  public void addPipeline(HddsProtos.Pipeline pipelineProto)
+      throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public void removePipeline(HddsProtos.PipelineID pipelineIDProto)
+      throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public void updatePipelineState(
+      HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
+      throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public void close() {
+    // Do nothing
   }
 }

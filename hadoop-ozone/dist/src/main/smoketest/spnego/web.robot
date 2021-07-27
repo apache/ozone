@@ -27,12 +27,13 @@ ${OM_URL}           http://om:9874
 ${OM_DB_CHECKPOINT_URL}      ${OM_URL}/dbCheckpoint
 ${OM_SERVICE_LIST_URL}       ${OM_URL}/serviceList
 
-${SCM_URL}          http://scm:9876
+${SCM}              scm
+${SCM_URL}          http://${SCM}:9876
 ${RECON_URL}        http://recon:9888
 
-${SCM_CONF_URL}     http://scm:9876/conf
-${SCM_JMX_URL}      http://scm:9876/jmx
-${SCM_STACKS_URL}   http://scm:9876/stacks
+${SCM_CONF_URL}     http://${SCM}:9876/conf
+${SCM_JMX_URL}      http://${SCM}:9876/jmx
+${SCM_STACKS_URL}   http://${SCM}:9876/stacks
 
 
 *** Keywords ***
@@ -40,7 +41,7 @@ Verify SPNEGO enabled URL
     [arguments]                      ${url}
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Execute     kdestroy
     ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}
-    Should contain      ${result}       401 Unauthorized
+    Should contain      ${result}       401 Authentication required
 
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
     ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}

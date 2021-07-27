@@ -148,8 +148,9 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(
+      OzoneManager ozoneManager, long trxnLogIndex,
+      OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     ozoneManager.getMetrics().incNumAddAcl();
     return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
         omDoubleBufferHelper);

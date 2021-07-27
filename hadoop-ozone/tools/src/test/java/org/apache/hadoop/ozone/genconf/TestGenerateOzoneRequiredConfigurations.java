@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.genconf;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -182,6 +182,56 @@ public class TestGenerateOzoneRequiredConfigurations {
   }
 
   /**
+   * Tests a valid path and generates secure ozone-site.xml by calling
+   * {@code GenerateOzoneRequiredConfigurations#generateConfigurations}.
+   * Further verifies that all properties have a default value.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testGenerateSecurityConfigurations() throws Exception {
+    int ozoneConfigurationCount, ozoneSecurityConfigurationCount;
+
+    // Generate default Ozone Configuration
+    File tempPath = getRandomTempDir();
+    String[] args = new String[]{tempPath.getAbsolutePath()};
+    execute(args, "ozone-site.xml has been generated at " +
+        tempPath.getAbsolutePath());
+
+    URL url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+        .toURI().toURL();
+    OzoneConfiguration oc = new OzoneConfiguration();
+    List<OzoneConfiguration.Property> allProperties =
+        oc.readPropertyFromXml(url);
+
+    for (OzoneConfiguration.Property p : allProperties) {
+      Assert.assertTrue(
+          p.getValue() != null && p.getValue().length() > 0);
+    }
+    ozoneConfigurationCount = allProperties.size();
+
+    // Generate secure Ozone Configuration
+    tempPath = getRandomTempDir();
+    args = new String[]{"--security", tempPath.getAbsolutePath()};
+    execute(args, "ozone-site.xml has been generated at " +
+        tempPath.getAbsolutePath());
+
+    url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+        .toURI().toURL();
+    oc = new OzoneConfiguration();
+    allProperties = oc.readPropertyFromXml(url);
+
+    for (OzoneConfiguration.Property p : allProperties) {
+      Assert.assertTrue(
+          p.getValue() != null && p.getValue().length() > 0);
+    }
+    ozoneSecurityConfigurationCount = allProperties.size();
+
+    Assert.assertNotEquals(ozoneConfigurationCount,
+        ozoneSecurityConfigurationCount);
+  }
+
+  /**
    * Generates ozone-site.xml at specified path.
    * Verify that it does not overwrite if file already exists in path.
    *
@@ -242,7 +292,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   public void genconfHelp() throws Exception {
     File tempPath = getRandomTempDir();
     String[] args = new String[]{"--help"};
-    execute(args, "Usage: ozone genconf [-hV] [--verbose]");
+    execute(args, "Usage: ozone genconf [-hV] [--security] [--verbose]");
   }
 
   private File getRandomTempDir() throws IOException {

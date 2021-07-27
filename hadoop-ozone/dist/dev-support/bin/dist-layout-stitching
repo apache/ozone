@@ -67,9 +67,9 @@ run cp -p "${ROOT}/hadoop-ozone/dist/src/main/license/bin/LICENSE.txt" "LICENSE.
 run cp -pr "${ROOT}/hadoop-ozone/dist/src/main/license/bin/licenses" "licenses"
 run cp -p "${ROOT}/hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/LICENSE" "licenses/LICENSE-ozone-recon.txt"
 run cp -p "${ROOT}/README.md" .
-
-run mkdir -p ./share/hadoop/ozone
-run mkdir -p ./share/hadoop/hdds
+run cp -p "${ROOT}/HISTORY.md" .
+run cp -p "${ROOT}/SECURITY.md" .
+run cp -p "${ROOT}/CONTRIBUTING.md" .
 
 run mkdir -p ./share/ozone/web
 run mkdir -p ./bin
@@ -119,6 +119,9 @@ run cp -p -R "${ROOT}/hadoop-ozone/dist/target/compose" .
 run cp -p -r "${ROOT}/hadoop-ozone/dist/src/main/smoketest" .
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/k8s" kubernetes
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
+
+#Copy pre-generated keytabs
+run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/_keytabs
 
 #workaround for https://issues.apache.org/jira/browse/MRESOURCES-236
 find ./compose -name "*.sh" -exec chmod 755 {} \;

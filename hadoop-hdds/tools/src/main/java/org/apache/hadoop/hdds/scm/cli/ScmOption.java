@@ -20,11 +20,13 @@ package org.apache.hadoop.hdds.scm.cli;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -45,30 +47,41 @@ public class ScmOption {
       description = "The destination scm (host:port)")
   private String scm;
 
-  public ScmClient createScmClient() {
-    try {
-      GenericParentCommand parent = (GenericParentCommand)
-          spec.root().userObject();
-      OzoneConfiguration conf = parent.createOzoneConfiguration();
-      checkAndSetSCMAddressArg(conf);
 
-      return new ContainerOperationClient(conf);
-    } catch (IOException ex) {
-      throw new IllegalArgumentException("Can't create SCM client", ex);
-    }
+  @CommandLine.Option(names = {"--service-id", "-id"}, description =
+      "ServiceId of SCM HA Cluster")
+  private String scmServiceId;
+
+  public ScmClient createScmClient() {
+    GenericParentCommand parent = (GenericParentCommand)
+        spec.root().userObject();
+    OzoneConfiguration conf = parent.createOzoneConfiguration();
+    checkAndSetSCMAddressArg(conf);
+
+    return new ContainerOperationClient(conf);
   }
 
   private void checkAndSetSCMAddressArg(MutableConfigurationSource conf) {
     if (StringUtils.isNotEmpty(scm)) {
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scm);
     }
-    if (!HddsUtils.getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY).isPresent()) {
 
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY
-              + " should be set in ozone-site.xml or with the --scm option");
+    // Use the scm service Id passed from the client.
+
+    if (StringUtils.isNotEmpty(scmServiceId)) {
+      conf.set(ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID, scmServiceId);
+    } else if (StringUtils.isBlank(SCMHAUtils.getScmServiceId(conf))) {
+      // Scm service id is not passed, and scm service id is not defined in
+      // the config, assuming it should be non-HA cluster.
+      if (!HddsUtils.getHostNameFromConfigKeys(conf,
+          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY).isPresent()) {
+
+        throw new ConfigurationException(
+            ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY
+                + " should be set in ozone-site.xml or with the --scm option");
+      }
     }
+
   }
 
   public SCMSecurityProtocol createScmSecurityClient() {
