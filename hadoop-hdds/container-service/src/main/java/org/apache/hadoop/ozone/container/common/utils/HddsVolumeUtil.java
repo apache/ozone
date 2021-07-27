@@ -19,11 +19,15 @@
 package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.compress.archivers.zip.X0016_CertificateIdForCentralDirectory;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
+import org.apache.hadoop.ozone.container.upgrade.ScmHAFinalizeUpgradeActionDatanode;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 
@@ -176,17 +180,20 @@ public final class HddsVolumeUtil {
    * >/hdds/<scm-id>}.
    *
    * @param hddsVolume
-   * @param scmId
    * @param clusterId
    * @param logger
    * @return true - if volume is in consistent state, otherwise false.
    */
   public static boolean checkVolume(HddsVolume hddsVolume, String scmId, String
-      clusterId, Logger logger) {
+      clusterId, Logger logger) throws IOException {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
     File clusterDir = new File(hddsRoot, clusterId);
-    File scmDir = new File(hddsRoot, scmId);
+    // Either the SCM ID or cluster ID that will be used in naming the
+    // volume's subdirectory, depending on the layout version.
+    String idToUse =
+        DatanodeMetadataFeatures.getContainerPathID(scmId, clusterId);
+    File newIDDir = new File(hddsRoot, idToUse);
     String errorPrefix = "Volume " + volumeRoot + " is in an inconsistent " +
         "state.";
 
@@ -200,68 +207,45 @@ public final class HddsVolumeUtil {
 
     File[] hddsFiles = hddsRoot.listFiles();
 
-    if(hddsFiles == null) {
+    if (hddsFiles == null) {
       // This is the case for IOException, where listFiles returns null.
       // So, we fail the volume.
       return false;
     } else if (hddsFiles.length == 1) {
       // DN started for first time or this is a newly added volume.
       // The one file is the version file.
-      // So we create cluster ID directory.
-      if (!clusterDir.mkdir()) {
-        logger.error("Unable to create cluster directory {}", clusterDir);
+      // So we create cluster ID directory, or SCM ID directory if
+      // pre-finalized for SCM HA.
+      if (!newIDDir.mkdir()) {
+        logger.error("Unable to create ID directory {} for datanode.",
+            newIDDir);
         return false;
       }
       return true;
-    } else if(hddsFiles.length == 2) {
-      // TODO: Handle upgrade prefin case
-//      // If there are 2 files, they should be the version file and the
-//      // cluster ID directory.
-//      if (!clusterDir.exists()) {
-//        logger.error("{} 2 files found but cluster ID directory {} does not " +
-//            "exist.", errorPrefix, clusterDir);
-//        return false;
-//      }
-    return true;
-  } else if(hddsFiles.length == 3) {
-      // If there are 3 files, they should be version file, SCM ID directory,
-      // and cluster ID symlink to SCM ID directory.
+    } else if (hddsFiles.length == 2) {
+      // If cluster ID dir exists, no issues.
       if (!clusterDir.exists()) {
-        logger.error("{} 3 files found but cluster ID directory {} does not " +
-            "exist.", errorPrefix, clusterDir);
+        if (newIDDir.equals(clusterDir)) {
+          // We have finalized but the cluster ID does not exist. May have
+          // occurred if the volume was unhealthy during finalization.
+          // Create cluster ID symlink now.
+          ScmHAFinalizeUpgradeActionDatanode.upgradeVolume(hddsVolume,
+              clusterId);
+        }
+        // Else, We are still pre-finalized.
+        // The existing directory should be left for backwards compatibility.
+        // Cannot check that it matches the SCM ID that we have since SCM HA
+        // may have already been finalized and give us a different SCM ID
+        // than the old cluster's single SCM.
+      }
+      return true;
+    } else {
+      if (!clusterDir.exists()) {
+        logger.error("{} {} files found but cluster ID directory {} does not " +
+            "exist.", errorPrefix, hddsFiles.length, clusterDir);
         return false;
       }
-
-      if (!scmDir.exists()) {
-        logger.error("{} 3 files found but SCM ID directory {} does not exist.",
-            errorPrefix, scmDir);
-        return false;
-      }
-
-      boolean symlinkCorrect;
-      try {
-        symlinkCorrect = Files.isSymbolicLink(clusterDir.toPath()) &&
-            Files.readSymbolicLink(clusterDir.toPath()).equals(scmDir.toPath());
-      } catch (IOException ex) {
-        symlinkCorrect = false;
-        logger.error("Error while reading {} as a symlink.",
-            clusterDir.toPath(), ex);
-      }
-
-      if (symlinkCorrect) {
-        return true;
-      } else {
-        logger.error("{} 3 files found but failed to read cluster ID " +
-                "directory {} as a symlink to SCM ID directory {}.",
-            errorPrefix, clusterDir, scmDir);
-        return false;
-      }
+      return true;
     }
-
-    logger.error("The HDDS root directory {} should contain a VERSION file," +
-        " a cluster ID directory, and optionally an SCM ID directory. " +
-    "Please remove any other extra files from the directory " +
-        "so that DataNode startup can proceed.", hddsRoot.getAbsolutePath());
-    return false;
   }
 }

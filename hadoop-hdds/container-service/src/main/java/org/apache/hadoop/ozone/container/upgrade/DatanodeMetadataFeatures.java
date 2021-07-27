@@ -17,12 +17,9 @@
  */
 package org.apache.hadoop.ozone.container.upgrade;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import java.io.IOException;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the
@@ -37,6 +34,10 @@ public final class DatanodeMetadataFeatures {
   public static synchronized void initialize(
       HDDSLayoutVersionManager manager) {
     versionManager = manager;
+  }
+
+  public static synchronized int getMetadataLayoutVersion() {
+    return versionManager.getMetadataLayoutVersion();
   }
 
   public static synchronized String getContainerPathID(String scmID,

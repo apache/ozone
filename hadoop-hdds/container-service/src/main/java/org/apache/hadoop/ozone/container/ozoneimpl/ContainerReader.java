@@ -110,7 +110,7 @@ public class ContainerReader implements Runnable {
     }
   }
 
-  public void readVolume(File hddsVolumeRootDir) throws Exception {
+  public void readVolume(File hddsVolumeRootDir) {
     Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
         "cannot be null");
 
@@ -128,20 +128,23 @@ public class ContainerReader implements Runnable {
     // by HddsUtil#checkVolume once we have a cluster ID from SCM. No
     // operations to perform here in that case.
     if (storageDirs.length > 0) {
-      File clusterDir = getClusterDir();
-      File idDir = clusterDir;
-      if (storageDirs.length == 1 && !clusterDir.exists()) {
+      File clusterIDDir = new File(hddsVolumeRootDir, hddsVolume.getClusterID());
+      // The subdirectory we should verify containers within.
+      // If this volume was formatted pre SCM HA, this will be the SCM ID.
+      // A cluster ID symlink will exist in this case only if this cluster is
+      // finalized for SCM HA.
+      // If the volume was formatted post SCM HA, this will be the cluster ID.
+      File idDir = clusterIDDir;
+      if (storageDirs.length == 1 && !clusterIDDir.exists()) {
         // If the one directory is not the cluster ID directory, assume it is
-        // the old SCM ID directory.
-        // Create a symlink named after cluster directory to use.
-//        Files.createSymbolicLink(clusterDir.toPath(), storageDirs[0].toPath());
+        // the old SCM ID directory used before SCM HA.
         idDir = storageDirs[0];
       } else {
         // There are 1 or more storage directories. We only care about the
         // cluster ID directory.
-        if (!clusterDir.exists()) {
+        if (!clusterIDDir.exists()) {
           LOG.error("Volume {} is in Inconsistent state. Expected directory" +
-              "{} not found.", hddsVolumeRootDir, clusterDir);
+              "{} not found.", hddsVolumeRootDir, clusterIDDir);
           volumeSet.failVolume(hddsVolumeRootDir.getPath());
           return;
         }
@@ -162,7 +165,7 @@ public class ContainerReader implements Runnable {
                   long containerID =
                       ContainerUtils.getContainerID(containerDir);
                   if (containerFile.exists()) {
-                    verifyContainerFile(clusterDir, containerID, containerFile);
+                    verifyContainerFile(clusterIDDir, containerID, containerFile);
                   } else {
                     LOG.error("Missing .container file for ContainerID: {}",
                         containerDir.getName());

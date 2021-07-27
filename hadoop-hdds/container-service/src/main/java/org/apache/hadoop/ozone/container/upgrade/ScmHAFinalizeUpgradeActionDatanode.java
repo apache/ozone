@@ -24,12 +24,14 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANO
 
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 
 /**
@@ -44,40 +46,51 @@ public class ScmHAFinalizeUpgradeActionDatanode
 
   @Override
   public void execute(DatanodeStateMachine dsm) throws Exception {
-    LOG.info("Upgrade Datanode container layout for SCM HA support.");
+    LOG.info("Upgrading Datanode container layout for SCM HA support.");
     String clusterID = dsm.getLayoutStorage().getClusterID();
 
     for (StorageVolume volume:
         dsm.getContainer().getVolumeSet().getVolumesList()) {
-      File hddsVolumeDir = volume.getStorageDir();
-      File clusterIDDir = new File(hddsVolumeDir, clusterID);
-      File[] storageDirs = volume.getStorageDir().listFiles(File::isDirectory);
+      upgradeVolume(volume, clusterID);
+    }
+  }
 
-      if (storageDirs == null) {
-        // TODO: Retry formatting on restart.
-        LOG.error("IO error for the volume {}, " +
-            "unable to process it for finalizing layout for SCM HA support. " +
-            " Formatting will be retried on datanode restart.",
-            volume.getStorageDir());
-      }  else if (storageDirs.length == 0) {
-        LOG.info("Skipping finalize for SCM HA for unformatted volume {}, no " +
-            "action required.", hddsVolumeDir);
-      } else if (storageDirs.length == 1) {
-        if (!clusterIDDir.exists()) {
-          // If the one directory is not the cluster ID directory, assume it is
-          // the old SCM ID directory.
-          File scmIDDir = storageDirs[0];
-          LOG.info("Creating symlink {} -> {} as part of SCM HA " +
-              "finalization for datanode.", clusterIDDir.getAbsolutePath(),
-              scmIDDir.getAbsolutePath());
-          Files.createSymbolicLink(clusterIDDir.toPath(), scmIDDir.toPath());
-        } else {
-          LOG.info("Volume already contains cluster ID directory {}. No " +
-              "action required for SCM HA finalization.", clusterIDDir);
-        }
-      } else if (!clusterIDDir.exists()) {
-            LOG.error("Volume {} is in Inconsistent state. Expected directory" +
-                "{} not found.", hddsVolumeDir, clusterIDDir);
+  public static void upgradeVolume(StorageVolume volume, String clusterID)
+      throws IOException  {
+    File hddsVolumeDir = volume.getStorageDir();
+    File clusterIDDir = new File(hddsVolumeDir, clusterID);
+    File[] storageDirs = volume.getStorageDir().listFiles(File::isDirectory);
+
+    if (storageDirs == null) {
+      LOG.error("IO error for the volume {}. " +
+              "Unable to process it for finalizing layout for SCM HA support. " +
+              " Formatting will be retried on datanode restart.",
+          volume.getStorageDir());
+    }  else if (storageDirs.length == 0) {
+      LOG.info("Skipping finalize for SCM HA for unformatted volume {}, no " +
+          "action required.", hddsVolumeDir);
+    } else if (storageDirs.length == 1) {
+      if (!clusterIDDir.exists()) {
+        // If the one directory is not the cluster ID directory, assume it is
+        // the old SCM ID directory.
+        File scmIDDir = storageDirs[0];
+        LOG.info("Creating symlink {} -> {} as part of SCM HA " +
+                "finalization for datanode.", clusterIDDir.getAbsolutePath(),
+            scmIDDir.getAbsolutePath());
+        Files.createSymbolicLink(clusterIDDir.toPath(), scmIDDir.toPath());
+      } else {
+        LOG.info("Volume already contains cluster ID directory {}. No " +
+            "action required for SCM HA finalization.", clusterIDDir);
+      }
+    } else {
+      // More than one subdirectory. As long as the cluster ID directory
+      // exists we are ok.
+      if (!clusterIDDir.exists()) {
+        LOG.error("Volume {} is in Inconsistent state. Expected directory" +
+            "{} not found.", hddsVolumeDir, clusterIDDir);
+      } else {
+        LOG.info("Volume already contains cluster ID directory {}. No " +
+            "action required for SCM HA finalization.", clusterIDDir);
       }
     }
   }
