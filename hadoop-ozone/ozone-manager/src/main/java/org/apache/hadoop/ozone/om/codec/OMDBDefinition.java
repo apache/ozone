@@ -27,6 +27,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -180,6 +182,7 @@ public class OMDBDefinition implements DBDefinition {
 
   // Tables for S3 multi-tenancy
 
+  // TODO: this table will be removed with the disappearance of CreateUser API.
   public static final DBColumnFamilyDefinition<String, String>
             TENANT_USER_TABLE =
             new DBColumnFamilyDefinition<>(
@@ -188,6 +191,25 @@ public class OMDBDefinition implements DBDefinition {
                     new StringCodec(),
                     String.class,
                     new StringCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDBAccessIdInfo>
+            TENANT_ACCESS_ID_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE,
+                    String.class,  // accessId
+                    new StringCodec(),
+                    OmDBAccessIdInfo.class,  // tenantId, secret, principal
+                    new OmDBAccessIdInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String,
+            OmDBKerberosPrincipalInfo>
+            PRINCIPAL_TO_ACCESS_IDS_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE,
+                    String.class,  // Kerberos principal
+                    new StringCodec(),
+                    OmDBKerberosPrincipalInfo.class,  // List of accessIds
+                    new OmDBKerberosPrincipalInfoCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDBTenantInfo>
             TENANT_STATE_TABLE =
@@ -244,7 +266,8 @@ public class OMDBDefinition implements DBDefinition {
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE,
-        TENANT_USER_TABLE, TENANT_STATE_TABLE, TENANT_GROUP_TABLE,
+        TENANT_USER_TABLE, TENANT_ACCESS_ID_TABLE,
+        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE, TENANT_GROUP_TABLE,
         TENANT_ROLE_TABLE, TENANT_POLICY_TABLE };
   }
 }
