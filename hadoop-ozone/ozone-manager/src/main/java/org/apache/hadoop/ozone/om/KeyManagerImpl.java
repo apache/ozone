@@ -676,21 +676,29 @@ public class KeyManagerImpl implements KeyManager {
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
 
+
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
 
-    // add block token for read.
-    addBlockToken4Read(value);
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
 
-    // Refresh container pipeline info from SCM
-    // based on OmKeyArgs.refreshPipeline flag
-    // value won't be null as the check is done inside try/catch block.
-    refresh(value);
+      // add block token for read.
+      addBlockToken4Read(value);
 
-    if (args.getSortDatanodes()) {
-      sortDatanodes(clientAddress, value);
+      // Refresh container pipeline info from SCM
+      // based on OmKeyArgs.refreshPipeline flag
+      // value won't be null as the check is done inside try/catch block.
+      refresh(value);
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+
     }
+
     return value;
   }
 
@@ -750,8 +758,11 @@ public class KeyManagerImpl implements KeyManager {
           keyInfo.getKeyLocationVersions();
 
       for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          containerIDs.add(k.getContainerID());
+        for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+            containerIDs.add(omKeyLocationInfo.getContainerID());
+          }
         }
       }
     }
@@ -763,11 +774,15 @@ public class KeyManagerImpl implements KeyManager {
       List<OmKeyLocationInfoGroup> locationInfoGroups =
           keyInfo.getKeyLocationVersions();
       for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          ContainerWithPipeline cp =
-              containerWithPipelineMap.get(k.getContainerID());
-          if (cp != null && !cp.getPipeline().equals(k.getPipeline())) {
-            k.setPipeline(cp.getPipeline());
+        for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+            ContainerWithPipeline cp = containerWithPipelineMap.get(
+                omKeyLocationInfo.getContainerID());
+            if (cp != null &&
+                !cp.getPipeline().equals(omKeyLocationInfo.getPipeline())) {
+              omKeyLocationInfo.setPipeline(cp.getPipeline());
+            }
           }
         }
       }
@@ -800,7 +815,7 @@ public class KeyManagerImpl implements KeyManager {
       return containerWithPipelineMap;
     } catch (IOException ioEx) {
       LOG.debug("Get containerPipeline failed for {}",
-          containerIDs.toString(), ioEx);
+          containerIDs, ioEx);
       throw new OMException(ioEx.getMessage(), SCM_GET_PIPELINE_EXCEPTION);
     }
   }
@@ -1782,7 +1797,7 @@ public class KeyManagerImpl implements KeyManager {
         return true;
       }
 
-      boolean hasAccess = OzoneAclUtil.checkAclRight(
+      boolean hasAccess = OzoneAclUtil.checkAclRights(
           keyInfo.getAcls(), context);
       if (LOG.isDebugEnabled()) {
         LOG.debug("user:{} has access rights for key:{} :{} ",
@@ -1819,7 +1834,7 @@ public class KeyManagerImpl implements KeyManager {
     // Using stack to check acls for subpaths
     Stack<OzoneFileStatus> directories = new Stack<>();
     // check whether given file/dir  has access
-    boolean hasAccess = OzoneAclUtil.checkAclRight(keyInfo.getAcls(), context);
+    boolean hasAccess = OzoneAclUtil.checkAclRights(keyInfo.getAcls(), context);
     if (LOG.isDebugEnabled()) {
       LOG.debug("user:{} has access rights for key:{} :{} ",
           context.getClientUgi(), ozObject.getKeyName(), hasAccess);
@@ -1835,7 +1850,7 @@ public class KeyManagerImpl implements KeyManager {
       while (hasAccess && children.hasNext()) {
         ozoneFileStatus = children.next();
         keyInfo = ozoneFileStatus.getKeyInfo();
-        hasAccess = OzoneAclUtil.checkAclRight(keyInfo.getAcls(), context);
+        hasAccess = OzoneAclUtil.checkAclRights(keyInfo.getAcls(), context);
         if (LOG.isDebugEnabled()) {
           LOG.debug("user:{} has access rights for key:{} :{} ",
               context.getClientUgi(), keyInfo.getKeyName(), hasAccess);

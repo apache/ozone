@@ -43,7 +43,7 @@ public class ContainerHealthStatus {
   ContainerHealthStatus(ContainerInfo container,
       Set<ContainerReplica> replicas, PlacementPolicy placementPolicy) {
     this.container = container;
-    int repFactor = container.getReplicationFactor().getNumber();
+    int repFactor = container.getReplicationConfig().getRequiredNodes();
     this.replicas = replicas
         .stream()
         .filter(r -> !r.getState()
@@ -62,7 +62,7 @@ public class ContainerHealthStatus {
   }
 
   public int getReplicationFactor() {
-    return container.getReplicationFactor().getNumber();
+    return container.getReplicationConfig().getRequiredNodes();
   }
 
   public boolean isHealthy() {

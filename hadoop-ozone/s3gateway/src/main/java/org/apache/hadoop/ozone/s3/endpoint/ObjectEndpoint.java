@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -337,7 +338,7 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private void addLastModifiedDate(
-      ResponseBuilder responseBuilder, OzoneKeyDetails key) {
+      ResponseBuilder responseBuilder, OzoneKey key) {
 
     ZonedDateTime lastModificationTime = key.getModificationTime()
         .atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE));
@@ -358,10 +359,10 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath) throws IOException, OS3Exception {
 
-    OzoneKeyDetails key;
+    OzoneKey key;
 
     try {
-      key = getBucket(bucketName).getKey(keyPath);
+      key = getBucket(bucketName).headObject(keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {

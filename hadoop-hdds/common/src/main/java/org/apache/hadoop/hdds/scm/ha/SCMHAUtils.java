@@ -320,6 +320,8 @@ public final class SCMHAUtils {
     } else if (SCMHAUtils.checkNonRetriableException(e)) {
       return RetryPolicy.RetryAction.FAIL;
     } else {
+      // For any other exception like RetriableWithFailOverException or any
+      // other we perform fail-over and retry.
       if (failovers < maxRetryCount) {
         return new RetryPolicy.RetryAction(
             RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,

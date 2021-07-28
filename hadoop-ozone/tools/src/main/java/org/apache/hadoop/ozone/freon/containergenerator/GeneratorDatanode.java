@@ -25,11 +25,14 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.Callable;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -37,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -50,6 +54,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
@@ -85,7 +90,8 @@ public class GeneratorDatanode extends BaseGenerator {
 
   @Option(names = {"--index"},
       description = "Index of the datanode. For example datanode #3 should "
-          + "have only every 3rd container in a 10 node cluster.).",
+          + "have only every 3rd container in a 10 node cluster. " +
+          "First datanode is 1 not 0.).",
       defaultValue = "1")
   private int datanodeIndex;
 
@@ -93,6 +99,14 @@ public class GeneratorDatanode extends BaseGenerator {
       description = "Use zero bytes instead of random data.",
       defaultValue = "false")
   private boolean zero;
+
+  @Option(names = {"--overlap"},
+      description = "Number of overlapping pipelines between 1 and 3." +
+          " This number provides a lightweight simulation of multi-raft" +
+          " placement. Set to 3 to have more sources ((overlap + 1) % 3 = 4)" +
+          " for replication in case of node failures.",
+      defaultValue = "1")
+  private int overlap;
 
   private ChunkManager chunkManager;
 
@@ -110,19 +124,10 @@ public class GeneratorDatanode extends BaseGenerator {
   private int logCounter;
   private String datanodeId;
   private String scmId;
-  private int numberOfPipelines;
-  private int currentPipeline;
 
   @Override
   public Void call() throws Exception {
     init();
-
-    numberOfPipelines = datanodes / 3;
-
-    //generate only containers for one datanodes
-    setTestNo(getTestNo() / numberOfPipelines);
-
-    currentPipeline = (datanodeIndex - 1) % numberOfPipelines;
 
     config = createOzoneConfiguration();
 
@@ -131,7 +136,7 @@ public class GeneratorDatanode extends BaseGenerator {
         .createChunkManager(config, blockManager, null);
 
     final Collection<String> storageDirs =
-        MutableVolumeSet.getDatanodeStorageDirs(config);
+        HddsServerUtil.getDatanodeStorageDirs(config);
 
     String firstStorageDir =
         StorageLocation.parse(storageDirs.iterator().next())
@@ -159,7 +164,8 @@ public class GeneratorDatanode extends BaseGenerator {
     datanodeId = HddsVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
 
-    volumeSet = new MutableVolumeSet(datanodeId, clusterId, config, null);
+    volumeSet = new MutableVolumeSet(datanodeId, clusterId, config, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
 
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
 
@@ -190,12 +196,43 @@ public class GeneratorDatanode extends BaseGenerator {
     return scmDirName.toString();
   }
 
-  private void generateData(long index) throws Exception {
+
+  /**
+   * Return the placement of the container with ONE based indexes.
+   * (first datanode is 1).
+   */
+  @VisibleForTesting
+  public static Set<Integer> getPlacement(
+      long containerId,
+      int maxDatanodes,
+      int overlap) {
+    int parallelPipelines = maxDatanodes / 3;
+    int startOffset = (int) ((containerId % parallelPipelines) * 3);
+
+    int pipelineLevel = (int) (containerId / parallelPipelines);
+
+    startOffset += pipelineLevel % overlap;
+
+    Set<Integer> result = new HashSet<>();
+    for (int i = startOffset; i < startOffset + 3; i++) {
+      result.add(i % maxDatanodes + 1);
+    }
+    return result;
+  }
+
+  public void generateData(long index) throws Exception {
 
     timer.time((Callable<Void>) () -> {
 
-      long containerId =
-          getContainerIdOffset() + index * numberOfPipelines + currentPipeline;
+      long containerId = index;
+
+      Set<Integer> selectedDatanodes = GeneratorDatanode
+          .getPlacement(containerId, datanodes, overlap);
+
+      //this container shouldn't be saved to this datanode.
+      if (!selectedDatanodes.contains(datanodeIndex)) {
+        return null;
+      }
 
       SplittableRandom random = new SplittableRandom(containerId);
 

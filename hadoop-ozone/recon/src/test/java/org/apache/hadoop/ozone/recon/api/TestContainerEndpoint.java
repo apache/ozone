@@ -47,6 +47,7 @@ import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -74,7 +75,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -100,7 +101,7 @@ public class TestContainerEndpoint {
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerManager reconContainerManager;
   private ReconPipelineManager reconPipelineManager;
-  private ContainerDBServiceProvider containerDbServiceProvider;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
@@ -142,8 +143,8 @@ public class TestContainerEndpoint {
         ozoneStorageContainerManager.getContainerManager();
     reconPipelineManager = (ReconPipelineManager)
         ozoneStorageContainerManager.getPipelineManager();
-    containerDbServiceProvider =
-        reconTestInjector.getInstance(ContainerDBServiceProvider.class);
+    reconContainerMetadataManager =
+        reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
@@ -228,7 +229,7 @@ public class TestContainerEndpoint {
     when(tableMock.getName()).thenReturn("KeyTable");
     when(omMetadataManagerMock.getKeyTable()).thenReturn(tableMock);
     ContainerKeyMapperTask containerKeyMapperTask  =
-        new ContainerKeyMapperTask(containerDbServiceProvider);
+        new ContainerKeyMapperTask(reconContainerMetadataManager);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
   }
 
@@ -465,11 +466,11 @@ public class TestContainerEndpoint {
   ContainerInfo newContainerInfo(long containerId) {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setOwner("owner1")
         .setNumberOfKeys(keyCount)
-        .setReplicationFactor(ReplicationFactor.THREE)
         .setPipelineID(pipelineID)
         .build();
   }

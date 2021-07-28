@@ -219,6 +219,7 @@ public final class HASecurityUtils {
     } catch (InterruptedException | ExecutionException| IOException |
         CertificateException  e) {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
+      Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     }
 
@@ -357,7 +358,7 @@ public final class HASecurityUtils {
         .setLeaderId(null)
         .setProperties(properties)
         .setRetryPolicy(
-            RetryPolicies.retryUpToMaximumCountWithFixedSleep(15,
+            RetryPolicies.retryUpToMaximumCountWithFixedSleep(120,
                 TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
 
     if (tlsConfig != null) {

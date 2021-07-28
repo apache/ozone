@@ -103,7 +103,7 @@
                 <artifactItem>
                   <groupId>com.google.protobuf</groupId>
                   <artifactId>protobuf-java</artifactId>
-                  <version>${protobuf-compile.version}</version>
+                  <version>${grpc.protobuf-compile.version}</version>
                 </artifactItem>
               </artifactItems>
             </configuration>

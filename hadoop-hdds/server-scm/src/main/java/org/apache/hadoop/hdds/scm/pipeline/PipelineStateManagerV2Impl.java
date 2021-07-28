@@ -203,12 +203,15 @@ public class PipelineStateManagerV2Impl implements StateManager {
     lock.writeLock().lock();
     try {
       PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
+      Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
+      nodeManager.removePipeline(pipeline);
       if (pipelineStore != null) {
         transactionBuffer.removeFromBuffer(pipelineStore, pipelineID);
       }
-      Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
-      nodeManager.removePipeline(pipeline);
       LOG.info("Pipeline {} removed.", pipeline);
+    } catch (PipelineNotFoundException pnfe) {
+      LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
+          + " may have been deleted already.", pipelineIDProto.getId());
     } finally {
       lock.writeLock().unlock();
     }
@@ -243,10 +246,10 @@ public class PipelineStateManagerV2Impl implements StateManager {
       HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
       throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
-    Pipeline.PipelineState oldState =
-        getPipeline(pipelineID).getPipelineState();
+    Pipeline.PipelineState oldState = null;
     lock.writeLock().lock();
     try {
+      oldState = getPipeline(pipelineID).getPipelineState();
       // null check is here to prevent the case where SCM store
       // is closed but the staleNode handlers/pipeline creations
       // still try to access it.
@@ -256,6 +259,9 @@ public class PipelineStateManagerV2Impl implements StateManager {
         transactionBuffer
             .addToBuffer(pipelineStore, pipelineID, getPipeline(pipelineID));
       }
+    } catch (PipelineNotFoundException pnfe) {
+      LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
+          + " may have been deleted already.", pipelineID);
     } catch (IOException ex) {
       LOG.warn("Pipeline {} state update failed", pipelineID);
       // revert back to old state in memory

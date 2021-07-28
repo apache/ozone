@@ -37,10 +37,13 @@ grep_log() {
 
 wait_for_startup(){
    print_phase "Waiting until the k8s cluster is running"
-   retry all_pods_are_running
-   retry grep_log scm-0 "SCM exiting safe mode."
-   retry grep_log om-0 "HTTP server of ozoneManager listening"
-   print_phase "Cluster is up and running"
+   if retry all_pods_are_running \
+       && retry grep_log scm-0 "SCM exiting safe mode." \
+       && retry grep_log om-0 "HTTP server of ozoneManager listening"; then
+     print_phase "Cluster is up and running"
+   else
+     return 1
+   fi
 }
 
 all_pods_are_running() {

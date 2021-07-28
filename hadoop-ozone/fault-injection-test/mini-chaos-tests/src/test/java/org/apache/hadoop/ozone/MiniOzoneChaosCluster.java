@@ -100,11 +100,14 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     }
   }
 
+  @SuppressWarnings("parameternumber")
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
       List<OzoneManager> ozoneManagers, List<StorageContainerManager> scms,
       List<HddsDatanodeService> hddsDatanodes, String omServiceID,
-      String scmServiceId, Set<Class<? extends Failures>> clazzes) {
-    super(conf, ozoneManagers, scms, hddsDatanodes, omServiceID, scmServiceId);
+      String scmServiceId, String clusterPath,
+      Set<Class<? extends Failures>> clazzes) {
+    super(conf, ozoneManagers, scms, hddsDatanodes, omServiceID, scmServiceId,
+        clusterPath);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = ozoneManagers.size();
     this.numStorageContainerManagers = scms.size();
@@ -241,6 +244,9 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           32, StorageUnit.KB);
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
           1, StorageUnit.MB);
+      conf.setStorageSize(
+          ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+          0, org.apache.hadoop.hdds.conf.StorageUnit.MB);
       conf.setTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT, 1000,
           TimeUnit.MILLISECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 10,
@@ -324,7 +330,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
       MiniOzoneChaosCluster cluster =
           new MiniOzoneChaosCluster(conf, omList, scmList, hddsDatanodes,
-              omServiceId, scmServiceId, clazzes);
+              omServiceId, scmServiceId, path, clazzes);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();

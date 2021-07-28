@@ -36,11 +36,14 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.insight.LoggerSource.Level;
 
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
 import picocli.CommandLine;
+
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * Subcommand to display log.
@@ -76,9 +79,9 @@ public class LogSubcommand extends BaseInsightSubCommand
     List<LoggerSource> loggers = insight.getRelatedLoggers(verbose, filters);
 
     setLogLevels(conf, loggers, LoggerSource::getLevel);
-    Runtime.getRuntime().addShutdownHook(new Thread(() ->
-        setLogLevels(conf, loggers, any -> Level.INFO)
-    ));
+    ShutdownHookManager.get().addShutdownHook(() ->
+        setLogLevels(conf, loggers, any -> Level.INFO),
+            DEFAULT_SHUTDOWN_HOOK_PRIORITY);
 
     Set<Component> sources = loggers.stream().map(LoggerSource::getComponent)
         .collect(Collectors.toSet());

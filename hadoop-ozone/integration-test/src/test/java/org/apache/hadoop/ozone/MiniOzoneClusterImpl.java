@@ -61,6 +61,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -83,12 +84,14 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.STANDALO
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -110,7 +113,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneClusterImpl.class);
 
-  private final OzoneConfiguration conf;
+  private OzoneConfiguration conf;
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
@@ -141,10 +144,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * @throws IOException if there is an I/O error
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf,
-      OzoneManager ozoneManager,
-      StorageContainerManager scm,
-      List<HddsDatanodeService> hddsDatanodes,
-      ReconServer reconServer) {
+                       OzoneManager ozoneManager,
+                       StorageContainerManager scm,
+                       List<HddsDatanodeService> hddsDatanodes,
+                       ReconServer reconServer) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
@@ -190,6 +193,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
+  public void setConf(OzoneConfiguration newConf) {
+    this.conf = newConf;
+  }
+
+  @Override
   public String getOMServiceId() {
     // Non-HA cluster doesn't have OM Service Id.
     return null;
@@ -203,7 +211,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
-    // Nothing implemented here
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      GenericTestUtils.waitFor(scm::checkLeader,
+          1000, waitForClusterToBeReadyTimeout);
+    }
   }
 
   public StorageContainerManager getActiveSCM() {
@@ -228,8 +239,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
           healthy, hddsDatanodes.size());
       LOG.info(exitSafeMode ? "Cluster exits safe mode" :
-              "Waiting for cluster to exit safe mode",
-          healthy, hddsDatanodes.size());
+              "Waiting for cluster to exit safe mode");
       LOG.info(checkScmLeader ? "SCM became leader" :
           "SCM has not become leader");
 
@@ -243,8 +253,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    */
   @Override
   public void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
-                                int timeoutInMs) throws
-          TimeoutException, InterruptedException {
+                                       int timeoutInMs) throws
+      TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       int openPipelineCount = scm.getPipelineManager().
           getPipelines(new RatisReplicationConfig(factor),
@@ -636,7 +646,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
-     // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+      // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
       if (!chunkSize.isPresent()) {
         //set it to 1MB by default in tests
         chunkSize = Optional.of(1);
@@ -687,6 +697,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // default max retry timeout set to 30s
       scmClientConfig.setMaxRetryTimeout(30 * 1000);
       conf.setFromObject(scmClientConfig);
+      // In this way safemode exit will happen only when atleast we have one
+      // pipeline.
+      conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
+          numOfDatanodes >=3 ? 3 : 1);
       configureTrace();
     }
 
@@ -703,7 +717,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
       configureSCM();
-      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+      SCMStorageConfig scmStore;
+
+      // Set non standard layout version if needed.
+      scmLayoutVersion.ifPresent(integer ->
+          conf.set(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
+              String.valueOf(integer)));
+
+      scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
       StorageContainerManager scm = TestUtils.getScmSimple(conf);
       HealthyPipelineSafeModeRule rule =
@@ -728,6 +749,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
       if (SCMHAUtils.isSCMHAEnabled(conf)) {
+        scmStore.setSCMHAFlag(true);
+        scmStore.persistCurrentState();
         SCMRatisServerImpl.initialize(clusterId, scmId.get(),
             SCMHANodeDetails.loadSCMHAConfig(conf).getLocalNodeDetails(), conf);
       }
@@ -755,6 +778,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
+      omLayoutVersion.ifPresent(integer ->
+          conf.set(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
+              String.valueOf(integer)));
       OMStorage omStore = new OMStorage(conf);
       initializeOmStorage(omStore);
       return OzoneManager.createOm(conf);
@@ -775,6 +801,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       return stringBuilder.toString();
     }
+
     /**
      * Creates HddsDatanodeService(s) instance.
      *
@@ -825,7 +852,20 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
       }
+      if (dnLayoutVersion.isPresent()) {
+        configureLayoutVersionInDatanodes(hddsDatanodes, dnLayoutVersion.get());
+      }
       return hddsDatanodes;
+    }
+
+    private void configureLayoutVersionInDatanodes(
+        List<HddsDatanodeService> dns, int layoutVersion) throws IOException {
+      for (HddsDatanodeService dn : dns) {
+        DatanodeLayoutStorage layoutStorage;
+        layoutStorage = new DatanodeLayoutStorage(dn.getConf(),
+            UUID.randomUUID().toString(), layoutVersion);
+        layoutStorage.initialize();
+      }
     }
 
     protected void configureSCM() {
