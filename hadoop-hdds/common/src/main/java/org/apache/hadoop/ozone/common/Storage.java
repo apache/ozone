@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -30,6 +33,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.function.Supplier;
 
 /**
  * Storage information file. This Class defines the methods to check
@@ -48,7 +52,6 @@ public abstract class Storage {
   public static final String STORAGE_DIR_CURRENT = "current";
   protected static final String STORAGE_FILE_VERSION = "VERSION";
   public static final String CONTAINER_DIR = "containerDir";
-  private static final int LAYOUT_VERSION = 0;
 
   private final NodeType nodeType;
   private final File root;
@@ -65,7 +68,14 @@ public abstract class Storage {
     NON_EXISTENT, NOT_INITIALIZED, INITIALIZED
   }
 
-  public Storage(NodeType type, File root, String sdName)
+  public Storage(NodeType type, File root, String sdName,
+                 int defaultLayoutVersion)
+      throws IOException {
+    this(type, root, sdName, StorageInfo.newClusterID(), defaultLayoutVersion);
+  }
+
+  public Storage(NodeType type, File root, String sdName,
+                 String id, int defaultLayoutVersion)
       throws IOException {
     this.nodeType = type;
     this.root = root;
@@ -74,8 +84,8 @@ public abstract class Storage {
     if (state == StorageState.INITIALIZED) {
       this.storageInfo = new StorageInfo(type, getVersionFile());
     } else {
-      this.storageInfo = new StorageInfo(
-          nodeType, StorageInfo.newClusterID(), Time.now(), LAYOUT_VERSION);
+      this.storageInfo = new StorageInfo(nodeType, id, Time.now(),
+          defaultLayoutVersion);
       setNodeProperties();
     }
   }
@@ -121,6 +131,18 @@ public abstract class Storage {
     return storageInfo.getLayoutVersion();
   }
 
+  public void setLayoutVersion(int version) {
+    storageInfo.setLayoutVersion(version);
+  }
+
+  public void setFirstUpgradeActionLayoutVersion(int version) {
+    storageInfo.setFirstUpgradeActionLayoutVersion(version);
+  }
+
+  public int getFirstUpgradeActionLayoutVersion() {
+    return storageInfo.getFirstUpgradeActionLayoutVersion();
+  }
+
   /**
    * Retrieves the storageInfo instance to read/write the common
    * version file properties.
@@ -133,7 +155,7 @@ public abstract class Storage {
   protected abstract Properties getNodeProperties();
 
   /**
-   * Sets the Node properties specific to OM/SCM.
+   * Sets the Node properties specific to OM/SCM/DataNode.
    */
   private void setNodeProperties() {
     Properties nodeProperties = getNodeProperties();
@@ -274,5 +296,14 @@ public abstract class Storage {
     storageInfo.writeTo(getVersionFile());
   }
 
+  protected static int getInitLayoutVersion(OzoneConfiguration conf,
+      String configKey,
+      Supplier<Integer> defaultLvSupplier) {
+    int lV = conf.getInt(configKey, OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT);
+    if (lV == OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT) {
+      lV = defaultLvSupplier.get();
+    }
+    return lV;
+  }
 }
 

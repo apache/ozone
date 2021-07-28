@@ -221,6 +221,13 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
 
+  // Comma separated acls (users, groups) allowing clients accessing
+  // OM admin protocol.
+  // When hadoop.security.authorization is true, this needs to be set in
+  // hadoop-policy.xml, "*" allows all users/groups to access.
+  public static final String OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL =
+      "ozone.om.security.admin.protocol.acl";
+
   public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
           "ozone.om.keyname.character.check.enabled";
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =

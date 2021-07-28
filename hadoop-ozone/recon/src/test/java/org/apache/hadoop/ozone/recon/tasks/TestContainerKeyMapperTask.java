@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -25,8 +26,6 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,7 +46,6 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -281,18 +279,5 @@ public class TestContainerKeyMapperTask {
         .setOmKeyLocationInfos(Collections.singletonList(
             omKeyLocationInfoGroup))
         .build();
-  }
-
-  private OzoneManagerServiceProviderImpl getMockOzoneManagerServiceProvider()
-      throws IOException {
-    OzoneManagerServiceProviderImpl omServiceProviderMock =
-        mock(OzoneManagerServiceProviderImpl.class);
-    OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
-    Table tableMock = mock(Table.class);
-    when(tableMock.getName()).thenReturn("keyTable");
-    when(omMetadataManagerMock.getKeyTable()).thenReturn(tableMock);
-    when(omServiceProviderMock.getOMMetadataManagerInstance())
-        .thenReturn(omMetadataManagerMock);
-    return omServiceProviderMock;
   }
 }

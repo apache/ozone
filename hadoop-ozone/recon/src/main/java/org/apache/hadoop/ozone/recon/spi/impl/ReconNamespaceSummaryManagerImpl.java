@@ -46,7 +46,7 @@ public class ReconNamespaceSummaryManagerImpl
   }
 
   @Override
-  public void initNSSummaryTable() throws IOException {
+  public void clearNSSummaryTable() throws IOException {
     truncateTable(nsSummaryTable);
   }
 
@@ -54,6 +54,11 @@ public class ReconNamespaceSummaryManagerImpl
   public void storeNSSummary(long objectId, NSSummary nsSummary)
           throws IOException {
     nsSummaryTable.put(objectId, nsSummary);
+  }
+
+  @Override
+  public void deleteNSSummary(long objectId) throws IOException {
+    nsSummaryTable.delete(objectId);
   }
 
   @Override

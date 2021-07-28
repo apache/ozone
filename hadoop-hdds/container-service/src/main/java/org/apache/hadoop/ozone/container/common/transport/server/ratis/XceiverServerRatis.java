@@ -513,7 +513,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         }
         isStarted = false;
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        LOG.error("XceiverServerRatis Could not be stopped gracefully.", e);
       }
     }
   }

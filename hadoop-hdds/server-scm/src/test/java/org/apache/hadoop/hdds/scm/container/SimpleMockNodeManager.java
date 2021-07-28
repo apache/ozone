@@ -19,7 +19,11 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -55,7 +59,7 @@ public class SimpleMockNodeManager implements NodeManager {
   public void register(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status));
+    nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status, null));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {
@@ -105,13 +109,15 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void setNodeOperationalState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+                                      NodeOperationalState newState)
+      throws NodeNotFoundException {
     setNodeOperationalState(dn, newState, 0);
   }
 
   @Override
   public void setNodeOperationalState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
+                                      NodeOperationalState newState,
+                                      long opStateExpiryEpocSec)
       throws NodeNotFoundException {
     DatanodeInfo dni = nodeMap.get(dn.getUuid());
     if (dni == null) {
@@ -148,7 +154,8 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void setContainers(DatanodeDetails dn,
-      Set<ContainerID> containerIds) throws NodeNotFoundException {
+                            Set<ContainerID> containerIds)
+      throws NodeNotFoundException {
     containerMap.put(dn.getUuid(), containerIds);
   }
 
@@ -182,7 +189,7 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public List<DatanodeDetails> getNodes(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState health) {
+      NodeOperationalState opState, HddsProtos.NodeState health) {
     return null;
   }
 
@@ -192,7 +199,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public int getNodeCount(HddsProtos.NodeOperationalState opState,
+  public int getNodeCount(NodeOperationalState opState,
                           HddsProtos.NodeState health) {
     return 0;
   }
@@ -241,7 +248,8 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void addContainer(DatanodeDetails datanodeDetails,
-      ContainerID containerId) throws NodeNotFoundException {
+                           ContainerID containerId)
+      throws NodeNotFoundException {
   }
 
 
@@ -252,7 +260,12 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void processNodeReport(DatanodeDetails datanodeDetails,
-      StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport) {
+                                NodeReportProto nodeReport) {
+  }
+
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails datanodeDetails,
+                                         LayoutVersionProto layoutReport) {
   }
 
   @Override
@@ -319,14 +332,15 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
-      StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport,
-      StorageContainerDatanodeProtocolProtos.PipelineReportsProto
-      pipelineReport) {
+                                    NodeReportProto nodeReport,
+                                    PipelineReportsProto pipelineReport,
+                                    LayoutVersionProto layoutreport) {
     return null;
   }
 
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                           LayoutVersionProto layoutInfo) {
     return null;
   }
 

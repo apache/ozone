@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import static junit.framework.TestCase.assertEquals;
@@ -59,7 +60,8 @@ public class TestSCMContainerPlacementRandom {
     for (int i = 0; i < 5; i++) {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
-          NodeStatus.inServiceHealthy());
+          NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = TestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
@@ -98,7 +100,7 @@ public class TestSCMContainerPlacementRandom {
     for (int i = 0; i < 100; i++) {
       //when
       List<DatanodeDetails> datanodeDetails = scmContainerPlacementRandom
-          .chooseDatanodes(existingNodes, null, 1, 15);
+          .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
       Assert.assertEquals(1, datanodeDetails.size());

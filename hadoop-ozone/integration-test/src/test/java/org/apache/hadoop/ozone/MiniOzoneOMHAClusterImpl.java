@@ -50,9 +50,10 @@ public final class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
       String omServiceId,
+      String metaPath,
       ReconServer reconServer) {
     super(conf, activeOMList, inactiveOMList, Collections.singletonList(scm),
-        null, hddsDatanodes, omServiceId, null, reconServer);
+        null, hddsDatanodes, omServiceId, null, metaPath, reconServer);
   }
 
   /**
@@ -104,7 +105,7 @@ public final class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
 
       MiniOzoneClusterImpl cluster = new MiniOzoneOMHAClusterImpl(conf,
           getActiveOMs(), getInactiveOMs(), scm, hddsDatanodes,
-          omServiceId, reconServer);
+          omServiceId, path, reconServer);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
