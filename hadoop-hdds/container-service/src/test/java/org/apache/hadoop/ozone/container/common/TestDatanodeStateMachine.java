@@ -81,6 +81,8 @@ public class TestDatanodeStateMachine {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, true);
+    conf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     serverAddresses = new ArrayList<>();
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
@@ -215,7 +217,6 @@ public class TestDatanodeStateMachine {
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
     ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
-
     try (DatanodeStateMachine stateMachine =
              new DatanodeStateMachine(datanodeDetails, conf, null, null,
                  null)) {
@@ -424,6 +425,8 @@ public class TestDatanodeStateMachine {
         DatanodeDetails.Port.Name.RATIS, 0);
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
+    DatanodeDetails.Port streamPort = DatanodeDetails.newPort(
+        DatanodeDetails.Port.Name.RATIS_DATASTREAM, 0);
     return DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .setHostName("localhost")
@@ -431,6 +434,7 @@ public class TestDatanodeStateMachine {
         .addPort(containerPort)
         .addPort(ratisPort)
         .addPort(restPort)
+        .addPort(streamPort)
         .build();
   }
 }
