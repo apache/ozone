@@ -80,7 +80,6 @@ public class TestDeadNodeHandler {
   private StorageContainerManager scm;
   private SCMNodeManager nodeManager;
   private ContainerManagerV2 containerManager;
-  private NodeReportHandler nodeReportHandler;
   private PipelineManagerV2Impl pipelineManager;
   private DeadNodeHandler deadNodeHandler;
   private EventPublisher publisher;
@@ -113,7 +112,6 @@ public class TestDeadNodeHandler {
         Mockito.mock(PipelineManager.class), containerManager);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     publisher = Mockito.mock(EventPublisher.class);
-    nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 
   @After
@@ -182,10 +180,8 @@ public class TestDeadNodeHandler {
             Arrays.asList(metaStorageOne)), null);
 
     LambdaTestUtils.await(120000, 1000,
-        () -> {
-          return pipelineManager.getPipelines(new RatisReplicationConfig(THREE))
-              .size() > 3;
-        });
+        () -> pipelineManager.getPipelines(new RatisReplicationConfig(THREE))
+            .size() > 3);
     TestUtils.openAllRatisPipelines(pipelineManager);
 
     ContainerInfo container1 =
@@ -212,6 +208,7 @@ public class TestDeadNodeHandler {
 
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
+    datanode1 = nodeManager.getNodeByUuid(datanode1.getUuidString());
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
     deadNodeHandler.onMessage(datanode1, publisher);
