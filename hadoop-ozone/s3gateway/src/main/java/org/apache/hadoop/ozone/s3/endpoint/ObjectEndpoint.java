@@ -597,10 +597,13 @@ public class ObjectEndpoint extends EndpointBase {
               headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
           String copySourceIfUnmodifiedSince =
               headers.getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-          if (!checkCopySourceModificationTime(sourceKeyModificationTime,
-              copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
-            throw S3ErrorTable.newError(PRECOND_FAILED,
-                sourceBucket + "/" + sourceKey);
+          if (isValidModificationTime(copySourceIfModifiedSince) &&
+              isValidModificationTime(copySourceIfUnmodifiedSince)) {
+            if (!checkCopySourceModificationTime(sourceKeyModificationTime,
+                copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
+              throw S3ErrorTable.newError(PRECOND_FAILED,
+                  sourceBucket + "/" + sourceKey);
+            }
           }
 
           try (OzoneInputStream sourceObject =
@@ -847,9 +850,6 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private static int parsePartNumberMarker(String partNumberMarker) {
-    if (new Integer(1) == new Integer(1)) {
-      LOG.info("gbj was here");
-    }
     int partMarker = 0;
     if (partNumberMarker != null) {
       partMarker = Integer.parseInt(partNumberMarker);
@@ -867,6 +867,23 @@ public class ObjectEndpoint extends EndpointBase {
     }
     return ozoneDateInMs;
   }
+  private boolean isValidModificationTime(String modificationTimeStr) {
+    long date;
+    long currentDate = new Date().getTime();
+    if (modificationTimeStr == null) {
+      return true;
+    }
+    try {
+      date = parseOzoneDate(modificationTimeStr);
+    } catch (OS3Exception e) {
+      return false;
+    }
+    if (currentDate < date) {
+      return false;
+    } else {
+      return true;
+    }
+  }
 
   private boolean checkCopySourceModificationTime(Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
@@ -874,24 +891,14 @@ public class ObjectEndpoint extends EndpointBase {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
     long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
-    long currTime = new Date().getTime();
-
     if (copySourceIfModifiedSinceStr != null) {
       copySourceIfModifiedSince =
           parseOzoneDate(copySourceIfModifiedSinceStr);
-    }
-    // Time in the future is invalid and should cause the precondition to pass
-    if (copySourceIfModifiedSince > currTime) {
-      return true;
     }
 
     if (copySourceIfUnmodifiedSinceStr != null) {
       copySourceIfUnmodifiedSince =
           parseOzoneDate(copySourceIfUnmodifiedSinceStr);
-    }
-
-    if (copySourceIfUnmodifiedSince > currTime) {
-      return true;
     }
 
     return (copySourceIfModifiedSince <= lastModificationTime) &&

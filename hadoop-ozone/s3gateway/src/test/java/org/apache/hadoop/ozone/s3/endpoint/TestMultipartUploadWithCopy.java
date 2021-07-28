@@ -26,11 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -74,6 +70,7 @@ public class TestMultipartUploadWithCopy {
   private static final OzoneClient CLIENT = new OzoneClientStub();
   private static final int RANGE_FROM = 2;
   private static final int RANGE_TO = 4;
+  private static final long DELAY_MS = 2000;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -165,11 +162,18 @@ public class TestMultipartUploadWithCopy {
     String beforeSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000);
+        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
 
+    // Make sure DELAY_MS has passed, otherwise
+    //  afterSourceKeyModificationTimeStr will be invalid
+    long currentTime = new Date().getTime();
+    long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
+    if (sleepMs > 0) {
+      Thread.sleep(sleepMs);
+    }
     // ifUnmodifiedSince = beforeSourceKeyModificationTime,
     // ifModifiedSince = afterSourceKeyModificationTime
     try {
