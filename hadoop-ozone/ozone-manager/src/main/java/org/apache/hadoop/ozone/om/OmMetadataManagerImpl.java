@@ -1301,7 +1301,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmDBKerberosPrincipalInfo>
-  getPrincipalToAccessIdsTable() {
+      getPrincipalToAccessIdsTable() {
     return principalToAccessIdsTable;
   }
 
