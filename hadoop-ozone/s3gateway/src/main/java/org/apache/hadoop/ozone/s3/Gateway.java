@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -92,24 +93,25 @@ public class Gateway extends GenericCli {
 
   private static void loginS3GUser(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      if (SecurityUtil.getAuthenticationMethod(conf).equals(
+          UserGroupInformation.AuthenticationMethod.KERBEROS)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Ozone security is enabled. Attempting login for S3G user. "
+                  + "Principal: {}, keytab: {}",
+              conf.get(OZONE_S3G_KERBEROS_PRINCIPAL_KEY),
+              conf.get(OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY));
+        }
 
-    if (SecurityUtil.getAuthenticationMethod(conf).equals(
-        UserGroupInformation.AuthenticationMethod.KERBEROS)) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Ozone security is enabled. Attempting login for S3G user. "
-                + "Principal: {}, keytab: {}",
-            conf.get(OZONE_S3G_KERBEROS_PRINCIPAL_KEY),
-            conf.get(OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY));
+        SecurityUtil.login(conf, OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY,
+            OZONE_S3G_KERBEROS_PRINCIPAL_KEY);
+      } else {
+        throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
+            conf) + " authentication method not supported. S3 user login "
+            + "failed.");
       }
-
-      SecurityUtil.login(conf, OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY,
-          OZONE_S3G_KERBEROS_PRINCIPAL_KEY);
-    } else {
-      throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
-          conf) + " authentication method not supported. S3 user login "
-          + "failed.");
+      LOG.info("S3Gateway login successful.");
     }
-    LOG.info("S3Gateway login successful.");
   }
 
 }
