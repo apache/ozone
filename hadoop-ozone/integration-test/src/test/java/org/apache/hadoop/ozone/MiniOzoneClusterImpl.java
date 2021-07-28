@@ -76,7 +76,6 @@ import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_ADMIN;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_SERVER;
@@ -690,8 +689,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 60,
-          TimeUnit.SECONDS);
-      conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 60,
           TimeUnit.SECONDS);
       SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
       // default max retry timeout set to 30s

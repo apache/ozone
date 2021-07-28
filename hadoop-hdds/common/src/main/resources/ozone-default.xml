@@ -325,7 +325,7 @@
   </property>
   <property>
     <name>hdds.pipeline.report.interval</name>
-    <value>60m</value>
+    <value>60000ms</value>
     <tag>OZONE, PIPELINE, MANAGEMENT</tag>
     <description>Time interval of the datanode to send pipeline report. Each
       datanode periodically send pipeline report to SCM. Unit could be
