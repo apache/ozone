@@ -81,12 +81,8 @@ create_results_dir
 COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility
 
 for cluster_version in 1.0.0; do
-  load_version_specifics ${cluster_version}
-
   export OZONE_VERSION=${cluster_version}
   COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility
-
-  unload_version_specifics
 done
 
 generate_report
