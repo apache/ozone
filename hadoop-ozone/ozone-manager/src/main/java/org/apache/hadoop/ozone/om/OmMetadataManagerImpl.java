@@ -132,10 +132,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
    * |----------------------------------------------------------------------|
+   *
+   * Multi-Tenant Tables:
+   * |----------------------------------------------------------------------|
    * | tenantAccessIdTable|  accessId -> OmTenantAccessIdInfo               |
+   * |----------------------------------------------------------------------|
+   * | principalToAccessIdsTable | Principal -> OmDBKerberosPrincipalInfo   |
+   * |----------------------------------------------------------------------|
    * | tenantStateTable   |  accessId -> OmDBTenantInfo                     |
+   * |----------------------------------------------------------------------|
    * | tenantGroupTable   |  accessId -> [tenant group A, B, ...]           |
+   * |----------------------------------------------------------------------|
    * | tenantRoleTable    |  accessId -> roles [admin, roleB, ...]          |
+   * |----------------------------------------------------------------------|
    * | tenantPolicyTable  |  policyGroup -> [policyId1, policyId2]          |
    * |----------------------------------------------------------------------|
    *
@@ -1291,7 +1300,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmDBAccessIdInfo> getPrincipalToAccessIdsTable() {
+  public Table<String, OmDBKerberosPrincipalInfo>
+  getPrincipalToAccessIdsTable() {
     return principalToAccessIdsTable;
   }
 
