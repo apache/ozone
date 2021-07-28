@@ -41,7 +41,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
-import org.apache.ratis.io.WriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -132,7 +131,8 @@ public class BlockDataStreamOutput extends OutputStream {
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  int writeSize = 0;
+  private final long syncSize = 1L << 24; // TODO: make it configurable
+  private long syncPosition = 0;
 
   /**
    * Creates a new BlockOutputStream.
@@ -668,6 +668,16 @@ public class BlockDataStreamOutput extends OutputStream {
     return xceiverClient == null;
   }
 
+  private boolean needSync(long position) {
+    if (syncSize > 0) {
+      if (position - syncPosition >= syncSize) { // TODO: or position >= fileLength
+        syncPosition = position;
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Writes buffered data as a new chunk to the container and saves chunk
    * information to be used later in putKey call.
@@ -694,15 +704,9 @@ public class BlockDataStreamOutput extends OutputStream {
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
 
-    writeSize += data.asReadOnlyByteBuffer().remaining();
-    WriteOption[] options = new WriteOption[0];
-    if (writeSize >= 16 * 1000 * 1000) {
-      writeSize = 0;
-      options = new WriteOption[1];
-      options[0] = StandardWriteOption.SYNC;
-    }
-
-    CompletableFuture<DataStreamReply> future = out.writeAsync(data.asReadOnlyByteBuffer(), options)
+    CompletableFuture<DataStreamReply> future = (needSync(offset + effectiveChunkSize) ?
+      out.writeAsync(data.asReadOnlyByteBuffer(), StandardWriteOption.SYNC) :
+      out.writeAsync(data.asReadOnlyByteBuffer()))
         .whenCompleteAsync((r,e) -> {
           if (e != null || !r.isSuccess()) {
             if (e == null) {
