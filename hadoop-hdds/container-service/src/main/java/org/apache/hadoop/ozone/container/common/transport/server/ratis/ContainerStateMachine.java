@@ -412,9 +412,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
+    RaftServer server = ratisServer.getServer();
     try {
-      RaftServer.Division division = ratisServer.getServerDivision();
-      if (division.getInfo().isLeader()) {
+      if (server.getDivision(gid).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
     } catch (InterruptedException ioe) {

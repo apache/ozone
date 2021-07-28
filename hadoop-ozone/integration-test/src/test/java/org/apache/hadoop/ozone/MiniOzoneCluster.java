@@ -76,6 +76,11 @@ public interface MiniOzoneCluster {
   OzoneConfiguration getConf();
 
   /**
+   * Set the configuration for the MiniOzoneCluster.
+   */
+  void setConf(OzoneConfiguration newConf);
+
+  /**
    * Waits for the cluster to be ready, this call blocks till all the
    * configured {@link HddsDatanodeService} registers with
    * {@link StorageContainerManager}.
@@ -317,6 +322,11 @@ public interface MiniOzoneCluster {
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
 
+
+    protected Optional<Integer> omLayoutVersion = Optional.empty();
+    protected Optional<Integer> scmLayoutVersion = Optional.empty();
+    protected Optional<Integer> dnLayoutVersion = Optional.empty();
+
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
@@ -553,6 +563,21 @@ public interface MiniOzoneCluster {
 
     public Builder setSCMServiceId(String serviceId) {
       this.scmServiceId = serviceId;
+      return this;
+    }
+
+    public Builder setScmLayoutVersion(int layoutVersion) {
+      scmLayoutVersion = Optional.of(layoutVersion);
+      return this;
+    }
+
+    public Builder setOmLayoutVersion(int layoutVersion) {
+      omLayoutVersion = Optional.of(layoutVersion);
+      return this;
+    }
+
+    public Builder setDnLayoutVersion(int layoutVersion) {
+      dnLayoutVersion = Optional.of(layoutVersion);
       return this;
     }
 

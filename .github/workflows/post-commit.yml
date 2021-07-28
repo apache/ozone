@@ -149,7 +149,7 @@ jobs:
   acceptance:
     needs: compile
     runs-on: ubuntu-18.04
-    timeout-minutes: 120
+    timeout-minutes: 120 # Todo HDDS-5270
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:

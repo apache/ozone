@@ -29,9 +29,11 @@ import java.io.IOException;
 @InterfaceStability.Unstable
 public interface ReconNamespaceSummaryManager {
 
-  void initNSSummaryTable() throws IOException;
+  void clearNSSummaryTable() throws IOException;
 
   void storeNSSummary(long objectId, NSSummary nsSummary) throws IOException;
+
+  void deleteNSSummary(long objectId) throws IOException;
 
   NSSummary getNSSummary(long objectId) throws IOException;
 }

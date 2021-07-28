@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -183,7 +184,7 @@ public class TestWatchForCommit {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
     Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());

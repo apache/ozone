@@ -189,6 +189,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
+  public static final String META_TABLE = "metaTable";
 
   // Tables for S3 multi-tenancy
   public static final String TENANT_USER_TABLE = "tenantUserTable";
@@ -199,6 +200,32 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String TENANT_GROUP_TABLE = "tenantGroupTable";
   public static final String TENANT_ROLE_TABLE = "tenantRoleTable";
   public static final String TENANT_POLICY_TABLE = "tenantPolicyTable";
+
+  static final String[] ALL_TABLES = new String[] {
+      USER_TABLE,
+      VOLUME_TABLE,
+      BUCKET_TABLE,
+      KEY_TABLE,
+      DELETED_TABLE,
+      OPEN_KEY_TABLE,
+      MULTIPARTINFO_TABLE,
+      S3_SECRET_TABLE,
+      DELEGATION_TOKEN_TABLE,
+      PREFIX_TABLE,
+      TRANSACTION_INFO_TABLE,
+      DIRECTORY_TABLE,
+      FILE_TABLE,
+      DELETED_DIR_TABLE,
+      OPEN_FILE_TABLE,
+      META_TABLE,
+      TENANT_USER_TABLE,
+      TENANT_ACCESS_ID_TABLE,
+      PRINCIPAL_TO_ACCESS_IDS_TABLE,
+      TENANT_STATE_TABLE,
+      TENANT_GROUP_TABLE,
+      TENANT_ROLE_TABLE,
+      TENANT_POLICY_TABLE
+  };
 
   private DBStore store;
 
@@ -219,6 +246,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table fileTable;
   private Table openFileTable;
   private Table transactionInfoTable;
+  private Table metaTable;
+
   // Tables for S3 multi-tenancy
   private Table tenantUserTable;
   private Table tenantAccessIdTable;
@@ -299,6 +328,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       return fileTable;
     }
     return keyTable;
+  }
+
+  @Override
+  public Table<String, OmKeyInfo> getFileTable() {
+    return fileTable;
   }
 
   @Override
@@ -426,6 +460,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(OPEN_FILE_TABLE)
         .addTable(DELETED_DIR_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
+        .addTable(META_TABLE)
         .addTable(TENANT_USER_TABLE)
         .addTable(TENANT_ACCESS_ID_TABLE)
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
@@ -518,6 +553,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
     checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE);
+
+    metaTable = this.store.getTable(META_TABLE, String.class, String.class);
+    checkTableStatus(metaTable, META_TABLE);
 
     // tenant user name -> tenant name string
     tenantUserTable = this.store.getTable(TENANT_USER_TABLE,
@@ -1287,6 +1325,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, TransactionInfo> getTransactionInfoTable() {
     return transactionInfoTable;
+  }
+
+  @Override
+  public Table<String, String> getMetaTable() {
+    return metaTable;
   }
 
   @Override

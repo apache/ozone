@@ -296,6 +296,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, OmKeyInfo> getKeyTable();
 
   /**
+   * Returns the FileTable.
+   *
+   * @return FileTable.
+   */
+  Table<String, OmKeyInfo> getFileTable();
+
+  /**
    * Get Deleted Table.
    *
    * @return Deleted Table.
@@ -363,6 +370,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, String> getTenantRoleTable();
 
   Table<String, String> getTenantPolicyTable();
+
+  /**
+   * Gets the OM Meta table.
+   * @return meta table reference.
+   */
+  Table<String, String> getMetaTable();
 
   /**
    * Returns number of rows in a table.  This should not be used for very

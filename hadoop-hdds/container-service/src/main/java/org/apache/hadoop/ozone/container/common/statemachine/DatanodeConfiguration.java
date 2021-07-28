@@ -54,7 +54,7 @@ public class DatanodeConfiguration {
 
   static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
 
-  static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 15;
+  static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
@@ -131,7 +131,7 @@ public class DatanodeConfiguration {
   }
 
   @Config(key = "periodic.disk.check.interval.minutes",
-      defaultValue = "15",
+      defaultValue = "60",
       type = ConfigType.LONG,
       tags = { DATANODE },
       description = "Periodic disk check run interval in minutes."

@@ -20,6 +20,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -39,7 +40,7 @@ public class TestOmKeyLocationInfoGroup {
   @Test
   public void testGettingPreviousVersions() {
     OmKeyLocationInfoGroup testInstance = createTestInstance();
-    List<OmKeyLocationInfo> list = testInstance.getLocationList(1L);
+    Collection<OmKeyLocationInfo> list = testInstance.getLocationList(1L);
     Assert.assertEquals(2, list.size());
   }
 
