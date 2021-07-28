@@ -56,6 +56,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -82,6 +83,9 @@ public class PipelineManagerV2Impl implements PipelineManager {
   private final SCMHAManager scmhaManager;
   private final SCMContext scmContext;
   private final NodeManager nodeManager;
+  // This allows for freezing/resuming the new pipeline creation while the
+  // SCM is already out of SafeMode.
+  private AtomicBoolean freezePipelineCreation;
 
   protected PipelineManagerV2Impl(ConfigurationSource conf,
                                  SCMHAManager scmhaManager,
@@ -105,6 +109,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.freezePipelineCreation = new AtomicBoolean();
   }
 
   public static PipelineManagerV2Impl newPipelineManager(
@@ -160,6 +165,14 @@ public class PipelineManagerV2Impl implements PipelineManager {
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");
     }
+
+    if (freezePipelineCreation.get()) {
+      String message = "Cannot create new pipelines while pipeline creation " +
+          "is frozen.";
+      LOG.info(message);
+      throw new IOException(message);
+    }
+
     lock.lock();
     try {
       Pipeline pipeline = pipelineFactory.create(replicationConfig,
@@ -532,6 +545,18 @@ public class PipelineManagerV2Impl implements PipelineManager {
   public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException {
     stateManager.reinitialize(pipelineStore);
+  }
+
+  @Override
+  public void freezePipelineCreation() {
+    freezePipelineCreation.set(true);
+    backgroundPipelineCreator.stop();
+  }
+
+  @Override
+  public void resumePipelineCreation() {
+    freezePipelineCreation.set(false);
+    backgroundPipelineCreator.start();
   }
 
   @Override

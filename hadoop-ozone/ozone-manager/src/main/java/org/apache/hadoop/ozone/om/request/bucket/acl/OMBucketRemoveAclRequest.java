@@ -117,13 +117,6 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return new OMBucketAclResponse(
-        createErrorOMResponse(omResponse, exception));
-  }
-
-  @Override
   void onComplete(boolean operationResult, IOException exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
@@ -152,5 +145,6 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
     return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
         omDoubleBufferHelper);
   }
+
 }
 

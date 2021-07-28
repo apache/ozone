@@ -116,6 +116,7 @@ public class ReplicationServer {
       server.shutdown().awaitTermination(10L, TimeUnit.SECONDS);
     } catch (InterruptedException ex) {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
+      Thread.currentThread().interrupt();
     }
   }
 

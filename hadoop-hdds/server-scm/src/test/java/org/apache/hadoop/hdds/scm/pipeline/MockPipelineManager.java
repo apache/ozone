@@ -231,6 +231,16 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public void freezePipelineCreation() {
+
+  }
+
+  @Override
+  public void resumePipelineCreation() {
+
+  }
+
+  @Override
   public void close() throws IOException {
 
   }

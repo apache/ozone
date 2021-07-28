@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.util.UUID;
 
-import org.junit.Assert;;
+import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;

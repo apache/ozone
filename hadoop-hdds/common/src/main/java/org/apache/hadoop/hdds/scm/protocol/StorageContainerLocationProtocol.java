@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
  * that currently host a container.
@@ -331,6 +333,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 
+  StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException;
+
+  StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException;
   /**
    * Obtain a token which can be used to let datanodes verify authentication of
    * commands operating on {@code containerID}.

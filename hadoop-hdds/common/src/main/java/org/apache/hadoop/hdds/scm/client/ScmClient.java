@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -356,4 +357,10 @@ public interface ScmClient extends Closeable {
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 
+  StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException;
+
+  StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException;
 }
