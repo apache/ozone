@@ -42,7 +42,7 @@ import java.util.List;
 public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
     implements PlacementPolicy {
   @VisibleForTesting
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);
 
   /**
@@ -64,17 +64,19 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of Datanodes.
    * @throws SCMException  SCMException
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      final int nodesRequired, final long sizeRequired) throws SCMException {
+      final int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
     List<DatanodeDetails> healthyNodes =
         super.chooseDatanodes(excludedNodes, favoredNodes, nodesRequired,
-            sizeRequired);
+            metadataSizeRequired, dataSizeRequired);
 
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;

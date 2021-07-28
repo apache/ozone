@@ -57,13 +57,14 @@ import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
@@ -102,13 +103,14 @@ public class ReconStorageContainerManagerFacade
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
+  private HDDSLayoutVersionManager scmLayoutVersionManager;
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
-      ContainerDBServiceProvider containerDBServiceProvider)
+      ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
     reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
@@ -119,17 +121,21 @@ public class ReconStorageContainerManagerFacade
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
+
+    this.scmLayoutVersionManager =
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     this.scmhaManager = MockSCMHAManager.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
-            ReconSCMDBDefinition.NODES.getTable(dbStore));
+            ReconSCMDBDefinition.NODES.getTable(dbStore),
+            this.scmLayoutVersionManager);
     placementMetrics = SCMContainerPlacementMetrics.create();
     this.containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
-        clusterMap, true, placementMetrics);
+            clusterMap, true, placementMetrics);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
@@ -143,7 +149,7 @@ public class ReconStorageContainerManagerFacade
         dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
-        containerHealthSchemaManager, containerDBServiceProvider,
+        containerHealthSchemaManager, reconContainerMetadataManager,
         scmhaManager, sequenceIdGen);
     this.scmServiceProvider = scmServiceProvider;
 

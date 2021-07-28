@@ -1460,4 +1460,25 @@ public class RpcClient implements ClientProtocol {
   public Cache<URI, KeyProvider> getKeyProviderCache() {
     return keyProviderCache;
   }
+
+  @Override
+  public OzoneKey headObject(String volumeName, String bucketName,
+      String keyName) throws IOException {
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setLatestVersionLocation(true)
+        .setHeadOp(true)
+        .build();
+    OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+
+    return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
+        keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
+        keyInfo.getModificationTime(), keyInfo.getReplicationConfig());
+
+  }
 }

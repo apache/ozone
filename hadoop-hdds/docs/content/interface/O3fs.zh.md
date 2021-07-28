@@ -59,6 +59,14 @@ ozone sh bucket create /volume/bucket
 </property>
 {{< /highlight >}}
 
+<div class="alert alert-warning" role="alert">
+
+提示: 对于 [OM HA]({{< ref "feature/OM-HA.zh.md">}}) 集群，需要指定 ozone service id。例如，
+如果 `ozone.om.service.ids = ozone1`，则 URL 是 `o3fs://bucket.volume.ozone1`。
+对于非 HA，它可以是 `o3fs://bucket.volume`。
+
+</div>
+
 这样会使指定的桶成为 HDFS 的 dfs 命令的默认文件系统，并且将其注册为了 o3fs 文件系统类型。
 
 你还需要将 ozone-filesystem.jar 文件加入 classpath：

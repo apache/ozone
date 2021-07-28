@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -206,10 +205,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setType(RaftClientRequest.writeRequestType())
         .build();
     // any request submitted to
-    final long requestTimeout = scm.getConfiguration()
-        .getTimeDuration(ScmConfigKeys.OZONE_SCM_RATIS_REQUEST_TIMEOUT_KEY,
-            ScmConfigKeys.OZONE_SCM_RATIS_REQUEST_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
+    final long requestTimeout =
+        scm.getConfiguration().getObject(SCMHAConfiguration.class)
+            .getRatisRequestTimeout();
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
