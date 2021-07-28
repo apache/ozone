@@ -97,6 +97,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -222,6 +223,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleDeleteChunk(request, kvContainer);
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
+    case StreamInit:
+      return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
     case CompactChunk:
@@ -246,6 +249,36 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public BlockManager getBlockManager() {
     return this.blockManager;
+  }
+
+  ContainerCommandResponseProto handleStreamInit(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext) {
+    if (!request.hasWriteChunk()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Write Chunk request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    String path = null;
+    try {
+      checkContainerOpen(kvContainer);
+
+      WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+
+      path = chunkManager
+          .streamInit(kvContainer, blockID);
+
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    }
+
+    return getSuccessResponseBuilder(request)
+        .setMessage(path)
+        .build();
   }
 
   /**
