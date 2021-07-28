@@ -38,7 +38,7 @@ public class DUResponse {
   @JsonProperty("subPaths")
   private List<DiskUsage> duData;
 
-  @JsonProperty("keySize")
+  @JsonProperty("sizeDirectKey")
   private long keySize;
 
   public DUResponse() {
