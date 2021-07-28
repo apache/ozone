@@ -217,7 +217,13 @@ public class MutableVolumeSet implements VolumeSet {
    * failed volumes.
    */
   public void checkAllVolumes() throws IOException {
-    if (volumeChecker == null) {
+    checkAllVolumes(volumeChecker);
+  }
+
+  @Override
+  public void checkAllVolumes(StorageVolumeChecker checker)
+      throws IOException {
+    if (checker == null) {
       LOG.debug("No volumeChecker, skip checkAllVolumes");
       return;
     }
@@ -225,7 +231,7 @@ public class MutableVolumeSet implements VolumeSet {
     List<StorageVolume> allVolumes = getVolumesList();
     Set<? extends StorageVolume> failedVolumes;
     try {
-      failedVolumes = volumeChecker.checkAllVolumes(allVolumes);
+      failedVolumes = checker.checkAllVolumes(allVolumes);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while running disk check", e);
