@@ -31,12 +31,15 @@ public class DUResponse {
   private ResponseStatus status;
 
   /** The number of subpaths under the request path. */
-  @JsonProperty("count")
+  @JsonProperty("subPathCount")
   private int count;
 
   /** Encapsulates a DU instance for a subpath. */
-  @JsonProperty("duData")
+  @JsonProperty("subPaths")
   private List<DiskUsage> duData;
+
+  @JsonProperty("keySize")
+  private long keySize;
 
   public DUResponse() {
     this.status = ResponseStatus.OK;
@@ -54,6 +57,10 @@ public class DUResponse {
     return count;
   }
 
+  public long getKeySize() {
+    return keySize;
+  }
+
   public void setCount(int count) {
     this.count = count;
   }
@@ -66,12 +73,16 @@ public class DUResponse {
     this.duData = duData;
   }
 
+  public void setKeySize(long keySize) {
+    this.keySize = keySize;
+  }
+
   /**
    * DU info for a path (path name, data size).
    */
   public static class DiskUsage {
     /** The subpath name. */
-    @JsonProperty("subpath")
+    @JsonProperty("path")
     private String subpath;
 
     /** Disk usage without replication under the subpath. */

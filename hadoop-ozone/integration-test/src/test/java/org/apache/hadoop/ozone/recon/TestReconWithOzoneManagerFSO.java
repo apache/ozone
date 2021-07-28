@@ -121,7 +121,8 @@ public class TestReconWithOzoneManagerFSO {
     NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
             omMetadataManagerInstance);
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
-    NamespaceSummaryResponse entity = (NamespaceSummaryResponse) basicInfo.getEntity();
+    NamespaceSummaryResponse entity =
+            (NamespaceSummaryResponse) basicInfo.getEntity();
     Assert.assertSame(entity.getEntityType(), EntityType.DIRECTORY);
     Assert.assertEquals(1, entity.getNumTotalKey());
     Assert.assertEquals(0, entity.getNumTotalDir());
@@ -140,7 +141,8 @@ public class TestReconWithOzoneManagerFSO {
 
     // test root response
     Response rootBasicRes = endpoint.getBasicInfo("/");
-    NamespaceSummaryResponse rootBasicEntity = (NamespaceSummaryResponse) rootBasicRes.getEntity();
+    NamespaceSummaryResponse rootBasicEntity =
+            (NamespaceSummaryResponse) rootBasicRes.getEntity();
     Assert.assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
     // one additional dummy volume at creation
     Assert.assertEquals(13, rootBasicEntity.getNumVolume());

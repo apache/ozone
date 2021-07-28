@@ -55,6 +55,7 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
+
 /**
  * REST APIs for namespace metadata summary.
  */
@@ -89,7 +90,7 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
-    String normalizedPath = OmUtils.normalizeKey(path, false);
+    String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
 
     EntityType type = getEntityType(normalizedPath, names);
@@ -113,7 +114,8 @@ public class NSSummaryEndpoint {
       namespaceSummaryResponse.setNumTotalKey(totalNumKey);
       break;
     case VOLUME:
-      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.VOLUME);
+      namespaceSummaryResponse =
+              new NamespaceSummaryResponse(EntityType.VOLUME);
       List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
       namespaceSummaryResponse.setNumBucket(buckets.size());
       int totalDir = 0;
@@ -129,7 +131,8 @@ public class NSSummaryEndpoint {
       namespaceSummaryResponse.setNumTotalKey(totalKey);
       break;
     case BUCKET:
-      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.BUCKET);
+      namespaceSummaryResponse =
+              new NamespaceSummaryResponse(EntityType.BUCKET);
       assert (names.length == 2);
       long bucketObjectId = getBucketObjectId(names);
       namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(bucketObjectId));
@@ -138,7 +141,8 @@ public class NSSummaryEndpoint {
     case DIRECTORY:
       // path should exist so we don't need any extra verification/null check
       long dirObjectId = getDirObjectId(names);
-      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.DIRECTORY);
+      namespaceSummaryResponse =
+              new NamespaceSummaryResponse(EntityType.DIRECTORY);
       namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(dirObjectId));
       namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
       break;
@@ -146,7 +150,8 @@ public class NSSummaryEndpoint {
       namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.KEY);
       break;
     case UNKNOWN:
-      namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.UNKNOWN);
+      namespaceSummaryResponse =
+              new NamespaceSummaryResponse(EntityType.UNKNOWN);
       namespaceSummaryResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
       break;
     default:
@@ -169,7 +174,7 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
-    String normalizedPath = OmUtils.normalizeKey(path, false);
+    String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
@@ -223,6 +228,7 @@ public class NSSummaryEndpoint {
       // get object IDs for all its subdirectories
       Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
       duResponse.setCount(bucketSubdirs.size());
+      duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
       List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
       for (long subdirObjectId: bucketSubdirs) {
         NSSummary subdirNSSummary = reconNamespaceSummaryManager
@@ -247,8 +253,8 @@ public class NSSummaryEndpoint {
               reconNamespaceSummaryManager.getNSSummary(dirObjectId);
       Set<Long> subdirs = dirNSSummary.getChildDir();
 
-      duResponse = new DUResponse();
       duResponse.setCount(subdirs.size());
+      duResponse.setKeySize(dirNSSummary.getSizeOfFiles());
       List<DUResponse.DiskUsage> subdirDUData = new ArrayList<>();
       // iterate all subdirectories to get disk usage data
       for (long subdirObjectId: subdirs) {
@@ -307,7 +313,7 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
-    String normalizedPath = OmUtils.normalizeKey(path, false);
+    String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
@@ -319,7 +325,14 @@ public class NSSummaryEndpoint {
       long quotaUsedInBytes = 0L;
 
       for (OmVolumeArgs volume: volumes) {
-        quotaInBytes += volume.getQuotaInBytes();
+        final long quota = volume.getQuotaInBytes();
+        assert(quota >= -1L);
+        if (quota == -1L) {
+          // If one volume has unlimited quota, the "root" quota is unlimited.
+          quotaInBytes = -1L;
+          break;
+        }
+        quotaInBytes += quota;
       }
       for (OmBucketInfo bucket: buckets) {
         long bucketObjectId = bucket.getObjectID();
@@ -376,9 +389,9 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
-    String normalizedPath = OmUtils.normalizeKey(path, false);
+    String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-      EntityType type = getEntityType(normalizedPath, names);
+    EntityType type = getEntityType(normalizedPath, names);
 
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();
@@ -760,5 +773,9 @@ public class NSSummaryEndpoint {
       return EntityType.DIRECTORY;
     }
     return EntityType.UNKNOWN;
+  }
+
+  private static String normalizePath(String path) {
+    return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
   }
 }
