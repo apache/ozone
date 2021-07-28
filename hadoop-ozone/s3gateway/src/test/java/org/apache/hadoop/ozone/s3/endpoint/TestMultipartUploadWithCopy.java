@@ -223,7 +223,8 @@ public class TestMultipartUploadWithCopy {
     String afterSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
     String tomorrowTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000*60*24);
+        OzoneUtils.formatTime(sourceKeyLastModificationTime +
+            1000 * 60 * 24);
 
     String badTimeStr = "Bad time string";
     // Initiate multipart upload
@@ -238,31 +239,31 @@ public class TestMultipartUploadWithCopy {
     }
     // ifUnmodifiedSince = bad
     // ifModifiedSince = beforeSourceKeyModificationTime,
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-			 beforeSourceKeyModificationTimeStr,
-			 badTimeStr);
+    uploadPartWithCopy(KEY, uploadID, 1,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+        beforeSourceKeyModificationTimeStr,
+        badTimeStr);
 
     // ifUnmodifiedSince = tomorrow
     // ifModifiedSince = beforeSourceKeyModificationTime,
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-			 beforeSourceKeyModificationTimeStr,
-			 tomorrowTimeStr);
+    uploadPartWithCopy(KEY, uploadID, 1,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+        beforeSourceKeyModificationTimeStr,
+        tomorrowTimeStr);
 
 
     // ifUnmodifiedSince = afterSourceKeyModificationTimeStr
     // ifModifiedSince = bad
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-			 badTimeStr,
-			 afterSourceKeyModificationTimeStr);
+    uploadPartWithCopy(KEY, uploadID, 1,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+        badTimeStr,
+        afterSourceKeyModificationTimeStr);
     // ifUnmodifiedSince = afterSourceKeyModificationTimeStr
     // ifModifiedSince = future
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-			 tomorrowTimeStr,
-			 afterSourceKeyModificationTimeStr);
+    uploadPartWithCopy(KEY, uploadID, 1,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+        tomorrowTimeStr,
+        afterSourceKeyModificationTimeStr);
   }
 
   private String initiateMultipartUpload(String key) throws IOException,
