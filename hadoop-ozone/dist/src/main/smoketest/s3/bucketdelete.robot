@@ -40,4 +40,4 @@ Delete existing bucket
 
 Delete non-existent bucket
     ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket    255
-                   Should contain                     ${result}                              NoSuchBucket
+                   Should contain                     ${result}                              AccessDenied
