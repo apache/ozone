@@ -38,6 +38,7 @@ import org.apache.ratis.client.api.GroupManagementApi;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.retry.RetryPolicy;
 import org.junit.Before;
@@ -98,6 +99,8 @@ public class TestCreatePipelineCommandHandler {
         .thenReturn(builder);
     Mockito.when(builder.setRetryPolicy(Mockito.any(RetryPolicy.class)))
         .thenReturn(builder);
+    Mockito.when(builder.setPrimaryDataStreamServer(
+        Mockito.any(RaftPeer.class))).thenReturn(builder);
     return builder;
   }
 
