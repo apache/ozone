@@ -309,7 +309,7 @@
   </property>
   <property>
     <name>hdds.container.report.interval</name>
-    <value>60000ms</value>
+    <value>60m</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
     <description>Time interval of the datanode to send container report. Each
       datanode periodically send container report to SCM. Unit could be
