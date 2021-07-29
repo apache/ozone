@@ -31,6 +31,10 @@
 #
 declare -a pattern_array ignore_array
 
+ignore_array=(
+    "/README.md" # exclude root README
+)
+
 function check_for_full_tests_needed_label() {
     if [[ ${PR_LABELS=} == *"full tests needed"* ]]; then
         echo
@@ -244,18 +248,6 @@ function get_count_doc_files() {
     start_end::group_end
 }
 
-function get_count_ignored_files() {
-    start_end::group_start "Count ignored files"
-    local pattern_array=(
-        "/README.md" # exclude root README
-    )
-    show_changed_files
-    COUNT_IGNORED_CHANGED_FILES=$(count_changed_files)
-    echo "Files count: ${COUNT_IGNORED_CHANGED_FILES}"
-    readonly COUNT_IGNORED_CHANGED_FILES
-    start_end::group_end
-}
-
 function get_count_junit_files() {
     start_end::group_start "Count junit test files"
     local pattern_array=(
@@ -384,7 +376,7 @@ function check_needs_unit_test() {
 
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
-    COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - COUNT_COMPOSE_CHANGED_FILES - COUNT_DOC_CHANGED_FILES - COUNT_IGNORED_CHANGED_FILES - COUNT_JUNIT_CHANGED_FILES - COUNT_KUBERNETES_CHANGED_FILES))
+    COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - COUNT_COMPOSE_CHANGED_FILES - COUNT_DOC_CHANGED_FILES - COUNT_JUNIT_CHANGED_FILES - COUNT_KUBERNETES_CHANGED_FILES))
     readonly COUNT_CORE_OTHER_CHANGED_FILES
     echo
     echo "Files count: ${COUNT_CORE_OTHER_CHANGED_FILES}"
@@ -453,7 +445,6 @@ check_if_tests_are_needed_at_all
 get_count_all_files
 get_count_compose_files
 get_count_doc_files
-get_count_ignored_files
 get_count_junit_files
 get_count_kubernetes_files
 
