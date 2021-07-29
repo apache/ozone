@@ -48,23 +48,13 @@ function check_for_full_tests_needed_label() {
 function get_changed_files() {
     start_end::group_start "Get changed files"
     local base
-    if [[ "${CI_EVENT_TYPE}" == "pull_request" ]]; then
-        git rev-parse "${CI_TARGET_BRANCH}" >& /dev/null || git fetch origin "${CI_TARGET_BRANCH}"
-        base=$(git rev-parse "${CI_TARGET_BRANCH}")
-    else
-        base=$(git rev-parse "${INCOMING_COMMIT_SHA}~1")
-    fi
-
-    local merge_base=$(git merge-base "${base}" "${INCOMING_COMMIT_SHA}")
 
     echo
     echo "Incoming commit SHA: ${INCOMING_COMMIT_SHA}"
     echo
-    echo "Changed files for ${base} (${merge_base}) .. ${INCOMING_COMMIT_SHA}"
-    echo
 
     CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r \
-        "${merge_base}" "${INCOMING_COMMIT_SHA}" || true)
+        "${INCOMING_COMMIT_SHA}~1" "${INCOMING_COMMIT_SHA}" || true)
     if [[ -z "${CHANGED_FILES}" ]]; then
         echo
         echo "${COLOR_YELLOW}WARNING: Could not find any changed files${COLOR_RESET}"
