@@ -64,7 +64,6 @@ function get_changed_files() {
     if [[ -z "${CHANGED_FILES}" ]]; then
         echo "${COLOR_YELLOW}WARNING: Could not find any changed files${COLOR_RESET}"
         echo Assuming that we should run all tests in this case
-        echo
         set_outputs_run_everything_and_exit
     fi
     echo "Changed files:"
@@ -75,54 +74,27 @@ function get_changed_files() {
     start_end::group_end
 }
 
-function set_needs_build() {
-    initialization::ga_output needs-build "${@}"
-}
-
-function set_needs_dependency_check() {
-    initialization::ga_output needs-dependency-check "${@}"
-}
-
-function set_needs_basic_checks() {
-    initialization::ga_output needs-basic-checks "${@}"
-}
-
-function set_needs_compose_tests() {
-    initialization::ga_output needs-compose-tests "${@}"
-}
-
-function set_needs_integration_tests() {
-    initialization::ga_output needs-integration-tests "${@}"
-}
-
-function set_needs_kubernetes_tests() {
-    initialization::ga_output needs-kubernetes-tests "${@}"
-}
-
-function set_basic_checks() {
-    initialization::ga_output basic-checks \
-        "$(initialization::parameters_to_json "${@}")"
-}
-
 function set_outputs_run_everything_and_exit() {
-    set_basic_checks author bats checkstyle docs findbugs rat unit
-    set_needs_build "true"
-    set_needs_basic_checks "true"
-    set_needs_compose_tests "true"
-    set_needs_dependency_check "true"
-    set_needs_integration_tests "true"
-    set_needs_kubernetes_tests "true"
+    BASIC_CHECKS="author bats checkstyle docs findbugs rat unit"
+    compose_tests_needed=true
+    dependency_check_needed=true
+    integration_tests_needed=true
+    kubernetes_tests_needed=true
+
+    start_end::group_end
+    set_outputs
     exit
 }
 
 function set_output_skip_all_tests_and_exit() {
-    set_basic_checks
-    set_needs_build "false"
-    set_needs_basic_checks "false"
-    set_needs_compose_tests "false"
-    set_needs_dependency_check "false"
-    set_needs_integration_tests "false"
-    set_needs_kubernetes_tests "false"
+    BASIC_CHECKS=""
+    compose_tests_needed=false
+    dependency_check_needed=false
+    integration_tests_needed=false
+    kubernetes_tests_needed=false
+
+    start_end::group_end
+    set_outputs
     exit
 }
 
@@ -429,18 +401,19 @@ function set_outputs() {
     # print results outside the group to increase visibility
 
     if [[ -n "${BASIC_CHECKS}" ]]; then
-        set_needs_basic_checks "true"
+        initialization::ga_output needs-basic-checks "${@}"
     fi
-    set_basic_checks "${BASIC_CHECKS}"
+    initialization::ga_output basic-checks \
+        "$(initialization::parameters_to_json "${@}")"
 
     if [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
-        set_needs_build "true"
+        initialization::ga_output needs-build "${@}"
     fi
 
-    set_needs_compose_tests "${compose_tests_needed}"
-    set_needs_dependency_check "${dependency_check_needed}"
-    set_needs_integration_tests "${integration_tests_needed}"
-    set_needs_kubernetes_tests "${kubernetes_tests_needed}"
+    initialization::ga_output needs-compose-tests "${@}"
+    initialization::ga_output needs-dependency-check "${@}"
+    initialization::ga_output needs-integration-tests "${@}"
+    initialization::ga_output needs-kubernetes-tests "${@}"
 }
 
 check_for_full_tests_needed_label
