@@ -352,10 +352,9 @@ function check_needs_dependency() {
     )
     show_changed_files
 
+    dependency_check_needed=false
     if [[ $(count_changed_files) != "0" ]]; then
-        set_needs_dependency_check "true"
-    else
-        set_needs_dependency_check "false"
+        dependency_check_needed=true
     fi
 
     start_end::group_end
@@ -442,6 +441,7 @@ function set_outputs() {
     fi
 
     set_needs_compose_tests "${compose_tests_needed}"
+    set_needs_dependency_check "${dependency_check_needed}"
     set_needs_integration_tests "${integration_tests_needed}"
     set_needs_kubernetes_tests "${kubernetes_tests_needed}"
 }
