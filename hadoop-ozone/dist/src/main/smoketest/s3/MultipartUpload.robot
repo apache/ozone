@@ -298,7 +298,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Should contain           ${result}    ${LastModified}
     ${lmDate} = 	Convert Date 	 	 ${lastModified}  date_format=%a, %d %b %Y %H:%M:%S %Z
     ${afterCreate} =    Add Time To Date         ${lmDate}  3 seconds
-    ${latestDate} =     Get Current Date
+    ${latestDate} =     Get Current Date         UTC
     ${sleepSeconds} =   Subtract Date From Date  ${afterCreate}  ${latestDate}
     Run Keyword If      ${sleepSeconds} > 0      Wait For AfterCreate  ${sleepSeconds}
 
