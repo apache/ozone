@@ -404,7 +404,7 @@ function set_outputs() {
         initialization::ga_output needs-basic-checks "true"
     fi
     initialization::ga_output basic-checks \
-        "$(initialization::parameters_to_json "${BASIC_CHECKS}")"
+        "$(initialization::parameters_to_json ${BASIC_CHECKS})"
 
     if [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
         initialization::ga_output needs-build "true"
