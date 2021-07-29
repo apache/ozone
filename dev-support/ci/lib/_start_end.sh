@@ -52,9 +52,6 @@ function start_end::script_start {
       return
     fi
 
-    verbosity::print_info
-    verbosity::print_info "${COLOR_BLUE}Log is redirected to '${OUTPUT_LOG}'${COLOR_RESET}"
-    verbosity::print_info
     if [[ ${VERBOSE_COMMANDS:="false"} == "true" ]]; then
         verbosity::print_info
         verbosity::print_info "${COLOR_BLUE}Variable VERBOSE_COMMANDS Set to \"true\"${COLOR_RESET}"
@@ -97,11 +94,6 @@ function start_end::script_end {
     local exit_code=$?
     if [[ ${exit_code} != 0 ]]; then
         # Finish previous group so that output can be written
-        # Cat output log in case we exit with error but only if we do not PRINT_INFO_FROM_SCRIPTS
-        # Because it will be printed immediately by "tee"
-        if [[ -f "${OUTPUT_LOG}" && ${PRINT_INFO_FROM_SCRIPTS} == "false" ]]; then
-            cat "${OUTPUT_LOG}"
-        fi
         start_end::group_end
         echo
         echo "${COLOR_RED}ERROR: The previous step completed with error. Please take a look at output above ${COLOR_RESET}"
