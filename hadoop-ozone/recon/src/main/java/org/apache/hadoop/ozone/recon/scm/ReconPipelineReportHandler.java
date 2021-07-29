@@ -70,12 +70,14 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
         pipelineFromScm =
             scmServiceProvider.getPipeline(report.getPipelineID());
       } catch (IOException ex) {
-        assert (ex instanceof RemoteException);
-        IOException exception = ((RemoteException) ex)
-                .unwrapRemoteException(PipelineNotFoundException.class);
-        assert (exception instanceof PipelineNotFoundException);
-        LOG.error("Could not find pipeline {} at SCM.", pipelineID);
-        return;
+        if (ex instanceof RemoteException) {
+          IOException ioe = ((RemoteException) ex)
+                  .unwrapRemoteException(PipelineNotFoundException.class);
+          if (ioe instanceof PipelineNotFoundException) {
+            LOG.error("Could not find pipeline {} at SCM.", pipelineID);
+          }
+        }
+        throw ex;
       }
 
       LOG.info("Adding new pipeline {} to Recon pipeline metadata.",
