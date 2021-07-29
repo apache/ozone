@@ -29,7 +29,7 @@
 # the commit addresses.
 #
 #
-declare -a pattern_array
+declare -a pattern_array ignore_array
 
 function check_for_full_tests_needed_label() {
     if [[ ${PR_LABELS=} == *"full tests needed"* ]]; then
@@ -126,10 +126,12 @@ function set_output_skip_all_tests_and_exit() {
 #    pattern_array - array storing regexp patterns
 # Outputs - pattern string
 function get_regexp_from_patterns() {
+    local array_name=${1:-"pattern_array"}
     local test_triggering_regexp=""
     local separator=""
     local pattern
-    for pattern in "${pattern_array[@]}"; do
+    local array="${array_name}[@]"
+    for pattern in "${!array}"; do
         test_triggering_regexp="${test_triggering_regexp}${separator}${pattern}"
         separator="|"
     done
@@ -141,11 +143,12 @@ function get_regexp_from_patterns() {
 #    pattern_array - array storing regexp patterns
 function show_changed_files() {
     local the_regexp
-    the_regexp=$(get_regexp_from_patterns)
+    match=$(get_regexp_from_patterns pattern_array)
+    ignore=$(get_regexp_from_patterns ignore_array)
     echo
-    echo "Changed files matching the ${the_regexp} pattern:"
+    echo "Changed files matching the '${match}' pattern, but ignoring '${ignore}':"
     echo
-    echo "${CHANGED_FILES}" | grep -E "${the_regexp}" || true
+    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -v "${ignore}" || true
     echo
 }
 
@@ -230,6 +233,9 @@ function get_count_doc_files() {
     local pattern_array=(
         "^hadoop-hdds/docs"
         "^hadoop-ozone/dev-support/checks/docs.sh"
+    )
+    local ignore_array=(
+        "^hadoop-hdds/docs/README.md"
     )
     show_changed_files
     COUNT_DOC_CHANGED_FILES=$(count_changed_files)
