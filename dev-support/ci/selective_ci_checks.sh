@@ -389,13 +389,12 @@ function calculate_test_types_to_run() {
     echo "Files count: ${COUNT_CORE_OTHER_CHANGED_FILES}"
     echo
 
-    local compose_tests_needed=false
-    local integration_tests_needed=false
-    local kubernetes_tests_needed=false
+    compose_tests_needed=false
+    integration_tests_needed=false
+    kubernetes_tests_needed=false
 
     if [[ ${COUNT_CORE_OTHER_CHANGED_FILES} -gt 0 ]]; then
         # Running all tests because some core or other files changed
-        echo
         echo "Looks like ${COUNT_CORE_OTHER_CHANGED_FILES} core files changed, running all tests."
         echo
         compose_tests_needed=true
@@ -412,6 +411,16 @@ function calculate_test_types_to_run() {
             kubernetes_tests_needed="true"
         fi
     fi
+    start_end::group_end
+}
+
+function set_outputs() {
+    # print results outside the group to increase visibility
+
+    if [[ -n "${BASIC_CHECKS}" ]]; then
+        set_needs_basic_checks "true"
+    fi
+    set_basic_checks "${BASIC_CHECKS}"
 
     if [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
         set_needs_build "true"
@@ -420,8 +429,6 @@ function calculate_test_types_to_run() {
     set_needs_compose_tests "${compose_tests_needed}"
     set_needs_integration_tests "${integration_tests_needed}"
     set_needs_kubernetes_tests "${kubernetes_tests_needed}"
-
-    start_end::group_end
 }
 
 check_for_full_tests_needed_label
@@ -461,7 +468,5 @@ check_needs_dependency
 check_needs_docs
 check_needs_findbugs
 check_needs_unit_test
-set_needs_basic_checks "true"
-set_basic_checks ${BASIC_CHECKS}
-
 calculate_test_types_to_run
+set_outputs
