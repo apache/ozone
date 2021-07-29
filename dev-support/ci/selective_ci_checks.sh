@@ -146,13 +146,13 @@ function get_regexp_from_patterns() {
 # Input:
 #    pattern_array - array storing regexp patterns
 function show_changed_files() {
-    local the_regexp
+    local match ignore
     match=$(get_regexp_from_patterns pattern_array)
     ignore=$(get_regexp_from_patterns ignore_array)
     echo
     echo "Changed files matching the '${match}' pattern, but ignoring '${ignore}':"
     echo
-    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -v "${ignore}" || true
+    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}" || true
     echo
 }
 
@@ -162,7 +162,10 @@ function show_changed_files() {
 # Output:
 #    Count of changed files matching the patterns
 function count_changed_files() {
-    echo "${CHANGED_FILES}" | grep -c -E "$(get_regexp_from_patterns)" || true
+    local match ignore
+    match=$(get_regexp_from_patterns pattern_array)
+    ignore=$(get_regexp_from_patterns ignore_array)
+    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}" | wc -l
 }
 
 SOURCES_TRIGGERING_TESTS=(
