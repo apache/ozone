@@ -20,6 +20,22 @@
 DOCKER_BINARY_PATH="${DOCKER_BINARY_PATH:=$(command -v docker || echo "/bin/docker")}"
 export DOCKER_BINARY_PATH
 
+function verbosity::store_exit_on_error_status() {
+    exit_on_error="false"
+    # If 'set -e' is set before entering the function, remember it, so you can restore before return!
+    if [[ $- == *e* ]]; then
+        exit_on_error="true"
+    fi
+    set +e
+}
+
+function verbosity::restore_exit_on_error_status() {
+    if [[ ${exit_on_error} == "true" ]]; then
+        set -e
+    fi
+    unset exit_on_error
+}
+
 # Prints verbose information in case VERBOSE variable is set
 function verbosity::print_info() {
     if [[ ${VERBOSE:="false"} == "true" && ${PRINT_INFO_FROM_SCRIPTS} == "true" ]]; then

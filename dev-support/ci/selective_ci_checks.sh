@@ -149,11 +149,13 @@ function show_changed_files() {
     local match ignore
     match=$(get_regexp_from_patterns pattern_array)
     ignore=$(get_regexp_from_patterns ignore_array)
+    verbosity::store_exit_on_error_status
     echo
     echo "Changed files matching the '${match}' pattern, but ignoring '${ignore}':"
     echo
-    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}" || true
+    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}"
     echo
+    verbosity::restore_exit_on_error_status
 }
 
 # Counts changed files in the commit vs. the target
@@ -165,7 +167,9 @@ function count_changed_files() {
     local match ignore
     match=$(get_regexp_from_patterns pattern_array)
     ignore=$(get_regexp_from_patterns ignore_array)
+    verbosity::store_exit_on_error_status
     echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}" | wc -l
+    verbosity::restore_exit_on_error_status
 }
 
 SOURCES_TRIGGERING_TESTS=(
