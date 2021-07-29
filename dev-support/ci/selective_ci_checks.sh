@@ -49,9 +49,9 @@ function get_changed_files() {
     start_end::group_start "Get changed files"
     local base
     if [[ "${CI_EVENT_TYPE}" == "pull_request" ]]; then
-      base=$(git rev-parse "${CI_TARGET_BRANCH}")
+        base=$(git rev-parse "${CI_TARGET_BRANCH}")
     else
-      base=$(git rev-parse "${INCOMING_COMMIT_SHA}~1")
+        base=$(git rev-parse "${INCOMING_COMMIT_SHA}~1")
     fi
 
     local merge_base=$(git merge-base "${base}" "${INCOMING_COMMIT_SHA}")
