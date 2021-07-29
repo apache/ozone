@@ -36,6 +36,7 @@ ignore_array=(
 )
 
 function check_for_full_tests_needed_label() {
+    start_end::group_start "Check for PR label"
     if [[ ${PR_LABELS=} == *"full tests needed"* ]]; then
         echo
         echo "Found PR label 'full tests needed' in '${PR_LABELS=}'"
@@ -47,6 +48,7 @@ function check_for_full_tests_needed_label() {
         echo
         FULL_TESTS_NEEDED_LABEL="false"
     fi
+    start_end::group_end
 }
 
 function get_changed_files() {
