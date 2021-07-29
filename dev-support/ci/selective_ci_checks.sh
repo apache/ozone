@@ -245,9 +245,6 @@ function get_count_doc_files() {
         "^hadoop-hdds/docs"
         "^hadoop-ozone/dev-support/checks/docs.sh"
     )
-    local ignore_array=(
-        "^hadoop-hdds/docs/README.md"
-    )
     show_changed_files
     COUNT_DOC_CHANGED_FILES=$(count_changed_files)
     echo "Files count: ${COUNT_DOC_CHANGED_FILES}"
