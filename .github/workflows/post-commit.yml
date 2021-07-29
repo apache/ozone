@@ -40,6 +40,13 @@ jobs:
         uses: actions/checkout@v2
         with:
           persist-credentials: false
+      - name: Fetch incoming commit ${{ github.sha }} with its parent
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+        if: github.event_name  == 'pull_request'
       - name: Selective checks
         id: selective-checks
         env:
