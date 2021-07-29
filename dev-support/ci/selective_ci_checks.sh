@@ -401,19 +401,19 @@ function set_outputs() {
     # print results outside the group to increase visibility
 
     if [[ -n "${BASIC_CHECKS}" ]]; then
-        initialization::ga_output needs-basic-checks "${@}"
+        initialization::ga_output needs-basic-checks "true"
     fi
     initialization::ga_output basic-checks \
-        "$(initialization::parameters_to_json "${@}")"
+        "$(initialization::parameters_to_json "${BASIC_CHECKS}")"
 
     if [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
-        initialization::ga_output needs-build "${@}"
+        initialization::ga_output needs-build "true"
     fi
 
-    initialization::ga_output needs-compose-tests "${@}"
-    initialization::ga_output needs-dependency-check "${@}"
-    initialization::ga_output needs-integration-tests "${@}"
-    initialization::ga_output needs-kubernetes-tests "${@}"
+    initialization::ga_output needs-compose-tests "${compose_tests_needed}"
+    initialization::ga_output needs-dependency-check "${dependency_check_needed}"
+    initialization::ga_output needs-integration-tests "${integration_tests_needed}"
+    initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
 }
 
 check_for_full_tests_needed_label
