@@ -284,6 +284,21 @@ function get_count_kubernetes_files() {
     start_end::group_end
 }
 
+function check_needs_author() {
+    start_end::group_start "Check if author is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/author.sh"
+        "src/..../java"
+    )
+    show_changed_files
+
+    if [[ $(count_changed_files) != "0" ]]; then
+        BASIC_CHECKS="${BASIC_CHECKS} author"
+    fi
+
+    start_end::group_end
+}
+
 function check_needs_bats() {
     start_end::group_start "Check if bats is needed"
     local pattern_array=(
@@ -461,7 +476,8 @@ get_count_junit_files
 get_count_kubernetes_files
 
 # calculate basic checks to run
-BASIC_CHECKS="author rat"
+BASIC_CHECKS="rat"
+check_needs_author
 check_needs_bats
 check_needs_checkstyle
 check_needs_dependency
