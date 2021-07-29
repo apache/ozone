@@ -65,6 +65,7 @@ OZONE-SITE.XML_hdds.scm.replication.thread.interval=5s
 OZONE-SITE.XML_hdds.scm.replication.event.timeout=10s
 OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
+OZONE-SITE.XML_hdds.container.report.interval=60s
 
 HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
 HDFS-SITE.XML_dfs.datanode.keytab.file=/etc/security/keytabs/dn.keytab
