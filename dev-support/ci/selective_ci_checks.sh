@@ -424,8 +424,6 @@ function calculate_test_types_to_run() {
     start_end::group_end
 }
 
-initialization::summarize_build_environment
-
 check_for_full_tests_needed_label
 
 if (($# < 1)); then
