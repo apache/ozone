@@ -293,6 +293,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, OmKeyInfo> getKeyTable();
 
   /**
+   * Returns the FileTable.
+   *
+   * @return FileTable.
+   */
+  Table<String, OmKeyInfo> getFileTable();
+
+  /**
    * Get Deleted Table.
    *
    * @return Deleted Table.

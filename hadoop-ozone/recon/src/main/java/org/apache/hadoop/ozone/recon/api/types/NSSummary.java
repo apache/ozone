@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import org.apache.hadoop.ozone.recon.ReconConstants;
 
-import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Class to encapsulate namespace metadata summaries from OM.
@@ -32,23 +32,27 @@ public class NSSummary {
   private int numOfFiles;
   private long sizeOfFiles;
   private int[] fileSizeBucket;
-  private List<Long> childDir;
+  private Set<Long> childDir;
+  private String dirName;
 
   public NSSummary() {
     this.numOfFiles = 0;
     this.sizeOfFiles = 0L;
     this.fileSizeBucket = new int[ReconConstants.NUM_OF_BINS];
-    this.childDir = new ArrayList<>();
+    this.childDir = new HashSet<>();
+    this.dirName = "";
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
                    int[] bucket,
-                   List<Long> childDir) {
+                   Set<Long> childDir,
+                   String dirName) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
+    this.dirName = dirName;
   }
 
   public int getNumOfFiles() {
@@ -63,8 +67,12 @@ public class NSSummary {
     return Arrays.copyOf(fileSizeBucket, ReconConstants.NUM_OF_BINS);
   }
 
-  public List<Long> getChildDir() {
+  public Set<Long> getChildDir() {
     return childDir;
+  }
+
+  public String getDirName() {
+    return dirName;
   }
 
   public void setNumOfFiles(int numOfFiles) {
@@ -80,7 +88,24 @@ public class NSSummary {
             ReconConstants.NUM_OF_BINS);
   }
 
-  public void setChildDir(List<Long> childDir) {
+  public void setChildDir(Set<Long> childDir) {
     this.childDir = childDir;
+  }
+
+  public void setDirName(String dirName) {
+    this.dirName = dirName;
+  }
+
+  public void addChildDir(long childId) {
+    if (this.childDir.contains(childId)) {
+      return;
+    }
+    this.childDir.add(childId);
+  }
+
+  public void removeChildDir(long childId) {
+    if (this.childDir.contains(childId)) {
+      this.childDir.remove(childId);
+    }
   }
 }
