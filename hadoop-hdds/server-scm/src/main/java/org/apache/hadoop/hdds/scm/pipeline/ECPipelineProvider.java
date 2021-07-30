@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import java.io.IOException;
@@ -40,6 +42,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
   private final ConfigurationSource conf;
   private final PlacementPolicy placementPolicy;
+  private final long containerSizeBytes;
 
   public ECPipelineProvider(NodeManager nodeManager,
                             StateManager stateManager,
@@ -48,6 +51,9 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
     super(nodeManager, stateManager);
     this.conf = conf;
     this.placementPolicy = placementPolicy;
+    this.containerSizeBytes = (long) this.conf
+        .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   @Override
@@ -61,8 +67,9 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   protected Pipeline create(ECReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
-    List<DatanodeDetails> dns = placementPolicy.chooseDatanodes(excludedNodes,
-        favoredNodes, replicationConfig.getRequiredNodes(), 0);
+    List<DatanodeDetails> dns = placementPolicy
+        .chooseDatanodes(excludedNodes, favoredNodes,
+            replicationConfig.getRequiredNodes(), 0, this.containerSizeBytes);
     return create(replicationConfig, dns);
   }
 
