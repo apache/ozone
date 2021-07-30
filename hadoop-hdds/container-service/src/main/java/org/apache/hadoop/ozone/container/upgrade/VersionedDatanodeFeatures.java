@@ -50,6 +50,39 @@ public final class VersionedDatanodeFeatures {
             layoutFeature.layoutVersion();
   }
 
+  /**
+   * Utilities for container Schema V2 layout feature.
+   * Containers created prior to the feature's finalization will use schema
+   * v1, and schema v2 will be used for all containers created after
+   * finalization.
+   */
+  public static class SchemaV2 {
+    public static String chooseSchemaVersion() {
+      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V2)) {
+        return OzoneConsts.SCHEMA_V2;
+      } else {
+        return OzoneConsts.SCHEMA_V1;
+      }
+    }
+  }
+
+  /**
+   * Utilities for SCM HA layout feature.
+   * Prior to SCM HA finalization, datanode volumes used the format
+   * {@literal <volume>/hdds/<scm-id>}. After SCM HA, the expected format is
+   * {@literal <volume>/hdds/<cluster-id>}.
+   *
+   * In pre-finalize for SCM HA, datanodes
+   * will still use the SCM ID for container file paths. The exception is if
+   * the cluster is already using cluster ID paths (since SCM HA was merged
+   * before the upgrade framework). In this case, cluster ID paths should
+   * continue to be used.
+   *
+   * On finalization of SCM HA, datanodes
+   * will create a symlink from the SCM ID directory to the cluster ID
+   * directory and use cluster ID in container file paths. If a cluster ID
+   * directory is already present, no changes are made.
+   */
   public static class ScmHA {
     private static String scmID;
 
@@ -80,16 +113,6 @@ public final class VersionedDatanodeFeatures {
         ScmHAFinalizeUpgradeActionDatanode.upgradeVolume(volume, clusterID);
       }
       return needsUpgrade;
-    }
-  }
-
-  public static class SchemaV2 {
-    public static String chooseSchemaVersion() {
-      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V2)) {
-        return OzoneConsts.SCHEMA_V2;
-      } else {
-        return OzoneConsts.SCHEMA_V1;
-      }
     }
   }
 }

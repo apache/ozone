@@ -75,6 +75,8 @@ public class DataNodeUpgradeFinalizer extends
       case UNHEALTHY:
         LOG.warn("FinalizeUpgrade: container {} is unhealthy, but " +
                 "finalization can proceed.", id);
+      default:
+        continue;
       }
     }
     return true;
@@ -88,7 +90,8 @@ public class DataNodeUpgradeFinalizer extends
     try {
       new ScmHAFinalizeUpgradeActionDatanode().execute(dsm);
     } catch (Exception ex) {
-      throw new UpgradeException(ex, UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+      throw new UpgradeException(ex,
+          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
     }
   }
 

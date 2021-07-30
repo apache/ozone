@@ -115,7 +115,8 @@ public class ContainerReader implements Runnable {
     // by HddsUtil#checkVolume once we have a cluster ID from SCM. No
     // operations to perform here in that case.
     if (storageDirs.length > 0) {
-      File clusterIDDir = new File(hddsVolumeRootDir, hddsVolume.getClusterID());
+      File clusterIDDir = new File(hddsVolumeRootDir,
+          hddsVolume.getClusterID());
       // The subdirectory we should verify containers within.
       // If this volume was formatted pre SCM HA, this will be the SCM ID.
       // A cluster ID symlink will exist in this case only if this cluster is

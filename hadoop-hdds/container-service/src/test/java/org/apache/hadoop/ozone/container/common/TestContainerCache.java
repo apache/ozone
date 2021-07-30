@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.common;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCacheMetrics;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -91,11 +90,13 @@ public class TestContainerCache {
     long numCacheMisses = metrics.getNumCacheMisses();
     // Get 2 references out of the same db and verify the objects are same.
     ReferenceCountedDB db1 = cache.getDB(1, "RocksDB",
-            containerDir1.getPath(), VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+            containerDir1.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
     Assert.assertEquals(1, db1.getReferenceCount());
     Assert.assertEquals(numDbGetCount + 1, metrics.getNumDbGetOps());
     ReferenceCountedDB db2 = cache.getDB(1, "RocksDB",
-            containerDir1.getPath(), VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+            containerDir1.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
     Assert.assertEquals(2, db2.getReferenceCount());
     Assert.assertEquals(numCacheMisses + 1, metrics.getNumCacheMisses());
     Assert.assertEquals(2, db1.getReferenceCount());
@@ -105,7 +106,8 @@ public class TestContainerCache {
 
     // add one more references to ContainerCache.
     ReferenceCountedDB db3 = cache.getDB(2, "RocksDB",
-            containerDir2.getPath(), VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+            containerDir2.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
     Assert.assertEquals(1, db3.getReferenceCount());
 
     // and close the reference
@@ -115,7 +117,8 @@ public class TestContainerCache {
     // add one more reference to ContainerCache and verify that it will not
     // evict the least recent entry as it has reference.
     ReferenceCountedDB db4 = cache.getDB(3, "RocksDB",
-            containerDir3.getPath(), VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+            containerDir3.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
     Assert.assertEquals(1, db4.getReferenceCount());
 
     Assert.assertEquals(2, cache.size());
@@ -131,7 +134,8 @@ public class TestContainerCache {
 
     // The reference count for container1 is 0 but it is not evicted.
     ReferenceCountedDB db5 = cache.getDB(1, "RocksDB",
-            containerDir1.getPath(), VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+            containerDir1.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
     Assert.assertEquals(1, db5.getReferenceCount());
     Assert.assertEquals(db1, db5);
     db5.close();
@@ -160,7 +164,8 @@ public class TestContainerCache {
     Runnable task = () -> {
       try {
         ReferenceCountedDB db1 = cache.getDB(1, "RocksDB",
-            containerDir.getPath(), VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+            containerDir.getPath(),
+            VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
         Assert.assertNotNull(db1);
       } catch (IOException e) {
         Assert.fail("Should get the DB instance");
@@ -178,7 +183,8 @@ public class TestContainerCache {
     }
 
     ReferenceCountedDB db = cache.getDB(1, "RocksDB",
-        containerDir.getPath(), VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
+        containerDir.getPath(),
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
     db.close();
     db.close();
     db.close();

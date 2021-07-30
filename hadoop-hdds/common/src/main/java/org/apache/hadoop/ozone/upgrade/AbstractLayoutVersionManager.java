@@ -119,8 +119,9 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           msgStart = "Finalize attempt on a layoutFeature which has already "
               + "been finalized.";
         } else {
-          msgStart = "Finalize attempt on a layoutFeature that is newer than the"
-              + " next feature to be finalized.";
+          msgStart =
+              "Finalize attempt on a layoutFeature that is newer than the " +
+                  "next feature to be finalized.";
         }
 
         throw new IllegalArgumentException(

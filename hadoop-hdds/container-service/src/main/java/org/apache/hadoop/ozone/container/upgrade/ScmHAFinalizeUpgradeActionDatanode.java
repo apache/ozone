@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANO
 
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.slf4j.Logger;
@@ -64,8 +63,8 @@ public class ScmHAFinalizeUpgradeActionDatanode
 
     if (storageDirs == null) {
       LOG.error("IO error for the volume {}. " +
-              "Unable to process it for finalizing layout for SCM HA support. " +
-              " Formatting will be retried on datanode restart.",
+          "Unable to process it for finalizing layout for SCM HA" +
+          "support. Formatting will be retried on datanode restart.",
           volume.getStorageDir());
     }  else if (storageDirs.length == 0) {
       LOG.info("Skipping finalize for SCM HA for unformatted volume {}, no " +
@@ -76,7 +75,7 @@ public class ScmHAFinalizeUpgradeActionDatanode
         // the old SCM ID directory.
         File scmIDDir = storageDirs[0];
         LOG.info("Creating symlink {} -> {} as part of SCM HA " +
-                "finalization for datanode.", clusterIDDir.getAbsolutePath(),
+            "finalization for datanode.", clusterIDDir.getAbsolutePath(),
             scmIDDir.getAbsolutePath());
         Path relativeScmIDDir =
             hddsVolumeDir.toPath().relativize(scmIDDir.toPath());
