@@ -24,6 +24,7 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.ReconfigurableBase;
+import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -54,6 +59,8 @@ import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -71,7 +78,11 @@ import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -422,6 +433,39 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     LOG.info("Creating csr for DN-> subject:{}", subject);
     return builder.build();
+  }
+
+  protected Configuration getNewConf() {
+    return new HdfsConfiguration();
+  }
+
+  @Override
+  public Collection<String> getReconfigurableProperties() {
+    return null;
+  }
+
+  @Override
+  public String reconfigurePropertyImpl(String property, String newVal)
+      throws ReconfigurationException {
+    switch (property) {
+      case HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD: {
+        IOException rootException = null;
+        LOG.info("Reconfiguring {} to {}", property, newVal);
+        return getConf().get(DFS_DATANODE_DATA_DIR_KEY);
+      }
+      }
+    throw new ReconfigurationException(
+        property, newVal, getConf().get(property));
+  }
+
+  public void startDatanodeReconfiguration() throws IOException {
+    if (startReconfiguration()) {
+      startReconfigurationTask();
+    }
+  }
+
+  public ReconfigurationTaskStatus getReconfigurationStatus() throws IOException {
+    return getReconfigurationTaskStatus();
   }
 
   /**
