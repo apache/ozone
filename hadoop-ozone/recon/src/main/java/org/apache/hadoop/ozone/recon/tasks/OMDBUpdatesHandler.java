@@ -126,7 +126,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       OMDBUpdateEvent event = builder.build();
       if (LOG.isDebugEnabled()) {
         LOG.debug(String.format("Generated OM update Event for table : %s, " +
-            "action = %s", tableName, action));
+                "action = %s", tableName, action));
       }
       if (omdbUpdateEvents.contains(event)) {
         // If the same event is part of this batch, the last one only holds.

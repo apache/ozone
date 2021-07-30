@@ -26,6 +26,7 @@ import java.util.StringJoiner;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.Before;
@@ -68,7 +69,8 @@ public class TestOMFailoverProxyProvider {
     config.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
     provider = new OMFailoverProxyProvider(config,
-        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID);
+        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
+        OzoneManagerProtocolPB.class);
   }
 
   /**
@@ -184,7 +186,8 @@ public class TestOMFailoverProxyProvider {
     ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
     OMFailoverProxyProvider prov = new OMFailoverProxyProvider(ozoneConf,
-        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID);
+        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
+        OzoneManagerProtocolPB.class);
 
     Text dtService = prov.getCurrentProxyDelegationToken();
 

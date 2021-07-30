@@ -36,4 +36,4 @@ Test hadoop dfs
     ${result} =        Execute                    hdfs dfs -ls ${dir}
                        Should contain             ${result}   ${PREFIX}-${random}
     ${result} =        Execute                    hdfs dfs -cat ${dir}/${PREFIX}-${random}
-                       Should contain             ${result}   This product includes software developed by The Apache Software
+                       Should contain             ${result}   This product includes software developed

@@ -75,9 +75,6 @@ public class DataNodeUpgradeFinalizer extends
       case UNHEALTHY:
         LOG.warn("FinalizeUpgrade: container {} is unhealthy, but " +
                 "finalization can proceed.", id);
-        return false;
-      default:
-        continue;
       }
     }
     return true;

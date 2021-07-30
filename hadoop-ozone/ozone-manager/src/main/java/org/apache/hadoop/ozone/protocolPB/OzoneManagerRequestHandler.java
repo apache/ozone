@@ -386,12 +386,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setRefreshPipeline(true)
-        .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
+        .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
+        .setHeadOp(keyArgs.getHeadOp())
         .build();
     OmKeyInfo keyInfo = impl.lookupKey(omKeyArgs);
-    resp.setKeyInfo(keyInfo.getProtobuf(false, clientVersion));
+
+    resp.setKeyInfo(keyInfo.getProtobuf(keyArgs.getHeadOp(), clientVersion));
+
 
     return resp.build();
   }
