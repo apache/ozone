@@ -51,7 +51,6 @@ USER jenkins1000
 RUN cd /tmp && \
    git clone --depth=1 https://gitbox.apache.org/repos/asf/ozone.git -b master && \
    cd /tmp/ozone && \
-   sed -i '/<frontend-maven-plugin.version>/ s/1.10/1.12/' pom.xml && \
    mvn package dependency:go-offline -DskipTests -pl :ozone-dist -am && \
    rm -rf /tmp/.m2/repository/org/apache/hadoop/*hdds* && \
    rm -rf /tmp/.m2/repository/org/apache/hadoop/*ozone* && \
