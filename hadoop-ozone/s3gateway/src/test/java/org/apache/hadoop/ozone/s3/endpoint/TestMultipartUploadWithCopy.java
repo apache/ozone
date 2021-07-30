@@ -27,12 +27,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
-
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -76,7 +74,6 @@ public class TestMultipartUploadWithCopy {
   private static final OzoneClient CLIENT = new OzoneClientStub();
   private static final int RANGE_FROM = 2;
   private static final int RANGE_TO = 4;
-  private static final long DELAY_MS = 2000;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -168,19 +165,11 @@ public class TestMultipartUploadWithCopy {
     String beforeSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
+        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000);
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
 
-    // Make sure DELAY_MS has passed, otherwise
-    //  afterSourceKeyModificationTimeStr will be in the future
-    //  and thus invalid
-    long currentTime = new Date().getTime();
-    long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
-    if (sleepMs > 0) {
-      Thread.sleep(sleepMs);
-    }
     // ifUnmodifiedSince = beforeSourceKeyModificationTime,
     // ifModifiedSince = afterSourceKeyModificationTime
     try {
@@ -217,60 +206,6 @@ public class TestMultipartUploadWithCopy {
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
-  }
-
-  @Test
-  public void testInvalidTimes() throws Exception {
-    long sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
-    String beforeSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
-    String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
-    String tomorrowTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime +
-            1000 * 60 * 24);
-
-    String badTimeStr = "Bad time string";
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(KEY);
-
-    // Make sure DELAY_MS has passed, otherwise
-    //  afterSourceKeyModificationTimeStr will be invalid
-    long currentTime = new Date().getTime();
-    long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
-    if (sleepMs > 0) {
-      Thread.sleep(sleepMs);
-    }
-    // ifUnmodifiedSince = bad
-    // ifModifiedSince = beforeSourceKeyModificationTime,
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        beforeSourceKeyModificationTimeStr,
-        badTimeStr);
-
-    // ifUnmodifiedSince = tomorrow
-    // ifModifiedSince = beforeSourceKeyModificationTime,
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        beforeSourceKeyModificationTimeStr,
-        tomorrowTimeStr);
-
-
-    // ifUnmodifiedSince = afterSourceKeyModificationTimeStr
-    // ifModifiedSince = bad
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        badTimeStr,
-        afterSourceKeyModificationTimeStr);
-    // ifUnmodifiedSince = afterSourceKeyModificationTimeStr
-    // ifModifiedSince = future
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        tomorrowTimeStr,
-        afterSourceKeyModificationTimeStr);
   }
 
   private String initiateMultipartUpload(String key) throws IOException,

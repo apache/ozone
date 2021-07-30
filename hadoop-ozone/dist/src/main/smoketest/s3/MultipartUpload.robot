@@ -29,9 +29,6 @@ Create Random file
     [arguments]             ${size_in_megabytes}
     Execute                 dd if=/dev/urandom of=/tmp/part1 bs=1048576 count=${size_in_megabytes}
 
-Wait For AfterCreate
-    [arguments]             ${sleepTime}
-    Sleep                   ${sleepTime}
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
@@ -282,7 +279,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
     Run Keyword         Create Random file      10
     ${curDate} =        Get Current Date
     ${beforeCreate} =   Subtract Time From Date     ${curDate}  1 day
-    ${tomorrow} =       Add Time To Date            ${curDate}  1 day
+    ${afterCreate} =    Add Time To Date        ${curDate}  1 day
 
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source --body /tmp/part1
 
@@ -291,16 +288,6 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
     ${uploadID} =       Execute and checkrc      echo '${result}' | jq -r '.UploadId'    0
                         Should contain           ${result}    ${BUCKET}
                         Should contain           ${result}    UploadId
-
-    ${result} =         Execute AWSS3APICli     head-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source
-
-    ${lastModified} =   Execute and checkrc      echo '${result}' | jq -r '.LastModified'    0
-                        Should contain           ${result}    ${LastModified}
-    ${lmDate} = 	Convert Date 	 	 ${lastModified}  date_format=%a, %d %b %Y %H:%M:%S %Z
-    ${afterCreate} =    Add Time To Date         ${lmDate}  3 seconds
-    ${latestDate} =     Get Current Date         UTC
-    ${sleepSeconds} =   Subtract Date From Date  ${afterCreate}  ${latestDate}
-    Run Keyword If      ${sleepSeconds} > 0      Wait For AfterCreate  ${sleepSeconds}
 
     ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${afterCreate}'    255
                         Should contain           ${result}    PreconditionFailed
@@ -319,13 +306,6 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Should contain           ${result}    LastModified
 
     ${eTag2} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
-
-# future date strings don't cause precondition to fail
-    ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${tomorrow}'   0
-                        Should contain           ${result}    ETag
-                        Should contain           ${result}    LastModified
-
-    ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
 
                         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
