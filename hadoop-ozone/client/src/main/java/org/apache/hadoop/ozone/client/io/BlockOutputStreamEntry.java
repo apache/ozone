@@ -96,19 +96,13 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   private void checkStream() throws IOException {
     if (this.outputStream == null) {
-<<<<<<< HEAD
       this.outputStream = createOutputStream();
-=======
-      this.outputStream =
-          new RatisBlockOutputStream(blockID, xceiverClientManager,
-              pipeline, bufferPool, config, token);
->>>>>>> master
     }
   }
 
   BlockOutputStream createOutputStream() throws IOException {
-    return new BlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token);
+    return new RatisBlockOutputStream(blockID, xceiverClientManager, pipeline,
+        bufferPool, config, token);
   }
 
   @Override

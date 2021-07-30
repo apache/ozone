@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.junit.Assert;
 import org.junit.Before;
@@ -47,16 +49,20 @@ public class TestECPipelineProvider {
   private NodeManager nodeManager = Mockito.mock(NodeManager.class);
   private StateManager stateManager = Mockito.mock(StateManager.class);
   private PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
-
+  private long containerSizeBytes;
   @Before
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
     provider = new ECPipelineProvider(
         nodeManager, stateManager, conf, placementPolicy);
-
+    this.containerSizeBytes = (long) this.conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
     // Placement policy will always return EC number of random nodes.
     Mockito.when(placementPolicy.chooseDatanodes(Mockito.anyList(),
-        Mockito.anyList(), Mockito.anyInt(), Mockito.anyLong()))
+        Mockito.anyList(), Mockito.anyInt(), Mockito.anyLong(),
+        Mockito.anyLong()))
         .thenAnswer(invocation -> {
           List<DatanodeDetails> dns = new ArrayList<>();
           for (int i=0; i<(int)invocation.getArguments()[2]; i++) {
@@ -64,6 +70,7 @@ public class TestECPipelineProvider {
           }
           return dns;
         });
+
   }
 
 
@@ -99,7 +106,7 @@ public class TestECPipelineProvider {
         pipeline.getNodes().size());
 
     verify(placementPolicy).chooseDatanodes(excludedNodes, favoredNodes,
-        ecConf.getRequiredNodes(), 0);
+        ecConf.getRequiredNodes(), 0, containerSizeBytes);
   }
 
 }

@@ -213,7 +213,6 @@ public class BlockOutputStream extends OutputStream {
     return ioException.get();
   }
 
-<<<<<<< HEAD
   XceiverClientSpi getXceiverClientSpi(){
     return this.xceiverClient;
   }
@@ -230,13 +229,6 @@ public class BlockOutputStream extends OutputStream {
     return this.responseExecutor;
   }
 
-  @VisibleForTesting
-  public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
-    return commitWatcher.getCommitIndex2flushedDataMap();
-  }
-
-=======
->>>>>>> master
   @Override
   public void write(int b) throws IOException {
     checkOpen();
