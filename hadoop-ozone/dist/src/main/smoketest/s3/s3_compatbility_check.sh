@@ -24,6 +24,8 @@ set -e
 : ${OZONE_TEST_S3_BUCKET2:?Please define second test bucket}
 : ${OZONE_TEST_S3_REGION:?Please define the S3 region for test buckets}
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 run_robot_test() {
    TEST_NAME=$1
    robot \
@@ -32,12 +34,23 @@ run_robot_test() {
        -v BUCKET:$OZONE_TEST_S3_BUCKET1 \
        -v DESTBUCKET:$OZONE_TEST_S3_BUCKET2 \
        -v OZONE_S3_SET_CREDENTIALS:false \
+       -v S3_SMOKETEST_DIR:${SCRIPT_DIR} \
        -o results/$TEST_NAME.xml \
        $TEST_NAME.robot
 }
 
 mkdir -p results
 
+run_robot_test awss3
 run_robot_test boto3
+run_robot_test bucketcreate
+run_robot_test bucketdelete
+run_robot_test buckethead
+run_robot_test bucketlist
+run_robot_test objectputget
+run_robot_test objectdelete
+run_robot_test objectcopy
+run_robot_test objectmultidelete
+run_robot_test MultipartUpload
 
 rebot --outputdir results/ results/*.xml
