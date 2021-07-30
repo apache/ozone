@@ -252,6 +252,18 @@ function get_count_kubernetes_files() {
     start_end::group_end
 }
 
+function get_count_robot_files() {
+    start_end::group_start "Count robot test files"
+    local pattern_array=(
+        "\.robot$"
+    )
+    show_changed_files
+    COUNT_ROBOT_CHANGED_FILES=$(count_changed_files)
+    echo "Files count: ${COUNT_ROBOT_CHANGED_FILES}"
+    readonly COUNT_ROBOT_CHANGED_FILES
+    start_end::group_end
+}
+
 function check_needs_author() {
     start_end::group_start "Check if author is needed"
     local pattern_array=(
@@ -365,7 +377,7 @@ function check_needs_unit_test() {
 
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
-    COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - COUNT_COMPOSE_CHANGED_FILES - COUNT_DOC_CHANGED_FILES - COUNT_JUNIT_CHANGED_FILES - COUNT_KUBERNETES_CHANGED_FILES))
+    COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - COUNT_COMPOSE_CHANGED_FILES - COUNT_DOC_CHANGED_FILES - COUNT_JUNIT_CHANGED_FILES - COUNT_KUBERNETES_CHANGED_FILES - COUNT_ROBOT_CHANGED_FILES))
     readonly COUNT_CORE_OTHER_CHANGED_FILES
     echo
     echo "Files count: ${COUNT_CORE_OTHER_CHANGED_FILES}"
@@ -383,13 +395,13 @@ function calculate_test_types_to_run() {
         integration_tests_needed=true
         kubernetes_tests_needed=true
     else
-        if [[ ${COUNT_COMPOSE_CHANGED_FILES} != "0" ]]; then
+        if [[ ${COUNT_COMPOSE_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             compose_tests_needed="true"
         fi
         if [[ ${COUNT_JUNIT_CHANGED_FILES} != "0" ]]; then
             integration_tests_needed="true"
         fi
-        if [[ ${COUNT_KUBERNETES_CHANGED_FILES} != "0" ]]; then
+        if [[ ${COUNT_KUBERNETES_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             kubernetes_tests_needed="true"
         fi
     fi
@@ -443,6 +455,7 @@ get_count_compose_files
 get_count_doc_files
 get_count_junit_files
 get_count_kubernetes_files
+get_count_robot_files
 
 # calculate basic checks to run
 BASIC_CHECKS="rat"
