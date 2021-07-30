@@ -37,7 +37,6 @@ _check_om_mlvs() {
 setup() {
   # OM preparation is not implemented until 1.2.0.
   export OZONE_OM_PREPARE='false'
-  load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 
 with_old_version() {
