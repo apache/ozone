@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -93,7 +94,8 @@ public class TestKeyValueContainerData {
     kvData.incrWriteCount();
     kvData.incrKeyCount();
     kvData.incrPendingDeletionBlocks(1);
-    kvData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
+    kvData.setSchemaVersion(
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
 
     assertEquals(state, kvData.getState());
     assertEquals(containerDBType, kvData.getContainerDBType());
@@ -108,7 +110,8 @@ public class TestKeyValueContainerData {
     assertEquals(1, kvData.getNumPendingDeletionBlocks());
     assertEquals(pipelineId.toString(), kvData.getOriginPipelineId());
     assertEquals(datanodeId.toString(), kvData.getOriginNodeId());
-    assertEquals(OzoneConsts.SCHEMA_LATEST, kvData.getSchemaVersion());
+    assertEquals(VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(),
+        kvData.getSchemaVersion());
   }
 
 }
