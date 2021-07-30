@@ -45,7 +45,13 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -597,6 +603,8 @@ public class ObjectEndpoint extends EndpointBase {
               headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
           String copySourceIfUnmodifiedSince =
               headers.getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
+	  // if not valid time, then skip the precondition checks
+	  //  which is what AWS seems to do as best I can tell
           if (isValidModificationTime(copySourceIfModifiedSince) &&
               isValidModificationTime(copySourceIfUnmodifiedSince)) {
             if (!checkCopySourceModificationTime(sourceKeyModificationTime,
