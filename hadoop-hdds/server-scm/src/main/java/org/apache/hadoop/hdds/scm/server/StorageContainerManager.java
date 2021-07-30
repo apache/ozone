@@ -1028,7 +1028,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // If SCM HA was not being used before pre-finalize, and is being used
       // when the cluster is pre-finalized for the SCM HA feature, init
       // should fail.
-      ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig);
+      ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
+          new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion()));
 
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
