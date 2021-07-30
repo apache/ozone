@@ -168,7 +168,8 @@ public class TestMultipartUploadWithCopy {
     String uploadID = initiateMultipartUpload(KEY);
 
     // Make sure DELAY_MS has passed, otherwise
-    //  afterSourceKeyModificationTimeStr will be invalid
+    //  afterSourceKeyModificationTimeStr will be in the future
+    //  and thus invalid
     long currentTime = new Date().getTime();
     long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
     if (sleepMs > 0) {
