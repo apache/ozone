@@ -92,13 +92,14 @@ public final class VersionedDatanodeFeatures {
 
     public static String chooseContainerPathID(StorageVolume volume,
         String clusterID) {
-      Preconditions.checkNotNull(scmID,
-          "Not yet initialized with scmID");
       File clusterIDDir = new File(volume.getStorageDir(), clusterID);
 
+      // SCM ID may be null for testing, but these non-upgrade tests will use
+      // the latest version with cluster ID anyways.
       if (isFinalized(HDDSLayoutFeature.SCM_HA) || clusterIDDir.exists()) {
         return clusterID;
       } else {
+        Preconditions.checkNotNull(scmID, "Not yet initialized with scmID");
         return scmID;
       }
     }
