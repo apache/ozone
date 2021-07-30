@@ -139,7 +139,7 @@ public class TestSCMInstallSnapshotWithHA {
     
     // Wait & retry for follower to update transactions to leader
     // snapshot index.
-    // Timeout error if follower does not load update within 3min
+    // Timeout error if follower does not load update within 3s
     GenericTestUtils.waitFor(() -> {
       return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
     }, 100, 3000);
