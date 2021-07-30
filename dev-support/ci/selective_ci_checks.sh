@@ -53,7 +53,6 @@ function check_for_full_tests_needed_label() {
 
 function get_changed_files() {
     start_end::group_start "Get changed files"
-    local base
 
     echo
     echo "Incoming commit SHA: ${INCOMING_COMMIT_SHA}"
