@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -165,21 +166,64 @@ public class MockOmTransport implements OmTransport {
   private CreateKeyResponse createKey(CreateKeyRequest createKeyRequest) {
     final KeyArgs keyArgs = createKeyRequest.getKeyArgs();
     final long now = System.currentTimeMillis();
-    final KeyInfo keyInfo = KeyInfo.newBuilder()
+    final BucketInfo bucketInfo =
+        buckets.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName());
+
+    final KeyInfo.Builder keyInfoBuilder = KeyInfo.newBuilder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
         .setCreationTime(now)
         .setModificationTime(now)
-        .setType(keyArgs.getType())
-        .setFactor(keyArgs.getFactor())
         .setDataSize(keyArgs.getDataSize())
         .setLatestVersion(0L)
         .addKeyLocationList(KeyLocationList.newBuilder()
             .addAllKeyLocations(
                 blockAllocator.allocateBlock(createKeyRequest.getKeyArgs()))
-            .build())
-        .build();
+            .build());
+    if (keyArgs.getType() == HddsProtos.ReplicationType.NONE) {
+      // 1. Client did not pass replication config.
+      // Now lets try bucket defaults
+      if (bucketInfo.getDefaultReplicationConfig() != null) {
+        // Since Bucket defaults are available, let's inherit
+        final HddsProtos.ReplicationType type =
+            bucketInfo.getDefaultReplicationConfig().getType();
+        keyInfoBuilder
+            .setType(bucketInfo.getDefaultReplicationConfig().getType());
+        switch (type) {
+        case EC:
+          keyInfoBuilder.setEcReplicationConfig(
+              bucketInfo.getDefaultReplicationConfig()
+                  .getEcReplicationConfig());
+        case RATIS:
+        case STAND_ALONE:
+          keyInfoBuilder
+              .setFactor(bucketInfo.getDefaultReplicationConfig().getFactor());
+        default:
+          //keyInfoBuilder.setReplicationConfig(replicationConfig);
+        }
+      }
+      // Else: 1. Client did not passed replication
+      // 2. Bucket does not have default replication config.
+      // Now lets set server defaults for key.
+      // TODO:
+    } else {
+      // 1. Client passed the replication config.
+      // Let's use it.
+      final HddsProtos.ReplicationType type = keyArgs.getType();
+      keyInfoBuilder.setType(type);
+      switch (type) {
+      case EC:
+        keyInfoBuilder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+      case RATIS:
+      case STAND_ALONE:
+        keyInfoBuilder.setFactor(keyArgs.getFactor());
+      default:
+        //keyInfoBuilder.setReplicationConfig(replicationConfig);
+      }
+    }
+
+    final KeyInfo keyInfo = keyInfoBuilder.build();
     openKeys.get(keyInfo.getVolumeName()).get(keyInfo.getBucketName())
         .put(keyInfo.getKeyName(), keyInfo);
     return CreateKeyResponse.newBuilder()

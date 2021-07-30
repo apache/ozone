@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.client;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -57,7 +57,7 @@ public final class BucketArgs {
    * Bucket encryption key name.
    */
   private String bucketEncryptionKey;
-  private ECReplicationConfig ecReplicationConfig;
+  private DefaultReplicationConfig defaultReplicationConfig;
   private final String sourceVolume;
   private final String sourceBucket;
 
@@ -81,14 +81,14 @@ public final class BucketArgs {
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout bucket layout.
-   * @param ecReplicationConfig EC replication config.
+   * @param defaultReplicationConfig default replication config.
    */
   @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
-      long quotaInBytes, long quotaInNamespace,BucketLayout bucketLayout,
-      ECReplicationConfig ecReplicationConfig) {
+      long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout,
+      DefaultReplicationConfig defaultReplicationConfig) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -99,7 +99,7 @@ public final class BucketArgs {
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
-    this.ecReplicationConfig = ecReplicationConfig;
+    this.defaultReplicationConfig = defaultReplicationConfig;
   }
 
   /**
@@ -144,11 +144,11 @@ public final class BucketArgs {
   }
 
   /**
-   * Returns the ec replication config.
-   * @return EC Replication Config.
+   * Returns the bucket default replication config.
+   * @return bucket's default Replication Config.
    */
-  public ECReplicationConfig getEcReplicationConfig() {
-    return this.ecReplicationConfig;
+  public DefaultReplicationConfig getDefaultReplicationConfig() {
+    return this.defaultReplicationConfig;
   }
 
   /**
@@ -205,7 +205,7 @@ public final class BucketArgs {
     private long quotaInBytes;
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
-    private ECReplicationConfig ecReplicationConfig;
+    private DefaultReplicationConfig defaultReplicationConfig;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -263,9 +263,9 @@ public final class BucketArgs {
       return this;
     }
 
-    public BucketArgs.Builder setEcReplicationConfig(
-        ECReplicationConfig ecReplConfig) {
-      ecReplicationConfig = ecReplConfig;
+    public BucketArgs.Builder setDefaultReplicationConfig(
+        DefaultReplicationConfig defaultReplConfig) {
+      defaultReplicationConfig = defaultReplConfig;
       return this;
     }
 
@@ -277,7 +277,7 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace, bucketLayout, ecReplicationConfig);
+          quotaInNamespace, bucketLayout, defaultReplicationConfig);
     }
   }
 }

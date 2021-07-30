@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -76,7 +76,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketEncryptionKeyInfo bekInfo;
 
-  private ECReplicationConfig ecReplicationConfig;
+  private DefaultReplicationConfig defaultReplicationConfig;
 
   private final String sourceVolume;
 
@@ -111,7 +111,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout bucket layout.
-   * @param ecReplicationConfig EC replication config.
+   * @param defaultReplicationConfig default replication config.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -132,7 +132,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       long quotaInBytes,
       long quotaInNamespace,
       BucketLayout bucketLayout,
-      ECReplicationConfig ecReplicationConfig) {
+      DefaultReplicationConfig defaultReplicationConfig) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -151,7 +151,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
-    this.ecReplicationConfig = ecReplicationConfig;
+    this.defaultReplicationConfig = defaultReplicationConfig;
   }
 
   /**
@@ -263,8 +263,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    *
    * @return EC replication config.
    */
-  public ECReplicationConfig getEcReplicationConfig() {
-    return ecReplicationConfig;
+  public DefaultReplicationConfig getDefaultReplicationConfig() {
+    return defaultReplicationConfig;
   }
 
   public String getSourceVolume() {
@@ -403,7 +403,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private long quotaInBytes;
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
-    private ECReplicationConfig ecReplicationConfig;
+    private DefaultReplicationConfig defaultReplicationConfig;
 
     public Builder() {
       //Default values
@@ -527,8 +527,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
-    public Builder setEcReplicationConfig(ECReplicationConfig ecReplConfig) {
-      this.ecReplicationConfig = ecReplConfig;
+    public Builder setDefaultReplicationConfig(
+        DefaultReplicationConfig defaultReplConfig) {
+      this.defaultReplicationConfig = defaultReplConfig;
       return this;
     }
 
@@ -545,7 +546,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, modificationTime, objectID, updateID,
           metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, ecReplicationConfig);
+          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout,
+          defaultReplicationConfig);
     }
   }
 
@@ -574,8 +576,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     if (bekInfo != null && bekInfo.getKeyName() != null) {
       bib.setBeinfo(OMPBHelper.convert(bekInfo));
     }
-    if (ecReplicationConfig != null) {
-      bib.setEcReplicationConfig(ecReplicationConfig.toProto());
+    if (defaultReplicationConfig != null) {
+      bib.setDefaultReplicationConfig(defaultReplicationConfig.toProto());
     }
     if (sourceVolume != null) {
       bib.setSourceVolume(sourceVolume);
@@ -622,9 +624,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       obib.setBucketLayout(
           BucketLayout.fromProto(bucketInfo.getBucketLayout()));
     }
-    if (bucketInfo.hasEcReplicationConfig()) {
-      obib.setEcReplicationConfig(
-          new ECReplicationConfig(bucketInfo.getEcReplicationConfig()));
+    if (bucketInfo.hasDefaultReplicationConfig()) {
+      obib.setDefaultReplicationConfig(
+          OMPBHelper.convert(bucketInfo.getDefaultReplicationConfig()));
     }
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());

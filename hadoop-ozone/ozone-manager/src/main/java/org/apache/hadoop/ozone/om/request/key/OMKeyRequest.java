@@ -34,6 +34,9 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -632,13 +635,37 @@ public abstract class OMKeyRequest extends OMClientRequest {
       return dbKeyInfo;
     }
 
+    ReplicationConfig replicationConfig = null;
+    if (keyArgs.getType() != HddsProtos.ReplicationType.NONE) {
+      // 1. Client passed the replication config.
+      // Let's use it.
+      final HddsProtos.ReplicationType type = keyArgs.getType();
+      replicationConfig = ReplicationConfig
+          .fromProto(keyArgs.getType(), keyArgs.getFactor(),
+              keyArgs.getEcReplicationConfig());
+    } else {
+      // 1. Client did not pass replication config.
+      // Now lets try bucket defaults
+      if (omBucketInfo.getDefaultReplicationConfig() != null) {
+        // Since Bucket defaults are available, let's inherit
+        replicationConfig = ReplicationConfig.fromProto(ReplicationType
+                .toProto(omBucketInfo.getDefaultReplicationConfig().getType()),
+            ReplicationFactor.toProto(
+                omBucketInfo.getDefaultReplicationConfig().getFactor()),
+            omBucketInfo.getDefaultReplicationConfig().getEcReplicationConfig()
+                .toProto());
+      }
+      //Else:  1. Client did not pass replication
+      // 2. Bucket does not have default replication config.
+      // Now lets set server defaults for key.
+      // TODO: This can happen once we remove configs from ozone-default.xml
+
+    }
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
-    return createFileInfo(keyArgs, locations, ReplicationConfig
-            .fromProto(keyArgs.getType(), keyArgs.getFactor(),
-                keyArgs.getEcReplicationConfig()), keyArgs.getDataSize(),
-        encInfo, prefixManager, omBucketInfo, omPathInfo, transactionLogIndex,
-        objectID);
+    return createFileInfo(keyArgs, locations, replicationConfig,
+            keyArgs.getDataSize(), encInfo, prefixManager,
+            omBucketInfo, omPathInfo, transactionLogIndex, objectID);
   }
 
   /**
@@ -664,20 +691,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setCreationTime(keyArgs.getModificationTime())
             .setModificationTime(keyArgs.getModificationTime())
             .setDataSize(size)
+            .setReplicationConfig(replicationConfig)
             .setFileEncryptionInfo(encInfo)
             .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
             .setUpdateID(transactionLogIndex);
-    if (omBucketInfo != null && omBucketInfo.getEcReplicationConfig() != null) {
-      // if bucket has the ec replication config, then we will inherit it from
-      // bucket.
-      builder.setReplicationConfig(omBucketInfo.getEcReplicationConfig());
-    } else {
-      // Otherwise use the client passed replication config.
-      builder.setReplicationConfig(replicationConfig);
-    }
-
     if (omPathInfo != null) {
       // FileTable metadata format
       objectID = omPathInfo.getLeafNodeObjectId();

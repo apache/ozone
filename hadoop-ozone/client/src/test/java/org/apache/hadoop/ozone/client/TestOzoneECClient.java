@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,6 +33,7 @@ import org.apache.hadoop.io.erasurecode.ECSchema;
 import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
 import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
 import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
@@ -122,7 +125,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testPutECKeyAndCheckDNStoredData() throws IOException {
-    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName);
+    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
     OzoneKey key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
     Map<DatanodeDetails, MockDatanodeStorage> storages =
@@ -142,7 +145,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testPutECKeyAndCheckParityData() throws IOException {
-    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName);
+    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
     final ByteBuffer[] dataBuffers = new ByteBuffer[3];
     for (int i = 0; i < inputChunks.length; i++) {
       dataBuffers[i] = ByteBuffer.wrap(inputChunks[i]);
@@ -174,7 +177,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testPutECKeyAndReadContent() throws IOException {
-    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName);
+    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
     OzoneKey key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -205,17 +208,41 @@ public class TestOzoneECClient {
     }
   }
 
-  private OzoneBucket writeIntoECKey(byte[][] chunks, String key)
+  @Test
+  public void testCreateBucketWithDefaultReplicationConfig()
       throws IOException {
+    final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(dataBlocks, parityBlocks)));
+
+    // create key without mentioning replication config. Since we set EC
+    // replication in bucket, key should be EC key.
+    try (OzoneOutputStream out = bucket.createKey("mykey", 2000)) {
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+  }
+
+
+  private OzoneBucket writeIntoECKey(byte[][] chunks, String key,
+      DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    if (defaultReplicationConfig != null) {
+      final BucketArgs.Builder builder = BucketArgs.newBuilder();
+      builder.setDefaultReplicationConfig(defaultReplicationConfig);
+      volume.createBucket(bucketName, builder.build());
+    } else {
+      volume.createBucket(bucketName);
+    }
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(key, 2000,
-        new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
+        new ECReplicationConfig(3, 2), new HashMap<>())) {
       for (int i = 0; i < chunks.length; i++) {
         out.write(chunks[i]);
       }
