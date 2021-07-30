@@ -139,7 +139,7 @@ function count_changed_files() {
     match=$(get_regexp_from_patterns pattern_array)
     ignore=$(get_regexp_from_patterns ignore_array)
     verbosity::store_exit_on_error_status
-    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}" | wc -l
+    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -cEv "${ignore}"
     verbosity::restore_exit_on_error_status
 }
 
