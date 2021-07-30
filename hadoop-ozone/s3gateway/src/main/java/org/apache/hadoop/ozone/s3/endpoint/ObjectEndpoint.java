@@ -878,11 +878,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OS3Exception e) {
       return false;
     }
-    if (currentDate < date) {
-      return false;
-    } else {
-      return true;
-    }
+    return (currentDate < date);
   }
 
   private boolean checkCopySourceModificationTime(Long lastModificationTime,
