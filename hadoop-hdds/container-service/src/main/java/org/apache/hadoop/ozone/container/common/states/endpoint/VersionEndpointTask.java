@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -77,6 +78,7 @@ public class VersionEndpointTask implements
           // If end point is passive, datanode does not need to check volumes.
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
+          VersionedDatanodeFeatures.ScmHA.initialize(scmId);
 
           // Check volumes
           MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
@@ -96,7 +98,7 @@ public class VersionEndpointTask implements
                 : volumeMap.entrySet()) {
               StorageVolume volume = entry.getValue();
               boolean result = HddsVolumeUtil.checkVolume((HddsVolume) volume,
-                  scmId, clusterId, LOG);
+                  clusterId, LOG);
               if (!result) {
                 volumeSet.failVolume(volume.getStorageDir().getPath());
               }
@@ -111,7 +113,7 @@ public class VersionEndpointTask implements
           }
 
           // Start the container services after getting the version information
-          ozoneContainer.start(scmId,  clusterId);
+          ozoneContainer.start(clusterId);
         }
         EndpointStateMachine.EndPointStates nextState =
             rpcEndPoint.getState().getNextState();

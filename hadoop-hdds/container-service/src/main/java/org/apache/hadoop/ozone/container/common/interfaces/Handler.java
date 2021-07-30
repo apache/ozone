@@ -190,8 +190,4 @@ public abstract class Handler {
   public void setClusterID(String clusterID) {
     this.clusterId = clusterID;
   }
-
-  public void setScmID(String scmID) {
-    this.scmId = scmID;
-  }
 }

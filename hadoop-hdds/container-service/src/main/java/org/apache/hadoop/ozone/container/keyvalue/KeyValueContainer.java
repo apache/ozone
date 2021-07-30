@@ -52,7 +52,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.base.Preconditions;
@@ -118,13 +118,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
       long containerID = containerData.getContainerID();
+      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+              containerVolume, clusterId);
 
       containerMetaDataPath = KeyValueContainerLocationUtil
-          .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerID);
+          .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
       containerData.setMetadataPath(containerMetaDataPath.getPath());
 
       File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-          hddsVolumeDir, clusterId, containerID);
+          hddsVolumeDir, idDir, containerID);
 
       // Check if it is new Container.
       ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
@@ -132,10 +134,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       //Create Metadata path chunks path and metadata db
       File dbFile = getContainerDBFile();
 
-      // This method is only called when creating new containers.
-      // Therefore, always use the newest schema version.
       containerData.setSchemaVersion(
-          DatanodeMetadataFeatures.getSchemaVersion());
+          VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
       KeyValueContainerUtil.createContainerMetaData(containerID,
               containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);

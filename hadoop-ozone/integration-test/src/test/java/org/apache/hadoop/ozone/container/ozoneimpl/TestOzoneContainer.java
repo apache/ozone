@@ -86,8 +86,7 @@ public class TestOzoneContainer {
       Mockito.when(context.getParent()).thenReturn(dsm);
       container = new OzoneContainer(datanodeDetails, conf, context, null);
       //Set scmId and clusterId and manually start ozone container.
-      container.start(UUID.randomUUID().toString(),
-          UUID.randomUUID().toString());
+      container.start(UUID.randomUUID().toString());
 
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
       client.connect();
@@ -129,11 +128,10 @@ public class TestOzoneContainer {
       container = new OzoneContainer(datanodeDetails, conf,
           context, null);
 
-      String scmId = UUID.randomUUID().toString();
       String clusterId = UUID.randomUUID().toString();
-      container.start(scmId, clusterId);
+      container.start(clusterId);
       try {
-        container.start(scmId, clusterId);
+        container.start(clusterId);
       } catch (Exception e) {
         Assert.fail();
       }

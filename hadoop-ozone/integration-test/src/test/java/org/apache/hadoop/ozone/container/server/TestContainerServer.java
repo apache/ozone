@@ -279,11 +279,6 @@ public class TestContainerServer {
     }
 
     @Override
-    public void setScmId(String scmId) {
-
-    }
-
-    @Override
     public void buildMissingContainerSetAndValidate(
         Map<Long, Long> container2BCSIDMap) {
     }

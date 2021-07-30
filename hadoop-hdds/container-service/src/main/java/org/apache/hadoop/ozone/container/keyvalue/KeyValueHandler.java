@@ -72,7 +72,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.AutoCloseableLock;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -263,9 +263,7 @@ public class KeyValueHandler extends Handler {
     boolean created = false;
     try (AutoCloseableLock l = containerCreationLock.acquire()) {
       if (containerSet.getContainer(containerID) == null) {
-        String containerPathID =
-            DatanodeMetadataFeatures.getContainerPathID(scmId, clusterId);
-        newContainer.create(volumeSet, volumeChoosingPolicy, containerPathID);
+        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
         created = containerSet.addContainer(newContainer);
       } else {
         // The create container request for an already existing container can
@@ -295,8 +293,8 @@ public class KeyValueHandler extends Handler {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           container.getContainerData().getMaxSize());
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-      String idDir = DatanodeMetadataFeatures.getContainerPathID(scmId,
-          clusterId);
+      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+              containerVolume, clusterId);
       container.populatePathFields(idDir, containerVolume, hddsVolumeDir);
     } finally {
       volumeSet.readUnlock();

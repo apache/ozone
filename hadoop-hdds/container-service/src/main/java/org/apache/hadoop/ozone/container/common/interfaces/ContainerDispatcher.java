@@ -84,11 +84,4 @@ public interface ContainerDispatcher {
    * @param clusterId
    */
   void setClusterId(String clusterId);
-
-  /**
-   * If scm ID is not set, this will set scm ID, otherwise it is a
-   * no-op.
-   * @param scmId
-   */
-  void setScmId(String scmId);
 }

@@ -557,17 +557,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
-  @Override
-  public void setScmId(String scmId) {
-    Preconditions.checkNotNull(scmId, "clusterId Cannot be null");
-    if (this.scmId == null) {
-      this.scmId = scmId;
-      for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
-        handlerMap.getValue().setScmID(scmId);
-      }
-    }
-  }
-
   @VisibleForTesting
   public Container getContainer(long containerID) {
     return containerSet.getContainer(containerID);

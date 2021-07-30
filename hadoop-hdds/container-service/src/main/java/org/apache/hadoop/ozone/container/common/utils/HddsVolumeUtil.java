@@ -19,21 +19,17 @@
 package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.compress.archivers.zip.X0016_CertificateIdForCentralDirectory;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.upgrade.DatanodeMetadataFeatures;
-import org.apache.hadoop.ozone.container.upgrade.ScmHAFinalizeUpgradeActionDatanode;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -184,16 +180,17 @@ public final class HddsVolumeUtil {
    * @param logger
    * @return true - if volume is in consistent state, otherwise false.
    */
-  public static boolean checkVolume(HddsVolume hddsVolume, String scmId, String
+  public static boolean checkVolume(HddsVolume hddsVolume, String
       clusterId, Logger logger) throws IOException {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
     File clusterDir = new File(hddsRoot, clusterId);
     // Either the SCM ID or cluster ID that will be used in naming the
     // volume's subdirectory, depending on the layout version.
-    String idToUse =
-        DatanodeMetadataFeatures.getContainerPathID(scmId, clusterId);
-    File newIDDir = new File(hddsRoot, idToUse);
+    String idDir =
+        VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(hddsVolume,
+            clusterId);
+    File newIDDir = new File(hddsRoot, idDir);
     String errorPrefix = "Volume " + volumeRoot + " is in an inconsistent " +
         "state.";
 
@@ -223,21 +220,13 @@ public final class HddsVolumeUtil {
       }
       return true;
     } else if (hddsFiles.length == 2) {
-      // If cluster ID dir exists, no issues.
-      if (!clusterDir.exists()) {
-        if (newIDDir.equals(clusterDir)) {
-          // We have finalized but the cluster ID does not exist. May have
-          // occurred if the volume was unhealthy during finalization.
-          // Create cluster ID symlink now.
-          ScmHAFinalizeUpgradeActionDatanode.upgradeVolume(hddsVolume,
-              clusterId);
-        }
-        // Else, We are still pre-finalized.
-        // The existing directory should be left for backwards compatibility.
-        // Cannot check that it matches the SCM ID that we have since SCM HA
-        // may have already been finalized and give us a different SCM ID
-        // than the old cluster's single SCM.
-      }
+      // If we are finalized for SCM HA and there is no cluster ID directory,
+      // the volume may have been unhealthy during finalization and been
+      // skipped. Create cluster ID symlink now.
+      // Else, We are still pre-finalized.
+      // The existing directory should be left for backwards compatibility.
+      VersionedDatanodeFeatures.ScmHA.
+          upgradeVolumeIfNeeded(hddsVolume, clusterId);
       return true;
     } else {
       if (!clusterDir.exists()) {

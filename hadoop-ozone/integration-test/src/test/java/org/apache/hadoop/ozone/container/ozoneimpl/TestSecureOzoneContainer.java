@@ -148,8 +148,7 @@ public class TestSecureOzoneContainer {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       container = new OzoneContainer(dn, conf, getContext(dn), caClient);
       //Set scmId and manually start ozone container.
-      container.start(UUID.randomUUID().toString(),
-          UUID.randomUUID().toString());
+      container.start(UUID.randomUUID().toString());
 
       String user = "user1";
       UserGroupInformation ugi = UserGroupInformation.createUserForTesting(

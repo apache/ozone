@@ -86,11 +86,6 @@ public class ContainerReader implements Runnable {
     this.volumeSet = volSet;
   }
 
-
-  private File getClusterDir() {
-    File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
-    return new File(hddsVolumeRootDir, hddsVolume.getClusterID());
-  }
   @Override
   public void run() {
     try {
