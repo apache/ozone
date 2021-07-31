@@ -20,6 +20,36 @@ set -e
 # This script helps to execute S3 robot test against real AWS s3 endpoint
 # To make sure that all of our defined tests cases copies the behavior of AWS
 
+
+# To run this script
+#    mvn clean install -DskipShade -DskipTests
+#    cd hadoop-ozone/dist/target/ozone-1.2.0-SNAPSHOT/smoketest/s3/
+#    python3 -m venv s3env
+#    source s3env/bin/activate
+#    pip3 install awscli==1.18.69
+#    pip3 install boto3==1.13.5
+
+# set up your aws credentials:
+#    export AWS_ACCESS_KEY_ID=<your access key>
+#    export AWS_SECRET_ACCESS_KEY=<your secret access key>
+#    export AWS_DEFAULT_REGION=us-east-1
+
+# add env vars:
+#    export OZONE_TEST_S3_BUCKET1=bucket-test1
+#    export OZONE_TEST_S3_BUCKET2=bucket-test2
+#    export OZONE_TEST_S3_REGION=us-east-1
+
+
+# create dummy buckets in aws:
+#    aws s3api create-bucket --bucket $OZONE_TEST_S3_BUCKET1
+#    aws s3api create-bucket --bucket $OZONE_TEST_S3_BUCKET2
+
+
+# finally to run the test:
+#    ./s3_compatbility_check.sh
+
+# when done, run 'deactivate' to turn off the python virtualenv.
+
 : ${OZONE_TEST_S3_BUCKET1:?Please define test bucket}
 : ${OZONE_TEST_S3_BUCKET2:?Please define second test bucket}
 : ${OZONE_TEST_S3_REGION:?Please define the S3 region for test buckets}
