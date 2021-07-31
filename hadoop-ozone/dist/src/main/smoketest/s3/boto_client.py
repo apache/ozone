@@ -34,7 +34,8 @@ class TestBotoClient(unittest.TestCase):
     setup_done = False
     target_bucket = None
     ozone_endpoint_url = None
- 
+    random_bucket_name = ''.join(random.choice(letters) for i in range(10))
+
     def setUp(self):
         if TestBotoClient.setup_done:
             return
@@ -53,7 +54,7 @@ class TestBotoClient(unittest.TestCase):
         )
 
         try:
-            response = self.s3_client.create_bucket(Bucket='boto-bucket999')
+            response = self.s3_client.create_bucket(Bucket=random_bucket_name)
             print(response)
 
             response = self.s3_client.upload_file("README.md", str(self.target_bucket), "README3.md")
@@ -117,7 +118,7 @@ class TestBotoClient(unittest.TestCase):
     def test_bucket_delete(self):
         self.assertTrue(self.s3_client is not None)
         try:
-           response = self.s3_client.delete_bucket(Bucket='boto-bucket999')
+           response = self.s3_client.delete_bucket(Bucket=random_bucket_name)
            self.assertTrue(response.get('ResponseMetadata').get('HTTPStatusCode') == 204)
            print(response)
         except ClientError as e:
