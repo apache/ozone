@@ -47,8 +47,8 @@ public class DirectoryServerSource implements StreamingSource {
     final Path streamingDir = root.resolve(id);
     try (Stream<Path> list = Files.walk(streamingDir)
             .filter(Files::isRegularFile)) {
-        list.forEach(path -> {
-            files.put(root.relativize(path).toString(), path);
+      list.forEach(path -> {
+          files.put(root.relativize(path).toString(), path);
         });
     } catch (IOException e) {
       throw new StreamingException("Couldn't read directory for streaming: " +
