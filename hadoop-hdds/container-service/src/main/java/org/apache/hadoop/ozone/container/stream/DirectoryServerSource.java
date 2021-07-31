@@ -42,7 +42,7 @@ public class DirectoryServerSource implements StreamingSource {
    * @param id name of the subdirectory to replitace relative to root.
    */
   public Map<String, Path> getFilesToStream(String id)
-          throws InterruptedException {
+      throws InterruptedException {
     Map<String, Path> files = new HashMap<>();
     final Path streamingDir = root.resolve(id);
     try {
@@ -54,7 +54,7 @@ public class DirectoryServerSource implements StreamingSource {
       }
     } catch (IOException e) {
       throw new StreamingException("Couldn't read directory for streaming: " +
-              streamingDir, e);
+          streamingDir, e);
     }
     return files;
   }
