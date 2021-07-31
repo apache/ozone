@@ -676,21 +676,29 @@ public class KeyManagerImpl implements KeyManager {
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
 
+
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
 
-    // add block token for read.
-    addBlockToken4Read(value);
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
 
-    // Refresh container pipeline info from SCM
-    // based on OmKeyArgs.refreshPipeline flag
-    // value won't be null as the check is done inside try/catch block.
-    refresh(value);
+      // add block token for read.
+      addBlockToken4Read(value);
 
-    if (args.getSortDatanodes()) {
-      sortDatanodes(clientAddress, value);
+      // Refresh container pipeline info from SCM
+      // based on OmKeyArgs.refreshPipeline flag
+      // value won't be null as the check is done inside try/catch block.
+      refresh(value);
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+
     }
+
     return value;
   }
 
