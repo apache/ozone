@@ -45,13 +45,11 @@ public class DirectoryServerSource implements StreamingSource {
       throws InterruptedException {
     Map<String, Path> files = new HashMap<>();
     final Path streamingDir = root.resolve(id);
-    try {
-      try (Stream<Path> list = Files.walk(streamingDir)
-              .filter(Files::isRegularFile)) {
+    try (Stream<Path> list = Files.walk(streamingDir)
+            .filter(Files::isRegularFile)) {
         list.forEach(path -> {
-          files.put(root.relativize(path).toString(), path);
+            files.put(root.relativize(path).toString(), path);
         });
-      }
     } catch (IOException e) {
       throw new StreamingException("Couldn't read directory for streaming: " +
           streamingDir, e);
