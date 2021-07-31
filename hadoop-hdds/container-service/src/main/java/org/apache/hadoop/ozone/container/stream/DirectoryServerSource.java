@@ -48,8 +48,8 @@ public class DirectoryServerSource implements StreamingSource {
     try (Stream<Path> list = Files.walk(streamingDir)
             .filter(Files::isRegularFile)) {
       list.forEach(path -> {
-          files.put(root.relativize(path).toString(), path);
-        });
+        files.put(root.relativize(path).toString(), path);
+      });
     } catch (IOException e) {
       throw new StreamingException("Couldn't read directory for streaming: " +
           streamingDir, e);
