@@ -52,6 +52,6 @@ RUN cd /tmp && \
    git clone --depth=1 https://gitbox.apache.org/repos/asf/ozone.git -b master && \
    cd /tmp/ozone && \
    mvn package dependency:go-offline -DskipTests -pl :ozone-dist -am && \
-   rm -rf /tmp/.m2/repository/org/apache/hadoop/*hdds* && \
-   rm -rf /tmp/.m2/repository/org/apache/hadoop/*ozone* && \
+   rm -rf /tmp/.m2/repository/org/apache/ozone/hdds* && \
+   rm -rf /tmp/.m2/repository/org/apache/ozone/ozone* && \
    find /tmp/.m2/repository -exec chmod o+wx {} \;
