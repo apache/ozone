@@ -34,9 +34,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurableBase;
-import org.apache.hadoop.conf.ReconfigurationException;
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
+import org.apache.hadoop.hdds.cli.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -59,8 +58,6 @@ import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -78,8 +75,6 @@ import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD;
@@ -274,7 +269,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       startPlugins();
       // Starting HDDS Daemons
       datanodeStateMachine.startDaemon();
-
+      startDatanodeReconfiguration();
       //for standalone, follower only test we can start the datanode (==raft
       // rings)
       //manually. In normal case it's handled by the initial SCM handshake.
@@ -435,8 +430,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return builder.build();
   }
 
+  protected static Configuration getOldConf() {
+    return new OzoneConfiguration();
+  }
+
   protected Configuration getNewConf() {
-    return new HdfsConfiguration();
+    return new OzoneConfiguration();
+  }
+
+  @Override
+  public void reconfigureProperty(String s, String s1) throws org.apache.hadoop.conf.ReconfigurationException {
+
   }
 
   @Override

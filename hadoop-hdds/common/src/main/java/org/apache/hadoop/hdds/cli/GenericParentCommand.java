@@ -16,11 +16,9 @@
  */
 package org.apache.hadoop.hdds.cli;
 
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  * Interface to access the higher level parameters.

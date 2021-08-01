@@ -49,7 +49,7 @@
   </property>
   <property>
     <name>ozone.scm.container.size</name>
-    <value>1G</value>
+    <value>5G</value>
   </property>
   <property>
     <name>hdds.datanode.storage.utilization.critical.threshold</name>
@@ -59,14 +59,14 @@
     <name>hdds.prometheus.endpoint.enabled</name>
     <value>true</value>
   </property>
-  <property>
-    <name>ozone.recon.address</name>
-    <value>localhost:9891</value>
-  </property>
-  <property>
-    <name>ozone.recon.db.dir</name>
-    <value>/tmp/recon</value>
-  </property>
+<!--  <property>-->
+<!--    <name>ozone.recon.address</name>-->
+<!--    <value>localhost:9891</value>-->
+<!--  </property>-->
+<!--  <property>-->
+<!--    <name>ozone.recon.db.dir</name>-->
+<!--    <value>/tmp/recon</value>-->
+<!--  </property>-->
   <property>
     <name>datanode.replication.port</name>
     <value>0</value>

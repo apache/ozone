@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
@@ -30,6 +33,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.util.Collection;
 
 /**
  * This class provides a command line interface to start the OM
@@ -72,6 +76,21 @@ public class OzoneManagerStarter extends GenericCli {
     return null;
   }
 
+  @Override
+  public Collection<String> getReconfigurableProperties() {
+    return null;
+  }
+
+  @Override
+  protected Configuration getNewConf() {
+    return null;
+  }
+
+  @Override
+  protected String reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+    return null;
+  }
+
   /**
    * This function is used by the command line to start the OM.
    */
@@ -110,6 +129,11 @@ public class OzoneManagerStarter extends GenericCli {
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
         OzoneManager.class, originalArgs, LOG);
+  }
+
+  @Override
+  public ReconfigurationTaskStatus getReconfigurationStatus() throws IOException {
+    return null;
   }
 
   /**

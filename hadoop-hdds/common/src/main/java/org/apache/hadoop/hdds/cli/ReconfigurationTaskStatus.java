@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.cli;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
+import org.apache.hadoop.hdds.cli.ReconfigurationUtil.PropertyChange;
 
 import java.util.Map;
 import java.util.Optional;

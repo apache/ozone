@@ -31,9 +31,6 @@ import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.conf.Reconfigurable;
-import org.apache.hadoop.conf.ReconfigurationException;
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
-import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -64,11 +61,11 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
   @Option(names = {"-conf"})
   private String configurationPath;
 
-  @Option(names = {"-start"})
-  private boolean reconfigStart;
+  @Option(names = {"--start"})
+  private String reconfigStart;
 
-  @Option(names = {"-status"})
-  private String reconfigStatus;
+//  @Option(names = {"-status"})
+//  private String reconfigStatus;
 
   private final CommandLine cmd;
 
@@ -81,6 +78,8 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
 
   // Use for testing purpose.
   private ReconfigurationUtil reconfigurationUtil = new ReconfigurationUtil();
+
+  private final Object monitor = new Object();
 
   /** Background thread to reload configuration. */
   private Thread reconfigThread = null;
@@ -97,6 +96,7 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
    */
   private long endTime = 0;
 
+  private static Configuration oldConf = getOldConf();
   /**
    * A map of <changed property, error message>. If error message is present,
    * it contains the messages about the error occurred when applies the particular
@@ -178,7 +178,7 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
   }
 
   public boolean startReconfiguration() throws IOException {
-    return reconfigStart;
+    return true;
   }
 
   @VisibleForTesting
@@ -204,7 +204,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
     // See {@link ReconfigurationServlet#applyChanges}
     public void run() {
       LOG.info("Starting reconfiguration task.");
-      final Configuration oldConf = parent.getConf();
       final Configuration newConf = parent.getNewConf();
       final Collection<ReconfigurationUtil.PropertyChange> changes =
           parent.getChangedProperties(newConf, oldConf);
@@ -255,29 +254,38 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
    * Start a reconfiguration task to reload configuration in background.
    */
   public void startReconfigurationTask() throws IOException {
-    synchronized (reconfigLock) {
-      if (!shouldRun) {
-        String errorMessage = "The server is stopped.";
-        LOG.warn(errorMessage);
-        throw new IOException(errorMessage);
+    while(true) {
+      synchronized (reconfigLock) {
+        if (!shouldRun) {
+          String errorMessage = "The server is stopped.";
+          LOG.warn(errorMessage);
+          throw new IOException(errorMessage);
+        }
+        if (reconfigThread != null) {
+          String errorMessage = "Another reconfiguration task is running.";
+          LOG.warn(errorMessage);
+          // throw new IOException(errorMessage);
+        }
+        reconfigThread = new GenericCli.ReconfigurationThread(this);
+        reconfigThread.setDaemon(true);
+        reconfigThread.setName("Reconfiguration Task");
+        reconfigThread.start();
+        startTime = Time.now();
       }
-      if (reconfigThread != null) {
-        String errorMessage = "Another reconfiguration task is running.";
-        LOG.warn(errorMessage);
-        throw new IOException(errorMessage);
+      try {
+        synchronized (monitor) {
+          monitor.wait(6000);
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       }
-      reconfigThread = new GenericCli.ReconfigurationThread(this);
-      reconfigThread.setDaemon(true);
-      reconfigThread.setName("Reconfiguration Task");
-      reconfigThread.start();
-      startTime = Time.now();
     }
   }
 
-  public org.apache.hadoop.conf.ReconfigurationTaskStatus getReconfigurationTaskStatus() {
+  public ReconfigurationTaskStatus getReconfigurationTaskStatus() {
     synchronized (reconfigLock) {
       if (reconfigThread != null) {
-        return new org.apache.hadoop.conf.ReconfigurationTaskStatus(startTime, 0, null);
+        return new ReconfigurationTaskStatus(startTime, 0, null);
       }
       return new ReconfigurationTaskStatus(startTime, endTime, status);
     }
@@ -306,24 +314,24 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
     return reconfigurationUtil.parseChangedProperties(newConf, oldConf);
   }
 
-  @Override
-  public void reconfigureProperty(String property, String newVal) throws ReconfigurationException {
-    if (isPropertyReconfigurable(property)) {
-      LOG.info("changing property " + property + " to " + newVal);
-      synchronized(getConf()) {
-        getConf().get(property);
-        String effectiveValue = reconfigurePropertyImpl(property, newVal);
-        if (newVal != null) {
-          getConf().set(property, effectiveValue);
-        } else {
-          getConf().unset(property);
-        }
-      }
-    } else {
-      throw new ReconfigurationException(property, newVal,
-          getConf().get(property));
-    }
-  }
+//  @Override
+//  public void reconfigureProperty(String property, String newVal) throws ReconfigurationException{
+//    if (isPropertyReconfigurable(property)) {
+//      LOG.info("changing property " + property + " to " + newVal);
+//      synchronized(getConf()) {
+//        getConf().get(property);
+//        String effectiveValue = reconfigurePropertyImpl(property, newVal);
+//        if (newVal != null) {
+//          getConf().set(property, effectiveValue);
+//        } else {
+//          getConf().unset(property);
+//        }
+//      }
+//    } else {
+//      throw new ReconfigurationException(property, newVal,
+//          getConf().get(property));
+//    }
+//  }
 
   @Override
   public boolean isPropertyReconfigurable(String property) {
@@ -337,6 +345,10 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
    * Create a new configuration.
    */
   protected abstract Configuration getNewConf();
+
+  protected static Configuration getOldConf() {
+    return new OzoneConfiguration();
+  }
 
   protected abstract String reconfigurePropertyImpl(
       String property, String newVal) throws ReconfigurationException;
