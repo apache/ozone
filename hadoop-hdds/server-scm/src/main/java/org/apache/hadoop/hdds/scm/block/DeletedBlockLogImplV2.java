@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
@@ -87,14 +88,17 @@ public class DeletedBlockLogImplV2
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
   private final SCMContext scmContext;
   private final SequenceIdGenerator sequenceIdGen;
+  private final ScmBlockDeletingServiceMetrics metrics;
 
+  @SuppressWarnings("parameternumber")
   public DeletedBlockLogImplV2(ConfigurationSource conf,
       ContainerManagerV2 containerManager,
       SCMRatisServer ratisServer,
       Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       DBTransactionBuffer dbTxBuffer,
       SCMContext scmContext,
-      SequenceIdGenerator sequenceIdGen) {
+      SequenceIdGenerator sequenceIdGen,
+      ScmBlockDeletingServiceMetrics metrics) {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;
@@ -116,6 +120,7 @@ public class DeletedBlockLogImplV2
         .build();
     this.scmContext = scmContext;
     this.sequenceIdGen = sequenceIdGen;
+    this.metrics = metrics;
   }
 
   @Override
@@ -203,9 +208,11 @@ public class DeletedBlockLogImplV2
       for (DeleteBlockTransactionResult transactionResult :
           transactionResults) {
         if (isTransactionFailed(transactionResult)) {
+          metrics.incrBlockDeletionTransactionFailure();
           continue;
         }
         try {
+          metrics.incrBlockDeletionTransactionSuccess();
           long txID = transactionResult.getTxID();
           // set of dns which have successfully committed transaction txId.
           dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
@@ -256,6 +263,7 @@ public class DeletedBlockLogImplV2
       }
       try {
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
+        metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
       } catch (IOException e) {
         LOG.warn("Could not commit delete block transactions: "
             + txIDsToBeDeleted, e);
@@ -347,6 +355,7 @@ public class DeletedBlockLogImplV2
       }
 
       deletedBlockLogStateManager.addTransactionsToDB(txsToBeAdded);
+      metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
     } finally {
       lock.unlock();
     }
@@ -409,6 +418,7 @@ public class DeletedBlockLogImplV2
         }
 
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
+        metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
       }
       return transactions;
     } finally {
@@ -424,9 +434,18 @@ public class DeletedBlockLogImplV2
       return;
     }
 
-    ContainerBlocksDeletionACKProto ackProto =
-        deleteBlockStatus.getCmdStatus().getBlockDeletionAck();
-    commitTransactions(ackProto.getResultsList(),
-        UUID.fromString(ackProto.getDnId()));
+    CommandStatus.Status status = deleteBlockStatus.getCmdStatus().getStatus();
+    if (status == CommandStatus.Status.EXECUTED) {
+      ContainerBlocksDeletionACKProto ackProto =
+          deleteBlockStatus.getCmdStatus().getBlockDeletionAck();
+      commitTransactions(ackProto.getResultsList(),
+          UUID.fromString(ackProto.getDnId()));
+      metrics.incrBlockDeletionCommandSuccess();
+    } else if (status == CommandStatus.Status.FAILED){
+      metrics.incrBlockDeletionCommandFailure();
+    } else {
+      LOG.error("Delete Block Command is not executed yet.");
+      return;
+    }
   }
 }
