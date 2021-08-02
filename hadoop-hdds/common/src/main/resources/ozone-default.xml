@@ -848,7 +848,7 @@
     <value>false</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>Disallows same set of datanodes to participate in multiple
-      pipelines when set top true. Default is set to false.
+      pipelines when set to true. Default is set to false.
     </description>
   </property>
   <property>

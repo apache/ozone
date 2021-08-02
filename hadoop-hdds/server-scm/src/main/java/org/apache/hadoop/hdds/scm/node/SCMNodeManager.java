@@ -66,6 +66,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -894,11 +895,11 @@ public class SCMNodeManager implements NodeManager {
     Preconditions.checkNotNull(dn);
     Set<PipelineID> pipelines =
         nodeStateManager.getPipelineByDnID(dn.getUuid());
+    PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
     if (!pipelines.isEmpty()) {
       pipelines.forEach(id -> {
         try {
-          Pipeline pipeline =
-              scmContext.getScm().getPipelineManager().getPipeline(id);
+          Pipeline pipeline = pipelineManager.getPipeline(id);
           List<DatanodeDetails> peers = pipeline.getNodes();
           dns.addAll(peers);
         } catch (PipelineNotFoundException pnfe) {

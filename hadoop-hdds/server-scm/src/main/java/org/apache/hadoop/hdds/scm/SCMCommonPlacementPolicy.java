@@ -51,6 +51,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   private final NodeManager nodeManager;
   private final Random rand;
   private final ConfigurationSource conf;
+  private final boolean shouldRemovePeers;
 
   /**
    * Return for replication factor 1 containers where the placement policy
@@ -74,6 +75,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     this.nodeManager = nodeManager;
     this.rand = new Random();
     this.conf = conf;
+    this.shouldRemovePeers = ScmUtils.shouldRemovePeers(conf);
   }
 
   /**
@@ -322,7 +324,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    */
   public void removePeers(DatanodeDetails dn,
       List<DatanodeDetails> healthyList) {
-    if (ScmUtils.shouldRemovePeers(conf)) {
+    if (shouldRemovePeers) {
       healthyList.removeAll(nodeManager.getPeerList(dn));
     }
   }
