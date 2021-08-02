@@ -2807,4 +2807,21 @@
       will not be allocated a pipeline or container replica.
     </description>
   </property>
+
+  <property>
+    <name>ozone.s3g.kerberos.keytab.file</name>
+    <value>/etc/security/keytabs/s3g.keytab</value>
+    <tag>OZONE, SECURITY, KERBEROS, S3GATEWAY</tag>
+    <description> The keytab file used by S3Gateway daemon to login as its
+      service principal. The principal name is configured with
+      ozone.s3g.kerberos.principal.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.kerberos.principal</name>
+    <value>s3g/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, S3GATEWAY</tag>
+    <description>The S3Gateway service principal.
+      Ex: s3g/_HOST@REALM.COM</description>
+  </property>
 </configuration>
