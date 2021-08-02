@@ -46,7 +46,7 @@ public class ScmHAFinalizeUpgradeActionDatanode
 
   @Override
   public void execute(DatanodeStateMachine dsm) throws Exception {
-    LOG.info("Upgrading Datanode container layout for SCM HA support.");
+    LOG.info("Upgrading Datanode volume layout for SCM HA support.");
     String clusterID = dsm.getLayoutStorage().getClusterID();
 
     for (StorageVolume volume:
@@ -74,11 +74,11 @@ public class ScmHAFinalizeUpgradeActionDatanode
         // If the one directory is not the cluster ID directory, assume it is
         // the old SCM ID directory.
         File scmIDDir = storageDirs[0];
-        LOG.info("Creating symlink {} -> {} as part of SCM HA " +
-            "finalization for datanode.", clusterIDDir.getAbsolutePath(),
-            scmIDDir.getAbsolutePath());
         Path relativeScmIDDir =
             hddsVolumeDir.toPath().relativize(scmIDDir.toPath());
+        LOG.info("Creating symlink {} -> {} as part of SCM HA " +
+                "finalization for datanode.", clusterIDDir.getAbsolutePath(),
+            relativeScmIDDir);
         Files.createSymbolicLink(clusterIDDir.toPath(), relativeScmIDDir);
       } else {
         LOG.info("Volume already contains cluster ID directory {}. No " +

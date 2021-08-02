@@ -48,8 +48,7 @@ public final class VersionedDatanodeFeatures {
     // version manager can be null for testing. Use the latest version in
     // this case.
     return versionManager == null ||
-        versionManager.getMetadataLayoutVersion() >=
-            layoutFeature.layoutVersion();
+        versionManager.isAllowed(layoutFeature);
   }
 
   /**

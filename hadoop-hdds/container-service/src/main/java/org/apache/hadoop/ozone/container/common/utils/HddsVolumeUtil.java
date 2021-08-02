@@ -209,8 +209,8 @@ public final class HddsVolumeUtil {
       // The one file is the version file.
       // So we create cluster ID directory, or SCM ID directory if
       // pre-finalized for SCM HA.
-      // Either the SCM ID or cluster ID that will be used in naming the
-      // volume's subdirectory, depending on the layout version.
+      // Either the SCM ID or cluster ID will be used in naming the
+      // volume's subdirectory, depending on the datanode's layout version.
       String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
           scmId, clusterId);
       File idDir = new File(hddsRoot, id);

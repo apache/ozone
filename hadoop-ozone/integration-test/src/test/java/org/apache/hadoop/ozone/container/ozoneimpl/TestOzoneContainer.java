@@ -85,7 +85,7 @@ public class TestOzoneContainer {
       Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
       Mockito.when(context.getParent()).thenReturn(dsm);
       container = new OzoneContainer(datanodeDetails, conf, context, null);
-      //Set scmId and clusterId and manually start ozone container.
+      //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);

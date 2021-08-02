@@ -32,11 +32,7 @@ run_test_scripts ${tests} || RESULT=$?
 RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
 # Upgrade tests to be run.
-# Run all upgrades even if one fails.
-# Any failure will save a failing return code to $RESULT.
-set +e
 run_test non-rolling-upgrade 1.1.0 1.2.0
-set -e
 
 generate_report "upgrade" "$ALL_RESULT_DIR"
 

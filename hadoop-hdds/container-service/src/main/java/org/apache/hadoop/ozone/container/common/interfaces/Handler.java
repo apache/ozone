@@ -49,7 +49,6 @@ public abstract class Handler {
   protected final ContainerSet containerSet;
   protected final VolumeSet volumeSet;
   protected String clusterId;
-  protected String scmId;
   protected final ContainerMetrics metrics;
   protected String datanodeId;
   private Consumer<ContainerReplicaProto> icrSender;
@@ -190,4 +189,5 @@ public abstract class Handler {
   public void setClusterID(String clusterID) {
     this.clusterId = clusterID;
   }
+
 }

@@ -86,7 +86,7 @@ public class DataNodeUpgradeFinalizer extends
   public void finalizeUpgrade(DatanodeStateMachine dsm)
       throws UpgradeException {
     super.finalizeUpgrade(dsm::getLayoutStorage);
-    // TODO: Fix upgrade action calling.
+    // TODO: Fix upgrade action calling in HDDS-5503.
     try {
       new ScmHAFinalizeUpgradeActionDatanode().execute(dsm);
     } catch (Exception ex) {

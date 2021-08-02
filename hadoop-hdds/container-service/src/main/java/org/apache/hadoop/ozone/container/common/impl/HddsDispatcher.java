@@ -89,7 +89,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
       ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
   private String clusterId;
-  private String scmId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
 
