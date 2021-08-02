@@ -173,7 +173,7 @@ jobs:
       - name: Execute tests
         run: |
           cd hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          hadoop-ozone/dev-support/checks/acceptance.sh
+          ./hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
@@ -205,7 +205,7 @@ jobs:
       - name: Execute tests
         run: |
           cd hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          hadoop-ozone/dev-support/checks/kubernetes.sh
+          ./hadoop-ozone/dev-support/checks/kubernetes.sh
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
