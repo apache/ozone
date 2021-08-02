@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A factory to create container placement instance based on configuration
- * property {@link ScmConfigKeys#OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY}.
+ * property {@link ScmConfigKeys#OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY} and
+ * property {@link ScmConfigKeys#OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY}.
  */
 public final class ContainerPlacementPolicyFactory {
   private static final Logger LOG =
@@ -52,6 +53,28 @@ public final class ContainerPlacementPolicyFactory {
         .getClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
             OZONE_SCM_CONTAINER_PLACEMENT_IMPL_DEFAULT,
             PlacementPolicy.class);
+    return getPolicyInternal(placementClass, conf, nodeManager, clusterMap,
+        fallback, metrics);
+  }
+
+  public static PlacementPolicy getECPolicy(
+      ConfigurationSource conf, final NodeManager nodeManager,
+      NetworkTopology clusterMap, final boolean fallback,
+      SCMContainerPlacementMetrics metrics) throws SCMException{
+    // TODO: Change default placement policy for EC
+    final Class<? extends PlacementPolicy> placementClass = conf
+        .getClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,
+            OZONE_SCM_CONTAINER_PLACEMENT_IMPL_DEFAULT,
+            PlacementPolicy.class);
+    return getPolicyInternal(placementClass, conf, nodeManager, clusterMap,
+        fallback, metrics);
+  }
+
+  public static PlacementPolicy getPolicyInternal(
+      Class<? extends PlacementPolicy> placementClass,
+      ConfigurationSource conf, final NodeManager nodeManager,
+      NetworkTopology clusterMap, final boolean fallback,
+      SCMContainerPlacementMetrics metrics) throws SCMException{
     Constructor<? extends PlacementPolicy> constructor;
     try {
       constructor = placementClass.getDeclaredConstructor(NodeManager.class,

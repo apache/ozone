@@ -821,6 +821,20 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.placement.ec.impl</name>
+    <value>
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom
+    </value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      The full name of class which implements
+      org.apache.hadoop.hdds.scm.PlacementPolicy.
+      The class decides which datanode will be used to host the container replica in EC mode. If not set,
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      value.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
