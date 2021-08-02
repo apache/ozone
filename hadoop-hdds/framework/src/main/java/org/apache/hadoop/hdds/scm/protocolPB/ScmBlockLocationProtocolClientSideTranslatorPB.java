@@ -174,6 +174,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     case EC:
       requestBuilder.setEcReplicationConfig(
           ((ECReplicationConfig)replicationConfig).toProto());
+      break;
     default:
       throw new IllegalArgumentException(
           "Unsupported replication type " + replicationConfig
