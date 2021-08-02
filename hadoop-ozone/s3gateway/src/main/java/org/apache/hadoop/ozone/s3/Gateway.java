@@ -107,7 +107,7 @@ public class Gateway extends GenericCli {
             OZONE_S3G_KERBEROS_PRINCIPAL_KEY);
       } else {
         throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
-            conf) + " authentication method not supported. S3 user login "
+            conf) + " authentication method not supported. S3G user login "
             + "failed.");
       }
       LOG.info("S3Gateway login successful.");
