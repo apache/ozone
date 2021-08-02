@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -84,12 +86,10 @@ public final class VersionedDatanodeFeatures {
    * directory is already present, no changes are made.
    */
   public static class ScmHA {
-    private static String scmID;
-
-    public static void initialize(String scmId) {
-      scmID = scmId;
-    }
-
+    /**
+     * Choose whether to use cluster ID or SCM ID based on the format of the
+     * volume and SCM HA finalization status.
+     */
     public static String chooseContainerPathID(StorageVolume volume,
         String clusterID) {
       File clusterIDDir = new File(volume.getStorageDir(), clusterID);
@@ -99,7 +99,28 @@ public final class VersionedDatanodeFeatures {
       if (isFinalized(HDDSLayoutFeature.SCM_HA) || clusterIDDir.exists()) {
         return clusterID;
       } else {
-        Preconditions.checkNotNull(scmID, "Not yet initialized with scmID");
+        File[] subdirs = volume.getStorageDir().listFiles(File::isDirectory);
+        Preconditions.checkNotNull(subdirs, "Failed to read volume " +
+            volume.getStorageDir());
+        Preconditions.checkArgument(subdirs.length == 1, "Invalid volume " +
+            "directory " + volume.getStorageDir() +
+            " has more than one directory before SCM HA finalization.");
+        return subdirs[0].getName();
+      }
+    }
+
+    /**
+     * Choose whether to use SCM ID or cluster ID based on SCM HA
+     * finalization status and SCM HA configuration.
+     */
+    public static String chooseContainerPathID(ConfigurationSource conf,
+        String scmID, String clusterID) {
+      boolean scmHAEnabled =
+          conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+      if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled){
+        return clusterID;
+      } else {
         return scmID;
       }
     }

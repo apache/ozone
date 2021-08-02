@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
@@ -180,17 +181,12 @@ public final class HddsVolumeUtil {
    * @param logger
    * @return true - if volume is in consistent state, otherwise false.
    */
-  public static boolean checkVolume(HddsVolume hddsVolume, String
-      clusterId, Logger logger) throws IOException {
+  public static boolean checkVolume(HddsVolume hddsVolume, String scmId,
+      String clusterId, ConfigurationSource conf, Logger logger)
+      throws IOException {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
     File clusterDir = new File(hddsRoot, clusterId);
-    // Either the SCM ID or cluster ID that will be used in naming the
-    // volume's subdirectory, depending on the layout version.
-    String idDir =
-        VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(hddsVolume,
-            clusterId);
-    File newIDDir = new File(hddsRoot, idDir);
     String errorPrefix = "Volume " + volumeRoot + " is in an inconsistent " +
         "state.";
 
@@ -213,9 +209,13 @@ public final class HddsVolumeUtil {
       // The one file is the version file.
       // So we create cluster ID directory, or SCM ID directory if
       // pre-finalized for SCM HA.
-      if (!newIDDir.mkdir()) {
-        logger.error("Unable to create ID directory {} for datanode.",
-            newIDDir);
+      // Either the SCM ID or cluster ID that will be used in naming the
+      // volume's subdirectory, depending on the layout version.
+      String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
+          scmId, clusterId);
+      File idDir = new File(hddsRoot, id);
+      if (!idDir.mkdir()) {
+        logger.error("Unable to create ID directory {} for datanode.", idDir);
         return false;
       }
       return true;
