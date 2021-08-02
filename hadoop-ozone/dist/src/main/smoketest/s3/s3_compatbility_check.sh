@@ -23,7 +23,7 @@ set -e
 
 # To run this script
 #    mvn clean install -DskipShade -DskipTests
-#    cd hadoop-ozone/dist/target/ozone-1.2.0-SNAPSHOT/smoketest/s3/
+#    cd hadoop-ozone/dist/target/ozone-*/smoketest/s3/
 #    python3 -m venv s3env
 #    source s3env/bin/activate
 #    pip3 install awscli==1.18.69
