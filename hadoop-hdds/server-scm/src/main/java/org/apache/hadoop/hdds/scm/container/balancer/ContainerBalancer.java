@@ -212,6 +212,10 @@ public class ContainerBalancer {
       LOG.error("Container Balancer cannot operate while SCM is in Safe Mode.");
       return false;
     }
+    if (!scmContext.isLeader()) {
+      LOG.warn("Current SCM is not the leader.");
+      return false;
+    }
     // sorted list in order from most to least used
     List<DatanodeUsageInfo> datanodeUsageInfos =
         nodeManager.getMostOrLeastUsedDatanodes(true);
