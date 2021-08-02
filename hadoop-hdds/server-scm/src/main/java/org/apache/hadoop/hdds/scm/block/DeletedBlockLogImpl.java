@@ -70,11 +70,11 @@ import org.slf4j.LoggerFactory;
  * equally same chance to be retrieved which only depends on the nature
  * order of the transaction ID.
  */
-public class DeletedBlockLogImplV2
+public class DeletedBlockLogImpl
     implements DeletedBlockLog, EventHandler<DeleteBlockStatus> {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(DeletedBlockLogImplV2.class);
+      LoggerFactory.getLogger(DeletedBlockLogImpl.class);
 
   private final int maxRetry;
   private final ContainerManagerV2 containerManager;
@@ -91,7 +91,7 @@ public class DeletedBlockLogImplV2
   private final ScmBlockDeletingServiceMetrics metrics;
 
   @SuppressWarnings("parameternumber")
-  public DeletedBlockLogImplV2(ConfigurationSource conf,
+  public DeletedBlockLogImpl(ConfigurationSource conf,
       ContainerManagerV2 containerManager,
       SCMRatisServer ratisServer,
       Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
