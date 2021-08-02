@@ -87,7 +87,7 @@ public class ContainerBalancerSelectionCriteria {
   public NavigableSet<ContainerID> getCandidateContainers(
       DatanodeDetails node) {
     NavigableSet<ContainerID> containerIDSet =
-        new TreeSet<>(orderContainersByUsedBytes());
+        new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
       containerIDSet.addAll(nodeManager.getContainers(node));
     } catch (NodeNotFoundException e) {

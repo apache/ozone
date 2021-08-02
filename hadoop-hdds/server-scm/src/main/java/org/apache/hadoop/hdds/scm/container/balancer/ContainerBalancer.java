@@ -70,9 +70,10 @@ public class ContainerBalancer {
   private OzoneConfiguration ozoneConfiguration;
   private final SCMContext scmContext;
   private double threshold;
-  private int maxDatanodesToInvolvePerIteration;
+  private int totalNodesInCluster;
+  private double maxDatanodesToInvolvePerIteration;
   private long maxSizeToMovePerIteration;
-  private int countDatanodesBalancedPerIteration;
+  private int countDatanodesInvolvedPerIteration;
   private long sizeMovedPerIteration;
   private int idleIteration;
   private List<DatanodeUsageInfo> unBalancedNodes;
@@ -83,7 +84,6 @@ public class ContainerBalancer {
   private ContainerBalancerMetrics metrics;
   private long clusterCapacity;
   private long clusterUsed;
-  private long clusterRemaining;
   private double clusterAvgUtilisation;
   private final AtomicBoolean balancerRunning = new AtomicBoolean(false);
   private Thread currentBalancingThread;
@@ -120,7 +120,7 @@ public class ContainerBalancer {
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
     this.ozoneConfiguration = ozoneConfiguration;
-    this.config = new ContainerBalancerConfiguration();
+    this.config = new ContainerBalancerConfiguration(ozoneConfiguration);
     this.metrics = new ContainerBalancerMetrics();
     this.scmContext = scmContext;
     this.placementPolicy = placementPolicy;
@@ -135,32 +135,25 @@ public class ContainerBalancer {
    *
    * @param balancerConfiguration Configuration values.
    */
-  public boolean start(
-      ContainerBalancerConfiguration balancerConfiguration) {
-    lock.lock();
-    try {
-      if (!balancerRunning.compareAndSet(false, true)) {
-        LOG.error("Container Balancer is already running.");
-        return false;
-      }
-
-      ozoneConfiguration = new OzoneConfiguration();
-      this.config = balancerConfiguration;
-      LOG.info("Starting Container Balancer...{}", this);
-
-      //we should start a new balancer thread async
-      //and response to cli as soon as possible
-
-
-      //TODO: this is a temporary implementation
-      //modify this later
-      currentBalancingThread = new Thread(this::balance);
-      currentBalancingThread.start();
-      ////////////////////////
-    } finally {
-      lock.unlock();
+  public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
+    if (!balancerRunning.compareAndSet(false, true)) {
+      LOG.error("Container Balancer is already running.");
+      return false;
     }
 
+    ozoneConfiguration = new OzoneConfiguration();
+    this.config = balancerConfiguration;
+    LOG.info("Starting Container Balancer...{}", this);
+
+    //we should start a new balancer thread async
+    //and response to cli as soon as possible
+
+
+    //TODO: this is a temporary implementation
+    //modify this later
+    currentBalancingThread = new Thread(this::balance);
+    currentBalancingThread.start();
+    ////////////////////////
     return true;
   }
 
@@ -170,20 +163,41 @@ public class ContainerBalancer {
   private void balance() {
     this.idleIteration = config.getIdleIteration();
     for (int i = 0; i < idleIteration; i++) {
-      countDatanodesBalancedPerIteration = 0;
+      countDatanodesInvolvedPerIteration = 0;
       sizeMovedPerIteration = 0;
-
       this.threshold = config.getThreshold();
       this.maxDatanodesToInvolvePerIteration =
           config.getMaxDatanodesToInvolvePerIteration();
       this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
 
-      if (!initializeIteration() || !doIteration()) {
-        //balancer should be stopped immediately
-        break;
+      // stop balancing if iteration is not initialized
+      if (!initializeIteration()) {
+        stop();
+        return;
+      }
+      doIteration();
+      if (!isBalancerRunning()) {
+        return;
+      }
+
+      // wait for configured time before starting next iteration, unless
+      // this was the final iteration
+      if (i != idleIteration - 1) {
+        synchronized (this) {
+          try {
+            wait(config.getBalancingInterval().toMillis());
+          } catch (InterruptedException e) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Container Balancer was interrupted while " +
+                  "waiting for next iteration.", e);
+            }
+            stop();
+            return;
+          }
+        }
       }
     }
-    balancerRunning.compareAndSet(true, false);
+    stop();
   }
 
   /**
@@ -202,14 +216,16 @@ public class ContainerBalancer {
     List<DatanodeUsageInfo> datanodeUsageInfos =
         nodeManager.getMostOrLeastUsedDatanodes(true);
     if (datanodeUsageInfos.isEmpty()) {
-      LOG.info("Container Balancer could not retrieve nodes from Node " +
-          "Manager.");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Container Balancer could not retrieve nodes from Node " +
+            "Manager.");
+      }
       return false;
     }
 
+    this.totalNodesInCluster = datanodeUsageInfos.size();
     this.clusterCapacity = 0L;
     this.clusterUsed = 0L;
-    this.clusterRemaining = 0L;
 
     this.selectedContainers = new HashSet<>();
     this.overUtilizedNodes = new ArrayList<>();
@@ -218,7 +234,10 @@ public class ContainerBalancer {
     this.unBalancedNodes = new ArrayList<>();
 
     clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
-    LOG.info("Average utilization of the cluster is {}", clusterAvgUtilisation);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Average utilization of the cluster is {}",
+          clusterAvgUtilisation);
+    }
 
     // under utilized nodes have utilization(that is, used / capacity) less
     // than lower limit
@@ -228,8 +247,10 @@ public class ContainerBalancer {
     // than upper limit
     double upperLimit = clusterAvgUtilisation + threshold;
 
-    LOG.info("Lower limit for utilization is {} and Upper limit for " +
-        "utilization is {}", lowerLimit, upperLimit);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Lower limit for utilization is {} and Upper limit for " +
+          "utilization is {}", lowerLimit, upperLimit);
+    }
 
     long countDatanodesToBalance = 0L;
     double overLoadedBytes = 0D, underLoadedBytes = 0D;
@@ -237,8 +258,11 @@ public class ContainerBalancer {
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
       double utilization = calculateUtilization(datanodeUsageInfo);
-      LOG.info("Utilization for node {} is {}",
-          datanodeUsageInfo.getDatanodeDetails().getUuidString(), utilization);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Utilization for node {} is {}",
+            datanodeUsageInfo.getDatanodeDetails().getUuidString(),
+            utilization);
+      }
       if (utilization > upperLimit) {
         overUtilizedNodes.add(datanodeUsageInfo);
         countDatanodesToBalance += 1;
@@ -278,8 +302,9 @@ public class ContainerBalancer {
       return false;
     }
 
-    LOG.info("Container Balancer has identified Datanodes that need to be" +
-        " balanced.");
+    LOG.info("Container Balancer has identified {} Over-Utilized and {} " +
+            "Under-Utilized Datanodes that need to be balanced.",
+        overUtilizedNodes.size(), underUtilizedNodes.size());
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager);
@@ -304,7 +329,7 @@ public class ContainerBalancer {
     return true;
   }
 
-  private boolean doIteration() {
+  private IterationResult doIteration() {
     List<DatanodeDetails> potentialTargets = getPotentialTargets();
     Set<DatanodeDetails> selectedTargets =
         new HashSet<>(potentialTargets.size());
@@ -313,10 +338,11 @@ public class ContainerBalancer {
     // match each overUtilized node with a target
     for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
       DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
-      if (!checkConditionsForBalancing()) {
-        LOG.info("Conditions for balancing failed. Stopping Container " +
-            "Balancer...");
-        return false;
+      IterationResult result = checkConditionsForBalancing();
+      if (result != null) {
+        LOG.info("Conditions for balancing failed. Exiting current " +
+            "iteration...");
+        return result;
       }
 
       ContainerMoveSelection moveSelection =
@@ -344,10 +370,11 @@ public class ContainerBalancer {
 
       for (DatanodeUsageInfo datanodeUsageInfo : withinThresholdUtilizedNodes) {
         DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
-        if (!checkConditionsForBalancing()) {
-          LOG.info("Conditions for balancing failed. Stopping Container " +
-              "Balancer...");
-          return false;
+        IterationResult result = checkConditionsForBalancing();
+        if (result != null) {
+          LOG.info("Conditions for balancing failed. Exiting current " +
+              "iteration...");
+          return result;
         }
 
         ContainerMoveSelection moveSelection =
@@ -370,6 +397,7 @@ public class ContainerBalancer {
       }
     }
 
+    // check move results
     for (Map.Entry<ContainerMoveSelection,
             CompletableFuture<ReplicationManager.MoveResult>>
         futureEntry : moveSelectionToFutureMap.entrySet()) {
@@ -377,8 +405,8 @@ public class ContainerBalancer {
       CompletableFuture<ReplicationManager.MoveResult> future =
           futureEntry.getValue();
       try {
-        ReplicationManager.MoveResult result =
-            future.get(config.getMoveTimeout().toMinutes(), TimeUnit.MINUTES);
+        ReplicationManager.MoveResult result = future.get(
+            config.getMoveTimeout().toMillis(), TimeUnit.MILLISECONDS);
         if (result == ReplicationManager.MoveResult.COMPLETED) {
           metrics.incrementMovedContainersNum(1);
           //TODO update metrics with size moved in this iteration
@@ -394,7 +422,7 @@ public class ContainerBalancer {
             moveSelection.getContainerID(), e);
       }
     }
-    return true;
+    return IterationResult.ITERATION_COMPLETED;
   }
 
   /**
@@ -438,16 +466,19 @@ public class ContainerBalancer {
    * Checks if limits maxDatanodesToInvolvePerIteration and
    * maxSizeToMovePerIteration have not been hit.
    *
-   * @return true if conditions pass and balancing can continue, else false
+   * @return {@link IterationResult#MAX_DATANODES_TO_INVOLVE_REACHED} if reached
+   * max datanodes to involve limit,
+   * {@link IterationResult#MAX_SIZE_TO_MOVE_REACHED} if reached max size to
+   * move limit, or null if balancing can continue
    */
-  private boolean checkConditionsForBalancing() {
-    if (countDatanodesBalancedPerIteration + 2 >
-        maxDatanodesToInvolvePerIteration) {
-      LOG.info("Hit max datanodes to balance limit. {} datanodes have already" +
-              " been balanced and the limit is {}.",
-          countDatanodesBalancedPerIteration,
-          maxDatanodesToInvolvePerIteration);
-      return false;
+  private IterationResult checkConditionsForBalancing() {
+    if (countDatanodesInvolvedPerIteration + 2 >
+        maxDatanodesToInvolvePerIteration * totalNodesInCluster) {
+      LOG.info("Hit max datanodes to involve limit. {} datanodes have already" +
+              " been involved and the limit is {}.",
+          countDatanodesInvolvedPerIteration,
+          maxDatanodesToInvolvePerIteration * totalNodesInCluster);
+      return IterationResult.MAX_DATANODES_TO_INVOLVE_REACHED;
     }
     if (sizeMovedPerIteration + (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -456,9 +487,9 @@ public class ContainerBalancer {
       LOG.info("Hit max size to move limit. {} bytes have already been moved " +
           "and the limit is {} bytes.", sizeMovedPerIteration,
           maxSizeToMovePerIteration);
-      return false;
+      return IterationResult.MAX_SIZE_TO_MOVE_REACHED;
     }
-    return true;
+    return null;
   }
 
   /**
@@ -518,7 +549,7 @@ public class ContainerBalancer {
       Collection<DatanodeDetails> potentialTargets,
       Set<DatanodeDetails> selectedTargets,
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
-    countDatanodesBalancedPerIteration += 2;
+    countDatanodesInvolvedPerIteration += 2;
     incSizeSelectedForMoving(source, moveSelection);
     sourceToTargetMap.put(source, moveSelection);
     selectedTargets.add(moveSelection.getTargetNode());
@@ -561,7 +592,6 @@ public class ContainerBalancer {
     }
     clusterCapacity = aggregatedStats.getCapacity().get();
     clusterUsed = aggregatedStats.getScmUsed().get();
-    clusterRemaining = aggregatedStats.getRemaining().get();
 
     return clusterUsed / (double) clusterCapacity;
   }
@@ -632,8 +662,7 @@ public class ContainerBalancer {
    */
   private void incSizeSelectedForMoving(DatanodeDetails source,
                                         ContainerMoveSelection moveSelection) {
-    DatanodeDetails target =
-        moveSelection.getTargetNode();
+    DatanodeDetails target = moveSelection.getTargetNode();
     ContainerInfo container;
     try {
       container =
@@ -648,20 +677,10 @@ public class ContainerBalancer {
     sizeMovedPerIteration += size;
 
     // update sizeLeavingNode map with the recent moveSelection
-    if (sizeLeavingNode.containsKey(source)) {
-      sizeLeavingNode
-          .put(source, sizeLeavingNode.get(source) + size);
-    } else {
-      sizeLeavingNode.put(source, size);
-    }
+    sizeLeavingNode.put(source, sizeLeavingNode.get(source) + size);
 
     // update sizeEnteringNode map with the recent moveSelection
-    if (sizeEnteringNode.containsKey(target)) {
-      sizeEnteringNode
-          .put(target, sizeEnteringNode.get(target) + size);
-    } else {
-      sizeEnteringNode.put(target, size);
-    }
+    sizeEnteringNode.put(target, sizeEnteringNode.get(target) + size);
   }
 
   /**
@@ -771,11 +790,28 @@ public class ContainerBalancer {
     return balancerRunning.get();
   }
 
+  int getCountDatanodesInvolvedPerIteration() {
+    return countDatanodesInvolvedPerIteration;
+  }
+
+  long getSizeMovedPerIteration() {
+    return sizeMovedPerIteration;
+  }
+
   @Override
   public String toString() {
     String status = String.format("%nContainer Balancer status:%n" +
         "%-30s %s%n" +
         "%-30s %b%n", "Key", "Value", "Running", balancerRunning);
     return status + config.toString();
+  }
+
+  /**
+   * The result of {@link ContainerBalancer#doIteration()}.
+   */
+  enum IterationResult {
+    ITERATION_COMPLETED,
+    MAX_DATANODES_TO_INVOLVE_REACHED,
+    MAX_SIZE_TO_MOVE_REACHED
   }
 }

@@ -708,29 +708,34 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public boolean startContainerBalancer(Optional<Double> threshold,
-                  Optional<Integer> idleiterations,
-                  Optional<Integer> maxDatanodesToBalance,
-                  Optional<Long> maxSizeToMoveInGB) throws IOException{
+  public boolean startContainerBalancer(
+      Optional<Double> threshold, Optional<Integer> idleiterations,
+      Optional<Double> maxDatanodesToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
-    ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
+    ContainerBalancerConfiguration cbc =
+        new ContainerBalancerConfiguration(scm.getConfiguration());
     if (threshold.isPresent()) {
       double tsd = threshold.get();
       Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
           "threshold should to be specified in range [0.0, 1.0).");
       cbc.setThreshold(tsd);
     }
-    if (maxSizeToMoveInGB.isPresent()) {
-      long mstm = maxSizeToMoveInGB.get();
+    if (maxSizeToMovePerIterationInGB.isPresent()) {
+      long mstm = maxSizeToMovePerIterationInGB.get();
       Preconditions.checkState(mstm > 0,
-          "maxSizeToMoveInGB must be positive.");
+          "maxSizeToMovePerIterationInGB must be positive.");
       cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
     }
-    if (maxDatanodesToBalance.isPresent()) {
-      int mdtb = maxDatanodesToBalance.get();
-      Preconditions.checkState(mdtb > 0,
-          "maxDatanodesToBalance must be positive.");
-      cbc.setMaxDatanodesToInvolvePerIteration(mdtb);
+    if (maxDatanodesToInvolvePerIteration.isPresent()) {
+      double mdti = maxDatanodesToInvolvePerIteration.get();
+      Preconditions.checkState(mdti >= 0.0,
+          "maxDatanodesToInvolvePerIteration must be greater than" +
+              " equal to zero.");
+      Preconditions.checkState(mdti <= 1,
+          "maxDatanodesToInvolvePerIteration must be lesser than" +
+              "equal to one.");
+      cbc.setMaxDatanodesToInvolvePerIteration(mdti);
     }
     if (idleiterations.isPresent()) {
       int idi = idleiterations.get();

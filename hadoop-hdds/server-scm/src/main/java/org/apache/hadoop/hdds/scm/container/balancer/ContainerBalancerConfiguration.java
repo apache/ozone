@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -41,6 +43,7 @@ import java.util.stream.Collectors;
 public final class ContainerBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
+  private OzoneConfiguration ozoneConfiguration;
 
   @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
       "0.1", tags = {ConfigTag.BALANCER},
@@ -51,11 +54,12 @@ public final class ContainerBalancerConfiguration {
           " of the entire cluster) no more than the threshold value.")
   private String threshold = "0.1";
 
-  @Config(key = "datanodes.involved.max.per.iteration", type = ConfigType.INT,
-      defaultValue = "5", tags = {ConfigTag.BALANCER}, description = "The " +
-      "maximum number of datanodes that should be involved in balancing in " +
-      "one iteration.")
-  private int maxDatanodesToInvolvePerIteration = 5;
+  @Config(key = "datanodes.involved.max.per.iteration", type = ConfigType.AUTO,
+      defaultValue = "0.2", tags = {ConfigTag.BALANCER}, description = "The " +
+      "ratio of maximum number of datanodes that should be involved in " +
+      "balancing in one iteration to the total number of healthy, in service " +
+      "nodes known to container balancer.")
+  private String maxDatanodesToInvolvePerIteration = "0.2";
 
   @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
       defaultValue = "10GB", tags = {ConfigTag.BALANCER},
@@ -90,6 +94,29 @@ public final class ContainerBalancerConfiguration {
       "The amount of time in minutes to allow a single container to move " +
           "from source to target.")
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
+
+  @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
+      defaultValue = "1h", timeUnit = TimeUnit.MINUTES, tags = {
+      ConfigTag.BALANCER}, description = "The interval period between each " +
+      "iteration of Container Balancer.")
+  private long balancingInterval;
+
+  private DUFactory.Conf duConf;
+
+  /**
+   * Create configuration with default values.
+   *
+   * @param ozoneConfiguration Ozone configuration
+   */
+  public ContainerBalancerConfiguration(
+      OzoneConfiguration ozoneConfiguration) {
+    this.ozoneConfiguration = ozoneConfiguration;
+
+    // balancing interval should be greater than DUFactory refresh period
+    duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
+    balancingInterval = duConf.getRefreshPeriod().toMillis() +
+        Duration.ofMinutes(10).toMillis();
+  }
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -137,24 +164,35 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the value of maximum number of datanodes that will be involved in
-   * balancing by Container Balancer in one iteration.
+   * Gets the ratio of maximum number of datanodes that will be involved in
+   * balancing by Container Balancer in one iteration to the total number of
+   * healthy, in-service nodes known to balancer.
    *
-   * @return maximum number of datanodes
+   * @return maximum datanodes to involve divided by total healthy,
+   * in-service nodes
    */
-  public int getMaxDatanodesToInvolvePerIteration() {
-    return maxDatanodesToInvolvePerIteration;
+  public double getMaxDatanodesToInvolvePerIteration() {
+    return Double.parseDouble(maxDatanodesToInvolvePerIteration);
   }
 
   /**
-   * Sets the value of maximum number of datanodes that will be involved in
-   * balancing by Container Balancer in one iteration.
+   * Sets the ratio of maximum number of datanodes that will be involved in
+   * balancing by Container Balancer in one iteration to the total number of
+   * healthy, in-service nodes known to balancer.
    *
-   * @param maxDatanodesToInvolvePerIteration maximum number of datanodes
+   * @param maxDatanodesToInvolvePerIteration number of datanodes to involve
+   *                                          divided by total number of
+   *                                          healthy, in service nodes
    */
   public void setMaxDatanodesToInvolvePerIteration(
-      int maxDatanodesToInvolvePerIteration) {
-    this.maxDatanodesToInvolvePerIteration = maxDatanodesToInvolvePerIteration;
+      double maxDatanodesToInvolvePerIteration) {
+    if (maxDatanodesToInvolvePerIteration < 0 ||
+        maxDatanodesToInvolvePerIteration > 1) {
+      throw new IllegalArgumentException("Max datanodes to involve must be a " +
+          "double greater than equal to zero and lesser than equal to one.");
+    }
+    this.maxDatanodesToInvolvePerIteration =
+        String.valueOf(maxDatanodesToInvolvePerIteration);
   }
 
   /**
@@ -197,9 +235,11 @@ public final class ContainerBalancerConfiguration {
     if (excludeContainers.isEmpty()) {
       return new HashSet<>();
     }
-    return Arrays.stream(excludeContainers.split(", |,"))
-        .map(s -> ContainerID.valueOf(Long.parseLong(s)))
-        .collect(Collectors.toSet());
+    return Arrays.stream(excludeContainers.split(","))
+        .map(s -> {
+          s = s.trim();
+          return ContainerID.valueOf(Long.parseLong(s));
+        }).collect(Collectors.toSet());
   }
 
   /**
@@ -219,15 +259,28 @@ public final class ContainerBalancerConfiguration {
     this.moveTimeout = duration.toMillis();
   }
 
+  public Duration getBalancingInterval() {
+    return Duration.ofMillis(balancingInterval);
+  }
+
+  public void setBalancingInterval(Duration balancingInterval) {
+    if (balancingInterval.toMillis() > duConf.getRefreshPeriod().toMillis()) {
+      this.balancingInterval = balancingInterval.toMillis();
+    } else {
+      LOG.warn("Balancing interval duration must be greater than du refresh " +
+          "period, {} milliseconds", duConf.getRefreshPeriod().toMillis());
+    }
+  }
+
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
-            "%-30s %s%n" +
-            "%-30s %s%n" +
-            "%-30s %d%n" +
-            "%-30s %dB%n", "Key", "Value", "Threshold",
-        threshold, "Max Datanodes to Involve",
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %dB%n", "Key", "Value", "Threshold",
+        threshold, "Max Datanodes to Involve per Iteration(ratio)",
         maxDatanodesToInvolvePerIteration,
-        "Max Size to Move", maxSizeToMovePerIteration);
+        "Max Size to Move per Iteration", maxSizeToMovePerIteration);
   }
 }
