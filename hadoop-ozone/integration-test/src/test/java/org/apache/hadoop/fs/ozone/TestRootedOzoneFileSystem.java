@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -108,16 +109,19 @@ public class TestRootedOzoneFileSystem {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true},
-        new Object[]{true, false},
-        new Object[]{false, true},
-        new Object[]{false, false});
+        new Object[]{true, true, true},
+        new Object[]{true, true, false},
+        new Object[]{true, false, false},
+        new Object[]{false, true, false},
+        new Object[]{false, false, false}
+    );
   }
 
   public TestRootedOzoneFileSystem(boolean setDefaultFs,
-      boolean enableOMRatis) {
+      boolean enableOMRatis, boolean isAclEnabled) {
     enabledFileSystemPaths = setDefaultFs;
     omRatisEnabled = enableOMRatis;
+    enableAcl = isAclEnabled;
   }
 
   public static FileSystem getFs() {
@@ -134,6 +138,7 @@ public class TestRootedOzoneFileSystem {
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
   private static boolean isBucketFSOptimized = false;
+  private static boolean enableAcl;
 
   private static OzoneConfiguration conf;
   private static MiniOzoneCluster cluster = null;
@@ -165,6 +170,7 @@ public class TestRootedOzoneFileSystem {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }
+    conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, enableAcl);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();

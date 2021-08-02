@@ -91,6 +91,7 @@ public class TestDeletedBlockLog {
   private SCMHADBTransactionBuffer scmHADBTransactionBuffer;
   private Map<Long, ContainerInfo> containers = new HashMap<>();
   private Map<Long, Set<ContainerReplica>> replicas = new HashMap<>();
+  private ScmBlockDeletingServiceMetrics metrics;
 
   @Before
   public void setup() throws Exception {
@@ -105,13 +106,15 @@ public class TestDeletedBlockLog {
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
         new MockSCMHADBTransactionBuffer(scm.getScmMetadataStore().getStore());
+    metrics = Mockito.mock(ScmBlockDeletingServiceMetrics.class);
     deletedBlockLog = new DeletedBlockLogImplV2(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     dnList = new ArrayList<>(3);
     setupContainerManager();
   }
@@ -402,7 +405,8 @@ public class TestDeletedBlockLog {
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(BLOCKS_PER_TXN * 10);
     Assert.assertEquals(10, blocks.size());
@@ -420,7 +424,8 @@ public class TestDeletedBlockLog {
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assert.assertEquals(0, blocks.size());
     //Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
