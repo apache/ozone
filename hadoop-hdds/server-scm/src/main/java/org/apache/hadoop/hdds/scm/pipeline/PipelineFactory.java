@@ -54,9 +54,9 @@ public class PipelineFactory {
         new RatisPipelineProvider(nodeManager,
             stateManager, conf,
             eventPublisher, scmContext));
-    PlacementPolicy placementPolicy;
+    PlacementPolicy ecPlacementPolicy;
     try {
-      placementPolicy = ContainerPlacementPolicyFactory.getPolicy(conf,
+      ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(conf,
           nodeManager, nodeManager.getClusterNetworkTopologyMap(), true,
           SCMContainerPlacementMetrics.create());
     } catch (SCMException e) {
@@ -65,7 +65,7 @@ public class PipelineFactory {
     }
     providers.put(ReplicationType.EC,
         new ECPipelineProvider(nodeManager, stateManager, conf,
-            placementPolicy));
+            ecPlacementPolicy));
   }
 
   protected PipelineFactory() {
