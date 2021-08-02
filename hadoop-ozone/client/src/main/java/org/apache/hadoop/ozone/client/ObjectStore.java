@@ -346,8 +346,8 @@ public class ObjectStore {
   public Iterator<? extends OzoneVolume> listVolumesByUser(String user,
       String volumePrefix, String prevVolume)
       throws IOException {
-    if (Strings.isNullOrEmpty(user)) {
-      user = UserGroupInformation.getCurrentUser().getUserName();
+    if(Strings.isNullOrEmpty(user)) {
+      user = UserGroupInformation.getCurrentUser().getShortUserName();
     }
     return new VolumeIterator(user, volumePrefix, prevVolume);
   }
