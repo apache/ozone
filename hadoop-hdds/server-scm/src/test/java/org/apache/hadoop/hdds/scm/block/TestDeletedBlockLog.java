@@ -80,7 +80,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestDeletedBlockLog {
 
-  private  DeletedBlockLogImplV2 deletedBlockLog;
+  private  DeletedBlockLogImpl deletedBlockLog;
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
@@ -107,7 +107,7 @@ public class TestDeletedBlockLog {
     scmHADBTransactionBuffer =
         new MockSCMHADBTransactionBuffer(scm.getScmMetadataStore().getStore());
     metrics = Mockito.mock(ScmBlockDeletingServiceMetrics.class);
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
@@ -399,7 +399,7 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // transactions are stored persistently.
     deletedBlockLog.close();
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
@@ -418,7 +418,7 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // currentTxnID = 50
     deletedBlockLog.close();
-    new DeletedBlockLogImplV2(conf,
+    new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
