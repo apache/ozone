@@ -23,9 +23,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -35,6 +40,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -121,10 +127,20 @@ public class PutKeyHandler extends KeyHandler {
       }
     } else {
       out().println("Use Streaming to put this key");
-      try (InputStream input = new FileInputStream(dataFile);
-           OutputStream output = bucket.createStreamKey(keyName,
+      try (RandomAccessFile raf = new RandomAccessFile(dataFile, "r");
+           OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
                dataFile.length(), replicationConfig, keyMetadata)) {
-        IOUtils.copyBytes(input, output, chunkSize);
+        FileChannel ch = raf.getChannel();
+        MappedByteBuffer buffer = ch.map(FileChannel.MapMode.READ_ONLY, 0, raf.length());
+        ByteBuf buf = Unpooled.wrappedBuffer(buffer);
+        int len = buf.readableBytes();
+        byte[] b = new byte[chunkSize];
+        while (len > 0) {
+          int writeLen = Math.min(len, b.length);
+          buf.readBytes(b, 0, writeLen);
+          out.write(b, 0, writeLen);
+          len -= writeLen;
+        }
       }
     }
   }
