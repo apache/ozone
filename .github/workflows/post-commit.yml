@@ -172,7 +172,9 @@ jobs:
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          cd hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
           ./hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
@@ -204,7 +206,9 @@ jobs:
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          cd hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
           ./hadoop-ozone/dev-support/checks/kubernetes.sh
       - name: Archive build results
         uses: actions/upload-artifact@v2
