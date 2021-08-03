@@ -691,6 +691,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public void bootstrapOzoneManager(String omNodeId) throws Exception {
 
+    // Set testReloadConfigFlag to true so that
+    // OzoneManager#reloadConfiguration does not reload config as it will
+    // return the default configurations.
+    OzoneManager.setTestReloadConfigFlag(true);
+
     int basePort;
     int retryCount = 0;
 

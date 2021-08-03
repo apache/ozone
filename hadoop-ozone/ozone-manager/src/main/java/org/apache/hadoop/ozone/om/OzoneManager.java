@@ -126,9 +126,12 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
+import org.apache.hadoop.ozone.om.protocol.OMMetadata;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
+import org.apache.hadoop.ozone.om.protocolPB.OMMetadataProtocolClientSideImpl;
+import org.apache.hadoop.ozone.om.protocolPB.OMMetadataProtocolPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
@@ -139,12 +142,14 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OzoneManagerMetaService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
+import org.apache.hadoop.ozone.protocolPB.OMMetadataProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
@@ -276,7 +281,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private CertificateClient certClient;
   private String caCertPem = null;
   private List<String> caCertPemList = new ArrayList<>();
-  private static boolean testSecureOmFlag = false;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
@@ -357,12 +361,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private OzoneManagerPrepareState prepareState;
 
+  private boolean isBootstrapping = false;
+  private boolean isForcedBootstrapping = false;
+
+  // Test flags
+  private static boolean testReloadConfigFlag = false;
+  private static boolean testSecureOmFlag = false;
+
   /**
    * OM Startup mode.
    */
   public enum StartupOption {
     REGUALR,
-    BOOTSTRAP
+    BOOTSTRAP,
+    FORCE_BOOTSTRAP
   }
 
   private enum State {
@@ -371,8 +383,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     RUNNING,
     STOPPED
   }
-
-  private boolean isBootstrapping = false;
 
   // Used in MiniOzoneCluster testing
   private State omState;
@@ -404,7 +414,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // In case of single OM Node Service there will be no OM Node ID
     // specified, set it to value from om storage
     if (this.omNodeDetails.getNodeId() == null) {
-      this.omNodeDetails = OMHANodeDetails.getOMNodeDetails(conf,
+      this.omNodeDetails = OMHANodeDetails.getOMNodeDetailsForNonHA(conf,
           omNodeDetails.getServiceId(),
           omStorage.getOmId(), omNodeDetails.getRpcAddress(),
           omNodeDetails.getRatisPort());
@@ -512,12 +522,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (startupOption == StartupOption.BOOTSTRAP) {
       isBootstrapping = true;
+    } else if (startupOption == StartupOption.FORCE_BOOTSTRAP) {
+      isForcedBootstrapping = true;
     }
 
     this.omRatisSnapshotInfo = new RatisSnapshotInfo();
 
     initializeRatisDirs(conf);
-    initializeRatisServer(isBootstrapping);
+    initializeRatisServer(isBootstrapping || isForcedBootstrapping);
 
     metrics = OMMetrics.create();
     omClientProtocolMetrics = ProtocolMessageMetrics
@@ -534,6 +546,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
+
+    if (isBootstrapping) {
+      // Check that all OM configs have been updated with the new OM info.
+      checkConfigBeforeBootstrap();
+    } else if (isForcedBootstrapping) {
+      LOG.warn("Skipped checking whether existing OM configs have been " +
+          "updated with this OM information as force bootstrap is called.");
+    }
+
     omState = State.INITIALIZED;
   }
 
@@ -735,6 +756,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omState != State.STOPPED) {
       stop();
       exitManager.exitSystem(1, ex.getLocalizedMessage(), ex, LOG);
+    }
+  }
+
+  public void shutdown(String errorMsg) throws IOException {
+    if (omState != State.STOPPED) {
+      stop();
+      exitManager.exitSystem(1, errorMsg, LOG);
     }
   }
 
@@ -975,8 +1003,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneManagerInterService.newReflectiveBlockingService(
             omInterServerProtocol);
 
+    OMMetadataProtocolServerSideImpl omMetadataServerProtocol =
+        new OMMetadataProtocolServerSideImpl(this);
+    BlockingService omMetadataService =
+        OzoneManagerMetaService.newReflectiveBlockingService(
+            omMetadataServerProtocol);
+
     return startRpcServer(configuration, omNodeRpcAddr, omService,
-        omInterService, handlerCount);
+        omInterService, omMetadataService, handlerCount);
   }
 
   /**
@@ -993,7 +1027,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private RPC.Server startRpcServer(OzoneConfiguration conf,
       InetSocketAddress addr, BlockingService clientProtocolService,
-      BlockingService interOMProtocolService, int handlerCount)
+      BlockingService interOMProtocolService,
+      BlockingService omMetadataProtocolService,
+      int handlerCount)
       throws IOException {
     RPC.Server rpcServer = new RPC.Builder(conf)
         .setProtocol(OzoneManagerProtocolPB.class)
@@ -1007,6 +1043,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, OMMetadataProtocolPB.class,
+        omMetadataProtocolService, rpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
@@ -1354,7 +1392,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
 
-    if (isBootstrapping) {
+    if (isBootstrapping || isForcedBootstrapping) {
       omState = State.BOOTSTRAPPING;
       bootstrap(omNodeDetails);
     }
@@ -1421,6 +1459,68 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
+  }
+
+  private void checkConfigBeforeBootstrap() throws IOException {
+    List<OMNodeDetails> omsWihtoutNewConfig = new ArrayList<>();
+    for (Map.Entry<String, OMNodeDetails> entry : peerNodesMap.entrySet()) {
+      String remoteNodeId = entry.getKey();
+      OMNodeDetails remoteNodeDetails = entry.getValue();
+      try (OMMetadataProtocolClientSideImpl omMetadataProtocolClient =
+               new OMMetadataProtocolClientSideImpl(configuration,
+                   getRemoteUser(), remoteNodeId,
+                   remoteNodeDetails.getRpcAddress())) {
+
+        OMMetadata remoteOMMetadata = omMetadataProtocolClient.getOMMetadata();
+        boolean exists = checkOMexistsInRemoteOMConfig(remoteOMMetadata);
+        if (!exists) {
+          LOG.error("Remote OM " + remoteNodeId + ":" +
+              remoteNodeDetails.getHostAddress() + " does not have the " +
+              "bootstrapping OM(" + getOMNodeId() + ") information on " +
+              "reloading configs.");
+          omsWihtoutNewConfig.add(remoteNodeDetails);
+        }
+      } catch (IOException ioe) {
+        LOG.error("Remote OM config check before bootstrap failed on OM {}",
+            remoteNodeId, ioe);
+        omsWihtoutNewConfig.add(remoteNodeDetails);
+      }
+    }
+    if (!omsWihtoutNewConfig.isEmpty()) {
+      StringBuilder errorMsgBuilder = new StringBuilder();
+      errorMsgBuilder.append("OM(s) [")
+          .append(omsWihtoutNewConfig.get(0).getOMPrintInfo());
+      for (int i = 1; i < omsWihtoutNewConfig.size(); i++) {
+        errorMsgBuilder.append(",")
+            .append(omsWihtoutNewConfig.get(i).getOMPrintInfo());
+      }
+      errorMsgBuilder.append("] do not have the bootstrapping OM information." +
+          " Update their ozone-site.xml with new node details before " +
+          "proceeding.");
+      shutdown(errorMsgBuilder.toString());
+    }
+  }
+
+  /**
+   * Check whether current OM information exists in the remote OM's reloaded
+   * configs.
+   */
+  private boolean checkOMexistsInRemoteOMConfig(OMMetadata remoteOMMetadata) {
+    List<OMNodeDetails> omNodesInNewConf = remoteOMMetadata
+        .getOmNodesInNewConf();
+    for (OMNodeDetails omNodeInRemoteOM : omNodesInNewConf) {
+      if (omNodeInRemoteOM.getNodeId().equals(getOMNodeId())) {
+        // Verify that the rpc address of current nodeID in remote OM config
+        // is correct.
+        if (omNodeInRemoteOM.getRpcAddress().equals(
+            omNodeDetails.getRpcAddress())) {
+          return true;
+        } else {
+          return false;
+        }
+      }
+    }
+    return false;
   }
 
   @Override
@@ -1529,6 +1629,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return peerNodesMap.containsKey(omNodeId);
     }
     return false;
+  }
+
+  public List<OMNodeDetails> getAllOMNodesInMemory() {
+    List<OMNodeDetails> peerNodes = getPeerNodes();
+    // Add current node also to list
+    peerNodes.add(omNodeDetails);
+    return peerNodes;
+  }
+
+  public List<OMNodeDetails> getAllOMNodesInNewConf() {
+    OzoneConfiguration newConf = reloadConfiguration();
+    return OmUtils.getAllOMAddresses(newConf, getOMServiceId(), getOMNodeId());
   }
 
   /**
@@ -3080,6 +3192,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
+  }
+
+  public OzoneConfiguration reloadConfiguration() {
+    if (testReloadConfigFlag) {
+      // If this flag is set, do not reload config
+      return this.configuration;
+    }
+    return new OzoneConfiguration();
+  }
+
+  public static void setTestReloadConfigFlag(boolean testReloadConfigFlag) {
+    OzoneManager.testReloadConfigFlag = testReloadConfigFlag;
   }
 
   public static void setTestSecureOmFlag(boolean testSecureOmFlag) {

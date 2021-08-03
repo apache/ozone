@@ -1,0 +1,65 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * These .proto interfaces are private and unstable.
+ * Please see http://wiki.apache.org/hadoop/Compatibility
+ * for what changes are allowed for a *unstable* .proto interface.
+ */
+
+syntax = "proto2";
+option java_package = "org.apache.hadoop.ozone.protocol.proto";
+option java_outer_classname = "OzoneManagerMetadataProtocolProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+package hadoop.ozone;
+
+/**
+This file contains the metadata protocol for Ozone Manager(s). This involves
+getting the meta information about an individual OM.
+*/
+
+message OMMetadataInfoRequest {
+}
+
+message OMMetadataInfoResponse {
+    required bool success = 1;
+    optional string errorMsg = 2;
+    // OM nodes present in OM's memory
+    repeated OMNodeInfo nodesInMemory = 3;
+    // OM nodes reloaded from new config on disk
+    repeated OMNodeInfo nodesInNewConf = 4;
+
+}
+
+message OMNodeInfo {
+    required string nodeID = 1;
+    required string hostAddress = 2;
+    required uint32 rpcPort = 3;
+    required uint32 ratisPort = 4;
+}
+
+/**
+ The service for getting OM metadata.
+*/
+service OzoneManagerMetaService {
+    // RPC request to OM to return its in memory OM nodes list and also the
+    // anticipated nodes list from the config files (upon reloading).
+    rpc getOMMetadataInfo(OMMetadataInfoRequest)
+    returns(OMMetadataInfoResponse);
+}

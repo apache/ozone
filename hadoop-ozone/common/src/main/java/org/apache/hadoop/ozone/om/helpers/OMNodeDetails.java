@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMNodeInfo;
 import org.apache.hadoop.hdds.NodeDetails;
 
 import java.net.InetSocketAddress;
@@ -164,8 +166,18 @@ public final class OMNodeDetails extends NodeDetails {
     return null;
   }
 
+  public String getOMPrintInfo() {
+    return getNodeId() + ":" + getHostAddress();
+  }
+
   public static OMNodeDetails getOMNodeDetailsFromConf(OzoneConfiguration conf,
       String omServiceId, String omNodeId) {
+    return getOMNodeDetailsFromConf(conf, omServiceId, omNodeId, true);
+  }
+
+  public static OMNodeDetails getOMNodeDetailsFromConf(OzoneConfiguration conf,
+      String omServiceId, String omNodeId, boolean shouldResolveAddr) {
+
     String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
         omServiceId, omNodeId);
     String rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
@@ -173,30 +185,61 @@ public final class OMNodeDetails extends NodeDetails {
       return null;
     }
 
+    String hostAddr;
+    InetSocketAddress omRpcAddress = null;
+    int rpcPort = 0;
+    if (shouldResolveAddr) {
+      try {
+        omRpcAddress = NetUtils.createSocketAddr(rpcAddrStr);
+        hostAddr = omRpcAddress.getHostName();
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Couldn't create socket address" +
+            " for OM " + omNodeId + " at " + rpcAddrStr, e);
+      }
+    } else {
+      hostAddr = HddsUtils.getHostName(rpcAddrStr).orElse(null);
+      rpcPort = HddsUtils.getHostPort(rpcAddrStr).orElse(0);
+    }
+
     String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
         omServiceId, omNodeId);
     int ratisPort = conf.getInt(ratisPortKey, OZONE_OM_RATIS_PORT_DEFAULT);
 
-    InetSocketAddress omRpcAddress = null;
-    try {
-      omRpcAddress = NetUtils.createSocketAddr(rpcAddrStr);
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Couldn't create socket address" +
-          " for OM " + omNodeId + " at " + rpcAddrStr, e);
-    }
-
     String httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
-        omServiceId, omNodeId, omRpcAddress.getHostName());
+        omServiceId, omNodeId, hostAddr);
     String httpsAddr = OmUtils.getHttpsAddressForOMPeerNode(conf,
-        omServiceId, omNodeId, omRpcAddress.getHostName());
+        omServiceId, omNodeId, hostAddr);
 
-    return new OMNodeDetails.Builder()
+    Builder builder = new Builder()
         .setOMNodeId(omNodeId)
-        .setRpcAddress(omRpcAddress)
         .setRatisPort(ratisPort)
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
-        .setOMServiceId(omServiceId)
+        .setOMServiceId(omServiceId);
+    if (shouldResolveAddr) {
+      builder.setRpcAddress(omRpcAddress);
+    } else {
+      builder.setHostAddress(hostAddr)
+          .setRpcPort(rpcPort);
+    }
+    return builder.build();
+  }
+
+  public OMNodeInfo getProtobuf() {
+    return OMNodeInfo.newBuilder()
+        .setNodeID(getNodeId())
+        .setHostAddress(getHostAddress())
+        .setRpcPort(getRpcPort())
+        .setRatisPort(getRatisPort())
+        .build();
+  }
+
+  public static OMNodeDetails getFromProtobuf(OMNodeInfo omNodeInfo) {
+    return new Builder()
+        .setOMNodeId(omNodeInfo.getNodeID())
+        .setHostAddress(omNodeInfo.getHostAddress())
+        .setRpcPort(omNodeInfo.getRpcPort())
+        .setRatisPort(omNodeInfo.getRatisPort())
         .build();
   }
 }

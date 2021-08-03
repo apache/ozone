@@ -15,23 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds;
+package org.apache.hadoop.ozone.om.protocol;
 
-import org.apache.ratis.util.ExitUtils;
-import org.slf4j.Logger;
+import java.io.Closeable;
+import java.io.IOException;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * An Exit Manager used to shutdown service in case of unrecoverable error.
- * This class will be helpful to test exit functionality.
+ * Protocol for retrieving OM metadata information.
  */
-public class ExitManager {
+@KerberosInfo(
+    serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
+public interface OMMetadataProtocol extends Closeable {
 
-  public void exitSystem(int status, String message, Throwable throwable,
-      Logger log) {
-    ExitUtils.terminate(status, message, throwable, log);
-  }
-
-  public void exitSystem(int status, String message, Logger log) {
-    ExitUtils.terminate(status, message, log);
-  }
+  /**
+   * Get the OM metadata information.
+   */
+  OMMetadata getOMMetadata() throws IOException;
 }
