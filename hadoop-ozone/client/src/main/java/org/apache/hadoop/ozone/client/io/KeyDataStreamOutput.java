@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -187,9 +188,13 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
 
   @Override
   public void write(ByteBuf b) throws IOException {
-    byte[] data = new byte[b.readableBytes()];
-    b.readBytes(data);
-    write(data);
+    checkNotClosed();
+    if (b == null) {
+      throw new NullPointerException();
+    }
+    final int len = b.readableBytes();
+    handleWrite(b, 0, len, false);
+    writeOffset += len;
   }
 
   @Override
@@ -201,7 +206,7 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
   public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
-    write(buf, 0, 1);
+    write(Unpooled.wrappedBuffer(buf));
   }
 
   /**
@@ -219,22 +224,10 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
   @Override
   public void write(byte[] b, int off, int len)
       throws IOException {
-    checkNotClosed();
-    if (b == null) {
-      throw new NullPointerException();
-    }
-    if ((off < 0) || (off > b.length) || (len < 0) || ((off + len) > b.length)
-        || ((off + len) < 0)) {
-      throw new IndexOutOfBoundsException();
-    }
-    if (len == 0) {
-      return;
-    }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+    write(Unpooled.wrappedBuffer(b, off, len));
   }
 
-  private void handleWrite(byte[] b, int off, long len, boolean retry)
+  private void handleWrite(ByteBuf b, int off, long len, boolean retry)
       throws IOException {
     while (len > 0) {
       try {
@@ -266,13 +259,16 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
   }
 
   private int writeToOutputStream(BlockDataStreamOutputEntry current,
-      boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
+      boolean retry, long len, ByteBuf b, int writeLen, int off, long currentPos)
       throws IOException {
     try {
       if (retry) {
         current.writeOnRetry(len);
       } else {
-        current.write(b, off, writeLen);
+        ByteBuf s = b.slice(off, writeLen);
+        byte[] data = new byte[writeLen];
+        s.readBytes(data);
+        current.write(data, 0, writeLen);
         offset += writeLen;
       }
     } catch (IOException ioe) {
