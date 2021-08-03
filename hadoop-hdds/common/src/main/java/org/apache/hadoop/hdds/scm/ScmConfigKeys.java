@@ -475,6 +475,72 @@ public final class ScmConfigKeys {
       OZONE_SCM_EVENT_PREFIX + "ContainerReport.thread.pool.size";
   public static final int OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT = 10;
 
+  public static final String RATIS_RPC_TYPE =
+          "ozone.scm.ha.ratis.rpc.type";
+  public static final String RATIS_RPC_TYPE_DEFAULT =
+          "GRPC";
+
+  public static final String RAFT_SEGMENT_SIZE=
+          "ozone.scm.ha.ratis.segment.size";
+  public static final long RAFT_SEGMENT_SIZE_DEFAULT = 16L * 1024L;
+
+  public static final String RAFT_SEGMENT_PRE_ALLOCATED_SIZE=
+          "ozone.scm.ha.ratis.segment.preallocated.size";
+  public static final long RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT= 16L * 1024L;
+
+  public static final String RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT=
+          "ozone.scm.ha.ratis.log.appender.queue.byte-limit";
+  public static final int RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT=
+          32 * 1024 * 1024;
+
+  public static final String GRPC_DEADLINE_INTERVAL=
+          "ozone.scm.ha.grpc.deadline.interval";
+  public static final long GRPC_DEADLINE_INTERVAL_DEFAULT = 30 * 60 * 1000L;
+
+  public static final String RATIS_NODE_FAILURE_TIMEOUT=
+          "ozone.scm.ha.ratis.server.failure.timeout.duration";
+  public static final long RATIS_NODE_FAILURE_TIMEOUT_DEFAULT= 120 * 1000L;
+
+  public static final String RATIS_LEADER_READY_CHECK_INTERVAL=
+          "ozone.scm.ha.ratis.leader.ready.check.interval";
+  public static final long RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT=
+          2 * 1000L;
+
+  public static final String RATIS_LEADER_READY_WAIT_TIMEOUT=
+          "ozone.scm.ha.ratis.leader.ready.wait.timeout";
+  public static final long RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT = 60 * 1000L;
+
+  public static final String RATIS_RETRY_CACHE_TIMEOUT=
+          "ozone.scm.ha.ratis.server.retry.cache.timeout";
+  public static final long RATIS_RETRY_CACHE_TIMEOUT_DEFAULT = 60 * 1000L;
+
+  public static final String RATIS_STORAGE_DIR=
+          "ozone.scm.ha.ratis.storage.dir";
+
+  public static final String RAFT_LOG_PURGE_ENABLED=
+          "ozone.scm.ha.ratis.log.purge.enabled";
+  public static final boolean RAFT_LOG_PURGE_ENABLED_DEFAULT= false;
+
+  public static final String RAFT_LOG_PURGE_GAP=
+          "ozone.scm.ha.ratis.log.purge.gap";
+  public static final int RAFT_LOG_PURGE_GAP_DEFAULT=1000000;
+
+  public static final String RATIS_SNAPSHOT_THRESHOLD=
+          "ozone.scm.ha.ratis.snapshot.threshold";
+  public static final long RATIS_SNAPSHOT_THRESHOLD_DEFAULT= 1000L;
+
+  public static final String RATIS_SNAPSHOT_DIR=
+          "ozone.scm.ha.ratis.snapshot.dir";
+
+  public static final String RATIS_LEADER_ELECTION_TIMEOUT=
+          "ozone.scm.ha.ratis.leader.election.timeout";
+  public static final long RATIS_LEADER_ELECTION_TIMEOUT_DEFAULT= 5 * 1000L;
+
+  public static final String RATIS_REQUEST_TIMEOUT=
+          "ozone.scm.ha.ratis.request.timeout";
+  public static final long RATIS_REQUEST_TIMEOUT_DEFAULT = 30 * 1000L;
+
+
   /**
    * Never constructed.
    */

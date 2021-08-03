@@ -60,26 +60,17 @@ public class TestSCMHAConfiguration {
 
   @Test
   public void testSetStorageDir() {
-    SCMHAConfiguration scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    scmhaConfiguration.setRatisStorageDir("scm-ratis");
-    conf.setFromObject(scmhaConfiguration);
-
-    scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    Assert.assertEquals("scm-ratis", scmhaConfiguration.getRatisStorageDir());
+    conf.set(ScmConfigKeys.RATIS_STORAGE_DIR, "scm-ratis");
+    Assert.assertEquals("scm-ratis", conf.get(ScmConfigKeys.RATIS_STORAGE_DIR));
   }
 
   @Test
   public void testRaftLogPurgeEnabled() {
-    SCMHAConfiguration scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    scmhaConfiguration.setRaftLogPurgeEnabled(true);
-    conf.setFromObject(scmhaConfiguration);
+    conf.setBoolean(ScmConfigKeys.RAFT_LOG_PURGE_ENABLED, true);
 
-    scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    Assert.assertEquals(true, scmhaConfiguration.getRaftLogPurgeEnabled());
+    Assert.assertEquals(true, conf.getBoolean(
+            ScmConfigKeys.RAFT_LOG_PURGE_ENABLED,
+            ScmConfigKeys.RAFT_LOG_PURGE_ENABLED_DEFAULT));
   }
 
 

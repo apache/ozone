@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -67,6 +68,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMRatisServerImpl.class);
 
+  private final OzoneConfiguration ozoneConf = new OzoneConfiguration();
   private final RaftServer server;
   private final SCMStateMachine stateMachine;
   private final StorageContainerManager scm;
@@ -134,9 +136,12 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       OzoneConfiguration conf, RaftGroup group) throws IOException {
     boolean ready;
     long st = Time.monotonicNow();
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
-    long waitTimeout = haConf.getLeaderReadyWaitTimeout();
-    long retryInterval = haConf.getLeaderReadyCheckInterval();
+    long waitTimeout =
+            conf.getLong(ScmConfigKeys.RATIS_LEADER_READY_WAIT_TIMEOUT,
+            ScmConfigKeys.RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT);
+    long retryInterval =
+            conf.getLong(ScmConfigKeys.RATIS_LEADER_READY_CHECK_INTERVAL,
+            ScmConfigKeys.RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT);
 
     do {
       ready = server.getDivision(group.getGroupId()).getInfo().isLeaderReady();
@@ -206,8 +211,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .build();
     // any request submitted to
     final long requestTimeout =
-        scm.getConfiguration().getObject(SCMHAConfiguration.class)
-            .getRatisRequestTimeout();
+        ozoneConf.getLong(ScmConfigKeys.RATIS_REQUEST_TIMEOUT,
+                ScmConfigKeys.RATIS_REQUEST_TIMEOUT_DEFAULT);
+    Preconditions.checkArgument(requestTimeout > 1000L,
+            "Ratis request timeout cannot be less than 1000ms.");
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);

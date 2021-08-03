@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolServiceGrpc;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -60,8 +61,8 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
       int port, final ConfigurationSource conf,
       SCMCertificateClient scmCertificateClient) throws IOException {
     Preconditions.checkNotNull(conf);
-    timeout =
-        conf.getObject(SCMHAConfiguration.class).getGrpcDeadlineInterval();
+    timeout = conf.getLong(ScmConfigKeys.GRPC_DEADLINE_INTERVAL,
+            ScmConfigKeys.GRPC_DEADLINE_INTERVAL_DEFAULT);
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
