@@ -163,9 +163,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   private static RaftServer.Builder newRaftServer(final String scmId,
       final ConfigurationSource conf) {
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
     final RaftProperties serverProperties =
-        RatisUtil.newRaftProperties(haConf, conf);
+        RatisUtil.newRaftProperties(conf);
     return RaftServer.newBuilder().setServerId(RaftPeerId.getRaftPeerId(scmId))
         .setProperties(serverProperties);
   }

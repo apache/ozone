@@ -58,21 +58,21 @@ public final class RatisUtil {
 
 
   /**
-   * Constructs new Raft Properties instance using {@link SCMHAConfiguration}.
-   * @param haConf SCMHAConfiguration
+   * Constructs new Raft Properties instance using {@link ConfigurationSource}.
+   *
    * @param conf ConfigurationSource
    */
   public static RaftProperties newRaftProperties(
-      final SCMHAConfiguration haConf, final ConfigurationSource conf) {
+          final ConfigurationSource conf) {
     //TODO: Remove ConfigurationSource!
     // TODO: Check the default values.
     final RaftProperties properties = new RaftProperties();
-    setRaftStorageDir(properties, haConf, conf);
-    setRaftRpcProperties(properties, haConf, conf);
-    setRaftLogProperties(properties, haConf, conf);
-    setRaftRetryCacheProperties(properties, haConf, conf);
-    setRaftSnapshotProperties(properties, haConf, conf);
-    setRaftLeadElectionProperties(properties, haConf);
+    setRaftStorageDir(properties, conf);
+    setRaftRpcProperties(properties, conf);
+    setRaftLogProperties(properties, conf);
+    setRaftRetryCacheProperties(properties, conf);
+    setRaftSnapshotProperties(properties, conf);
+    setRaftLeadElectionProperties(properties);
     return properties;
   }
 
@@ -80,18 +80,15 @@ public final class RatisUtil {
    * Set the local directory where ratis logs will be stored.
    *
    * @param properties RaftProperties instance which will be updated
-   * @param haConf SCMHAConfiguration
    * @param conf ConfigurationSource
    */
   public static void setRaftStorageDir(final RaftProperties properties,
-                                       final SCMHAConfiguration haConf,
                                        final ConfigurationSource conf) {
     RaftServerConfigKeys.setStorageDir(properties,
-        Collections.singletonList(new File(getRatisStorageDir(haConf, conf))));
+        Collections.singletonList(new File(getRatisStorageDir(conf))));
   }
 
-  public static String getRatisStorageDir(final SCMHAConfiguration haConf,
-      final ConfigurationSource conf) {
+  public static String getRatisStorageDir(final ConfigurationSource conf) {
     String storageDir = conf.get(ScmConfigKeys.RATIS_STORAGE_DIR);
     if (Strings.isNullOrEmpty(storageDir)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
@@ -103,10 +100,10 @@ public final class RatisUtil {
    * Set properties related to Raft RPC.
    *
    * @param properties RaftProperties instance which will be updated
-   * @param conf SCMHAConfiguration
+   * @param ozoneConf ConfigurationSource
    */
   private static void setRaftRpcProperties(final RaftProperties properties,
-      final SCMHAConfiguration conf, ConfigurationSource ozoneConf) {
+      ConfigurationSource ozoneConf) {
     RaftConfigKeys.Rpc.setType(properties,
         RpcType.valueOf(ozoneConf.get(ScmConfigKeys.RATIS_RPC_TYPE,
                 ScmConfigKeys.RATIS_RPC_TYPE_DEFAULT)));
@@ -140,10 +137,10 @@ public final class RatisUtil {
    * Set properties related to Raft leader election.
    *
    * @param properties RaftProperties instance which will be updated
-   * @param conf SCMHAConfiguration
+   *
    */
   private static void setRaftLeadElectionProperties(
-      final RaftProperties properties, final SCMHAConfiguration conf) {
+      final RaftProperties properties) {
     // Disable the pre vote feature (related to leader election) in Ratis
     RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
   }
@@ -152,10 +149,10 @@ public final class RatisUtil {
    * Set properties related to Raft Log.
    *
    * @param properties RaftProperties instance which will be updated
-   * @param conf SCMHAConfiguration
+   * @param ozoneConf ConfigurationSource
    */
   private static void setRaftLogProperties(final RaftProperties properties,
-      final SCMHAConfiguration conf, final ConfigurationSource ozoneConf) {
+      final ConfigurationSource ozoneConf) {
     Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(ozoneConf.getLong(ScmConfigKeys.RAFT_SEGMENT_SIZE,
                 ScmConfigKeys.RAFT_SEGMENT_SIZE_DEFAULT)));
@@ -184,10 +181,10 @@ public final class RatisUtil {
    * Set properties related to Raft Retry Cache.
    *
    * @param properties RaftProperties instance which will be updated
-   * @param conf SCMHAConfiguration
+   * @param ozoneConf ConfigurationSource
    */
   private static void setRaftRetryCacheProperties(
-      final RaftProperties properties, final SCMHAConfiguration conf,
+      final RaftProperties properties,
       final ConfigurationSource ozoneConf) {
     RetryCache.setExpiryTime(properties, TimeDuration.valueOf(
             ozoneConf.getLong(ScmConfigKeys.RATIS_RETRY_CACHE_TIMEOUT,
@@ -199,10 +196,10 @@ public final class RatisUtil {
    * Set properties related to Raft Snapshot.
    *
    * @param properties RaftProperties instance which will be updated
-   * @param conf SCMHAConfiguration
+   * @param ozoneConf ConfigurationSource
    */
   private static void setRaftSnapshotProperties(
-      final RaftProperties properties, final SCMHAConfiguration conf,
+      final RaftProperties properties,
       final ConfigurationSource ozoneConf) {
     Snapshot.setAutoTriggerEnabled(properties, true);
     Snapshot.setAutoTriggerThreshold(properties,
