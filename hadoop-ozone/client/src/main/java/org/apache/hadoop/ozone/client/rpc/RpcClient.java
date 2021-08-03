@@ -1421,33 +1421,7 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
-    final FileEncryptionInfo feInfo = keyOutputStream.getFileEncryptionInfo();
-    if (feInfo != null) {
-      KeyProvider.KeyVersion decrypted = getDEK(feInfo);
-      final CryptoOutputStream cryptoOut =
-          new CryptoOutputStream(keyOutputStream,
-              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-              decrypted.getMaterial(), feInfo.getIV());
-      return new OzoneDataStreamOutput(cryptoOut);
-    } else {
-      try{
-        GDPRSymmetricKey gk;
-        Map<String, String> openKeyMetadata =
-            openKey.getKeyInfo().getMetadata();
-        if(Boolean.valueOf(openKeyMetadata.get(OzoneConsts.GDPR_FLAG))){
-          gk = new GDPRSymmetricKey(
-              openKeyMetadata.get(OzoneConsts.GDPR_SECRET),
-              openKeyMetadata.get(OzoneConsts.GDPR_ALGORITHM)
-          );
-          gk.getCipher().init(Cipher.ENCRYPT_MODE, gk.getSecretKey());
-          return new OzoneDataStreamOutput(
-              new CipherOutputStream(keyOutputStream, gk.getCipher()));
-        }
-      }catch (Exception ex){
-        throw new IOException(ex);
-      }
-      return new OzoneDataStreamOutput(keyOutputStream);
-    }
+    return new OzoneDataStreamOutput(keyOutputStream);
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
