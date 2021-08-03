@@ -133,14 +133,11 @@ public class PutKeyHandler extends KeyHandler {
         FileChannel ch = raf.getChannel();
         long len = raf.length();
         long off = 0;
-        byte[] b = new byte[chunkSize];
         while (len > 0) {
           long writeLen = Math.min(len, chunkSize);
           ByteBuffer segment = ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
           ByteBuf buf = Unpooled.wrappedBuffer(segment);
-          int n = buf.readableBytes();
-          buf.readBytes(b, 0, n);
-          out.write(b, 0, n);
+          out.write(buf);
           off += writeLen;
           len -= writeLen;
         }

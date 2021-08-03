@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
@@ -40,14 +42,31 @@ public class OzoneDataStreamOutput extends OutputStream {
     this.outputStream = outputStream;
   }
 
+  public void write(ByteBuf b) throws IOException {
+    byte[] data = new byte[b.readableBytes()];
+    b.readBytes(data);
+    outputStream.write(data);
+  }
+
+  public void write(ByteBuf b, int off, int len) throws IOException {
+    write(b.slice(off, len));
+  }
+
   @Override
   public void write(int b) throws IOException {
-    outputStream.write(b);
+    byte[] buf = new byte[1];
+    buf[0] = (byte) b;
+    write(buf, 0, 1);
+  }
+
+  @Override
+  public void write(byte[] b) throws IOException {
+    write(b, 0, b.length);
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    outputStream.write(b, off, len);
+    write(Unpooled.wrappedBuffer(b, off, len));
   }
 
   @Override
