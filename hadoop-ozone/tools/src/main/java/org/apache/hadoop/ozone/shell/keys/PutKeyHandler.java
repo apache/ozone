@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.nio.MappedByteBuffer;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
@@ -131,14 +131,17 @@ public class PutKeyHandler extends KeyHandler {
            OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
                dataFile.length(), replicationConfig, keyMetadata)) {
         FileChannel ch = raf.getChannel();
-        MappedByteBuffer buffer = ch.map(FileChannel.MapMode.READ_ONLY, 0, raf.length());
-        ByteBuf buf = Unpooled.wrappedBuffer(buffer);
-        int len = buf.readableBytes();
+        long len = raf.length();
+        long off = 0;
         byte[] b = new byte[chunkSize];
         while (len > 0) {
-          int writeLen = Math.min(len, b.length);
-          buf.readBytes(b, 0, writeLen);
-          out.write(b, 0, writeLen);
+          long writeLen = Math.min(len, chunkSize);
+          ByteBuffer segment = ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
+          ByteBuf buf = Unpooled.wrappedBuffer(segment);
+          int n = buf.readableBytes();
+          buf.readBytes(b, 0, n);
+          out.write(b, 0, n);
+          off += writeLen;
           len -= writeLen;
         }
       }
