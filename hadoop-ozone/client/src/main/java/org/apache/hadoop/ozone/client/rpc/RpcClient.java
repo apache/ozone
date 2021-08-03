@@ -492,7 +492,8 @@ public class RpcClient implements ClientProtocol {
         .setSourceBucket(bucketArgs.getSourceBucket())
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
-        .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
+        .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
+        .setBucketLayout(bucketArgs.getBucketLayout());
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
@@ -715,7 +716,8 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedBytes(),
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
-        bucketInfo.getQuotaInNamespace()
+        bucketInfo.getQuotaInNamespace(),
+        bucketInfo.getBucketLayout()
     );
   }
 
@@ -910,7 +912,6 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     List<OmKeyInfo> keys = ozoneManagerClient.listKeys(
         volumeName, bucketName, prevKey, keyPrefix, maxListResult);
-
     return keys.stream().map(key -> new OzoneKey(
         key.getVolumeName(),
         key.getBucketName(),

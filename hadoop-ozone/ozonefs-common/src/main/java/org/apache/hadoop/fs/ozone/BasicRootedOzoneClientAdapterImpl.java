@@ -212,7 +212,7 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean createIfNotExist) throws IOException {
     Preconditions.checkNotNull(volumeStr);
     Preconditions.checkNotNull(bucketStr);
-    
+
     if (bucketStr.isEmpty()) {
       // throw FileNotFoundException in this case to make Hadoop common happy
       throw new FileNotFoundException(
