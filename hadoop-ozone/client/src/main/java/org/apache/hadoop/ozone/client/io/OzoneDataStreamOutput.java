@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.hadoop.hdds.scm.storage.DataStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
@@ -29,7 +30,7 @@ import java.io.OutputStream;
  * OzoneOutputStream is used to write data into Ozone.
  * It uses SCM's {@link KeyOutputStream} for writing the data.
  */
-public class OzoneDataStreamOutput extends OutputStream {
+public class OzoneDataStreamOutput extends OutputStream implements DataStreamOutput {
 
   private final OutputStream outputStream;
 
@@ -42,12 +43,14 @@ public class OzoneDataStreamOutput extends OutputStream {
     this.outputStream = outputStream;
   }
 
+  @Override
   public void write(ByteBuf b) throws IOException {
     byte[] data = new byte[b.readableBytes()];
     b.readBytes(data);
     outputStream.write(data);
   }
 
+  @Override
   public void write(ByteBuf b, int off, int len) throws IOException {
     write(b.slice(off, len));
   }
