@@ -255,7 +255,7 @@ function get_count_kubernetes_files() {
 function get_count_robot_files() {
     start_end::group_start "Count robot test files"
     local pattern_array=(
-        "\.robot$"
+        "^hadoop-ozone/dist/src/main/smoketest"
     )
     show_changed_files
     COUNT_ROBOT_CHANGED_FILES=$(count_changed_files)
