@@ -265,10 +265,7 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
       if (retry) {
         current.writeOnRetry(len);
       } else {
-        ByteBuf s = b.slice(off, writeLen);
-        byte[] data = new byte[writeLen];
-        s.readBytes(data);
-        current.write(data, 0, writeLen);
+        current.write(b, off, writeLen);
         offset += writeLen;
       }
     } catch (IOException ioe) {

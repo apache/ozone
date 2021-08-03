@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.buffer.ByteBuf;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -25,6 +26,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.DataStreamOutput;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -36,7 +38,7 @@ import java.util.Collections;
 /**
  * Helper class used inside {@link BlockDataStreamOutput}.
  * */
-public final class BlockDataStreamOutputEntry extends OutputStream {
+public final class BlockDataStreamOutputEntry extends OutputStream implements DataStreamOutput {
 
   private final OzoneClientConfig config;
   private OutputStream outputStream;
@@ -100,6 +102,17 @@ public final class BlockDataStreamOutputEntry extends OutputStream {
     }
   }
 
+  @Override
+  public void write(ByteBuf b) throws IOException {
+    byte[] data = new byte[b.readableBytes()];
+    b.readBytes(data);
+    write(data);
+  }
+
+  @Override
+  public void write(ByteBuf b, int off, int len) throws IOException {
+    write(b.slice(off, len));
+  }
 
   @Override
   public void write(int b) throws IOException {
