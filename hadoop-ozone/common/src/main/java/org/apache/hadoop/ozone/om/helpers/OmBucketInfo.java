@@ -76,6 +76,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketEncryptionKeyInfo bekInfo;
 
+  /**
+   * Optional default replication for bucket.
+   */
   private DefaultReplicationConfig defaultReplicationConfig;
 
   private final String sourceVolume;
@@ -667,6 +670,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", quotaInBytes='" + quotaInBytes + "'" +
         ", quotaInNamespace='" + quotaInNamespace + "'" +
         ", bucketLayout='" + bucketLayout + '\'' +
+        ", quotaInNamespace='" + quotaInNamespace + '\'' +
+        ", defaultReplicationConfig='" + defaultReplicationConfig + '\'' +
         sourceInfo +
         '}';
   }
@@ -694,7 +699,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
-        Objects.equals(bekInfo, that.bekInfo);
+        Objects.equals(bekInfo, that.bekInfo) && Objects
+        .equals(defaultReplicationConfig, this.defaultReplicationConfig);
   }
 
   @Override
@@ -722,6 +728,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +
+        ", defaultReplicationConfig=" + defaultReplicationConfig +
         '}';
   }
 }

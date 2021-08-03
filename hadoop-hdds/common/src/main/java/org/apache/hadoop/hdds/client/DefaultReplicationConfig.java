@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
+import java.util.Objects;
+
 /**
  * Replication configuration for EC replication.
  */
@@ -70,6 +72,25 @@ public class DefaultReplicationConfig {
     }
     builder.setEcReplicationConfig(this.ecReplicationConfig.toProto());
     return builder.build();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    DefaultReplicationConfig that = (DefaultReplicationConfig) o;
+    return Objects.equals(type, that.type) && Objects
+        .equals(factor, that.factor) && Objects
+        .equals(ecReplicationConfig, ecReplicationConfig);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(type, factor, ecReplicationConfig);
   }
 }
 
