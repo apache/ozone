@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.hdds.scm.storage.DataStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
@@ -32,22 +31,20 @@ import java.io.OutputStream;
  */
 public class OzoneDataStreamOutput extends OutputStream implements DataStreamOutput {
 
-  private final OutputStream outputStream;
+  private final DataStreamOutput dataStreamOutput;
 
   /**
    * Constructs OzoneOutputStream with KeyOutputStream.
    *
    * @param outputStream
    */
-  public OzoneDataStreamOutput(OutputStream outputStream) {
-    this.outputStream = outputStream;
+  public OzoneDataStreamOutput(DataStreamOutput dataStreamOutput) {
+    this.dataStreamOutput = dataStreamOutput;
   }
 
   @Override
   public void write(ByteBuf b) throws IOException {
-    byte[] data = new byte[b.readableBytes()];
-    b.readBytes(data);
-    outputStream.write(data);
+    dataStreamOutput.write(b);
   }
 
   @Override
@@ -74,30 +71,24 @@ public class OzoneDataStreamOutput extends OutputStream implements DataStreamOut
 
   @Override
   public synchronized void flush() throws IOException {
-    outputStream.flush();
+    dataStreamOutput.flush();
   }
 
   @Override
   public synchronized void close() throws IOException {
     //commitKey can be done here, if needed.
-    outputStream.close();
+    dataStreamOutput.close();
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    if (outputStream instanceof KeyOutputStream) {
-      return ((KeyOutputStream) outputStream).getCommitUploadPartInfo();
-    } else  if (outputStream instanceof CryptoOutputStream) {
-      OutputStream wrappedStream =
-          ((CryptoOutputStream) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyDataStreamOutput) {
-        return ((KeyOutputStream) wrappedStream).getCommitUploadPartInfo();
-      }
+    if (dataStreamOutput instanceof KeyDataStreamOutput) {
+      return ((KeyDataStreamOutput) dataStreamOutput).getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
   }
 
-  public OutputStream getOutputStream() {
-    return outputStream;
+  public DataStreamOutput getDataStreamOutput() {
+    return dataStreamOutput;
   }
 }

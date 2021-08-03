@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.netty.buffer.ByteBuf;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.storage.DataStreamOutput;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -62,7 +64,7 @@ import java.util.stream.Collectors;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput extends OutputStream {
+public class KeyDataStreamOutput extends OutputStream implements DataStreamOutput {
 
   private OzoneClientConfig config;
 
@@ -181,6 +183,18 @@ public class KeyDataStreamOutput extends OutputStream {
   public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
       long openVersion) throws IOException {
     blockDataStreamOutputEntryPool.addPreallocateBlocks(version, openVersion);
+  }
+
+  @Override
+  public void write(ByteBuf b) throws IOException {
+    byte[] data = new byte[b.readableBytes()];
+    b.readBytes(data);
+    write(data);
+  }
+
+  @Override
+  public void write(ByteBuf b, int off, int len) throws IOException {
+    write(b.slice(off, len));
   }
 
   @Override
