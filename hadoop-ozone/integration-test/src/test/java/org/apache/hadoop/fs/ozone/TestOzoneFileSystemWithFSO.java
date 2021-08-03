@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -67,7 +68,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @BeforeClass
   public static void init() {
-    setIsBucketFSOptimized(true);
+    setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   public TestOzoneFileSystemWithFSO(boolean setDefaultFs,
