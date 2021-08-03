@@ -30,6 +30,18 @@ public class DUResponse {
   @JsonProperty("status")
   private ResponseStatus status;
 
+  /** The current path request. */
+  @JsonProperty("path")
+  private String path;
+
+  /** Total size under current path.*/
+  @JsonProperty("size")
+  private long size;
+
+  /** Total size with replicas counted.*/
+  @JsonProperty("sizeWithReplica")
+  private long sizeWithReplica;
+
   /** The number of subpaths under the request path. */
   @JsonProperty("subPathCount")
   private int count;
@@ -43,6 +55,8 @@ public class DUResponse {
 
   public DUResponse() {
     this.status = ResponseStatus.OK;
+    // by default, the replication feature is disabled
+    this.sizeWithReplica = -1L;
   }
 
   public ResponseStatus getStatus() {
@@ -51,6 +65,30 @@ public class DUResponse {
 
   public void setStatus(ResponseStatus status) {
     this.status = status;
+  }
+
+  public long getSize() {
+    return size;
+  }
+
+  public void setSize(long size) {
+    this.size = size;
+  }
+
+  public long getSizeWithReplica() {
+    return sizeWithReplica;
+  }
+
+  public void setSizeWithReplica(long sizeWithReplica) {
+    this.sizeWithReplica = sizeWithReplica;
+  }
+
+  public String getPath() {
+    return path;
+  }
+
+  public void setPath(String path) {
+    this.path = path;
   }
 
   public int getCount() {
@@ -89,6 +127,14 @@ public class DUResponse {
     @JsonProperty("size")
     private long size;
 
+    /** Disk usage with replication under the subpath. */
+    @JsonProperty("sizeWithReplica")
+    private long sizeWithReplica;
+
+    public DiskUsage() {
+      this.sizeWithReplica = -1L;
+    }
+
     public long getSize() {
       return size;
     }
@@ -97,12 +143,20 @@ public class DUResponse {
       return subpath;
     }
 
+    public long getSizeWithReplica() {
+      return sizeWithReplica;
+    }
+
     public void setSize(long size) {
       this.size = size;
     }
 
     public void setSubpath(String subpath) {
       this.subpath = subpath;
+    }
+
+    public void setSizeWithReplica(long sizeWithReplica) {
+      this.sizeWithReplica = sizeWithReplica;
     }
   }
 }

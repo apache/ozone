@@ -257,7 +257,8 @@ public class TestNSSummaryEndpoint {
   @Test
   public void testDiskUsage() throws Exception {
     // volume level DU
-    Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH);
+    Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
+            false, false);
     DUResponse duVolRes = (DUResponse) volResponse.getEntity();
     Assert.assertEquals(2, duVolRes.getCount());
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
@@ -272,7 +273,8 @@ public class TestNSSummaryEndpoint {
     Assert.assertEquals(BUCKET_TWO_DATA_SIZE, duBucket2.getSize());
 
     // bucket level DU
-    Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH);
+    Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
+            false, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
     Assert.assertEquals(1, duBucketResponse.getCount());
     DUResponse.DiskUsage duDir1 = duBucketResponse.getDuData().get(0);
@@ -280,7 +282,8 @@ public class TestNSSummaryEndpoint {
     Assert.assertEquals(DIR_ONE_DATA_SIZE, duDir1.getSize());
 
     // dir level DU
-    Response dirResponse = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH);
+    Response dirResponse = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH,
+            false, false);
     DUResponse duDirReponse = (DUResponse) dirResponse.getEntity();
     Assert.assertEquals(3, duDirReponse.getCount());
     List<DUResponse.DiskUsage> duSubDir = duDirReponse.getDuData();
@@ -299,13 +302,15 @@ public class TestNSSummaryEndpoint {
     Assert.assertEquals(KEY_SIX_SIZE, duDir4.getSize());
 
     // key level DU
-    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH);
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
+            false, false);
     DUResponse keyObj = (DUResponse) keyResponse.getEntity();
-    Assert.assertEquals(1, keyObj.getCount());
-    Assert.assertEquals(KEY_FOUR_SIZE, keyObj.getDuData().get(0).getSize());
+    Assert.assertEquals(0, keyObj.getCount());
+    Assert.assertEquals(KEY_FOUR_SIZE, keyObj.getSize());
 
     // invalid path check
-    Response invalidResponse = nsSummaryEndpoint.getDiskUsage(INVALID_PATH);
+    Response invalidResponse = nsSummaryEndpoint.getDiskUsage(INVALID_PATH,
+            false, false);
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
     Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidObj.getStatus());
