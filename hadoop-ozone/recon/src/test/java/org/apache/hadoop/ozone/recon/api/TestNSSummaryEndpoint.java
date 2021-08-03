@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -34,8 +35,11 @@ import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.junit.Assert;
 import org.junit.Before;
@@ -56,6 +60,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOz
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test for NSSummary REST APIs.
@@ -178,6 +183,10 @@ public class TestNSSummaryEndpoint {
                     .withOmServiceProvider(ozoneManagerServiceProvider)
                     .withReconSqlDb()
                     .withContainerDB()
+                    .addBinding(OzoneStorageContainerManager.class,
+                            ReconStorageContainerManagerFacade.class)
+                    .addBinding(StorageContainerServiceProvider.class,
+                            mock(StorageContainerServiceProviderImpl.class))
                     .addBinding(NSSummaryEndpoint.class)
                     .build();
     reconNamespaceSummaryManager =
