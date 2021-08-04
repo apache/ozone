@@ -71,11 +71,11 @@ The defined prefixes can be used to define the address of each of the SCM servic
    <value>host1</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm2</name>
    <value>host2</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm3</name>
    <value>host3</value>
 </property>
 ```
