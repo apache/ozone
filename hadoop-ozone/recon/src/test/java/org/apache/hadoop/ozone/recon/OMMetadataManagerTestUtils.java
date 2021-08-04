@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -194,7 +197,7 @@ public final class OMMetadataManagerTestUtils {
                                     long dataSize)
           throws IOException {
     // DB key in FileTable => "parentId/filename"
-    String omKey = parentObjectId + OM_KEY_PREFIX + fileName;
+    String omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
     omMetadataManager.getKeyTable().put(omKey,
             new OmKeyInfo.Builder()
                     .setBucketName(bucket)
@@ -212,7 +215,7 @@ public final class OMMetadataManagerTestUtils {
                                   long parentObjectId,
                                   String dirName) throws IOException {
     // DB key in DirectoryTable => "parentId/dirName"
-    String omKey = parentObjectId + OM_KEY_PREFIX + dirName;
+    String omKey = omMetadataManager.getOzonePathKey(parentObjectId, dirName);
     omMetadataManager.getDirectoryTable().put(omKey,
             new OmDirectoryInfo.Builder()
                     .setName(dirName)
@@ -241,10 +244,16 @@ public final class OMMetadataManagerTestUtils {
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table keyTableMock = mock(Table.class);
     Table dirTableMock = mock(Table.class);
-    when(keyTableMock.getName()).thenReturn("fileTable");
+    Table volTableMock = mock(Table.class);
+    Table bucketTableMock = mock(Table.class);
+    when(keyTableMock.getName()).thenReturn(FILE_TABLE);
     when(omMetadataManagerMock.getKeyTable()).thenReturn(keyTableMock);
-    when(dirTableMock.getName()).thenReturn("directoryTable");
+    when(dirTableMock.getName()).thenReturn(DIRECTORY_TABLE);
     when(omMetadataManagerMock.getDirectoryTable()).thenReturn(dirTableMock);
+    when(volTableMock.getName()).thenReturn(VOLUME_TABLE);
+    when(omMetadataManagerMock.getVolumeTable()).thenReturn(volTableMock);
+    when(bucketTableMock.getName()).thenReturn(BUCKET_TABLE);
+    when(omMetadataManagerMock.getBucketTable()).thenReturn(bucketTableMock);
     when(omServiceProviderMock.getOMMetadataManagerInstance())
             .thenReturn(omMetadataManagerMock);
     return omServiceProviderMock;

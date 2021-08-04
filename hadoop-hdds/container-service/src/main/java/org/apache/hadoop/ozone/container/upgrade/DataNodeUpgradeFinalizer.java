@@ -68,7 +68,6 @@ public class DataNodeUpgradeFinalizer extends
       switch (state) {
       case OPEN:
       case CLOSING:
-      case UNHEALTHY:
         LOG.warn("FinalizeUpgrade : Waiting for container to close, current "
             + "state is: {}", state);
         return false;
