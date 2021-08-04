@@ -198,11 +198,6 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
   }
 
   @Override
-  public void write(ByteBuf b, int off, int len) throws IOException {
-    write(b.slice(off, len));
-  }
-
-  @Override
   public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;

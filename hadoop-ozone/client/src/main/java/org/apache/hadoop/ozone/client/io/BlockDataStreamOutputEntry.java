@@ -110,11 +110,6 @@ public final class BlockDataStreamOutputEntry extends OutputStream implements Da
   }
 
   @Override
-  public void write(ByteBuf b, int off, int len) throws IOException {
-    write(b.slice(off, len));
-  }
-
-  @Override
   public void write(int b) throws IOException {
     checkStream();
     outputStream.write(b);

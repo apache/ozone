@@ -9,7 +9,9 @@ public interface DataStreamOutput extends Closeable {
 
     void write(ByteBuf b) throws IOException;
 
-    void write(ByteBuf b, int off, int len) throws IOException;
+    default void write(ByteBuf b, int off, int len) throws IOException {
+        write(b.slice(off, len));
+    }
 
     void flush() throws IOException;
 }
