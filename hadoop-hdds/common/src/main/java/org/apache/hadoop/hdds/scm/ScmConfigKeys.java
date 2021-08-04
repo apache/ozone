@@ -356,6 +356,11 @@ public final class ScmConfigKeys {
           "ozone.scm.datanode.pipeline.limit";
   public static final int OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT = 2;
 
+  public static final String OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS =
+      "ozone.scm.datanode.disallow.same.peers";
+  public static final boolean OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT =
+      false;
+
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.
   // Only for test purpose now.

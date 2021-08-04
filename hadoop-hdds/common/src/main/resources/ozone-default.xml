@@ -844,6 +844,14 @@
   </description>
   </property>
   <property>
+    <name>ozone.scm.datanode.disallow.same.peers</name>
+    <value>false</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Disallows same set of datanodes to participate in multiple
+      pipelines when set to true. Default is set to false.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ratis.pipeline.limit</name>
     <value>0</value>
     <tag>OZONE, SCM, PIPELINE</tag>
