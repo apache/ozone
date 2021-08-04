@@ -25,11 +25,14 @@ import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
@@ -59,6 +62,12 @@ public class TestReplicationSupervisor {
   private final ContainerReplicator noopReplicator = task -> {};
   private final ContainerReplicator throwingReplicator = task -> {
     throw new RuntimeException("testing replication failure");
+  };
+  private final ContainerReplicator slowReplicator = task -> {
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {
+    }
   };
   private final AtomicReference<ContainerReplicator> replicatorRef =
       new AtomicReference<>();
@@ -91,7 +100,10 @@ public class TestReplicationSupervisor {
   @Test
   public void normal() {
     // GIVEN
-    ReplicationSupervisor supervisor = supervisorWithSuccessfulReplicator();
+    ReplicationSupervisor supervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+    ReplicationSupervisorMetrics metrics =
+        ReplicationSupervisorMetrics.create(supervisor);
 
     try {
       //WHEN
@@ -103,8 +115,14 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(3, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
       Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(3, set.containerCount());
+
+      MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
+      metrics.getMetrics(metricsCollector, true);
+      Assert.assertEquals(1, metricsCollector.getRecords().size());
     } finally {
+      metrics.unRegister();
       supervisor.stop();
     }
   }
@@ -112,7 +130,8 @@ public class TestReplicationSupervisor {
   @Test
   public void duplicateMessage() {
     // GIVEN
-    ReplicationSupervisor supervisor = supervisorWithSuccessfulReplicator();
+    ReplicationSupervisor supervisor = supervisorWithReplicator(
+        FakeReplicator::new);
 
     try {
       //WHEN
@@ -126,6 +145,7 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
       Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(1, set.containerCount());
     } finally {
       supervisor.stop();
@@ -148,6 +168,7 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(1, supervisor.getReplicationFailureCount());
       Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(0, set.containerCount());
       Assert.assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
     } finally {
@@ -172,7 +193,36 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
       Assert.assertEquals(3, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(0, set.containerCount());
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @Test
+  public void slowDownload() {
+    // GIVEN
+    ReplicationSupervisor supervisor = supervisorWith(__ -> slowReplicator,
+        new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>()));
+
+    try {
+      //WHEN
+      supervisor.addTask(new ReplicationTask(1L, emptyList()));
+      supervisor.addTask(new ReplicationTask(2L, emptyList()));
+      supervisor.addTask(new ReplicationTask(3L, emptyList()));
+
+      //THEN
+      Assert.assertEquals(3, supervisor.getInFlightReplications());
+      Assert.assertEquals(2, supervisor.getQueueSize());
+      // Sleep 4s, wait all tasks processed
+      try {
+        Thread.sleep(4000);
+      } catch (InterruptedException e) {
+      }
+      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getQueueSize());
     } finally {
       supervisor.stop();
     }
@@ -208,8 +258,9 @@ public class TestReplicationSupervisor {
         .contains("Container 1 replication was unsuccessful."));
   }
 
-  private ReplicationSupervisor supervisorWithSuccessfulReplicator() {
-    return supervisorWith(FakeReplicator::new, newDirectExecutorService());
+  private ReplicationSupervisor supervisorWithReplicator(
+      Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory) {
+    return supervisorWith(replicatorFactory, newDirectExecutorService());
   }
 
   private ReplicationSupervisor supervisorWith(
