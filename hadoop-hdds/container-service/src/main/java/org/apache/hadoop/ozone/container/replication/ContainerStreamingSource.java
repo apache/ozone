@@ -75,8 +75,11 @@ public class ContainerStreamingSource implements StreamingSource {
       final File dbPath =
           container.getContainerData().getContainerDBFile();
 
-      final List<Path> dbFiles =
-          Files.list(dbPath.toPath()).collect(Collectors.toList());
+      List<Path> dbFiles;
+      try (Stream<Path> files = Files.list(dbPath.toPath())) {
+        dbFiles = files.collect(Collectors.toList());
+      }
+
       for (Path dbFile : dbFiles) {
         if (dbFile.getFileName() != null) {
           filesToStream.put("DB/" + dbFile.getFileName(), dbFile);
@@ -89,15 +92,15 @@ public class ContainerStreamingSource implements StreamingSource {
       final Path dataPath =
           Paths.get(container.getContainerData().getChunksPath());
 
-      final Stream<Path> walk = Files.walk(dataPath);
+      try (Stream<Path> walk = Files.walk(dataPath)) {
 
-      walk.filter(Files::isRegularFile)
-          .forEach(path -> {
-            filesToStream
-                .put("DATA/" + dataPath.relativize(path), path);
-          });
-
-      walk.close();
+        walk.filter(Files::isRegularFile)
+            .forEach(path -> {
+              filesToStream
+                  .put("DATA/" + dataPath.relativize(path), path);
+            });
+      }
+      
     } catch (IOException e) {
       throw new StreamingException("Couldn't stream container " + containerId,
           e);
