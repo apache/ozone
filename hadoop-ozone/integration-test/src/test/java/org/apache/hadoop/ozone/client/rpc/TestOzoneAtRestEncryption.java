@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.MultipartCryptoKeyInputStream;
@@ -183,9 +182,7 @@ public class TestOzoneAtRestEncryption {
   public void testPutKeyWithEncryption() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
 
-    String value = "sample value";
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
@@ -193,35 +190,82 @@ public class TestOzoneAtRestEncryption {
     volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    for (int i = 0; i < 1; i++) {
-      String keyName = UUID.randomUUID().toString();
+    createAndVerifyKeyData(bucket);
+  }
 
-      try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(StandardCharsets.UTF_8).length,
-          ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>())) {
-        out.write(value.getBytes(StandardCharsets.UTF_8));
-      }
+  @Test
+  public void testLinkEncryptedBuckets() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
 
-      OzoneKey key = bucket.getKey(keyName);
-      Assert.assertEquals(keyName, key.getName());
-      byte[] fileContent;
-      int len = 0;
+    // Create source volume/bucket.
+    createVolumeAndBucket(volumeName, bucketName);
 
-      try(OzoneInputStream is = bucket.readKey(keyName)) {
-        fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
-        len = is.read(fileContent);
-      }
+    // Create link volume/bucket.
+    String linkVolumeName = UUID.randomUUID().toString();
+    String linkBucketName = UUID.randomUUID().toString();
+    OzoneBucket linkBucket = createLinkVolumeAndBucket(volumeName, bucketName,
+        linkVolumeName, linkBucketName);
 
-      Assert.assertEquals(len, value.length());
-      Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE));
-      Assert.assertEquals(value, new String(fileContent,
-          StandardCharsets.UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+    createAndVerifyKeyData(linkBucket);
+  }
+
+
+  private void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
+    Instant testStartTime = Instant.now();
+    String keyName = UUID.randomUUID().toString();
+    String value = "sample value";
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(StandardCharsets.UTF_8).length,
+        ReplicationType.STAND_ALONE,
+        ReplicationFactor.ONE, new HashMap<>())) {
+      out.write(value.getBytes(StandardCharsets.UTF_8));
     }
+
+    // Verify content.
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+
+    // Check file encryption info is set,
+    // if set key will use this encryption info and encrypt data.
+    Assert.assertTrue(key.getFileEncryptionInfo() != null);
+
+    byte[] fileContent;
+    int len = 0;
+
+    try(OzoneInputStream is = bucket.readKey(keyName)) {
+      fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
+      len = is.read(fileContent);
+    }
+
+
+    Assert.assertEquals(len, value.length());
+    Assert.assertTrue(verifyRatisReplication(bucket.getVolumeName(),
+        bucket.getName(), keyName, ReplicationType.STAND_ALONE,
+        ReplicationFactor.ONE));
+    Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
+    Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+    Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+  }
+
+  private OzoneBucket createVolumeAndBucket(String volumeName,
+      String bucketName) throws Exception{
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketEncryptionKey(TEST_KEY).build();
+    volume.createBucket(bucketName, bucketArgs);
+    return volume.getBucket(bucketName);
+  }
+
+  private OzoneBucket createLinkVolumeAndBucket(String sourceVol,
+      String sourceBucket, String linkVol, String linkBucket) throws Exception {
+    store.createVolume(linkVol);
+    OzoneVolume linkVolume = store.getVolume(linkVol);
+    BucketArgs linkBucketArgs = BucketArgs.newBuilder()
+        .setSourceVolume(sourceVol).setSourceBucket(sourceBucket).build();
+    linkVolume.createBucket(linkBucket, linkBucketArgs);
+    return linkVolume.getBucket(linkBucket);
   }
 
   /**
@@ -354,25 +398,37 @@ public class TestOzoneAtRestEncryption {
 
   @Test
   public void testMPUwithOnePart() throws Exception {
-    testMultipartUploadWithEncryption(1);
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    testMultipartUploadWithEncryption(bucket, 1);
   }
 
   @Test
   public void testMPUwithTwoParts() throws Exception {
-    testMultipartUploadWithEncryption(2);
-  }
-
-  public void testMultipartUploadWithEncryption(int numParts) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = "mpu_test_key_" + numParts;
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    testMultipartUploadWithEncryption(bucket, 2);
+  }
 
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setBucketEncryptionKey(TEST_KEY).build();
-    volume.createBucket(bucketName, bucketArgs);
-    OzoneBucket bucket = volume.getBucket(bucketName);
+
+  @Test
+  public void testMPUwithLinkBucket() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    createVolumeAndBucket(volumeName, bucketName);
+
+    String linkVolumeName = UUID.randomUUID().toString();
+    String linkBucketName = UUID.randomUUID().toString();
+    OzoneBucket linkBucket = createLinkVolumeAndBucket(volumeName, bucketName,
+        linkVolumeName, linkBucketName);
+    testMultipartUploadWithEncryption(linkBucket, 2);
+  }
+
+  public void testMultipartUploadWithEncryption(OzoneBucket bucket,
+      int numParts) throws Exception {
+    String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
