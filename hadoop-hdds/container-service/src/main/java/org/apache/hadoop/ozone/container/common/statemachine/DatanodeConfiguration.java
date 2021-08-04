@@ -79,6 +79,18 @@ public class DatanodeConfiguration {
   )
   private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
+  /**
+   * The maximum number of replication requests.
+   */
+  @Config(key = "replication.queue.limit",
+      type = ConfigType.INT,
+      defaultValue = "1000",
+      tags = {DATANODE},
+      description = "The maximum number of queued requests for container  " +
+          "replication"
+  )
+  private int replicationQueueLimit = 1000;
+
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
@@ -290,6 +302,14 @@ public class DatanodeConfiguration {
 
   public int getReplicationMaxStreams() {
     return replicationMaxStreams;
+  }
+
+  public int getReplicationQueueLimit() {
+    return replicationQueueLimit;
+  }
+
+  public void setReplicationQueueLimit(int limit) {
+    this.replicationQueueLimit = limit;
   }
 
   public int getContainerDeleteThreads() {

@@ -18,8 +18,11 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -28,12 +31,18 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
+import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollEventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollServerDomainSocketChannel;
+import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
@@ -57,22 +66,50 @@ public class ReplicationServer {
 
   private int port;
 
+  private int poolSize;
+
+  private int queueLimit;
+
   public ReplicationServer(
       ContainerController controller,
       ReplicationConfig replicationConfig,
-      SecurityConfig secConf,
-      CertificateClient caClient
-  ) {
+      SecurityConfig secConf, DatanodeConfiguration dnConfig,
+      CertificateClient caClient) {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
     this.port = replicationConfig.getPort();
+    this.poolSize = dnConfig.getReplicationMaxStreams();
+    this.queueLimit = dnConfig.getReplicationQueueLimit();
     init();
   }
 
   public void init() {
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(
+        poolSize, poolSize, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(queueLimit),
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("ReplicationServerExecutor-%d")
+            .build());
+
+    EventLoopGroup eventLoopGroup;
+    Class channelType;
+    try {
+      eventLoopGroup = new EpollEventLoopGroup(poolSize);
+      channelType = EpollServerDomainSocketChannel.class;
+    } catch (UnsatisfiedLinkError e) {
+      LOG.info("ePool is not enabled, use NioEventLoopGroup for both worker " +
+              "and boss pool.", e);
+      eventLoopGroup = new NioEventLoopGroup(poolSize);
+      channelType = NioServerSocketChannel.class;
+    }
+
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+        .workerEventLoopGroup(eventLoopGroup)
+        .bossEventLoopGroup(eventLoopGroup)
+        .channelType(channelType)
+        .executor(executor)
         .addService(ServerInterceptors.intercept(new GrpcReplicationService(
             new OnDemandContainerReplicationSource(controller)
         ), new GrpcServerInterceptor()));
