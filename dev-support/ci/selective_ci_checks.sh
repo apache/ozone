@@ -143,6 +143,16 @@ function count_changed_files() {
     verbosity::restore_exit_on_error_status
 }
 
+# Keep running list of matched files
+function update_matched_files() {
+    local match ignore
+    match=$(get_regexp_from_patterns pattern_array)
+    ignore=$(get_regexp_from_patterns ignore_array)
+    verbosity::store_exit_on_error_status
+    matched_files=${matched_files=}$(echo -e "\n" "${CHANGED_FILES}")
+    verbosity::restore_exit_on_error_status
+}
+
 SOURCES_TRIGGERING_TESTS=(
     "^hadoop-hdds"
     "^hadoop-ozone"
@@ -207,6 +217,7 @@ function get_count_compose_files() {
     COUNT_COMPOSE_CHANGED_FILES=$(count_changed_files)
     echo "Files count: ${COUNT_COMPOSE_CHANGED_FILES}"
     readonly COUNT_COMPOSE_CHANGED_FILES
+    update_matched_files
     start_end::group_end
 }
 
@@ -220,6 +231,7 @@ function get_count_doc_files() {
     COUNT_DOC_CHANGED_FILES=$(count_changed_files)
     echo "Files count: ${COUNT_DOC_CHANGED_FILES}"
     readonly COUNT_DOC_CHANGED_FILES
+    update_matched_files
     start_end::group_end
 }
 
@@ -236,6 +248,7 @@ function get_count_junit_files() {
     COUNT_JUNIT_CHANGED_FILES=$(count_changed_files)
     echo "Files count: ${COUNT_JUNIT_CHANGED_FILES}"
     readonly COUNT_JUNIT_CHANGED_FILES
+    update_matched_files
     start_end::group_end
 }
 
@@ -249,6 +262,7 @@ function get_count_kubernetes_files() {
     COUNT_KUBERNETES_CHANGED_FILES=$(count_changed_files)
     echo "Files count: ${COUNT_KUBERNETES_CHANGED_FILES}"
     readonly COUNT_KUBERNETES_CHANGED_FILES
+    update_matched_files
     start_end::group_end
 }
 
@@ -261,6 +275,7 @@ function get_count_robot_files() {
     COUNT_ROBOT_CHANGED_FILES=$(count_changed_files)
     echo "Files count: ${COUNT_ROBOT_CHANGED_FILES}"
     readonly COUNT_ROBOT_CHANGED_FILES
+    update_matched_files
     start_end::group_end
 }
 
@@ -377,7 +392,10 @@ function check_needs_unit_test() {
 
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
-    COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - COUNT_COMPOSE_CHANGED_FILES - COUNT_DOC_CHANGED_FILES - COUNT_JUNIT_CHANGED_FILES - COUNT_KUBERNETES_CHANGED_FILES - COUNT_ROBOT_CHANGED_FILES))
+    verbosity::store_exit_on_error_status
+    local matched_files_count=$(echo "${matched_files}" | sort | uniq | grep -v -e "^$" | wc -l)
+    verbosity::restore_exit_on_error_status
+    COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - matched_files_count))
     readonly COUNT_CORE_OTHER_CHANGED_FILES
     echo
     echo "Files count: ${COUNT_CORE_OTHER_CHANGED_FILES}"
