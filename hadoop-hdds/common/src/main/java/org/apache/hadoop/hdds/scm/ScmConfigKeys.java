@@ -482,16 +482,15 @@ public final class ScmConfigKeys {
 
   public static final String RAFT_SEGMENT_SIZE=
           "ozone.scm.ha.ratis.segment.size";
-  public static final long RAFT_SEGMENT_SIZE_DEFAULT = 16L * 1024L;
+  public static final String RAFT_SEGMENT_SIZE_DEFAULT = "16KB";
 
   public static final String RAFT_SEGMENT_PRE_ALLOCATED_SIZE=
           "ozone.scm.ha.ratis.segment.preallocated.size";
-  public static final long RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT= 16L * 1024L;
+  public static final String RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT= "16KB";
 
   public static final String RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT=
           "ozone.scm.ha.ratis.log.appender.queue.byte-limit";
-  public static final int RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT=
-          32 * 1024 * 1024;
+  public static final String RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT= "32MB";
 
   public static final String GRPC_DEADLINE_INTERVAL=
           "ozone.scm.ha.grpc.deadline.interval";

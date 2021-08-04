@@ -2822,18 +2822,6 @@
     <description>Storage directory used by SCM to write Ratis logs.</description>
   </property>
   <property>
-    <name>ozone.scm.ha.ratis.bind.host</name>
-    <value>0.0.0.0</value>
-    <tag>OZONE, SCM, HA, RATIS</tag>
-    <description>Host used by SCM for binding Ratis Server.</description>
-  </property>
-  <property>
-    <name>ozone.scm.ha.ratis.bind.port</name>
-    <value>9894</value>
-    <tag>OZONE, SCM, HA, RATIS</tag>
-    <description>Port used by SCM for Ratis Server.</description>
-  </property>
-  <property>
     <name>ozone.scm.ha.ratis.rpc.type</name>
     <value>GRPC</value>
     <tag>SCM, OZONE, HA, RATIS</tag>

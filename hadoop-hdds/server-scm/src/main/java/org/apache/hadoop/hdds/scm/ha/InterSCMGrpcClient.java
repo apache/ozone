@@ -61,8 +61,9 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
       int port, final ConfigurationSource conf,
       SCMCertificateClient scmCertificateClient) throws IOException {
     Preconditions.checkNotNull(conf);
-    timeout = conf.getLong(ScmConfigKeys.GRPC_DEADLINE_INTERVAL,
-            ScmConfigKeys.GRPC_DEADLINE_INTERVAL_DEFAULT);
+    timeout = conf.getTimeDuration(ScmConfigKeys.GRPC_DEADLINE_INTERVAL,
+            ScmConfigKeys.GRPC_DEADLINE_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
