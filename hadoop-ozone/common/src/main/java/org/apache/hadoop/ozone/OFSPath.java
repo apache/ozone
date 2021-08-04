@@ -73,8 +73,11 @@ public class OFSPath {
   }
 
   public OFSPath(String pathStr) {
+    final OzoneURIParser parser = new OzoneURIParser(pathStr);
     try {
-      initOFSPath(new URI(pathStr));
+      URI uri = new URI(
+          parser.getScheme(), parser.getAuthority(), parser.getPath(), "", "");
+      initOFSPath(uri);
     } catch (URISyntaxException ex) {
       throw new RuntimeException(ex);
     }
@@ -83,14 +86,12 @@ public class OFSPath {
   private void initOFSPath(URI uri) {
     // Scheme is case-insensitive
     String scheme = uri.getScheme();
-    if (scheme != null) {
-      if (!scheme.toLowerCase().equals(OZONE_OFS_URI_SCHEME)) {
-        throw new ParseException("Can't parse schemes other than ofs://.");
-      }
+    if (scheme != null && !scheme.equalsIgnoreCase(OZONE_OFS_URI_SCHEME)) {
+      throw new ParseException("Can't parse schemes other than ofs.");
     }
     // authority could be empty
     authority = uri.getAuthority() == null ? "" : uri.getAuthority();
-    String pathStr = uri.getPath();
+    final String pathStr = uri.getPath();
     StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
     int numToken = token.countTokens();
 
