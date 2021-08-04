@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -41,7 +42,7 @@ import java.util.Collections;
 public final class BlockDataStreamOutputEntry extends OutputStream implements DataStreamOutput {
 
   private final OzoneClientConfig config;
-  private OutputStream outputStream;
+  private DataStreamOutput dataStreamOutput;
   private BlockID blockID;
   private final String key;
   private final XceiverClientFactory xceiverClientManager;
@@ -65,7 +66,7 @@ public final class BlockDataStreamOutputEntry extends OutputStream implements Da
       OzoneClientConfig config
   ) {
     this.config = config;
-    this.outputStream = null;
+    this.dataStreamOutput = null;
     this.blockID = blockID;
     this.key = key;
     this.xceiverClientManager = xceiverClientManager;
@@ -95,8 +96,8 @@ public final class BlockDataStreamOutputEntry extends OutputStream implements Da
    * @throws IOException if xceiverClient initialization fails
    */
   private void checkStream() throws IOException {
-    if (this.outputStream == null) {
-      this.outputStream =
+    if (this.dataStreamOutput == null) {
+      this.dataStreamOutput =
           new BlockDataStreamOutput(blockID, xceiverClientManager,
               pipeline, bufferPool, config, token);
     }
@@ -104,52 +105,51 @@ public final class BlockDataStreamOutputEntry extends OutputStream implements Da
 
   @Override
   public void write(ByteBuf b) throws IOException {
-    byte[] data = new byte[b.readableBytes()];
-    b.readBytes(data);
-    write(data);
-  }
-
-  @Override
-  public void write(int b) throws IOException {
     checkStream();
-    outputStream.write(b);
-    this.currentPosition += 1;
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    checkStream();
-    outputStream.write(b, off, len);
+    final int len = b.readableBytes();
+    dataStreamOutput.write(b);
     this.currentPosition += len;
   }
 
   @Override
+  public void write(int b) throws IOException {
+    byte[] buf = new byte[1];
+    buf[0] = (byte) b;
+    write(Unpooled.wrappedBuffer(buf));
+  }
+
+  @Override
+  public void write(byte[] b, int off, int len) throws IOException {
+    write(Unpooled.wrappedBuffer(b), off, len);
+  }
+
+  @Override
   public void flush() throws IOException {
-    if (this.outputStream != null) {
-      this.outputStream.flush();
+    if (this.dataStreamOutput != null) {
+      this.dataStreamOutput.flush();
     }
   }
 
   @Override
   public void close() throws IOException {
-    if (this.outputStream != null) {
-      this.outputStream.close();
+    if (this.dataStreamOutput != null) {
+      this.dataStreamOutput.close();
       // after closing the chunkOutPutStream, blockId would have been
       // reconstructed with updated bcsId
-      this.blockID = ((BlockDataStreamOutput) outputStream).getBlockID();
+      this.blockID = ((BlockDataStreamOutput) dataStreamOutput).getBlockID();
     }
   }
 
   boolean isClosed() {
-    if (outputStream != null) {
-      return  ((BlockDataStreamOutput) outputStream).isClosed();
+    if (dataStreamOutput != null) {
+      return  ((BlockDataStreamOutput) dataStreamOutput).isClosed();
     }
     return false;
   }
 
   long getTotalAckDataLength() {
-    if (outputStream != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.outputStream;
+    if (dataStreamOutput != null) {
+      BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
       blockID = out.getBlockID();
       return out.getTotalAckDataLength();
     } else {
@@ -161,16 +161,16 @@ public final class BlockDataStreamOutputEntry extends OutputStream implements Da
   }
 
   Collection<DatanodeDetails> getFailedServers() {
-    if (outputStream != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.outputStream;
+    if (dataStreamOutput != null) {
+      BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
       return out.getFailedServers();
     }
     return Collections.emptyList();
   }
 
   long getWrittenDataLength() {
-    if (outputStream != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.outputStream;
+    if (dataStreamOutput != null) {
+      BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
       return out.getWrittenDataLength();
     } else {
       // For a pre allocated block for which no write has been initiated,
@@ -182,14 +182,14 @@ public final class BlockDataStreamOutputEntry extends OutputStream implements Da
 
   void cleanup(boolean invalidateClient) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = (BlockDataStreamOutput) this.outputStream;
+    BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
     out.cleanup(invalidateClient);
 
   }
 
   void writeOnRetry(long len) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = (BlockDataStreamOutput) this.outputStream;
+    BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
     out.writeOnRetry(len);
     this.currentPosition += len;
 
@@ -265,8 +265,8 @@ public final class BlockDataStreamOutputEntry extends OutputStream implements Da
   }
 
   @VisibleForTesting
-  public OutputStream getOutputStream() {
-    return outputStream;
+  public DataStreamOutput getDataStreamOutput() {
+    return dataStreamOutput;
   }
 
   public BlockID getBlockID() {
