@@ -65,7 +65,8 @@ import java.util.stream.Collectors;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput extends OutputStream implements DataStreamOutput {
+public class KeyDataStreamOutput extends OutputStream
+    implements DataStreamOutput {
 
   private OzoneClientConfig config;
 
@@ -254,8 +255,8 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
   }
 
   private int writeToOutputStream(BlockDataStreamOutputEntry current,
-      boolean retry, long len, ByteBuf b, int writeLen, int off, long currentPos)
-      throws IOException {
+      boolean retry, long len, ByteBuf b, int writeLen, int off,
+      long currentPos) throws IOException {
     try {
       if (retry) {
         current.writeOnRetry(len);
@@ -325,7 +326,8 @@ public class KeyDataStreamOutput extends OutputStream implements DataStreamOutpu
     Preconditions.checkArgument(
         bufferedDataLen <= config.getStreamBufferMaxSize());
     Preconditions.checkArgument(
-        offset - blockDataStreamOutputEntryPool.getKeyLength() == bufferedDataLen);
+        offset - blockDataStreamOutputEntryPool.getKeyLength() ==
+        bufferedDataLen);
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
     Preconditions.checkNotNull(failedServers);

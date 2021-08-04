@@ -29,7 +29,8 @@ import java.io.OutputStream;
  * OzoneOutputStream is used to write data into Ozone.
  * It uses SCM's {@link KeyOutputStream} for writing the data.
  */
-public class OzoneDataStreamOutput extends OutputStream implements DataStreamOutput {
+public class OzoneDataStreamOutput extends OutputStream
+    implements DataStreamOutput {
 
   private final DataStreamOutput dataStreamOutput;
 

@@ -139,7 +139,8 @@ public class PutKeyHandler extends KeyHandler {
         long off = 0;
         while (len > 0) {
           long writeLen = Math.min(len, chunkSize);
-          ByteBuffer segment = ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
+          ByteBuffer segment =
+              ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
           ByteBuf buf = Unpooled.wrappedBuffer(segment);
           out.write(buf);
           off += writeLen;

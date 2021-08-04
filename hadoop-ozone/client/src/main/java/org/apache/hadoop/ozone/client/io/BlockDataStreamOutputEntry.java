@@ -39,7 +39,8 @@ import java.util.Collections;
 /**
  * Helper class used inside {@link BlockDataStreamOutput}.
  * */
-public final class BlockDataStreamOutputEntry extends OutputStream implements DataStreamOutput {
+public final class BlockDataStreamOutputEntry extends OutputStream
+    implements DataStreamOutput {
 
   private final OzoneClientConfig config;
   private DataStreamOutput dataStreamOutput;

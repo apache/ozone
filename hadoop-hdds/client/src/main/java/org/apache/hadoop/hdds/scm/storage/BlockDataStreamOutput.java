@@ -85,6 +85,7 @@ public class BlockDataStreamOutput extends OutputStream
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
+  private static final CompletableFuture[] EMPTY_FUTURE_ARRAY = {};
 
   private AtomicReference<BlockID> blockID;
 
@@ -133,7 +134,7 @@ public class BlockDataStreamOutput extends OutputStream
   private final Token<? extends TokenIdentifier> token;
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
-  List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
+  private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   private final long syncSize = 1L << 24; // TODO: make it configurable
   private long syncPosition = 0;
 
@@ -161,7 +162,8 @@ public class BlockDataStreamOutput extends OutputStream
     this.containerBlockData =
         BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .addMetadata(keyValue);
-    this.xceiverClient = (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
+    this.xceiverClient =
+        (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
     ContainerProtos.WriteChunkRequestProto.Builder writeChunkRequest =
         ContainerProtos.WriteChunkRequestProto.newBuilder()
             .setBlockID(blockID.getDatanodeBlockIDProtobuf());
@@ -173,7 +175,8 @@ public class BlockDataStreamOutput extends OutputStream
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
-    ContainerCommandRequestMessage message = ContainerCommandRequestMessage.toMessage(builder.build(), null);
+    ContainerCommandRequestMessage message =
+        ContainerCommandRequestMessage.toMessage(builder.build(), null);
 
     out = Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
             .stream(message.getContent().asReadOnlyByteBuffer());
@@ -260,7 +263,8 @@ public class BlockDataStreamOutput extends OutputStream
     while (len > 0) {
       allocateNewBufferIfNeeded();
       final int writeLen = Math.min(currentBufferRemaining, len);
-      currentBuffer.put(b.nioBuffer(off, writeLen)); // TODO: avoid buffer copy here
+      // TODO: avoid buffer copy here
+      currentBuffer.put(b.nioBuffer(off, writeLen));
       currentBufferRemaining -= writeLen;
       writeChunkIfNeeded();
       off += writeLen;
@@ -440,9 +444,8 @@ public class BlockDataStreamOutput extends OutputStream
       byteBufferList = null;
     }
 
-    CompletableFuture[] EMPTY_COMPLETABLE_FUTURE_ARRAY = {};
     try {
-      CompletableFuture.allOf(futures.toArray(EMPTY_COMPLETABLE_FUTURE_ARRAY)).get();
+      CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
@@ -671,7 +674,8 @@ public class BlockDataStreamOutput extends OutputStream
 
   private boolean needSync(long position) {
     if (syncSize > 0) {
-      if (position - syncPosition >= syncSize) { // TODO: or position >= fileLength
+      // TODO: or position >= fileLength
+      if (position - syncPosition >= syncSize) {
         syncPosition = position;
         return true;
       }
@@ -705,16 +709,17 @@ public class BlockDataStreamOutput extends OutputStream
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
 
-    CompletableFuture<DataStreamReply> future = (needSync(offset + effectiveChunkSize) ?
-      out.writeAsync(data.asReadOnlyByteBuffer(), StandardWriteOption.SYNC) :
-      out.writeAsync(data.asReadOnlyByteBuffer()))
-        .whenCompleteAsync((r,e) -> {
+    CompletableFuture<DataStreamReply> future =
+        (needSync(offset + effectiveChunkSize) ?
+        out.writeAsync(data.asReadOnlyByteBuffer(), StandardWriteOption.SYNC) :
+        out.writeAsync(data.asReadOnlyByteBuffer()))
+        .whenCompleteAsync((r, e) -> {
           if (e != null || !r.isSuccess()) {
             if (e == null) {
               e = new IOException("result is not success");
             }
-            String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
-                "into block " + blockID;
+            String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
+                " " + "into block " + blockID;
             LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
             CompletionException ce = new CompletionException(msg, e);
             setIoException(ce);
