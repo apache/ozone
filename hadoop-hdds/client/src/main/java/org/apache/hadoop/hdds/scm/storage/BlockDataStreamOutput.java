@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -249,20 +250,31 @@ public class BlockDataStreamOutput extends OutputStream
 
   @Override
   public void write(ByteBuf b) throws IOException {
-    byte[] data = new byte[b.readableBytes()];
-    b.readBytes(data);
-    write(data);
+    checkOpen();
+    if (b == null) {
+      throw new NullPointerException();
+    }
+    int off = 0;
+    int len = b.readableBytes();
+
+    while (len > 0) {
+      allocateNewBufferIfNeeded();
+      final int writeLen = Math.min(currentBufferRemaining, len);
+      currentBuffer.put(b.nioBuffer(off, writeLen));
+      currentBufferRemaining -= writeLen;
+      writeChunkIfNeeded();
+      off += writeLen;
+      len -= writeLen;
+      writtenDataLength += writeLen;
+      doFlushOrWatchIfNeeded();
+    }
   }
 
   @Override
   public void write(int b) throws IOException {
-    checkOpen();
-    allocateNewBufferIfNeeded();
-    currentBuffer.put((byte) b);
-    currentBufferRemaining--;
-    writeChunkIfNeeded();
-    writtenDataLength++;
-    doFlushOrWatchIfNeeded();
+    byte[] buf = new byte[1];
+    buf[0] = (byte)b;
+    write(Unpooled.wrappedBuffer(buf));
   }
 
   private void writeChunkIfNeeded() throws IOException {
@@ -273,29 +285,7 @@ public class BlockDataStreamOutput extends OutputStream
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    checkOpen();
-    if (b == null) {
-      throw new NullPointerException();
-    }
-    if ((off < 0) || (off > b.length) || (len < 0) || ((off + len) > b.length)
-        || ((off + len) < 0)) {
-      throw new IndexOutOfBoundsException();
-    }
-    if (len == 0) {
-      return;
-    }
-
-    while (len > 0) {
-      allocateNewBufferIfNeeded();
-      final int writeLen = Math.min(currentBufferRemaining, len);
-      currentBuffer.put(b, off, writeLen);
-      currentBufferRemaining -= writeLen;
-      writeChunkIfNeeded();
-      off += writeLen;
-      len -= writeLen;
-      writtenDataLength += writeLen;
-      doFlushOrWatchIfNeeded();
-    }
+    write(Unpooled.wrappedBuffer(b), off, len);
   }
 
   private void doFlushOrWatchIfNeeded() throws IOException {
