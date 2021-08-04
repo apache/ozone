@@ -76,11 +76,12 @@ public class OMMetadataProtocolClientSideImpl implements
     Configuration hadoopConf = LegacyHadoopConfigurationSource
         .asHadoopConfiguration(conf);
 
-    OMMetadataProtocolPB proxy = RPC.getProtocolProxy(OMMetadataProtocolPB.class,
+    OMMetadataProtocolPB proxy = RPC.getProtocolProxy(
+        OMMetadataProtocolPB.class,
         RPC.getProtocolVersion(OMMetadataProtocolPB.class), omAddress, ugi,
         hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf),
-        (int) OmUtils.getOMClientRpcTimeOut(conf),
-        connectionRetryPolicy).getProxy();
+        (int) OmUtils.getOMClientRpcTimeOut(conf), connectionRetryPolicy)
+        .getProxy();
 
     RetryPolicy retryPolicy = RetryPolicies.retryUpToMaximumCountWithFixedSleep(
         10, 1000, TimeUnit.MILLISECONDS);

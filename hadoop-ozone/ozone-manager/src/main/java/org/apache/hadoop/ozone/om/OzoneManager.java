@@ -1512,12 +1512,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omNodeInRemoteOM.getNodeId().equals(getOMNodeId())) {
         // Verify that the rpc address of current nodeID in remote OM config
         // is correct.
-        if (omNodeInRemoteOM.getRpcAddress().equals(
-            omNodeDetails.getRpcAddress())) {
-          return true;
-        } else {
-          return false;
-        }
+        return omNodeInRemoteOM.getRpcAddress().equals(
+            omNodeDetails.getRpcAddress());
       }
     }
     return false;

@@ -703,7 +703,7 @@ public final class OmUtils {
   }
 
   /**
-   * Get a list of all OM details (address and ports) from the specified config
+   * Get a list of all OM details (address and ports) from the specified config.
    */
   public static List<OMNodeDetails> getAllOMAddresses(OzoneConfiguration conf,
       String omServiceId, String currentOMNodeId) {

@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
  * information through the {@link OMMetadataProtocol} and not for storing the
  * metadata information in OzoneManager itself.
  */
-public class OMMetadata {
+public final class OMMetadata {
 
   // OM nodes present in OM's memory
   private List<OMNodeDetails> omNodesInMemory = new ArrayList<>();
@@ -44,6 +44,9 @@ public class OMMetadata {
     }
   }
 
+  /**
+   * OMMetadata Builder class.
+   */
   public static class Builder {
     private List<OMNodeDetails> omNodesInMemory;
     private List<OMNodeDetails> omNodesInNewConf;
@@ -54,7 +57,7 @@ public class OMMetadata {
     }
 
     public Builder addToNodesInMemory(OMNodeDetails nodeDetails) {
-     this.omNodesInMemory.add(nodeDetails);
+      this.omNodesInMemory.add(nodeDetails);
       return this;
     }
 

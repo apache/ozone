@@ -20,8 +20,6 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMMetadataProtocolPB;
@@ -29,6 +27,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMMetadataInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMNodeInfo;
 
+/**
+ * This class is the server-side translator that forwards requests received on
+ * {@link OMMetadataProtocolPB} to the OMMetadata server implementation.
+ */
 public class OMMetadataProtocolServerSideImpl implements OMMetadataProtocolPB {
 
   private final OzoneManager ozoneManager;
