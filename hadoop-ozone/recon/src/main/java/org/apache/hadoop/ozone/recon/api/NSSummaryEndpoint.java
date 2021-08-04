@@ -980,7 +980,7 @@ public class NSSummaryEndpoint {
     OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
     List<OmKeyLocationInfo> keyLocations =
             locationGroup.getBlocksLatestVersionOnly();
-    long du = keyInfo.getDataSize();
+    long du = 0L;
     // a key could be too large to fit in one single container
     for (OmKeyLocationInfo location: keyLocations) {
       BlockID block = location.getBlockID();
@@ -988,8 +988,8 @@ public class NSSummaryEndpoint {
       try {
         int replicationFactor =
                 containerManager.getContainerReplicas(containerId).size();
-        du *= replicationFactor;
-        break;
+        long blockSize = location.getLength() * replicationFactor;
+        du += blockSize;
       } catch (ContainerNotFoundException cnfe) {
         LOG.warn("Cannot find container");
       }
