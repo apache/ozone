@@ -260,7 +260,7 @@ public class BlockDataStreamOutput extends OutputStream
     while (len > 0) {
       allocateNewBufferIfNeeded();
       final int writeLen = Math.min(currentBufferRemaining, len);
-      currentBuffer.put(b.nioBuffer(off, writeLen));
+      currentBuffer.put(b.nioBuffer(off, writeLen)); // TODO: avoid buffer copy here
       currentBufferRemaining -= writeLen;
       writeChunkIfNeeded();
       off += writeLen;
