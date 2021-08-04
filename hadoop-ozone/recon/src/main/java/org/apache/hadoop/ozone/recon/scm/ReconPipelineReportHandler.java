@@ -75,6 +75,7 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
                   .unwrapRemoteException(PipelineNotFoundException.class);
           if (ioe instanceof PipelineNotFoundException) {
             LOG.error("Could not find pipeline {} at SCM.", pipelineID);
+            throw new PipelineNotFoundException();
           }
         }
         throw ex;
