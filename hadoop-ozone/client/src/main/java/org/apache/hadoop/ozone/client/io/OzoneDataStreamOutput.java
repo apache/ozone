@@ -52,7 +52,7 @@ public class OzoneDataStreamOutput extends OutputStream
   public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
-    write(buf, 0, 1);
+    write(buf);
   }
 
   @Override

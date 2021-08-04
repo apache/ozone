@@ -277,8 +277,8 @@ public class BlockDataStreamOutput extends OutputStream
   @Override
   public void write(int b) throws IOException {
     byte[] buf = new byte[1];
-    buf[0] = (byte)b;
-    write(Unpooled.wrappedBuffer(buf));
+    buf[0] = (byte) b;
+    write(buf);
   }
 
   private void writeChunkIfNeeded() throws IOException {

@@ -116,7 +116,7 @@ public final class BlockDataStreamOutputEntry extends OutputStream
   public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
-    write(Unpooled.wrappedBuffer(buf));
+    write(buf);
   }
 
   @Override
