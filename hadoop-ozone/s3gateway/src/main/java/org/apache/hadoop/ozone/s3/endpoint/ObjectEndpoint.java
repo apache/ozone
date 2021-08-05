@@ -868,10 +868,13 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
     } catch (ParseException e) {
+      // if not valid time, then skip the precondition checks
+      //  which is what AWS seems to do as best I can tell
       return OptionalLong.empty();
     }
 
-    // dates in the future are invalid and should not be used
+    // dates in the future are invalid and should cause
+    //  the precondition checks to be skipped
     long currentDate = new Date().getTime();
     if  (ozoneDateInMs <= currentDate){
       return OptionalLong.of(ozoneDateInMs);
@@ -891,7 +894,8 @@ public class ObjectEndpoint extends EndpointBase {
       copySourceIfModifiedSince = modifiedDate.getAsLong();
     }
 
-    OptionalLong unmodifiedDate = parseOzoneDate(copySourceIfUnmodifiedSinceStr);
+    OptionalLong unmodifiedDate =
+        parseOzoneDate(copySourceIfUnmodifiedSinceStr);
     if (unmodifiedDate.isPresent()) {
       copySourceIfUnmodifiedSince = unmodifiedDate.getAsLong();
     }
