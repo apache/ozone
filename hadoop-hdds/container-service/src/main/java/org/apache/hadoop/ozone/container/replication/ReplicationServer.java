@@ -39,12 +39,14 @@ import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.Epoll;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollEventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollServerDomainSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +72,10 @@ public class ReplicationServer {
 
   private int queueLimit;
 
+  private ThreadPoolExecutor executor;
+
+  EventLoopGroup eventLoopGroup;
+
   public ReplicationServer(
       ContainerController controller,
       ReplicationConfig replicationConfig,
@@ -85,21 +91,19 @@ public class ReplicationServer {
   }
 
   public void init() {
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(
+    executor = new ThreadPoolExecutor(
         poolSize, poolSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(queueLimit),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ReplicationServerExecutor-%d")
             .build());
 
-    EventLoopGroup eventLoopGroup;
     Class channelType;
-    try {
+
+    if (Epoll.isAvailable()) {
       eventLoopGroup = new EpollEventLoopGroup(poolSize);
       channelType = EpollServerDomainSocketChannel.class;
-    } catch (UnsatisfiedLinkError e) {
-      LOG.info("ePool is not enabled, use NioEventLoopGroup for both worker " +
-              "and boss pool.", e);
+    } else {
       eventLoopGroup = new NioEventLoopGroup(poolSize);
       channelType = NioServerSocketChannel.class;
     }
@@ -146,12 +150,14 @@ public class ReplicationServer {
     }
 
     port = server.getPort();
-
   }
 
   public void stop() {
     try {
-      server.shutdown().awaitTermination(10L, TimeUnit.SECONDS);
+      eventLoopGroup.shutdownGracefully().sync();
+      executor.shutdown();
+      executor.awaitTermination(5L, TimeUnit.SECONDS);
+      server.shutdown().awaitTermination(5L, TimeUnit.SECONDS);
     } catch (InterruptedException ex) {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
       Thread.currentThread().interrupt();
