@@ -2370,6 +2370,8 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
 
     Table keyTable = metadataManager.getKeyTable();
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator;
     try {
       Iterator< Map.Entry< CacheKey< String >, CacheValue< OmKeyInfo > > >
           cacheIter = keyTable.cacheIterator();
@@ -2380,6 +2382,7 @@ public class KeyManagerImpl implements KeyManager {
       // First, find key in TableCache
       listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
           recursive, cacheKeyMap, deletedKeySet);
+      iterator = keyTable.iterator();
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
@@ -2388,8 +2391,6 @@ public class KeyManagerImpl implements KeyManager {
     // Then, find key in DB
     String seekKeyInDb =
         metadataManager.getOzoneKey(volumeName, bucketName, startKey);
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
     iterator.seek(seekKeyInDb);
     int countEntries = 0;
     if (iterator.hasNext()) {
@@ -2529,6 +2530,9 @@ public class KeyManagerImpl implements KeyManager {
     // TODO: recursive flag=true will be handled in HDDS-4360 jira.
 
 
+    Set<String> deletedKeySet = new TreeSet<>();
+    TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
+
     if (Strings.isNullOrEmpty(startKey)) {
       OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
       if (fileStatus.isFile()) {
@@ -2561,34 +2565,14 @@ public class KeyManagerImpl implements KeyManager {
       // (1)Seek files in fileTable
       // (2)Seek dirs in dirTable
 
-      Set<String> deletedKeySet = new TreeSet<>();
-      TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
-
       // Get files, dirs and marked for delete entries from cache.
-      countEntries = getFilesAndDirsFromCache(volumeName, bucketName,
-          cacheFileMap, tempCacheDirMap, deletedKeySet, prefixKeyInDB,
-          seekFileInDB, seekDirInDB, prefixPath, startKey, countEntries,
-          numEntries);
+      countEntries = getFilesAndDirsFromCacheWithBucketLock(volumeName,
+          bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
+          prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
+          countEntries, numEntries);
 
       countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
           prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet);
-
-      // Now first add all entries in the dir cache, if numEntries required
-      // is less than countEntries.
-      for (Map.Entry<String, OzoneFileStatus> dirEntry :
-          tempCacheDirMap.entrySet()) {
-        if (countEntries < numEntries) {
-          cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
-          countEntries++;
-        }
-      }
-
-      // 2. Seek the given key in dir table.
-      if (countEntries < numEntries) {
-        getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-            prefixKeyInDB, countEntries, numEntries, recursive,
-            volumeName, bucketName, deletedKeySet);
-      }
 
     } else {
       /*
@@ -2627,6 +2611,7 @@ public class KeyManagerImpl implements KeyManager {
 
       if (fileStatusInfo != null) {
         prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
+
         if(fileStatusInfo.isDirectory()){
           seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
               fileStatusInfo.getKeyInfo().getFileName());
@@ -2638,9 +2623,6 @@ public class KeyManagerImpl implements KeyManager {
           // Seek the given key in dirTable.
           metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
                 bucketName);
-
-          TreeSet<String> deletedKeySet = new TreeSet<>();
-          TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
           try {
             listStatusFindDirsInTableCache(tempCacheDirMap,
                 metadataManager.getDirectoryTable(),
@@ -2651,32 +2633,14 @@ public class KeyManagerImpl implements KeyManager {
                 bucketName);
           }
 
-          // Now first add all entries in the dir cache, if numEntries required
-          // is less than countEntries.
-          for (Map.Entry<String, OzoneFileStatus> dirEntry :
-              tempCacheDirMap.entrySet()) {
-            if (countEntries < numEntries) {
-              cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
-              countEntries++;
-            }
-          }
-
-          if (countEntries < numEntries) {
-            getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-                prefixKeyInDB, countEntries, numEntries, recursive,
-                volumeName, bucketName, deletedKeySet);
-          }
         } else {
           seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
               fileStatusInfo.getKeyInfo().getFileName());
           // begins from the first sub-dir under the parent dir
           seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-          TreeSet<String> deletedKeySet = new TreeSet<>();
-          TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
-
           // Get files, dirs and marked for delete entries from cache.
-          countEntries = getFilesAndDirsFromCache(volumeName, bucketName,
+          countEntries = getFilesAndDirsFromCacheWithBucketLock(volumeName, bucketName,
               cacheFileMap, tempCacheDirMap, deletedKeySet, prefixKeyInDB,
               seekFileInDB, seekDirInDB, prefixPath, startKey, countEntries,
               numEntries);
@@ -2685,23 +2649,6 @@ public class KeyManagerImpl implements KeyManager {
           countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
               prefixPath, prefixKeyInDB, countEntries, numEntries,
               deletedKeySet);
-
-          // Now first add all entries in the dir cache, if numEntries required
-          // is less than countEntries.
-          for (Map.Entry<String, OzoneFileStatus> dirEntry :
-              tempCacheDirMap.entrySet()) {
-            if (countEntries < numEntries) {
-              cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
-              countEntries++;
-            }
-          }
-
-          // 2. Seek the given key in dir table.
-          if (countEntries < numEntries) {
-            getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-                prefixKeyInDB, countEntries, numEntries, recursive,
-                volumeName, bucketName, deletedKeySet);
-          }
         }
       } else {
         // TODO: HDDS-4364: startKey can be a non-existed key
@@ -2712,6 +2659,24 @@ public class KeyManagerImpl implements KeyManager {
         return Collections.emptyList();
       }
     }
+
+    // Now first add all entries in the dir cache, if numEntries required
+    // is less than countEntries.
+    for (Map.Entry<String, OzoneFileStatus> dirEntry :
+        tempCacheDirMap.entrySet()) {
+      if (countEntries < numEntries) {
+        cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
+        countEntries++;
+      }
+    }
+
+    // 2. Seek the given key in dir table.
+    if (countEntries < numEntries) {
+      getDirectories(cacheDirMap, seekDirInDB, prefixPath,
+          prefixKeyInDB, countEntries, numEntries, recursive,
+          volumeName, bucketName, deletedKeySet);
+    }
+
 
     return buildFinalStatusList(cacheFileMap, cacheDirMap, args, clientAddress);
 
@@ -2758,7 +2723,7 @@ public class KeyManagerImpl implements KeyManager {
    * cache.
    */
   @SuppressWarnings("parameternumber")
-  private int getFilesAndDirsFromCache(String volumeName, String bucketName,
+  private int getFilesAndDirsFromCacheWithBucketLock(String volumeName, String bucketName,
       Map<String, OzoneFileStatus> cacheFileMap,
       Map<String, OzoneFileStatus> tempCacheDirMap,
       Set<String> deletedKeySet, long prefixKeyInDB,
