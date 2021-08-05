@@ -135,7 +135,7 @@ public class BlockDataStreamOutput extends OutputStream
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  private final long syncSize = 1L << 24; // TODO: make it configurable
+  private final long syncSize = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
 
   /**
