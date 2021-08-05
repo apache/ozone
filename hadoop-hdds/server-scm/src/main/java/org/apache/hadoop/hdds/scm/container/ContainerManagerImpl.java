@@ -233,6 +233,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       containerInfoBuilder.setReplicationFactor(
           ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
     }
+
     containerStateManager.addContainer(containerInfoBuilder.build());
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
     return containerStateManager.getContainer(containerID.getProtobuf());
