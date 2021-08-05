@@ -860,6 +860,7 @@ public class ObjectEndpoint extends EndpointBase {
     return partMarker;
   }
 
+  // If the return is empty, the precondition should be ignored
   private static OptionalLong parseOzoneDate(String ozoneDateStr)
       throws OS3Exception {
     long ozoneDateInMs;

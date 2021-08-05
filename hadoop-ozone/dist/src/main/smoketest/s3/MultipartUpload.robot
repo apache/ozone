@@ -293,7 +293,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Should contain           ${result}    UploadId
 
 #calc time-to-sleep from time-last-modified plus a few seconds
-    ${result} =         Execute AWSS3APICli     head-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source
+    ${result} =         Execute AWSS3APICli      head-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source
     ${lastModified} =   Execute and checkrc      echo '${result}' | jq -r '.LastModified'    0
                         Should contain           ${result}    ${LastModified}
     ${lmDate} =         Convert Date 	 	 ${lastModified}  date_format=%a, %d %b %Y %H:%M:%S %Z
@@ -320,7 +320,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
 
     ${eTag2} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
-# future date strings don't cause precondition to fail
+# future date strings cause precondition to be ignored
     ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${tomorrow}'   0
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified

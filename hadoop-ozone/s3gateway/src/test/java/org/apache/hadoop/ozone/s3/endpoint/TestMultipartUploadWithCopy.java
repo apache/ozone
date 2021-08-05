@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
-
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -219,8 +218,8 @@ public class TestMultipartUploadWithCopy {
     }
   }
 
-  // Test operations with 2 datestrings; one valid, the other invalid
-  //  to confirm the invalid one doesn't change the behaviour of the valid
+  // Test operations with 2 datestrings; one valid, the other invalid;
+  // confirm the invalid one is ignored and the valid precondition tested
   @Test
   public void testInvalidTimes() throws Exception {
     long sourceKeyLastModificationTime = CLIENT.getObjectStore()
