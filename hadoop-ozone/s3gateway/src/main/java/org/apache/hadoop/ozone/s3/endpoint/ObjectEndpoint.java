@@ -46,10 +46,12 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -601,10 +603,15 @@ public class ObjectEndpoint extends EndpointBase {
               headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
           String copySourceIfUnmodifiedSince =
               headers.getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-          if (!checkCopySourceModificationTime(sourceKeyModificationTime,
-              copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
-            throw S3ErrorTable.newError(PRECOND_FAILED,
-                sourceBucket + "/" + sourceKey);
+	  // if not valid time, then skip the precondition checks
+	  //  which is what AWS seems to do as best I can tell
+          if (isValidModificationTime(copySourceIfModifiedSince) &&
+              isValidModificationTime(copySourceIfUnmodifiedSince)) {
+            if (!checkCopySourceModificationTime(sourceKeyModificationTime,
+                copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
+              throw S3ErrorTable.newError(PRECOND_FAILED,
+                  sourceBucket + "/" + sourceKey);
+            }
           }
 
           try (OzoneInputStream sourceObject =
@@ -867,6 +874,19 @@ public class ObjectEndpoint extends EndpointBase {
           .INVALID_ARGUMENT, ozoneDateStr);
     }
     return ozoneDateInMs;
+  }
+  private boolean isValidModificationTime(String modificationTimeStr) {
+    long date;
+    long currentDate = new Date().getTime();
+    if (modificationTimeStr == null) {
+      return true;
+    }
+    try {
+      date = parseOzoneDate(modificationTimeStr);
+    } catch (OS3Exception e) {
+      return false;
+    }
+    return (date <= currentDate);
   }
 
   private boolean checkCopySourceModificationTime(Long lastModificationTime,
