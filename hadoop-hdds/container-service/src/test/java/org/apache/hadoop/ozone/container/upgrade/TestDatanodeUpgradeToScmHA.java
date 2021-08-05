@@ -2,6 +2,7 @@ package org.apache.hadoop.ozone.container.upgrade;
 
 import kotlin.contracts.Returns;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -34,9 +35,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class TestDatanodeUpgradeToScmHA {
   @Rule
@@ -252,6 +255,9 @@ public class TestDatanodeUpgradeToScmHA {
   }
 
   public String startDnWithScm(int mlv) throws Exception {
+    InetSocketAddress address = SCMTestUtils.getReuseableAddress();
+    conf.set(ScmConfigKeys.OZONE_SCM_NAMES, address.getHostName());
+
     // Set layout version.
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.getRoot().getAbsolutePath());
@@ -278,28 +284,33 @@ public class TestDatanodeUpgradeToScmHA {
     // Stop existing datanode.
     DatanodeDetails dd = dsm.getDatanodeDetails();
     dsm.stopDaemon();
+
     // Start new datanode with the same configuration.
     dsm = new DatanodeStateMachine(dd,
         conf, null, null,
         null);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(expectedMlv, mlv);
-//    dsm.startDaemon();
 
     String scmID = UUID.randomUUID().toString();
     startScmServer(scmID);
     return scmID;
   }
 
-  public void startScmServer(String scmID) throws Exception {
+  public void startScmServer(String scmID)
+      throws Exception {
     if(scmRpcServer != null) {
       scmRpcServer.stop();
     }
 
-    InetSocketAddress address = SCMTestUtils.getReuseableAddress();
+    Collection<InetSocketAddress> addresses =
+        HddsUtils.getSCMAddressForDatanodes(conf);
+    Assert.assertEquals(1, addresses.size());
+    InetSocketAddress address = new ArrayList<>(addresses).get(0);
     ScmTestMock scmServerImpl = new ScmTestMock(CLUSTER_ID, scmID);
     scmRpcServer = SCMTestUtils.startScmRpcServer(SCMTestUtils.getConf(),
         scmServerImpl, address, 10);
+
     EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
         address, 1000);
     VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
