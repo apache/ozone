@@ -615,11 +615,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
-    return createFileInfo(keyArgs, locations,
-            ReplicationConfig.fromTypeAndFactor(
-                    keyArgs.getType(), keyArgs.getFactor()),
-            keyArgs.getDataSize(), encInfo, prefixManager,
-            omBucketInfo, omPathInfo, transactionLogIndex, objectID);
+    return createFileInfo(keyArgs, locations, ReplicationConfig
+            .fromProto(keyArgs.getType(), keyArgs.getFactor(),
+                keyArgs.getEcReplicationConfig()), keyArgs.getDataSize(),
+        encInfo, prefixManager, omBucketInfo, omPathInfo, transactionLogIndex,
+        objectID);
   }
 
   /**
