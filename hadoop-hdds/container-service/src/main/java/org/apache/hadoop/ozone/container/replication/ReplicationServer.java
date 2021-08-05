@@ -46,7 +46,6 @@ import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
-import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +73,7 @@ public class ReplicationServer {
 
   private ThreadPoolExecutor executor;
 
-  EventLoopGroup eventLoopGroup;
+  private EventLoopGroup eventLoopGroup;
 
   public ReplicationServer(
       ContainerController controller,
