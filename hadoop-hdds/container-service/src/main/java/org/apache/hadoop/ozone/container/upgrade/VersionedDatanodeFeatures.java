@@ -125,15 +125,18 @@ public final class VersionedDatanodeFeatures {
     }
 
     public static boolean upgradeVolumeIfNeeded(StorageVolume volume,
-        String clusterID) throws IOException {
+        String clusterID) {
       File clusterIDDir = new File(volume.getStorageDir(), clusterID);
       boolean needsUpgrade = isFinalized(HDDSLayoutFeature.SCM_HA) &&
           !clusterIDDir.exists();
 
+      boolean success = true;
+
       if (needsUpgrade) {
-        ScmHAFinalizeUpgradeActionDatanode.upgradeVolume(volume, clusterID);
+        success = ScmHAFinalizeUpgradeActionDatanode.upgradeVolume(volume,
+            clusterID);
       }
-      return needsUpgrade;
+      return success;
     }
   }
 }

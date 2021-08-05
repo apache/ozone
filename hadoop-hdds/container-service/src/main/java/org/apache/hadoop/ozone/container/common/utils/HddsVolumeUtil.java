@@ -225,9 +225,8 @@ public final class HddsVolumeUtil {
       // skipped. Create cluster ID symlink now.
       // Else, We are still pre-finalized.
       // The existing directory should be left for backwards compatibility.
-      VersionedDatanodeFeatures.ScmHA.
+      return VersionedDatanodeFeatures.ScmHA.
           upgradeVolumeIfNeeded(hddsVolume, clusterId);
-      return true;
     } else {
       if (!clusterDir.exists()) {
         logger.error("{} {} files found but cluster ID directory {} does not " +

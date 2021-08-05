@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANO
 
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.volume.ImmutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.slf4j.Logger;
@@ -48,24 +50,37 @@ public class ScmHAFinalizeUpgradeActionDatanode
   public void execute(DatanodeStateMachine dsm) throws Exception {
     LOG.info("Upgrading Datanode volume layout for SCM HA support.");
     String clusterID = dsm.getLayoutStorage().getClusterID();
+    MutableVolumeSet volumeSet = dsm.getContainer().getVolumeSet();
 
     for (StorageVolume volume:
-        dsm.getContainer().getVolumeSet().getVolumesList()) {
-      upgradeVolume(volume, clusterID);
+        volumeSet.getVolumesList()) {
+      if (!upgradeVolume(volume, clusterID)) {
+        volumeSet.writeLock();
+        try {
+          volumeSet.failVolume(volume.getStorageDir().getAbsolutePath());
+        } finally {
+          volumeSet.writeUnlock();
+        }
+      }
     }
   }
 
-  public static void upgradeVolume(StorageVolume volume, String clusterID)
-      throws IOException  {
+  /**
+   * Upgrade the specified volume to be comaptible with SCM HA layout feature.
+   * @return true if the volume upgrade succeeded, false otherwise.
+   */
+  public static boolean upgradeVolume(StorageVolume volume, String clusterID) {
     File hddsVolumeDir = volume.getStorageDir();
     File clusterIDDir = new File(hddsVolumeDir, clusterID);
     File[] storageDirs = volume.getStorageDir().listFiles(File::isDirectory);
+    boolean success = true;
 
     if (storageDirs == null) {
       LOG.error("IO error for the volume {}. " +
           "Unable to process it for finalizing layout for SCM HA" +
           "support. Formatting will be retried on datanode restart.",
           volume.getStorageDir());
+      success = false;
     }  else if (storageDirs.length == 0) {
       LOG.info("Skipping finalize for SCM HA for unformatted volume {}, no " +
           "action required.", hddsVolumeDir);
@@ -79,7 +94,15 @@ public class ScmHAFinalizeUpgradeActionDatanode
         LOG.info("Creating symlink {} -> {} as part of SCM HA " +
                 "finalization for datanode.", clusterIDDir.getAbsolutePath(),
             relativeScmIDDir);
-        Files.createSymbolicLink(clusterIDDir.toPath(), relativeScmIDDir);
+        try {
+          Files.createSymbolicLink(clusterIDDir.toPath(), relativeScmIDDir);
+        } catch (IOException ex) {
+          LOG.error("IO error for the volume {}. " +
+                  "Unable to process it for finalizing layout for SCM HA" +
+                  "support. Formatting will be retried on datanode restart.",
+              volume.getStorageDir(), ex);
+          success = false;
+        }
       } else {
         LOG.info("Volume already contains cluster ID directory {}. No " +
             "action required for SCM HA finalization.", clusterIDDir);
@@ -90,10 +113,13 @@ public class ScmHAFinalizeUpgradeActionDatanode
       if (!clusterIDDir.exists()) {
         LOG.error("Volume {} is in Inconsistent state. Expected directory" +
             "{} not found.", hddsVolumeDir, clusterIDDir);
+        success = false;
       } else {
         LOG.info("Volume already contains cluster ID directory {}. No " +
             "action required for SCM HA finalization.", clusterIDDir);
       }
     }
+
+    return success;
   }
 }
