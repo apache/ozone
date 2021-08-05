@@ -149,7 +149,7 @@ function update_matched_files() {
     match=$(get_regexp_from_patterns pattern_array)
     ignore=$(get_regexp_from_patterns ignore_array)
     verbosity::store_exit_on_error_status
-    matched_files=${matched_files=}$(echo -e "\n" "${CHANGED_FILES}")
+    matched_files=${matched_files=}$(echo -e "\n" "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}")
     verbosity::restore_exit_on_error_status
 }
 
