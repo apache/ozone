@@ -219,6 +219,8 @@ public class TestMultipartUploadWithCopy {
     }
   }
 
+  // Test operations with 2 datestrings; one valid, the other invalid
+  //  to confirm the invalid one doesn't change the behaviour of the valid
   @Test
   public void testInvalidTimes() throws Exception {
     long sourceKeyLastModificationTime = CLIENT.getObjectStore()
@@ -252,21 +254,32 @@ public class TestMultipartUploadWithCopy {
         badTimeStr);
 
     // ifUnmodifiedSince = tomorrow
-    // ifModifiedSince = beforeSourceKeyModificationTime,
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        beforeSourceKeyModificationTimeStr,
-        tomorrowTimeStr);
+    // ifModifiedSince = afterSourceKeyModificationTime,
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          afterSourceKeyModificationTimeStr,
+          tomorrowTimeStr);
+      fail("testInvalidTimesError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
 
 
-    // ifUnmodifiedSince = afterSourceKeyModificationTimeStr
+    // ifUnmodifiedSince = beforeSourceKeyModificationTimeStr
     // ifModifiedSince = bad
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        badTimeStr,
-        afterSourceKeyModificationTimeStr);
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          badTimeStr,
+          beforeSourceKeyModificationTimeStr);
+      fail("testInvalidTimesError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
+
     // ifUnmodifiedSince = afterSourceKeyModificationTimeStr
-    // ifModifiedSince = future
+    // ifModifiedSince = tomorrow
     uploadPartWithCopy(KEY, uploadID, 1,
         OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
         tomorrowTimeStr,

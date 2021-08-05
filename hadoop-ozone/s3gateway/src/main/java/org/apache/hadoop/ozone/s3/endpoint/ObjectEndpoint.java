@@ -860,7 +860,8 @@ public class ObjectEndpoint extends EndpointBase {
     return partMarker;
   }
 
-  private static OptionalLong parseOzoneDate(String ozoneDateStr) throws OS3Exception {
+  private static OptionalLong parseOzoneDate(String ozoneDateStr)
+      throws OS3Exception {
     long ozoneDateInMs;
     if (ozoneDateStr == null) {
       return OptionalLong.empty();
