@@ -76,9 +76,10 @@ To use TDE from S3 interface, it can be done in 2 ways.
   ```bash
   ozone sh bucket create -k encKey /s3v/encryptedBucket
   ```
-####2. Create a link to a bucket under "/s3v" volume
+####2. Create a link to an encrypted bucket under "/s3v" volume
 
   ```bash
+  ozone sh bucket create -k encKey /vol/encryptedBucket
   ozone sh bucket link  /vol/encryptedBucket /s3v/linkencryptedbucket
   ```
 
