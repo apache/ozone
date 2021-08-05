@@ -66,3 +66,56 @@ via the encKey and while reading the clients will talk to Key Management
 Server and read the key and decrypt it. In other words, the data stored
 inside Ozone is always encrypted. The fact that data is encrypted at rest
 will be completely transparent to the clients and end users.
+
+### Using Transparent Data Encryption from S3G
+
+To use TDE from S3 interface, it can be done in 2 ways.
+
+####1. Create a bucket using shell under "/s3v" volume
+
+  ```bash
+  ozone sh bucket create -k encKey /s3v/encryptedBucket
+  ```
+####2. Create a link to a bucket under "/s3v" volume
+
+  ```bash
+  ozone sh bucket link  /vol/encryptedBucket /s3v/linkencryptedbucket
+  ```
+
+After this, all the keys created using s3g in the buckets will be encrypted.
+
+In non-secure mode, the user running the S3Gateway is the proxy user, 
+while in secure mode the user in Kerberos keytab is the proxy user. 
+S3Gateway proxy's all the users accessing the encrypted buckets to decrypt the key. 
+For this purpose on security enabled cluster, during S3Gateway server startup 
+logins using configured 
+**ozone.s3g.kerberos.keytab.file**  and **ozone.s3g.kerberos.principal**. 
+
+Below 2 configuration need to be added to kms-site.xml
+
+```
+<property>
+  <name>hadoop.kms.proxyuser.s3g.users</name>
+  <value>user1,user2,user3</value>
+  <description>
+        Here the value can be all the S3G accesskey ids accessing Ozone S3 
+        or set to '*' to allow all the accesskey ids.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.kms.proxyuser.s3g.hosts</name>
+  <value>s3g-host1.com</value>
+  <description>
+         This is the host where the S3Gateway is running. Set this to '*' to allow
+         requests from any hosts to be proxied.
+  </description>
+
+</property>
+
+```
+
+###KMS Authorization
+If Ranger authorization is enabled for KMS, then decrypt key permission should be given to
+access key id user(currently access key is kerberos principal) to decrypt the encrypted key 
+to read/write a key in the encrypted bucket.
