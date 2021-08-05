@@ -2640,10 +2640,10 @@ public class KeyManagerImpl implements KeyManager {
           seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
           // Get files, dirs and marked for delete entries from cache.
-          countEntries = getFilesAndDirsFromCacheWithBucketLock(volumeName, bucketName,
-              cacheFileMap, tempCacheDirMap, deletedKeySet, prefixKeyInDB,
-              seekFileInDB, seekDirInDB, prefixPath, startKey, countEntries,
-              numEntries);
+          countEntries = getFilesAndDirsFromCacheWithBucketLock(volumeName,
+              bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
+              prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
+              countEntries, numEntries);
 
           // 1. Seek the given key in key table.
           countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
@@ -2723,8 +2723,8 @@ public class KeyManagerImpl implements KeyManager {
    * cache.
    */
   @SuppressWarnings("parameternumber")
-  private int getFilesAndDirsFromCacheWithBucketLock(String volumeName, String bucketName,
-      Map<String, OzoneFileStatus> cacheFileMap,
+  private int getFilesAndDirsFromCacheWithBucketLock(String volumeName,
+      String bucketName, Map<String, OzoneFileStatus> cacheFileMap,
       Map<String, OzoneFileStatus> tempCacheDirMap,
       Set<String> deletedKeySet, long prefixKeyInDB,
       String seekFileInDB,  String seekDirInDB, String prefixPath,
