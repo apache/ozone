@@ -32,7 +32,8 @@ Create new bucket
     Create bucket
 
 Create bucket which already exists
-    Create bucket with name     ${BUCKET}
+    ${bucket} =                 Create bucket
+    Create bucket with name     ${bucket}
 
 Create bucket with invalid bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255
