@@ -17,7 +17,6 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
-import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -43,6 +42,10 @@ public class TestDatanodeUpgradeToScmHA {
   @Rule
   public TemporaryFolder tempFolder;
 
+  // The daemon for the datanode state machine will not be started in this test.
+  // This greatly speeds up execution time, and the only  thing we lose is
+  // any actions that would need to be run in pre-finalize, but we do not
+  // have any such actions for SCM HA.
   private DatanodeStateMachine dsm;
   private OzoneConfiguration conf;
   private RPC.Server scmRpcServer;
@@ -58,10 +61,6 @@ public class TestDatanodeUpgradeToScmHA {
 
   @After
   public void teardown() {
-    if (dsm != null) {
-      dsm.stopDaemon();
-    }
-
     if (scmRpcServer != null) {
       scmRpcServer.stop();
     }
@@ -267,7 +266,6 @@ public class TestDatanodeUpgradeToScmHA {
         null);
     int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(mlv, actualMlv);
-    newDsm.startDaemon();
 
     dsm = newDsm;
     String scmID = UUID.randomUUID().toString();
@@ -286,7 +284,7 @@ public class TestDatanodeUpgradeToScmHA {
         null);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(expectedMlv, mlv);
-    dsm.startDaemon();
+//    dsm.startDaemon();
 
     String scmID = UUID.randomUUID().toString();
     startScmServer(scmID);
