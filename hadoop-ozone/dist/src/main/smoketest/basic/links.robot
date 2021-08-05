@@ -76,7 +76,7 @@ Link Bucket info
     ${result} =         Execute And Ignore Error    ozone sh bucket info ${target}/readable-link
                         Should Contain              ${result}            ${source}
                         Should Contain              ${result}            readable-bucket
-                        Should Contain              ${result}            ${target}t
+                        Should Contain              ${result}            ${target}
                         Should Contain              ${result}            readable-link
                         Should Contain              ${result}            modificationTime
                         Should Contain              ${result}            creationTime
