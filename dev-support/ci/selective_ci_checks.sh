@@ -15,6 +15,13 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+# This script gets a list of the changed files from git, and matches
+# that list against a set of regexes, each of which corresponds to a
+# test group.  For each set of matches, a flag is set to let github
+# actions know to run that test group.
+
+# The code is heavily based on this:
+# https://github.com/apache/airflow/blob/6af963c7d5ae9b59d17b156a053d5c85e678a3cb/scripts/ci/selective_ci_checks.sh
 
 # shellcheck source=dev-support/ci/lib/_script_init.sh
 . dev-support/ci/lib/_script_init.sh
