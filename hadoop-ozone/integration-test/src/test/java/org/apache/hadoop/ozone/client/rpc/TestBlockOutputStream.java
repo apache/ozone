@@ -23,7 +23,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -327,7 +325,6 @@ public class TestBlockOutputStream {
         metrics.getTotalOpCount());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
-    blockOutputStream.close();
   }
 
   @Test
@@ -713,16 +710,6 @@ public class TestBlockOutputStream {
   private void validateData(String keyName, byte[] data) throws Exception {
     TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
-  }
-
-  @Test
-  public void testCreateKeyWithECReplicationConfig() throws Exception {
-    String keyName = getKeyName();
-    try (OzoneOutputStream key = TestHelper
-        .createKey(keyName, new ECReplicationConfig(3, 2), 2000, objectStore,
-            volumeName, bucketName)) {
-      Assert.assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
-    }
   }
 
 }
