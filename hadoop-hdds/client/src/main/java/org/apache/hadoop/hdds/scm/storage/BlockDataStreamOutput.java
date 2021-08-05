@@ -164,22 +164,8 @@ public class BlockDataStreamOutput extends OutputStream
             .addMetadata(keyValue);
     this.xceiverClient =
         (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
-    ContainerProtos.WriteChunkRequestProto.Builder writeChunkRequest =
-        ContainerProtos.WriteChunkRequestProto.newBuilder()
-            .setBlockID(blockID.getDatanodeBlockIDProtobuf());
-
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.StreamInit)
-            .setContainerID(blockID.getContainerID())
-            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
-
-    ContainerCommandRequestMessage message =
-        ContainerCommandRequestMessage.toMessage(builder.build(), null);
-
-    out = Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
-            .stream(message.getContent().asReadOnlyByteBuffer());
+    // Alternatively, stream setup can be delayed till the first chunk write.
+    this.out = setupStream();
     this.bufferPool = bufferPool;
     this.token = token;
 
@@ -203,6 +189,27 @@ public class BlockDataStreamOutput extends OutputStream
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+  }
+
+  private DataStreamOutput setupStream() throws IOException {
+    // Execute a dummy WriteChunk request to get the path of the target file,
+    // but does NOT write any data to it.
+    ContainerProtos.WriteChunkRequestProto.Builder writeChunkRequest =
+        ContainerProtos.WriteChunkRequestProto.newBuilder()
+            .setBlockID(blockID.get().getDatanodeBlockIDProtobuf());
+
+    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
+    ContainerProtos.ContainerCommandRequestProto.Builder builder =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.StreamInit)
+            .setContainerID(blockID.get().getContainerID())
+            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
+
+    ContainerCommandRequestMessage message =
+        ContainerCommandRequestMessage.toMessage(builder.build(), null);
+
+    return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+        .stream(message.getContent().asReadOnlyByteBuffer());
   }
 
   private void refreshCurrentBuffer(BufferPool pool) {
