@@ -59,7 +59,7 @@ public class ScmHAUnfinalizedStateValidationAction
 
     // Since this action may need to be called outside the upgrade framework
     // during init, it needs to check for pre-finalized state.
-    if (versionManager.needsFinalization() &&
+    if (!versionManager.isAllowed(SCM_HA) &&
         SCMHAUtils.isSCMHAEnabled(conf) &&
         !storageConf.isSCMHAEnabled()) {
       throw new UpgradeException(String.format("Configuration %s cannot be " +
