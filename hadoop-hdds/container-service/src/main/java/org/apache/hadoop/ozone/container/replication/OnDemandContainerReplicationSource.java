@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
