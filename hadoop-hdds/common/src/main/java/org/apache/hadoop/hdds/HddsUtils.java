@@ -620,6 +620,6 @@ public final class HddsUtils {
    * Utility method to round up bytes into the nearest MB.
    */
   public static int roundupMb(long bytes) {
-    return Math.toIntExact((bytes - 1) / ONE_MB + 1);
+    return (int)Math.ceil((double) bytes/(double) ONE_MB);
   }
 }
