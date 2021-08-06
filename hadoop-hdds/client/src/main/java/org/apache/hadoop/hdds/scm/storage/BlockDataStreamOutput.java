@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -49,7 +48,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +62,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
 /**
- * An {@link OutputStream} used by the REST service in combination with the
+ * An {@link ByteBufferStreamOutput} used by the REST service in combination with the
  * SCMClient to write the value of a key to a sequence
  * of container chunks.  Writes are buffered locally and periodically written to
  * the container as a new chunk.  In order to preserve the semantics that
@@ -79,8 +77,7 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
  * This class encapsulates all state management for buffering and writing
  * through to the container.
  */
-public class BlockDataStreamOutput extends OutputStream
-    implements ByteBufferStreamOutput {
+public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
   public static final String EXCEPTION_MSG =
@@ -281,22 +278,10 @@ public class BlockDataStreamOutput extends OutputStream
     }
   }
 
-  @Override
-  public void write(int b) throws IOException {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    write(buf);
-  }
-
   private void writeChunkIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       writeChunk(currentBuffer);
     }
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    write(Unpooled.wrappedBuffer(b), off, len);
   }
 
   private void doFlushOrWatchIfNeeded() throws IOException {

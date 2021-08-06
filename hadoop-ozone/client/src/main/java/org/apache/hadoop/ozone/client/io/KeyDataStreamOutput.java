@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -49,7 +48,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -65,8 +63,7 @@ import java.util.stream.Collectors;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput extends OutputStream
-    implements ByteBufferStreamOutput {
+public class KeyDataStreamOutput implements ByteBufferStreamOutput {
 
   private OzoneClientConfig config;
 
@@ -196,31 +193,6 @@ public class KeyDataStreamOutput extends OutputStream
     final int len = b.readableBytes();
     handleWrite(b, 0, len, false);
     writeOffset += len;
-  }
-
-  @Override
-  public void write(int b) throws IOException {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    write(buf);
-  }
-
-  /**
-   * Try to write the bytes sequence b[off:off+len) to streams.
-   *
-   * NOTE: Throws exception if the data could not fit into the remaining space.
-   * In which case nothing will be written.
-   * TODO:May need to revisit this behaviour.
-   *
-   * @param b byte data
-   * @param off starting offset
-   * @param len length to write
-   * @throws IOException
-   */
-  @Override
-  public void write(byte[] b, int off, int len)
-      throws IOException {
-    write(Unpooled.wrappedBuffer(b, off, len));
   }
 
   private void handleWrite(ByteBuf b, int off, long len, boolean retry)

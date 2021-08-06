@@ -14,30 +14,26 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
 package org.apache.hadoop.ozone.client.io;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
-import java.io.OutputStream;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
  * It uses SCM's {@link KeyOutputStream} for writing the data.
  */
-public class OzoneDataStreamOutput extends OutputStream
-    implements ByteBufferStreamOutput {
+public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
 
   private final ByteBufferStreamOutput byteBufferStreamOutput;
 
   /**
    * Constructs OzoneOutputStream with KeyOutputStream.
    *
-   * @param outputStream
+   * @param byteBufferStreamOutput
    */
   public OzoneDataStreamOutput(ByteBufferStreamOutput byteBufferStreamOutput) {
     this.byteBufferStreamOutput = byteBufferStreamOutput;
@@ -46,23 +42,6 @@ public class OzoneDataStreamOutput extends OutputStream
   @Override
   public void write(ByteBuf b) throws IOException {
     byteBufferStreamOutput.write(b);
-  }
-
-  @Override
-  public void write(int b) throws IOException {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    write(buf);
-  }
-
-  @Override
-  public void write(byte[] b) throws IOException {
-    write(b, 0, b.length);
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    write(Unpooled.wrappedBuffer(b, off, len));
   }
 
   @Override

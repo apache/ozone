@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -32,14 +31,13 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 
 /**
  * Helper class used inside {@link BlockDataStreamOutput}.
  * */
-public final class BlockDataStreamOutputEntry extends OutputStream
+public final class BlockDataStreamOutputEntry
     implements ByteBufferStreamOutput {
 
   private final OzoneClientConfig config;
@@ -110,18 +108,6 @@ public final class BlockDataStreamOutputEntry extends OutputStream
     final int len = b.readableBytes();
     byteBufferStreamOutput.write(b);
     this.currentPosition += len;
-  }
-
-  @Override
-  public void write(int b) throws IOException {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    write(buf);
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    write(Unpooled.wrappedBuffer(b), off, len);
   }
 
   @Override
