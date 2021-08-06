@@ -264,7 +264,7 @@ public class BlockDataStreamOutput extends OutputStream
     if (b == null) {
       throw new NullPointerException();
     }
-    int off = 0;
+    int off = b.readerIndex();
     int len = b.readableBytes();
 
     while (len > 0) {
