@@ -29,6 +29,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import javax.xml.bind.ValidationEvent;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
@@ -42,6 +43,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Tests upgrading a single datanode from pre-SCM HA volume format that used
@@ -107,6 +112,44 @@ public class TestDatanodeUpgradeToScmHA {
     if (dsm != null) {
       dsm.close();
     }
+  }
+
+  @Test
+  public void testBusyUpgrade() throws Exception {
+    // start DN and SCM
+    startScmServer();
+    addVolume();
+    startDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    final Pipeline pipeline = getPipeline();
+
+    // Add data to read.
+    final long containerID = addContainer(pipeline);
+    ContainerProtos.WriteChunkRequestProto writeChunk = putBlock(containerID,
+        pipeline);
+    dsm.getContainer().getContainerSet().getContainer(containerID).close();
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    // Create thread to keep reading during the upgrade.
+    Future<Void> readFuture = executor.submit(() -> {
+      try {
+        // Layout version check should be thread safe.
+        while(!dsm.getLayoutVersionManager()
+            .isAllowed(HDDSLayoutFeature.SCM_HA)) {
+          readChunk(writeChunk, pipeline);
+        }
+        // Make sure we can read after upgrade too.
+        readChunk(writeChunk, pipeline);
+      } catch(Exception ex) {
+        Assert.fail(ex.getMessage());
+      }
+      return null;
+    });
+
+    dsm.finalizeUpgrade();
+    // If there was a failure reading during the upgrade, the exception will
+    // be thrown here.
+    readFuture.get();
   }
 
   // TODO:
