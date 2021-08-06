@@ -65,7 +65,7 @@ public class ScmHAFinalizeUpgradeActionDatanode
   }
 
   /**
-   * Upgrade the specified volume to be comaptible with SCM HA layout feature.
+   * Upgrade the specified volume to be compatible with SCM HA layout feature.
    * @return true if the volume upgrade succeeded, false otherwise.
    */
   public static boolean upgradeVolume(StorageVolume volume, String clusterID) {

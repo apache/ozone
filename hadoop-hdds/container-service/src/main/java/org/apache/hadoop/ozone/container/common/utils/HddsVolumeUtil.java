@@ -182,8 +182,7 @@ public final class HddsVolumeUtil {
    * @return true - if volume is in consistent state, otherwise false.
    */
   public static boolean checkVolume(HddsVolume hddsVolume, String scmId,
-      String clusterId, ConfigurationSource conf, Logger logger)
-      throws IOException {
+      String clusterId, ConfigurationSource conf, Logger logger) {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
     File clusterDir = new File(hddsRoot, clusterId);
