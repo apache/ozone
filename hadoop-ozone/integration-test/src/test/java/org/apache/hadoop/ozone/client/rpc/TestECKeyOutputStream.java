@@ -39,7 +39,10 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -138,17 +141,35 @@ public class TestECKeyOutputStream {
               .getXceiverClientFactory()).getClientCache();
       final String firstCacheKey =
           clientCache.asMap().entrySet().iterator().next().getKey();
+      List<String> prevVisitedKeys = new ArrayList<>();
+      prevVisitedKeys.add(firstCacheKey);
       // Lets look at all underlying EC Block group streams and make sure
       // xceiver client entry is not repeating for all.
       for (int i = 1; i < streamEntries.size(); i++) {
         Pipeline pipeline = streamEntries.get(i).getPipeline();
+        Assert.assertEquals(i, clientCache.asMap().size());
         xceiverClientSpi = ((ECKeyOutputStream) key.getOutputStream())
             .getXceiverClientFactory().acquireClient(pipeline);
         Assert.assertNotNull(xceiverClientSpi);
-        final String nextCacheKey =
-            clientCache.asMap().entrySet().iterator().next().getKey();
-        Assert.assertNotEquals(firstCacheKey, nextCacheKey);
+        Assert.assertEquals(i + 1, clientCache.asMap().size());
+        final String newCacheKey =
+            getNewKey(clientCache.asMap().entrySet().iterator(),
+                prevVisitedKeys);
+        prevVisitedKeys.add(newCacheKey);
+        Assert.assertNotEquals(firstCacheKey, newCacheKey);
       }
     }
+  }
+
+  private String getNewKey(
+      Iterator<Map.Entry<String, XceiverClientSpi>> iterator,
+      List<String> prevVisitedKeys) {
+    while (iterator.hasNext()) {
+      final String key = iterator.next().getKey();
+      if (!prevVisitedKeys.contains(key)) {
+        return key;
+      }
+    }
+    return null;
   }
 }
