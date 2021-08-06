@@ -16,15 +16,29 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
-}
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage',
-};
+import React from 'react';
+import './pathForm.less';
+import { Input } from 'antd';
+
+export class PathForm extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {value: '/'};
+        const { clickEvent } = this.props;
+
+        this.handleChange = this.handleChange.bind(this);
+    }
+
+    handleChange(event) {
+        this.setState({value: event.target.value});
+    }
+
+    render() {
+    return (
+      <form className='input' onSubmit={this.clickEvent} id="input-form">
+        <Input placeholder="/" value={this.state.value} onChange={this.handleChange} />
+      </form>
+    );
+  }
+}

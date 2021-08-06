@@ -16,15 +16,14 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
-}
+.du-container {
+  .filter-block {
+    display: inline-block;
+    margin-left: 25px;
+  }
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage',
-};
+  h3 {
+    display: inline-block;
+    padding-right: 5px;
+  }
+}

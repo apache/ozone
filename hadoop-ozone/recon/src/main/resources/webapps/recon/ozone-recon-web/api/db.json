@@ -896,5 +896,48 @@
       "fileSize": 131072,
       "count": 217
     }
-  ]
+  ],
+  "du": {
+    "status": "OK",
+    "path": "/",
+    "size": 100000,
+    "sizeWithReplica": 300000,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/vol1",
+        "size": 50000,
+        "sizeWithReplica": 150000
+      },
+      {
+        "path": "/vol2",
+        "size": 20000,
+        "sizeWithReplica": 60000
+      },
+      {
+        "path": "/vol3",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol4",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol5",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      }
+    ],
+    "sizeDirectKey": 0
+  },
+  "metadata": {
+    "type": "VOLUME",
+    "numVolume": 0,
+    "numBucket": 100,
+    "numDir": 1000,
+    "numKey": 10000,
+    "status": "OK"
+  }
 }

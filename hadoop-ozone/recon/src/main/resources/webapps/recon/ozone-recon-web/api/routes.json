@@ -2,5 +2,7 @@
   "/api/v1/*": "/$1",
   "/containers/:id/keys": "/keys",
   "/containers/missing": "/missingContainers",
-  "/utilization/fileCount": "/fileSizeCounts"
+  "/utilization/fileCount": "/fileSizeCounts",
+  "/namespace/du?path=*": "/du",
+  "/namespace/summary?path=/vol1": "/metadata"
 }
