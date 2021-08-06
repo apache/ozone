@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.hdds.scm.storage.DataStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -40,10 +40,10 @@ import java.util.Collections;
  * Helper class used inside {@link BlockDataStreamOutput}.
  * */
 public final class BlockDataStreamOutputEntry extends OutputStream
-    implements DataStreamOutput {
+    implements ByteBufferStreamOutput {
 
   private final OzoneClientConfig config;
-  private DataStreamOutput dataStreamOutput;
+  private ByteBufferStreamOutput byteBufferStreamOutput;
   private BlockID blockID;
   private final String key;
   private final XceiverClientFactory xceiverClientManager;
@@ -67,7 +67,7 @@ public final class BlockDataStreamOutputEntry extends OutputStream
       OzoneClientConfig config
   ) {
     this.config = config;
-    this.dataStreamOutput = null;
+    this.byteBufferStreamOutput = null;
     this.blockID = blockID;
     this.key = key;
     this.xceiverClientManager = xceiverClientManager;
@@ -97,8 +97,8 @@ public final class BlockDataStreamOutputEntry extends OutputStream
    * @throws IOException if xceiverClient initialization fails
    */
   private void checkStream() throws IOException {
-    if (this.dataStreamOutput == null) {
-      this.dataStreamOutput =
+    if (this.byteBufferStreamOutput == null) {
+      this.byteBufferStreamOutput =
           new BlockDataStreamOutput(blockID, xceiverClientManager,
               pipeline, bufferPool, config, token);
     }
@@ -108,7 +108,7 @@ public final class BlockDataStreamOutputEntry extends OutputStream
   public void write(ByteBuf b) throws IOException {
     checkStream();
     final int len = b.readableBytes();
-    dataStreamOutput.write(b);
+    byteBufferStreamOutput.write(b);
     this.currentPosition += len;
   }
 
@@ -126,31 +126,31 @@ public final class BlockDataStreamOutputEntry extends OutputStream
 
   @Override
   public void flush() throws IOException {
-    if (this.dataStreamOutput != null) {
-      this.dataStreamOutput.flush();
+    if (this.byteBufferStreamOutput != null) {
+      this.byteBufferStreamOutput.flush();
     }
   }
 
   @Override
   public void close() throws IOException {
-    if (this.dataStreamOutput != null) {
-      this.dataStreamOutput.close();
+    if (this.byteBufferStreamOutput != null) {
+      this.byteBufferStreamOutput.close();
       // after closing the chunkOutPutStream, blockId would have been
       // reconstructed with updated bcsId
-      this.blockID = ((BlockDataStreamOutput) dataStreamOutput).getBlockID();
+      this.blockID = ((BlockDataStreamOutput) byteBufferStreamOutput).getBlockID();
     }
   }
 
   boolean isClosed() {
-    if (dataStreamOutput != null) {
-      return  ((BlockDataStreamOutput) dataStreamOutput).isClosed();
+    if (byteBufferStreamOutput != null) {
+      return  ((BlockDataStreamOutput) byteBufferStreamOutput).isClosed();
     }
     return false;
   }
 
   long getTotalAckDataLength() {
-    if (dataStreamOutput != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
+    if (byteBufferStreamOutput != null) {
+      BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
       blockID = out.getBlockID();
       return out.getTotalAckDataLength();
     } else {
@@ -162,16 +162,16 @@ public final class BlockDataStreamOutputEntry extends OutputStream
   }
 
   Collection<DatanodeDetails> getFailedServers() {
-    if (dataStreamOutput != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
+    if (byteBufferStreamOutput != null) {
+      BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
       return out.getFailedServers();
     }
     return Collections.emptyList();
   }
 
   long getWrittenDataLength() {
-    if (dataStreamOutput != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
+    if (byteBufferStreamOutput != null) {
+      BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
       return out.getWrittenDataLength();
     } else {
       // For a pre allocated block for which no write has been initiated,
@@ -183,14 +183,14 @@ public final class BlockDataStreamOutputEntry extends OutputStream
 
   void cleanup(boolean invalidateClient) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
+    BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
     out.cleanup(invalidateClient);
 
   }
 
   void writeOnRetry(long len) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = (BlockDataStreamOutput) this.dataStreamOutput;
+    BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
     out.writeOnRetry(len);
     this.currentPosition += len;
 
@@ -266,8 +266,8 @@ public final class BlockDataStreamOutputEntry extends OutputStream
   }
 
   @VisibleForTesting
-  public DataStreamOutput getDataStreamOutput() {
-    return dataStreamOutput;
+  public ByteBufferStreamOutput getByteBufferStreamOutput() {
+    return byteBufferStreamOutput;
   }
 
   public BlockID getBlockID() {

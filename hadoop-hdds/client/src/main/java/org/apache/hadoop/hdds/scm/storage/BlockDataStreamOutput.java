@@ -80,7 +80,7 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
  * through to the container.
  */
 public class BlockDataStreamOutput extends OutputStream
-    implements org.apache.hadoop.hdds.scm.storage.DataStreamOutput {
+    implements ByteBufferStreamOutput {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
   public static final String EXCEPTION_MSG =

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.apache.hadoop.hdds.scm.storage.DataStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
@@ -30,22 +30,22 @@ import java.io.OutputStream;
  * It uses SCM's {@link KeyOutputStream} for writing the data.
  */
 public class OzoneDataStreamOutput extends OutputStream
-    implements DataStreamOutput {
+    implements ByteBufferStreamOutput {
 
-  private final DataStreamOutput dataStreamOutput;
+  private final ByteBufferStreamOutput byteBufferStreamOutput;
 
   /**
    * Constructs OzoneOutputStream with KeyOutputStream.
    *
    * @param outputStream
    */
-  public OzoneDataStreamOutput(DataStreamOutput dataStreamOutput) {
-    this.dataStreamOutput = dataStreamOutput;
+  public OzoneDataStreamOutput(ByteBufferStreamOutput byteBufferStreamOutput) {
+    this.byteBufferStreamOutput = byteBufferStreamOutput;
   }
 
   @Override
   public void write(ByteBuf b) throws IOException {
-    dataStreamOutput.write(b);
+    byteBufferStreamOutput.write(b);
   }
 
   @Override
@@ -67,24 +67,24 @@ public class OzoneDataStreamOutput extends OutputStream
 
   @Override
   public synchronized void flush() throws IOException {
-    dataStreamOutput.flush();
+    byteBufferStreamOutput.flush();
   }
 
   @Override
   public synchronized void close() throws IOException {
     //commitKey can be done here, if needed.
-    dataStreamOutput.close();
+    byteBufferStreamOutput.close();
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    if (dataStreamOutput instanceof KeyDataStreamOutput) {
-      return ((KeyDataStreamOutput) dataStreamOutput).getCommitUploadPartInfo();
+    if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
+      return ((KeyDataStreamOutput) byteBufferStreamOutput).getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
   }
 
-  public DataStreamOutput getDataStreamOutput() {
-    return dataStreamOutput;
+  public ByteBufferStreamOutput getByteBufferStreamOutput() {
+    return byteBufferStreamOutput;
   }
 }
