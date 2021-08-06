@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.replication;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -29,24 +30,6 @@ import java.io.IOException;
  * Test the replication server.
  */
 public class TestReplicationServer {
-
-  @Test
-  public void testEpollEnabled() {
-    OzoneConfiguration config = new OzoneConfiguration();
-    DatanodeConfiguration dnConf =
-        config.getObject(DatanodeConfiguration.class);
-    ReplicationServer.ReplicationConfig replicationConfig =
-        config.getObject(ReplicationServer.ReplicationConfig.class);
-    SecurityConfig secConf = new SecurityConfig(config);
-    ReplicationServer server = new ReplicationServer(null, replicationConfig,
-        secConf, dnConf, null);
-    try {
-      server.start();
-      server.stop();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
 
   @Test
   public void testEpollDisabled() {
@@ -60,11 +43,14 @@ public class TestReplicationServer {
         "org.apache.ratis.thirdparty.io.netty.transport.noNative", "true");
     ReplicationServer server = new ReplicationServer(null, replicationConfig,
         secConf, dnConf, null);
+
     try {
       server.start();
-      server.stop();
     } catch (IOException e) {
+      Assert.fail("Replication Server start should succeed.");
       e.printStackTrace();
+    } finally {
+      server.stop();
     }
   }
 }
