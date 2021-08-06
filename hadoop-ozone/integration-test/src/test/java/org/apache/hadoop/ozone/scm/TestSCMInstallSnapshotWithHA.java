@@ -87,9 +87,10 @@ public class TestSCMInstallSnapshotWithHA {
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
 
-    conf.setBoolean(ScmConfigKeys.RAFT_LOG_PURGE_ENABLED, true);
-    conf.setInt(ScmConfigKeys.RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
-    conf.setLong(ScmConfigKeys.RATIS_SNAPSHOT_THRESHOLD, SNAPSHOT_THRESHOLD);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+            SNAPSHOT_THRESHOLD);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)

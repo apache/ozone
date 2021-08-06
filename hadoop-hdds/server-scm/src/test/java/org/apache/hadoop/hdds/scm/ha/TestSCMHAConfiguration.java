@@ -59,22 +59,6 @@ public class TestSCMHAConfiguration {
   }
 
   @Test
-  public void testSetStorageDir() {
-    conf.set(ScmConfigKeys.RATIS_STORAGE_DIR, "scm-ratis");
-    Assert.assertEquals("scm-ratis", conf.get(ScmConfigKeys.RATIS_STORAGE_DIR));
-  }
-
-  @Test
-  public void testRaftLogPurgeEnabled() {
-    conf.setBoolean(ScmConfigKeys.RAFT_LOG_PURGE_ENABLED, true);
-
-    Assert.assertEquals(true, conf.getBoolean(
-            ScmConfigKeys.RAFT_LOG_PURGE_ENABLED,
-            ScmConfigKeys.RAFT_LOG_PURGE_ENABLED_DEFAULT));
-  }
-
-
-  @Test
   public void testSCMHAConfig() throws Exception {
     String scmServiceId = "scmserviceId";
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);

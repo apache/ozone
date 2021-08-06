@@ -48,7 +48,7 @@ public class TestSCMSnapshot {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
-    conf.setLong(ScmConfigKeys.RATIS_SNAPSHOT_THRESHOLD, 1L);
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD, 1L);
     cluster = MiniOzoneCluster
         .newBuilder(conf)
         .setNumDatanodes(3)

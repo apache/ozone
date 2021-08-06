@@ -136,14 +136,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       OzoneConfiguration conf, RaftGroup group) throws IOException {
     boolean ready;
     long st = Time.monotonicNow();
-    long waitTimeout =
-            conf.getTimeDuration(ScmConfigKeys.RATIS_LEADER_READY_WAIT_TIMEOUT,
-            ScmConfigKeys.RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT,
-                    TimeUnit.MILLISECONDS);
+    long waitTimeout = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
     long retryInterval = conf.getTimeDuration(
-                    ScmConfigKeys.RATIS_LEADER_READY_CHECK_INTERVAL,
-                    ScmConfigKeys.RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT,
-                    TimeUnit.MILLISECONDS);
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL,
+            ScmConfigKeys.
+                    OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
 
     do {
       ready = server.getDivision(group.getGroupId()).getInfo().isLeaderReady();
@@ -211,9 +212,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setType(RaftClientRequest.writeRequestType())
         .build();
     // any request submitted to
-    final long requestTimeout =
-        ozoneConf.getTimeDuration(ScmConfigKeys.RATIS_REQUEST_TIMEOUT,
-                ScmConfigKeys.RATIS_REQUEST_TIMEOUT_DEFAULT,
+    final long requestTimeout = ozoneConf.getTimeDuration(
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
                 TimeUnit.MILLISECONDS);
     Preconditions.checkArgument(requestTimeout > 1000L,
             "Ratis request timeout cannot be less than 1000ms.");

@@ -75,7 +75,7 @@ public class TestFailoverWithSCMHA {
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-    conf.setLong(ScmConfigKeys.RATIS_SNAPSHOT_THRESHOLD,
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
             SNAPSHOT_THRESHOLD);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)

@@ -64,7 +64,7 @@ public final class RatisUtil {
    * @param conf ConfigurationSource
    */
   public static RaftProperties newRaftProperties(
-          final ConfigurationSource conf) {
+      final ConfigurationSource conf) {
     //TODO: Remove ConfigurationSource!
     // TODO: Check the default values.
     final RaftProperties properties = new RaftProperties();
@@ -90,7 +90,7 @@ public final class RatisUtil {
   }
 
   public static String getRatisStorageDir(final ConfigurationSource conf) {
-    String storageDir = conf.get(ScmConfigKeys.RATIS_STORAGE_DIR);
+    String storageDir = conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
     if (Strings.isNullOrEmpty(storageDir)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       storageDir = (new File(metaDirPath, "scm-ha")).getPath();
@@ -106,34 +106,40 @@ public final class RatisUtil {
   private static void setRaftRpcProperties(final RaftProperties properties,
       ConfigurationSource ozoneConf) {
     RaftConfigKeys.Rpc.setType(properties,
-        RpcType.valueOf(ozoneConf.get(ScmConfigKeys.RATIS_RPC_TYPE,
-                ScmConfigKeys.RATIS_RPC_TYPE_DEFAULT)));
+        RpcType.valueOf(ozoneConf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE,
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE_DEFAULT)));
     GrpcConfigKeys.Server.setPort(properties, ozoneConf
         .getInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
             ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT));
     GrpcConfigKeys.setMessageSizeMax(properties,
         SizeInBytes.valueOf("32m"));
     long ratisRequestTimeout = ozoneConf.getTimeDuration(
-            ScmConfigKeys.RATIS_REQUEST_TIMEOUT,
-            ScmConfigKeys.RATIS_REQUEST_TIMEOUT_DEFAULT,
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
     Preconditions.checkArgument(ratisRequestTimeout > 1000L,
             "Ratis request timeout cannot be less than 1000ms.");
     Rpc.setRequestTimeout(properties, TimeDuration.valueOf(
         ratisRequestTimeout, TimeUnit.MILLISECONDS));
     Rpc.setTimeoutMin(properties, TimeDuration.valueOf(
-        ozoneConf.getTimeDuration(ScmConfigKeys.RATIS_LEADER_ELECTION_TIMEOUT,
-                ScmConfigKeys.RATIS_LEADER_ELECTION_TIMEOUT_DEFAULT,
+        ozoneConf.getTimeDuration(
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT,
+                ScmConfigKeys.
+                        OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT_DEFAULT,
                 TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
     Rpc.setTimeoutMax(properties, TimeDuration.valueOf(
-        ozoneConf.getTimeDuration(ScmConfigKeys.RATIS_LEADER_ELECTION_TIMEOUT,
-                ScmConfigKeys.RATIS_LEADER_ELECTION_TIMEOUT_DEFAULT,
+        ozoneConf.getTimeDuration(
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT,
+                ScmConfigKeys.
+                        OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT_DEFAULT,
                 TimeUnit.MILLISECONDS)+200L,
             TimeUnit.MILLISECONDS));
     Rpc.setSlownessTimeout(properties, TimeDuration.valueOf(
-            ozoneConf.getTimeDuration(ScmConfigKeys.RATIS_NODE_FAILURE_TIMEOUT,
-                    ScmConfigKeys.RATIS_NODE_FAILURE_TIMEOUT_DEFAULT,
+            ozoneConf.getTimeDuration(
+                    ScmConfigKeys.OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT,
+                    ScmConfigKeys.
+                            OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT_DEFAULT,
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
   }
@@ -158,35 +164,36 @@ public final class RatisUtil {
    */
   private static void setRaftLogProperties(final RaftProperties properties,
       final ConfigurationSource ozoneConf) {
-    Log.setSegmentSizeMax(properties,
-        SizeInBytes.valueOf((long)
-                ozoneConf.getStorageSize(ScmConfigKeys.RAFT_SEGMENT_SIZE,
-                ScmConfigKeys.RAFT_SEGMENT_SIZE_DEFAULT, StorageUnit.BYTES)));
+    Log.setSegmentSizeMax(properties, SizeInBytes.valueOf((long)
+        ozoneConf.getStorageSize(
+                ScmConfigKeys.OZONE_SCM_HA_RAFT_SEGMENT_SIZE,
+                ScmConfigKeys.OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT,
+                StorageUnit.BYTES)));
     Log.Appender.setBufferElementLimit(properties,
-            (int) ozoneConf.getStorageSize(
-                    ScmConfigKeys.RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
-                    ScmConfigKeys.RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-                    StorageUnit.BYTES));
-    Log.Appender.setBufferByteLimit(properties,
-        SizeInBytes.valueOf(
-                (long) ozoneConf.getStorageSize(
-                        ScmConfigKeys.RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
-                        ScmConfigKeys.
-                                RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-                        StorageUnit.BYTES)));
-    Log.setPreallocatedSize(properties,
-        SizeInBytes.valueOf(
-                (long) ozoneConf.getStorageSize(
-                        ScmConfigKeys.RAFT_SEGMENT_PRE_ALLOCATED_SIZE,
-                        ScmConfigKeys.RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT,
-                        StorageUnit.BYTES)));
+        (int) ozoneConf.getStorageSize(
+                ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+                ScmConfigKeys.
+                        OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+                StorageUnit.BYTES));
+    Log.Appender.setBufferByteLimit(properties, SizeInBytes.valueOf(
+        (long) ozoneConf.getStorageSize(
+              ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+              ScmConfigKeys.
+                      OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+              StorageUnit.BYTES)));
+    Log.setPreallocatedSize(properties, SizeInBytes.valueOf(
+        (long) ozoneConf.getStorageSize(
+              ScmConfigKeys.OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE,
+              ScmConfigKeys.
+                      OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT,
+              StorageUnit.BYTES)));
     Log.Appender.setInstallSnapshotEnabled(properties, false);
-    Log.setPurgeUptoSnapshotIndex(properties,
-            ozoneConf.getBoolean(ScmConfigKeys.RAFT_LOG_PURGE_ENABLED,
-                    ScmConfigKeys.RAFT_LOG_PURGE_ENABLED_DEFAULT));
+    Log.setPurgeUptoSnapshotIndex(properties, ozoneConf.getBoolean(
+                    ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED,
+                    ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED_DEFAULT));
     Log.setPurgeGap(properties,
-            ozoneConf.getInt(ScmConfigKeys.RAFT_LOG_PURGE_GAP,
-                    ScmConfigKeys.RAFT_LOG_PURGE_GAP_DEFAULT));
+            ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
+                    ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
   }
 
@@ -200,8 +207,10 @@ public final class RatisUtil {
       final RaftProperties properties,
       final ConfigurationSource ozoneConf) {
     RetryCache.setExpiryTime(properties, TimeDuration.valueOf(
-            ozoneConf.getTimeDuration(ScmConfigKeys.RATIS_RETRY_CACHE_TIMEOUT,
-                    ScmConfigKeys.RATIS_RETRY_CACHE_TIMEOUT_DEFAULT,
+            ozoneConf.getTimeDuration(
+                    ScmConfigKeys.OZONE_SCM_HA_RATIS_RETRY_CACHE_TIMEOUT,
+                    ScmConfigKeys.
+                            OZONE_SCM_HA_RATIS_RETRY_CACHE_TIMEOUT_DEFAULT,
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
   }
@@ -217,8 +226,8 @@ public final class RatisUtil {
       final ConfigurationSource ozoneConf) {
     Snapshot.setAutoTriggerEnabled(properties, true);
     Snapshot.setAutoTriggerThreshold(properties,
-        ozoneConf.getLong(ScmConfigKeys.RATIS_SNAPSHOT_THRESHOLD,
-                ScmConfigKeys.RATIS_SNAPSHOT_THRESHOLD_DEFAULT));
+        ozoneConf.getLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT));
   }
 
   public static void checkRatisException(IOException e, String port,
