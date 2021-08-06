@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 import java.io.File;
-import java.io.IOException;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the

@@ -1,6 +1,5 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
-import kotlin.contracts.Returns;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,8 +38,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
+/**
+ * Tests upgrading a single datanode from pre-SCM HA volume format that used
+ * SCM ID to the post-SCM HA volume format using cluster ID.
+ */
 public class TestDatanodeUpgradeToScmHA {
   @Rule
   public TemporaryFolder tempFolder;
@@ -68,43 +70,10 @@ public class TestDatanodeUpgradeToScmHA {
       scmRpcServer.stop();
     }
   }
-    // scm ha with upgrades
-    // In all places where we write container, can also import container.
 
-    /** failed volume on finalize + format pre-finalized + different scm ids preF
-     * Call vet
-     * Write data with container
-     * check scm id format
-     * restart dsm
-     * call vet with different scm id
-     * check original scm id in container format
-     * read container
-     *
-     * Remove volume
-     * Finalize
-     * Check that volume is added to failed volume set or something.
-     * Restart dsm with volume.
-     *
-     * Check volume in old format.
-     * call VET.
-     * Volume should be formatted with cluster ID.
-     * read container
-     * write container
-     * should be formatted with cluster ID
-     * read container
-     */
-
-    /** use while finalizing
-     * write data with container
-     * finalize on one thread
-     * read on one thread until done finalizing.
-     * import container on one thread until done finalizing.
-     * read all containers
-     */
-
-    // scm ha before upgrades
-    // same tests but with scm ha on in the config.
-
+  // TODO:
+  //  - Test container import
+  //  - Test with SCM HA already enabled
   @Test
   public void testChaoticUpgrade() throws Exception {
     /// SETUP ///
@@ -155,7 +124,8 @@ public class TestDatanodeUpgradeToScmHA {
     Assert.assertTrue(volume.renameTo(failedVolume));
     dsm.finalizeUpgrade();
     LambdaTestUtils.await(2000, 500,
-        () -> dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.SCM_HA));
+        () -> dsm.getLayoutVersionManager()
+            .isAllowed(HDDSLayoutFeature.SCM_HA));
 
     /// FINALIZED: Volume failed, but container can still be read ///
 
@@ -344,9 +314,10 @@ public class TestDatanodeUpgradeToScmHA {
     dispatchRequest(putBlockRequest);
   }
 
-  public void addContainer(long containerID, Pipeline pipeline) throws Exception {
+  public void addContainer(long containerID, Pipeline pipeline)
+      throws Exception {
     ContainerProtos.ContainerCommandRequestProto createContainerRequest =
-      ContainerTestHelper.getCreateContainerRequest(containerID, pipeline);
+        ContainerTestHelper.getCreateContainerRequest(containerID, pipeline);
 
     dispatchRequest(createContainerRequest);
   }

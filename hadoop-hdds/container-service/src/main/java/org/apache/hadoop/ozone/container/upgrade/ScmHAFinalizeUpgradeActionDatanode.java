@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANO
 
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.volume.ImmutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
