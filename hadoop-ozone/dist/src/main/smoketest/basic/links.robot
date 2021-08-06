@@ -71,8 +71,6 @@ ACL verified on source bucket
 
 *** Test Cases ***
 Link Bucket info
-    Execute             kdestroy
-    Run Keyword         Kinit test user             testuser2            testuser2.keytab
     ${result} =         Execute And Ignore Error    ozone sh bucket info ${target}/readable-link
                         Should Contain              ${result}            ${source}
                         Should Contain              ${result}            readable-bucket
