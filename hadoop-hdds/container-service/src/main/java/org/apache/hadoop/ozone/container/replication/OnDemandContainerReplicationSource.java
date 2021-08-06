@@ -56,8 +56,8 @@ public class OnDemandContainerReplicationSource
     Container container = controller.getContainer(containerId);
 
     if (container == null) {
-      throw new StorageContainerException("Container not found",
-          CONTAINER_NOT_FOUND);
+      throw new StorageContainerException("Container " + containerId +
+          " is not found.", CONTAINER_NOT_FOUND);
     }
 
     controller.exportContainer(
