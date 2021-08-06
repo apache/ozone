@@ -100,10 +100,10 @@ public class ReplicationServer {
     Class channelType;
 
     if (Epoll.isAvailable()) {
-      eventLoopGroup = new EpollEventLoopGroup(poolSize);
+      eventLoopGroup = new EpollEventLoopGroup(poolSize * 2);
       channelType = EpollServerDomainSocketChannel.class;
     } else {
-      eventLoopGroup = new NioEventLoopGroup(poolSize);
+      eventLoopGroup = new NioEventLoopGroup(poolSize * 2);
       channelType = NioServerSocketChannel.class;
     }
 

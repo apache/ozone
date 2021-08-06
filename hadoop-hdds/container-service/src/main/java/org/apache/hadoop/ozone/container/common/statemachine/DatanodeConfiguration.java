@@ -84,12 +84,12 @@ public class DatanodeConfiguration {
    */
   @Config(key = "replication.queue.limit",
       type = ConfigType.INT,
-      defaultValue = "1000",
+      defaultValue = "4096",
       tags = {DATANODE},
       description = "The maximum number of queued requests for container  " +
           "replication"
   )
-  private int replicationQueueLimit = 1000;
+  private int replicationQueueLimit = 4096;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
