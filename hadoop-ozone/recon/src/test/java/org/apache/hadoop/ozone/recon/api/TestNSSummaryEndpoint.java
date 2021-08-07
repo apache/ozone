@@ -87,7 +87,6 @@ public class TestNSSummaryEndpoint {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
   private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
   private NSSummaryEndpoint nsSummaryEndpoint;
 
