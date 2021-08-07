@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -41,9 +42,7 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +80,7 @@ public class NSSummaryEndpoint {
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
-  private ReconContainerManager containerManager;
+  private ContainerManagerV2 containerManager;
 
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
@@ -89,8 +88,7 @@ public class NSSummaryEndpoint {
                            OzoneStorageContainerManager reconSCM) {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
-    this.containerManager =
-            (ReconContainerManager) reconSCM.getContainerManager();
+    this.containerManager = reconSCM.getContainerManager();
   }
 
   /**
@@ -122,7 +120,7 @@ public class NSSummaryEndpoint {
       List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
       namespaceSummaryResponse.setNumBucket(allBuckets.size());
       int totalNumDir = 0;
-      int totalNumKey = 0;
+      long totalNumKey = 0L;
       for (OmBucketInfo bucket : allBuckets) {
         long bucketObjectId = bucket.getObjectID();
         totalNumDir += getTotalDirCount(bucketObjectId);
@@ -137,7 +135,7 @@ public class NSSummaryEndpoint {
       List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
       namespaceSummaryResponse.setNumBucket(buckets.size());
       int totalDir = 0;
-      int totalKey = 0;
+      long totalKey = 0L;
 
       // iterate all buckets to collect the total object count.
       for (OmBucketInfo bucket : buckets) {
@@ -211,8 +209,8 @@ public class NSSummaryEndpoint {
       duResponse.setCount(volumes.size());
 
       List<DUResponse.DiskUsage> volumeDuData = new ArrayList<>();
-      long totalDataSize = 0;
-      long totalDataSizeWithReplica = 0;
+      long totalDataSize = 0L;
+      long totalDataSizeWithReplica = 0L;
       for (OmVolumeArgs volume: volumes) {
         String volumeName = volume.getVolume();
         String subpath = omMetadataManager.getVolumeKey(volumeName);
@@ -227,12 +225,9 @@ public class NSSummaryEndpoint {
         totalDataSize += dataSize;
 
         // count replicas
+        // TODO: to be dropped or optimized in the future
         if (withReplica) {
-          long volumeDU = 0;
-          List<OmKeyInfo> keys = listKeysUnderVolume(volumeName);
-          for (OmKeyInfo keyInfo: keys) {
-            volumeDU += getKeySizeWithReplication(keyInfo);
-          }
+          long volumeDU = calculateDUForVolume(volumeName);
           totalDataSizeWithReplica += volumeDU;
           diskUsage.setSizeWithReplica(volumeDU);
         }
@@ -252,8 +247,8 @@ public class NSSummaryEndpoint {
 
       // List of DiskUsage data for all buckets
       List<DUResponse.DiskUsage> bucketDuData = new ArrayList<>();
-      long volDataSize = 0;
-      long volDataSizeWithReplica = 0;
+      long volDataSize = 0L;
+      long volDataSizeWithReplica = 0L;
       for (OmBucketInfo bucket: buckets) {
         String bucketName = bucket.getBucketName();
         long bucketObjectID = bucket.getObjectID();
@@ -263,11 +258,7 @@ public class NSSummaryEndpoint {
         long dataSize = getTotalSize(bucketObjectID);
         volDataSize += dataSize;
         if (withReplica) {
-          long bucketDU = 0;
-          List<OmKeyInfo> keys = listKeysUnderBucket(bucketName);
-          for (OmKeyInfo keyInfo: keys) {
-            bucketDU += getKeySizeWithReplication(keyInfo);
-          }
+          long bucketDU = calculateDUUnderObject(bucketObjectID);
           diskUsage.setSizeWithReplica(bucketDU);
           volDataSizeWithReplica += bucketDU;
         }
@@ -290,7 +281,7 @@ public class NSSummaryEndpoint {
       duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
       List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
       long bucketDataSize = duResponse.getKeySize();
-      long bucketDataSizeWithReplica = 0;
+      long bucketDataSizeWithReplica = 0L;
       for (long subdirObjectId: bucketSubdirs) {
         NSSummary subdirNSSummary = reconNamespaceSummaryManager
                 .getNSSummary(subdirObjectId);
@@ -306,12 +297,7 @@ public class NSSummaryEndpoint {
         bucketDataSize += dataSize;
 
         if (withReplica) {
-          long dirDU = 0;
-
-          List<OmKeyInfo> keys = listKeysUnderDirectory(subdirObjectId);
-          for (OmKeyInfo keyInfo: keys) {
-            dirDU += getKeySizeWithReplication(keyInfo);
-          }
+          long dirDU = calculateDUUnderObject(subdirObjectId);
           diskUsage.setSizeWithReplica(dirDU);
           bucketDataSizeWithReplica += dirDU;
         }
@@ -355,7 +341,7 @@ public class NSSummaryEndpoint {
 
       duResponse.setKeySize(dirNSSummary.getSizeOfFiles());
       long dirDataSize = duResponse.getKeySize();
-      long dirDataSizeWithReplica = 0;
+      long dirDataSizeWithReplica = 0L;
       List<DUResponse.DiskUsage> subdirDUData = new ArrayList<>();
       // iterate all subdirectories to get disk usage data
       for (long subdirObjectId: subdirs) {
@@ -371,11 +357,7 @@ public class NSSummaryEndpoint {
         dirDataSize += dataSize;
 
         if (withReplica) {
-          long subdirDU = 0;
-          List<OmKeyInfo> keys = listKeysUnderDirectory(subdirObjectId);
-          for (OmKeyInfo keyInfo: keys) {
-            subdirDU += getKeySizeWithReplication(keyInfo);
-          }
+          long subdirDU = calculateDUUnderObject(subdirObjectId);
           diskUsage.setSizeWithReplica(subdirDU);
           dirDataSizeWithReplica += subdirDU;
         }
@@ -429,8 +411,6 @@ public class NSSummaryEndpoint {
         long keySizeWithReplica = getKeySizeWithReplication(keyInfo);
         duResponse.setSizeWithReplica(keySizeWithReplica);
       }
-      // give an empty list to avoid NPE
-      duResponse.setDuData(new ArrayList<>());
       break;
     case UNKNOWN:
       duResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
@@ -734,12 +714,12 @@ public class NSSummaryEndpoint {
    * @return count of keys
    * @throws IOException ioEx
    */
-  private int getTotalKeyCount(long objectId) throws IOException {
+  private long getTotalKeyCount(long objectId) throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary == null) {
-      return 0;
+      return 0L;
     }
-    int totalCnt = nsSummary.getNumOfFiles();
+    long totalCnt = nsSummary.getNumOfFiles();
     for (long childId: nsSummary.getChildDir()) {
       totalCnt += getTotalKeyCount(childId);
     }
@@ -868,12 +848,9 @@ public class NSSummaryEndpoint {
     return result;
   }
 
-  private List<OmKeyInfo> listKeysUnderVolume(String volumeName)
+  private long calculateDUForVolume(String volumeName)
           throws IOException {
-    List<OmKeyInfo> result = new ArrayList<>();
-    if (Strings.isBlank(volumeName)) {
-      return result;
-    }
+    long result = 0L;
 
     Table keyTable = omMetadataManager.getFileTable();
 
@@ -886,91 +863,70 @@ public class NSSummaryEndpoint {
 
       if (keyInfo != null) {
         if (volumeName.equals(keyInfo.getVolumeName())) {
-          result.add(keyInfo);
+          result += getKeySizeWithReplication(keyInfo);
         }
       }
     }
     return result;
   }
 
-  private List<OmKeyInfo> listKeysUnderBucket(String bucketName)
-          throws IOException {
-    List<OmKeyInfo> result = new ArrayList<>();
-    if (Strings.isBlank(bucketName)) {
-      return result;
-    }
-
+  // FileTable's key is in the format of "parentId/fileName"
+  // Make use of RocksDB's order to seek to the prefix and avoid full iteration
+  private long calculateDUUnderObject(long parentId) throws IOException {
     Table keyTable = omMetadataManager.getFileTable();
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
 
+    String seekPrefix = parentId + OM_KEY_PREFIX;
+    iterator.seek(seekPrefix);
+    long totalDU = 0L;
+    // handle direct keys
     while (iterator.hasNext()) {
       Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+      String dbKey = kv.getKey();
+      // since the RocksDB is ordered, seek until the prefix isn't matched
+      if (!dbKey.startsWith(seekPrefix)) {
+        break;
+      }
       OmKeyInfo keyInfo = kv.getValue();
-
       if (keyInfo != null) {
-        if (bucketName.equals(keyInfo.getBucketName())) {
-          result.add(keyInfo);
-        }
+        totalDU += getKeySizeWithReplication(keyInfo);
       }
     }
-    return result;
-  }
 
-  private List<OmKeyInfo> listKeysUnderDirectory(long dirObjectId)
-          throws IOException {
-    List<OmKeyInfo> result = new ArrayList<>();
-
-    Table keyTable = omMetadataManager.getFileTable();
-
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator();
-
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      OmKeyInfo keyInfo = kv.getValue();
-
-      if (keyInfo != null
-              && isFileUnderDir(dirObjectId, keyInfo.getParentObjectID())) {
-        result.add(keyInfo);
-      }
+    // handle nested keys (DFS)
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+    Set<Long> subDirIds = nsSummary.getChildDir();
+    for (long subDirId: subDirIds) {
+      totalDU += calculateDUUnderObject(subDirId);
     }
-    return result;
+    return totalDU;
   }
 
-  private boolean isFileUnderDir(long dirObjectId,
-                                 long keyParentId) throws IOException {
-    if (dirObjectId == keyParentId) {
-      return true;
-    } else {
-      NSSummary nsSummary =
-              reconNamespaceSummaryManager.getNSSummary(dirObjectId);
-      for (long subdirId: nsSummary.getChildDir()) {
-        if (isFileUnderDir(subdirId, keyParentId)) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
-
+  // TODO: to be optimized later. We don't want to get the batch in memory,
+  //  but for now I didn't figure out an elegant way to do the iteration
+  //  along with different combinations of listFile and withReplica
   private List<OmKeyInfo> listDirectKeys(long parentId) throws IOException {
     List<OmKeyInfo> result = new ArrayList<>();
 
     Table keyTable = omMetadataManager.getFileTable();
-
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = keyTable.iterator();
 
+    String seekPrefix = parentId + OM_KEY_PREFIX;
+    iterator.seek(seekPrefix);
+
     while (iterator.hasNext()) {
       Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      OmKeyInfo keyInfo = kv.getValue();
+      String dbKey = kv.getKey();
 
+      if (!dbKey.startsWith(seekPrefix)) {
+        break;
+      }
+      OmKeyInfo keyInfo = kv.getValue();
       if (keyInfo != null) {
-        if (parentId == keyInfo.getParentObjectID()) {
-          result.add(keyInfo);
-        }
+        result.add(keyInfo);
       }
     }
     return result;
@@ -991,7 +947,7 @@ public class NSSummaryEndpoint {
         long blockSize = location.getLength() * replicationFactor;
         du += blockSize;
       } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot find container");
+        LOG.debug("Cannot find container {}", block.getContainerID(), cnfe);
       }
     }
     return du;

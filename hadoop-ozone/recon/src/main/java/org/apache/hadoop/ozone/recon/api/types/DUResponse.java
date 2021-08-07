@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -55,6 +56,7 @@ public class DUResponse {
 
   public DUResponse() {
     this.status = ResponseStatus.OK;
+    this.duData = new ArrayList<>();
     // by default, the replication feature is disabled
     this.sizeWithReplica = -1L;
   }

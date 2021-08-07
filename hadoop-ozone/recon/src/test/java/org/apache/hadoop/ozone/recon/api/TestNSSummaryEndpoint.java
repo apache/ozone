@@ -18,13 +18,19 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
@@ -51,16 +57,13 @@ import javax.ws.rs.core.Response;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for NSSummary REST APIs.
@@ -84,6 +87,7 @@ public class TestNSSummaryEndpoint {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private OzoneStorageContainerManager ozoneStorageContainerManager;
   private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
   private NSSummaryEndpoint nsSummaryEndpoint;
 
@@ -104,6 +108,8 @@ public class TestNSSummaryEndpoint {
   private static final String KEY_FOUR = "file4";
   private static final String KEY_FIVE = "file5";
   private static final String KEY_SIX = "dir1/dir4/file6";
+  private static final String MULTI_BLOCK_KEY = "dir1/file7";
+  private static final String MULTI_BLOCK_FILE = "file7";
   private static final String FILE_ONE = "file1";
   private static final String FILE_TWO = "file2";
   private static final String FILE_THREE = "file3";
@@ -129,6 +135,22 @@ public class TestNSSummaryEndpoint {
   private static final long KEY_SIX_OBJECT_ID = 10L;
   private static final long DIR_THREE_OBJECT_ID = 11L;
   private static final long DIR_FOUR_OBJECT_ID = 12L;
+  private static final long MULTI_BLOCK_KEY_OBJECT_ID = 13L;
+
+  // container IDs
+  private static final long CONTAINER_ONE_ID = 1L;
+  private static final long CONTAINER_TWO_ID = 2L;
+  private static final long CONTAINER_THREE_ID = 3L;
+
+  // replication factors
+  private static final int THREE = 3;
+  private static final int TWO = 2;
+  private static final int FOUR = 4;
+
+  // block lengths
+  private static final long BLOCK_ONE_LENGTH = 1000L;
+  private static final long BLOCK_TWO_LENGTH = 2000L;
+  private static final long BLOCK_THREE_LENGTH = 3000L;
 
   // data size in bytes
   private static final long KEY_ONE_SIZE = 500L; // bin 0
@@ -137,6 +159,10 @@ public class TestNSSummaryEndpoint {
   private static final long KEY_FOUR_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_FIVE_SIZE = 100L; // bin 0
   private static final long KEY_SIX_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
+          = THREE * BLOCK_ONE_LENGTH
+          + TWO * BLOCK_TWO_LENGTH
+          + FOUR * BLOCK_THREE_LENGTH;
 
   // quota in bytes
   private static final long VOL_QUOTA = 2 * OzoneConsts.MB;
@@ -153,6 +179,7 @@ public class TestNSSummaryEndpoint {
   private static final String DIR_THREE_PATH = "/vol/bucket1/dir1/dir3";
   private static final String DIR_FOUR_PATH = "/vol/bucket1/dir1/dir4";
   private static final String KEY_PATH = "/vol/bucket2/file4";
+  private static final String MULTI_BLOCK_KEY_PATH = "/vol/bucket1/dir1/file7";
   private static final String INVALID_PATH = "/vol/path/not/found";
 
   // some expected answers
@@ -184,7 +211,7 @@ public class TestNSSummaryEndpoint {
                     .withReconSqlDb()
                     .withContainerDB()
                     .addBinding(OzoneStorageContainerManager.class,
-                            ReconStorageContainerManagerFacade.class)
+                            getMockReconSCM())
                     .addBinding(StorageContainerServiceProvider.class,
                             mock(StorageContainerServiceProviderImpl.class))
                     .addBinding(NSSummaryEndpoint.class)
@@ -323,6 +350,17 @@ public class TestNSSummaryEndpoint {
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
     Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidObj.getStatus());
+  }
+
+  @Test
+  public void testDiskUsageWithReplication() throws Exception {
+    setUpMultiBlockKey();
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(MULTI_BLOCK_KEY_PATH,
+            false, true);
+    DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
+    Assert.assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    Assert.assertEquals(MULTI_BLOCK_KEY_SIZE_WITH_REPLICA,
+            replicaDUResponse.getSizeWithReplica());
   }
 
   @Test
@@ -508,5 +546,93 @@ public class TestNSSummaryEndpoint {
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
 
     return omMetadataManager;
+  }
+
+  private void setUpMultiBlockKey() throws IOException {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    BlockID block1 = new BlockID(CONTAINER_ONE_ID, 0L);
+    BlockID block2 = new BlockID(CONTAINER_TWO_ID, 0L);
+    BlockID block3 = new BlockID(CONTAINER_THREE_ID, 0L);
+
+    OmKeyLocationInfo location1 = new OmKeyLocationInfo.Builder()
+            .setBlockID(block1)
+            .setLength(BLOCK_ONE_LENGTH)
+            .build();
+    OmKeyLocationInfo location2 = new OmKeyLocationInfo.Builder()
+            .setBlockID(block2)
+            .setLength(BLOCK_TWO_LENGTH)
+            .build();
+    OmKeyLocationInfo location3 = new OmKeyLocationInfo.Builder()
+            .setBlockID(block3)
+            .setLength(BLOCK_THREE_LENGTH)
+            .build();
+    locationInfoList.add(location1);
+    locationInfoList.add(location2);
+    locationInfoList.add(location3);
+
+    OmKeyLocationInfoGroup locationInfoGroup =
+            new OmKeyLocationInfoGroup(0L, locationInfoList);
+
+    // add the multi-block key to Recon's OM
+    writeKeyToOm(reconOMMetadataManager,
+            DIR_ONE_OBJECT_ID,
+            MULTI_BLOCK_KEY_OBJECT_ID,
+            VOL, BUCKET_ONE,
+            MULTI_BLOCK_KEY,
+            MULTI_BLOCK_FILE,
+            Collections.singletonList(locationInfoGroup));
+  }
+
+  /**
+   * Generate a set of mock container replica with a size of
+   * replication factor for container.
+   * @param replicationFactor number of replica
+   * @param containerID the container replicated based upon
+   * @return a set of container replica for testing
+   */
+  private static Set<ContainerReplica> generateMockContainerReplicas(
+          int replicationFactor, ContainerID containerID) {
+    Set<ContainerReplica> result = new HashSet<>();
+    for (int i = 0; i < replicationFactor; ++i) {
+      DatanodeDetails randomDatanode = randomDatanodeDetails();
+      ContainerReplica replica = new ContainerReplica.ContainerReplicaBuilder()
+              .setContainerID(containerID)
+              .setContainerState(State.OPEN)
+              .setDatanodeDetails(randomDatanode)
+              .build();
+      result.add(replica);
+    }
+    return result;
+  }
+
+  private static ReconStorageContainerManagerFacade getMockReconSCM()
+          throws ContainerNotFoundException {
+    ReconStorageContainerManagerFacade reconSCM =
+            mock(ReconStorageContainerManagerFacade.class);
+    ContainerManagerV2 containerManagerV2 = mock(ContainerManagerV2.class);
+
+    // Container 1 is 3-way replicated
+    ContainerID containerID1 = new ContainerID(CONTAINER_ONE_ID);
+    Set<ContainerReplica> containerReplicas1 = generateMockContainerReplicas(
+            THREE, containerID1);
+    when(containerManagerV2.getContainerReplicas(containerID1))
+            .thenReturn(containerReplicas1);
+
+    // Container 2 is under replicated with 2 replica
+    ContainerID containerID2 = new ContainerID(CONTAINER_TWO_ID);
+    Set<ContainerReplica> containerReplicas2 = generateMockContainerReplicas(
+            TWO, containerID2);
+    when(containerManagerV2.getContainerReplicas(containerID2))
+            .thenReturn(containerReplicas2);
+
+    // Container 3 is over replicated with 4 replica
+    ContainerID containerID3 = new ContainerID(CONTAINER_THREE_ID);
+    Set<ContainerReplica> containerReplicas3 = generateMockContainerReplicas(
+            FOUR, containerID3);
+    when(containerManagerV2.getContainerReplicas(containerID3))
+            .thenReturn(containerReplicas3);
+
+    when(reconSCM.getContainerManager()).thenReturn(containerManagerV2);
+    return reconSCM;
   }
 }
