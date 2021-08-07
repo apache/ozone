@@ -62,8 +62,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
 /**
- * An {@link ByteBufferStreamOutput} used by the REST service in combination with the
- * SCMClient to write the value of a key to a sequence
+ * An {@link ByteBufferStreamOutput} used by the REST service in combination
+ * with the SCMClient to write the value of a key to a sequence
  * of container chunks.  Writes are buffered locally and periodically written to
  * the container as a new chunk.  In order to preserve the semantics that
  * replacement of a pre-existing key is atomic, each instance of the stream has

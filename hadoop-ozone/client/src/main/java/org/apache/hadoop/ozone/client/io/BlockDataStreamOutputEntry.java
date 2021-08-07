@@ -123,7 +123,8 @@ public final class BlockDataStreamOutputEntry
       this.byteBufferStreamOutput.close();
       // after closing the chunkOutPutStream, blockId would have been
       // reconstructed with updated bcsId
-      this.blockID = ((BlockDataStreamOutput) byteBufferStreamOutput).getBlockID();
+      this.blockID =
+          ((BlockDataStreamOutput) byteBufferStreamOutput).getBlockID();
     }
   }
 
@@ -136,7 +137,8 @@ public final class BlockDataStreamOutputEntry
 
   long getTotalAckDataLength() {
     if (byteBufferStreamOutput != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
+      BlockDataStreamOutput out =
+          (BlockDataStreamOutput) this.byteBufferStreamOutput;
       blockID = out.getBlockID();
       return out.getTotalAckDataLength();
     } else {
@@ -149,7 +151,8 @@ public final class BlockDataStreamOutputEntry
 
   Collection<DatanodeDetails> getFailedServers() {
     if (byteBufferStreamOutput != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
+      BlockDataStreamOutput out =
+          (BlockDataStreamOutput) this.byteBufferStreamOutput;
       return out.getFailedServers();
     }
     return Collections.emptyList();
@@ -157,7 +160,8 @@ public final class BlockDataStreamOutputEntry
 
   long getWrittenDataLength() {
     if (byteBufferStreamOutput != null) {
-      BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
+      BlockDataStreamOutput out =
+          (BlockDataStreamOutput) this.byteBufferStreamOutput;
       return out.getWrittenDataLength();
     } else {
       // For a pre allocated block for which no write has been initiated,
@@ -169,14 +173,16 @@ public final class BlockDataStreamOutputEntry
 
   void cleanup(boolean invalidateClient) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
+    BlockDataStreamOutput out =
+        (BlockDataStreamOutput) this.byteBufferStreamOutput;
     out.cleanup(invalidateClient);
 
   }
 
   void writeOnRetry(long len) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = (BlockDataStreamOutput) this.byteBufferStreamOutput;
+    BlockDataStreamOutput out =
+        (BlockDataStreamOutput) this.byteBufferStreamOutput;
     out.writeOnRetry(len);
     this.currentPosition += len;
 

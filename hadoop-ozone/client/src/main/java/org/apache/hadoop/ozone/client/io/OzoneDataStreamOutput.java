@@ -57,7 +57,8 @@ public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
-      return ((KeyDataStreamOutput) byteBufferStreamOutput).getCommitUploadPartInfo();
+      return ((KeyDataStreamOutput)
+          byteBufferStreamOutput).getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
