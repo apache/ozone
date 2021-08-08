@@ -81,6 +81,7 @@ public class TestDatanodeUpgradeToScmHA {
   private final boolean scmHAAlreadyEnabled;
 
   private InetSocketAddress address;
+  private ScmTestMock scmServerImpl;
 
   private Random random;
 
@@ -190,8 +191,8 @@ public class TestDatanodeUpgradeToScmHA {
     readChunk(exportWriteChunk2, pipeline);
 
     // SCM HA could have been finalized, so restart DN with a different SCM ID.
-    // TODO: restart with ID
-    startScmServer();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    changeScmID();
     restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     // Make sure the existing container can be read.
     readChunk(exportWriteChunk2, pipeline);
@@ -347,8 +348,7 @@ public class TestDatanodeUpgradeToScmHA {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     // A new volume is added that must be formatted.
     File volumeScmID2 = addVolume();
-    // TODO: Restart with ID.
-    startScmServer();
+    changeScmID();
     restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
     Assert.assertEquals(2,
@@ -382,8 +382,7 @@ public class TestDatanodeUpgradeToScmHA {
     // Restart the datanode. It should upgrade the volume that was down
     // during finalization.
     // Yet another SCM ID is received this time, but it should not matter.
-    // TODO: Restart with ID.
-    startScmServer();
+    changeScmID();
     restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion());
     Assert.assertEquals(3,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
@@ -561,23 +560,25 @@ public class TestDatanodeUpgradeToScmHA {
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(expectedMlv, mlv);
 
-    EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
-        address, 1000);
-    VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
-        dsm.getContainer());
-    esm.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-    vet.call();
+    try(EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
+        address, 1000)) {
+      VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
+          dsm.getContainer());
+      esm.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      vet.call();
+    }
   }
 
   public void startScmServer() throws Exception {
-    if(scmRpcServer != null) {
-      scmRpcServer.stop();
-    }
-
     currentScmID = UUID.randomUUID().toString();
-    ScmTestMock scmServerImpl = new ScmTestMock(CLUSTER_ID, currentScmID);
-    scmRpcServer = SCMTestUtils.startScmRpcServer(SCMTestUtils.getConf(),
+    scmServerImpl = new ScmTestMock(CLUSTER_ID, currentScmID);
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
         scmServerImpl, address, 10);
+  }
+
+  public void changeScmID() {
+    currentScmID = UUID.randomUUID().toString();
+    scmServerImpl.setScmId(currentScmID);
   }
 
   public void dispatchRequest(

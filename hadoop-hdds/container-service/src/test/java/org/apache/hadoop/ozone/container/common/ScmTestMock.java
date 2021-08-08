@@ -357,4 +357,8 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   public void setClusterId(String clusterId) {
     this.clusterId = clusterId;
   }
+
+  public void setScmId(String scmId) {
+    this.scmId = scmId;
+  }
 }
