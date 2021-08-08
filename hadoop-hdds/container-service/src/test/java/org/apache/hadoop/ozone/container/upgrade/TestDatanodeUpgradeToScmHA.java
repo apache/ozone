@@ -19,6 +19,11 @@ import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachin
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
+import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
+import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -31,9 +36,12 @@ import org.junit.runners.Parameterized;
 
 import javax.xml.bind.ValidationEvent;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
+import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -152,8 +160,17 @@ public class TestDatanodeUpgradeToScmHA {
     readFuture.get();
   }
 
-  // TODO:
-  //  - Test container import
+  @Test
+  public void testImportContainer() {
+    // Create container normally.
+    // Export it to temp location
+    // For each import: modify
+
+    // DownloadAndImportReplicator#importContainer
+    // ONDemandcontainerReplicationSource#copyData
+
+  }
+
   @Test
   public void testChaoticUpgrade() throws Exception {
     /// SETUP ///
@@ -162,6 +179,14 @@ public class TestDatanodeUpgradeToScmHA {
     File volume = addVolume();
     startDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     final Pipeline pipeline = getPipeline();
+
+    // Pre-export a container for import testing.
+    final long exportContainerID = addContainer(pipeline);
+    ContainerProtos.WriteChunkRequestProto exportWriteChunk =
+        putBlock(exportContainerID, pipeline);
+    dsm.getContainer().getContainerSet().getContainer(exportContainerID).close();
+    File exportedContainerFile = exportContainer(exportContainerID);
+    deleteContainer(exportContainerID, pipeline);
 
     /// PRE-FINALIZED: Write and Read ///
 
@@ -173,6 +198,10 @@ public class TestDatanodeUpgradeToScmHA {
 
     checkVolumePathID(volume);
     checkContainerPathID(containerID);
+
+    importContainer(exportContainerID, exportedContainerFile);
+    readChunk(exportWriteChunk, pipeline);
+    deleteContainer(exportContainerID, pipeline);
 
     /// PRE-FINALIZED: SCM finalizes and SCM HA is enabled ///
 
@@ -192,6 +221,10 @@ public class TestDatanodeUpgradeToScmHA {
     // On restart, there should have been no changes to the paths used.
     checkVolumePathID(volume);
     checkContainerPathID(containerID);
+
+    importContainer(exportContainerID, exportedContainerFile);
+    readChunk(exportWriteChunk, pipeline);
+    deleteContainer(exportContainerID, pipeline);
 
     /// PRE-FINALIZED: Do finalization while the one volume is failed ///
 
@@ -248,6 +281,10 @@ public class TestDatanodeUpgradeToScmHA {
 
     /// FINALIZED: Read old data and write + read new data ///
 
+    importContainer(exportContainerID, exportedContainerFile);
+    readChunk(exportWriteChunk, pipeline);
+    deleteContainer(exportContainerID, pipeline);
+
     // Read container from before upgrade. The upgrade required it to be closed.
     readChunk(writeChunk, pipeline);
     // Write and read container after upgrade.
@@ -258,6 +295,33 @@ public class TestDatanodeUpgradeToScmHA {
     // The new container should use cluster ID in its path.
     // The volume it is placed on is up to the implementation.
     checkContainerPathID(containerID);
+  }
+
+  public File exportContainer(long containerId) throws Exception {
+    final ContainerReplicationSource replicationSource =
+        new OnDemandContainerReplicationSource(dsm.getContainer().getController());
+
+    replicationSource.prepare(containerId);
+
+    File destination = tempFolder.newFile();
+    try (FileOutputStream fos = new FileOutputStream(destination)) {
+      replicationSource.copyData(containerId, fos);
+    }
+    return destination;
+  }
+
+  public void importContainer(long containerID, File source) throws Exception {
+    DownloadAndImportReplicator replicator =
+        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
+            dsm.getContainer().getController(),
+            new SimpleContainerDownloader(conf, null),
+            new TarContainerPacker());
+
+    // Import will delete the source container. We want to keep reusing it,
+    // so give import a copy instead.
+    File tempFile = tempFolder.newFile();
+    Files.copy(source.toPath(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    replicator.importContainer(containerID, tempFile.toPath());
   }
 
   public void checkContainerPathID(long containerID) {
@@ -451,6 +515,16 @@ public class TestDatanodeUpgradeToScmHA {
 
     containerCreationInfo.put(containerID, new CreationInfo());
     return containerID;
+  }
+
+  public void deleteContainer(long containerID, Pipeline pipeline)
+      throws Exception {
+    ContainerProtos.ContainerCommandRequestProto deleteContainerRequest =
+        ContainerTestHelper.getDeleteContainer(pipeline, containerID, true);
+    dispatchRequest(deleteContainerRequest);
+
+//    containerCreationInfo.put(containerID, new CreationInfo());
+//    return containerID;
   }
 
 
