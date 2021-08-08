@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 import java.io.File;
@@ -123,7 +124,7 @@ public final class VersionedDatanodeFeatures {
       }
     }
 
-    public static boolean upgradeVolumeIfNeeded(StorageVolume volume,
+    public static boolean upgradeVolumeIfNeeded(HddsVolume volume,
         String clusterID) {
       File clusterIDDir = new File(volume.getStorageDir(), clusterID);
       boolean needsUpgrade = isFinalized(HDDSLayoutFeature.SCM_HA) &&

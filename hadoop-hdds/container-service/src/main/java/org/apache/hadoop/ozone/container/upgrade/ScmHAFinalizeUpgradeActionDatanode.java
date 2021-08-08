@@ -22,8 +22,10 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.SCM_HA;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
@@ -48,18 +50,19 @@ public class ScmHAFinalizeUpgradeActionDatanode
   @Override
   public void execute(DatanodeStateMachine dsm) throws Exception {
     LOG.info("Upgrading Datanode volume layout for SCM HA support.");
-    String clusterID = dsm.getLayoutStorage().getClusterID();
     MutableVolumeSet volumeSet = dsm.getContainer().getVolumeSet();
 
-    for (StorageVolume volume:
-        volumeSet.getVolumesList()) {
-      if (!upgradeVolume(volume, clusterID)) {
-        volumeSet.writeLock();
-        try {
-          volumeSet.failVolume(volume.getStorageDir().getAbsolutePath());
-        } finally {
-          volumeSet.writeUnlock();
+    for (StorageVolume volume: volumeSet.getVolumesList()) {
+      volumeSet.writeLock();
+      try {
+        if (volume instanceof HddsVolume) {
+          HddsVolume hddsVolume = (HddsVolume) volume;
+          if (!upgradeVolume(hddsVolume, hddsVolume.getClusterID())) {
+            volumeSet.failVolume(volume.getStorageDir().getAbsolutePath());
+          }
         }
+      } finally {
+        volumeSet.writeUnlock();
       }
     }
   }
@@ -68,7 +71,9 @@ public class ScmHAFinalizeUpgradeActionDatanode
    * Upgrade the specified volume to be compatible with SCM HA layout feature.
    * @return true if the volume upgrade succeeded, false otherwise.
    */
-  public static boolean upgradeVolume(StorageVolume volume, String clusterID) {
+  public static boolean upgradeVolume(HddsVolume volume, String clusterID) {
+    Preconditions.checkNotNull(clusterID, "Cannot upgrade volume with null " +
+        "cluster ID");
     File hddsVolumeDir = volume.getStorageDir();
     File clusterIDDir = new File(hddsVolumeDir, clusterID);
     File[] storageDirs = volume.getStorageDir().listFiles(File::isDirectory);
