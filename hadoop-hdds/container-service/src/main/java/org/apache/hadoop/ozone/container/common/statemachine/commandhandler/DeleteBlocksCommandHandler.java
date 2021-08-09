@@ -164,8 +164,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         while (!deleteCommandQueues.isEmpty()) {
           DeleteCmdInfo cmd = deleteCommandQueues.poll();
           try {
-            processCmd(cmd.getCmd(), cmd.getContainer(), cmd.getContext(),
-                cmd.getConnectionManager());
+            processCmd(cmd);
           } catch (Throwable e) {
             LOG.error("taskProcess failed.", e);
           }
@@ -245,8 +244,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
-  private void processCmd(DeleteBlocksCommand cmd, OzoneContainer container,
-      StateContext context, SCMConnectionManager connectionManager) {
+  private void processCmd(DeleteCmdInfo cmd) {
     LOG.debug("Processing block deletion command.");
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
@@ -256,7 +254,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // this is a metadata update, the actual deletion happens in another
       // recycling thread.
       List<DeletedBlocksTransaction> containerBlocks =
-          cmd.blocksTobeDeleted();
+          cmd.getCmd().blocksTobeDeleted();
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
@@ -285,8 +283,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
       });
 
-      resultBuilder.setDnId(
-          context.getParent().getDatanodeDetails().getUuid().toString());
+      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
+          .getUuid().toString());
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated
@@ -309,7 +307,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         cmdStatus.setStatus(status);
         ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(deleteAck);
       };
-      updateCommandStatus(context, cmd, statusUpdater, LOG);
+      updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;
       invocationCount++;
