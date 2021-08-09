@@ -24,8 +24,8 @@ import org.apache.hadoop.lib.util.Check;
 import java.util.concurrent.Callable;
 
 /**
- * Adapter class that allows <code>Runnable</code>s and <code>Callable</code>s to
- * be treated as the other.
+ * Adapter class that allows <code>Runnable</code>s and <code>Callable</code>s
+ * to be treated as the other.
  */
 @InterfaceAudience.Private
 public class RunnableCallable implements Callable<Void>, Runnable {
@@ -70,7 +70,8 @@ public class RunnableCallable implements Callable<Void>, Runnable {
   /**
    * Invokes the wrapped callable/runnable as a runnable.
    *
-   * @throws RuntimeException thrown by the wrapped callable/runnable invocation.
+   * @throws RuntimeException thrown by the wrapped callable/runnable
+   * invocation.
    */
   @Override
   public void run() {
@@ -92,6 +93,7 @@ public class RunnableCallable implements Callable<Void>, Runnable {
    */
   @Override
   public String toString() {
-    return (runnable != null) ? runnable.getClass().getSimpleName() : callable.getClass().getSimpleName();
+    return (runnable != null) ? runnable.getClass().getSimpleName()
+        : callable.getClass().getSimpleName();
   }
 }

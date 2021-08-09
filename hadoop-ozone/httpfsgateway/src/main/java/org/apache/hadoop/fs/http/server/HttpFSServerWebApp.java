@@ -46,8 +46,8 @@ import java.io.IOException;
  */
 @InterfaceAudience.Private
 public class HttpFSServerWebApp extends ServerWebApp {
-  private static final Logger LOG =
-    LoggerFactory.getLogger(HttpFSServerWebApp.class);
+  private static final Logger LOG
+      = LoggerFactory.getLogger(HttpFSServerWebApp.class);
 
   /**
    * Server name and prefix for all configuration properties.
@@ -59,7 +59,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
    */
   public static final String CONF_ADMIN_GROUP = "admin.group";
 
-  private static HttpFSServerWebApp SERVER;
+  private static HttpFSServerWebApp server;
   private static HttpFSServerMetrics metrics;
 
   private String adminGroup;
@@ -98,10 +98,10 @@ public class HttpFSServerWebApp extends ServerWebApp {
    */
   @Override
   public void init() throws ServerException {
-    if (SERVER != null) {
+    if (server != null) {
       throw new RuntimeException("HttpFSServer server already initialized");
     }
-    SERVER = this;
+    server = this;
     super.init();
     adminGroup = getConfig().get(getPrefixedName(CONF_ADMIN_GROUP), "admin");
     LOG.info("Connects to Namenode [{}]",
@@ -115,7 +115,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
    */
   @Override
   public void destroy() {
-    SERVER = null;
+    server = null;
     if (metrics != null) {
       metrics.shutdown();
     }
@@ -139,7 +139,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
    * @return the HttpFSServer server singleton.
    */
   public static HttpFSServerWebApp get() {
-    return SERVER;
+    return server;
   }
 
   /**

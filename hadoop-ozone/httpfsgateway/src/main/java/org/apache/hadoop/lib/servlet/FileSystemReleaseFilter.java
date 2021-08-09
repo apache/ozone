@@ -40,7 +40,8 @@ import java.io.IOException;
  */
 @InterfaceAudience.Private
 public abstract class FileSystemReleaseFilter implements Filter {
-  private static final ThreadLocal<FileSystem> FILE_SYSTEM_TL = new ThreadLocal<FileSystem>();
+  private static final ThreadLocal<FileSystem> FILE_SYSTEM_TL
+      = new ThreadLocal<FileSystem>();
 
   /**
    * Initializes the filter.
@@ -68,8 +69,10 @@ public abstract class FileSystemReleaseFilter implements Filter {
    * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
-  public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain)
-    throws IOException, ServletException {
+  public void doFilter(ServletRequest servletRequest,
+                       ServletResponse servletResponse,
+                       FilterChain filterChain)
+      throws IOException, ServletException {
     try {
       filterChain.doFilter(servletRequest, servletResponse);
     } finally {
@@ -102,8 +105,8 @@ public abstract class FileSystemReleaseFilter implements Filter {
 
   /**
    * Abstract method to be implemetned by concrete implementations of the
-   * filter that return the {@link FileSystemAccess} service to which the filesystem
-   * will be returned to.
+   * filter that return the {@link FileSystemAccess} service to which the
+   * filesystem will be returned to.
    *
    * @return the FileSystemAccess service.
    */

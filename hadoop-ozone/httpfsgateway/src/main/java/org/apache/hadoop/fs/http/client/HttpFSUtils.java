@@ -62,7 +62,7 @@ public class HttpFSUtils {
    * @throws IOException thrown if an IO error occurs.
    */
   static URL createURL(Path path, Map<String, String> params)
-    throws IOException {
+      throws IOException {
     return createURL(path, params, null);
   }
 
@@ -104,8 +104,8 @@ public class HttpFSUtils {
       separator = "&";
     }
     if (multiValuedParams != null) {
-      for (Map.Entry<String, List<String>> multiValuedEntry : 
-        multiValuedParams.entrySet()) {
+      for (Map.Entry<String, List<String>> multiValuedEntry
+          : multiValuedParams.entrySet()) {
         String name = URLEncoder.encode(multiValuedEntry.getKey(), "UTF8");
         List<String> values = multiValuedEntry.getValue();
         for (String value : values) {

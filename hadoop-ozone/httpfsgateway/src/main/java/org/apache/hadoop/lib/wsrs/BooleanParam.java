@@ -36,7 +36,8 @@ public abstract class BooleanParam extends Param<Boolean> {
     } else if (str.equalsIgnoreCase("false")) {
       return false;
     }
-    throw new IllegalArgumentException(MessageFormat.format("Invalid value [{0}], must be a boolean", str));
+    throw new IllegalArgumentException(MessageFormat
+        .format("Invalid value [{0}], must be a boolean", str));
   }
 
   @Override

@@ -53,8 +53,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 @InterfaceAudience.Private
-public class FileSystemAccessService extends BaseService implements FileSystemAccess {
-  private static final Logger LOG = LoggerFactory.getLogger(FileSystemAccessService.class);
+public class FileSystemAccessService extends BaseService
+    implements FileSystemAccess {
+  private static final Logger LOG
+      = LoggerFactory.getLogger(FileSystemAccessService.class);
 
   public static final String PREFIX = "hadoop";
 
@@ -62,17 +64,22 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
 
   public static final String AUTHENTICATION_TYPE = "authentication.type";
   public static final String KERBEROS_KEYTAB = "authentication.kerberos.keytab";
-  public static final String KERBEROS_PRINCIPAL = "authentication.kerberos.principal";
-  public static final String FS_CACHE_PURGE_FREQUENCY = "filesystem.cache.purge.frequency";
-  public static final String FS_CACHE_PURGE_TIMEOUT = "filesystem.cache.purge.timeout";
+  public static final String KERBEROS_PRINCIPAL
+      = "authentication.kerberos.principal";
+  public static final String FS_CACHE_PURGE_FREQUENCY
+      = "filesystem.cache.purge.frequency";
+  public static final String FS_CACHE_PURGE_TIMEOUT
+      = "filesystem.cache.purge.timeout";
 
   public static final String NAME_NODE_WHITELIST = "name.node.whitelist";
 
   public static final String HADOOP_CONF_DIR = "config.dir";
 
-  private static final String[] HADOOP_CONF_FILES = {"core-site.xml", "hdfs-site.xml"};
+  private static final String[] HADOOP_CONF_FILES
+      = {"core-site.xml", "hdfs-site.xml"};
 
-  private static final String FILE_SYSTEM_SERVICE_CREATED = "FileSystemAccessService.created";
+  private static final String FILE_SYSTEM_SERVICE_CREATED
+      = "FileSystemAccessService.created";
 
   private static class CachedFileSystem {
     private FileSystem fs;
@@ -80,14 +87,14 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
     private long timeout;
     private int count;
 
-    public CachedFileSystem(long timeout) {
+    CachedFileSystem(long timeout) {
       this.timeout = timeout;
       lastUse = -1;
       count = 0;
     }
 
     synchronized FileSystem getFileSystem(Configuration conf)
-      throws IOException {
+        throws IOException {
       if (fs == null) {
         fs = FileSystem.get(conf);
       }
@@ -103,8 +110,7 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
           fs.close();
           fs = null;
           lastUse = -1;
-        }
-        else {
+        } else {
           lastUse = System.currentTimeMillis();
         }
       }
@@ -141,25 +147,30 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
   private AtomicInteger unmanagedFileSystems = new AtomicInteger();
 
   private ConcurrentHashMap<String, CachedFileSystem> fsCache =
-    new ConcurrentHashMap<String, CachedFileSystem>();
+      new ConcurrentHashMap<String, CachedFileSystem>();
 
   private long purgeTimeout;
 
   @Override
   protected void init() throws ServiceException {
-    LOG.info("Using FileSystemAccess JARs version [{}]", VersionInfo.getVersion());
-    String security = getServiceConfig().get(AUTHENTICATION_TYPE, "simple").trim();
+    LOG.info("Using FileSystemAccess JARs version [{}]",
+        VersionInfo.getVersion());
+    String security = getServiceConfig()
+        .get(AUTHENTICATION_TYPE, "simple").trim();
     if (security.equals("kerberos")) {
       String defaultName = getServer().getName();
-      String keytab = System.getProperty("user.home") + "/" + defaultName + ".keytab";
+      String keytab = System
+          .getProperty("user.home") + "/" + defaultName + ".keytab";
       keytab = getServiceConfig().get(KERBEROS_KEYTAB, keytab).trim();
       if (keytab.length() == 0) {
-        throw new ServiceException(FileSystemAccessException.ERROR.H01, KERBEROS_KEYTAB);
+        throw new ServiceException(FileSystemAccessException.ERROR.H01,
+            KERBEROS_KEYTAB);
       }
       String principal = defaultName + "/localhost@LOCALHOST";
       principal = getServiceConfig().get(KERBEROS_PRINCIPAL, principal).trim();
       if (principal.length() == 0) {
-        throw new ServiceException(FileSystemAccessException.ERROR.H01, KERBEROS_PRINCIPAL);
+        throw new ServiceException(FileSystemAccessException.ERROR.H01,
+            KERBEROS_PRINCIPAL);
       }
       Configuration conf = new Configuration();
       conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
@@ -167,31 +178,39 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
       try {
         UserGroupInformation.loginUserFromKeytab(principal, keytab);
       } catch (IOException ex) {
-        throw new ServiceException(FileSystemAccessException.ERROR.H02, ex.getMessage(), ex);
+        throw new ServiceException(FileSystemAccessException.ERROR.H02,
+            ex.getMessage(),
+            ex);
       }
-      LOG.info("Using FileSystemAccess Kerberos authentication, principal [{}] keytab [{}]", principal, keytab);
+      LOG.info("Using FileSystemAccess Kerberos authentication, " +
+          "principal [{}] keytab [{}]", principal, keytab);
     } else if (security.equals("simple")) {
       Configuration conf = new Configuration();
       conf.set(HADOOP_SECURITY_AUTHENTICATION, "simple");
       UserGroupInformation.setConfiguration(conf);
-      LOG.info("Using FileSystemAccess simple/pseudo authentication, principal [{}]", System.getProperty("user.name"));
+      LOG.info("Using FileSystemAccess simple/pseudo authentication, " +
+          "principal [{}]", System.getProperty("user.name"));
     } else {
       throw new ServiceException(FileSystemAccessException.ERROR.H09, security);
     }
 
-    String hadoopConfDirProp = getServiceConfig().get(HADOOP_CONF_DIR, getServer().getConfigDir());
+    String hadoopConfDirProp = getServiceConfig().get(HADOOP_CONF_DIR,
+        getServer().getConfigDir());
     File hadoopConfDir = new File(hadoopConfDirProp).getAbsoluteFile();
     if (!hadoopConfDir.exists()) {
       hadoopConfDir = new File(getServer().getConfigDir()).getAbsoluteFile();
     }
     if (!hadoopConfDir.exists()) {
-      throw new ServiceException(FileSystemAccessException.ERROR.H10, hadoopConfDir);
+      throw new ServiceException(FileSystemAccessException.ERROR.H10,
+          hadoopConfDir);
     }
     try {
       serviceHadoopConf = loadHadoopConf(hadoopConfDir);
       fileSystemConf = getNewFileSystemConfiguration();
     } catch (IOException ex) {
-      throw new ServiceException(FileSystemAccessException.ERROR.H11, ex.toString(), ex);
+      throw new ServiceException(FileSystemAccessException.ERROR.H11,
+          ex.toString(),
+          ex);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -202,7 +221,8 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
     }
     setRequiredServiceHadoopConf(serviceHadoopConf);
 
-    nameNodeWhitelist = toLowerCase(getServiceConfig().getTrimmedStringCollection(NAME_NODE_WHITELIST));
+    nameNodeWhitelist = toLowerCase(getServiceConfig()
+        .getTrimmedStringCollection(NAME_NODE_WHITELIST));
   }
 
   private Configuration loadHadoopConf(File dir) throws IOException {
@@ -230,18 +250,23 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
   public void postInit() throws ServiceException {
     super.postInit();
     Instrumentation instrumentation = getServer().get(Instrumentation.class);
-    instrumentation.addVariable(INSTRUMENTATION_GROUP, "unmanaged.fs", new Instrumentation.Variable<Integer>() {
-      @Override
-      public Integer getValue() {
-        return unmanagedFileSystems.get();
-      }
-    });
-    instrumentation.addSampler(INSTRUMENTATION_GROUP, "unmanaged.fs", 60, new Instrumentation.Variable<Long>() {
-      @Override
-      public Long getValue() {
-        return (long) unmanagedFileSystems.get();
-      }
-    });
+    instrumentation.addVariable(INSTRUMENTATION_GROUP,
+        "unmanaged.fs",
+        new Instrumentation.Variable<Integer>() {
+          @Override
+          public Integer getValue() {
+            return unmanagedFileSystems.get();
+          }
+        });
+    instrumentation.addSampler(INSTRUMENTATION_GROUP,
+        "unmanaged.fs",
+        60,
+        new Instrumentation.Variable<Long>() {
+          @Override
+          public Long getValue() {
+            return (long) unmanagedFileSystems.get();
+          }
+        });
     Scheduler scheduler = getServer().get(Scheduler.class);
     int purgeInterval = getServiceConfig().getInt(FS_CACHE_PURGE_FREQUENCY, 60);
     purgeTimeout = getServiceConfig().getLong(FS_CACHE_PURGE_TIMEOUT, 60);
@@ -287,7 +312,8 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
   }
 
   protected UserGroupInformation getUGI(String user) throws IOException {
-    return UserGroupInformation.createProxyUser(user, UserGroupInformation.getLoginUser());
+    return UserGroupInformation.createProxyUser(user,
+        UserGroupInformation.getLoginUser());
   }
 
   protected void setRequiredServiceHadoopConf(Configuration conf) {
@@ -297,7 +323,7 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
   private static final String HTTPFS_FS_USER = "httpfs.fs.user";
 
   protected FileSystem createFileSystem(Configuration namenodeConf)
-    throws IOException {
+      throws IOException {
     String user = UserGroupInformation.getCurrentUser().getShortUserName();
     CachedFileSystem newCachedFS = new CachedFileSystem(purgeTimeout);
     CachedFileSystem cachedFS = fsCache.putIfAbsent(user, newCachedFS);
@@ -315,21 +341,27 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
     }
   }
 
-  protected void validateNamenode(String namenode) throws FileSystemAccessException {
+  protected void validateNamenode(String namenode)
+      throws FileSystemAccessException {
     if (nameNodeWhitelist.size() > 0 && !nameNodeWhitelist.contains("*")) {
       if (!nameNodeWhitelist.contains(
           StringUtils.toLowerCase(namenode))) {
-        throw new FileSystemAccessException(FileSystemAccessException.ERROR.H05, namenode, "not in whitelist");
+        throw new FileSystemAccessException(FileSystemAccessException.ERROR.H05,
+            namenode,
+            "not in whitelist");
       }
     }
   }
 
-  protected void checkNameNodeHealth(FileSystem fileSystem) throws FileSystemAccessException {
+  protected void checkNameNodeHealth(FileSystem fileSystem)
+      throws FileSystemAccessException {
   }
 
   @Override
-  public <T> T execute(String user, final Configuration conf, final FileSystemExecutor<T> executor)
-    throws FileSystemAccessException {
+  public <T> T execute(String user,
+                       final Configuration conf,
+                       final FileSystemExecutor<T> executor)
+      throws FileSystemAccessException {
     Check.notEmpty(user, "user");
     Check.notNull(conf, "conf");
     Check.notNull(executor, "executor");
@@ -337,20 +369,23 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H04);
     }
     if (conf.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) == null ||
-        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY).length() == 0) {
+        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY)
+            .length() == 0) {
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H06,
-                                          CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY);
+                                          CommonConfigurationKeysPublic
+                                              .FS_DEFAULT_NAME_KEY);
     }
     try {
       validateNamenode(
-        new URI(conf.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY)).
-          getAuthority());
+          new URI(conf.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY))
+            .getAuthority());
       UserGroupInformation ugi = getUGI(user);
       return ugi.doAs(new PrivilegedExceptionAction<T>() {
         @Override
         public T run() throws Exception {
           FileSystem fs = createFileSystem(conf);
-          Instrumentation instrumentation = getServer().get(Instrumentation.class);
+          Instrumentation instrumentation = getServer()
+              .get(Instrumentation.class);
           Instrumentation.Cron cron = instrumentation.createCron();
           try {
             checkNameNodeHealth(fs);
@@ -358,7 +393,9 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
             return executor.execute(fs);
           } finally {
             cron.stop();
-            instrumentation.addCron(INSTRUMENTATION_GROUP, executor.getClass().getSimpleName(), cron);
+            instrumentation.addCron(INSTRUMENTATION_GROUP,
+                executor.getClass().getSimpleName(),
+                cron);
             closeFileSystem(fs);
           }
         }
@@ -366,20 +403,23 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
     } catch (FileSystemAccessException ex) {
       throw ex;
     } catch (Exception ex) {
-      throw new FileSystemAccessException(FileSystemAccessException.ERROR.H03, ex);
+      throw new FileSystemAccessException(FileSystemAccessException.ERROR.H03,
+          ex);
     }
   }
 
-  public FileSystem createFileSystemInternal(String user, final Configuration conf)
-    throws IOException, FileSystemAccessException {
+  public FileSystem createFileSystemInternal(String user,
+                                             final Configuration conf)
+      throws IOException, FileSystemAccessException {
     Check.notEmpty(user, "user");
     Check.notNull(conf, "conf");
     if (!conf.getBoolean(FILE_SYSTEM_SERVICE_CREATED, false)) {
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H04);
     }
     try {
-      validateNamenode(
-        new URI(conf.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY)).getAuthority());
+      validateNamenode(new URI(conf
+          .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY))
+          .getAuthority());
       UserGroupInformation ugi = getUGI(user);
       return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
         @Override
@@ -392,13 +432,15 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
     } catch (FileSystemAccessException ex) {
       throw ex;
     } catch (Exception ex) {
-      throw new FileSystemAccessException(FileSystemAccessException.ERROR.H08, ex.getMessage(), ex);
+      throw new FileSystemAccessException(FileSystemAccessException.ERROR.H08,
+          ex.getMessage(),
+          ex);
     }
   }
 
   @Override
-  public FileSystem createFileSystem(String user, final Configuration conf) throws IOException,
-    FileSystemAccessException {
+  public FileSystem createFileSystem(String user, final Configuration conf)
+      throws IOException, FileSystemAccessException {
     unmanagedFileSystems.incrementAndGet();
     return createFileSystemInternal(user, conf);
   }

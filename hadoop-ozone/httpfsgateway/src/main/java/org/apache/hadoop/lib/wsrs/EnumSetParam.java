@@ -25,8 +25,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.StringUtils;
 
 @InterfaceAudience.Private
-public abstract class EnumSetParam<E extends Enum<E>> extends Param<EnumSet<E>> {
-  Class<E> klass;
+public abstract class EnumSetParam<E extends Enum<E>>
+    extends Param<EnumSet<E>> {
+  private Class<E> klass;
 
   public EnumSetParam(String name, Class<E> e, EnumSet<E> defaultValue) {
     super(name, defaultValue);

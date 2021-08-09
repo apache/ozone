@@ -30,8 +30,8 @@ import org.apache.hadoop.lib.servlet.FileSystemReleaseFilter;
 public class HttpFSReleaseFilter extends FileSystemReleaseFilter {
 
   /**
-   * Returns the {@link FileSystemAccess} service to return the FileSystemAccess filesystem
-   * instance to.
+   * Returns the {@link FileSystemAccess} service to return the FileSystemAccess
+   * filesystem instance to.
    *
    * @return the FileSystemAccess service.
    */

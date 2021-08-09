@@ -32,7 +32,8 @@ import java.util.Map;
 public abstract class ConfigurationUtils {
 
   /**
-   * Copy configuration key/value pairs from one configuration to another if a property exists in the target, it gets
+   * Copy configuration key/value pairs from one configuration to another if a
+   * property exists in the target, it gets
    * replaced.
    *
    * @param source source configuration.
@@ -47,13 +48,15 @@ public abstract class ConfigurationUtils {
   }
 
   /**
-   * Injects configuration key/value pairs from one configuration to another if the key does not exist in the target
+   * Injects configuration key/value pairs from one configuration to another if
+   * the key does not exist in the target
    * configuration.
    *
    * @param source source configuration.
    * @param target target configuration.
    */
-  public static void injectDefaults(Configuration source, Configuration target) {
+  public static void injectDefaults(Configuration source,
+                                    Configuration target) {
     Check.notNull(source, "source");
     Check.notNull(target, "target");
     for (Map.Entry<String, String> entry : source) {
@@ -76,7 +79,8 @@ public abstract class ConfigurationUtils {
     return resolved;
   }
 
-  // Canibalized from FileSystemAccess <code>Configuration.loadResource()</code>.
+  // Canibalized from FileSystemAccess
+  // <code>Configuration.loadResource()</code>.
 
   /**
    * Create a configuration from an InputStream.
@@ -87,7 +91,8 @@ public abstract class ConfigurationUtils {
    *
    * @throws IOException thrown if the configuration could not be read.
    */
-  public static void load(Configuration conf, InputStream is) throws IOException {
+  public static void load(Configuration conf, InputStream is)
+      throws IOException {
     conf.addResource(is);
   }
 }

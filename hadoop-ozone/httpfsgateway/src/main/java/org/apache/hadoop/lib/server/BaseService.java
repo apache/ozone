@@ -62,10 +62,12 @@ public abstract class BaseService implements Service {
     this.server = server;
     String servicePrefix = getPrefixedName("");
     serviceConfig = new Configuration(false);
-    for (Map.Entry<String, String> entry : ConfigurationUtils.resolve(server.getConfig())) {
+    for (Map.Entry<String, String> entry : ConfigurationUtils
+        .resolve(server.getConfig())) {
       String key = entry.getKey();
       if (key.startsWith(servicePrefix)) {
-        serviceConfig.set(key.substring(servicePrefix.length()), entry.getValue());
+        serviceConfig.set(key.substring(servicePrefix.length()),
+            entry.getValue());
       }
     }
     init();
@@ -116,10 +118,13 @@ public abstract class BaseService implements Service {
    * @param oldStatus old server status.
    * @param newStatus new server status.
    *
-   * @throws ServiceException thrown if the service could not process the status change.
+   * @throws ServiceException thrown if the service could not process the status
+   * change.
    */
   @Override
-  public void serverStatusChange(Server.Status oldStatus, Server.Status newStatus) throws ServiceException {
+  public void serverStatusChange(Server.Status oldStatus,
+                                 Server.Status newStatus)
+      throws ServiceException {
   }
 
   /**

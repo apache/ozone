@@ -41,8 +41,8 @@ public abstract class Param<T> {
       value = (str != null && str.trim().length() > 0) ? parse(str) : value;
     } catch (Exception ex) {
       throw new IllegalArgumentException(
-        MessageFormat.format("Parameter [{0}], invalid value [{1}], value must be [{2}]",
-                             name, str, getDomain()));
+        MessageFormat.format("Parameter [{0}], invalid value [{1}], " +
+                "value must be [{2}]", name, str, getDomain()));
     }
     return value;
   }

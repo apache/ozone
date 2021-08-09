@@ -35,7 +35,7 @@ public interface Service {
    *
    * @throws ServiceException thrown if the service could not be initialized.
    */
-  public void init(Server server) throws ServiceException;
+  void init(Server server) throws ServiceException;
 
   /**
    * Post initializes the service. This method is called by the
@@ -44,13 +44,13 @@ public interface Service {
    * @throws ServiceException thrown if the service could not be
    * post-initialized.
    */
-  public void postInit() throws ServiceException;
+  void postInit() throws ServiceException;
 
   /**
    * Destroy the services.  This method is called once, when the
    * {@link Server} owning the service is being destroyed.
    */
-  public void destroy();
+  void destroy();
 
   /**
    * Returns the service dependencies of this service. The service will be
@@ -58,7 +58,7 @@ public interface Service {
    *
    * @return the service dependencies.
    */
-  public Class[] getServiceDependencies();
+  Class[] getServiceDependencies();
 
   /**
    * Returns the interface implemented by this service. This interface is used
@@ -67,7 +67,7 @@ public interface Service {
    *
    * @return the interface that identifies the service.
    */
-  public Class getInterface();
+  Class getInterface();
 
   /**
    * Notification callback when the server changes its status.
@@ -75,8 +75,10 @@ public interface Service {
    * @param oldStatus old server status.
    * @param newStatus new server status.
    *
-   * @throws ServiceException thrown if the service could not process the status change.
+   * @throws ServiceException thrown if the service could not process the status
+   * change.
    */
-  public void serverStatusChange(Server.Status oldStatus, Server.Status newStatus) throws ServiceException;
+  void serverStatusChange(Server.Status oldStatus, Server.Status newStatus)
+      throws ServiceException;
 
 }

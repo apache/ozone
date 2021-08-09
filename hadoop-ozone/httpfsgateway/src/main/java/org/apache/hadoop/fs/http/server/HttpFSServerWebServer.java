@@ -178,7 +178,8 @@ public class HttpFSServerWebServer {
   public static void main(String[] args) throws Exception {
     startupShutdownMessage(HttpFSServerWebServer.class, args, LOG);
     Configuration conf = new Configuration(true);
-    Configuration sslConf = SSLFactory.readSSLConfiguration(conf, SSLFactory.Mode.SERVER);
+    Configuration sslConf = SSLFactory.readSSLConfiguration(conf,
+        SSLFactory.Mode.SERVER);
     HttpFSServerWebServer webServer =
         new HttpFSServerWebServer(conf, sslConf);
     webServer.start();

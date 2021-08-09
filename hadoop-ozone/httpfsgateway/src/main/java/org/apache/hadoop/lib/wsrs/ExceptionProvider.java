@@ -28,11 +28,13 @@ import javax.ws.rs.ext.ExceptionMapper;
 
 @InterfaceAudience.Private
 public class ExceptionProvider implements ExceptionMapper<Throwable> {
-  private static Logger LOG = LoggerFactory.getLogger(ExceptionProvider.class);
+  private static final Logger LOG
+      = LoggerFactory.getLogger(ExceptionProvider.class);
 
   private static final String ENTER = System.getProperty("line.separator");
 
-  protected Response createResponse(Response.Status status, Throwable throwable) {
+  protected Response createResponse(Response.Status status,
+                                    Throwable throwable) {
     return HttpExceptionUtils.createJerseyExceptionResponse(status, throwable);
   }
 

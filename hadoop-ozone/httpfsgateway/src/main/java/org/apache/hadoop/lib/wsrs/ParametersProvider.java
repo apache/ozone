@@ -42,8 +42,8 @@ import java.util.Map;
  */
 @InterfaceAudience.Private
 public class ParametersProvider
-  extends AbstractHttpContextInjectable<Parameters>
-  implements InjectableProvider<Context, Type> {
+    extends AbstractHttpContextInjectable<Parameters>
+    implements InjectableProvider<Context, Type> {
 
   private String driverParam;
   private Class<? extends Enum> enumClass;
@@ -60,8 +60,8 @@ public class ParametersProvider
   @SuppressWarnings("unchecked")
   public Parameters getValue(HttpContext httpContext) {
     Map<String, List<Param<?>>> map = new HashMap<String, List<Param<?>>>();
-    Map<String, List<String>> queryString =
-      httpContext.getRequest().getQueryParameters();
+    Map<String, List<String>> queryString
+        = httpContext.getRequest().getQueryParameters();
     String str = ((MultivaluedMap<String, String>) queryString).
         getFirst(driverParam);
     if (str == null) {
@@ -88,8 +88,7 @@ public class ParametersProvider
         for (String p : ps) {
           try {
             param.parseParam(p);
-          }
-          catch (Exception ex) {
+          } catch (Exception ex) {
             throw new IllegalArgumentException(ex.toString(), ex);
           }
           paramList.add(param);
@@ -121,7 +120,9 @@ public class ParametersProvider
   }
 
   @Override
-  public Injectable getInjectable(ComponentContext componentContext, Context context, Type type) {
+  public Injectable getInjectable(ComponentContext componentContext,
+                                  Context context,
+                                  Type type) {
     return (type.equals(Parameters.class)) ? this : null;
   }
 }

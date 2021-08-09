@@ -38,7 +38,8 @@ import java.security.Principal;
  * <ul>
  * <li>hostname: if the {@link HostnameFilter} is present and configured
  * before this filter</li>
- * <li>user: the <code>HttpServletRequest.getUserPrincipal().getName()</code></li>
+ * <li>user: the
+ * <code>HttpServletRequest.getUserPrincipal().getName()</code></li>
  * <li>method: the HTTP method fo the request (GET, POST, ...)</li>
  * <li>path: the path of the request URL</li>
  * </ul>
@@ -70,8 +71,10 @@ public class MDCFilter implements Filter {
    * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
-  public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-    throws IOException, ServletException {
+  public void doFilter(ServletRequest request,
+                       ServletResponse response,
+                       FilterChain chain)
+      throws IOException, ServletException {
     try {
       MDC.clear();
       String hostname = HostnameFilter.get();

@@ -46,8 +46,8 @@ import java.util.regex.Pattern;
 @SuppressWarnings("unchecked")
 public class HttpFSParametersProvider extends ParametersProvider {
 
-  private static final Map<Enum, Class<Param<?>>[]> PARAMS_DEF =
-    new HashMap<Enum, Class<Param<?>>[]>();
+  private static final Map<Enum, Class<Param<?>>[]> PARAMS_DEF
+      = new HashMap<Enum, Class<Param<?>>[]>();
 
   static {
     PARAMS_DEF.put(Operation.OPEN,
@@ -90,8 +90,9 @@ public class HttpFSParametersProvider extends ParametersProvider {
         new Class[]{AclPermissionParam.class});
     PARAMS_DEF.put(Operation.REMOVEDEFAULTACL, new Class[]{});
     PARAMS_DEF.put(Operation.SETXATTR,
-        new Class[]{XAttrNameParam.class, XAttrValueParam.class,
-                  XAttrSetFlagParam.class});
+        new Class[]{XAttrNameParam.class,
+            XAttrValueParam.class,
+            XAttrSetFlagParam.class});
     PARAMS_DEF.put(Operation.REMOVEXATTR, new Class[]{XAttrNameParam.class});
     PARAMS_DEF.put(Operation.GETXATTRS, 
         new Class[]{XAttrNameParam.class, XAttrEncodingParam.class});
@@ -143,7 +144,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public AccessTimeParam() {
-      super(NAME, -1l);
+      super(NAME, -1L);
     }
   }
 
@@ -162,7 +163,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public BlockSizeParam() {
-      super(NAME, -1l);
+      super(NAME, -1L);
     }
   }
 
@@ -206,7 +207,8 @@ public class HttpFSParametersProvider extends ParametersProvider {
    * Class for operation parameter.
    */
   @InterfaceAudience.Private
-  public static class OperationParam extends EnumParam<HttpFSFileSystem.Operation> {
+  public static class OperationParam
+      extends EnumParam<HttpFSFileSystem.Operation> {
 
     /**
      * Parameter name.
@@ -296,7 +298,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public LenParam() {
-      super(NAME, -1l);
+      super(NAME, -1L);
     }
   }
 
@@ -315,7 +317,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public ModifiedTimeParam() {
-      super(NAME, -1l);
+      super(NAME, -1L);
     }
   }
 
@@ -334,7 +336,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public OffsetParam() {
-      super(NAME, 0l);
+      super(NAME, 0L);
     }
   }
 
@@ -353,7 +355,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public NewLengthParam() {
-      super(NAME, 0l);
+      super(NAME, 0L);
     }
   }
 
@@ -454,12 +456,14 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public AclPermissionParam() {
-      super(NAME, HttpFSFileSystem.ACLSPEC_DEFAULT,
-        Pattern.compile(HttpFSServerWebApp.get()
-          .get(FileSystemAccess.class)
-          .getFileSystemConfiguration()
-          .get(HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_KEY,
-            HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT)));
+      super(NAME,
+          HttpFSFileSystem.ACLSPEC_DEFAULT,
+          Pattern.compile(HttpFSServerWebApp.get()
+              .get(FileSystemAccess.class)
+              .getFileSystemConfiguration()
+              .get(HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_KEY,
+                  HdfsClientConfigKeys
+                      .DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT)));
     }
   }
 
@@ -531,13 +535,13 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Parameter name.
      */
     public static final String NAME = HttpFSFileSystem.XATTR_NAME_PARAM;
-    private static final Pattern pattern = Pattern.compile(XATTR_NAME_REGX);
+    private static final Pattern PATTERN = Pattern.compile(XATTR_NAME_REGX);
 
     /**
      * Constructor.
      */
     public XAttrNameParam() {
-      super(NAME, null, pattern);
+      super(NAME, null, PATTERN);
     }
   }
 

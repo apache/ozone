@@ -26,6 +26,6 @@ import java.util.List;
 @InterfaceAudience.Private
 public interface Groups {
 
-  public List<String> getGroups(String user) throws IOException;
+  List<String> getGroups(String user) throws IOException;
 
 }

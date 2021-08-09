@@ -34,7 +34,7 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem;
-import org.apache.hadoop.fs.http.client.HttpFSFileSystem.FILE_TYPE;
+import org.apache.hadoop.fs.http.client.HttpFSFileSystem.FILETYPE;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -126,9 +126,9 @@ public final class FSOperations {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
     json.put(HttpFSFileSystem.PATH_SUFFIX_JSON,
         (emptyPathSuffix) ? "" : fileStatus.getPath().getName());
-    FILE_TYPE fileType = HttpFSFileSystem.FILE_TYPE.getType(fileStatus);
+    FILETYPE fileType = FILETYPE.getType(fileStatus);
     json.put(HttpFSFileSystem.TYPE_JSON, fileType.toString());
-    if (fileType.equals(FILE_TYPE.SYMLINK)) {
+    if (fileType.equals(FILETYPE.SYMLINK)) {
       // put the symlink into Json
       try {
         json.put(HttpFSFileSystem.SYMLINK_JSON,
@@ -208,16 +208,16 @@ public final class FSOperations {
    * @return The JSON representation of the ACLs for the file
    */
   @SuppressWarnings({"unchecked"})
-  private static Map<String,Object> aclStatusToJSON(AclStatus aclStatus) {
-    Map<String,Object> json = new LinkedHashMap<String,Object>();
-    Map<String,Object> inner = new LinkedHashMap<String,Object>();
+  private static Map<String, Object> aclStatusToJSON(AclStatus aclStatus) {
+    Map<String, Object> json = new LinkedHashMap<String, Object>();
+    Map<String, Object> inner = new LinkedHashMap<String, Object>();
     JSONArray entriesArray = new JSONArray();
     inner.put(HttpFSFileSystem.OWNER_JSON, aclStatus.getOwner());
     inner.put(HttpFSFileSystem.GROUP_JSON, aclStatus.getGroup());
     inner.put(HttpFSFileSystem.PERMISSION_JSON,
         HttpFSFileSystem.permissionToString(aclStatus.getPermission()));
     inner.put(HttpFSFileSystem.ACL_STICKY_BIT_JSON, aclStatus.isStickyBit());
-    for ( AclEntry e : aclStatus.getEntries() ) {
+    for (AclEntry e : aclStatus.getEntries()) {
       entriesArray.add(e.toString());
     }
     inner.put(HttpFSFileSystem.ACL_ENTRIES_JSON, entriesArray);
@@ -236,9 +236,11 @@ public final class FSOperations {
   @SuppressWarnings({"unchecked"})
   private static Map fileChecksumToJSON(FileChecksum checksum) {
     Map json = new LinkedHashMap();
-    json.put(HttpFSFileSystem.CHECKSUM_ALGORITHM_JSON, checksum.getAlgorithmName());
+    json.put(HttpFSFileSystem.CHECKSUM_ALGORITHM_JSON,
+        checksum.getAlgorithmName());
     json.put(HttpFSFileSystem.CHECKSUM_BYTES_JSON,
-             org.apache.hadoop.util.StringUtils.byteToHexString(checksum.getBytes()));
+             org.apache.hadoop.util.StringUtils
+                 .byteToHexString(checksum.getBytes()));
     json.put(HttpFSFileSystem.CHECKSUM_LENGTH_JSON, checksum.getLength());
     Map response = new LinkedHashMap();
     response.put(HttpFSFileSystem.FILE_CHECKSUM_JSON, json);
@@ -285,7 +287,8 @@ public final class FSOperations {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static Map xAttrNamesToJSON(List<String> names) throws IOException {
     Map jsonMap = new LinkedHashMap();
-    jsonMap.put(HttpFSFileSystem.XATTRNAMES_JSON, JSONArray.toJSONString(names));
+    jsonMap.put(HttpFSFileSystem.XATTRNAMES_JSON,
+        JSONArray.toJSONString(names));
     return jsonMap;
   }
 
@@ -424,7 +427,8 @@ public final class FSOperations {
    * Executor that performs an append FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSAppend implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSAppend
+      implements FileSystemAccess.FileSystemExecutor<Void> {
     private InputStream is;
     private Path path;
 
@@ -462,7 +466,8 @@ public final class FSOperations {
    * Executor that performs a concat FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSConcat implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSConcat
+      implements FileSystemAccess.FileSystemExecutor<Void> {
     private Path path;
     private Path[] sources;
 
@@ -543,10 +548,12 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that performs a content-summary FileSystemAccess files system operation.
+   * Executor that performs a content-summary FileSystemAccess files system
+   * operation.
    */
   @InterfaceAudience.Private
-  public static class FSContentSummary implements FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSContentSummary
+      implements FileSystemAccess.FileSystemExecutor<Map> {
     private Path path;
 
     /**
@@ -599,7 +606,8 @@ public final class FSOperations {
    * Executor that performs a create FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSCreate implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSCreate
+      implements FileSystemAccess.FileSystemExecutor<Void> {
     private InputStream is;
     private Path path;
     private short permission;
@@ -652,7 +660,13 @@ public final class FSOperations {
         fsPermission = FsCreateModes.create(fsPermission,
             new FsPermission(unmaskedPermission));
       }
-      OutputStream os = fs.create(path, fsPermission, override, bufferSize, replication, blockSize, null);
+      OutputStream os = fs.create(path,
+          fsPermission,
+          override,
+          bufferSize,
+          replication,
+          blockSize,
+          null);
       long bytes = copyBytes(is, os);
       HttpFSServerWebApp.get().getMetrics().incrBytesWritten(bytes);
       return null;
@@ -715,7 +729,8 @@ public final class FSOperations {
    * Executor that performs a delete FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSDelete implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSDelete
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private boolean recursive;
 
@@ -751,10 +766,12 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that performs a file-checksum FileSystemAccess files system operation.
+   * Executor that performs a file-checksum FileSystemAccess files system
+   * operation.
    */
   @InterfaceAudience.Private
-  public static class FSFileChecksum implements FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSFileChecksum
+      implements FileSystemAccess.FileSystemExecutor<Map> {
     private Path path;
 
     /**
@@ -784,10 +801,12 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that performs a file-status FileSystemAccess files system operation.
+   * Executor that performs a file-status FileSystemAccess files system
+   * operation.
    */
   @InterfaceAudience.Private
-  public static class FSFileStatus implements FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSFileStatus
+      implements FileSystemAccess.FileSystemExecutor<Map> {
     private Path path;
 
     /**
@@ -822,7 +841,8 @@ public final class FSOperations {
    * Executor that performs a home-dir FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSHomeDir implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSHomeDir
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     /**
      * Executes the filesystem operation.
@@ -844,10 +864,12 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that performs a list-status FileSystemAccess files system operation.
+   * Executor that performs a list-status FileSystemAccess files system
+   * operation.
    */
   @InterfaceAudience.Private
-  public static class FSListStatus implements FileSystemAccess.FileSystemExecutor<Map>, PathFilter {
+  public static class FSListStatus
+      implements FileSystemAccess.FileSystemExecutor<Map>, PathFilter {
     private Path path;
     private PathFilter filter;
 
@@ -883,7 +905,7 @@ public final class FSOperations {
     }
 
     @Override
-    public boolean accept(Path path) {
+    public boolean accept(Path p) {
       return true;
     }
 
@@ -908,7 +930,7 @@ public final class FSOperations {
      * listStatus API so we can use it.
      */
     private static class WrappedFileSystem extends FilterFileSystem {
-      public WrappedFileSystem(FileSystem f) {
+      WrappedFileSystem(FileSystem f) {
         super(f);
       }
 
@@ -932,7 +954,8 @@ public final class FSOperations {
    * Executor that performs a mkdirs FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSMkdirs implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSMkdirs
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     private Path path;
     private short permission;
@@ -980,7 +1003,8 @@ public final class FSOperations {
    * Executor that performs a open FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSOpen implements FileSystemAccess.FileSystemExecutor<InputStream> {
+  public static class FSOpen
+      implements FileSystemAccess.FileSystemExecutor<InputStream> {
     private Path path;
 
     /**
@@ -1014,7 +1038,8 @@ public final class FSOperations {
    * Executor that performs a rename FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSRename implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSRename
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private Path toPath;
 
@@ -1052,7 +1077,8 @@ public final class FSOperations {
    * Executor that performs a set-owner FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSSetOwner implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSSetOwner
+      implements FileSystemAccess.FileSystemExecutor<Void> {
     private Path path;
     private String owner;
     private String group;
@@ -1088,10 +1114,12 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that performs a set-permission FileSystemAccess files system operation.
+   * Executor that performs a set-permission FileSystemAccess files system
+   * operation.
    */
   @InterfaceAudience.Private
-  public static class FSSetPermission implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSSetPermission
+      implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
     private short permission;
@@ -1126,10 +1154,11 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that sets the acl for a file in a FileSystem
+   * Executor that sets the acl for a file in a FileSystem.
    */
   @InterfaceAudience.Private
-  public static class FSSetAcl implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSSetAcl
+      implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
     private List<AclEntry> aclEntries;
@@ -1163,10 +1192,11 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that removes all acls from a file in a FileSystem
+   * Executor that removes all acls from a file in a FileSystem.
    */
   @InterfaceAudience.Private
-  public static class FSRemoveAcl implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSRemoveAcl
+      implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
 
@@ -1197,10 +1227,11 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that modifies acl entries for a file in a FileSystem
+   * Executor that modifies acl entries for a file in a FileSystem.
    */
   @InterfaceAudience.Private
-  public static class FSModifyAclEntries implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSModifyAclEntries
+      implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
     private List<AclEntry> aclEntries;
@@ -1234,10 +1265,11 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that removes acl entries from a file in a FileSystem
+   * Executor that removes acl entries from a file in a FileSystem.
    */
   @InterfaceAudience.Private
-  public static class FSRemoveAclEntries implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSRemoveAclEntries
+      implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
     private List<AclEntry> aclEntries;
@@ -1271,10 +1303,11 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that removes the default acl from a directory in a FileSystem
+   * Executor that removes the default acl from a directory in a FileSystem.
    */
   @InterfaceAudience.Private
-  public static class FSRemoveDefaultAcl implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSRemoveDefaultAcl
+      implements FileSystemAccess.FileSystemExecutor<Void> {
 
     private Path path;
 
@@ -1331,7 +1364,8 @@ public final class FSOperations {
    * Executor that gets the ACL information for a given file.
    */
   @InterfaceAudience.Private
-  public static class FSAclStatus implements FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSAclStatus
+      implements FileSystemAccess.FileSystemExecutor<Map> {
     private Path path;
 
     /**
@@ -1361,10 +1395,12 @@ public final class FSOperations {
   }
 
   /**
-   * Executor that performs a set-replication FileSystemAccess files system operation.
+   * Executor that performs a set-replication FileSystemAccess files system
+   * operation.
    */
   @InterfaceAudience.Private
-  public static class FSSetReplication implements FileSystemAccess.FileSystemExecutor<JSONObject> {
+  public static class FSSetReplication
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private short replication;
 
@@ -1404,7 +1440,8 @@ public final class FSOperations {
    * Executor that performs a set-times FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSSetTimes implements FileSystemAccess.FileSystemExecutor<Void> {
+  public static class FSSetTimes
+      implements FileSystemAccess.FileSystemExecutor<Void> {
     private Path path;
     private long mTime;
     private long aTime;

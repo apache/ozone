@@ -27,18 +27,21 @@ import java.io.IOException;
 @InterfaceAudience.Private
 public interface FileSystemAccess {
 
-  public interface FileSystemExecutor<T> {
+  interface FileSystemExecutor<T> {
 
-    public T execute(FileSystem fs) throws IOException;
+    T execute(FileSystem fs) throws IOException;
   }
 
-  public <T> T execute(String user, Configuration conf, FileSystemExecutor<T> executor) throws
-    FileSystemAccessException;
+  <T> T execute(String user,
+                Configuration conf,
+                FileSystemExecutor<T> executor)
+      throws FileSystemAccessException;
 
-  public FileSystem createFileSystem(String user, Configuration conf) throws IOException, FileSystemAccessException;
+  FileSystem createFileSystem(String user, Configuration conf)
+      throws IOException, FileSystemAccessException;
 
-  public void releaseFileSystem(FileSystem fs) throws IOException;
+  void releaseFileSystem(FileSystem fs) throws IOException;
 
-  public Configuration getFileSystemConfiguration();
+  Configuration getFileSystemConfiguration();
 
 }

@@ -76,7 +76,7 @@ public class CheckUploadContentTypeFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response,
                        FilterChain chain)
-    throws IOException, ServletException {
+      throws IOException, ServletException {
     boolean contentTypeOK = true;
     HttpServletRequest httpReq = (HttpServletRequest) request;
     HttpServletResponse httpRes = (HttpServletResponse) response;
@@ -85,7 +85,8 @@ public class CheckUploadContentTypeFilter implements Filter {
       String op = httpReq.getParameter(HttpFSFileSystem.OP_PARAM);
       if (op != null && UPLOAD_OPERATIONS.contains(
           StringUtils.toUpperCase(op))) {
-        if ("true".equalsIgnoreCase(httpReq.getParameter(HttpFSParametersProvider.DataParam.NAME))) {
+        if ("true".equalsIgnoreCase(httpReq
+            .getParameter(HttpFSParametersProvider.DataParam.NAME))) {
           String contentType = httpReq.getContentType();
           contentTypeOK =
             HttpFSFileSystem.UPLOAD_CONTENT_TYPE.equalsIgnoreCase(contentType);
@@ -94,8 +95,7 @@ public class CheckUploadContentTypeFilter implements Filter {
     }
     if (contentTypeOK) {
       chain.doFilter(httpReq, httpRes);
-    }
-    else {
+    } else {
       httpRes.sendError(HttpServletResponse.SC_BAD_REQUEST,
                         "Data upload requests must have content-type set to '" +
                         HttpFSFileSystem.UPLOAD_CONTENT_TYPE + "'");

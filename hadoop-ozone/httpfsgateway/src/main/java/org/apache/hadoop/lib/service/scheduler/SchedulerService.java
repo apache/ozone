@@ -38,7 +38,8 @@ import java.util.concurrent.TimeUnit;
 
 @InterfaceAudience.Private
 public class SchedulerService extends BaseService implements Scheduler {
-  private static final Logger LOG = LoggerFactory.getLogger(SchedulerService.class);
+  private static final Logger LOG
+      = LoggerFactory.getLogger(SchedulerService.class);
 
   private static final String INST_GROUP = "scheduler";
 
@@ -90,18 +91,23 @@ public class SchedulerService extends BaseService implements Scheduler {
   }
 
   @Override
-  public void schedule(final Callable<?> callable, long delay, long interval, TimeUnit unit) {
+  public void schedule(final Callable<?> callable,
+                       long delay,
+                       long interval,
+                       TimeUnit unit) {
     Check.notNull(callable, "callable");
     if (!scheduler.isShutdown()) {
-      LOG.debug("Scheduling callable [{}], interval [{}] seconds, delay [{}] in [{}]",
-                new Object[]{callable, delay, interval, unit});
+      LOG.debug("Scheduling callable [{}], interval [{}] seconds, delay [{}] " +
+          "in [{}]", new Object[]{callable, delay, interval, unit});
       Runnable r = new Runnable() {
         @Override
         public void run() {
           String instrName = callable.getClass().getSimpleName();
           Instrumentation instr = getServer().get(Instrumentation.class);
           if (getServer().getStatus() == Server.Status.HALTED) {
-            LOG.debug("Skipping [{}], server status [{}]", callable, getServer().getStatus());
+            LOG.debug("Skipping [{}], server status [{}]",
+                callable,
+                getServer().getStatus());
             instr.incr(INST_GROUP, instrName + ".skips", 1);
           } else {
             LOG.debug("Executing [{}]", callable);
@@ -111,7 +117,8 @@ public class SchedulerService extends BaseService implements Scheduler {
               callable.call();
             } catch (Exception ex) {
               instr.incr(INST_GROUP, instrName + ".fails", 1);
-              LOG.error("Error executing [{}], {}", new Object[]{callable, ex.getMessage(), ex});
+              LOG.error("Error executing [{}], {}",
+                  new Object[]{callable, ex.getMessage(), ex});
             } finally {
               instr.addCron(INST_GROUP, instrName, cron.stop());
             }
@@ -121,13 +128,20 @@ public class SchedulerService extends BaseService implements Scheduler {
       scheduler.scheduleWithFixedDelay(r, delay, interval, unit);
     } else {
       throw new IllegalStateException(
-        MessageFormat.format("Scheduler shutting down, ignoring scheduling of [{}]", callable));
+        MessageFormat.format("Scheduler shutting down," +
+            " ignoring scheduling of [{}]", callable));
     }
   }
 
   @Override
-  public void schedule(Runnable runnable, long delay, long interval, TimeUnit unit) {
-    schedule((Callable<?>) new RunnableCallable(runnable), delay, interval, unit);
+  public void schedule(Runnable runnable,
+                       long delay,
+                       long interval,
+                       TimeUnit unit) {
+    schedule((Callable<?>) new RunnableCallable(runnable),
+        delay,
+        interval,
+        unit);
   }
 
 }

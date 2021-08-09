@@ -25,7 +25,7 @@ import java.util.Arrays;
 
 @InterfaceAudience.Private
 public abstract class EnumParam<E extends Enum<E>> extends Param<E> {
-  Class<E> klass;
+  private Class<E> klass;
 
   public EnumParam(String name, Class<E> e, E defaultValue) {
     super(name, defaultValue);

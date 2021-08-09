@@ -28,7 +28,8 @@ public class FileSystemAccessException extends XException {
     H01("Service property [{0}] not defined"),
     H02("Kerberos initialization failed, {0}"),
     H03("FileSystemExecutor error, {0}"),
-    H04("Invalid configuration, it has not be created by the FileSystemAccessService"),
+    H04("Invalid configuration, it has not be created by the " +
+        "FileSystemAccessService"),
     H05("[{0}] validation failed, {1}"),
     H06("Property [{0}] not defined in configuration object"),
     H07("[{0}] not healthy, {1}"),

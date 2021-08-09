@@ -47,8 +47,8 @@ public abstract class StringParam extends Param<String> {
       }
     } catch (Exception ex) {
       throw new IllegalArgumentException(
-        MessageFormat.format("Parameter [{0}], invalid value [{1}], value must be [{2}]",
-                             getName(), str, getDomain()));
+        MessageFormat.format("Parameter [{0}], invalid value [{1}], " +
+                "value must be [{2}]", getName(), str, getDomain()));
     }
     return value;
   }

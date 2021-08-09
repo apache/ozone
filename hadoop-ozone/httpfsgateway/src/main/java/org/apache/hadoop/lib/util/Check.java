@@ -62,13 +62,14 @@ public class Check {
   public static <T> List<T> notNullElements(List<T> list, String name) {
     notNull(list, name);
     for (int i = 0; i < list.size(); i++) {
-      notNull(list.get(i), MessageFormat.format("list [{0}] element [{1}]", name, i));
+      notNull(list.get(i), MessageFormat
+          .format("list [{0}] element [{1}]", name, i));
     }
     return list;
   }
 
   /**
-   * Verifies a string is not NULL and not emtpy
+   * Verifies a string is not NULL and not emtpy.
    *
    * @param str the variable to check.
    * @param name the name to use in the exception message.
@@ -88,7 +89,7 @@ public class Check {
   }
 
   /**
-   * Verifies a string list is not NULL and not emtpy
+   * Verifies a string list is not NULL and not emtpy.
    *
    * @param list the list to check.
    * @param name the name to use in the exception message.
@@ -101,14 +102,17 @@ public class Check {
   public static List<String> notEmptyElements(List<String> list, String name) {
     notNull(list, name);
     for (int i = 0; i < list.size(); i++) {
-      notEmpty(list.get(i), MessageFormat.format("list [{0}] element [{1}]", name, i));
+      notEmpty(list.get(i), MessageFormat
+          .format("list [{0}] element [{1}]", name, i));
     }
     return list;
   }
 
-  private static final String IDENTIFIER_PATTERN_STR = "[a-zA-z_][a-zA-Z0-9_\\-]*";
+  private static final String IDENTIFIER_PATTERN_STR
+      = "[a-zA-z_][a-zA-Z0-9_\\-]*";
 
-  private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^" + IDENTIFIER_PATTERN_STR + "$");
+  private static final Pattern IDENTIFIER_PATTERN
+      = Pattern.compile("^" + IDENTIFIER_PATTERN_STR + "$");
 
   /**
    * Verifies a value is a valid identifier,
@@ -126,11 +130,17 @@ public class Check {
     Check.notEmpty(value, name);
     if (value.length() > maxLen) {
       throw new IllegalArgumentException(
-        MessageFormat.format("[{0}] = [{1}] exceeds max len [{2}]", name, value, maxLen));
+        MessageFormat.format("[{0}] = [{1}] exceeds max len [{2}]",
+            name,
+            value,
+            maxLen));
     }
     if (!IDENTIFIER_PATTERN.matcher(value).find()) {
       throw new IllegalArgumentException(
-        MessageFormat.format("[{0}] = [{1}] must be '{2}'", name, value, IDENTIFIER_PATTERN_STR));
+        MessageFormat.format("[{0}] = [{1}] must be '{2}'",
+            name,
+            value,
+            IDENTIFIER_PATTERN_STR));
     }
     return value;
   }
@@ -162,7 +172,10 @@ public class Check {
   public static long gt0(long value, String name) {
     if (value <= 0) {
       throw new IllegalArgumentException(
-        MessageFormat.format("parameter [{0}] = [{1}] must be greater than zero", name, value));
+        MessageFormat
+            .format("parameter [{0}] = [{1}] must be greater than zero",
+                name,
+                value));
     }
     return value;
   }
@@ -175,7 +188,8 @@ public class Check {
    *
    * @return the value.
    *
-   * @throws IllegalArgumentException if the integer is greater or equal to zero.
+   * @throws IllegalArgumentException if the integer is greater or equal to
+   * zero.
    */
   public static int ge0(int value, String name) {
     return (int) ge0((long) value, name);
@@ -194,7 +208,9 @@ public class Check {
   public static long ge0(long value, String name) {
     if (value < 0) {
       throw new IllegalArgumentException(MessageFormat.format(
-        "parameter [{0}] = [{1}] must be greater than or equals zero", name, value));
+        "parameter [{0}] = [{1}] must be greater than or equals zero",
+          name,
+          value));
     }
     return value;
   }

@@ -33,15 +33,16 @@ public class XException extends Exception {
   /**
    * Interface to define error codes.
    */
-  public static interface ERROR {
+  public interface ERROR {
 
     /**
      * Returns the template for the error.
      *
      * @return the template for the error, the template must be in JDK
-     *         <code>MessageFormat</code> syntax (using {#} positional parameters).
+     *         <code>MessageFormat</code> syntax (using {#} positional
+     *         parameters).
      */
-    public String getTemplate();
+    String getTemplate();
 
   }
 
@@ -81,7 +82,9 @@ public class XException extends Exception {
    */
   @SuppressWarnings({"ThrowableResultOfMethodCallIgnored"})
   public XException(ERROR error, Object... params) {
-    this(Check.notNull(error, "error"), format(error, params), getCause(params));
+    this(Check.notNull(error, "error"),
+        format(error, params),
+        getCause(params));
   }
 
   /**
@@ -127,7 +130,8 @@ public class XException extends Exception {
    */
   private static Throwable getCause(Object... params) {
     Throwable throwable = null;
-    if (params != null && params.length > 0 && params[params.length - 1] instanceof Throwable) {
+    if (params != null && params.length > 0 && params[params.length - 1]
+        instanceof Throwable) {
       throwable = (Throwable) params[params.length - 1];
     }
     return throwable;

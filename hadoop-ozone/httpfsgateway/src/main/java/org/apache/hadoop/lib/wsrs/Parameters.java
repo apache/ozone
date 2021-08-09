@@ -66,7 +66,8 @@ public class Parameters {
    * @return the values of the parameter.
    */
   @SuppressWarnings("unchecked")
-  public <V, T extends Param<V>> List<V> getValues(String name, Class<T> klass) {
+  public <V, T extends Param<V>> List<V> getValues(String name,
+                                                   Class<T> klass) {
     List<Param<?>> multiParams = (List<Param<?>>)params.get(name);
     List<V> values = Lists.newArrayList();
     if (multiParams != null) {

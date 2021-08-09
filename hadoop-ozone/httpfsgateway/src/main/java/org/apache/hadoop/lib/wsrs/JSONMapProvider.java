@@ -44,21 +44,33 @@ public class JSONMapProvider implements MessageBodyWriter<Map> {
   private static final String ENTER = System.getProperty("line.separator");
 
   @Override
-  public boolean isWriteable(Class<?> aClass, Type type, Annotation[] annotations, MediaType mediaType) {
+  public boolean isWriteable(Class<?> aClass,
+                             Type type,
+                             Annotation[] annotations,
+                             MediaType mediaType) {
     return Map.class.isAssignableFrom(aClass);
   }
 
   @Override
-  public long getSize(Map map, Class<?> aClass, Type type, Annotation[] annotations, MediaType mediaType) {
+  public long getSize(Map map,
+                      Class<?> aClass,
+                      Type type,
+                      Annotation[] annotations,
+                      MediaType mediaType) {
     return -1;
   }
 
   @Override
-  public void writeTo(Map map, Class<?> aClass, Type type, Annotation[] annotations,
-                      MediaType mediaType, MultivaluedMap<String, Object> stringObjectMultivaluedMap,
-                      OutputStream outputStream) throws IOException, WebApplicationException {
-    Writer writer =
-        new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
+  public void writeTo(Map map,
+                      Class<?> aClass,
+                      Type type,
+                      Annotation[] annotations,
+                      MediaType mediaType,
+                      MultivaluedMap<String, Object> stringObjectMultivaluedMap,
+                      OutputStream outputStream)
+      throws IOException, WebApplicationException {
+    Writer writer
+        = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
     JSONObject.writeJSONString(map, writer);
     writer.write(ENTER);
     writer.flush();

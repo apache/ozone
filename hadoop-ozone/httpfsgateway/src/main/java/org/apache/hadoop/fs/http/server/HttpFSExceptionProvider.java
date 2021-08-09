@@ -38,8 +38,10 @@ import java.io.IOException;
 @Provider
 @InterfaceAudience.Private
 public class HttpFSExceptionProvider extends ExceptionProvider {
-  private static Logger AUDIT_LOG = LoggerFactory.getLogger("httpfsaudit");
-  private static Logger LOG = LoggerFactory.getLogger(HttpFSExceptionProvider.class);
+  private static final Logger AUDIT_LOG
+      = LoggerFactory.getLogger("httpfsaudit");
+  private static final Logger LOG
+      = LoggerFactory.getLogger(HttpFSExceptionProvider.class);
 
   /**
    * Maps different exceptions thrown by HttpFSServer to HTTP status codes.
@@ -95,8 +97,14 @@ public class HttpFSExceptionProvider extends ExceptionProvider {
     String method = MDC.get("method");
     String path = MDC.get("path");
     String message = getOneLineMessage(throwable);
-    AUDIT_LOG.warn("FAILED [{}:{}] response [{}] {}", new Object[]{method, path, status, message});
-    LOG.warn("[{}:{}] response [{}] {}", method, path, status, message, throwable);
+    AUDIT_LOG.warn("FAILED [{}:{}] response [{}] {}",
+        new Object[]{method, path, status, message});
+    LOG.warn("[{}:{}] response [{}] {}",
+        method,
+        path,
+        status,
+        message,
+        throwable);
   }
 
   private void logErrorFully(Response.Status status, Throwable throwable) {

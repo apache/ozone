@@ -39,7 +39,8 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 public class HostnameFilter implements Filter {
   static final ThreadLocal<String> HOSTNAME_TL = new ThreadLocal<String>();
-  private static final Logger log = LoggerFactory.getLogger(HostnameFilter.class);
+  private static Logger log
+      = LoggerFactory.getLogger(HostnameFilter.class);
 
   /**
    * Initializes the filter.
@@ -67,8 +68,10 @@ public class HostnameFilter implements Filter {
    * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
-  public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-    throws IOException, ServletException {
+  public void doFilter(ServletRequest request,
+                       ServletResponse response,
+                       FilterChain chain)
+      throws IOException, ServletException {
     try {
       String hostname;
       try {
@@ -80,7 +83,9 @@ public class HostnameFilter implements Filter {
           hostname = "???";
         }
       } catch (UnknownHostException ex) {
-        log.warn("Request remote address could not be resolved, {0}", ex.toString(), ex);
+        log.warn("Request remote address could not be resolved, {0}",
+            ex.toString(),
+            ex);
         hostname = "???";
       }
       HOSTNAME_TL.set(hostname);

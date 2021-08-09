@@ -216,7 +216,7 @@ public abstract class ServerWebApp
   public InetSocketAddress getAuthority() throws ServerException {
     synchronized (this) {
       if (authority == null) {
-          authority = resolveAuthority();
+        authority = resolveAuthority();
       }
     }
     return authority;
