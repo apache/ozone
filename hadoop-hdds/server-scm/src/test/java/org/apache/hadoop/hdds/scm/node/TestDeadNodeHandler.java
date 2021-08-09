@@ -55,7 +55,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -81,7 +81,7 @@ public class TestDeadNodeHandler {
   private SCMNodeManager nodeManager;
   private ContainerManagerV2 containerManager;
   private NodeReportHandler nodeReportHandler;
-  private PipelineManagerV2Impl pipelineManager;
+  private PipelineManagerImpl pipelineManager;
   private DeadNodeHandler deadNodeHandler;
   private EventPublisher publisher;
   private EventQueue eventQueue;
@@ -102,7 +102,7 @@ public class TestDeadNodeHandler {
     scm = TestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     pipelineManager =
-        (PipelineManagerV2Impl)scm.getPipelineManager();
+        (PipelineManagerImpl)scm.getPipelineManager();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
