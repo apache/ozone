@@ -82,14 +82,8 @@ public class DataNodeUpgradeFinalizer extends
   @Override
   public void finalizeUpgrade(DatanodeStateMachine dsm)
       throws UpgradeException {
-    // TODO: Fix upgrade action calling in HDDS-5503.
-    try {
-      new ScmHAFinalizeUpgradeActionDatanode().execute(dsm);
-    } catch (Exception ex) {
-      throw new UpgradeException(ex,
-          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
-    }
-    super.finalizeUpgrade(dsm::getLayoutStorage);
+    super.finalizeUpgrade(lf -> ((HDDSLayoutFeature) lf)::datanodeAction,
+        dsm.getLayoutStorage());
   }
 
   @Override

@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Streaming files from single directory.
@@ -44,12 +45,11 @@ public class DirectoryServerSource implements StreamingSource {
       throws InterruptedException {
     Map<String, Path> files = new HashMap<>();
     final Path streamingDir = root.resolve(id);
-    try {
-      Files.walk(streamingDir)
-          .filter(Files::isRegularFile)
-          .forEach(path -> {
-            files.put(root.relativize(path).toString(), path);
-          });
+    try (Stream<Path> list = Files.walk(streamingDir)
+            .filter(Files::isRegularFile)) {
+      list.forEach(path -> {
+        files.put(root.relativize(path).toString(), path);
+      });
     } catch (IOException e) {
       throw new StreamingException("Couldn't read directory for streaming: " +
           streamingDir, e);

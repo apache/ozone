@@ -80,7 +80,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private ObjectName mxBean;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final SequenceIdGenerator sequenceIdGen;
-
+  private ScmBlockDeletingServiceMetrics metrics;
   /**
    * Constructor.
    *
@@ -104,15 +104,17 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     this.writableContainerFactory = scm.getWritableContainerFactory();
 
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
+    metrics = ScmBlockDeletingServiceMetrics.create();
 
     // SCM block deleting transaction log and deleting service.
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm.getContainerManager(),
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scm.getScmHAManager().getDBTransactionBuffer(),
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     Duration svcInterval = conf.getObject(
             ScmConfig.class).getBlockDeletionInterval();
     long serviceTimeout =
@@ -123,7 +125,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog, containerManager,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
-            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf);
+            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf,
+            metrics);
   }
 
   /**
@@ -284,6 +287,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       deletedBlockLog.close();
     }
     blockDeletingService.shutdown();
+    if (metrics != null) {
+      ScmBlockDeletingServiceMetrics.unRegister();
+      metrics = null;
+    }
     if (mxBean != null) {
       MBeans.unregister(mxBean);
       mxBean = null;
@@ -311,8 +318,4 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public static Logger getLogger() {
     return LOG;
   }
-
-  /**
-   * This class uses system current time milliseconds to generate unique id.
-   */
 }
