@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.container.common.impl;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -59,6 +61,7 @@ public class TestContainerDataYaml {
   private static final String CONTAINER_DB_TYPE = "RocksDB";
 
   private final ChunkLayOutVersion layout;
+  private OzoneConfiguration conf = new OzoneConfiguration();
     
   public TestContainerDataYaml(ChunkLayOutVersion layout) {
     this.layout = layout;
@@ -199,7 +202,7 @@ public class TestContainerDataYaml {
       File file = new File(classLoader.getResource(containerFile).getFile());
       KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
           .readContainerFile(file);
-      ContainerUtils.verifyChecksum(kvData);
+      ContainerUtils.verifyChecksum(kvData, conf);
 
       //Checking the Container file data is consistent or not
       assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
@@ -233,7 +236,7 @@ public class TestContainerDataYaml {
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
-    ContainerUtils.verifyChecksum(kvData);
+    ContainerUtils.verifyChecksum(kvData, conf);
 
     cleanup();
   }
@@ -250,11 +253,32 @@ public class TestContainerDataYaml {
       File file = new File(classLoader.getResource(containerFile).getFile());
       KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
           .readContainerFile(file);
-      ContainerUtils.verifyChecksum(kvData);
+      ContainerUtils.verifyChecksum(kvData, conf);
       fail("testIncorrectChecksum failed");
     } catch (Exception ex) {
       GenericTestUtils.assertExceptionContains("Container checksum error for " +
           "ContainerID:", ex);
     }
+  }
+
+  /**
+   * Test to verify disabled checksum with incorrect checksum.
+   */
+  @Test
+  public void testDisabledChecksum(){
+    try {
+      String containerFile = "incorrect.checksum.container";
+      //Get file from resources folder
+      ClassLoader classLoader = getClass().getClassLoader();
+      File file = new File(classLoader.getResource(containerFile).getFile());
+      KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
+              .readContainerFile(file);
+      conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_ENABLED, false);
+      ContainerUtils.verifyChecksum(kvData, conf);
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      fail("testDisabledChecksum failed");
+    }
+
   }
 }

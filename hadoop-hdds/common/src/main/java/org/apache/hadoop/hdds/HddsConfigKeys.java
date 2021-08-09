@@ -265,4 +265,9 @@ public final class HddsConfigKeys {
       "hdds.datanode.ratis.server.request.timeout";
   public static final String
       HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
+
+  public static final String HDDS_CONTAINER_CHECKSUM_ENABLED =
+          "hdds.container.checksum.enabled";
+  public static final boolean HDDS_CONTAINER_CHECKSUM_ENABLED_DEFAULT = true;
+
 }

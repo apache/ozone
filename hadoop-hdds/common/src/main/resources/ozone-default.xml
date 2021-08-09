@@ -2832,4 +2832,13 @@
     <description>The S3Gateway service principal.
       Ex: s3g/_HOST@REALM.COM</description>
   </property>
+
+  <property>
+    <name>hdds.container.checksum.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description> To enable/disable checksum verification of the
+      containers.
+    </description>
+  </property>
 </configuration>

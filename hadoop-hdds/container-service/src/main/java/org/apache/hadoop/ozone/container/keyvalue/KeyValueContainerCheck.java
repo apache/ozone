@@ -170,7 +170,7 @@ public class KeyValueContainerCheck {
     Preconditions
         .checkState(onDiskContainerData != null, "Container File not loaded");
 
-    ContainerUtils.verifyChecksum(onDiskContainerData);
+    ContainerUtils.verifyChecksum(onDiskContainerData, checkConfig);
 
     if (onDiskContainerData.getContainerType()
         != ContainerProtos.ContainerType.KeyValueContainer) {
