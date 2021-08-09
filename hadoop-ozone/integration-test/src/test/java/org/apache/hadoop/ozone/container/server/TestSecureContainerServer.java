@@ -68,6 +68,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -137,6 +138,11 @@ public class TestSecureContainerServer {
     containerTokenSecretManager = new ContainerTokenSecretManager(
         secConf, tokenLifetime, certSerialId);
     containerTokenSecretManager.start(caClient);
+  }
+
+  @AfterClass
+  public static void deleteTestDir() {
+    FileUtils.deleteQuietly(new File(TEST_DIR));
   }
 
   @After
