@@ -171,7 +171,7 @@ readonly SOURCES_TRIGGERING_TESTS
 function check_if_tests_are_needed_at_all() {
     start_end::group_start "Check if tests are needed"
 
-    if [[ "${PR_DRAFT}" == "true" ]]; then
+    if [[ "${PR_DRAFT:-}" == "true" ]]; then
         echo "Draft PR, skipping tests"
         set_output_skip_all_tests_and_exit
     fi
