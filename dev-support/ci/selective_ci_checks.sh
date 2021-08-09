@@ -153,7 +153,7 @@ function filter_changed_files() {
     fi
 
     echo
-    echo "Changed files matching the '${match}' pattern, but ignoring '${ignore}':"
+    echo "${match_count} changed files matching the '${match}' pattern, but ignoring '${ignore}':"
     echo
     echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}"
     echo
@@ -211,7 +211,6 @@ function get_count_all_files() {
     local pattern_array=("${SOURCES_TRIGGERING_TESTS[@]}")
     filter_changed_files
     COUNT_ALL_CHANGED_FILES=${match_count}
-    echo "Files count: ${COUNT_ALL_CHANGED_FILES}"
     readonly COUNT_ALL_CHANGED_FILES
     start_end::group_end
 }
@@ -223,7 +222,6 @@ function get_count_compose_files() {
     )
     filter_changed_files true
     COUNT_COMPOSE_CHANGED_FILES=${match_count}
-    echo "Files count: ${COUNT_COMPOSE_CHANGED_FILES}"
     readonly COUNT_COMPOSE_CHANGED_FILES
     start_end::group_end
 }
@@ -236,7 +234,6 @@ function get_count_doc_files() {
     )
     filter_changed_files true
     COUNT_DOC_CHANGED_FILES=${match_count}
-    echo "Files count: ${COUNT_DOC_CHANGED_FILES}"
     readonly COUNT_DOC_CHANGED_FILES
     start_end::group_end
 }
@@ -252,7 +249,6 @@ function get_count_junit_files() {
     )
     filter_changed_files true
     COUNT_JUNIT_CHANGED_FILES=${match_count}
-    echo "Files count: ${COUNT_JUNIT_CHANGED_FILES}"
     readonly COUNT_JUNIT_CHANGED_FILES
     start_end::group_end
 }
@@ -265,7 +261,6 @@ function get_count_kubernetes_files() {
     )
     filter_changed_files true
     COUNT_KUBERNETES_CHANGED_FILES=${match_count}
-    echo "Files count: ${COUNT_KUBERNETES_CHANGED_FILES}"
     readonly COUNT_KUBERNETES_CHANGED_FILES
     start_end::group_end
 }
@@ -277,7 +272,6 @@ function get_count_robot_files() {
     )
     filter_changed_files true
     COUNT_ROBOT_CHANGED_FILES=${match_count}
-    echo "Files count: ${COUNT_ROBOT_CHANGED_FILES}"
     readonly COUNT_ROBOT_CHANGED_FILES
     start_end::group_end
 }
@@ -400,9 +394,6 @@ function calculate_test_types_to_run() {
     verbosity::restore_exit_on_error_status
     COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - matched_files_count))
     readonly COUNT_CORE_OTHER_CHANGED_FILES
-    echo
-    echo "Files count: ${COUNT_CORE_OTHER_CHANGED_FILES}"
-    echo
 
     compose_tests_needed=false
     integration_tests_needed=false
@@ -416,6 +407,8 @@ function calculate_test_types_to_run() {
         integration_tests_needed=true
         kubernetes_tests_needed=true
     else
+        echo "All ${COUNT_ALL_CHANGED_FILES} changed files are known to be handled by specific checks."
+        echo
         if [[ ${COUNT_COMPOSE_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             compose_tests_needed="true"
         fi
