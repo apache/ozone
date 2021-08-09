@@ -38,6 +38,7 @@
 #
 declare -a pattern_array ignore_array
 
+matched_files=""
 ignore_array=(
     "/README.md" # exclude root README
 )
@@ -120,43 +121,43 @@ function get_regexp_from_patterns() {
     echo "${test_triggering_regexp}"
 }
 
-# Shows changed files in the commit vs. the target.
+# Finds changed files in the commit that match the pattern given in
+# `pattern_array` (but do not match `ignore_array`).
+#
+# Optionally also keeps a running list of matched files.  These matches
+# are handled by one or more specific checks.
+#
+# Parameter:
+#    add_to_list - if true, the files matched are added to the global
+#        matched_files list
 # Input:
 #    pattern_array - array storing regexp patterns
-function show_changed_files() {
+#    ignore_array - array storing regexp patterns to be ignored
+# Output:
+#    match_count - number of matched files
+#    matched_files (appended) - list of matched files
+function filter_changed_files() {
+    local add_to_list="${1:-}"
+
     local match ignore
     match=$(get_regexp_from_patterns pattern_array)
     ignore=$(get_regexp_from_patterns ignore_array)
+
     verbosity::store_exit_on_error_status
+
+    match_count=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -cEv "${ignore}")
+
+    if [[ "${add_to_list}" == "true" ]]; then
+        local additional=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}")
+        matched_files="${matched_files}$(echo -e "\n${additional}")"
+    fi
+
     echo
     echo "Changed files matching the '${match}' pattern, but ignoring '${ignore}':"
     echo
     echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}"
     echo
-    verbosity::restore_exit_on_error_status
-}
 
-# Counts changed files in the commit vs. the target
-# Input:
-#    pattern_array - array storing regexp patterns
-# Output:
-#    Count of changed files matching the patterns
-function count_changed_files() {
-    local match ignore
-    match=$(get_regexp_from_patterns pattern_array)
-    ignore=$(get_regexp_from_patterns ignore_array)
-    verbosity::store_exit_on_error_status
-    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -cEv "${ignore}"
-    verbosity::restore_exit_on_error_status
-}
-
-# Keep running list of matched files
-function update_matched_files() {
-    local match ignore
-    match=$(get_regexp_from_patterns pattern_array)
-    ignore=$(get_regexp_from_patterns ignore_array)
-    verbosity::store_exit_on_error_status
-    matched_files=${matched_files=}$(echo -e "\n" "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}")
     verbosity::restore_exit_on_error_status
 }
 
@@ -176,9 +177,9 @@ function check_if_tests_are_needed_at_all() {
     fi
 
     local pattern_array=("${SOURCES_TRIGGERING_TESTS[@]}")
-    show_changed_files
+    filter_changed_files
 
-    if [[ $(count_changed_files) == "0" ]]; then
+    if [[ ${match_count} == "0" ]]; then
         echo "None of the important files changed, skipping tests"
         set_output_skip_all_tests_and_exit
     fi
@@ -192,9 +193,9 @@ function run_all_tests_if_environment_files_changed() {
         "^dev-support/ci"
         "^hadoop-ozone/dev-support/checks/_lib.sh"
     )
-    show_changed_files
+    filter_changed_files
 
-    if [[ $(count_changed_files) != "0" ]]; then
+    if [[ ${match_count} != "0" ]]; then
         echo "Important environment files changed. Running everything"
         set_outputs_run_everything_and_exit
     fi
@@ -208,8 +209,8 @@ function run_all_tests_if_environment_files_changed() {
 function get_count_all_files() {
     start_end::group_start "Count all changed source files"
     local pattern_array=("${SOURCES_TRIGGERING_TESTS[@]}")
-    show_changed_files
-    COUNT_ALL_CHANGED_FILES=$(count_changed_files)
+    filter_changed_files
+    COUNT_ALL_CHANGED_FILES=${match_count}
     echo "Files count: ${COUNT_ALL_CHANGED_FILES}"
     readonly COUNT_ALL_CHANGED_FILES
     start_end::group_end
@@ -220,11 +221,10 @@ function get_count_compose_files() {
     local pattern_array=(
         "^hadoop-ozone/dist/src/main/compose"
     )
-    show_changed_files
-    COUNT_COMPOSE_CHANGED_FILES=$(count_changed_files)
+    filter_changed_files true
+    COUNT_COMPOSE_CHANGED_FILES=${match_count}
     echo "Files count: ${COUNT_COMPOSE_CHANGED_FILES}"
     readonly COUNT_COMPOSE_CHANGED_FILES
-    update_matched_files
     start_end::group_end
 }
 
@@ -234,11 +234,10 @@ function get_count_doc_files() {
         "^hadoop-hdds/docs"
         "^hadoop-ozone/dev-support/checks/docs.sh"
     )
-    show_changed_files
-    COUNT_DOC_CHANGED_FILES=$(count_changed_files)
+    filter_changed_files true
+    COUNT_DOC_CHANGED_FILES=${match_count}
     echo "Files count: ${COUNT_DOC_CHANGED_FILES}"
     readonly COUNT_DOC_CHANGED_FILES
-    update_matched_files
     start_end::group_end
 }
 
@@ -251,11 +250,10 @@ function get_count_junit_files() {
         "src/test/java"
         "src/test/resources"
     )
-    show_changed_files
-    COUNT_JUNIT_CHANGED_FILES=$(count_changed_files)
+    filter_changed_files true
+    COUNT_JUNIT_CHANGED_FILES=${match_count}
     echo "Files count: ${COUNT_JUNIT_CHANGED_FILES}"
     readonly COUNT_JUNIT_CHANGED_FILES
-    update_matched_files
     start_end::group_end
 }
 
@@ -265,11 +263,10 @@ function get_count_kubernetes_files() {
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
         "^hadoop-ozone/dist/src/main/k8s"
     )
-    show_changed_files
-    COUNT_KUBERNETES_CHANGED_FILES=$(count_changed_files)
+    filter_changed_files true
+    COUNT_KUBERNETES_CHANGED_FILES=${match_count}
     echo "Files count: ${COUNT_KUBERNETES_CHANGED_FILES}"
     readonly COUNT_KUBERNETES_CHANGED_FILES
-    update_matched_files
     start_end::group_end
 }
 
@@ -278,11 +275,10 @@ function get_count_robot_files() {
     local pattern_array=(
         "^hadoop-ozone/dist/src/main/smoketest"
     )
-    show_changed_files
-    COUNT_ROBOT_CHANGED_FILES=$(count_changed_files)
+    filter_changed_files true
+    COUNT_ROBOT_CHANGED_FILES=${match_count}
     echo "Files count: ${COUNT_ROBOT_CHANGED_FILES}"
     readonly COUNT_ROBOT_CHANGED_FILES
-    update_matched_files
     start_end::group_end
 }
 
@@ -292,9 +288,9 @@ function check_needs_author() {
         "^hadoop-ozone/dev-support/checks/author.sh"
         "src/..../java"
     )
-    show_changed_files
+    filter_changed_files
 
-    if [[ $(count_changed_files) != "0" ]]; then
+    if [[ ${match_count} != "0" ]]; then
         BASIC_CHECKS="${BASIC_CHECKS} author"
     fi
 
@@ -308,9 +304,9 @@ function check_needs_bats() {
         "\.bats$"
         "\.sh$" # includes hadoop-ozone/dev-support/checks/bats.sh
     )
-    show_changed_files
+    filter_changed_files
 
-    if [[ $(count_changed_files) != "0" ]]; then
+    if [[ ${match_count} != "0" ]]; then
         BASIC_CHECKS="${BASIC_CHECKS} bats"
     fi
 
@@ -325,9 +321,9 @@ function check_needs_checkstyle() {
         "pom.xml"
         "src/..../java"
     )
-    show_changed_files
+    filter_changed_files
 
-    if [[ $(count_changed_files) != "0" ]]; then
+    if [[ ${match_count} != "0" ]]; then
         BASIC_CHECKS="${BASIC_CHECKS} checkstyle"
     fi
 
@@ -352,10 +348,10 @@ function check_needs_dependency() {
         "^hadoop-ozone/dist/src/main/license/jar-report.txt"
         "pom.xml"
     )
-    show_changed_files
+    filter_changed_files
 
     dependency_check_needed=false
-    if [[ $(count_changed_files) != "0" ]]; then
+    if [[ ${match_count} != "0" ]]; then
         dependency_check_needed=true
     fi
 
@@ -370,9 +366,9 @@ function check_needs_findbugs() {
         "pom.xml"
         "src/..../java"
     )
-    show_changed_files
+    filter_changed_files
 
-    if [[ $(count_changed_files) != "0" ]]; then
+    if [[ ${match_count} != "0" ]]; then
         BASIC_CHECKS="${BASIC_CHECKS} findbugs"
     fi
 
@@ -388,9 +384,9 @@ function check_needs_unit_test() {
         "src/..../java"
         "src/..../resources"
     )
-    show_changed_files
+    filter_changed_files
 
-    if [[ $(count_changed_files) != "0" ]]; then
+    if [[ ${match_count} != "0" ]]; then
         BASIC_CHECKS="${BASIC_CHECKS} unit"
     fi
 
@@ -400,7 +396,7 @@ function check_needs_unit_test() {
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
     verbosity::store_exit_on_error_status
-    local matched_files_count=$(echo "${matched_files}" | sort | uniq | grep -v -e "^$" | wc -l)
+    local matched_files_count=$(echo "${matched_files}" | sort -u | grep -cv "^$")
     verbosity::restore_exit_on_error_status
     COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - matched_files_count))
     readonly COUNT_CORE_OTHER_CHANGED_FILES
