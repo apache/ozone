@@ -55,7 +55,7 @@ public final class TimeDurationUtil {
     }
 
     long raw = Long.parseLong(vStr);
-    long converted = unit.convert(raw, vUnit.unit());
+    long converted = unit.convert(raw, vUnit != null ? vUnit.unit() : null);
     if (vUnit.unit().convert(converted, unit) < raw) {
       LOG.warn("Possible loss of precision converting " + vStr
           + vUnit.suffix() + " to " + unit + " for " + name);
