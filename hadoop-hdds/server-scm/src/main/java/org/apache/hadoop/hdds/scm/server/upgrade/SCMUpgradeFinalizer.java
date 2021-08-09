@@ -83,7 +83,7 @@ public class SCMUpgradeFinalizer extends
   public void finalizeUpgrade(StorageContainerManager scm)
       throws UpgradeException {
     super.finalizeUpgrade(lf -> ((HDDSLayoutFeature) lf)::scmAction,
-        scm::getScmStorageConfig);
+        scm.getScmStorageConfig());
   }
 
   public void postFinalizeUpgrade(StorageContainerManager scm)

@@ -38,7 +38,6 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
@@ -197,16 +196,14 @@ public abstract class BasicUpgradeFinalizer
 
   protected void finalizeUpgrade(Function<LayoutFeature,
       Function<UpgradeActionType, Optional<? extends UpgradeAction>>>
-      aFunction, Supplier<Storage> storageSuppplier)
-      throws UpgradeException {
+      aFunction, Storage storage) throws UpgradeException {
     for (Object obj : versionManager.unfinalizedFeatures()) {
       LayoutFeature lf = (LayoutFeature) obj;
-      Storage layoutStorage = storageSuppplier.get();
       Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
           aFunction.apply(lf);
       Optional<? extends UpgradeAction> action = function.apply(ON_FINALIZE);
       runFinalizationAction(lf, action);
-      updateLayoutVersionInVersionFile(lf, layoutStorage);
+      updateLayoutVersionInVersionFile(lf, storage);
       versionManager.finalized(lf);
     }
     versionManager.completeFinalization();

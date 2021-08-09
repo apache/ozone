@@ -40,7 +40,7 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   public void finalizeUpgrade(OzoneManager om)
       throws UpgradeException {
     super.finalizeUpgrade(lf -> ((OMLayoutFeature) lf)::action,
-        om::getOmStorage);
+        om.getOmStorage());
   }
 
   public void runPrefinalizeStateActions(Storage storage, OzoneManager om)
