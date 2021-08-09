@@ -325,13 +325,9 @@ function check_needs_checkstyle() {
 }
 
 function check_needs_docs() {
-    start_end::group_start "Check if docs is needed"
-
     if [[ ${COUNT_DOC_CHANGED_FILES} != "0" ]]; then
         BASIC_CHECKS="${BASIC_CHECKS} docs"
     fi
-
-    start_end::group_end
 }
 
 function check_needs_dependency() {
