@@ -87,6 +87,16 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
+@test "java and docs change" {
+  run dev-support/ci/selective_ci_checks.sh 2c0adac26
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","docs","findbugs","unit"]'
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=true
+}
+
 @test "pom change" {
   run dev-support/ci/selective_ci_checks.sh 9129424a9
 
@@ -97,7 +107,7 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
-@test "CI env change" {
+@test "CI lib change" {
   run dev-support/ci/selective_ci_checks.sh ceb79acaa
 
   assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","rat","unit"]'
@@ -105,4 +115,44 @@ load bats-assert/load.bash
   assert_output -p needs-dependency-check=true
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=true
+}
+
+@test "CI workflow change" {
+  run dev-support/ci/selective_ci_checks.sh 90a8d7c01
+
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","rat","unit"]'
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-dependency-check=true
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=true
+}
+
+@test "root README" {
+  run dev-support/ci/selective_ci_checks.sh 8bbbf3f7d
+
+  assert_output -p 'basic-checks=[]'
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "ignored code" {
+  run dev-support/ci/selective_ci_checks.sh ac8aee7f8
+
+  assert_output -p 'basic-checks=[]'
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "other README" {
+  run dev-support/ci/selective_ci_checks.sh 5532981a7
+
+  assert_output -p 'basic-checks=[]'
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
 }
