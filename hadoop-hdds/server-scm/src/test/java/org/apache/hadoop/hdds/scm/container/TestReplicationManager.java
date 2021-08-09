@@ -1415,7 +1415,7 @@ public class TestReplicationManager {
     cf = replicationManager.move(id,
         new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
     Assert.assertTrue(cf.isDone() && cf.get() ==
-        MoveResult.RM_NOT_RUNNING);
+        MoveResult.FAIL_NOT_RUNNING);
     replicationManager.start();
     Thread.sleep(100L);
 

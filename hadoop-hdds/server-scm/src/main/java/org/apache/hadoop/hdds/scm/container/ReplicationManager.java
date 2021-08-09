@@ -154,7 +154,9 @@ public class ReplicationManager implements SCMService {
     // both replication and deletion are completed
     COMPLETED,
     // RM is not running
-    RM_NOT_RUNNING,
+    FAIL_NOT_RUNNING,
+    // RM is not ratis leader
+    FAIL_NOT_LEADER,
     // replication fail because the container does not exist in src
     REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
     // replication fail because the container exists in target
@@ -611,11 +613,6 @@ public class ReplicationManager implements SCMService {
     final boolean isInflightReplication =
         inflightActions.equals(inflightReplication);
 
-    //if RM is reinitialize, inflightMove will be restored,
-    //but inflightMoveFuture not. so there will be a case that
-    //container is in inflightMove, but not in inflightMoveFuture.
-    final boolean hasMoveFuture = inflightMoveFuture.containsKey(id);
-
     /*
      * there are some case:
      **********************************************************
@@ -630,54 +627,48 @@ public class ReplicationManager implements SCMService {
      */
 
     if (isSource && isInflightReplication) {
-      if (hasMoveFuture) {
-        inflightMoveFuture.get(id).complete(
-            MoveResult.UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION);
-        inflightMoveFuture.remove(id);
-      }
+      //if RM is reinitialize, inflightMove will be restored,
+      //but inflightMoveFuture not. so there will be a case that
+      //container is in inflightMove, but not in inflightMoveFuture.
+      compleleteMoveFutureWithResult(id,
+          MoveResult.UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION);
       moveScheduler.completeMove(id);
       return;
     }
 
     if (isTarget && !isInflightReplication) {
-      if (hasMoveFuture) {
-        inflightMoveFuture.get(id).complete(
-            MoveResult.UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION);
-        inflightMoveFuture.remove(id);
-      }
+      compleleteMoveFutureWithResult(id,
+          MoveResult.UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION);
       moveScheduler.completeMove(id);
       return;
     }
 
     if (!(isInflightReplication && isCompleted)) {
-      if (hasMoveFuture) {
-        if (isInflightReplication) {
-          if (isUnhealthy) {
-            inflightMoveFuture.get(id).complete(
-                MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
-          } else if (isNotInService) {
-            inflightMoveFuture.get(id).complete(
-                MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
-          } else {
-            inflightMoveFuture.get(id).complete(
-                MoveResult.REPLICATION_FAIL_TIME_OUT);
-          }
+      if (isInflightReplication) {
+        if (isUnhealthy) {
+          compleleteMoveFutureWithResult(id,
+              MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
+        } else if (isNotInService) {
+          compleleteMoveFutureWithResult(id,
+              MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
         } else {
-          if (isUnhealthy) {
-            inflightMoveFuture.get(id).complete(
-                MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
-          } else if (isTimeout) {
-            inflightMoveFuture.get(id).complete(
-                MoveResult.DELETION_FAIL_TIME_OUT);
-          } else if (isNotInService) {
-            inflightMoveFuture.get(id).complete(
-                MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE);
-          } else {
-            inflightMoveFuture.get(id).complete(
-                MoveResult.COMPLETED);
-          }
+          compleleteMoveFutureWithResult(id,
+              MoveResult.REPLICATION_FAIL_TIME_OUT);
         }
-        inflightMoveFuture.remove(id);
+      } else {
+        if (isUnhealthy) {
+          compleleteMoveFutureWithResult(id,
+              MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
+        } else if (isTimeout) {
+          compleleteMoveFutureWithResult(id,
+              MoveResult.DELETION_FAIL_TIME_OUT);
+        } else if (isNotInService) {
+          compleleteMoveFutureWithResult(id,
+              MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE);
+        } else {
+          compleleteMoveFutureWithResult(id,
+              MoveResult.COMPLETED);
+        }
       }
       moveScheduler.completeMove(id);
     } else {
@@ -697,7 +688,12 @@ public class ReplicationManager implements SCMService {
       throws ContainerNotFoundException, NodeNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
     if (!isRunning()) {
-      ret.complete(MoveResult.RM_NOT_RUNNING);
+      ret.complete(MoveResult.FAIL_NOT_RUNNING);
+      return ret;
+    }
+
+    if (!scmContext.isLeader()) {
+      ret.complete(MoveResult.FAIL_NOT_LEADER);
       return ret;
     }
 
@@ -1255,16 +1251,11 @@ public class ReplicationManager implements SCMService {
     ContainerReplicaCount replicaCount =
         getContainerReplicaCount(cif, replicaSet);
 
-    final boolean hasMoveFuture = inflightMoveFuture.containsKey(cid);
-
     if(!replicaSet.stream()
         .anyMatch(r -> r.getDatanodeDetails().equals(srcDn))){
       // if the target is present but source disappears somehow,
       // we can consider move is successful.
-      if (hasMoveFuture) {
-        inflightMoveFuture.get(cid).complete(MoveResult.COMPLETED);
-        inflightMoveFuture.remove(cid);
-      }
+      compleleteMoveFutureWithResult(cid, MoveResult.COMPLETED);
       moveScheduler.completeMove(cid);
       return;
     }
@@ -1289,10 +1280,7 @@ public class ReplicationManager implements SCMService {
       // we just complete the future without sending a delete command.
       LOG.info("can not remove source replica after successfully " +
           "replicated to target datanode");
-      if (hasMoveFuture) {
-        inflightMoveFuture.get(cid).complete(MoveResult.DELETE_FAIL_POLICY);
-        inflightMoveFuture.remove(cid);
-      }
+      compleleteMoveFutureWithResult(cid, MoveResult.DELETE_FAIL_POLICY);
       moveScheduler.completeMove(cid);
     }
   }
@@ -1936,8 +1924,8 @@ public class ReplicationManager implements SCMService {
   private void onLeaderReadyAndOutOfSafeMode() {
     List<ContainerID> needToRemove = new LinkedList<>();
     moveScheduler.getInflightMove().forEach((k, v) -> {
-      Set<ContainerReplica> replicas = null;
-      ContainerInfo cif = null;
+      Set<ContainerReplica> replicas;
+      ContainerInfo cif;
       try {
         replicas = containerManager.getContainerReplicas(k);
         cif = containerManager.getContainer(k);
@@ -1945,6 +1933,7 @@ public class ReplicationManager implements SCMService {
         needToRemove.add(k);
         LOG.error("can not find container {} " +
             "while processing replicated move", k);
+        return;
       }
       boolean isSrcExist = replicas.stream()
           .anyMatch(r -> r.getDatanodeDetails().equals(v.getSrc()));
@@ -1971,6 +1960,17 @@ public class ReplicationManager implements SCMService {
     });
 
     needToRemove.forEach(moveScheduler::completeMove);
+  }
+
+  /**
+   * complete the CompletableFuture of the container in the given Map with
+   * a given MoveResult.
+   */
+  private void compleleteMoveFutureWithResult(ContainerID cid, MoveResult mr){
+    if(inflightMoveFuture.containsKey(cid)) {
+      inflightMoveFuture.get(cid).complete(mr);
+      inflightMoveFuture.remove(cid);
+    }
   }
 }
 
