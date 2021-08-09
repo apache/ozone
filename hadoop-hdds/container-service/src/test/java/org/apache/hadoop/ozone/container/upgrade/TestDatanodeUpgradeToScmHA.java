@@ -6,7 +6,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -16,7 +15,6 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
@@ -47,9 +45,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -58,28 +54,20 @@ import java.util.concurrent.Future;
 
 /**
  * Tests upgrading a single datanode from pre-SCM HA volume format that used
- * SCM ID to the post-SCM HA volume format using cluster ID.
+ * SCM ID to the post-SCM HA volume format using cluster ID. If SCM HA was
+ * already being used before the upgrade, there should be no changes.
  */
 @RunWith(Parameterized.class)
 public class TestDatanodeUpgradeToScmHA {
   @Rule
   public TemporaryFolder tempFolder;
 
-  // The daemon for the datanode state machine is not started in this test.
-  // This greatly speeds up execution time, and the only thing we lose is
-  // any actions that would need to be run in pre-finalize, but we do not
-  // have any such actions for SCM HA.
   private DatanodeStateMachine dsm;
   private final OzoneConfiguration conf;
-  private RPC.Server scmRpcServer;
-
   private static final String CLUSTER_ID = "clusterID";
-
-  private Map<String, CreationInfo> volumeCreationInfo;
-  private Map<Long, CreationInfo> containerCreationInfo;
-  private String currentScmID;
   private final boolean scmHAAlreadyEnabled;
 
+  private RPC.Server scmRpcServer;
   private InetSocketAddress address;
   private ScmTestMock scmServerImpl;
 
@@ -105,9 +93,6 @@ public class TestDatanodeUpgradeToScmHA {
     tempFolder.create();
     random = new Random();
 
-    volumeCreationInfo = new HashMap<>();
-    containerCreationInfo = new HashMap<>();
-    currentScmID = null;
     address = SCMTestUtils.getReuseableAddress();
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
   }
@@ -128,7 +113,7 @@ public class TestDatanodeUpgradeToScmHA {
     // start DN and SCM
     startScmServer();
     addVolume();
-    startDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    startPreFinalizedDatanode();
     final Pipeline pipeline = getPipeline();
 
     // Add data to read.
@@ -137,21 +122,16 @@ public class TestDatanodeUpgradeToScmHA {
         pipeline);
     closeContainer(containerID, pipeline);
 
-    ExecutorService executor = Executors.newFixedThreadPool(1);
-
     // Create thread to keep reading during finalization.
+    ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<Void> readFuture = executor.submit(() -> {
-      try {
-        // Layout version check should be thread safe.
-        while(!dsm.getLayoutVersionManager()
-            .isAllowed(HDDSLayoutFeature.SCM_HA)) {
-          readChunk(writeChunk, pipeline);
-        }
-        // Make sure we can read after finalizing too.
+      // Layout version check should be thread safe.
+      while(!dsm.getLayoutVersionManager()
+          .isAllowed(HDDSLayoutFeature.SCM_HA)) {
         readChunk(writeChunk, pipeline);
-      } catch(Exception ex) {
-        Assert.fail(ex.getMessage());
       }
+      // Make sure we can read after finalizing too.
+      readChunk(writeChunk, pipeline);
       return null;
     });
 
@@ -166,7 +146,7 @@ public class TestDatanodeUpgradeToScmHA {
     // start DN and SCM
     startScmServer();
     addVolume();
-    startDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    startPreFinalizedDatanode();
     final Pipeline pipeline = getPipeline();
 
     // Pre-export a container to continuously import and delete.
@@ -190,37 +170,30 @@ public class TestDatanodeUpgradeToScmHA {
     importContainer(exportContainerID2, exportedContainerFile2);
     readChunk(exportWriteChunk2, pipeline);
 
-    // SCM HA could have been finalized, so restart DN with a different SCM ID.
+    // Now SCM and enough other DNs finalize to enable SCM HA. This DN is
+    // restarted with SCM HA config and gets a different SCM ID.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     changeScmID();
     restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     // Make sure the existing container can be read.
     readChunk(exportWriteChunk2, pipeline);
 
-    ExecutorService executor = Executors.newFixedThreadPool(1);
-
     // Create thread to keep importing containers during the upgrade.
     // Since the datanode's MLV is behind SCM's, container creation is not
     // allowed. We will keep importing and deleting the same container since
     // we cannot create new ones to import here.
+    ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<Void> importFuture = executor.submit(() -> {
-      try {
-        // Layout version check should be thread safe.
-        while(!dsm.getLayoutVersionManager()
-            .isAllowed(HDDSLayoutFeature.SCM_HA)) {
-          importContainer(exportContainerID, exportedContainerFile);
-          readChunk(exportWriteChunk, pipeline);
-          deleteContainer(exportContainerID, pipeline);
-        }
-        // Make sure we can import after finalizing too.
+      // Layout version check should be thread safe.
+      while(!dsm.getLayoutVersionManager()
+          .isAllowed(HDDSLayoutFeature.SCM_HA)) {
         importContainer(exportContainerID, exportedContainerFile);
         readChunk(exportWriteChunk, pipeline);
         deleteContainer(exportContainerID, pipeline);
-      } catch(Exception ex) {
-        System.err.println("Import container failed.");
-        ex.printStackTrace();
-        Assert.fail();
       }
+      // Make sure we can import after finalizing too.
+      importContainer(exportContainerID, exportedContainerFile);
+      readChunk(exportWriteChunk, pipeline);
       return null;
     });
 
@@ -229,8 +202,8 @@ public class TestDatanodeUpgradeToScmHA {
     // be thrown here.
     importFuture.get();
 
-    // Make sure we can read the container imported while pre-finalized after
-    // finalizing.
+    // Make sure we can read the container that was imported while
+    // pre-finalized after finalizing.
     readChunk(exportWriteChunk2, pipeline);
   }
 
@@ -238,9 +211,9 @@ public class TestDatanodeUpgradeToScmHA {
   public void testFailedVolumeDuringFinalization() throws Exception {
     /// SETUP ///
 
-    startScmServer();
+    String originalScmID = startScmServer();
     File volume = addVolume();
-    startDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    startPreFinalizedDatanode();
     final Pipeline pipeline = getPipeline();
 
     /// PRE-FINALIZED: Write and Read from formatted volume ///
@@ -256,14 +229,14 @@ public class TestDatanodeUpgradeToScmHA {
         pipeline);
     readChunk(writeChunk, pipeline);
 
-    checkVolumePathID(volume);
-    checkContainerPathID(containerID);
+    checkPreFinalizedVolumePathID(volume, originalScmID, CLUSTER_ID);
+    checkContainerPathID(containerID, originalScmID, CLUSTER_ID);
 
     // FINALIZE: With failed volume ///
 
     failVolume(volume);
-    // Since volume is failed, container should be marked unhealthy. Upgrade
-    // should proceed anyways.
+    // Since volume is failed, container should be marked unhealthy.
+    // Finalization should proceed anyways.
     closeContainer(containerID, pipeline,
         ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR);
     State containerState = dsm.getContainer().getContainerSet()
@@ -284,8 +257,8 @@ public class TestDatanodeUpgradeToScmHA {
 
     // Since the volume was out during the upgrade, it should maintain its
     // original format.
-    checkVolumePathID(volume);
-    checkContainerPathID(containerID);
+    checkPreFinalizedVolumePathID(volume, originalScmID, CLUSTER_ID);
+    checkContainerPathID(containerID, originalScmID, CLUSTER_ID);
 
     // Now that we are done finalizing, restore the volume.
     restoreVolume(volume);
@@ -305,6 +278,9 @@ public class TestDatanodeUpgradeToScmHA {
     Assert.assertEquals(0,
         dsm.getContainer().getVolumeSet().getFailedVolumesList().size());
 
+    checkFinalizedVolumePathID(volume, originalScmID, CLUSTER_ID);
+    checkContainerPathID(containerID, originalScmID, CLUSTER_ID);
+
     // Read container from before upgrade. The upgrade required it to be closed.
     readChunk(writeChunk, pipeline);
     // Write and read container after upgrade.
@@ -314,16 +290,16 @@ public class TestDatanodeUpgradeToScmHA {
     readChunk(newWriteChunk, pipeline);
     // The new container should use cluster ID in its path.
     // The volume it is placed on is up to the implementation.
-    checkContainerPathID(newContainerID);
+    checkContainerPathID(newContainerID, CLUSTER_ID);
   }
 
   @Test
   public void testFormattingNewVolumes() throws Exception {
     /// SETUP ///
 
-    startScmServer();
-    File volumeScmID1 = addVolume();
-    startDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    String originalScmID = startScmServer();
+    File preFinVolume1 = addVolume();
+    startPreFinalizedDatanode();
     final Pipeline pipeline = getPipeline();
 
     /// PRE-FINALIZED: Write and Read from formatted volume ///
@@ -339,16 +315,17 @@ public class TestDatanodeUpgradeToScmHA {
         pipeline);
     readChunk(writeChunk, pipeline);
 
-    checkVolumePathID(volumeScmID1);
-    checkContainerPathID(containerID);
+    checkPreFinalizedVolumePathID(preFinVolume1, originalScmID, CLUSTER_ID);
+    checkContainerPathID(containerID, originalScmID, CLUSTER_ID);
 
     /// PRE-FINALIZED: Restart with SCM HA enabled and new SCM ID ///
 
-    // DN restarts with SCM HA enabled but gets an ID from a different SCM.
+    // Now SCM and enough other DNs finalize to enable SCM HA. This DN is
+    // restarted with SCM HA config and gets a different SCM ID.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    // A new volume is added that must be formatted.
-    File volumeScmID2 = addVolume();
     changeScmID();
+    // A new volume is added that must be formatted.
+    File preFinVolume2 = addVolume();
     restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
     Assert.assertEquals(2,
@@ -360,11 +337,13 @@ public class TestDatanodeUpgradeToScmHA {
     readChunk(writeChunk, pipeline);
 
     // On restart, there should have been no changes to the paths already used.
-    checkVolumePathID(volumeScmID1);
-    checkContainerPathID(containerID);
+    checkPreFinalizedVolumePathID(preFinVolume1, originalScmID, CLUSTER_ID);
+    checkContainerPathID(containerID, originalScmID, CLUSTER_ID);
     // No new containers can be created on this volume since SCM MLV is ahead
     // of DN MLV at this point.
-    checkVolumePathID(volumeScmID2);
+    // cluster ID should always be used for the new volume since SCM HA is now
+    // enabled.
+    checkVolumePathID(preFinVolume2, CLUSTER_ID);
 
     /// FINALIZE ///
 
@@ -378,9 +357,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     // Add a new volume that should be formatted with cluster ID only, since
     // DN has finalized.
-    File volumeClusterID = addVolume();
-    // Restart the datanode. It should upgrade the volume that was down
-    // during finalization.
+    File finVolume = addVolume();
     // Yet another SCM ID is received this time, but it should not matter.
     changeScmID();
     restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion());
@@ -389,12 +366,12 @@ public class TestDatanodeUpgradeToScmHA {
     Assert.assertEquals(0,
         dsm.getContainer().getVolumeSet().getFailedVolumesList().size());
 
-    checkVolumePathID(volumeScmID1);
-    checkVolumePathID(volumeScmID2);
-    checkContainerPathID(containerID);
+    checkFinalizedVolumePathID(preFinVolume1, originalScmID, CLUSTER_ID);
+    checkVolumePathID(preFinVolume2, CLUSTER_ID);
+    checkContainerPathID(containerID, originalScmID, CLUSTER_ID);
     // New volume should have been formatted with cluster ID only, since the
     // datanode is finalized.
-    checkVolumePathID(volumeClusterID);
+    checkVolumePathID(finVolume, CLUSTER_ID);
 
     /// FINALIZED: Read old data and write + read new data ///
 
@@ -407,51 +384,80 @@ public class TestDatanodeUpgradeToScmHA {
     readChunk(newWriteChunk, pipeline);
     // The new container should use cluster ID in its path.
     // The volume it is placed on is up to the implementation.
-    checkContainerPathID(containerID);
+    checkContainerPathID(newContainerID, CLUSTER_ID);
   }
 
-  public File exportContainer(long containerId) throws Exception {
-    final ContainerReplicationSource replicationSource =
-        new OnDemandContainerReplicationSource(dsm.getContainer().getController());
+  /// CHECKS FOR TESTING ///
 
-    replicationSource.prepare(containerId);
-
-    File destination = tempFolder.newFile();
-    try (FileOutputStream fos = new FileOutputStream(destination)) {
-      replicationSource.copyData(containerId, fos);
-    }
-    return destination;
-  }
-
-  public void importContainer(long containerID, File source) throws Exception {
-    DownloadAndImportReplicator replicator =
-        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
-            dsm.getContainer().getController(),
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
-
-    // Import will delete the source container. We want to keep reusing it,
-    // so give import a copy instead.
-    File tempFile = tempFolder.newFile();
-    Files.copy(source.toPath(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-    replicator.importContainer(containerID, tempFile.toPath());
-  }
-
-  public void checkContainerPathID(long containerID) {
-    CreationInfo creationInfo =  containerCreationInfo.get(containerID);
-    String expectedID;
-
-    if (scmHAAlreadyEnabled || creationInfo.createdAfterScmHA()) {
-      expectedID = CLUSTER_ID;
+  public void checkContainerPathID(long containerID, String scmID,
+      String clusterID) {
+    if (scmHAAlreadyEnabled) {
+      checkContainerPathID(containerID, clusterID);
     } else {
-      expectedID = creationInfo.getScmID();
+      checkContainerPathID(containerID, scmID);
     }
+  }
 
+  public void checkContainerPathID(long containerID, String expectedID) {
     KeyValueContainerData data =
         (KeyValueContainerData) dsm.getContainer().getContainerSet()
             .getContainer(containerID).getContainerData();
     Assert.assertTrue(data.getChunksPath().contains(expectedID));
     Assert.assertTrue(data.getMetadataPath().contains(expectedID));
+  }
+
+  public void checkFinalizedVolumePathID(File volume, String scmID,
+      String clusterID) throws Exception {
+
+    if (scmHAAlreadyEnabled)  {
+      checkVolumePathID(volume, clusterID);
+    } else {
+      List<File> subdirs = getHddsSubdirs(volume);
+      File hddsRoot = getHddsRoot(volume);
+
+      // Volume should have SCM ID and cluster ID directory, where cluster ID
+      // is a symlink to SCM ID.
+      Assert.assertEquals(2, subdirs.size());
+
+      File scmIDDir = new File(hddsRoot, scmID);
+      Assert.assertTrue(subdirs.contains(scmIDDir));
+
+      File clusterIDDir = new File(hddsRoot, CLUSTER_ID);
+      Assert.assertTrue(subdirs.contains(clusterIDDir));
+      Assert.assertTrue(Files.isSymbolicLink(clusterIDDir.toPath()));
+      Path symlinkTarget = Files.readSymbolicLink(clusterIDDir.toPath());
+      Assert.assertEquals(scmID, symlinkTarget.toString());
+    }
+  }
+
+  public void checkPreFinalizedVolumePathID(File volume, String scmID,
+      String clusterID) {
+
+    if (scmHAAlreadyEnabled) {
+      checkVolumePathID(volume, clusterID);
+    } else {
+      checkVolumePathID(volume, scmID);
+    }
+
+  }
+
+  public void checkVolumePathID(File volume, String expectedID) {
+    List<File> subdirs;
+    File hddsRoot;
+    if (dnThinksVolumeFailed(volume)) {
+      // If the volume is failed, read from the failed location it was
+      // moved to.
+      subdirs = getHddsSubdirs(getFailedVolume(volume));
+      hddsRoot = getHddsRoot(getFailedVolume(volume));
+    } else {
+      subdirs = getHddsSubdirs(volume);
+      hddsRoot = getHddsRoot(volume);
+    }
+
+    // Volume should only have the specified ID directory.
+    Assert.assertEquals(1, subdirs.size());
+    File idDir = new File(hddsRoot, expectedID);
+    Assert.assertTrue(subdirs.contains(idDir));
   }
 
   public List<File> getHddsSubdirs(File volume) {
@@ -464,69 +470,24 @@ public class TestDatanodeUpgradeToScmHA {
     return new File(HddsVolumeUtil.getHddsRoot(volume.getAbsolutePath()));
   }
 
-  public void checkVolumePathID(File volume) throws Exception {
-    CreationInfo creationInfo =
-        volumeCreationInfo.get(volume.getAbsolutePath());
-    Assert.assertNotNull(creationInfo);
+  /// CLUSTER OPERATIONS ///
 
-    if (!scmHAAlreadyEnabled && !creationInfo.createdAfterScmHA() &&
-      dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.SCM_HA) &&
-          !isFailed(volume)) {
-
-      List<File> subdirs = getHddsSubdirs(volume);
-      File hddsRoot = getHddsRoot(volume);
-
-      // Volume should have SCM ID and cluster ID directory, where cluster ID
-      // is a symlink to SCM ID.
-      Assert.assertEquals(2, subdirs.size());
-
-      File scmIDDir = new File(hddsRoot, creationInfo.getScmID());
-      Assert.assertTrue(subdirs.contains(scmIDDir));
-
-      File clusterIDDir = new File(hddsRoot, CLUSTER_ID);
-      Assert.assertTrue(subdirs.contains(clusterIDDir));
-      Assert.assertTrue(Files.isSymbolicLink(clusterIDDir.toPath()));
-      Path symlinkTarget = Files.readSymbolicLink(clusterIDDir.toPath());
-      Assert.assertEquals(creationInfo.getScmID(), symlinkTarget.toString());
-    } else {
-      String expectedID;
-      if (scmHAAlreadyEnabled || creationInfo.createdAfterScmHA()) {
-        expectedID = CLUSTER_ID;
-      } else {
-        expectedID = creationInfo.getScmID();
-      }
-
-      List<File> subdirs;
-      File hddsRoot;
-      if (isFailed(volume)) {
-        // If the volume is failed, read from the failed location it was
-        // moved to.
-        subdirs = getHddsSubdirs(getFailedVolume(volume));
-        hddsRoot = getHddsRoot(getFailedVolume(volume));
-      } else {
-        subdirs = getHddsSubdirs(volume);
-        hddsRoot = getHddsRoot(volume);
-      }
-
-      // Volume should only have the specified ID directory.
-      Assert.assertEquals(1, subdirs.size());
-      File idDir = new File(hddsRoot, expectedID);
-      Assert.assertTrue(subdirs.contains(idDir));
-    }
-  }
-
-  public boolean isFailed(File volume) {
-    return dsm.getContainer().getVolumeSet().getFailedVolumesList().stream()
-        .anyMatch(v ->
-            getHddsRoot(v.getStorageDir()).equals(getHddsRoot(volume)));
-  }
-
-  public void startDatanode(int mlv) throws Exception {
+  /**
+   * Starts the datanode with the first layout version, and calls the version
+   * endpoint task to get cluster ID and SCM ID.
+   *
+   * The daemon for the datanode state machine is not started in this test.
+   * This greatly speeds up execution time.
+   * It means we do not have heartbeat functionality or pre-finalize
+   * upgrade actions, but neither of those things are needed for these tests.
+   */
+  public void startPreFinalizedDatanode() throws Exception {
     // Set layout version.
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.getRoot().getAbsolutePath());
     DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
-        UUID.randomUUID().toString(), mlv);
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     layoutStorage.initialize();
 
     // Build and start the datanode.
@@ -535,16 +496,11 @@ public class TestDatanodeUpgradeToScmHA {
         conf, null, null,
         null);
     int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
-    Assert.assertEquals(mlv, actualMlv);
-
+    Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
+        actualMlv);
     dsm = newDsm;
 
-    EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
-        address, 1000);
-    VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
-        dsm.getContainer());
-    esm.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-    vet.call();
+    callVersionEndpointTask();
   }
 
   public void restartDatanode(int expectedMlv)
@@ -560,6 +516,13 @@ public class TestDatanodeUpgradeToScmHA {
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(expectedMlv, mlv);
 
+    callVersionEndpointTask();
+  }
+
+  /**
+   * Get the cluster ID and SCM ID from SCM to the datanode.
+   */
+  public void callVersionEndpointTask() throws Exception {
     try(EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
         address, 1000)) {
       VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
@@ -569,30 +532,26 @@ public class TestDatanodeUpgradeToScmHA {
     }
   }
 
-  public void startScmServer() throws Exception {
-    currentScmID = UUID.randomUUID().toString();
-    scmServerImpl = new ScmTestMock(CLUSTER_ID, currentScmID);
+  public String startScmServer() throws Exception {
+    String scmID = UUID.randomUUID().toString();
+    scmServerImpl = new ScmTestMock(CLUSTER_ID, scmID);
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
         scmServerImpl, address, 10);
+    return scmID;
   }
 
-  public void changeScmID() {
-    currentScmID = UUID.randomUUID().toString();
-    scmServerImpl.setScmId(currentScmID);
+  /**
+   * Updates the SCM ID on the SCM server. Datanode will not be aware of this
+   * until {@link this#callVersionEndpointTask} is called.
+   * @return the new scm ID.
+   */
+  public String changeScmID() {
+    String scmID = UUID.randomUUID().toString();
+    scmServerImpl.setScmId(scmID);
+    return scmID;
   }
 
-  public void dispatchRequest(
-      ContainerProtos.ContainerCommandRequestProto request) {
-    dispatchRequest(request, ContainerProtos.Result.SUCCESS);
-  }
-
-  public void dispatchRequest(
-      ContainerProtos.ContainerCommandRequestProto request,
-      ContainerProtos.Result expectedResult) {
-    ContainerProtos.ContainerCommandResponseProto response =
-        dsm.getContainer().getDispatcher().dispatch(request, null);
-    Assert.assertEquals(expectedResult, response.getResult());
-  }
+  /// CONTAINER OPERATIONS ///
 
   public void readChunk(ContainerProtos.WriteChunkRequestProto writeChunk,
       Pipeline pipeline)  throws Exception {
@@ -629,12 +588,11 @@ public class TestDatanodeUpgradeToScmHA {
 
   public long addContainer(Pipeline pipeline)
       throws Exception {
-    long containerID = Math.abs(random.nextLong());
+    long containerID = random.nextInt(Integer.MAX_VALUE);
     ContainerProtos.ContainerCommandRequestProto createContainerRequest =
         ContainerTestHelper.getCreateContainerRequest(containerID, pipeline);
     dispatchRequest(createContainerRequest);
 
-    containerCreationInfo.put(containerID, new CreationInfo());
     return containerID;
   }
 
@@ -657,7 +615,59 @@ public class TestDatanodeUpgradeToScmHA {
     dispatchRequest(closeContainerRequest, expectedResult);
   }
 
+  /**
+   * Exports the specified container to a temporary file and returns the file.
+   */
+  public File exportContainer(long containerId) throws Exception {
+    final ContainerReplicationSource replicationSource =
+        new OnDemandContainerReplicationSource(
+            dsm.getContainer().getController());
 
+    replicationSource.prepare(containerId);
+
+    File destination = tempFolder.newFile();
+    try (FileOutputStream fos = new FileOutputStream(destination)) {
+      replicationSource.copyData(containerId, fos);
+    }
+    return destination;
+  }
+
+  /**
+   * Imports the container found in {@code source} to the datanode with the ID
+   * {@code containerID}.
+   */
+  public void importContainer(long containerID, File source) throws Exception {
+    DownloadAndImportReplicator replicator =
+        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
+            dsm.getContainer().getController(),
+            new SimpleContainerDownloader(conf, null),
+            new TarContainerPacker());
+
+    File tempFile = tempFolder.newFile();
+    Files.copy(source.toPath(), tempFile.toPath(),
+        StandardCopyOption.REPLACE_EXISTING);
+    replicator.importContainer(containerID, tempFile.toPath());
+  }
+
+  public void dispatchRequest(
+      ContainerProtos.ContainerCommandRequestProto request) {
+    dispatchRequest(request, ContainerProtos.Result.SUCCESS);
+  }
+
+  public void dispatchRequest(
+      ContainerProtos.ContainerCommandRequestProto request,
+      ContainerProtos.Result expectedResult) {
+    ContainerProtos.ContainerCommandResponseProto response =
+        dsm.getContainer().getDispatcher().dispatch(request, null);
+    Assert.assertEquals(expectedResult, response.getResult());
+  }
+
+  /// VOLUME OPERATIONS ///
+
+  /**
+   * Append a datanode volume to the existing volumes in the configuration.
+   * @return The root directory for the new volume.
+   */
   public File addVolume() throws Exception {
     File vol = tempFolder.newFolder(UUID.randomUUID().toString());
     String[] existingVolumes =
@@ -671,52 +681,43 @@ public class TestDatanodeUpgradeToScmHA {
     conf.setStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         allVolumes.toArray(new String[0]));
 
-    volumeCreationInfo.put(vol.getAbsolutePath(), new CreationInfo());
     return vol;
   }
 
+  /**
+   * Renames the specified volume directory so it will appear as failed to
+   * the datanode.
+   */
   public void failVolume(File volume) {
-    // Rename the volume to invalidate its path and fail it.
     File failedVolume = getFailedVolume(volume);
     Assert.assertTrue(volume.renameTo(failedVolume));
   }
 
+  /**
+   * Convert the specified volume from its failed name back to its original
+   * name. The File passed should be the original volume path, not the one it
+   * was renamed to to fail it.
+   */
   public void restoreVolume(File volume) {
     File failedVolume = getFailedVolume(volume);
     Assert.assertTrue(failedVolume.renameTo(volume));
   }
 
+  /**
+   * @return The file name that will be used to rename a volume to fail it.
+   */
   public File getFailedVolume(File volume) {
     return new File(volume.getParent(), volume.getName() + "-failed");
   }
 
   /**
-   * Maintains information about the state of the datanode when a volume or
-   * container is created. This allows us to test that an existing volume or
-   * container's state is correct at each stage of finalization.
+   * Checks whether the datanode thinks the volume has failed.
+   * This could be outdated information if the volume was restored already
+   * and the datanode has not been restarted since then.
    */
-  public class CreationInfo {
-    private final String scmID;
-    private final int layoutVersionCreatedIn;
-
-    public CreationInfo() {
-      // Pull necessary information from the enclosing class.
-      this.scmID = currentScmID;
-      if (dsm == null) {
-        this.layoutVersionCreatedIn =
-            HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
-      } else {
-        this.layoutVersionCreatedIn =
-            dsm.getLayoutVersionManager().getMetadataLayoutVersion();
-      }
-    }
-
-    public String getScmID() {
-      return scmID;
-    }
-
-    public boolean createdAfterScmHA() {
-      return layoutVersionCreatedIn >= HDDSLayoutFeature.SCM_HA.layoutVersion();
-    }
+  public boolean dnThinksVolumeFailed(File volume) {
+    return dsm.getContainer().getVolumeSet().getFailedVolumesList().stream()
+        .anyMatch(v ->
+            getHddsRoot(v.getStorageDir()).equals(getHddsRoot(volume)));
   }
 }

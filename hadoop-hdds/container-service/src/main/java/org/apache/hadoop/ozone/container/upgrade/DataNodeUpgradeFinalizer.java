@@ -72,9 +72,6 @@ public class DataNodeUpgradeFinalizer extends
         LOG.warn("FinalizeUpgrade : Waiting for container {} to close, current "
             + "state is: {}", id, state);
         return false;
-      case UNHEALTHY:
-        LOG.warn("FinalizeUpgrade: container {} is unhealthy, but " +
-                "finalization can proceed.", id);
       default:
         continue;
       }
