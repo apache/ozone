@@ -136,6 +136,13 @@ public class TestSCMInstallSnapshotWithHA {
     // The recently started  should be lagging behind the leader .
     SCMStateMachine followerSM =
         followerSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
+    
+    // Wait & retry for follower to update transactions to leader
+    // snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
+    }, 100, 3000);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
     assertTrue(followerLastAppliedIndex >= 200);

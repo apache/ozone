@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 /**
  * Replication configuration for any ReplicationType with all the required
@@ -63,7 +64,14 @@ public interface ReplicationConfig {
   }
 
   static ReplicationConfig getDefault(ConfigurationSource config) {
-    return new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
+    String replication = config.get(OzoneConfigKeys.OZONE_REPLICATION);
+    String replType = config.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE);
+    ReplicationConfig replicationConfig = null;
+    if (replication != null && replType != null) {
+      replicationConfig = ReplicationConfig
+          .fromTypeAndString(ReplicationType.valueOf(replType), replication);
+    }
+    return replicationConfig;
   }
 
   /**
