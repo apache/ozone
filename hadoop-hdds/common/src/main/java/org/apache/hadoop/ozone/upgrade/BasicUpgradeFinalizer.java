@@ -279,12 +279,13 @@ public abstract class BasicUpgradeFinalizer
       if (f.layoutVersion() > versionOnDisk) {
         LOG.info("Executing first upgrade start action {}", action.name());
         action.execute(component);
+
+        storage.setFirstUpgradeActionLayoutVersion(f.layoutVersion());
+        persistStorage(storage);
       } else {
         LOG.info("Skipping action {} since it has already been run.",
             action.name());
       }
-      storage.setFirstUpgradeActionLayoutVersion(f.layoutVersion());
-      persistStorage(storage);
     } catch (Exception ex) {
       String msg = "Exception while running first upgrade run actions " +
           "for feature %s";
