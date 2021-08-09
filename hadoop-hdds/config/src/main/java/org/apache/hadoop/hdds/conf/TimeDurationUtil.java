@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -55,7 +56,7 @@ public final class TimeDurationUtil {
     }
 
     long raw = Long.parseLong(vStr);
-    long converted = unit.convert(raw, vUnit != null ? vUnit.unit() : null);
+    long converted = unit.convert(raw, Objects.requireNonNull(vUnit).unit());
     if (vUnit.unit().convert(converted, unit) < raw) {
       LOG.warn("Possible loss of precision converting " + vStr
           + vUnit.suffix() + " to " + unit + " for " + name);
