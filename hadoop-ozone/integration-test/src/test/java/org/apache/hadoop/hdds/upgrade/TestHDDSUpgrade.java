@@ -46,7 +46,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -284,7 +283,7 @@ public class TestHDDSUpgrade {
     // Allow closed and quasi closed containers as valid closed containers by
     // default.
     if (closeStates.isEmpty()) {
-      closeStates.addAll(Arrays.asList(CLOSED, QUASI_CLOSED));
+      closeStates = Arrays.asList(CLOSED, QUASI_CLOSED);
     }
 
     try {
