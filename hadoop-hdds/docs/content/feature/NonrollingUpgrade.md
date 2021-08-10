@@ -26,18 +26,19 @@ Ozone supports non-rolling upgrades, where all components are stopped first, and
 
 ## Upgrade States
 
-After upgrading components, the upgrade process is divided into two states. The current state of the upgrade for OM can be queried by running `ozone admin om finalizationstatus` and for the SCM by running `ozone admin scm finalizationstatus`.
+After upgrading components, the upgrade process is divided into two states. The current state of the upgrade for OM can be queried by running `ozone admin om finalizationstatus` and for the SCM by running `ozone admin scm finalizationstatus`. TODO: Datanode finalization?
 
 1. **Pre-finalized**: When the current components are stopped and the new versions are started, they will see that the data on disk was written by a previous version of Ozone and enter a pre-finalized state. In the pre-finalized state:
     - The cluster can be downgraded at any time by stopping all components and restarting with the old versions.
     - Backwards incompatible features introduced in the new version will be disallowed by the cluster.
+    - The cluster will remain fully operational with all functionality present in the old version still allowed.
     - Any data created while pre-finalized will remain readable after downgrade.
 
 2. **Finalized**: When a finalize command is given to OM or SCM, they will enter a finalized state.  In the finalized state:
     - The cluster can no longer be downgraded.
     - All new features of the cluster introduced in the new version can be used.
 
-## Steps to upgrade or downgrade
+## Steps to upgrade or downgrade OM, SCM, and datanodes
 
 Starting with your current version of Ozone, complete the following steps to upgrade to a newer version of Ozone.
 
@@ -48,19 +49,6 @@ Starting with your current version of Ozone, complete the following steps to upg
     If OM HA is not being used, this step can be skipped. This will block the Ozone Managers from receiving all write requests. See [Ozone Manager Prepare For Upgrade]({{< relref "../design/omprepare.md" >}}) for more information
 
 2.  Stop all components.
-
-    On each Ozone manager:
-    ```
-    ozone admin om stop
-    ```
-    On the Storage Container Manager:
-    ```
-    ozone admin scm stop
-    ```
-    On each datanode:
-    ```
-    ozone admin datanode stop
-    ```
 
 3. Replace artifacts of all components with the newer versions.
 
@@ -97,9 +85,13 @@ At this point, the cluster is upgraded to a pre-finalized state and fully operat
 
 At this point, the cluster is finalized and the upgrade is complete.
 
+## Steps to upgrade Recon and S3 Gatway
+
+- TODO: just stop and restart?
+
 ## Features Requiring Finalization
 
-Below is a list of backwards incompatible features and the version in which they were introduced. These features can only be used on a finalized ozone cluster with at least the specified version. Run `TODO` to get the current version of your Ozone cluster.
+Below is a list of backwards incompatible features and the version in which they were introduced. These features can only be used on a finalized ozone cluster with at least the specified version. Run `ozone version` to get the current version of your Ozone cluster.
 
 ### Version 1.2.0
 
@@ -108,9 +100,3 @@ Below is a list of backwards incompatible features and the version in which they
 - [SCM High Availability]({{< relref "SCM-HA.md" >}})
 
 
-TODO:
-    - ozone version command
-    - Document extra upgrade commands like finalizationstatus and --takeover
-    - finalizationstatus for datanodes?
-    - Check commands for stopping components.
- 
