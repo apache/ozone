@@ -70,7 +70,7 @@ public final class ContainerPlacementPolicyFactory {
         fallback, metrics);
   }
 
-  public static PlacementPolicy getPolicyInternal(
+  private static PlacementPolicy getPolicyInternal(
       Class<? extends PlacementPolicy> placementClass,
       ConfigurationSource conf, final NodeManager nodeManager,
       NetworkTopology clusterMap, final boolean fallback,
