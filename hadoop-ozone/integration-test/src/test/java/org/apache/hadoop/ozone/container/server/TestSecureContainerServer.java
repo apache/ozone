@@ -105,6 +105,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -141,6 +142,11 @@ public class TestSecureContainerServer {
     containerTokenSecretManager = new ContainerTokenSecretManager(
         secConf, tokenLifetime, certSerialId);
     containerTokenSecretManager.start(caClient);
+  }
+
+  @AfterClass
+  public static void deleteTestDir() {
+    FileUtils.deleteQuietly(new File(TEST_DIR));
   }
 
   @After
