@@ -932,9 +932,97 @@
     ],
     "sizeDirectKey": 0
   },
+  "du1": {
+    "status": "OK",
+    "path": "/vol1",
+    "size": 150000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/vol1/bucket1",
+        "size": 100000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket2",
+        "size": 20000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket3",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket4",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket5",
+        "size": 10000,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 0
+  },
+  "du2": {
+    "status": "OK",
+    "path": "/vol1/bucket1",
+    "size": 200000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/vol1/bucket1/dir1",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket1/dir2",
+        "size": 20000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket1/dir3",
+        "size": 30000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket1/dir4",
+        "size": 40000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/vol1/bucket1/dir5",
+        "size": 50000,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 50000
+  },
+  "empty": {
+    "status": "OK",
+    "path": "/vol1/bucket1/dir1",
+    "size": 0,
+    "sizeWithReplica": -1,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": 0
+  },
+  "key": {
+    "status": "OK",
+    "path": "/vol1/bucket1/dir1/key1",
+    "size": 3800,
+    "sizeWithReplica": -1,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": 0
+  },
   "metadata": {
     "type": "VOLUME",
-    "numVolume": 0,
+    "numVolume": -1,
     "numBucket": 100,
     "numDir": 1000,
     "numKey": 10000,

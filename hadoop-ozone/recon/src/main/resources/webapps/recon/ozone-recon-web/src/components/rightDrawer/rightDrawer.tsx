@@ -1,20 +1,12 @@
 import React from 'react';
 import { Drawer, Button } from 'antd';
 
-interface Metadata {
-    title: string;
-    keys: string[];
-    values: string[];
-}
-
 export class DetailPanel extends React.Component {
-  state = { visible: false };
+  state = { visible: false};
 
-  showDrawer = () => {
-    this.setState({
-      visible: true,
-    });
-  };
+  componentWillReceiveProps(props) {
+    this.setState({ visible: props.visible })
+  }
 
   onClose = () => {
     this.setState({
@@ -25,23 +17,16 @@ export class DetailPanel extends React.Component {
   render() {
     return (
       <div className="site-drawer-render-in-current-wrapper">
-        Render in this
-        <div style={{ marginTop: 16 }}>
-          <Button type="primary" onClick={this.showDrawer}>
-            Open
-          </Button>
-        </div>
         <Drawer
-          title="Summary for /"
+          title= {"Metadata Summary for " + this.props.path}
           placement="right"
-          width="50%"
+          width="40%"
           closable={false}
           onClose={this.onClose}
           visible={this.state.visible}
           getContainer={false}
           style={{ position: 'absolute' }}
         >
-          <p>Some contents...</p>
         </Drawer>
       </div>
     );
