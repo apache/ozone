@@ -50,8 +50,8 @@ public final class TimeDurationUtil {
     if (null == vUnit) {
       LOG.warn("No unit for " + name + "(" + vStr + ") assuming " + unit);
       vUnit = ParsedTimeDuration.unitFor(unit);
-      if(null == vUnit){
-        throw new NullPointerException("Unexpected unit" + unit);
+      if (null == vUnit) {
+        throw new IllegalArgumentException("Unexpected unit: " + unit);
       }
     } else {
       vStr = vStr.substring(0, vStr.lastIndexOf(vUnit.suffix()));
