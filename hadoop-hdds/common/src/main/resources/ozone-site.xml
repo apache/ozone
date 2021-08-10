@@ -53,26 +53,23 @@
   </property>
   <property>
     <name>hdds.datanode.storage.utilization.critical.threshold</name>
-    <value>0.99</value>
+    <value>0.98</value>
   </property>
   <property>
     <name>hdds.prometheus.endpoint.enabled</name>
     <value>true</value>
   </property>
-<!--  <property>-->
-<!--    <name>ozone.recon.address</name>-->
-<!--    <value>localhost:9891</value>-->
-<!--  </property>-->
-<!--  <property>-->
-<!--    <name>ozone.recon.db.dir</name>-->
-<!--    <value>/tmp/recon</value>-->
-<!--  </property>-->
+  <!--  <property>-->
+  <!--    <name>ozone.recon.address</name>-->
+  <!--    <value>localhost:9891</value>-->
+  <!--  </property>-->
+  <!--  </property>-->
+  <!--  <property>-->
+  <!--    <name>ozone.recon.db.dir</name>-->
+  <!--    <value>/tmp/recon</value>-->
+  <!--  </property>-->
   <property>
     <name>datanode.replication.port</name>
-    <value>0</value>
-  </property>
-  <property>
-    <name>datanode.pipeline.port</name>
     <value>0</value>
   </property>
 </configuration>

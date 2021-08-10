@@ -19,9 +19,12 @@
 package org.apache.hadoop.hdds.cli;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ReconfigurationUtil {
@@ -38,36 +41,45 @@ public class ReconfigurationUtil {
     }
   }
 
-  public static Collection<PropertyChange> 
-    getChangedProperties(Configuration newConf, Configuration oldConf) {
+  public static Collection<PropertyChange>
+  getChangedProperties(List<OzoneConfiguration.Property> newConf, List<OzoneConfiguration.Property> oldConf) {
     Map<String, PropertyChange> changes = new HashMap<String, PropertyChange>();
 
     // iterate over old configuration
-    for (Map.Entry<String, String> oldEntry: oldConf) {
-      String prop = oldEntry.getKey();
+    for (OzoneConfiguration.Property oldEntry: oldConf) {
+      String oldkey = oldEntry.getName();
       String oldVal = oldEntry.getValue();
-      String newVal = newConf.getRaw(prop);
-      
+      String newVal = null;
+      for (OzoneConfiguration.Property newEntry: newConf) {
+        if (newEntry.getName().equals(oldkey)) {
+          newVal = newEntry.getValue();
+        }
+      }
       if (newVal == null || !newVal.equals(oldVal)) {
-        changes.put(prop, new PropertyChange(prop, newVal, oldVal));
+        changes.put(oldkey, new PropertyChange(oldkey, newVal, oldVal));
       }
     }
-    
+
     // now iterate over new configuration
     // (to look for properties not present in old conf)
-    for (Map.Entry<String, String> newEntry: newConf) {
-      String prop = newEntry.getKey();
+    List<String> oldKeys = new ArrayList<>();
+    for (OzoneConfiguration.Property oldEntry: oldConf) {
+      oldKeys.add(oldEntry.getName());
+    }
+    for (OzoneConfiguration.Property newEntry: newConf) {
+      String newkey = newEntry.getName();
       String newVal = newEntry.getValue();
-      if (oldConf.get(prop) == null) {
-        changes.put(prop, new PropertyChange(prop, newVal, null));
+      for (OzoneConfiguration.Property oldEntry: oldConf)
+      if (!oldKeys.contains(newkey)) {
+        changes.put(newkey, new PropertyChange(newkey, newVal, null));
       }
-    } 
+    }
 
     return changes.values();
   }
 
   public Collection<PropertyChange> parseChangedProperties(
-      Configuration newConf, Configuration oldConf) {
+      List<OzoneConfiguration.Property> newConf, List<OzoneConfiguration.Property> oldConf) {
     return getChangedProperties(newConf, oldConf);
   }
 }

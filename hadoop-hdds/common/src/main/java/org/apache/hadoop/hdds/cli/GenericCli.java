@@ -16,10 +16,14 @@
  */
 package org.apache.hadoop.hdds.cli;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -36,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.util.Time;
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -45,11 +50,13 @@ import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.RunLast;
 
+import javax.xml.bind.JAXBException;
+
 /**
  * This is a generic parent class for all the ozone related cli tools.
  */
-public abstract class GenericCli extends Configured implements Callable<Void>, GenericParentCommand,
-    Reconfigurable {
+public abstract class GenericCli extends Configured implements Callable<Void>, GenericParentCommand
+    {
 
   @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
@@ -81,6 +88,8 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
 
   private final Object monitor = new Object();
 
+  static List<OzoneConfiguration.Property> oldProperties = getOldProperties();
+
   /** Background thread to reload configuration. */
   private Thread reconfigThread = null;
   private volatile boolean shouldRun = true;
@@ -96,7 +105,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
    */
   private long endTime = 0;
 
-  private static Configuration oldConf = getOldConf();
   /**
    * A map of <changed property, error message>. If error message is present,
    * it contains the messages about the error occurred when applies the particular
@@ -204,42 +212,43 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
     // See {@link ReconfigurationServlet#applyChanges}
     public void run() {
       LOG.info("Starting reconfiguration task.");
-      final Configuration newConf = parent.getNewConf();
-      final Collection<ReconfigurationUtil.PropertyChange> changes =
-          parent.getChangedProperties(newConf, oldConf);
-      Map<ReconfigurationUtil.PropertyChange, Optional<String>> results = Maps.newHashMap();
-      ConfigRedactor oldRedactor = new ConfigRedactor(oldConf);
-      ConfigRedactor newRedactor = new ConfigRedactor(newConf);
-      for (ReconfigurationUtil.PropertyChange change : changes) {
-        String errorMessage = null;
-        String oldValRedacted = oldRedactor.redact(change.prop, change.oldVal);
-        String newValRedacted = newRedactor.redact(change.prop, change.newVal);
-        if (!parent.isPropertyReconfigurable(change.prop)) {
-          LOG.info(String.format(
-              "Property %s is not configurable: old value: %s, new value: %s",
-              change.prop,
-              oldValRedacted,
-              newValRedacted));
-          continue;
+      OzoneConfiguration oc = new OzoneConfiguration();
+      ClassLoader cL = Thread.currentThread().getContextClassLoader();
+      if (cL == null) {
+        cL = OzoneConfiguration.class.getClassLoader();
+      }
+      File file = new File("/Users/chenchao/IdeaProjects/ozone-722/hadoop-hdds/common/src/main/resources/" +
+          "ozone-site.xml");
+      URL url = null;
+      List<OzoneConfiguration.Property> allProperties = null;
+      try {
+        url = file.toURL();
+      } catch (MalformedURLException e) {
+        e.printStackTrace();
+      }
+      try {
+        allProperties = oc.readPropertyFromXml(url);
+        for (OzoneConfiguration.Property property : allProperties) {
+          property.getName();
         }
+      } catch (JAXBException e) {
+        e.printStackTrace();
+      }
+
+      final Collection<ReconfigurationUtil.PropertyChange> changes =
+          parent.getChangedProperties(allProperties, oldProperties);
+      Map<ReconfigurationUtil.PropertyChange, Optional<String>> results = Maps.newHashMap();
+      for (ReconfigurationUtil.PropertyChange change : changes) {
         LOG.info("Change property: " + change.prop + " from \""
-            + ((change.oldVal == null) ? "<default>" : oldValRedacted)
+            + ((change.oldVal == null) ? "<default>" : change.oldVal)
             + "\" to \""
-            + ((change.newVal == null) ? "<default>" : newValRedacted)
+            + ((change.newVal == null) ? "<default>" : change.newVal)
             + "\".");
         try {
-          String effectiveValue =
-              parent.reconfigurePropertyImpl(change.prop, change.newVal);
-          if (change.newVal != null) {
-            oldConf.set(change.prop, effectiveValue);
-          } else {
-            oldConf.unset(change.prop);
-          }
+          parent.reconfigurePropertyImpl(change.prop, change.newVal);
         } catch (ReconfigurationException e) {
-          Throwable cause = e.getCause();
-          errorMessage = cause == null ? e.getMessage() : cause.getMessage();
+          e.printStackTrace();
         }
-        results.put(change, Optional.ofNullable(errorMessage));
       }
 
       synchronized (parent.reconfigLock) {
@@ -310,46 +319,38 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
 
   @VisibleForTesting
   public Collection<ReconfigurationUtil.PropertyChange> getChangedProperties(
-      Configuration newConf, Configuration oldConf) {
+      List<OzoneConfiguration.Property> newConf, List<OzoneConfiguration.Property> oldConf) {
     return reconfigurationUtil.parseChangedProperties(newConf, oldConf);
   }
 
-//  @Override
-//  public void reconfigureProperty(String property, String newVal) throws ReconfigurationException{
-//    if (isPropertyReconfigurable(property)) {
-//      LOG.info("changing property " + property + " to " + newVal);
-//      synchronized(getConf()) {
-//        getConf().get(property);
-//        String effectiveValue = reconfigurePropertyImpl(property, newVal);
-//        if (newVal != null) {
-//          getConf().set(property, effectiveValue);
-//        } else {
-//          getConf().unset(property);
-//        }
-//      }
-//    } else {
-//      throw new ReconfigurationException(property, newVal,
-//          getConf().get(property));
-//    }
-//  }
 
-  @Override
-  public boolean isPropertyReconfigurable(String property) {
-    return getReconfigurableProperties().contains(property);
+  protected static List<OzoneConfiguration.Property> getOldProperties() {
+    OzoneConfiguration oc = new OzoneConfiguration();
+    ClassLoader cL = Thread.currentThread().getContextClassLoader();
+    if (cL == null) {
+      cL = OzoneConfiguration.class.getClassLoader();
+    }
+    String fileStr = cL.getResource("ozone-site.xml").toString();
+    File file = new File("/Users/chenchao/IdeaProjects/ozone-722/hadoop-hdds/common/src/main/resources/" +
+        "ozone-site.xml");
+    URL url = null;
+    List<OzoneConfiguration.Property> allProperties = null;
+    try {
+      url = file.toURL();
+    } catch (MalformedURLException e) {
+      e.printStackTrace();
+    }
+    try {
+      allProperties = oc.readPropertyFromXml(url);
+      for (OzoneConfiguration.Property property : allProperties) {
+        property.getName();
+      }
+    } catch (JAXBException e) {
+      e.printStackTrace();
+    }
+    return allProperties;
   }
 
-  @Override
-  public abstract Collection<String> getReconfigurableProperties();
-
-  /**
-   * Create a new configuration.
-   */
-  protected abstract Configuration getNewConf();
-
-  protected static Configuration getOldConf() {
-    return new OzoneConfiguration();
-  }
-
-  protected abstract String reconfigurePropertyImpl(
+  protected abstract void reconfigurePropertyImpl(
       String property, String newVal) throws ReconfigurationException;
 }

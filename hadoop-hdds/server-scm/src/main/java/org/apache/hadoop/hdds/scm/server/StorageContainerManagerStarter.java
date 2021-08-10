@@ -22,10 +22,10 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.cli.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -78,18 +78,8 @@ public class StorageContainerManagerStarter extends GenericCli {
   }
 
   @Override
-  public Collection<String> getReconfigurableProperties() {
-    return null;
-  }
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
 
-  @Override
-  protected Configuration getNewConf() {
-    return null;
-  }
-
-  @Override
-  protected String reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-    return null;
   }
 
   /**

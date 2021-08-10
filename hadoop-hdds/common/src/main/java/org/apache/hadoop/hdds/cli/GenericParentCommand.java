@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.cli;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import javax.xml.bind.JAXBException;
 import java.io.IOException;
 
 /**
@@ -27,7 +28,7 @@ public interface GenericParentCommand {
 
   boolean isVerbose();
 
-  OzoneConfiguration createOzoneConfiguration();
+  OzoneConfiguration createOzoneConfiguration() throws JAXBException;
 
   boolean startReconfiguration() throws IOException;
 

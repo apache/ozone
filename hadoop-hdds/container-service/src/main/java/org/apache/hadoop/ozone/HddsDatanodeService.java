@@ -73,12 +73,14 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
+
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,12 +112,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
+      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
+      };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
-  public HddsDatanodeService(){}
+  public HddsDatanodeService() {
+  }
 
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
@@ -128,7 +132,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * This method is intended for unit tests only. It suppresses the
    * startup/shutdown message and skips registering Unix signal handlers.
    *
-   * @param args      command line arguments.
+   * @param args command line arguments.
    * @return Datanode instance
    */
   @VisibleForTesting
@@ -205,7 +209,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     RatisDropwizardExports.
         registerRatisMetricReporters(ratisMetricsMap);
 
-    OzoneConfiguration.activate();
+    // OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
     try {
       String hostname = HddsUtils.getHostName(conf);
@@ -315,7 +319,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   /**
    * Initializes secure Datanode.
-   * */
+   */
   @VisibleForTesting
   public void initializeCertificateClient(OzoneConfiguration config)
       throws IOException {
@@ -324,32 +328,33 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     CertificateClient.InitResponse response = dnCertClient.init();
     LOG.info("Init response: {}", response);
     switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful, case:{}.", response);
-      break;
-    case GETCERT:
-      getSCMSignedCert(config);
-      LOG.info("Successfully stored SCM signed certificate, case:{}.",
-          response);
-      break;
-    case FAILURE:
-      LOG.error("DN security initialization failed, case:{}.", response);
-      throw new RuntimeException("DN security initialization failed.");
-    case RECOVER:
-      LOG.error("DN security initialization failed, case:{}. OM certificate " +
-          "is missing.", response);
-      throw new RuntimeException("DN security initialization failed.");
-    default:
-      LOG.error("DN security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("DN security initialization failed.");
+      case SUCCESS:
+        LOG.info("Initialization successful, case:{}.", response);
+        break;
+      case GETCERT:
+        getSCMSignedCert(config);
+        LOG.info("Successfully stored SCM signed certificate, case:{}.",
+            response);
+        break;
+      case FAILURE:
+        LOG.error("DN security initialization failed, case:{}.", response);
+        throw new RuntimeException("DN security initialization failed.");
+      case RECOVER:
+        LOG.error("DN security initialization failed, case:{}. OM certificate " +
+            "is missing.", response);
+        throw new RuntimeException("DN security initialization failed.");
+      default:
+        LOG.error("DN security initialization failed. Init response: {}",
+            response);
+        throw new RuntimeException("DN security initialization failed.");
     }
   }
 
   /**
    * Get SCM signed certificate and store it using certificate client.
+   *
    * @param config
-   * */
+   */
   private void getSCMSignedCert(OzoneConfiguration config) {
     try {
       PKCS10CertificationRequest csr = getCSR(config);
@@ -361,7 +366,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));
       // Persist certificates.
-      if(response.hasX509CACertificate()) {
+      if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
@@ -408,8 +413,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   /**
    * Creates CSR for DN.
+   *
    * @param config
-   * */
+   */
   @VisibleForTesting
   public PKCS10CertificationRequest getCSR(ConfigurationSource config)
       throws IOException {
@@ -430,34 +436,24 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return builder.build();
   }
 
-  protected static Configuration getOldConf() {
+  protected static OzoneConfiguration getOldConf() {
     return new OzoneConfiguration();
   }
 
-  protected Configuration getNewConf() {
+  protected static OzoneConfiguration getNewConf() {
     return new OzoneConfiguration();
   }
 
-  @Override
-  public void reconfigureProperty(String s, String s1) throws org.apache.hadoop.conf.ReconfigurationException {
-
-  }
 
   @Override
-  public Collection<String> getReconfigurableProperties() {
-    return null;
-  }
-
-  @Override
-  public String reconfigurePropertyImpl(String property, String newVal)
+  public void reconfigurePropertyImpl(String property, String newVal)
       throws ReconfigurationException {
     switch (property) {
       case HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD: {
-        IOException rootException = null;
         LOG.info("Reconfiguring {} to {}", property, newVal);
-        return getConf().get(DFS_DATANODE_DATA_DIR_KEY);
+//        return getConf().get(HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD);
       }
-      }
+    }
     throw new ReconfigurationException(
         property, newVal, getConf().get(property));
   }
@@ -485,9 +481,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
       throw new IllegalArgumentException(
           ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
+              " must be defined. See" +
+              " https://wiki.apache.org/hadoop/Ozone#Configuration" +
+              " for details on configuring Ozone.");
     }
 
     Preconditions.checkNotNull(idFilePath);
@@ -507,8 +503,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   /**
    * Persist DatanodeDetails to file system.
-   * @param dnDetails
    *
+   * @param dnDetails
    * @return DatanodeDetails
    */
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
@@ -519,9 +515,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
       throw new IllegalArgumentException(
           ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
+              " must be defined. See" +
+              " https://wiki.apache.org/hadoop/Ozone#Configuration" +
+              " for details on configuring Ozone.");
     }
 
     Preconditions.checkNotNull(idFilePath);

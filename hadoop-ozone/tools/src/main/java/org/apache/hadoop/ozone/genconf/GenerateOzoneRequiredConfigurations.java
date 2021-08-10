@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.genconf;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
+import org.apache.hadoop.hdds.cli.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -40,6 +42,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 /**
  * GenerateOzoneRequiredConfigurations - A tool to generate ozone-site.xml<br>
@@ -79,6 +82,21 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
   @Override
   public Void call() throws Exception {
     generateConfigurations(path, genSecurityConf);
+    return null;
+  }
+
+  @Override
+  public void reconfigureProperty(String s, String s1) throws org.apache.hadoop.conf.ReconfigurationException {
+
+  }
+
+  @Override
+  public Collection<String> getReconfigurableProperties() {
+    return null;
+  }
+
+  @Override
+  protected String reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
     return null;
   }
 
@@ -203,4 +221,8 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
     return file.canWrite();
   }
 
+  @Override
+  public ReconfigurationTaskStatus getReconfigurationStatus() throws IOException {
+    return null;
+  }
 }

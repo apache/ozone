@@ -77,18 +77,7 @@ public class OzoneManagerStarter extends GenericCli {
   }
 
   @Override
-  public Collection<String> getReconfigurableProperties() {
-    return null;
-  }
-
-  @Override
-  protected Configuration getNewConf() {
-    return null;
-  }
-
-  @Override
-  protected String reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-    return null;
+  protected void reconfigurePropertyImpl(String property, String newVal) {
   }
 
   /**
