@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerV2Impl;
 import org.apache.hadoop.hdds.scm.pipeline.StateManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -47,7 +47,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 /**
  * Recon's overriding implementation of SCM's Pipeline Manager.
  */
-public final class ReconPipelineManager extends PipelineManagerV2Impl {
+public final class ReconPipelineManager extends PipelineManagerImpl {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconPipelineManager.class);
