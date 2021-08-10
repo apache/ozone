@@ -52,18 +52,18 @@ public abstract class BaseService implements Service {
    * After collecting  the service properties it delegates to the
    * {@link #init()} method.
    *
-   * @param server the server initializing the service, give access to the
-   * server context.
+   * @param s the s initializing the service, give access to the
+   * s context.
    *
    * @throws ServiceException thrown if the service could not be initialized.
    */
   @Override
-  public final void init(Server server) throws ServiceException {
-    this.server = server;
+  public final void init(Server s) throws ServiceException {
+    this.server = s;
     String servicePrefix = getPrefixedName("");
     serviceConfig = new Configuration(false);
     for (Map.Entry<String, String> entry : ConfigurationUtils
-        .resolve(server.getConfig())) {
+        .resolve(s.getConfig())) {
       String key = entry.getKey();
       if (key.startsWith(servicePrefix)) {
         serviceConfig.set(key.substring(servicePrefix.length()),

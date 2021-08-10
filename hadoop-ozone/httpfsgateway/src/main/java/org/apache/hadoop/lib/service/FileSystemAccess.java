@@ -24,9 +24,17 @@ import org.apache.hadoop.fs.FileSystem;
 
 import java.io.IOException;
 
+/**
+ * Interface for accessing the filesystem.
+ */
 @InterfaceAudience.Private
 public interface FileSystemAccess {
 
+  /**
+   * Executor to filesystem operations.
+   *
+   * @param <T> return type of operations.
+   */
   interface FileSystemExecutor<T> {
 
     T execute(FileSystem fs) throws IOException;

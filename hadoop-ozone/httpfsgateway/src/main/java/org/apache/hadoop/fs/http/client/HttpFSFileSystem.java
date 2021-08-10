@@ -159,6 +159,9 @@ public class HttpFSFileSystem extends FileSystem
 
   public static final String SNAPSHOT_JSON = "Path";
 
+  /**
+   * File types.
+   */
   public enum FILETYPE {
     FILE, DIRECTORY, SYMLINK;
 
@@ -245,6 +248,9 @@ public class HttpFSFileSystem extends FileSystem
   private static final String HTTP_POST = "POST";
   private static final String HTTP_DELETE = "DELETE";
 
+  /**
+   * Operation types.
+   */
   @InterfaceAudience.Private
   public enum Operation {
     OPEN(HTTP_GET), GETFILESTATUS(HTTP_GET), LISTSTATUS(HTTP_GET),

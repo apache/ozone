@@ -40,6 +40,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * Hadoop server instrumentation.
+ */
 @InterfaceAudience.Private
 public class InstrumentationService extends BaseService
     implements Instrumentation {
@@ -169,9 +172,16 @@ public class InstrumentationService extends BaseService
   }
 
   static class Cron implements Instrumentation.Cron {
+    // Suppressed these variable visibilities, because they are only used in
+    // class or in the test files, but those will be removed later.
+
+    @SuppressWarnings("checkstyle:VisibilityModifier")
     long start;
+    @SuppressWarnings("checkstyle:VisibilityModifier")
     long lapStart;
+    @SuppressWarnings("checkstyle:VisibilityModifier")
     long own;
+    @SuppressWarnings("checkstyle:VisibilityModifier")
     long total;
 
     @Override
@@ -308,6 +318,9 @@ public class InstrumentationService extends BaseService
   }
 
   static class VariableHolder<E> implements JSONAware, JSONStreamAware {
+    // Supressed, because it is only used in this class or in test files,
+    // but the tests will be removed later.
+    @SuppressWarnings("checkstyle:VisibilityModifier")
     Variable<E> var;
 
     VariableHolder() {

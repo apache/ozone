@@ -21,9 +21,15 @@ package org.apache.hadoop.lib.service;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.lib.lang.XException;
 
+/**
+ * Exception thrown when filesystem access problem.
+ */
 @InterfaceAudience.Private
 public class FileSystemAccessException extends XException {
 
+  /**
+   * Error codes.
+   */
   public enum ERROR implements XException.ERROR {
     H01("Service property [{0}] not defined"),
     H02("Kerberos initialization failed, {0}"),

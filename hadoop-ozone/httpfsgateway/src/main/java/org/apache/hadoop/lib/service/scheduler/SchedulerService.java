@@ -36,6 +36,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Scheduler service.
+ */
 @InterfaceAudience.Private
 public class SchedulerService extends BaseService implements Scheduler {
   private static final Logger LOG

@@ -22,9 +22,15 @@ import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.util.Map;
 
+/**
+ * Hadoop server instrumentation implementation.
+ */
 @InterfaceAudience.Private
 public interface Instrumentation {
 
+  /**
+   * Cron interface.
+   */
   interface Cron {
 
     Cron start();
@@ -32,6 +38,11 @@ public interface Instrumentation {
     Cron stop();
   }
 
+  /**
+   * Variable interface.
+   *
+   * @param <T> the type of the variable.
+   */
   interface Variable<T> {
 
     T getValue();

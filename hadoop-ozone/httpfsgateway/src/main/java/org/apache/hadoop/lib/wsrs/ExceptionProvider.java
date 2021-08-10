@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 
+/**
+ * JAX-RS <code>ExceptionMapper</code> implementation that maps exceptions.
+ */
 @InterfaceAudience.Private
 public class ExceptionProvider implements ExceptionMapper<Throwable> {
   private static final Logger LOG

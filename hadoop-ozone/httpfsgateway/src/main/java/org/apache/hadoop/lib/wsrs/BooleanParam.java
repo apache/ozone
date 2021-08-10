@@ -22,6 +22,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.text.MessageFormat;
 
+/**
+ * Boolean parameter.
+ */
 @InterfaceAudience.Private
 public abstract class BooleanParam extends Param<Boolean> {
 

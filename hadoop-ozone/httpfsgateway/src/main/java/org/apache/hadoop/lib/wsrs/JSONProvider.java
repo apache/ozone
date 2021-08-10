@@ -36,6 +36,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * A <code>MessageBodyWriter</code> implementation providing a JSON stream.
+ */
 @Provider
 @Produces(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8)
 @InterfaceAudience.Private

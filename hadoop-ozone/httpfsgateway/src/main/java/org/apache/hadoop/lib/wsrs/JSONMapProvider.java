@@ -37,6 +37,9 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+/**
+ * A <code>MessageBodyWriter</code> implementation providing a JSON map.
+ */
 @Provider
 @Produces(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8)
 @InterfaceAudience.Private

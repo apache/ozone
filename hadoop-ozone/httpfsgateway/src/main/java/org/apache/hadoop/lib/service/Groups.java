@@ -23,6 +23,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Groups interface.
+ */
 @InterfaceAudience.Private
 public interface Groups {
 

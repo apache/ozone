@@ -23,6 +23,11 @@ import org.apache.hadoop.util.StringUtils;
 
 import java.util.Arrays;
 
+/**
+ * Enum parameter.
+ *
+ * @param <E> the enum type
+ */
 @InterfaceAudience.Private
 public abstract class EnumParam<E extends Enum<E>> extends Param<E> {
   private Class<E> klass;

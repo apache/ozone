@@ -24,6 +24,11 @@ import java.util.Iterator;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.StringUtils;
 
+/**
+ * Set of Enums as parameter.
+ *
+ * @param <E> the enum type
+ */
 @InterfaceAudience.Private
 public abstract class EnumSetParam<E extends Enum<E>>
     extends Param<EnumSet<E>> {

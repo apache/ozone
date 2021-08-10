@@ -47,8 +47,8 @@ public class ServerException extends XException {
         "-server shutting down-, {2}"),
     S12("Could not start service [{0}], {1}"),
     S13("Missing system property [{0}]"),
-    S14("Could not initialize server, {0}")
-    ;
+    S14("Could not initialize server, {0}");
+
     private String msg;
 
     /**

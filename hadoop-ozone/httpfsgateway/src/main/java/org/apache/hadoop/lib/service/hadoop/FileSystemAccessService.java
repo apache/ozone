@@ -52,6 +52,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
+/**
+ * Provides authenticated filesystem access.
+ */
 @InterfaceAudience.Private
 public class FileSystemAccessService extends BaseService
     implements FileSystemAccess {
@@ -141,6 +144,9 @@ public class FileSystemAccessService extends BaseService
 
   private Collection<String> nameNodeWhitelist;
 
+  // Suppressed because serviceHadoopConf only used in this class and in the
+  // tests, which will be removed later.
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   Configuration serviceHadoopConf;
   private Configuration fileSystemConf;
 

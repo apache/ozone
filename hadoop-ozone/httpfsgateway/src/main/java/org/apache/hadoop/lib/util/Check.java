@@ -30,7 +30,10 @@ import java.util.regex.Pattern;
  * Commonly used for method arguments preconditions.
  */
 @InterfaceAudience.Private
-public class Check {
+public final class Check {
+
+  private Check() {
+  }
 
   /**
    * Verifies a variable is not NULL.

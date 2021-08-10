@@ -29,6 +29,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * This entity represents an input stream.
+ */
 @InterfaceAudience.Private
 public class InputStreamEntity implements StreamingOutput {
   private InputStream is;

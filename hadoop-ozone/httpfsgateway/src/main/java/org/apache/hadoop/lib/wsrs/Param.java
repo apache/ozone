@@ -22,9 +22,15 @@ import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.text.MessageFormat;
 
+/**
+ * Base class of parameters.
+ *
+ * @param <T>
+ */
 @InterfaceAudience.Private
 public abstract class Param<T> {
   private String name;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected T value;
 
   public Param(String name, T defaultValue) {

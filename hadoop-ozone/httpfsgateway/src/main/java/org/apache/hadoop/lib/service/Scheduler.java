@@ -23,6 +23,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Scheduler interface.
+ */
 @InterfaceAudience.Private
 public interface Scheduler {
 

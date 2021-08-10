@@ -28,6 +28,9 @@ import org.apache.hadoop.lib.util.ConfigurationUtils;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Service implementation to provide group mappings.
+ */
 @InterfaceAudience.Private
 public class GroupsService extends BaseService implements Groups {
   private static final String PREFIX = "groups";
