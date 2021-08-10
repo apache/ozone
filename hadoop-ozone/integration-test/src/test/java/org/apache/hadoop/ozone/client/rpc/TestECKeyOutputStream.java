@@ -16,16 +16,21 @@
  */
 package org.apache.hadoop.ozone.client.rpc;
 
+import com.google.common.cache.Cache;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
@@ -34,6 +39,10 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -109,5 +118,58 @@ public class TestECKeyOutputStream {
             volumeName, bucketName)) {
       Assert.assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
     }
+  }
+
+  @Test
+  public void testECKeyXceiverClientShouldNotUseCachedKeysForDifferentStreams()
+      throws Exception {
+    int data = 3;
+    int parity = 2;
+    try (OzoneOutputStream key = TestHelper
+        .createKey(keyString, new ECReplicationConfig(data, parity), 1024,
+            objectStore, volumeName, bucketName)) {
+      final List<BlockOutputStreamEntry> streamEntries =
+          ((ECKeyOutputStream) key.getOutputStream()).getStreamEntries();
+      Assert.assertEquals(data + parity, streamEntries.size());
+      final Pipeline firstStreamPipeline = streamEntries.get(0).getPipeline();
+      XceiverClientSpi xceiverClientSpi =
+          ((ECKeyOutputStream) key.getOutputStream()).getXceiverClientFactory()
+              .acquireClient(firstStreamPipeline);
+      Assert.assertNotNull(xceiverClientSpi);
+      final Cache<String, XceiverClientSpi> clientCache =
+          ((XceiverClientManager) ((ECKeyOutputStream) key.getOutputStream())
+              .getXceiverClientFactory()).getClientCache();
+      final String firstCacheKey =
+          clientCache.asMap().entrySet().iterator().next().getKey();
+      List<String> prevVisitedKeys = new ArrayList<>();
+      prevVisitedKeys.add(firstCacheKey);
+      // Lets look at all underlying EC Block group streams and make sure
+      // xceiver client entry is not repeating for all.
+      for (int i = 1; i < streamEntries.size(); i++) {
+        Pipeline pipeline = streamEntries.get(i).getPipeline();
+        Assert.assertEquals(i, clientCache.asMap().size());
+        xceiverClientSpi = ((ECKeyOutputStream) key.getOutputStream())
+            .getXceiverClientFactory().acquireClient(pipeline);
+        Assert.assertNotNull(xceiverClientSpi);
+        Assert.assertEquals(i + 1, clientCache.asMap().size());
+        final String newCacheKey =
+            getNewKey(clientCache.asMap().entrySet().iterator(),
+                prevVisitedKeys);
+        prevVisitedKeys.add(newCacheKey);
+        Assert.assertNotEquals(firstCacheKey, newCacheKey);
+      }
+    }
+  }
+
+  private String getNewKey(
+      Iterator<Map.Entry<String, XceiverClientSpi>> iterator,
+      List<String> prevVisitedKeys) {
+    while (iterator.hasNext()) {
+      final String key = iterator.next().getKey();
+      if (!prevVisitedKeys.contains(key)) {
+        return key;
+      }
+    }
+    return null;
   }
 }
