@@ -69,7 +69,7 @@ will be completely transparent to the clients and end users.
 
 ### Using Transparent Data Encryption from S3G
 
-To use TDE from S3 interface, it can be done in 2 ways.
+There are two ways to create an encrypted bucket that can be accessed via S3 Gateway.
 
 ####1. Create a bucket using shell under "/s3v" volume
 
