@@ -60,7 +60,7 @@ Starting with your current version of Ozone, complete the following steps to upg
 2.  Stop all components.
 
 3. Replace artifacts of all components with the newer versions.
-    - TODO: No action required for recon or S3 gateway?
+    - TODO: S3 gateway and recon.
 
 4. Start the components
     1. Start the SCM and datanodes as usual:
@@ -102,7 +102,9 @@ Below is a list of backwards incompatible features and the version in which they
 
 ### Version 1.2.0
 
-- [Prefix based FileSystem Optimization]({{< relref "PrefixFSO.md" >}}) 
+- TODO: Can either of these be used on upgrades from 1.1.0? FSO currently not. I think the same is true for SCM HA?
+
+- [Prefix based File System Optimization]({{< relref "PrefixFSO.md" >}}) 
 
 - [SCM High Availability]({{< relref "SCM-HA.md" >}})
 
