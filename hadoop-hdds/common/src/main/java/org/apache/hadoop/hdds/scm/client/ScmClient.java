@@ -312,7 +312,7 @@ public interface ScmClient extends Closeable {
    */
   boolean startContainerBalancer(Optional<Double> threshold,
       Optional<Integer> idleiterations,
-      Optional<Double> maxDatanodesToInvolvePerIteration,
+      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB) throws IOException;
 
   /**

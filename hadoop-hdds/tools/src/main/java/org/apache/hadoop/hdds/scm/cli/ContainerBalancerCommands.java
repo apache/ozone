@@ -42,8 +42,8 @@ import java.util.concurrent.Callable;
  *      ozone admin containerbalancer start
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -i/--idleiterations {@literal <idleiterations>}]
- *      [ -d/--maxDatanodesToInvolvePerIteration
- *      {@literal <maxDatanodesToInvolvePerIteration>}]
+ *      [ -d/--maxDatanodesRatioToInvolvePerIteration
+ *      {@literal <maxDatanodesRatioToInvolvePerIteration>}]
  *      [ -s/--maxSizeToMovePerIterationInGB
  *      {@literal <maxSizeToMovePerIterationInGB>}]
  *      Examples:

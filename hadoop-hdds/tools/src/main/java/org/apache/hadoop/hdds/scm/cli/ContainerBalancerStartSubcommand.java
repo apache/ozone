@@ -43,11 +43,11 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       description = "Maximum consecutive idle iterations")
   private Optional<Integer> idleiterations;
 
-  @Option(names = {"-d", "--maxDatanodesToInvolvePerIteration"},
+  @Option(names = {"-d", "--maxDatanodesRatioToInvolvePerIteration"},
       description = "The ratio of maximum number of datanodes that should be " +
           "involved in balancing in one iteration to the total number of " +
           "healthy, in service nodes known to container balancer.")
-  private Optional<Double> maxDatanodesToInvolvePerIteration;
+  private Optional<Double> maxDatanodesRatioToInvolvePerIteration;
 
   @Option(names = {"-s", "--maxSizeToMovePerIterationInGB"},
       description = "Maximum size to move per iteration of balancing in GB, " +
@@ -57,7 +57,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean result = scmClient.startContainerBalancer(threshold, idleiterations,
-        maxDatanodesToInvolvePerIteration, maxSizeToMovePerIterationInGB);
+        maxDatanodesRatioToInvolvePerIteration, maxSizeToMovePerIterationInGB);
     if (result) {
       System.out.println("Starting ContainerBalancer Successfully.");
       return;

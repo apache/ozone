@@ -710,7 +710,7 @@ public class SCMClientProtocolServer implements
   @Override
   public boolean startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> idleiterations,
-      Optional<Double> maxDatanodesToInvolvePerIteration,
+      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     ContainerBalancerConfiguration cbc =
@@ -727,15 +727,15 @@ public class SCMClientProtocolServer implements
           "maxSizeToMovePerIterationInGB must be positive.");
       cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
     }
-    if (maxDatanodesToInvolvePerIteration.isPresent()) {
-      double mdti = maxDatanodesToInvolvePerIteration.get();
+    if (maxDatanodesRatioToInvolvePerIteration.isPresent()) {
+      double mdti = maxDatanodesRatioToInvolvePerIteration.get();
       Preconditions.checkState(mdti >= 0.0,
-          "maxDatanodesToInvolvePerIteration must be greater than" +
-              " equal to zero.");
+          "maxDatanodesRatioToInvolvePerIteration must be " +
+              "greater than equal to zero.");
       Preconditions.checkState(mdti <= 1,
-          "maxDatanodesToInvolvePerIteration must be lesser than" +
-              "equal to one.");
-      cbc.setMaxDatanodesToInvolvePerIteration(mdti);
+          "maxDatanodesRatioToInvolvePerIteration must be " +
+              "lesser than equal to one.");
+      cbc.setMaxDatanodesRatioToInvolvePerIteration(mdti);
     }
     if (idleiterations.isPresent()) {
       int idi = idleiterations.get();

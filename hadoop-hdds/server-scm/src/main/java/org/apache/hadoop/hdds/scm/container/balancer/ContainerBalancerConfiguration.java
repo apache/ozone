@@ -54,12 +54,13 @@ public final class ContainerBalancerConfiguration {
           " of the entire cluster) no more than the threshold value.")
   private String threshold = "0.1";
 
-  @Config(key = "datanodes.involved.max.per.iteration", type = ConfigType.AUTO,
+  @Config(key = "datanodes.involved.max.ratio.per.iteration", type =
+      ConfigType.AUTO,
       defaultValue = "0.2", tags = {ConfigTag.BALANCER}, description = "The " +
       "ratio of maximum number of datanodes that should be involved in " +
       "balancing in one iteration to the total number of healthy, in service " +
       "nodes known to container balancer.")
-  private String maxDatanodesToInvolvePerIteration = "0.2";
+  private String maxDatanodesRatioToInvolvePerIteration = "0.5";
 
   @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
       defaultValue = "10GB", tags = {ConfigTag.BALANCER},
@@ -171,8 +172,8 @@ public final class ContainerBalancerConfiguration {
    * @return maximum datanodes to involve divided by total healthy,
    * in-service nodes
    */
-  public double getMaxDatanodesToInvolvePerIteration() {
-    return Double.parseDouble(maxDatanodesToInvolvePerIteration);
+  public double getMaxDatanodesRatioToInvolvePerIteration() {
+    return Double.parseDouble(maxDatanodesRatioToInvolvePerIteration);
   }
 
   /**
@@ -180,19 +181,21 @@ public final class ContainerBalancerConfiguration {
    * balancing by Container Balancer in one iteration to the total number of
    * healthy, in-service nodes known to balancer.
    *
-   * @param maxDatanodesToInvolvePerIteration number of datanodes to involve
-   *                                          divided by total number of
-   *                                          healthy, in service nodes
+   * @param maxDatanodesRatioToInvolvePerIteration number of datanodes to
+   *                                               involve divided by total
+   *                                               number of healthy, in
+   *                                               service nodes
    */
-  public void setMaxDatanodesToInvolvePerIteration(
-      double maxDatanodesToInvolvePerIteration) {
-    if (maxDatanodesToInvolvePerIteration < 0 ||
-        maxDatanodesToInvolvePerIteration > 1) {
-      throw new IllegalArgumentException("Max datanodes to involve must be a " +
-          "double greater than equal to zero and lesser than equal to one.");
+  public void setMaxDatanodesRatioToInvolvePerIteration(
+      double maxDatanodesRatioToInvolvePerIteration) {
+    if (maxDatanodesRatioToInvolvePerIteration < 0 ||
+        maxDatanodesRatioToInvolvePerIteration > 1) {
+      throw new IllegalArgumentException("Max datanodes to involve ratio must" +
+          " be a double greater than equal to zero and lesser than equal to " +
+          "one.");
     }
-    this.maxDatanodesToInvolvePerIteration =
-        String.valueOf(maxDatanodesToInvolvePerIteration);
+    this.maxDatanodesRatioToInvolvePerIteration =
+        String.valueOf(maxDatanodesRatioToInvolvePerIteration);
   }
 
   /**
@@ -280,7 +283,7 @@ public final class ContainerBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %dB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Involve per Iteration(ratio)",
-        maxDatanodesToInvolvePerIteration,
+        maxDatanodesRatioToInvolvePerIteration,
         "Max Size to Move per Iteration", maxSizeToMovePerIteration);
   }
 }

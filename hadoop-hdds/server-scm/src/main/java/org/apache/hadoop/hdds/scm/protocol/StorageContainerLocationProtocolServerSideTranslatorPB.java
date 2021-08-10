@@ -707,7 +707,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     Optional<Double> threshold = Optional.empty();
     Optional<Integer> idleiterations = Optional.empty();
-    Optional<Double> maxDatanodesToInvolvePerIteration = Optional.empty();
+    Optional<Double> maxDatanodesRatioToInvolvePerIteration = Optional.empty();
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
 
     if(request.hasThreshold()) {
@@ -716,9 +716,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     if(request.hasIdleiterations()) {
       idleiterations = Optional.of(request.getIdleiterations());
     }
-    if(request.hasMaxDatanodesToInvolvePerIteration()) {
-      maxDatanodesToInvolvePerIteration =
-          Optional.of(request.getMaxDatanodesToInvolvePerIteration());
+    if(request.hasMaxDatanodesRatioToInvolvePerIteration()) {
+      maxDatanodesRatioToInvolvePerIteration =
+          Optional.of(request.getMaxDatanodesRatioToInvolvePerIteration());
     }
     if(request.hasMaxSizeToMovePerIterationInGB()) {
       maxSizeToMovePerIterationInGB =
@@ -727,7 +727,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
     return StartContainerBalancerResponseProto.newBuilder().
         setStart(impl.startContainerBalancer(threshold,
-            idleiterations, maxDatanodesToInvolvePerIteration,
+            idleiterations, maxDatanodesRatioToInvolvePerIteration,
             maxSizeToMovePerIterationInGB)).build();
   }
 
