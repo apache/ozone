@@ -22,11 +22,11 @@ summary: How to do non-rolling upgrades and downgrades of Ozone
   limitations under the License. See accompanying LICENSE file.
 -->
 
-Ozone supports non-rolling upgrades, where all components are stopped first, and then restarted with their newer versions.
+Ozone supports non-rolling upgrades and downgrades, where all components are stopped first, and then restarted with the upgraded or downgraded versions.
 
 ## Upgrade States
 
-After upgrading components, the upgrade process is divided into two states. The current state of the upgrade for OM can be queried by running `ozone admin om finalizationstatus` and for the SCM by running `ozone admin scm finalizationstatus`. TODO: Datanode finalization?
+After upgrading components, the upgrade process is divided into two states:
 
 1. **Pre-finalized**: When the current components are stopped and the new versions are started, they will see that the data on disk was written by a previous version of Ozone and enter a pre-finalized state. In the pre-finalized state:
     - The cluster can be downgraded at any time by stopping all components and restarting with the old versions.
@@ -38,7 +38,16 @@ After upgrading components, the upgrade process is divided into two states. The 
     - The cluster can no longer be downgraded.
     - All new features of the cluster introduced in the new version can be used.
 
-## Steps to upgrade or downgrade OM, SCM, and datanodes
+### Querying finalization status
+
+**OM**: `ozone admin om finalizationstatus`. If using OM HA, finalization status is checked for the quorum, not individual OMs.
+
+**SCM**: `ozone admin scm finalizationstatus`. SCM will report that finalization is complete once it has finalized and is aware of enough finalized datanodes to form a write pipeline. The remaining datanodes will finalize asynchronously and be incorporated into write pipelines after informing SCM that they have finalized.
+
+**Datanodes**: `ozone admin datanode list` will list all datanodes and their health state as seen by SCM. If SCM is finalized, then datanodes whose health state is `HEALTHY` have informed SCM that they have finalized. Datanodes whose health state is `HEALTHY_READONLY` have not yet informed SCM that they have finished finalization. `HEALTHY_READONLY` (pre-finalized) datanodes remain readable, so the cluster is operational even if some otherwise healthy datanodes have not yet finalized. `STALE` or `DEAD` datanodes will be told to finalize by SCM once they are reachable again.
+
+
+## Steps to upgrade and downgrade
 
 Starting with your current version of Ozone, complete the following steps to upgrade to a newer version of Ozone.
 
@@ -51,6 +60,7 @@ Starting with your current version of Ozone, complete the following steps to upg
 2.  Stop all components.
 
 3. Replace artifacts of all components with the newer versions.
+    - TODO: No action required for recon or S3 gateway?
 
 4. Start the components
     1. Start the SCM and datanodes as usual:
@@ -65,8 +75,9 @@ Starting with your current version of Ozone, complete the following steps to upg
         ```
         ozone --daemon om start --upgrade
         ```
+        - There also exists a `--downgrade` flag which is an alias of `--upgrade`. The name used does not matter.
 
-        **IMPORTANT**: All OMs must be started with the `--upgrade` flag in this step. If some or none of the OMs are started with this flag by mistake, run `ozone admin om -id=<om-sevice-id> cancelprepare` to make sure all OMs leave prepare mode.
+        - **IMPORTANT**: All OMs must be started with the `--upgrade`  or `--downgrade` flag in this step. If some or none of the OMs are started with this flag by mistake, run `ozone admin om -id=<om-sevice-id> cancelprepare` to make sure all OMs leave prepare mode.
 
 At this point, the cluster is upgraded to a pre-finalized state and fully operational. The cluster can be downgraded from this state by repeating the above steps, but restoring the older versions of components in step 3, instead of the newer versions. To finalize the cluster to use new features, continue on with the following steps.
 
@@ -84,10 +95,6 @@ At this point, the cluster is upgraded to a pre-finalized state and fully operat
     ```
 
 At this point, the cluster is finalized and the upgrade is complete.
-
-## Steps to upgrade Recon and S3 Gatway
-
-- TODO: just stop and restart?
 
 ## Features Requiring Finalization
 
