@@ -82,16 +82,8 @@ public class ECReplicationConfig implements ReplicationConfig {
     return data;
   }
 
-  public void setData(int data) {
-    this.data = data;
-  }
-
   public int getParity() {
     return parity;
-  }
-
-  public void setParity(int parity) {
-    this.parity = parity;
   }
 
   @Override
