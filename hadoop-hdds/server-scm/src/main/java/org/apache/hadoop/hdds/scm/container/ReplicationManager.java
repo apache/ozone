@@ -84,6 +84,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
+import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 import com.google.protobuf.GeneratedMessage;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
@@ -632,14 +633,14 @@ public class ReplicationManager implements SCMService {
       //container is in inflightMove, but not in inflightMoveFuture.
       compleleteMoveFutureWithResult(id,
           MoveResult.UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION);
-      moveScheduler.completeMove(id);
+      moveScheduler.completeMove(id.getProtobuf());
       return;
     }
 
     if (isTarget && !isInflightReplication) {
       compleleteMoveFutureWithResult(id,
           MoveResult.UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION);
-      moveScheduler.completeMove(id);
+      moveScheduler.completeMove(id.getProtobuf());
       return;
     }
 
@@ -670,7 +671,7 @@ public class ReplicationManager implements SCMService {
               MoveResult.COMPLETED);
         }
       }
-      moveScheduler.completeMove(id);
+      moveScheduler.completeMove(id.getProtobuf());
     } else {
       deleteSrcDnForMove(container,
           containerManager.getContainerReplicas(id));
@@ -801,7 +802,8 @@ public class ReplicationManager implements SCMService {
       }
 
       try {
-        moveScheduler.startMove(cid, mp);
+        moveScheduler.startMove(cid.getProtobuf(),
+            mp.getProtobufMessage(CURRENT_VERSION));
       } catch (IOException e) {
         LOG.warn("Exception while starting move {}", cid);
         ret.complete(MoveResult.FAIL_CAN_NOT_RECORD_TO_DB);
@@ -1256,7 +1258,7 @@ public class ReplicationManager implements SCMService {
       // if the target is present but source disappears somehow,
       // we can consider move is successful.
       compleleteMoveFutureWithResult(cid, MoveResult.COMPLETED);
-      moveScheduler.completeMove(cid);
+      moveScheduler.completeMove(cid.getProtobuf());
       return;
     }
 
@@ -1281,7 +1283,7 @@ public class ReplicationManager implements SCMService {
       LOG.info("can not remove source replica after successfully " +
           "replicated to target datanode");
       compleleteMoveFutureWithResult(cid, MoveResult.DELETE_FAIL_POLICY);
-      moveScheduler.completeMove(cid);
+      moveScheduler.completeMove(cid.getProtobuf());
     }
   }
 
@@ -1754,19 +1756,20 @@ public class ReplicationManager implements SCMService {
     /**
      * completeMove a move action for a given container.
      *
-     * @param cid Container to which the move option is finished
+     * @param contianerIDProto Container to which the move option is finished
      */
     @Replicate
-    void completeMove(ContainerID cid);
+    void completeMove(HddsProtos.ContainerID contianerIDProto);
 
     /**
      * start a move action for a given container.
      *
-     * @param cid Container to move
+     * @param contianerIDProto Container to move
      * @param mp encapsulates the source and target datanode infos
      */
     @Replicate
-    void startMove(ContainerID cid, MoveDataNodePair mp) throws IOException;
+    void startMove(HddsProtos.ContainerID contianerIDProto,
+              HddsProtos.MoveDataNodePairProto mp) throws IOException;
 
     /**
      * get the MoveDataNodePair of the giver container.
@@ -1818,8 +1821,10 @@ public class ReplicationManager implements SCMService {
     }
 
     @Override
-    public void completeMove(ContainerID cid) {
+    public void completeMove(HddsProtos.ContainerID contianerIDProto) {
+      ContainerID cid = null;
       try {
+        cid = ContainerID.getFromProtobuf(contianerIDProto);
         transactionBuffer.removeFromBuffer(moveTable, cid);
       } catch (IOException e) {
         LOG.warn("Exception while completing move {}", cid);
@@ -1828,11 +1833,20 @@ public class ReplicationManager implements SCMService {
     }
 
     @Override
-    public void startMove(ContainerID cid, MoveDataNodePair mp)
+    public void startMove(HddsProtos.ContainerID contianerIDProto,
+                          HddsProtos.MoveDataNodePairProto mdnpp)
         throws IOException {
-      if(!inflightMove.containsKey(cid)) {
-        transactionBuffer.addToBuffer(moveTable, cid, mp);
-        inflightMove.putIfAbsent(cid, mp);
+      ContainerID cid = null;
+      MoveDataNodePair mp = null;
+      try {
+        cid = ContainerID.getFromProtobuf(contianerIDProto);
+        mp = MoveDataNodePair.getFromProtobuf(mdnpp);
+        if(!inflightMove.containsKey(cid)) {
+          transactionBuffer.addToBuffer(moveTable, cid, mp);
+          inflightMove.putIfAbsent(cid, mp);
+        }
+      } catch (IOException e) {
+        LOG.warn("Exception while completing move {}", cid);
       }
     }
 
@@ -1920,7 +1934,7 @@ public class ReplicationManager implements SCMService {
   * infligtht move.
   */
   private void onLeaderReadyAndOutOfSafeMode() {
-    List<ContainerID> needToRemove = new LinkedList<>();
+    List<HddsProtos.ContainerID> needToRemove = new LinkedList<>();
     moveScheduler.getInflightMove().forEach((k, v) -> {
       Set<ContainerReplica> replicas;
       ContainerInfo cif;
@@ -1928,7 +1942,7 @@ public class ReplicationManager implements SCMService {
         replicas = containerManager.getContainerReplicas(k);
         cif = containerManager.getContainer(k);
       } catch (ContainerNotFoundException e) {
-        needToRemove.add(k);
+        needToRemove.add(k.getProtobuf());
         LOG.error("can not find container {} " +
             "while processing replicated move", k);
         return;
@@ -1953,7 +1967,7 @@ public class ReplicationManager implements SCMService {
         // if container does not exist in src datanode, no matter it exists
         // in target datanode, we can not take more actions to this option,
         // so just remove it through ratis
-        needToRemove.add(k);
+        needToRemove.add(k.getProtobuf());
       }
     });
 
