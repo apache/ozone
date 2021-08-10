@@ -82,7 +82,7 @@ There are two ways to create an encrypted bucket that can be accessed via S3 Gat
   ozone sh bucket create -k encKey /vol/encryptedBucket
   ozone sh bucket link  /vol/encryptedBucket /s3v/linkencryptedbucket
   ```
-
+Note: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
 After this, all the keys created using s3g in the buckets will be encrypted.
 
 In non-secure mode, the user running the S3Gateway is the proxy user, 
