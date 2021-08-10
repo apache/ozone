@@ -1703,12 +1703,9 @@ public class ReplicationManager implements SCMService {
           lastTimeToBeReadyInMillis = clock.millis();
           serviceStatus = ServiceStatus.RUNNING;
         }
-
         //now, as the current scm is leader and it`s state is up-to-date,
         //we need to take some action about replicated inflight move options.
-        //TODO: after a confirm
         onLeaderReadyAndOutOfSafeMode();
-
       } else {
         serviceStatus = ServiceStatus.PAUSING;
       }
@@ -1858,8 +1855,9 @@ public class ReplicationManager implements SCMService {
           iterator = moveTable.iterator();
 
       while (iterator.hasNext()) {
-        final ContainerID cid = iterator.next().getKey();
-        final MoveDataNodePair mp = iterator.next().getValue();
+        Table.KeyValue<ContainerID, MoveDataNodePair> kv = iterator.next();
+        final ContainerID cid = kv.getKey();
+        final MoveDataNodePair mp = kv.getValue();
         Preconditions.assertNotNull(cid,
             "moved container id should not be null");
         Preconditions.assertNotNull(mp,
@@ -1948,8 +1946,8 @@ public class ReplicationManager implements SCMService {
         } else {
           // resenting replication command is ok , no matter whether there is an
           // on-going replication
-          sendReplicateCommand(cif, v.getSrc(),
-              Collections.singletonList(v.getTgt()));
+          sendReplicateCommand(cif, v.getTgt(),
+              Collections.singletonList(v.getSrc()));
         }
       } else {
         // if container does not exist in src datanode, no matter it exists

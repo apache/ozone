@@ -104,6 +104,7 @@ public class TestReplicationManager {
   private SimpleMockNodeManager nodeManager;
   private ContainerManagerV2 containerManager;
   private GenericTestUtils.LogCapturer scmLogs;
+  private SCMServiceManager serviceManager;
   private TestClock clock;
   private File testDir;
   private DBStore dbStore;
@@ -122,6 +123,7 @@ public class TestReplicationManager {
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
+    serviceManager = new SCMServiceManager();
 
     datanodeCommandHandler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, datanodeCommandHandler);
@@ -178,8 +180,6 @@ public class TestReplicationManager {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
     config.setFromObject(rmConf);
-
-    SCMServiceManager serviceManager = new SCMServiceManager();
 
     SCMHAManager scmHAManager = MockSCMHAManager
         .getInstance(true, new SCMDBTransactionBufferImpl());
@@ -1298,6 +1298,100 @@ public class TestReplicationManager {
     eventQueue.processAll(1000);
 
     Assert.assertTrue(cf.isDone() && cf.get() == MoveResult.COMPLETED);
+  }
+
+  /**
+   * if crash happened and restarted, move option should work as expected.
+   */
+  @Test
+  public void testMoveCrashAndRestart() throws IOException,
+      NodeNotFoundException, InterruptedException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    ContainerID id = container.containerID();
+    ContainerReplica dn1 = addReplica(container,
+        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container,
+        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container,
+        new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
+    replicationManager.move(id,
+        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    Assert.assertTrue(scmLogs.getOutput().contains(
+        "receive a move request about container"));
+    Thread.sleep(100L);
+    Assert.assertTrue(datanodeCommandHandler.received(
+        SCMCommandProto.Type.replicateContainerCommand, dn3));
+    Assert.assertEquals(1, datanodeCommandHandler.getInvocationCount(
+        SCMCommandProto.Type.replicateContainerCommand));
+
+    //crash happens, restart scm.
+    //clear current inflight actions and reload inflightMove from DBStore.
+    resetReplicationManager();
+    replicationManager.getMoveScheduler()
+        .reinitialize(SCMDBDefinition.MOVE.getTable(dbStore));
+    Assert.assertTrue(replicationManager.getMoveScheduler()
+        .getInflightMove().containsKey(id));
+    MoveDataNodePair kv = replicationManager.getMoveScheduler()
+        .getInflightMove().get(id);
+    Assert.assertEquals(kv.getSrc(), dn1.getDatanodeDetails());
+    Assert.assertEquals(kv.getTgt(), dn3);
+    serviceManager.notifyStatusChanged();
+
+    Thread.sleep(100L);
+    // now, the container is not over-replicated,
+    // so no deleteContainerCommand will be sent
+    Assert.assertFalse(datanodeCommandHandler.received(
+        SCMCommandProto.Type.deleteContainerCommand, dn1.getDatanodeDetails()));
+    //replica does not exist in target datanode, so a replicateContainerCommand
+    //will be sent again at notifyStatusChanged#onLeaderReadyAndOutOfSafeMode
+    Assert.assertEquals(2, datanodeCommandHandler.getInvocationCount(
+        SCMCommandProto.Type.replicateContainerCommand));
+
+
+    //replicate container to dn3, now, over-replicated
+    addReplicaToDn(container, dn3, CLOSED);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
+
+    //deleteContainerCommand is sent, but the src replica is not deleted now
+    Assert.assertEquals(1, datanodeCommandHandler.getInvocationCount(
+        SCMCommandProto.Type.deleteContainerCommand));
+
+    //crash happens, restart scm.
+    //clear current inflight actions and reload inflightMove from DBStore.
+    resetReplicationManager();
+    replicationManager.getMoveScheduler()
+        .reinitialize(SCMDBDefinition.MOVE.getTable(dbStore));
+    Assert.assertTrue(replicationManager.getMoveScheduler()
+        .getInflightMove().containsKey(id));
+    kv = replicationManager.getMoveScheduler()
+        .getInflightMove().get(id);
+    Assert.assertEquals(kv.getSrc(), dn1.getDatanodeDetails());
+    Assert.assertEquals(kv.getTgt(), dn3);
+    serviceManager.notifyStatusChanged();
+
+    //after restart and the container is over-replicated now,
+    //deleteContainerCommand will be sent again
+    Assert.assertEquals(2, datanodeCommandHandler.getInvocationCount(
+        SCMCommandProto.Type.deleteContainerCommand));
+    containerStateManager.removeContainerReplica(id, dn1);
+
+    //replica in src datanode is deleted now
+    containerStateManager.removeContainerReplica(id, dn1);
+    replicationManager.processAll();
+    eventQueue.processAll(1000);
+
+    //since the move is complete,so after scm crash and restart
+    //inflightMove should not contain the container again
+    resetReplicationManager();
+    replicationManager.getMoveScheduler()
+        .reinitialize(SCMDBDefinition.MOVE.getTable(dbStore));
+    Assert.assertFalse(replicationManager.getMoveScheduler()
+        .getInflightMove().containsKey(id));
+
+    //completeableFuture is not stored in DB, so after scm crash and
+    //restart ,completeableFuture is missing
   }
 
   /**
