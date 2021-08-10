@@ -47,11 +47,11 @@ public final class TimeDurationUtil {
     vStr = vStr.trim();
     vStr = vStr.toLowerCase();
     ParsedTimeDuration vUnit = ParsedTimeDuration.unitFor(vStr);
-    if (vUnit == null) {
+    if (null == vUnit) {
       LOG.warn("No unit for " + name + "(" + vStr + ") assuming " + unit);
       vUnit = ParsedTimeDuration.unitFor(unit);
-      if(vUnit == null){
-        throw new NullPointerException("Specified vUnit is null");
+      if(null == vUnit){
+        throw new NullPointerException("Unexpected unit" + unit);
       }
     } else {
       vStr = vStr.substring(0, vStr.lastIndexOf(vUnit.suffix()));
