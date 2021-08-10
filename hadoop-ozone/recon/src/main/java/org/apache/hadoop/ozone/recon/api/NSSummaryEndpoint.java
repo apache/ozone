@@ -306,25 +306,8 @@ public class NSSummaryEndpoint {
       }
       // Either listFile or withReplica is enabled, we need the directKeys info
       if (listFile || withReplica) {
-        List<OmKeyInfo> directKeys = listDirectKeys(bucketObjectId);
-
-        for (OmKeyInfo directKey: directKeys) {
-          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-          String subpath = buildSubpath(normalizedPath,
-                  directKey.getFileName());
-          diskUsage.setSubpath(subpath);
-          diskUsage.setSize(directKey.getDataSize());
-
-          if (withReplica) {
-            long keyDU = getKeySizeWithReplication(directKey);
-            bucketDataSizeWithReplica += keyDU;
-            diskUsage.setSizeWithReplica(keyDU);
-          }
-          // list the key as a subpath
-          if (listFile) {
-            dirDUData.add(diskUsage);
-          }
-        }
+        bucketDataSizeWithReplica += handleDirectKeys(bucketObjectId,
+                withReplica, listFile, dirDUData, normalizedPath);
       }
       if (withReplica) {
         duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
@@ -368,25 +351,8 @@ public class NSSummaryEndpoint {
 
       // handle direct keys under directory
       if (listFile || withReplica) {
-        List<OmKeyInfo> directKeys = listDirectKeys(dirObjectId);
-
-        for (OmKeyInfo directKey: directKeys) {
-          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-          String subpath = buildSubpath(normalizedPath,
-                  directKey.getFileName());
-          diskUsage.setSubpath(subpath);
-          diskUsage.setSize(directKey.getDataSize());
-
-          if (withReplica) {
-            long keyDU = getKeySizeWithReplication(directKey);
-            dirDataSizeWithReplica += keyDU;
-            diskUsage.setSizeWithReplica(keyDU);
-          }
-          // list the key as a subpath
-          if (listFile) {
-            subdirDUData.add(diskUsage);
-          }
-        }
+        dirDataSizeWithReplica += handleDirectKeys(dirObjectId, withReplica,
+            listFile, subdirDUData, normalizedPath);
       }
 
       if (withReplica) {
@@ -904,11 +870,21 @@ public class NSSummaryEndpoint {
     return totalDU;
   }
 
-  // TODO: to be optimized later. We don't want to get the batch in memory,
-  //  but for now I didn't figure out an elegant way to do the iteration
-  //  along with different combinations of listFile and withReplica
-  private List<OmKeyInfo> listDirectKeys(long parentId) throws IOException {
-    List<OmKeyInfo> result = new ArrayList<>();
+  /**
+   * This method handles disk usage of direct keys.
+   * @param parentId parent directory/bucket
+   * @param withReplica if withReplica is enabled, set sizeWithReplica
+   * for each direct key's DU
+   * @param listFile if listFile is enabled, append key DU as a subpath
+   * @param duData the current DU data
+   * @param normalizedPath the normalized path request
+   * @return the total DU of all direct keys
+   * @throws IOException IOE
+   */
+  private long handleDirectKeys(long parentId, boolean withReplica,
+                                boolean listFile,
+                                List<DUResponse.DiskUsage> duData,
+                                String normalizedPath) throws IOException {
 
     Table keyTable = omMetadataManager.getFileTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -916,6 +892,8 @@ public class NSSummaryEndpoint {
 
     String seekPrefix = parentId + OM_KEY_PREFIX;
     iterator.seek(seekPrefix);
+
+    long keyDataSizeWithReplica = 0L;
 
     while (iterator.hasNext()) {
       Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
@@ -926,10 +904,25 @@ public class NSSummaryEndpoint {
       }
       OmKeyInfo keyInfo = kv.getValue();
       if (keyInfo != null) {
-        result.add(keyInfo);
+        DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+        String subpath = buildSubpath(normalizedPath,
+            keyInfo.getFileName());
+        diskUsage.setSubpath(subpath);
+        diskUsage.setSize(keyInfo.getDataSize());
+
+        if (withReplica) {
+          long keyDU = getKeySizeWithReplication(keyInfo);
+          keyDataSizeWithReplica += keyDU;
+          diskUsage.setSizeWithReplica(keyDU);
+        }
+        // list the key as a subpath
+        if (listFile) {
+          duData.add(diskUsage);
+        }
       }
     }
-    return result;
+
+    return keyDataSizeWithReplica;
   }
 
   private long getKeySizeWithReplication(OmKeyInfo keyInfo) {
@@ -947,7 +940,7 @@ public class NSSummaryEndpoint {
         long blockSize = location.getLength() * replicationFactor;
         du += blockSize;
       } catch (ContainerNotFoundException cnfe) {
-        LOG.debug("Cannot find container {}", block.getContainerID(), cnfe);
+        LOG.warn("Cannot find container {}", block.getContainerID(), cnfe);
       }
     }
     return du;
