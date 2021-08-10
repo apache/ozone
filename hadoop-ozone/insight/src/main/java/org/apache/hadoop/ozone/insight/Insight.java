@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.insight;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import picocli.CommandLine;
 
 /**
@@ -36,6 +37,11 @@ public class Insight extends GenericCli {
 
   public Insight() {
     super(Insight.class);
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 
   public static void main(String[] args) throws Exception {

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import picocli.CommandLine;
 
 /**
@@ -40,6 +41,11 @@ public class OzoneChaosCluster extends GenericCli {
   @Override
   public void execute(String[] argv) {
     super.execute(argv);
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 
   public static void main(String[] args) {

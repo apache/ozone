@@ -86,18 +86,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
   }
 
   @Override
-  public void reconfigureProperty(String s, String s1) throws org.apache.hadoop.conf.ReconfigurationException {
-
-  }
-
-  @Override
-  public Collection<String> getReconfigurableProperties() {
-    return null;
-  }
-
-  @Override
-  protected String reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-    return null;
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
   }
 
   /**
@@ -219,10 +208,5 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
   public static boolean canWrite(String path) {
     File file = new File(path);
     return file.canWrite();
-  }
-
-  @Override
-  public ReconfigurationTaskStatus getReconfigurationStatus() throws IOException {
-    return null;
   }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import picocli.CommandLine.Command;
@@ -55,6 +56,11 @@ public class OzoneShell extends Shell {
           super.execute(argv);
           return null;
         });
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 
 }

@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.audit.parser;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.ozone.audit.parser.handler.LoadCommandHandler;
 import org.apache.hadoop.ozone.audit.parser.handler.QueryCommandHandler;
 import org.apache.hadoop.ozone.audit.parser.handler.TemplateCommandHandler;
@@ -56,5 +57,10 @@ public class AuditParser extends GenericCli {
 
   public String getDatabase(){
     return database;
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 }

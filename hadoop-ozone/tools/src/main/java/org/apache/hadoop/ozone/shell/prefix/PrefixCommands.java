@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.shell.prefix;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
@@ -66,6 +67,11 @@ public class PrefixCommands implements GenericParentCommand, Callable<Void>,
   @Override
   public OzoneConfiguration createOzoneConfiguration() {
     return shell.createOzoneConfiguration();
+  }
+
+  @Override
+  public boolean startReconfiguration() throws IOException {
+    return false;
   }
 
   @Override

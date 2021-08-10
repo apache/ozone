@@ -20,6 +20,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -89,6 +90,11 @@ public class Freon extends GenericCli {
     HddsServerUtil.initializeMetrics(conf, "ozone-freon");
     TracingUtil.initTracing("freon", conf);
     super.execute(argv);
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 
   public void stopHttpServer() {

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.admin.scm;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -54,6 +55,11 @@ public class ScmAdmin extends GenericCli  implements SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 
   @Override

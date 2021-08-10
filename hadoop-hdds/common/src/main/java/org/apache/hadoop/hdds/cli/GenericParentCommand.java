@@ -28,10 +28,8 @@ public interface GenericParentCommand {
 
   boolean isVerbose();
 
-  OzoneConfiguration createOzoneConfiguration() throws JAXBException;
+  OzoneConfiguration createOzoneConfiguration();
 
   boolean startReconfiguration() throws IOException;
-
-  ReconfigurationTaskStatus getReconfigurationStatus() throws IOException;
 
 }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.shell.keys;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
@@ -74,6 +75,11 @@ public class KeyCommands
   @Override
   public OzoneConfiguration createOzoneConfiguration() {
     return shell.createOzoneConfiguration();
+  }
+
+  @Override
+  public boolean startReconfiguration() throws IOException {
+    return false;
   }
 
   @Override

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.shell.s3;
 
 import java.util.function.Supplier;
 
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
 
@@ -43,6 +44,11 @@ public class S3Shell extends Shell {
           super.execute(argv);
           return null;
         });
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 
   /**

@@ -330,9 +330,8 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
     if (cL == null) {
       cL = OzoneConfiguration.class.getClassLoader();
     }
-    String fileStr = cL.getResource("ozone-site.xml").toString();
-    File file = new File("/Users/chenchao/IdeaProjects/ozone-722/hadoop-hdds/common/src/main/resources/" +
-        "ozone-site.xml");
+    File file = new File("ozone-site.xml");
+    System.out.println(file.getAbsolutePath());
     URL url = null;
     List<OzoneConfiguration.Property> allProperties = null;
     try {

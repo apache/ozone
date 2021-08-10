@@ -21,6 +21,7 @@ import java.io.PrintStream;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.util.NativeCodeLoader;
 import org.apache.log4j.ConsoleAppender;
@@ -68,7 +69,7 @@ public class OzoneGetConf extends GenericCli {
     out.println(message);
   }
 
-  OzoneConfiguration getConf() {
+  public OzoneConfiguration getConf() {
     return this.conf;
   }
 
@@ -82,5 +83,10 @@ public class OzoneGetConf extends GenericCli {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.addResource(new OzoneConfiguration());
     new OzoneGetConf(conf).run(argv);
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 }

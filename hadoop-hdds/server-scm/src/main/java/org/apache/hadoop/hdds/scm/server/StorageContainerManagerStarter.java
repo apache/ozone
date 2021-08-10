@@ -162,11 +162,6 @@ public class StorageContainerManagerStarter extends GenericCli {
         StorageContainerManager.class, originalArgs, LOG);
   }
 
-  @Override
-  public ReconfigurationTaskStatus getReconfigurationStatus() throws IOException {
-    return null;
-  }
-
   /**
    * This static class wraps the external dependencies needed for this command
    * to execute its tasks. This allows the dependency to be injected for unit

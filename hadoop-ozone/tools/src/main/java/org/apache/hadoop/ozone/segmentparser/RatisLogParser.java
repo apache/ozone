@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.segmentparser;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 
@@ -45,6 +46,11 @@ public class RatisLogParser extends GenericCli implements SubcommandWithParent {
   @Override
   public void execute(String[] argv) {
     super.execute(argv);
+  }
+
+  @Override
+  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+
   }
 
   public static void main(String[] args) {
