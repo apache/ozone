@@ -143,7 +143,7 @@ public final class BlockDataStreamOutputEntry
       return out.getTotalAckDataLength();
     } else {
       // For a pre allocated block for which no write has been initiated,
-      // the OutputStream will be null here.
+      // the ByteBufferStreamOutput will be null here.
       // In such cases, the default blockCommitSequenceId will be 0
       return 0;
     }
@@ -165,7 +165,7 @@ public final class BlockDataStreamOutputEntry
       return out.getWrittenDataLength();
     } else {
       // For a pre allocated block for which no write has been initiated,
-      // the OutputStream will be null here.
+      // the ByteBufferStreamOutput will be null here.
       // In such cases, the default blockCommitSequenceId will be 0
       return 0;
     }
@@ -189,7 +189,7 @@ public final class BlockDataStreamOutputEntry
   }
 
   /**
-   * Builder class for ChunkGroupOutputStreamEntry.
+   * Builder class for BlockDataStreamOutputEntry.
    * */
   public static class Builder {
 

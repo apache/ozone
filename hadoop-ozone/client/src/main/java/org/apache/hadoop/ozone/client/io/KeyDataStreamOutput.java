@@ -202,8 +202,8 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
         BlockDataStreamOutputEntry current =
             blockDataStreamOutputEntryPool.allocateBlockIfNeeded();
         // length(len) will be in int range if the call is happening through
-        // write API of blockOutputStream. Length can be in long range if it
-        // comes via Exception path.
+        // write API of blockDataStreamOutput. Length can be in long range
+        // if it comes via Exception path.
         int expectedWriteLen = Math.min((int) len,
                 (int) current.getRemaining());
         long currentPos = current.getWrittenDataLength();
@@ -211,8 +211,8 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
         // or if it sees an exception, how much the actual write was
         // acknowledged.
         int writtenLength =
-                writeToOutputStream(current, retry, len, b, expectedWriteLen,
-                off, currentPos);
+            writeToDataStreamOutput(current, retry, len, b,
+                expectedWriteLen, off, currentPos);
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
           handleFlushOrClose(StreamAction.FULL);
@@ -226,7 +226,7 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
-  private int writeToOutputStream(BlockDataStreamOutputEntry current,
+  private int writeToDataStreamOutput(BlockDataStreamOutputEntry current,
       boolean retry, long len, ByteBuf b, int writeLen, int off,
       long currentPos) throws IOException {
     try {
@@ -526,7 +526,7 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   /**
-   * Builder class of KeyOutputStream.
+   * Builder class of KeyDataStreamOutput.
    */
   public static class Builder {
     private OpenKeySession openHandler;

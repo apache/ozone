@@ -136,7 +136,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private long syncPosition = 0;
 
   /**
-   * Creates a new BlockOutputStream.
+   * Creates a new BlockDataStreamOutput.
    *
    * @param blockID              block ID
    * @param xceiverClientManager client manager that controls client
@@ -653,7 +653,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    */
   private void checkOpen() throws IOException {
     if (isClosed()) {
-      throw new IOException("BlockOutputStream has been closed.");
+      throw new IOException("BlockDataStreamOutput has been closed.");
     } else if (getIoException() != null) {
       adjustBuffersOnException();
       throw getIoException();

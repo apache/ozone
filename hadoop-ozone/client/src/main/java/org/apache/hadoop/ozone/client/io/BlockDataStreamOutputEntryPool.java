@@ -98,7 +98,7 @@ public class BlockDataStreamOutputEntryPool {
   /**
    * A constructor for testing purpose only.
    *
-   * @see KeyOutputStream#KeyOutputStream()
+   * @see KeyDataStreamOutput#KeyDataStreamOutput()
    */
   @VisibleForTesting
   BlockDataStreamOutputEntryPool() {
@@ -230,7 +230,7 @@ public class BlockDataStreamOutputEntryPool {
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)
    *
-   * The returned block is made to new BlockOutputStreamEntry to write.
+   * The returned block is made to new BlockDataStreamOutputEntry to write.
    *
    * @throws IOException
    */
@@ -261,7 +261,7 @@ public class BlockDataStreamOutputEntryPool {
         omClient.commitKey(keyArgs, openID);
       }
     } else {
-      LOG.warn("Closing KeyOutputStream, but key args is null");
+      LOG.warn("Closing KeyDataStreamOutput, but key args is null");
     }
   }
 

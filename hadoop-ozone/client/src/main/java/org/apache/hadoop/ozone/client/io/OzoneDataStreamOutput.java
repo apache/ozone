@@ -23,15 +23,15 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import java.io.IOException;
 
 /**
- * OzoneOutputStream is used to write data into Ozone.
- * It uses SCM's {@link KeyOutputStream} for writing the data.
+ * OzoneDataStreamOutput is used to write data into Ozone.
+ * It uses SCM's {@link KeyDataStreamOutput} for writing the data.
  */
 public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
 
   private final ByteBufferStreamOutput byteBufferStreamOutput;
 
   /**
-   * Constructs OzoneOutputStream with KeyOutputStream.
+   * Constructs OzoneDataStreamOutput with KeyDataStreamOutput.
    *
    * @param byteBufferStreamOutput
    */

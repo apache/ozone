@@ -535,7 +535,7 @@ public class OzoneBucket extends WithMetadata {
    * @param key               Name of the key to be created.
    * @param size              Size of the data the key will point to.
    * @param replicationConfig Replication configuration.
-   * @return OzoneOutputStream to which the data has to be written.
+   * @return OzoneDataStreamOutput to which the data has to be written.
    * @throws IOException
    */
   public OzoneDataStreamOutput createStreamKey(String key, long size,
