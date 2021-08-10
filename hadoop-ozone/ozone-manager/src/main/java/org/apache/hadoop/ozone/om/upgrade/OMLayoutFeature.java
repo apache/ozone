@@ -29,17 +29,8 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  */
 public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
-  INITIAL_VERSION(0, "Initial Layout Version");
-
-
-  ///////////////////////////////  /////////////////////////////
-  //    Example OM Layout Feature with Actions
-  //      CREATE_EC(1, "",
-  //          new ImmutablePair<>(ON_FINALIZE, new OnFinalizeECAction()),
-  //          new ImmutablePair<>(FIRST_RUN_ON_UPGRADE,
-  //          new OnFirstUpgradeStartECAction());
-  //
-  //////////////////////////////  //////////////////////////////
+  INITIAL_VERSION(0, "Initial Layout Version"),
+  FSO(1, "File System Optimization");
 
   private int layoutVersion;
   private String description;
