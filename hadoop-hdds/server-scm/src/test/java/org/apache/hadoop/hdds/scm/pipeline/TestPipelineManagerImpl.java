@@ -103,9 +103,9 @@ public class TestPipelineManagerImpl {
     FileUtil.fullyDelete(testDir);
   }
 
-  private PipelineManagerV2Impl createPipelineManager(boolean isLeader)
+  private PipelineManagerImpl createPipelineManager(boolean isLeader)
       throws IOException {
-    return PipelineManagerV2Impl.newPipelineManager(conf,
+    return PipelineManagerImpl.newPipelineManager(conf,
         MockSCMHAManager.getInstance(isLeader),
         new MockNodeManager(true, 20),
         SCMDBDefinition.PIPELINES.getTable(dbStore),
@@ -114,9 +114,9 @@ public class TestPipelineManagerImpl {
         serviceManager);
   }
 
-  private PipelineManagerV2Impl createPipelineManager(
+  private PipelineManagerImpl createPipelineManager(
       boolean isLeader, SCMHADBTransactionBuffer buffer) throws IOException {
-    return PipelineManagerV2Impl.newPipelineManager(conf,
+    return PipelineManagerImpl.newPipelineManager(conf,
         MockSCMHAManager.getInstance(isLeader, buffer),
         new MockNodeManager(true, 20),
         SCMDBDefinition.PIPELINES.getTable(dbStore),
@@ -129,7 +129,7 @@ public class TestPipelineManagerImpl {
   public void testCreatePipeline() throws Exception {
     SCMHADBTransactionBuffer buffer1 =
         new MockSCMHADBTransactionBuffer(dbStore);
-    PipelineManagerV2Impl pipelineManager =
+    PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer1);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
     Pipeline pipeline1 = pipelineManager.createPipeline(
@@ -146,7 +146,7 @@ public class TestPipelineManagerImpl {
 
     SCMHADBTransactionBuffer buffer2 =
         new MockSCMHADBTransactionBuffer(dbStore);
-    PipelineManagerV2Impl pipelineManager2 =
+    PipelineManagerImpl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
     Assert.assertFalse(pipelineManager2.getPipelines().isEmpty());
@@ -162,7 +162,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testCreatePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(false);
+    PipelineManagerImpl pipelineManager = createPipelineManager(false);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
     try {
       pipelineManager
@@ -178,7 +178,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testUpdatePipelineStates() throws Exception {
     SCMHADBTransactionBuffer buffer = new MockSCMHADBTransactionBuffer(dbStore);
-    PipelineManagerV2Impl pipelineManager =
+    PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =
         SCMDBDefinition.PIPELINES.getTable(dbStore);
@@ -221,7 +221,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testOpenPipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
         new RatisReplicationConfig(ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
@@ -242,7 +242,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testActivatePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
         new RatisReplicationConfig(ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
@@ -263,7 +263,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testDeactivatePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
         new RatisReplicationConfig(ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
@@ -284,7 +284,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testRemovePipeline() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     // Create a pipeline
     Pipeline pipeline = pipelineManager.createPipeline(
         new RatisReplicationConfig(ReplicationFactor.THREE));
@@ -325,7 +325,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testClosePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(
         new RatisReplicationConfig(ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
@@ -346,7 +346,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineReport() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
             new EventQueue(), serviceManager, scmContext);
@@ -395,7 +395,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineCreationFailedMetric() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
 
     // No pipeline at start
     MetricsRecordBuilder metrics = getMetrics(
@@ -450,7 +450,7 @@ public class TestPipelineManagerImpl {
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
     SCMHADBTransactionBuffer buffer1 =
         new MockSCMHADBTransactionBuffer(dbStore);
-    PipelineManagerV2Impl pipelineManager =
+    PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer1);
 
     Pipeline pipeline = pipelineManager
@@ -499,7 +499,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager
         .createPipeline(new RatisReplicationConfig(ReplicationFactor.THREE));
     // At this point, pipeline is not at OPEN stage.
@@ -528,7 +528,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager
         .createPipeline(new RatisReplicationConfig(ReplicationFactor.THREE));
     // At this point, pipeline is not at OPEN stage.
@@ -565,7 +565,7 @@ public class TestPipelineManagerImpl {
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(true, false));
 
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
     try {
       pipelineManager
           .createPipeline(new RatisReplicationConfig(ReplicationFactor.THREE));
@@ -602,7 +602,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
 
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(true, false));
