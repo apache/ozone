@@ -755,7 +755,7 @@ public final class OzoneManagerRatisServer {
     return this.raftPeerId;
   }
 
-  private UUID getRaftGroupIdFromOmServiceId(String omServiceId) {
+  public static UUID getRaftGroupIdFromOmServiceId(String omServiceId) {
     return UUID.nameUUIDFromBytes(omServiceId.getBytes(StandardCharsets.UTF_8));
   }
 
