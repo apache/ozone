@@ -125,6 +125,12 @@ public class FilePerBlockStrategy implements ChunkManager {
           info, overwrite, stage, chunkFile);
     }
 
+    // Safety check : When offset=0, this is the beginning of a new block and
+    // hence the block file must be empty.
+    if (offset == 0) {
+      Preconditions.checkArgument(chunkFile.length() == 0,
+          "Block file is not empty at offset 0");
+    }
     HddsVolume volume = containerData.getVolume();
 
     FileChannel channel = null;
