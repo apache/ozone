@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.upgrade;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -27,6 +28,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 import java.io.File;
+import java.io.IOException;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the
@@ -90,7 +92,7 @@ public final class VersionedDatanodeFeatures {
      * volume and SCM HA finalization status.
      */
     public static String chooseContainerPathID(StorageVolume volume,
-        String clusterID) {
+        String clusterID) throws IOException {
       File clusterIDDir = new File(volume.getStorageDir(), clusterID);
 
       // SCM ID may be null for testing, but these non-upgrade tests will use
@@ -99,11 +101,14 @@ public final class VersionedDatanodeFeatures {
         return clusterID;
       } else {
         File[] subdirs = volume.getStorageDir().listFiles(File::isDirectory);
-        Preconditions.checkNotNull(subdirs, "Failed to read volume " +
-            volume.getStorageDir());
-        Preconditions.checkArgument(subdirs.length == 1, "Invalid volume " +
-            "directory " + volume.getStorageDir() +
-            " has more than one directory before SCM HA finalization.");
+        if (subdirs == null) {
+          throw new IOException("Failed to read volume " +
+              volume.getStorageDir());
+        } else if (subdirs.length != 1) {
+          throw new IOException("Invalid volume directory " +
+              volume.getStorageDir() +
+              " has more than one directory before SCM HA finalization.");
+        }
         return subdirs[0].getName();
       }
     }
