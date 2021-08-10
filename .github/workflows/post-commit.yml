@@ -161,25 +161,21 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-        with:
-          path: ozone
-      - name: Move Ozone to /mnt
-        run: |
-          sudo chmod 777 /mnt
-          mv ozone /mnt/
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v2
         with:
           name: ozone-bin
       - name: Untar binaries
         run: |
-          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
-          sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          cd /mnt/ozone && hadoop-ozone/dev-support/checks/acceptance.sh
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
@@ -190,7 +186,7 @@ jobs:
         if: always()
         with:
           name: acceptance-${{ matrix.suite }}
-          path: /mnt/ozone/target/acceptance
+          path: target/acceptance
         continue-on-error: true
   kubernetes:
     needs: compile
@@ -200,30 +196,26 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-        with:
-          path: ozone
-      - name: Move Ozone to /mnt
-        run: |
-          sudo chmod 777 /mnt
-          mv ozone /mnt/
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v2
         with:
           name: ozone-bin
       - name: Untar binaries
         run: |
-          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/kubernetes.sh
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
         with:
           name: kubernetes
-          path: /mnt/ozone/target/kubernetes
+          path: target/kubernetes
         continue-on-error: true
   integration:
     runs-on: ubuntu-18.04
@@ -237,32 +229,28 @@ jobs:
           - ozone
       fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
-      - name: Setup link to SSD
-        run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
       - name: Checkout project
         uses: actions/checkout@v2
-        with:
-          path: mnt/ozone
       - name: Cache for maven dependencies
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8-${{ matrix.profile }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.profile }}
           restore-keys: |
-            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Execute tests
-        run: mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
       - name: Summary of failures
-        run: cat mnt/ozone/target/${{ github.job }}/summary.txt
+        run: cat target/${{ github.job }}/summary.txt
         if: always()
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
         with:
           name: it-${{ matrix.profile }}
-          path: mnt/ozone/target/integration
+          path: target/integration
         continue-on-error: true
       - name: Delete temporary build artifacts before caching
         run: |
