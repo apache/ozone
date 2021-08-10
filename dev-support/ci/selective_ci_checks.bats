@@ -33,6 +33,16 @@
 load bats-support/load.bash
 load bats-assert/load.bash
 
+@test "checkstyle and bats" {
+  run dev-support/ci/selective_ci_checks.sh 11b098430
+
+  assert_output -p 'basic-checks=["rat","bats","checkstyle"]'
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "compose only" {
   run dev-support/ci/selective_ci_checks.sh 5e6f6fef9
 
@@ -45,6 +55,16 @@ load bats-assert/load.bash
 
 @test "compose and robot" {
   run dev-support/ci/selective_ci_checks.sh b83039eef
+
+  assert_output -p 'basic-checks=["rat","bats"]'
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=true
+}
+
+@test "check script" {
+  run dev-support/ci/selective_ci_checks.sh 316899152
 
   assert_output -p 'basic-checks=["rat","bats"]'
   assert_output -p needs-compose-tests=true

@@ -218,6 +218,7 @@ function get_count_all_files() {
 function get_count_compose_files() {
     start_end::group_start "Count compose files"
     local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/acceptance.sh"
         "^hadoop-ozone/dist/src/main/compose"
     )
     filter_changed_files true
@@ -273,6 +274,23 @@ function get_count_robot_files() {
     filter_changed_files true
     COUNT_ROBOT_CHANGED_FILES=${match_count}
     readonly COUNT_ROBOT_CHANGED_FILES
+    start_end::group_end
+}
+
+function check_needs_build() {
+    start_end::group_start "Check if build is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/build.sh"
+        "src/main/java"
+        "src/main/resources"
+    )
+    filter_changed_files
+
+    build_needed=false
+    if [[ ${match_count} != "0" ]]; then
+        build_needed=true
+    fi
+
     start_end::group_end
 }
 
@@ -383,6 +401,27 @@ function check_needs_unit_test() {
     start_end::group_end
 }
 
+# Counts other files which do not need to trigger any functional test
+# (i.e. no compose/integration/kubernetes)
+function get_count_misc_files() {
+    start_end::group_start "Count misc. files"
+    local pattern_array=(
+        "^hadoop-hdds/dev-support/checkstyle"
+        "^hadoop-ozone/dev-support/checks"
+        "^hadoop-ozone/dist/src/main/license"
+        "\.bats$"
+        "findbugsExcludeFile.xml"
+    )
+    local ignore_array=(
+        "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
+        "^hadoop-ozone/dev-support/checks/acceptance.sh"
+        "^hadoop-ozone/dev-support/checks/integration.sh"
+        "^hadoop-ozone/dev-support/checks/kubernetes.sh"
+    )
+    filter_changed_files true
+    start_end::group_end
+}
+
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
     verbosity::store_exit_on_error_status
@@ -428,9 +467,10 @@ function set_outputs() {
         "$(initialization::parameters_to_json ${BASIC_CHECKS})"
 
     if [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
-        initialization::ga_output needs-build "true"
+        build_needed=true
     fi
 
+    initialization::ga_output needs-build "${build_needed}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
@@ -466,6 +506,9 @@ get_count_doc_files
 get_count_junit_files
 get_count_kubernetes_files
 get_count_robot_files
+get_count_misc_files
+
+check_needs_build
 
 # calculate basic checks to run
 BASIC_CHECKS="rat"
