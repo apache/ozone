@@ -190,8 +190,9 @@ public final class ContainerUtils {
   public static void verifyChecksum(ContainerData containerData,
       ConfigurationSource conf) throws IOException {
     boolean enabled = conf.getBoolean(
-            HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_ENABLED,
-            HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_ENABLED_DEFAULT);
+            HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
+            HddsConfigKeys.
+                    HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
     if(enabled) {
       String storedChecksum = containerData.getChecksum();
 

@@ -241,18 +241,21 @@ public class TestContainerDataYaml {
     cleanup();
   }
 
+  private KeyValueContainerData getKeyValueContainerData() throws IOException {
+    String containerFile = "incorrect.checksum.container";
+    //Get file from resources folder
+    ClassLoader classLoader = getClass().getClassLoader();
+    File file = new File(classLoader.getResource(containerFile).getFile());
+    return (KeyValueContainerData) ContainerDataYaml.readContainerFile(file);
+  }
+
   /**
    * Test to verify incorrect checksum is detected.
    */
   @Test
   public void testIncorrectChecksum() {
     try {
-      String containerFile = "incorrect.checksum.container";
-      //Get file from resources folder
-      ClassLoader classLoader = getClass().getClassLoader();
-      File file = new File(classLoader.getResource(containerFile).getFile());
-      KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
-          .readContainerFile(file);
+      KeyValueContainerData kvData = getKeyValueContainerData();
       ContainerUtils.verifyChecksum(kvData, conf);
       fail("testIncorrectChecksum failed");
     } catch (Exception ex) {
@@ -267,13 +270,9 @@ public class TestContainerDataYaml {
   @Test
   public void testDisabledChecksum(){
     try {
-      String containerFile = "incorrect.checksum.container";
-      //Get file from resources folder
-      ClassLoader classLoader = getClass().getClassLoader();
-      File file = new File(classLoader.getResource(containerFile).getFile());
-      KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
-              .readContainerFile(file);
-      conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_ENABLED, false);
+      KeyValueContainerData kvData = getKeyValueContainerData();
+      conf.setBoolean(HddsConfigKeys.
+                      HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
       ContainerUtils.verifyChecksum(kvData, conf);
     } catch (Exception ex) {
       ex.printStackTrace();

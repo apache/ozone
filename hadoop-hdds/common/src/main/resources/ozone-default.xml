@@ -2834,7 +2834,7 @@
   </property>
 
   <property>
-    <name>hdds.container.checksum.enabled</name>
+    <name>hdds.container.checksum.verification.enabled</name>
     <value>true</value>
     <tag>OZONE, DATANODE</tag>
     <description> To enable/disable checksum verification of the
