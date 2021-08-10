@@ -16,6 +16,11 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
+
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,9 +49,6 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
-import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -107,7 +109,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);
-
   }
 
   /**
@@ -131,47 +132,19 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       if (OmUtils.isReadOnly(request)) {
         return submitReadRequestToOM(request);
       } else {
-        raftServerStatus = omRatisServer.checkLeaderStatus();
-        if (raftServerStatus == LEADER_AND_READY) {
-          try {
-            OMClientRequest omClientRequest =
-                OzoneManagerRatisUtils.createClientRequest(request);
-            request = omClientRequest.preExecute(ozoneManager);
-          } catch (IOException ex) {
-            // As some of the preExecute returns error. So handle here.
-            return createErrorResponse(request, ex);
-          }
-          return submitRequestToRatis(request);
-        } else {
-          throw createLeaderErrorException(raftServerStatus);
+        checkLeaderStatus();
+        try {
+          OMClientRequest omClientRequest = createClientRequest(request);
+          request = omClientRequest.preExecute(ozoneManager);
+        } catch (IOException ex) {
+          // As some of the preExecute returns error. So handle here.
+          return createErrorResponse(request, ex);
         }
+        return submitRequestToRatis(request);
       }
     } else {
       return submitRequestDirectlyToOM(request);
     }
-  }
-
-  /**
-   * Create OMResponse from the specified OMRequest and exception.
-   *
-   * @param omRequest
-   * @param exception
-   * @return OMResponse
-   */
-  private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception) {
-    // Added all write command types here, because in future if any of the
-    // preExecute is changed to return IOException, we can return the error
-    // OMResponse to the client.
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
-        .setCmdType(omRequest.getCmdType())
-        .setTraceID(omRequest.getTraceID())
-        .setSuccess(false);
-    if (exception.getMessage() != null) {
-      omResponse.setMessage(exception.getMessage());
-    }
-    return omResponse.build();
   }
 
   /**
@@ -186,7 +159,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       throws ServiceException {
     // Check if this OM is the leader.
     RaftServerStatus raftServerStatus = omRatisServer.checkLeaderStatus();
-    if (raftServerStatus == LEADER_AND_READY) {
+    if (raftServerStatus == LEADER_AND_READY ||
+        request.getCmdType().equals(PrepareStatus)) {
       return handler.handleReadRequest(request);
     } else {
       throw createLeaderErrorException(raftServerStatus);
@@ -238,8 +212,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
       } else {
-        OMClientRequest omClientRequest =
-            OzoneManagerRatisUtils.createClientRequest(request);
+        OMClientRequest omClientRequest = createClientRequest(request);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);
@@ -261,6 +234,34 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       ExitUtils.terminate(1, errorMessage, ex, LOG);
     }
     return omClientResponse.getOMResponse();
+  }
+
+  private void checkLeaderStatus() throws ServiceException {
+    OzoneManagerRatisUtils.checkLeaderStatus(omRatisServer.checkLeaderStatus(),
+        omRatisServer.getRaftPeerId());
+  }
+
+  /**
+   * Create OMResponse from the specified OMRequest and exception.
+   *
+   * @param omRequest
+   * @param exception
+   * @return OMResponse
+   */
+  private OMResponse createErrorResponse(
+      OMRequest omRequest, IOException exception) {
+    // Added all write command types here, because in future if any of the
+    // preExecute is changed to return IOException, we can return the error
+    // OMResponse to the client.
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
   }
 
   public void stop() {

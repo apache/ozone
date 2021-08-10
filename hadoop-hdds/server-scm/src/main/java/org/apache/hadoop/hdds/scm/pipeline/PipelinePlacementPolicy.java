@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -40,9 +39,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT;
 
 /**
  * Pipeline placement policy that choose datanodes based on load balancing
@@ -126,7 +122,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   /**
    * Filter out viable nodes based on
    * 1. nodes that are healthy
-   * 2. nodes that are not too heavily engaged in other pipelines
+   * 2. nodes that have enough space
+   * 3. nodes that are not too heavily engaged in other pipelines
    * The results are sorted based on pipeline count of each node.
    *
    * @param excludedNodes - excluded nodes
@@ -135,11 +132,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @throws SCMException when viable nodes are not enough in numbers
    */
   List<DatanodeDetails> filterViableNodes(
-      List<DatanodeDetails> excludedNodes, int nodesRequired)
+      List<DatanodeDetails> excludedNodes, int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    healthyNodes = filterNodesWithSpace(healthyNodes, nodesRequired,
+        metadataSizeRequired, dataSizeRequired);
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
@@ -156,36 +156,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
-    long sizeRequired = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-
-    long metaSizeRequired = (long) conf.getStorageSize(
-        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
-        OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
-        StorageUnit.BYTES);
-
-    // filter nodes that don't even have space for one container
-    List<DatanodeDetails> canHoldList = healthyNodes.stream().filter(d ->
-        hasEnoughSpace(d, sizeRequired)).collect(Collectors.toList());
-
-    if (canHoldList.size() < nodesRequired) {
-      msg = String.format("Pipeline creation failed due to no sufficient" +
-          " healthy datanodes with enough space for container data and " +
-          "metadata. Required %d. Found %d. Container data required %d, " +
-          "metadata required %d.",
-          nodesRequired, canHoldList.size(), sizeRequired, metaSizeRequired);
-      LOG.warn(msg);
-      throw new SCMException(msg,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
-    }
-
     // filter nodes that meet the size and pipeline engagement criteria.
     // Pipeline placement doesn't take node space left into account.
     // Sort the DNs by pipeline load.
     // TODO check if sorting could cause performance issue: HDDS-3466.
-    List<DatanodeDetails> healthyList = canHoldList.stream()
+    List<DatanodeDetails> healthyList = healthyNodes.stream()
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
         .filter(d ->
@@ -247,18 +222,20 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param excludedNodes - excluded nodes
    * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired  - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return a list of chosen datanodeDetails
    * @throws SCMException when chosen nodes are not enough in numbers
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, final long sizeRequired) throws SCMException {
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
     // Get a list of viable nodes based on criteria
     // and make sure excludedNodes are excluded from list.
-    List<DatanodeDetails> healthyNodes =
-        filterViableNodes(excludedNodes, nodesRequired);
+    List<DatanodeDetails> healthyNodes = filterViableNodes(excludedNodes,
+        nodesRequired, metadataSizeRequired, dataSizeRequired);
 
     // Randomly picks nodes when all nodes are equal or factor is ONE.
     // This happens when network topology is absent or

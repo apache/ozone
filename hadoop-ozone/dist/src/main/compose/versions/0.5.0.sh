@@ -15,10 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ozone_logical_version() {
-  echo 1
-}
-
 ozone_version_load() {
   export OZONE_ADMIN_COMMAND=scmcli
   export OZONE_SAFEMODE_STATUS_COMMAND='ozone scmcli safemode status'

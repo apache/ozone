@@ -120,13 +120,6 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return new OMBucketAclResponse(
-        createErrorOMResponse(omResponse, exception));
-  }
-
-  @Override
   void onComplete(boolean operationResult, IOException exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
@@ -148,8 +141,9 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(
+      OzoneManager ozoneManager, long trxnLogIndex,
+      OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     ozoneManager.getMetrics().incNumAddAcl();
     return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
         omDoubleBufferHelper);

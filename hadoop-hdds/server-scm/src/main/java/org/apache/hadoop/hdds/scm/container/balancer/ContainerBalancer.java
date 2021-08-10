@@ -255,7 +255,9 @@ public class ContainerBalancer {
       //if fully completed
       try {
         Thread.sleep(50);
-      } catch (InterruptedException e) {}
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
       /////////////////////////////
 
       if (unBalancedNodes.isEmpty()) {

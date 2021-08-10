@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -55,7 +56,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -67,6 +67,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
 /**
  * Handles create file request.
@@ -124,13 +125,15 @@ public class OMFileCreateRequest extends OMKeyRequest {
       type = useRatis ? HddsProtos.ReplicationType.RATIS :
           HddsProtos.ReplicationType.STAND_ALONE;
     }
+    ReplicationConfig repConfig = ReplicationConfig.fromProto(
+        type, factor, keyArgs.getEcReplicationConfig());
 
     // TODO: Here we are allocating block with out any check for
     //  bucket/key/volume or not and also with out any authorization checks.
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), type, factor,
+              ozoneManager.getBlockTokenSecretManager(), repConfig,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
@@ -296,7 +299,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
-          .setCmdType(Type.CreateFile);
+          .setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
           omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
 
@@ -305,7 +308,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumCreateFileFails();
-      omResponse.setCmdType(Type.CreateFile);
+      omResponse.setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
             omResponse, exception));
     } finally {
@@ -386,4 +389,5 @@ public class OMFileCreateRequest extends OMKeyRequest {
           OMException.ResultCodes.DIRECTORY_NOT_FOUND);
     }
   }
+
 }

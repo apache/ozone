@@ -289,6 +289,7 @@ public final class ContainerUtils {
         }
         if (msg.getReadChunk().hasDataBuffers()) {
           builder.getReadChunkBuilder().getDataBuffersBuilder()
+              .clearBuffers()
               .addBuffers(REDACTED);
         }
       }
@@ -298,7 +299,9 @@ public final class ContainerUtils {
         }
         if (msg.getGetSmallFile().getData().hasDataBuffers()) {
           builder.getGetSmallFileBuilder().getDataBuilder()
-              .getDataBuffersBuilder().addBuffers(REDACTED);
+              .getDataBuffersBuilder()
+                  .clearBuffers()
+                  .addBuffers(REDACTED);
         }
       }
       return builder.build();
