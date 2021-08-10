@@ -106,8 +106,11 @@ public class CommitWatcher {
         }
       }
       Preconditions.checkNotNull(remove);
-      for (ChunkBuffer byteBuffer : buffers) {
-        bufferPool.releaseBuffer(byteBuffer);
+      // if size of bufferPool is 0, we are not using bufferPool
+      if (bufferPool.getSize() > 0) {
+        for (ChunkBuffer byteBuffer : buffers) {
+          bufferPool.releaseBuffer(byteBuffer);
+        }
       }
     }
     return totalAckDataLength;
@@ -125,7 +128,7 @@ public class CommitWatcher {
   /**
    * Calls watch for commit for the first index in commitIndex2flushedDataMap to
    * the Ratis client.
-   * @return reply reply from raft client
+   * @return {@link XceiverClientReply} reply from raft client
    * @throws IOException in case watchForCommit fails
    */
   public XceiverClientReply watchOnFirstIndex() throws IOException {
@@ -146,9 +149,9 @@ public class CommitWatcher {
   }
 
   /**
-   * Calls watch for commit for the first index in commitIndex2flushedDataMap to
+   * Calls watch for commit for the last index in commitIndex2flushedDataMap to
    * the Ratis client.
-   * @return reply reply from raft client
+   * @return {@link XceiverClientReply} reply from raft client
    * @throws IOException in case watchForCommit fails
    */
   public XceiverClientReply watchOnLastIndex()

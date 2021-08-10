@@ -261,21 +261,13 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     if (b == null) {
       throw new NullPointerException();
     }
-    int off = b.readerIndex();
-    int len = b.readableBytes();
-
-    while (len > 0) {
-      allocateNewBufferIfNeeded();
-      final int writeLen = Math.min(currentBufferRemaining, len);
-      // TODO: avoid buffer copy here
-      currentBuffer.put(b.nioBuffer(off, writeLen));
-      currentBufferRemaining -= writeLen;
-      writeChunkIfNeeded();
-      off += writeLen;
-      len -= writeLen;
-      writtenDataLength += writeLen;
-      doFlushOrWatchIfNeeded();
+    final int len = b.readableBytes();
+    if (len == 0) {
+      return;
     }
+    ChunkBuffer chunk = ChunkBuffer.wrap(b.nioBuffer());
+    writeChunk(chunk.duplicate(len, len)); // pretend as write buffer
+    writtenDataLength += len;
   }
 
   private void writeChunkIfNeeded() throws IOException {
@@ -320,6 +312,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    */
 
   // In this case, the data is already cached in the currentBuffer.
+  // FIXME: drop bufferPool breaks writeOnRetry
   public void writeOnRetry(long len) throws IOException {
     if (len == 0) {
       return;
@@ -543,11 +536,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
-      refreshCurrentBuffer(bufferPool);
-      Preconditions.checkArgument(currentBuffer.position() > 0);
-      if (currentBuffer.hasRemaining()) {
-        writeChunk(currentBuffer);
-      }
       // This can be a partially filled chunk. Since we are flushing the buffer
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
@@ -570,8 +558,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
   @Override
   public void close() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient != null
-        && bufferPool != null && bufferPool.getSize() > 0) {
+    if (xceiverClientFactory != null && xceiverClient != null) {
       try {
         handleFlush(true);
         dataStreamCloseReply.get();
