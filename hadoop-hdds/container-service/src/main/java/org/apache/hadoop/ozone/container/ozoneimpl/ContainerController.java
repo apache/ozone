@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,6 +38,7 @@ import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Control plane for container management in datanode.
@@ -44,6 +47,7 @@ public class ContainerController {
 
   private final ContainerSet containerSet;
   private final Map<ContainerType, Handler> handlers;
+  private final Logger LOG = LoggerFactory.getLogger(ContainerController.class);
 
   public ContainerController(final ContainerSet containerSet,
       final Map<ContainerType, Handler> handlers) {
@@ -79,9 +83,18 @@ public class ContainerController {
   public void markContainerForClose(final long containerId)
       throws IOException {
     Container container = containerSet.getContainer(containerId);
-
-    if (container.getContainerState() == State.OPEN) {
-      getHandler(container).markContainerForClose(container);
+    if(container==null){
+      Set<Long> missingContainerSet = containerSet.getMissingContainerSet();
+      if(missingContainerSet.contains(containerId)){
+        LOG.warn("The Container is in the MissingContainerSet " +
+                "hence we can't close it.");
+      }else{
+        LOG.warn("The Container is not found");
+      }
+    }else{
+      if (container.getContainerState() == State.OPEN) {
+        getHandler(container).markContainerForClose(container);
+      }
     }
   }
 

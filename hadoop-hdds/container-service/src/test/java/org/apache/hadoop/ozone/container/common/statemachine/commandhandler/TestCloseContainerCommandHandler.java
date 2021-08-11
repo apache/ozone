@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -66,7 +67,7 @@ public class TestCloseContainerCommandHandler {
   private Handler containerHandler;
   private PipelineID pipelineID;
   private PipelineID nonExistentPipelineID = PipelineID.randomId();
-
+  private ContainerController controller;
   private CloseContainerCommandHandler subject =
       new CloseContainerCommandHandler();
 
@@ -100,7 +101,7 @@ public class TestCloseContainerCommandHandler {
     containerSet.addContainer(container);
 
     containerHandler = mock(Handler.class);
-    ContainerController controller = new ContainerController(containerSet,
+    controller = new ContainerController(containerSet,
         singletonMap(ContainerProtos.ContainerType.KeyValueContainer,
             containerHandler));
 
@@ -202,6 +203,12 @@ public class TestCloseContainerCommandHandler {
         .closeContainer(container);
     verify(writeChannel, never())
         .submitRequest(any(), any());
+  }
+
+  @Test
+  public void closeNonExistenceContainer() throws IOException {
+    controller.markContainerForClose(1L);
+
   }
 
   private CloseContainerCommand closeWithKnownPipeline() {
