@@ -34,7 +34,7 @@ class TestBotoClient(unittest.TestCase):
     setup_done = False
     target_bucket = None
     ozone_endpoint_url = None
-    random_bucket_name = ''.join(
+    random_bucket_name = 'ozone-test-' + ''.join(
         random.choice(string.ascii_lowercase) for i in range(10))
 
     def setUp(self):

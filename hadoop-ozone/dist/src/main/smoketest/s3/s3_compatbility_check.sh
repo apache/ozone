@@ -35,8 +35,8 @@ set -e
 #    export AWS_DEFAULT_REGION=us-east-1
 
 # add env vars:
-#    export OZONE_TEST_S3_BUCKET1=ozone-test1
-#    export OZONE_TEST_S3_BUCKET2=ozone-test2
+#    export OZONE_TEST_S3_BUCKET1=ozone-test-`openssl rand -hex 5`
+#    export OZONE_TEST_S3_BUCKET2=ozone-test-`openssl rand -hex 5`
 #    export OZONE_TEST_S3_REGION=us-east-1
 
 

@@ -80,7 +80,7 @@ Setup dummy credentials for S3
 
 Generate Ozone String
     ${randStr} =         Generate Random String     10  [NUMBERS]
-    [Return]             ozone-${randStr}
+    [Return]             ozone-test-${randStr}
 
 Create bucket
     ${postfix} =         Generate Ozone String
