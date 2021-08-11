@@ -214,6 +214,15 @@ public class DatanodeConfiguration {
   )
   private long diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
+  @Config(key = "write.chunk.validation.check",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {
+      DATANODE },
+      description = "Enable safety checks to ensure"
+          + " chunk offset equal to block file length")
+  private boolean isWriteChunkValidationCheck;
+
   @PostConstruct
   public void validate() {
     if (replicationMaxStreams < 1) {
@@ -339,5 +348,13 @@ public class DatanodeConfiguration {
 
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public boolean isWriteChunkValidationCheck() {
+    return isWriteChunkValidationCheck;
+  }
+
+  public void setWriteChunkValidationCheck(boolean writeChunkValidationCheck) {
+    this.isWriteChunkValidationCheck = writeChunkValidationCheck;
   }
 }

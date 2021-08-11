@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -372,5 +373,18 @@ public final class ChunkUtils {
     }
 
     return CONTAINER_INTERNAL_ERROR;
+  }
+
+  /**
+   * Checks if the block file length is equal to the chunk offset.
+   *
+   * @param chunkFile - File
+   * @param chunkInfo - Buffer to write
+   */
+  public static void validateChunkSize(File chunkFile, ChunkInfo chunkInfo) {
+    long offset = chunkInfo.getOffset();
+    long length = chunkFile.length();
+    Preconditions.checkArgument(offset == length,
+        "Offset does not match blockFile length");
   }
 }

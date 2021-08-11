@@ -61,6 +61,7 @@ import static org.apache.hadoop.ozone.container.common.transport.server.ratis.Di
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkSize;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
 /**
@@ -125,11 +126,12 @@ public class FilePerBlockStrategy implements ChunkManager {
           info, overwrite, stage, chunkFile);
     }
 
-    // Safety check : When offset=0, this is the beginning of a new block and
-    // hence the block file must be empty.
-    if (offset == 0) {
-      Preconditions.checkArgument(chunkFile.length() == 0,
-          "Block file is not empty at offset 0");
+    // if this is not an overwrite ,
+    // check whether offset matches block file length
+    if (ChunkManagerFactory.isValidateWriteChunk()) {
+      if (!overwrite) {
+        validateChunkSize(chunkFile, info);
+      }
     }
     HddsVolume volume = containerData.getVolume();
 

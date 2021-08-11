@@ -265,4 +265,7 @@ public final class HddsConfigKeys {
       "hdds.datanode.ratis.server.request.timeout";
   public static final String
       HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
+
+  public static final String HDDS_DATANODE_WRITE_CHUNK_VALIDATION_CHECK =
+      "hdds.datanode.write.chunk.validation.check";
 }

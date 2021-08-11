@@ -77,6 +77,7 @@ import org.apache.hadoop.util.AutoCloseableLock;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_WRITE_CHUNK_VALIDATION_CHECK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
@@ -128,6 +129,9 @@ public class KeyValueHandler extends Handler {
     blockManager = new BlockManagerImpl(config);
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
+    ChunkManagerFactory.setValidateWriteChunk(
+        conf.getBoolean(HDDS_DATANODE_WRITE_CHUNK_VALIDATION_CHECK,
+            false));
     try {
       volumeChoosingPolicy = conf.getClass(
           HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy

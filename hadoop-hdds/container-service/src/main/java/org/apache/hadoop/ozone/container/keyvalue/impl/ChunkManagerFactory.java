@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfi
 public final class ChunkManagerFactory {
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkManagerFactory.class);
+  private static boolean validateWriteChunk;
 
   private ChunkManagerFactory() {
   }
@@ -77,5 +78,13 @@ public final class ChunkManagerFactory {
     }
 
     return new ChunkManagerDispatcher(sync, manager, volSet);
+  }
+
+  public static void setValidateWriteChunk(boolean validateWriteChunk) {
+    ChunkManagerFactory.validateWriteChunk = validateWriteChunk;
+  }
+
+  public static boolean isValidateWriteChunk() {
+    return validateWriteChunk;
   }
 }
