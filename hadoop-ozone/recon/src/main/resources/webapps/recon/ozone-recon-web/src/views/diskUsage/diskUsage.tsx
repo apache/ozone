@@ -21,7 +21,6 @@ import axios from 'axios';
 import Plot from 'react-plotly.js';
 import {Row, Col, Icon, Button, Input} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
-import {PathForm} from 'components/pathForm/pathForm';
 import * as Plotly from 'plotly.js';
 import {showDataFetchError} from 'utils/common';
 import './diskUsage.less';
@@ -30,7 +29,6 @@ import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 
 const DISPLAY_LIMIT = 20;
 const OTHER_PATH_NAME = "Other Objects";
-const DIRECT_KEYS = "Direct Keys";
 
 interface IDUSubpath {
   path: string;
@@ -112,12 +110,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
             subpaths.sort((a, b) => (a.size < b.size) ? 1 : -1);
 
-            // show all direct keys as a single block
-            // Do not enable "&files=true" on UI
-            if (duResponse.sizeDirectKey > 0) {
-                const directKey = {"path": DIRECT_KEYS, "size": duResponse.sizeDirectKey};
-                subpaths.push(directKey);
-            }
             // Only show 20 blocks with the most DU,
             // other blocks are merged as a single block
             if (subpaths.length > DISPLAY_LIMIT) {
@@ -132,7 +124,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
             }
 
             var pathLabels = subpaths.map(subpath => {
-                return subpath.path;
+                // the return subPath must be normalized in a format with
+                // a leading slash and without trailing slash
+                var pieces = subpath.path.split('/');
+                return pieces[pieces.length - 1];
             });
 
             var percentage = subpaths.map(subpath => {
@@ -176,9 +171,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         this.updatePieChart("/");
     }
 
-    clickPieSection(e): void {
-        const path = e.points[0].label;
-        if (path === OTHER_PATH_NAME || path === DIRECT_KEYS) {
+    clickPieSection(e, curPath): void {
+        const path = (curPath === '/') ? curPath + e.points[0].label
+        : curPath + '/' + e.points[0].label;
+        if (path === OTHER_PATH_NAME) {
             return;
         }
         this.updatePieChart(path);
@@ -187,11 +183,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     // show the right side panel that display metadata details of path
     showMetadataDetails(e, path): void {
         const summaryEndpoint = "/api/v1/namespace/summary?path=" + path;
-        var keys = ["Type"];
-        var values = [summaryResponse.type];
+        var keys = [];
+        var values = [];
         axios.get(summaryEndpoint).then(response => {
             const summaryResponse = response.data;
 
+            keys.push("Type");
+            values.push(summaryResponse.type);
             if (summaryResponse.status !== "OK") {
               showDataFetchError("Invalid path: " + path);
               return;
@@ -241,10 +239,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
             // In case the object's quota isn't set
             if (quotaResponse.allowed !== -1) {
                 keys.push("Quota Allowed");
-                values.push(this.byteToSize(quotaResponse.allowed);
+                values.push(this.byteToSize(quotaResponse.allowed));
             }
             keys.push("Quota Used");
-            values.push(this.byteToSize(quotaResponse.used);
+            values.push(this.byteToSize(quotaResponse.used));
             this.setState({
               showPanel: true,
               panelKeys: keys,
@@ -286,7 +284,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
             </Row>
             {(duResponse.size > 0) ?
             <Row>
-            <Plot onClick={(e) => this.clickPieSection(e)}
+            <Plot onClick={(e) => this.clickPieSection(e, returnPath)}
                   data={plotData}
                   layout={
                     {

@@ -3,10 +3,17 @@
   "/containers/:id/keys": "/keys",
   "/containers/missing": "/missingContainers",
   "/utilization/fileCount": "/fileSizeCounts",
-  "/namespace/du?path=/": "/du",
-  "/namespace/du?path=/vol1": "/du1",
-  "/namespace/du?path=/vol1/bucket1": "/du2",
-  "/namespace/du?path=/vol1/bucket1/dir1": "/empty",
-  "/namespace/du?path=/vol1/bucket1/dir1/key1": "/key",
-  "/namespace/summary?path=/vol1": "/metadata"
+  "/namespace/du?path=/": "/root",
+  "/namespace/du?path=/vol:id": "/volume",
+  "/namespace/du?path=/vol:id/bucket:id": "/bucket",
+  "/namespace/du?path=/dummyVolume/bucket:id": "/bucket",
+  "/namespace/du?path=/vol:id/bucket:id/dir:id": "/dir",
+  "/namespace/du?path=/dummyVolume/dummyBucket/dir:id": "/dir",
+  "/namespace/du?path=/vol:id/bucket:id/dir:id/key:id": "/key",
+  "/namespace/du?path=/dummyVolume/dummyBucket/dummyDir/key:id": "/key",
+  "/namespace/du?path=/vol:id/bucket:id/directKey:id": "/key",
+  "/namespace/du?path=/vol1/bucket1/empty": "/empty",
+  "/namespace/summary?path=/dummyVolume": "/volumeMetadata",
+  "/namespace/summary?path=/dummyVolume/dummyBucket": "/bucketMetadata",
+  "/namespace/summary?path=/dummyVolume/dummyBucket/dummyDir": "/dirMetadata"
 }
