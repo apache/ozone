@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import io.netty.buffer.ByteBuf;
-import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.ByteBufStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
@@ -26,45 +26,45 @@ import java.io.IOException;
  * OzoneDataStreamOutput is used to write data into Ozone.
  * It uses SCM's {@link KeyDataStreamOutput} for writing the data.
  */
-public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
+public class OzoneDataStreamOutput implements ByteBufStreamOutput {
 
-  private final ByteBufferStreamOutput byteBufferStreamOutput;
+  private final ByteBufStreamOutput byteBufStreamOutput;
 
   /**
    * Constructs OzoneDataStreamOutput with KeyDataStreamOutput.
    *
-   * @param byteBufferStreamOutput
+   * @param byteBufStreamOutput
    */
-  public OzoneDataStreamOutput(ByteBufferStreamOutput byteBufferStreamOutput) {
-    this.byteBufferStreamOutput = byteBufferStreamOutput;
+  public OzoneDataStreamOutput(ByteBufStreamOutput byteBufStreamOutput) {
+    this.byteBufStreamOutput = byteBufStreamOutput;
   }
 
   @Override
   public void write(ByteBuf b) throws IOException {
-    byteBufferStreamOutput.write(b);
+    byteBufStreamOutput.write(b);
   }
 
   @Override
   public synchronized void flush() throws IOException {
-    byteBufferStreamOutput.flush();
+    byteBufStreamOutput.flush();
   }
 
   @Override
   public synchronized void close() throws IOException {
     //commitKey can be done here, if needed.
-    byteBufferStreamOutput.close();
+    byteBufStreamOutput.close();
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
+    if (byteBufStreamOutput instanceof KeyDataStreamOutput) {
       return ((KeyDataStreamOutput)
-          byteBufferStreamOutput).getCommitUploadPartInfo();
+              byteBufStreamOutput).getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
   }
 
-  public ByteBufferStreamOutput getByteBufferStreamOutput() {
-    return byteBufferStreamOutput;
+  public ByteBufStreamOutput getByteBufStreamOutput() {
+    return byteBufStreamOutput;
   }
 }

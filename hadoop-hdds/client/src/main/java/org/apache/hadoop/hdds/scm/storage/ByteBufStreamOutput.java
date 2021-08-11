@@ -25,9 +25,9 @@ import java.io.IOException;
 
 /**
 * This interface is for writing an output stream of ByteBuffers.
-* An ByteBufferStreamOutput accepts Netty ByteBuf and sends them to some sink.
+* An ByteBufStreamOutput accepts Netty ByteBuf and sends them to some sink.
 */
-public interface ByteBufferStreamOutput extends Closeable {
+public interface ByteBufStreamOutput extends Closeable {
   /**
    * Try to write all the bytes in ByteBuf b to DataStream.
    *
