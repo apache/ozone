@@ -47,7 +47,8 @@ public class ContainerController {
 
   private final ContainerSet containerSet;
   private final Map<ContainerType, Handler> handlers;
-  private final Logger LOG = LoggerFactory.getLogger(ContainerController.class);
+  private static final Logger LOG =
+          LoggerFactory.getLogger(ContainerController.class);
 
   public ContainerController(final ContainerSet containerSet,
       final Map<ContainerType, Handler> handlers) {
@@ -83,15 +84,15 @@ public class ContainerController {
   public void markContainerForClose(final long containerId)
       throws IOException {
     Container container = containerSet.getContainer(containerId);
-    if(container==null){
+    if (container==null) {
       Set<Long> missingContainerSet = containerSet.getMissingContainerSet();
-      if(missingContainerSet.contains(containerId)){
+      if (missingContainerSet.contains(containerId)) {
         LOG.warn("The Container is in the MissingContainerSet " +
-                "hence we can't close it.");
-      }else{
-        LOG.warn("The Container is not found");
+                "hence we can't close it. ContainerID: {}", containerId);
+      } else {
+        LOG.warn("The Container is not found. ContainerID: {}", containerId);
       }
-    }else{
+    } else {
       if (container.getContainerState() == State.OPEN) {
         getHandler(container).markContainerForClose(container);
       }
