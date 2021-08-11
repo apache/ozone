@@ -99,7 +99,7 @@ public class ReplicationManager implements SCMService {
   /**
    * Reference to the ContainerManager.
    */
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
 
   /**
    * PlacementPolicy which is used to identify where a container
@@ -242,7 +242,7 @@ public class ReplicationManager implements SCMService {
    */
   @SuppressWarnings("parameternumber")
   public ReplicationManager(final ConfigurationSource conf,
-                            final ContainerManagerV2 containerManager,
+                            final ContainerManager containerManager,
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
                             final SCMContext scmContext,

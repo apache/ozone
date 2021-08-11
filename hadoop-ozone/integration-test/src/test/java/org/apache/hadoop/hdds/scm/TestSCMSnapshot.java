@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -66,7 +66,7 @@ public class TestSCMSnapshot {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     long snapshotInfo1 = scm.getScmHAManager().asSCMHADBTransactionBuffer()
         .getLatestTrxInfo().getTransactionIndex();
-    ContainerManagerV2 containerManager = scm.getContainerManager();
+    ContainerManager containerManager = scm.getContainerManager();
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(

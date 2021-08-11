@@ -94,7 +94,7 @@ public class TestReplicationManager {
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private OzoneConfiguration conf;
   private SCMNodeManager scmNodeManager;
   private GenericTestUtils.LogCapturer scmLogs;
@@ -109,7 +109,7 @@ public class TestReplicationManager {
         0, TimeUnit.SECONDS);
 
     scmLogs = GenericTestUtils.LogCapturer.captureLogs(ReplicationManager.LOG);
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);

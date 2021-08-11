@@ -52,7 +52,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       LoggerFactory.getLogger(ContainerReportHandler.class);
 
   private final NodeManager nodeManager;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final String unknownContainerHandleAction;
 
   /**
@@ -71,7 +71,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    * @param conf OzoneConfiguration instance
    */
   public ContainerReportHandler(final NodeManager nodeManager,
-                                final ContainerManagerV2 containerManager,
+                                final ContainerManager containerManager,
                                 final SCMContext scmContext,
                                 OzoneConfiguration conf) {
     super(containerManager, scmContext, LOG);
@@ -87,7 +87,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   public ContainerReportHandler(final NodeManager nodeManager,
-      final ContainerManagerV2 containerManager) {
+      final ContainerManager containerManager) {
     this(nodeManager, containerManager, SCMContext.emptyContext(), null);
   }
 

@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -84,7 +84,7 @@ public class TestSCMContainerManagerMetrics {
   @Test
   public void testContainerOpsMetrics() throws IOException {
     MetricsRecordBuilder metrics;
-    ContainerManagerV2 containerManager = scm.getContainerManager();
+    ContainerManager containerManager = scm.getContainerManager();
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     long numSuccessfulCreateContainers = getLongCounter(
         "NumSuccessfulCreateContainers", metrics);

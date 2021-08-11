@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
@@ -75,7 +75,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     MockPlacementPolicy placementMock = new MockPlacementPolicy();
-    ContainerManagerV2 containerManagerMock = mock(ContainerManagerV2.class);
+    ContainerManager containerManagerMock = mock(ContainerManager.class);
     StorageContainerServiceProvider scmClientMock =
         mock(StorageContainerServiceProvider.class);
     ContainerReplica unhealthyReplicaMock = mock(ContainerReplica.class);
@@ -227,7 +227,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     MockPlacementPolicy placementMock = new MockPlacementPolicy();
-    ContainerManagerV2 containerManagerMock = mock(ContainerManagerV2.class);
+    ContainerManager containerManagerMock = mock(ContainerManager.class);
     StorageContainerServiceProvider scmClientMock =
         mock(StorageContainerServiceProvider.class);
 

@@ -53,11 +53,11 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       LoggerFactory.getLogger(CloseContainerEventHandler.class);
 
   private final PipelineManager pipelineManager;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final SCMContext scmContext;
 
   public CloseContainerEventHandler(final PipelineManager pipelineManager,
-                                    final ContainerManagerV2 containerManager,
+                                    final ContainerManager containerManager,
                                     final SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;

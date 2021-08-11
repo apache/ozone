@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -52,7 +52,7 @@ public class NodeDecommissionManager {
   private DatanodeAdminMonitor monitor;
 
   private NodeManager nodeManager;
-  //private ContainerManagerV2 containerManager;
+  //private ContainerManager containerManager;
   private SCMContext scmContext;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
@@ -173,8 +173,8 @@ public class NodeDecommissionManager {
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
-      ContainerManagerV2 containerManager, SCMContext scmContext,
-      EventPublisher eventQueue, ReplicationManager rm) {
+             ContainerManager containerManager, SCMContext scmContext,
+             EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
     //this.containerManager = containerManager;

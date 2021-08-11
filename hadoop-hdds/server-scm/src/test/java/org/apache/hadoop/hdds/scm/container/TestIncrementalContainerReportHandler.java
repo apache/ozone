@@ -70,7 +70,7 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 public class TestIncrementalContainerReportHandler {
 
   private NodeManager nodeManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
   private HDDSLayoutVersionManager versionManager;
@@ -83,7 +83,7 @@ public class TestIncrementalContainerReportHandler {
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    this.containerManager = Mockito.mock(ContainerManagerV2.class);
+    this.containerManager = Mockito.mock(ContainerManager.class);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);

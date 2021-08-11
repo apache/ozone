@@ -23,7 +23,7 @@ import java.util.Optional;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Node;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -45,7 +45,7 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
 
   public ReconDeadNodeHandler(NodeManager nodeManager,
                               PipelineManager pipelineManager,
-                              ContainerManagerV2 containerManager,
+                              ContainerManager containerManager,
                               StorageContainerServiceProvider scmClient) {
     super(nodeManager, pipelineManager, containerManager);
     this.scmClient = scmClient;
