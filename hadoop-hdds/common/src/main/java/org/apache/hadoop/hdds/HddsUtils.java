@@ -65,6 +65,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_D
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 
+import org.apache.ratis.util.SizeInBytes;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,6 +90,8 @@ public final class HddsUtils {
   private static final String MULTIPLE_SCM_NOT_YET_SUPPORTED =
       ScmConfigKeys.OZONE_SCM_NAMES + " must contain a single hostname."
           + " Multiple SCM hosts are currently unsupported";
+
+  private static final int ONE_MB = SizeInBytes.valueOf("1m").getSizeInt();
 
   private static final int NO_PORT = -1;
 
@@ -611,5 +614,12 @@ public final class HddsUtils {
    */
   public static long getShutDownTimeOut(ConfigurationSource conf) {
     return conf.getObject(OzoneServiceConfig.class).getServiceShutdownTimeout();
+  }
+
+  /**
+   * Utility method to round up bytes into the nearest MB.
+   */
+  public static int roundupMb(long bytes) {
+    return (int)Math.ceil((double) bytes/(double) ONE_MB);
   }
 }
