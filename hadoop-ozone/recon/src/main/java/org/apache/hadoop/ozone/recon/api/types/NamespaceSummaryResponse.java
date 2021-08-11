@@ -27,20 +27,21 @@ public class NamespaceSummaryResponse {
   @JsonProperty("type")
   private EntityType entityType;
 
+  /** Total number of volumes under root, -1 for other types. */
   @JsonProperty("numVolume")
   private int numVolume;
 
-  /** Total number of buckets for volume, 0 for other types. */
+  /** Total number of buckets for root/volume, -1 for other types. */
   @JsonProperty("numBucket")
   private int numBucket;
 
-  /** Total number of directories for a bucket or directory, 0 for others. */
+  /** Total number of directories for all types except key, -1 for key. */
   @JsonProperty("numDir")
   private int numTotalDir;
 
-  /** Total number of keys for a bucket or directory, 0 for others. */
+  /** Total number of keys. */
   @JsonProperty("numKey")
-  private int numTotalKey;
+  private long numTotalKey;
 
   /** Path Status. */
   @JsonProperty("status")
@@ -48,9 +49,9 @@ public class NamespaceSummaryResponse {
 
   public NamespaceSummaryResponse(EntityType entityType) {
     this.entityType = entityType;
-    this.numVolume = 0;
-    this.numBucket = 0;
-    this.numTotalDir = 0;
+    this.numVolume = -1;
+    this.numBucket = -1;
+    this.numTotalDir = -1;
     this.numTotalKey = 0;
     this.status = ResponseStatus.OK;
   }
@@ -71,7 +72,7 @@ public class NamespaceSummaryResponse {
     return this.numTotalDir;
   }
 
-  public int getNumTotalKey() {
+  public long getNumTotalKey() {
     return this.numTotalKey;
   }
 
@@ -95,7 +96,7 @@ public class NamespaceSummaryResponse {
     this.numTotalDir = numTotalDir;
   }
 
-  public void setNumTotalKey(int numTotalKey) {
+  public void setNumTotalKey(long numTotalKey) {
     this.numTotalKey = numTotalKey;
   }
 

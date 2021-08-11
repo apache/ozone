@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -77,8 +77,8 @@ public class TestHealthyPipelineSafeModeRule {
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
 
     try {
-      PipelineManagerV2Impl pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+      PipelineManagerImpl pipelineManager =
+          PipelineManagerImpl.newPipelineManager(
               config,
               MockSCMHAManager.getInstance(true),
               nodeManager,
@@ -131,8 +131,8 @@ public class TestHealthyPipelineSafeModeRule {
 
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
     try {
-      PipelineManagerV2Impl pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+      PipelineManagerImpl pipelineManager =
+          PipelineManagerImpl.newPipelineManager(
               config,
               MockSCMHAManager.getInstance(true),
               nodeManager,
@@ -229,8 +229,8 @@ public class TestHealthyPipelineSafeModeRule {
 
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
     try {
-      PipelineManagerV2Impl pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+      PipelineManagerImpl pipelineManager =
+          PipelineManagerImpl.newPipelineManager(
               config,
               MockSCMHAManager.getInstance(true),
               nodeManager,

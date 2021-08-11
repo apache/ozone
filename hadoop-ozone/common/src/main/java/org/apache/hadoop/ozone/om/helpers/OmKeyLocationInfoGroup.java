@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
  */
 public class OmKeyLocationInfoGroup {
   private final long version;
+  // TODO: HDDS-5472 Store one version of locationInfo for each
+  //   OmKeyLocationInfoGroup
   private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
   private  boolean isMultipartKey;
 
@@ -109,6 +111,7 @@ public class OmKeyLocationInfoGroup {
     return locationVersionMap.values().stream().mapToLong(List::size).sum();
   }
 
+  @Deprecated
   public List<OmKeyLocationInfo> getLocationList(Long versionToFetch) {
     return new ArrayList<>(locationVersionMap.get(versionToFetch));
   }
@@ -149,7 +152,7 @@ public class OmKeyLocationInfoGroup {
   OmKeyLocationInfoGroup generateNextVersion(
       List<OmKeyLocationInfo> newLocationList) {
     Map<Long, List<OmKeyLocationInfo>> newMap =
-        new HashMap<>(locationVersionMap);
+        new HashMap<>();
     newMap.put(version + 1, new ArrayList<>(newLocationList));
     return new OmKeyLocationInfoGroup(version + 1, newMap);
   }
