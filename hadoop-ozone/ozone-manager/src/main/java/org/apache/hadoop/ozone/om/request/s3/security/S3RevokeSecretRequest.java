@@ -113,7 +113,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
       // Remove if entry exists in table
       if (omMetadataManager.getS3SecretTable().isExist(kerberosID)) {
         // Invalid entry in table cache immediately
-        omMetadataManager.getKeyTable().addCacheEntry(
+        omMetadataManager.getS3SecretTable().addCacheEntry(
             new CacheKey<>(kerberosID),
             new CacheValue<>(Optional.absent(), transactionLogIndex));
         omClientResponse = new S3RevokeSecretResponse(kerberosID,
@@ -129,25 +129,6 @@ public class S3RevokeSecretRequest extends OMClientRequest {
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
-
-    // added HDDS-5358
-      try {
-        long startTime = System.currentTimeMillis();
-        while (omMetadataManager.getS3SecretTable().get(kerberosID) != null) {
-          if ((System.currentTimeMillis() - startTime) > 6000) {
-            throw new IOException("Timed out updating s3 table for "
-                                  + "revoke secret");
-          }
-          Thread.sleep(100);
-        }
-
-      } catch (Throwable e)  {
-        exception = new IOException(e);
-        omClientResponse = new S3RevokeSecretResponse(null,
-            createErrorOMResponse(omResponse, new IOException(e)));
-      }
-      
-      
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK,
             kerberosID);
