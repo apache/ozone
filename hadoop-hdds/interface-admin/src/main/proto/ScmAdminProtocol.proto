@@ -479,8 +479,8 @@ message StartContainerBalancerRequestProto {
   optional string traceID = 1;
   optional double threshold = 2;
   optional int32 idleiterations = 3;
-  optional int32 maxDatanodesToBalance = 4;
-  optional int64 maxSizeToMoveInGB = 5;
+  optional double maxDatanodesRatioToInvolvePerIteration = 4;
+  optional int64 maxSizeToMovePerIterationInGB = 5;
 }
 
 message StartContainerBalancerResponseProto {

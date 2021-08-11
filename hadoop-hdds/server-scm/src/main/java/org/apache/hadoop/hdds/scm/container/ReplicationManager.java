@@ -146,7 +146,7 @@ public class ReplicationManager implements SCMService {
    * the corresponding reason. this is useful for tracking
    * the result of move option
    */
-  enum MoveResult {
+  public enum MoveResult {
     // both replication and deletion are completed
     COMPLETED,
     // RM is not running
@@ -1569,6 +1569,11 @@ public class ReplicationManager implements SCMService {
     LifeCycleState state = container.getState();
     return replicas.stream()
         .allMatch(r -> ReplicationManager.compareState(state, r.getState()));
+  }
+
+  public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
+    return inflightReplication.containsKey(containerID) ||
+        inflightDeletion.containsKey(containerID);
   }
 
   /**
