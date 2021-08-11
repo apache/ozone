@@ -286,7 +286,6 @@ function check_needs_build() {
     )
     filter_changed_files
 
-    build_needed=false
     if [[ ${match_count} != "0" ]]; then
         build_needed=true
     fi
@@ -470,7 +469,7 @@ function set_outputs() {
         build_needed=true
     fi
 
-    initialization::ga_output needs-build "${build_needed}"
+    initialization::ga_output needs-build "${build_needed:-false}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
