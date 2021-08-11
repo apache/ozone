@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -73,6 +74,8 @@ public class TestContainerBalancerOperations {
    * @throws Exception
    */
   @Test
+  @Ignore("Since the cluster doesn't have unbalanced nodes, ContainerBalancer" +
+      " stops before the assertion checks whether balancer is running.")
   public void testContainerBalancerCLIOperations() throws Exception {
     // test normally start and stop
     boolean running = containerBalancerClient.getContainerBalancerStatus();

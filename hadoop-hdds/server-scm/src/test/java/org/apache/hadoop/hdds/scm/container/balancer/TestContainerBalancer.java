@@ -491,35 +491,6 @@ public class TestContainerBalancer {
   }
 
   /**
-   * Creates DatanodeUsageInfo nodes using the generated utilization values.
-   * Capacities are chosen randomly from a list.
-   *
-   * @return Average utilization of the created cluster.
-   */
-  private double createNodesInCluster() {
-    this.numberOfNodes = 10;
-    generateUtilizations(numberOfNodes);
-    nodesInCluster = new ArrayList<>(nodeUtilizations.size());
-    long[] capacities = {1000000, 2000000, 3000000, 4000000, 5000000};
-    double totalUsed = 0, totalCapacity = 0;
-
-    for (double utilization : nodeUtilizations) {
-      // select a random index from 0 to capacities.length
-      int index = RANDOM.nextInt(0, capacities.length);
-      long capacity = capacities[index];
-      long used = (long) (capacity * utilization);
-      totalCapacity += capacity;
-      totalUsed += used;
-      SCMNodeStat stat = new SCMNodeStat(capacity, used, capacity - used);
-
-      nodesInCluster.add(
-          new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(),
-              stat));
-    }
-    return totalUsed / totalCapacity;
-  }
-
-  /**
    * Create an unbalanced cluster by generating some data. Nodes in the
    * cluster have utilization values determined by generateUtilizations method.
    * @return average utilization (used space / capacity) of the cluster

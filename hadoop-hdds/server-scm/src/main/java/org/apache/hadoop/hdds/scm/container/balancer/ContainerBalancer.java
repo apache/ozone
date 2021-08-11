@@ -645,14 +645,6 @@ public class ContainerBalancer {
         stat.getCapacity().get().doubleValue();
   }
 
-  boolean canSizeLeaveSource(DatanodeDetails source, long size) {
-    if (sizeLeavingNode.containsKey(source)) {
-      return sizeLeavingNode.get(source) + size <=
-          config.getMaxSizeLeavingSource();
-    }
-    return false;
-  }
-
   /**
    * Checks if specified size can enter specified target datanode
    * according to configuration.
@@ -753,16 +745,6 @@ public class ContainerBalancer {
   public void setOzoneConfiguration(
       OzoneConfiguration ozoneConfiguration) {
     this.ozoneConfiguration = ozoneConfiguration;
-  }
-
-  /**
-   * Gets the average utilization of the cluster as calculated by
-   * ContainerBalancer.
-   *
-   * @return average utilization value
-   */
-  public double getClusterAvgUtilisation() {
-    return clusterAvgUtilisation;
   }
 
   /**
