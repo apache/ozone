@@ -682,6 +682,19 @@ public class ReplicationManager implements SCMService {
    * add a move action for a given container.
    *
    * @param cid Container to move
+   * @param src source datanode
+   * @param tgt target datanode
+   */
+  public CompletableFuture<MoveResult> move(ContainerID cid,
+             DatanodeDetails src, DatanodeDetails tgt)
+      throws ContainerNotFoundException, NodeNotFoundException {
+    return move(cid, new MoveDataNodePair(src, tgt));
+  }
+
+  /**
+   * add a move action for a given container.
+   *
+   * @param cid Container to move
    * @param mp MoveDataNodePair which contains source and target datanodes
    */
   public CompletableFuture<MoveResult> move(ContainerID cid,
