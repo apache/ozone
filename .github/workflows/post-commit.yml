@@ -26,10 +26,49 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  build-info:
+    runs-on: ubuntu-18.04
+    env:
+      GITHUB_CONTEXT: ${{ toJson(github) }}
+    outputs:
+      basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
+      needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
+      needs-build: ${{ steps.selective-checks.outputs.needs-build }}
+      needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
+      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
+      needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
+      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+    steps:
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+      - name: Fetch incoming commit ${{ github.sha }} with its parent
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+        if: github.event_name  == 'pull_request'
+      - name: Selective checks
+        id: selective-checks
+        env:
+          PR_LABELS: "${{ toJSON(github.event.pull_request.labels.*.name) }}"
+          PR_DRAFT: "${{ github.event.pull_request.draft }}"
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            # Run selective checks
+            dev-support/ci/selective_ci_checks.sh "${GITHUB_SHA}"
+          else
+            # Run all checks
+            dev-support/ci/selective_ci_checks.sh
+          fi
   compile:
+    needs:
+      - build-info
     runs-on: ubuntu-18.04
     timeout-minutes: 30
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
         java: [ 8, 11 ]
@@ -74,19 +113,14 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   basic:
+    needs:
+      - build-info
     runs-on: ubuntu-18.04
     timeout-minutes: 40
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
       matrix:
-        check:
-          - author
-          - bats
-          - checkstyle
-          - docs
-          - findbugs
-          - rat
-          - unit
+        check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
       fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
@@ -120,10 +154,12 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   dependency:
-    needs: compile
+    needs:
+      - build-info
+      - compile
     runs-on: ubuntu-18.04
     timeout-minutes: 5
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-dependency-check == 'true'
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -147,10 +183,12 @@ jobs:
           path: target/dependency
         continue-on-error: true
   acceptance:
-    needs: compile
+    needs:
+      - build-info
+      - compile
     runs-on: ubuntu-18.04
     timeout-minutes: 120 # Todo HDDS-5270
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
       matrix:
         suite:
@@ -189,10 +227,12 @@ jobs:
           path: target/acceptance
         continue-on-error: true
   kubernetes:
-    needs: compile
+    needs:
+      - build-info
+      - compile
     runs-on: ubuntu-18.04
     timeout-minutes: 60
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -218,9 +258,11 @@ jobs:
           path: target/kubernetes
         continue-on-error: true
   integration:
+    needs:
+      - build-info
     runs-on: ubuntu-18.04
     timeout-minutes: 150
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
       matrix:
         profile:
