@@ -191,7 +191,7 @@ public class KeyDataStreamOutput implements ByteBufStreamOutput {
       throw new NullPointerException();
     }
     final int len = b.readableBytes();
-    handleWrite(b, 0, len, false);
+    handleWrite(b, b.readerIndex(), len, false);
     writeOffset += len;
   }
 
