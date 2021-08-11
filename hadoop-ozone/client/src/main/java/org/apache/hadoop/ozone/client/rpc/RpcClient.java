@@ -804,17 +804,6 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  @Deprecated
-  public OzoneDataStreamOutput createStreamKey(String volumeName,
-      String bucketName, String keyName, long size, ReplicationType type,
-      ReplicationFactor factor, Map<String, String> metadata)
-      throws IOException {
-
-    return createStreamKey(volumeName, bucketName, keyName, size,
-        ReplicationConfig.fromTypeAndFactor(type, factor), metadata);
-  }
-
-  @Override
   public OzoneDataStreamOutput createStreamKey(
       String volumeName, String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig,

@@ -531,25 +531,6 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Creates a new key in the bucket.
-   * @param key Name of the key to be created.
-   * @param size Size of the data the key will point to.
-   * @param type Replication type to be used.
-   * @param factor Replication factor of the key.
-   * @return OzoneDataStreamOutput to which the data has to be written.
-   * @throws IOException
-   */
-  @Deprecated
-  public OzoneDataStreamOutput createStreamKey(String key, long size,
-      ReplicationType type,
-      ReplicationFactor factor,
-      Map<String, String> keyMetadata)
-      throws IOException {
-    return proxy.createStreamKey(
-        volumeName, name, key, size, type, factor, keyMetadata);
-  }
-
-  /**
-   * Creates a new key in the bucket.
    *
    * @param key               Name of the key to be created.
    * @param size              Size of the data the key will point to.
