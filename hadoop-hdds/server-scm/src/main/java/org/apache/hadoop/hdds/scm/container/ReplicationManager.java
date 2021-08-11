@@ -1601,6 +1601,11 @@ public class ReplicationManager implements SCMService {
         .allMatch(r -> ReplicationManager.compareState(state, r.getState()));
   }
 
+  public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
+    return inflightReplication.containsKey(containerID) ||
+        inflightDeletion.containsKey(containerID);
+  }
+
   /**
    * Wrapper class to hold the InflightAction with its start time.
    */
