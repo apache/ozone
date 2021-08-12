@@ -17,17 +17,16 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
+
+import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group container balancer related operations.
@@ -43,8 +42,10 @@ import picocli.CommandLine.Spec;
  *      ozone admin containerbalancer start
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -i/--idleiterations {@literal <idleiterations>}]
- *      [ -d/--maxDatanodesToBalance {@literal <maxDatanodesToBalance>}]
- *      [ -s/--maxSizeToMoveInGB {@literal <maxSizeToMoveInGB>}]
+ *      [ -d/--maxDatanodesRatioToInvolvePerIteration
+ *      {@literal <maxDatanodesRatioToInvolvePerIteration>}]
+ *      [ -s/--maxSizeToMovePerIterationInGB
+ *      {@literal <maxSizeToMovePerIterationInGB>}]
  *      Examples:
  *      ozone admin containerbalancer start
  *        start balancer with default values in the configuration
@@ -54,10 +55,12 @@ import picocli.CommandLine.Spec;
  *        start balancer with maximum 20 consecutive idle iterations
  *      ozone admin containerbalancer start -i 0
  *        run balancer infinitely with default values in the configuration
- *      ozone admin containerbalancer start -d 10
- *        start balancer with maximum 10 datanodes to balance
+ *      ozone admin containerbalancer start -d 0.4
+ *        start balancer with the ratio of maximum datanodes to involve in
+ *        balancing in one iteration to the total number of healthy datanodes as
+ *        0.4
  *      ozone admin containerbalancer start -s 10
- *        start balancer with maximum size of 10GB to move
+ *        start balancer with maximum size of 10GB to move in one iteration
  * To stop:
  *      ozone admin containerbalancer stop
  * </pre>
