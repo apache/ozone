@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -526,6 +527,24 @@ public class OzoneBucket extends WithMetadata {
       throws IOException {
     return proxy
         .createKey(volumeName, name, key, size, replicationConfig, keyMetadata);
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata)
+      throws IOException {
+    return proxy
+        .createStreamKey(volumeName, name, key, size, replicationConfig,
+            keyMetadata);
   }
 
   /**
