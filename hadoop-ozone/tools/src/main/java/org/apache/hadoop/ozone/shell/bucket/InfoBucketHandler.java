@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /**
  * Executes Info bucket.
@@ -40,7 +41,56 @@ public class InfoBucketHandler extends BucketHandler {
         .getVolume(address.getVolumeName())
         .getBucket(address.getBucketName());
 
-    printObjectAsJson(bucket);
+    if (bucket.getSourceBucket() != null && bucket.getSourceVolume() != null) {
+      printObjectAsJson(new LinkBucket(bucket));
+    } else {
+      printObjectAsJson(bucket);
+    }
+  }
+
+  /**
+   * Class used for link buckets.
+   */
+  private static class LinkBucket {
+    private String volumeName;
+    private String bucketName;
+    private String sourceVolume;
+    private String sourceBucket;
+    private Instant creationTime;
+    private Instant modificationTime;
+
+    LinkBucket(OzoneBucket ozoneBucket) {
+      this.volumeName = ozoneBucket.getVolumeName();
+      this.bucketName = ozoneBucket.getName();
+      this.sourceVolume = ozoneBucket.getSourceVolume();
+      this.sourceBucket = ozoneBucket.getSourceBucket();
+      this.creationTime = ozoneBucket.getCreationTime();
+      this.modificationTime = ozoneBucket.getModificationTime();
+    }
+
+    public String getVolumeName() {
+      return volumeName;
+    }
+
+    public String getBucketName() {
+      return bucketName;
+    }
+
+    public String getSourceVolume() {
+      return sourceVolume;
+    }
+
+    public String getSourceBucket() {
+      return sourceBucket;
+    }
+
+    public Instant getCreationTime() {
+      return creationTime;
+    }
+
+    public Instant getModificationTime() {
+      return modificationTime;
+    }
   }
 
 }

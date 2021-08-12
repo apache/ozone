@@ -134,7 +134,6 @@ public class TestContainerReplication {
 
     cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
 
-    waitForReplicaCount(containerID, 2, cluster);
     waitForReplicaCount(containerID, 3, cluster);
   }
 
