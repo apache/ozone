@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.block.ScmBlockDeletingServiceMetrics;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -354,6 +355,7 @@ public class TestBlockDeletion {
 
     cluster.shutdownHddsDatanode(0);
     scm.getReplicationManager().processAll();
+    ((EventQueue)scm.getEventQueue()).processAll(500);
     containerInfos = scm.getContainerManager().getContainers();
     containerInfos.stream().forEach(container ->
         Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
@@ -369,6 +371,7 @@ public class TestBlockDeletion {
     Thread.sleep(100);
 
     scm.getReplicationManager().processAll();
+    ((EventQueue)scm.getEventQueue()).processAll(500);
     containerInfos = scm.getContainerManager().getContainers();
     containerInfos.stream().forEach(container -> {
       Assert.assertEquals(HddsProtos.LifeCycleState.DELETED,
