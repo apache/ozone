@@ -1000,14 +1000,16 @@
         "sizeWithReplica": -1
       },
       {
-        "path": "/dummyVolume/dummyBucket/directKey1",
+        "path": "/dummyVolume/dummyBucket/key1",
         "size": 25000,
-        "sizeWithReplica": -1
+        "sizeWithReplica": -1,
+        "isKey": true
       },
       {
-        "path": "/dummyVolume/dummyBucket/directKey2",
+        "path": "/dummyVolume/dummyBucket/key2",
         "size": 25000,
-        "sizeWithReplica": -1
+        "sizeWithReplica": -1,
+        "isKey": true
       },
       {
         "path": "/dummyVolume/dummyBucket/empty",
@@ -1027,22 +1029,26 @@
       {
         "path": "/dummyVolume/dummyBucket/dummyDir/key1",
         "size": 100000,
-        "sizeWithReplica": -1
+        "sizeWithReplica": -1,
+        "isKey": true
       },
       {
         "path": "/dummyVolume/dummyBucket/dummyDir/key2",
         "size": 30000,
-        "sizeWithReplica": -1
+        "sizeWithReplica": -1,
+        "isKey": true
       },
       {
         "path": "/dummyVolume/dummyBucket/dummyDir/key3",
         "size": 30000,
-        "sizeWithReplica": -1
+        "sizeWithReplica": -1,
+        "isKey": true
       },
       {
         "path": "/dummyVolume/dummyBucket/dummyDir/key4",
         "size": 40000,
-        "sizeWithReplica": -1
+        "sizeWithReplica": -1,
+        "isKey": true
       }
     ],
     "sizeDirectKey": 50000
@@ -1060,33 +1066,22 @@
     "status": "OK",
     "path": "/vol1/bucket1/dir1/key1",
     "size": 3800,
-    "sizeWithReplica": -1,
+    "sizeWithReplica": 11400,
     "subPathCount": 0,
     "subPaths": [],
     "sizeDirectKey": 0
   },
-  "volumeMetadata": {
-    "type": "VOLUME",
-    "numVolume": -1,
-    "numBucket": 100,
-    "numDir": 1000,
-    "numKey": 10000,
-    "status": "OK"
-  },
-  "bucketMetadata": {
-    "type": "BUCKET",
-    "numVolume": -1,
-    "numBucket": -1,
-    "numDir": 500,
-    "numKey": 1000,
-    "status": "OK"
-  },
-  "dirMetadata": {
-    "type": "DIRECTORY",
-    "numVolume": -1,
-    "numBucket": -1,
-    "numDir": 200,
+  "metadata": {
+    "type": "DUMMY_TYPE",
+    "numVolume": 100,
+    "numBucket": 200,
+    "numDir": 400,
     "numKey": 800,
+    "status": "OK"
+  },
+  "quota": {
+    "allowed": 1000000000,
+    "used": 5000000,
     "status": "OK"
   }
 }

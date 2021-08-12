@@ -47,8 +47,8 @@ export const routes: IRoute[] = [
     component: MissingContainers
   },
   {
-      path: '/DiskUsage',
-      component: DiskUsage
+    path: '/DiskUsage',
+    component: DiskUsage
   },
   {
     path: '/:NotFound',
