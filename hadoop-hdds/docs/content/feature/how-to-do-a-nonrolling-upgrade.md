@@ -20,7 +20,7 @@ author: Aravindan Vijayan
 
 ### Prepare the Ozone Manager.
  
-    ozone admin om -id=<om-sevice-id> prepare
+    ozone admin om prepare -id=<om-sevice-id>
 
 ### Stop the components
 Stop all components (OMs, SCMs & DNs) using an appropriate 'stop' command.
@@ -41,7 +41,7 @@ Start the Ozone Manager using the --upgrade flag.
  
     ozone admin scm finalizeupgrade
 
-    ozone admin om -id=<service-id> finalizeupgrade
+    ozone admin om finalizeupgrade -id=<service-id>
 
 ### Downgrade (instead of finalizing)
  - Prepare the ozone managers: `ozone admin om -id=<om-sevice-id> prepare`
