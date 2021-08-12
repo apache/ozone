@@ -13,7 +13,7 @@ Ozone is a scalable, redundant, and distributed object store for Hadoop and Clou
 
 ## Documentation
 
-The latest documentation is generated together with the releases and hosted on the apache site.
+The latest documentation is generated together with the releases and hosted on the Apache site.
 
 Please check [the documentation page](https://ozone.apache.org/docs/) for more information.
 
@@ -37,13 +37,13 @@ Latest release artifacts (source release and binary packages) are [available](ht
 
 ### Run Ozone from published Docker image
 
-The easiest way to start a cluster with docker is:
+The easiest way to start a cluster with Docker is:
 
 ```
 docker run -p 9878:9878 apache/ozone
 ```
 
-And you can use AWS S3 cli:
+And you can use the AWS S3 cli:
 
 ```
 aws s3api --endpoint http://localhost:9878/ create-bucket --bucket=wordcount
@@ -81,7 +81,7 @@ And can be started with the help of Docker:
 cd hadoop-ozone/dist/target/ozone-*/compose/ozone
 docker-compose up -d --scale datanode=3
 ```
-For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
+For more information, you can check the [contribution guidelines](./CONTRIBUTING.md)
 
 ## Contribute
 
@@ -90,7 +90,7 @@ All contributions are welcome.
  1. Please open a [Jira](https://issues.apache.org/jira/projects/HDDS/issues) issue
  2. And create a pull request
 
-For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
+For more information, you can check the [contribution guidelines](./CONTRIBUTING.md)
 
 ## License
 
