@@ -55,6 +55,7 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
       <scope>compile</scope>
+      <version>3.3.1</version>
     </dependency>
     <dependency>
       <groupId>com.sun.jersey</groupId>
@@ -93,6 +94,7 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>compile</scope>
+      <version>3.3.1</version>
       <exclusions>
         <exclusion>
           <groupId>javax.xml.stream</groupId>
@@ -128,6 +130,7 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>compile</scope>
+      <version>3.3.1</version>
       <exclusions>
         <exclusion>
           <groupId>commons-cli</groupId>
@@ -165,18 +168,21 @@
       <artifactId>hadoop-common</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
+      <version>3.3.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
+      <version>3.3.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
+      <version>3.3.1</version>
     </dependency>
     <dependency>
       <groupId>log4j</groupId>
