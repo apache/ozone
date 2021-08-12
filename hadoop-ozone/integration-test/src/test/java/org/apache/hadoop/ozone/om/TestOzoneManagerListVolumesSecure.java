@@ -98,6 +98,7 @@ public class TestOzoneManagerListVolumesSecure {
   public void init() throws Exception {
     this.conf = new OzoneConfiguration();
     this.workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
+
     startMiniKdc();
     this.realm = miniKdc.getRealm();
     createPrincipals();
