@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -59,6 +60,8 @@ public class RatisPipelineProvider
   private int maxPipelinePerDatanode;
   private final LeaderChoosePolicy leaderChoosePolicy;
   private final SCMContext scmContext;
+  private final long containerSizeBytes;
+  private final long minRatisVolumeSizeBytes;
 
   @VisibleForTesting
   public RatisPipelineProvider(NodeManager nodeManager,
@@ -78,6 +81,14 @@ public class RatisPipelineProvider
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.maxPipelinePerDatanode = dnLimit == null ? 0 :
         Integer.parseInt(dnLimit);
+    this.containerSizeBytes = (long) this.conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+    this.minRatisVolumeSizeBytes = (long) this.conf.getStorageSize(
+        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
+        StorageUnit.BYTES);
     try {
       leaderChoosePolicy = LeaderChoosePolicyFactory
           .getPolicy(conf, nodeManager, stateManager);
@@ -135,11 +146,13 @@ public class RatisPipelineProvider
         replicationConfig.getReplicationFactor();
     switch (factor) {
     case ONE:
-      dns = pickNodesNeverUsed(replicationConfig);
+      dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
+          containerSizeBytes);
       break;
     case THREE:
       dns = placementPolicy.chooseDatanodes(null,
-          null, factor.getNumber(), 0);
+          null, factor.getNumber(), minRatisVolumeSizeBytes,
+          containerSizeBytes);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());

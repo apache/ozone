@@ -807,7 +807,7 @@ public class TestStorageContainerManager {
       Thread.sleep(5000);
       // Give ReplicationManager some time to process the containers.
       cluster.getStorageContainerManager()
-          .getReplicationManager().processContainersNow();
+          .getReplicationManager().processAll();
       Thread.sleep(5000);
 
       verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new

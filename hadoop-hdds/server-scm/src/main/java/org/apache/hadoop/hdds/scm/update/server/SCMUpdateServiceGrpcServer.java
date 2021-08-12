@@ -76,8 +76,9 @@ public class SCMUpdateServiceGrpcServer {
       server.shutdown();
       try {
         server.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
+      } catch (InterruptedException e) {
         LOG.error("failed to shutdown SCMClientGrpcServer", e);
+        Thread.currentThread().interrupt();
       } finally {
         server.shutdownNow();
       }
