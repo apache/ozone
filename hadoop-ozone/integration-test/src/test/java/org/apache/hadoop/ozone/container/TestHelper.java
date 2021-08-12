@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -134,8 +135,23 @@ public final class TestHelper {
     }
     org.apache.hadoop.hdds.client.ReplicationFactor factor =
             org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+    ReplicationConfig config =
+            ReplicationConfig.fromTypeAndFactor(type, factor);
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createKey(keyName, size, config, new HashMap<>());
+  }
+
+  public static OzoneDataStreamOutput createStreamKey(String keyName,
+      ReplicationType type, long size, ObjectStore objectStore,
+      String volumeName, String bucketName) throws Exception {
+    org.apache.hadoop.hdds.client.ReplicationFactor factor =
+        type == ReplicationType.STAND_ALONE ?
+            org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
+            org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+    ReplicationConfig config =
+        ReplicationConfig.fromTypeAndFactor(type, factor);
+    return objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createStreamKey(keyName, size, config, new HashMap<>());
   }
 
   public static OzoneOutputStream createKey(String keyName,
@@ -143,8 +159,10 @@ public final class TestHelper {
       org.apache.hadoop.hdds.client.ReplicationFactor factor, long size,
       ObjectStore objectStore, String volumeName, String bucketName)
       throws Exception {
+    ReplicationConfig config =
+            ReplicationConfig.fromTypeAndFactor(type, factor);
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createKey(keyName, size, config, new HashMap<>());
   }
 
   public static OzoneOutputStream createKey(String keyName,
