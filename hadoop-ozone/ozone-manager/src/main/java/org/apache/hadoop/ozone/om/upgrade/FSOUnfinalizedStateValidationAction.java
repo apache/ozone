@@ -22,7 +22,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FSO;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 
@@ -36,13 +36,13 @@ public class FSOUnfinalizedStateValidationAction
 
   @Override
   public void execute(OzoneManager om) throws UpgradeException {
-    if (om.getOMMetadataLayout()
-        .equalsIgnoreCase(OZONE_OM_METADATA_LAYOUT_PREFIX)) {
-      throwExceptionForConfig(OZONE_OM_METADATA_LAYOUT);
-    }
-
     if (om.getEnableFileSystemPaths()) {
       throwExceptionForConfig(OZONE_OM_ENABLE_FILESYSTEM_PATHS);
+    }
+
+    if (!om.getOMMetadataLayout()
+        .equalsIgnoreCase(OZONE_OM_METADATA_LAYOUT_DEFAULT)) {
+      throwExceptionForConfig(OZONE_OM_METADATA_LAYOUT);
     }
   }
 
@@ -51,9 +51,5 @@ public class FSOUnfinalizedStateValidationAction
             "used until OM upgrade has been finalized", config),
         UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
   }
-
-  // TODO: Test on/off pre-finalized for upgrade from 1.1 to >=1.3
-  //  Test on for finalized (Won't work right now)
-  //  Test off for finalized (should start)
 }
 
