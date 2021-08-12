@@ -237,6 +237,14 @@
 
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${maven-checkstyle-plugin.version}</version>
+        <configuration>
+          <includeTestSourceDirectory>false</includeTestSourceDirectory>
+        </configuration>
+      </plugin>
+      <plugin>
         <!-- workaround for filtered/unfiltered resources in same directory -->
         <!-- remove when maven-eclipse-plugin 2.9 is available -->
         <groupId>org.apache.maven.plugins</groupId>
