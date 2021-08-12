@@ -86,7 +86,7 @@ Note: An encrypted bucket cannot be created via S3 APIs. It must be done using O
 After creating an encrypted bucket, all the keys added to this bucket using s3g will be encrypted.
 
 In non-secure mode, the user running the S3Gateway daemon process is the proxy user, 
-while in secure mode the user in Kerberos keytab is the proxy user. 
+while in secure mode the S3Gateway Kerberos principal (ozone.s3g.kerberos.principal) is the proxy user. 
 S3Gateway proxy's all the users accessing the encrypted buckets to decrypt the key. 
 For this purpose on security enabled cluster, during S3Gateway server startup 
 logins using configured 
