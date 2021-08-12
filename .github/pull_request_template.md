@@ -2,7 +2,7 @@
 
 (Please fill in changes proposed in this fix)
 
-## What is the link to the Apache JIRA
+## What is the link to the Apache JIRA?
 
 (Please create an issue in ASF JIRA before opening a pull request,
 and you need to set the title of the pull request which starts with
