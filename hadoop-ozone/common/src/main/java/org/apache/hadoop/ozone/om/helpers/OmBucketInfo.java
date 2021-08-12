@@ -670,7 +670,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", quotaInBytes='" + quotaInBytes + "'" +
         ", quotaInNamespace='" + quotaInNamespace + "'" +
         ", bucketLayout='" + bucketLayout + '\'' +
-        ", quotaInNamespace='" + quotaInNamespace + '\'' +
         ", defaultReplicationConfig='" + defaultReplicationConfig + '\'' +
         sourceInfo +
         '}';
