@@ -92,7 +92,7 @@ For this purpose on security enabled cluster, during S3Gateway server startup
 logins using configured 
 **ozone.s3g.kerberos.keytab.file**  and **ozone.s3g.kerberos.principal**. 
 
-The below two configurations must be added to the kms-site.xml to allow the S3Gateway principal to act as a proxy for other users.
+The below two configurations must be added to the kms-site.xml to allow the S3Gateway principal to act as a proxy for other users. In this example, "ozone.s3g.kerberos.principal" is assumed to be "s3g"
 
 ```
 <property>
