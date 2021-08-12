@@ -46,4 +46,5 @@ fi
 
 generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
 
+
 exit $RESULT
