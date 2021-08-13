@@ -39,6 +39,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_F
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -275,7 +276,16 @@ public class TestHDDSUpgrade {
   /*
    * Helper function to test Post-Upgrade conditions on all the DataNodes.
    */
-  private void testPostUpgradeConditionsDataNodes() {
+  private void testPostUpgradeConditionsDataNodes(
+      ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
+    List<ContainerProtos.ContainerDataProto.State> closeStates =
+        Arrays.asList(validClosedContainerStates);
+    // Allow closed and quasi closed containers as valid closed containers by
+    // default.
+    if (closeStates.isEmpty()) {
+      closeStates = Arrays.asList(CLOSED, QUASI_CLOSED);
+    }
+
     try {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
@@ -308,9 +318,11 @@ public class TestHDDSUpgrade {
       // Also verify that all the existing containers are closed.
       for (Iterator<Container<?>> it =
            dsm.getContainer().getController().getContainers(); it.hasNext();) {
-        Container container = it.next();
-        Assert.assertTrue(container.getContainerState() == CLOSED ||
-            container.getContainerState() == QUASI_CLOSED);
+        Container<?> container = it.next();
+        Assert.assertTrue("Container had unexpected state " +
+                container.getContainerState(),
+            closeStates.stream().anyMatch(
+                state -> container.getContainerState().equals(state)));
         countContainers++;
       }
     }
@@ -434,7 +446,9 @@ public class TestHDDSUpgrade {
     testDataNodesStateOnSCM(HEALTHY_READONLY, HEALTHY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
-    testPostUpgradeConditionsDataNodes();
+    // In the happy path case, no containers should have been quasi closed as
+    // a result of the upgrade.
+    testPostUpgradeConditionsDataNodes(CLOSED);
 
     // Test that we can use a pipeline after upgrade.
     // Will fail with exception if there are no pipelines.
