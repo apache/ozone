@@ -21,12 +21,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.io.Text;
 
+/**
+ * Declared WebHdfs constants.
+ */
 @InterfaceAudience.Private
-public class WebHdfsConstants {
+public final class WebHdfsConstants {
   public static final String WEBHDFS_SCHEME = "webhdfs";
   public static final String SWEBHDFS_SCHEME = "swebhdfs";
-  public static final Text WEBHDFS_TOKEN_KIND = new Text("WEBHDFS delegation");
-  public static final Text SWEBHDFS_TOKEN_KIND = new Text("SWEBHDFS delegation");
+  public static final Text WEBHDFS_TOKEN_KIND
+      = new Text("WEBHDFS delegation");
+  public static final Text SWEBHDFS_TOKEN_KIND
+      = new Text("SWEBHDFS delegation");
 
   private WebHdfsConstants() {
   }

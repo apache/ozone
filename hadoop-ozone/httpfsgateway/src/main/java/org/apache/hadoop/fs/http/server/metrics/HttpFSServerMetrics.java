@@ -47,7 +47,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Metrics(about="HttpFSServer metrics", context="httpfs")
 public class HttpFSServerMetrics {
 
-  private static String DFS_METRICS_SESSION_ID_KEY = "dfs.metrics.session-id";
+  private static final String DFS_METRICS_SESSION_ID_KEY
+      = "dfs.metrics.session-id";
   private @Metric MutableCounterLong bytesWritten;
   private @Metric MutableCounterLong bytesRead;
 

@@ -25,20 +25,21 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.*;
-import org.apache.hadoop.hdfs.web.WebHdfsConstants;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
 import java.util.*;
 
-/** JSON Utilities */
-class JsonUtil {
+/** JSON Utilities. */
+final class JsonUtil {
   private static final Object[] EMPTY_OBJECT_ARRAY = {};
+
+  private JsonUtil() {
+  }
 
   // Reuse ObjectMapper instance for improving performance.
   // ObjectMapper is thread safe as long as we always configure instance
@@ -47,8 +48,8 @@ class JsonUtil {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /** Convert a token object to a Json string. */
-  public static String toJsonString(final Token<? extends TokenIdentifier> token
-      ) throws IOException {
+  public static String toJsonString(final Token<?
+      extends TokenIdentifier> token) throws IOException {
     return toJsonString(Token.class, toJsonMap(token));
   }
 
@@ -93,7 +94,8 @@ class JsonUtil {
   }
 
   /** Convert an ExtendedBlock to a Json map. */
-  private static Map<String, Object> toJsonMap(final ExtendedBlock extendedblock) {
+  private static Map<String, Object> toJsonMap(
+      final ExtendedBlock extendedblock) {
     if (extendedblock == null) {
       return null;
     }
@@ -176,8 +178,8 @@ class JsonUtil {
   }
 
   /** Convert a LocatedBlock to a Json map. */
-  private static Map<String, Object> toJsonMap(final LocatedBlock locatedblock
-      ) throws IOException {
+  private static Map<String, Object> toJsonMap(
+      final LocatedBlock locatedblock) throws IOException {
     if (locatedblock == null) {
       return null;
     }
@@ -194,8 +196,8 @@ class JsonUtil {
   }
 
   /** Convert a LocatedBlock[] to a Json array. */
-  private static Object[] toJsonArray(final List<LocatedBlock> array
-      ) throws IOException {
+  private static Object[] toJsonArray(
+      final List<LocatedBlock> array) throws IOException {
     if (array == null) {
       return null;
     } else if (array.size() == 0) {
@@ -210,8 +212,8 @@ class JsonUtil {
   }
 
   /** Convert LocatedBlocks to a Json string. */
-  public static String toJsonString(final LocatedBlocks locatedblocks
-      ) throws IOException {
+  public static String toJsonString(
+      final LocatedBlocks locatedblocks) throws IOException {
     if (locatedblocks == null) {
       return null;
     }
@@ -363,7 +365,7 @@ class JsonUtil {
   }
   
   public static String toJsonString(final List<XAttr> xAttrs)
-    throws IOException {
+      throws IOException {
     final List<String> names = Lists.newArrayListWithCapacity(xAttrs.size());
     for (XAttr xAttr : xAttrs) {
       names.add(XAttrHelper.getPrefixedName(xAttr));
