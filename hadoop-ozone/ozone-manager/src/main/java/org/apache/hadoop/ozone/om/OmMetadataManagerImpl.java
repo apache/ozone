@@ -279,6 +279,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
+    // TODO: Refactor the below function by reading bucketLayout.
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       return fileTable;
     }
@@ -302,6 +303,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getOpenKeyTable() {
+    // TODO: Refactor the below function by reading bucketLayout.
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       return openFileTable;
     }

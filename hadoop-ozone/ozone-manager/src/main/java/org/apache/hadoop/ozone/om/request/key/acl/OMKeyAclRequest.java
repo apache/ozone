@@ -26,12 +26,14 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -145,6 +147,30 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
+
+  public OmBucketInfo getBucketInfo(OzoneManager ozoneManager) {
+    OmBucketInfo buckInfo = null;
+    try {
+      ObjectParser objectParser = new ObjectParser(getPath(),
+          OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
+
+      String volume = objectParser.getVolume();
+      String bucket = objectParser.getBucket();
+
+      String buckKey =
+          ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
+
+      try {
+        buckInfo =
+            ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    } catch (OMException ome) {
+        // Handle exception
+    }
+    return buckInfo;
+  }
 
   /**
    * Get Key object Info from the request.

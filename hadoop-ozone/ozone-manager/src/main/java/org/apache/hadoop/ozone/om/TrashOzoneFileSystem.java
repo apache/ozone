@@ -110,7 +110,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     ozoneManager.getMetrics().incNumTrashWriteRequests();
     if (ozoneManager.isRatisEnabled()) {
       OMClientRequest omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(omRequest);
+          OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
       omRequest = omClientRequest.preExecute(ozoneManager);
       RaftClientRequest req = getRatisRequest(omRequest);
       ozoneManager.getOmRatisServer().submitRequest(omRequest, req);

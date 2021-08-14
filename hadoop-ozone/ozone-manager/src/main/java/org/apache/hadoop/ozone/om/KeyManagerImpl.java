@@ -97,7 +97,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -256,8 +256,7 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     // Start directory deletion service for FSO buckets.
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()
-        && dirDeletingService == null) {
+    if (dirDeletingService == null) {
       long dirDeleteInterval = configuration.getTimeDuration(
           OZONE_DIR_DELETING_SERVICE_INTERVAL,
           OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT,
@@ -649,7 +648,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     OmKeyInfo value = null;
     try {
-      if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      if (isBucketFSOptimized(volumeName, bucketName)) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
@@ -1478,7 +1477,7 @@ public class KeyManagerImpl implements KeyManager {
 
         if (replicationConfig == null) {
           //if there are no parts, use the replicationType from the open key.
-          if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+          if (isBucketFSOptimized(volumeName, bucketName)) {
             multipartKey =
                 getMultipartOpenKeyFSO(volumeName, bucketName, keyName,
                     uploadID);
@@ -1526,11 +1525,12 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private String getPartName(PartKeyInfo partKeyInfo, String volName,
-                             String buckName, String keyName) {
+                             String buckName, String keyName)
+      throws IOException {
 
     String partName = partKeyInfo.getPartName();
 
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volName, buckName)) {
       String parentDir = OzoneFSUtils.getParentDir(keyName);
       String partFileName = OzoneFSUtils.getFileName(partKeyInfo.getPartName());
 
@@ -1712,7 +1712,7 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
-      if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      if (isBucketFSOptimized(volume, bucket)) {
         keyInfo = getOmKeyInfoFSO(volume, bucket, keyName);
       } else {
         keyInfo = getOmKeyInfo(volume, bucket, keyName);
@@ -1925,7 +1925,7 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volumeName, bucketName)) {
       return getOzoneFileStatusFSO(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress,
               args.getLatestVersionLocation(), false);
@@ -2202,7 +2202,7 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus;
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volumeName, bucketName)) {
       fileStatus = getOzoneFileStatusFSO(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress,
               args.getLatestVersionLocation(), false);
@@ -2305,13 +2305,13 @@ public class KeyManagerImpl implements KeyManager {
       String startKey, long numEntries, String clientAddress)
           throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
-
+    String volName = args.getVolumeName();
+    String buckName = args.getBucketName();
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
     if (numEntries <= 0) {
       return fileStatusList;
     }
-
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volName, buckName)) {
       return listStatusFSO(args, recursive, startKey, numEntries,
           clientAddress);
     }
@@ -3092,5 +3092,20 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     return files;
+  }
+
+  public boolean isBucketFSOptimized(String volName, String buckName)
+      throws IOException {
+    String buckKey =
+        ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
+    OmBucketInfo buckInfo =
+        ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+    if (buckInfo != null) {
+      buckInfo =
+          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+      return buckInfo.getBucketLayout()
+          .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    }
+    return false;
   }
 }
