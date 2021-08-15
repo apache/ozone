@@ -289,7 +289,8 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.KEY == type) {
         OMKeyRemoveAclRequest aclReq = new OMKeyRemoveAclRequest(omRequest);
         OmBucketInfo buckInfo = aclReq.getBucketInfo(ozoneManager);
-        if (buckInfo.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+        if (BucketLayout.FILE_SYSTEM_OPTIMIZED
+            .equals(buckInfo.getBucketLayout())) {
           return new OMKeyRemoveAclRequestWithFSO(omRequest);
         }
         return aclReq;
@@ -534,7 +535,7 @@ public final class OzoneManagerRatisUtils {
     default:
       break;
     }
-    return bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED.equals(bucketLayout);
   }
 
   private static OmBucketInfo getOmBucketInfo(OzoneManager ozoneManager,

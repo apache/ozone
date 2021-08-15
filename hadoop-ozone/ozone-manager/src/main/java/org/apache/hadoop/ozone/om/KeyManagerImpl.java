@@ -181,6 +181,8 @@ public class KeyManagerImpl implements KeyManager {
   private final boolean enableFileSystemPaths;
   private BackgroundService dirDeletingService;
 
+  // test config - used only for skipping FSO check using OzoneMgr.
+  private boolean isFSOBucketCheckEnabled = true;
 
   @VisibleForTesting
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
@@ -3096,16 +3098,22 @@ public class KeyManagerImpl implements KeyManager {
 
   public boolean isBucketFSOptimized(String volName, String buckName)
       throws IOException {
+    if (!isFSOBucketCheckEnabled) {
+      return false;
+    }
     String buckKey =
         ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
     OmBucketInfo buckInfo =
         ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
     if (buckInfo != null) {
-      buckInfo =
-          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
       return buckInfo.getBucketLayout()
           .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     }
     return false;
+  }
+
+  @VisibleForTesting
+  void setIsFSOBucketCheckEnabled(boolean isFSOBucketCheck) {
+    this.isFSOBucketCheckEnabled = isFSOBucketCheck;
   }
 }
