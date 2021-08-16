@@ -81,6 +81,18 @@ And can be started with the help of Docker:
 cd hadoop-ozone/dist/target/ozone-*/compose/ozone
 docker-compose up -d --scale datanode=3
 ```
+
+To quickly start a cluster with the [FileSystem Optimization (FSO)](https://ci-hadoop.apache.org/view/Hadoop%20Ozone/job/ozone-doc-master/lastSuccessfulBuild/artifact/hadoop-hdds/docs/public/feature/prefixfso.html) feature enabled, run
+
+```
+./enable_fso.sh <number-of-datanodes>
+```
+If any permission issue occurs, secure the shell first: 
+
+```
+chmod +x ./enable_fso.sh
+```
+
 For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
 
 ## Contribute
