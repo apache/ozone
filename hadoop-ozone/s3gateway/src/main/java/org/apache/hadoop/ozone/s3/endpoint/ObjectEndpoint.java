@@ -860,7 +860,9 @@ public class ObjectEndpoint extends EndpointBase {
     return partMarker;
   }
 
-  // Parses date string and return long representation. Returns an empty if DateStr is null or invalid. Date in the future are considered invalid.
+  // Parses date string and return long representation. Returns an
+  // empty if DateStr is null or invalid. Date in the future are
+  // considered invalid.
   private static OptionalLong parseAndValidateDate(String ozoneDateStr)
       throws OS3Exception {
     long ozoneDateInMs;
@@ -870,17 +872,15 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
     } catch (ParseException e) {
-      // if not valid time, then skip the precondition checks
-      //  which is what AWS seems to do as best I can tell
+      // if time not parseable, then return empty()
       return OptionalLong.empty();
     }
 
-    // dates in the future are invalid and should cause
-    //  the precondition checks to be skipped
     long currentDate = new Date().getTime();
     if  (ozoneDateInMs <= currentDate){
       return OptionalLong.of(ozoneDateInMs);
     } else {
+      // dates in the future are invalid, so return empty()
       return OptionalLong.empty();
     }
   }
@@ -891,13 +891,13 @@ public class ObjectEndpoint extends EndpointBase {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
     long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
-    OptionalLong modifiedDate = parseOzoneDate(copySourceIfModifiedSinceStr);
+    OptionalLong modifiedDate = parseAndValidateDate(copySourceIfModifiedSinceStr);
     if (modifiedDate.isPresent()) {
       copySourceIfModifiedSince = modifiedDate.getAsLong();
     }
 
     OptionalLong unmodifiedDate =
-        parseOzoneDate(copySourceIfUnmodifiedSinceStr);
+        parseAndValidateDate(copySourceIfUnmodifiedSinceStr);
     if (unmodifiedDate.isPresent()) {
       copySourceIfUnmodifiedSince = unmodifiedDate.getAsLong();
     }
