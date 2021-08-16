@@ -860,7 +860,7 @@ public class ObjectEndpoint extends EndpointBase {
     return partMarker;
   }
 
-  // If the return is empty, the precondition should be ignored
+  // Parses date string and return long representation. Returns an empty if DateStr is null or invalid. Date in the future are considered invalid.
   private static OptionalLong parseOzoneDate(String ozoneDateStr)
       throws OS3Exception {
     long ozoneDateInMs;
