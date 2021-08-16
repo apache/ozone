@@ -78,7 +78,7 @@ public class TestMultipartUploadWithCopy {
   private static String beforeSourceKeyModificationTimeStr;
   private static String afterSourceKeyModificationTimeStr;
   private static String futureTimeStr;
-  private static final String badTimeStr = "Bad time string";
+  private static final String BAD_TIME_STR = "Bad time string";
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -217,7 +217,7 @@ public class TestMultipartUploadWithCopy {
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // Bad
     try {
-      uploadPartWithCopy(afterSourceKeyModificationTimeStr, badTimeStr);
+      uploadPartWithCopy(afterSourceKeyModificationTimeStr, BAD_TIME_STR);
       fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
@@ -228,7 +228,7 @@ public class TestMultipartUploadWithCopy {
   @Test
   public void testMultipartIfModifiedIsTrueOrInvalid() throws Exception {
     String[] trueOrInvalidTimes = {beforeSourceKeyModificationTimeStr,
-				   null, badTimeStr, futureTimeStr};
+                                   null, BAD_TIME_STR, futureTimeStr};
 
     for (String ts: trueOrInvalidTimes) {
       // True/Null/Bad/Future
@@ -254,7 +254,7 @@ public class TestMultipartUploadWithCopy {
   
       // True/Null/Bad/Future
       // Bad
-      uploadPartWithCopy(ts, badTimeStr);
+      uploadPartWithCopy(ts, BAD_TIME_STR);
     }
   }
 

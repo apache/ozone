@@ -891,7 +891,8 @@ public class ObjectEndpoint extends EndpointBase {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
     long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
-    OptionalLong modifiedDate = parseAndValidateDate(copySourceIfModifiedSinceStr);
+    OptionalLong modifiedDate =
+        parseAndValidateDate(copySourceIfModifiedSinceStr);
     if (modifiedDate.isPresent()) {
       copySourceIfModifiedSince = modifiedDate.getAsLong();
     }
