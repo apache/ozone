@@ -72,9 +72,9 @@ import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
