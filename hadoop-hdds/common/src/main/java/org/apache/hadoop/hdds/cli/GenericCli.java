@@ -210,12 +210,12 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
       try {
         url = file.toURL();
       } catch (MalformedURLException e) {
-        e.printStackTrace();
+        LOG.warn("transfer url error {}", e.getMessage());
       }
       try {
         allProperties = oc.readPropertyFromXml(url);
       } catch (JAXBException e) {
-        e.printStackTrace();
+        LOG.warn("read Xml error {}", e.getMessage());
       }
 
       final Collection<ReconfigurationUtil.PropertyChange> changes =
@@ -264,7 +264,7 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
       }
       try {
         synchronized (monitor) {
-          monitor.wait(6000);
+          monitor.wait(120000);
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -292,15 +292,12 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
     try {
       url = file.toURL();
     } catch (MalformedURLException e) {
-      e.printStackTrace();
+      LOG.warn("transfer url error {}", e.getMessage());
     }
     try {
       allProperties = oc.readPropertyFromXml(url);
-      for (OzoneConfiguration.Property property : allProperties) {
-        property.getName();
-      }
     } catch (JAXBException e) {
-      e.printStackTrace();
+      LOG.warn("read Xml error {}", e.getMessage());
     }
     return allProperties;
   }
