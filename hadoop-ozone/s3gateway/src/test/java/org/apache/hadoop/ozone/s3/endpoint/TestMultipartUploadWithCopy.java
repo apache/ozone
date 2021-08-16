@@ -168,6 +168,10 @@ public class TestMultipartUploadWithCopy {
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     String afterSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
+    String tomorrowTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime +
+            1000 * 60 * 24);
+    String badTimeStr = "Bad time string";
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
@@ -180,8 +184,46 @@ public class TestMultipartUploadWithCopy {
     if (sleepMs > 0) {
       Thread.sleep(sleepMs);
     }
-    // ifUnmodifiedSince = beforeSourceKeyModificationTime,
-    // ifModifiedSince = afterSourceKeyModificationTime
+    // True/ifModifiedSince = beforeSourceKeyModificationTime
+    // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          beforeSourceKeyModificationTimeStr,
+          beforeSourceKeyModificationTimeStr
+      );
+      fail("testMultipartIfModifiedSinceError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
+
+    // True/ifModifiedSince = beforeSourceKeyModificationTime
+    // Null
+    uploadPartWithCopy(KEY, uploadID, 1,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+        beforeSourceKeyModificationTimeStr,
+        null
+    );
+
+    // True/ifModifiedSince = beforeSourceKeyModificationTime
+    // fUture
+    uploadPartWithCopy(KEY, uploadID, 1,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+        beforeSourceKeyModificationTimeStr,
+        tomorrowTimeStr
+    );
+
+    // True/ifModifiedSince = beforeSourceKeyModificationTime
+    // Bad
+    uploadPartWithCopy(KEY, uploadID, 1,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+        beforeSourceKeyModificationTimeStr,
+        badTimeStr
+    );
+
+
+    // False/ifUnmodifiedSince = beforeSourceKeyModificationTime,
+    // False/ifModifiedSince = afterSourceKeyModificationTime
     try {
       uploadPartWithCopy(KEY, uploadID, 1,
           OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
