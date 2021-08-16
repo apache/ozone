@@ -606,7 +606,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmContext,
           serviceManager,
           scmNodeManager,
-          new MonotonicClock(ZoneOffset.UTC));
+          new MonotonicClock(ZoneOffset.UTC),
+          scmHAManager,
+          getScmMetadataStore().getMoveTable());
     }
     if(configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
