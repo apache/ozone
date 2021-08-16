@@ -51,11 +51,11 @@ After upgrading components, the upgrade process is divided into two states:
 
 Starting with your current version of Ozone, complete the following steps to upgrade to a newer version of Ozone.
 
-1. If using OM HA and currently running Ozone 1.2.0 or greater, prepare the Ozone Manager.
+1. If using OM HA and currently running Ozone 1.2.0 or greater, prepare the Ozone Manager. If OM HA is not being used, this step can be skipped.
     ```
     ozone admin om prepare -id=<om-sevice-id>
     ```
-    If OM HA is not being used, this step can be skipped. This will block the Ozone Managers from receiving all write requests. See [Ozone Manager Prepare For Upgrade]({{< relref "../design/omprepare.md" >}}) for more information
+    The `prepare` command will block the Ozone Managers from receiving all write requests. See [Ozone Manager Prepare For Upgrade]({{< relref "../design/omprepare.md" >}}) for more information
 
 2.  Stop all components.
 
@@ -76,9 +76,9 @@ Starting with your current version of Ozone, complete the following steps to upg
         ```
         - There also exists a `--downgrade` flag which is an alias of `--upgrade`. The name used does not matter.
 
-        - **IMPORTANT**: All OMs must be started with the `--upgrade`  or `--downgrade` flag in this step. If some or none of the OMs are started with this flag by mistake, run `ozone admin om cancelprepare -id=<om-sevice-id>` to make sure all OMs leave prepare mode.
+        - **IMPORTANT**: All OMs must be started with the `--upgrade`  or `--downgrade` flag in this step. If some of the OMs are not started with this flag by mistake, run `ozone admin om cancelprepare -id=<om-sevice-id>` to make sure all OMs leave prepare mode.
 
-At this point, the cluster is upgraded to a pre-finalized state and fully operational. The cluster can be downgraded from this state by repeating the above steps, but restoring the older versions of components in step 3, instead of the newer versions. To finalize the cluster to use new features, continue on with the following steps.
+At this point, the cluster is upgraded to a pre-finalized state and fully operational. The cluster can be downgraded by repeating the above steps, but restoring the older versions of components in step 3, instead of the newer versions. To finalize the cluster to use new features, continue on with the following steps.
 
 **Once the following steps are performed, downgrading will not be possible.**
 
