@@ -73,9 +73,12 @@ public class TestMultipartUploadWithCopy {
   private static final String EXISTING_KEY = "key1";
   private static final String EXISTING_KEY_CONTENT = "testkey";
   private static final OzoneClient CLIENT = new OzoneClientStub();
-  private static final int RANGE_FROM = 2;
-  private static final int RANGE_TO = 4;
   private static final long DELAY_MS = 2000;
+  private static Long sourceKeyLastModificationTime;
+  private static String beforeSourceKeyModificationTimeStr;
+  private static String afterSourceKeyModificationTimeStr;
+  private static String tomorrowTimeStr;
+  private static final String badTimeStr = "Bad time string";
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -91,6 +94,26 @@ public class TestMultipartUploadWithCopy {
       stream.write(keyContent);
     }
 
+    sourceKeyLastModificationTime = CLIENT.getObjectStore()
+        .getS3Bucket(OzoneConsts.S3_BUCKET)
+        .getKey(EXISTING_KEY)
+        .getModificationTime().toEpochMilli();
+    beforeSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
+    afterSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
+    tomorrowTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime +
+            1000 * 60 * 24);
+
+    // Make sure DELAY_MS has passed, otherwise
+    //  afterSourceKeyModificationTimeStr will be in the future
+    //  and thus invalid
+    long currentTime = new Date().getTime();
+    long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
+    if (sleepMs > 0) {
+      Thread.sleep(sleepMs);
+    }
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
@@ -101,15 +124,6 @@ public class TestMultipartUploadWithCopy {
 
   @Test
   public void testMultipart() throws Exception {
-    Long sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
-    String beforeSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
-    String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000);
-
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
 
@@ -159,31 +173,10 @@ public class TestMultipartUploadWithCopy {
   }
 
   @Test
-  public void testMultipartIfModifiedSince() throws Exception {
-    Long sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
-    String beforeSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
-    String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
-    String tomorrowTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime +
-            1000 * 60 * 24);
-    String badTimeStr = "Bad time string";
-
+  public void testMultipartIfModifiedIsTrue() throws Exception {
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
 
-    // Make sure DELAY_MS has passed, otherwise
-    //  afterSourceKeyModificationTimeStr will be in the future
-    //  and thus invalid
-    long currentTime = new Date().getTime();
-    long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
-    if (sleepMs > 0) {
-      Thread.sleep(sleepMs);
-    }
     // True/ifModifiedSince = beforeSourceKeyModificationTime
     // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
     try {
@@ -220,8 +213,12 @@ public class TestMultipartUploadWithCopy {
         beforeSourceKeyModificationTimeStr,
         badTimeStr
     );
+  }
 
-
+  @Test
+  public void testMultipartIfModifiedIsFalse() throws Exception {
+    // Initiate multipart upload
+    String uploadID = initiateMultipartUpload(KEY);
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // True/ifUnmodifiedSince = afterSourceKeyModificationTime
     try {
@@ -285,73 +282,6 @@ public class TestMultipartUploadWithCopy {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
 
-  }
-
-  // Test operations with 2 datestrings; one valid, the other invalid;
-  // confirm the invalid one is ignored and the valid precondition tested
-  @Test
-  public void testInvalidTimes() throws Exception {
-    long sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
-    String beforeSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
-    String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
-    String tomorrowTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime +
-            1000 * 60 * 24);
-
-    String badTimeStr = "Bad time string";
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(KEY);
-
-    // Make sure DELAY_MS has passed, otherwise
-    //  afterSourceKeyModificationTimeStr will be invalid
-    long currentTime = new Date().getTime();
-    long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
-    if (sleepMs > 0) {
-      Thread.sleep(sleepMs);
-    }
-    // ifUnmodifiedSince = bad
-    // ifModifiedSince = beforeSourceKeyModificationTime,
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        beforeSourceKeyModificationTimeStr,
-        badTimeStr);
-
-    // ifUnmodifiedSince = tomorrow
-    // ifModifiedSince = afterSourceKeyModificationTime,
-    try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTimeStr,
-          tomorrowTimeStr);
-      fail("testInvalidTimesError");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
-    }
-
-
-    // ifUnmodifiedSince = beforeSourceKeyModificationTimeStr
-    // ifModifiedSince = bad
-    try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          badTimeStr,
-          beforeSourceKeyModificationTimeStr);
-      fail("testInvalidTimesError");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
-    }
-
-    // ifUnmodifiedSince = afterSourceKeyModificationTimeStr
-    // ifModifiedSince = tomorrow
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        tomorrowTimeStr,
-        afterSourceKeyModificationTimeStr);
   }
 
   private String initiateMultipartUpload(String key) throws IOException,
