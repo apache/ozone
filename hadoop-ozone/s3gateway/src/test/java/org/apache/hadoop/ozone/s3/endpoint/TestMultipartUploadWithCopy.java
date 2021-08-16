@@ -222,8 +222,21 @@ public class TestMultipartUploadWithCopy {
     );
 
 
-    // False/ifUnmodifiedSince = beforeSourceKeyModificationTime,
     // False/ifModifiedSince = afterSourceKeyModificationTime
+    // True/ifUnmodifiedSince = afterSourceKeyModificationTime
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          afterSourceKeyModificationTimeStr,
+          afterSourceKeyModificationTimeStr
+      );
+      fail("testMultipartIfModifiedSinceError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
+
+    // False/ifModifiedSince = afterSourceKeyModificationTime
+    // False/ifUnmodifiedSince = beforeSourceKeyModificationTime,
     try {
       uploadPartWithCopy(KEY, uploadID, 1,
           OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
@@ -235,19 +248,8 @@ public class TestMultipartUploadWithCopy {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
 
-    // ifUnmodifiedSince = beforeSourceKeyModificationTime,
-    try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          null,
-          beforeSourceKeyModificationTimeStr
-      );
-      fail("testMultipartIfModifiedSinceError");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
-    }
-
-    // ifModifiedSince = afterSourceKeyModificationTime
+    // False/ifModifiedSince = afterSourceKeyModificationTime
+    // Null
     try {
       uploadPartWithCopy(KEY, uploadID, 1,
           OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
@@ -258,6 +260,31 @@ public class TestMultipartUploadWithCopy {
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
+    // False/ifModifiedSince = afterSourceKeyModificationTime
+    // fUture
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          afterSourceKeyModificationTimeStr,
+          tomorrowTimeStr
+      );
+      fail("testMultipartIfModifiedSinceError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
+    // False/ifModifiedSince = afterSourceKeyModificationTime
+    // Bad
+    try {
+      uploadPartWithCopy(KEY, uploadID, 1,
+          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+          afterSourceKeyModificationTimeStr,
+          badTimeStr
+      );
+      fail("testMultipartIfModifiedSinceError");
+    } catch (OS3Exception ex) {
+      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+    }
+
   }
 
   // Test operations with 2 datestrings; one valid, the other invalid;
