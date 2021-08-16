@@ -77,7 +77,7 @@ public class TestMultipartUploadWithCopy {
   private static Long sourceKeyLastModificationTime;
   private static String beforeSourceKeyModificationTimeStr;
   private static String afterSourceKeyModificationTimeStr;
-  private static String tomorrowTimeStr;
+  private static String futureTimeStr;
   private static final String badTimeStr = "Bad time string";
 
   @BeforeClass
@@ -102,7 +102,7 @@ public class TestMultipartUploadWithCopy {
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     afterSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
-    tomorrowTimeStr =
+    futureTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime +
             1000 * 60 * 24);
 
@@ -173,40 +173,6 @@ public class TestMultipartUploadWithCopy {
   }
 
   @Test
-  public void testMultipartIfModifiedIsTrue() throws Exception {
-    // True/ifModifiedSince = beforeSourceKeyModificationTime
-    // True/ifUnmodifiedSince = afterSourceKeyModificationTimeStr
-    uploadPartWithCopy(
-        beforeSourceKeyModificationTimeStr,
-        afterSourceKeyModificationTimeStr
-    );
-
-    // True/ifModifiedSince = beforeSourceKeyModificationTime
-    // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
-    try {
-      uploadPartWithCopy(
-          beforeSourceKeyModificationTimeStr,
-          beforeSourceKeyModificationTimeStr
-      );
-      fail("testMultipartIfModifiedIsTrue");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
-    }
-
-    // True/ifModifiedSince = beforeSourceKeyModificationTime
-    // Null
-    uploadPartWithCopy(beforeSourceKeyModificationTimeStr, null);
-
-    // True/ifModifiedSince = beforeSourceKeyModificationTime
-    // Future
-    uploadPartWithCopy(beforeSourceKeyModificationTimeStr, tomorrowTimeStr);
-
-    // True/ifModifiedSince = beforeSourceKeyModificationTime
-    // Bad
-    uploadPartWithCopy(beforeSourceKeyModificationTimeStr, badTimeStr);
-  }
-
-  @Test
   public void testMultipartIfModifiedIsFalse() throws Exception {
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // True/ifUnmodifiedSince = afterSourceKeyModificationTime
@@ -243,7 +209,7 @@ public class TestMultipartUploadWithCopy {
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // Future
     try {
-      uploadPartWithCopy(afterSourceKeyModificationTimeStr, tomorrowTimeStr);
+      uploadPartWithCopy(afterSourceKeyModificationTimeStr, futureTimeStr);
       fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
@@ -258,42 +224,40 @@ public class TestMultipartUploadWithCopy {
     }
 
   }
-
+  
   @Test
-  public void testInvalidOrNullTimes() throws Exception {
-    String[] invalidOrNullTimes = {null, badTimeStr, tomorrowTimeStr};
+  public void testMultipartIfModifiedIsTrueOrInvalid() throws Exception {
+    String[] trueOrInvalidTimes = {beforeSourceKeyModificationTimeStr,
+				   null, badTimeStr, futureTimeStr};
 
-    for (String ts: invalidOrNullTimes) {
-      // null/bad/future
+    for (String ts: trueOrInvalidTimes) {
+      // True/Null/Bad/Future
       // True/ifUnmodifiedSince = afterSourceKeyModificationTimeStr
       uploadPartWithCopy(ts, afterSourceKeyModificationTimeStr);
   
-      // null/bad/future
+      // True/Null/Bad/Future
       // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
       try {
         uploadPartWithCopy(ts, beforeSourceKeyModificationTimeStr);
-        fail("testInvalidOrNullTimes");
+        fail("testMultipartIfModifiedIsTrueOrInvalid");
       } catch (OS3Exception ex) {
         assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
       }
   
-      // null/bad/future
+      // True/Null/Bad/Future
       // Null
       uploadPartWithCopy(ts, null);
   
-      // null/bad/future
-      // True/ifModifiedSince = beforeSourceKeyModificationTime
+      // True/Null/Bad/Future
       // Future
-      uploadPartWithCopy(ts, tomorrowTimeStr);
+      uploadPartWithCopy(ts, futureTimeStr);
   
-      // null/bad/future
-      // True/ifModifiedSince = beforeSourceKeyModificationTime
+      // True/Null/Bad/Future
       // Bad
       uploadPartWithCopy(ts, badTimeStr);
     }
   }
 
-  
   private String initiateMultipartUpload(String key) throws IOException,
       OS3Exception {
     setHeaders();
