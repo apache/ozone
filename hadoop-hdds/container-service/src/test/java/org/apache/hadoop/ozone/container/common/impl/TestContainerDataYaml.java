@@ -275,7 +275,6 @@ public class TestContainerDataYaml {
                       HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
       ContainerUtils.verifyChecksum(kvData, conf);
     } catch (Exception ex) {
-      ex.printStackTrace();
       fail("testDisabledChecksum failed");
     }
 
