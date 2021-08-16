@@ -861,7 +861,7 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   // Parses date string and return long representation. Returns an empty if DateStr is null or invalid. Date in the future are considered invalid.
-  private static OptionalLong parseOzoneDate(String ozoneDateStr)
+  private static OptionalLong parseAndValidateDate(String ozoneDateStr)
       throws OS3Exception {
     long ozoneDateInMs;
     if (ozoneDateStr == null) {
