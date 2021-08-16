@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -100,28 +99,31 @@ public class ContainerMapper {
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo
                 .getKeyLocationVersions()) {
-              List<OmKeyLocationInfo> keyLocationInfo = keyLocationInfoGroup
-                  .getLocationList();
-              for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
-                BlockIdDetails blockIdDetails = new BlockIdDetails();
-                Map<Long, BlockIdDetails> innerMap = new HashMap<>();
+              keyLocationInfoGroup.getLocationLists()
+                  .stream()
+                  .flatMap(List::stream)
+                  .forEach(keyLocation -> {
+                    BlockIdDetails blockIdDetails = new BlockIdDetails();
+                    Map<Long, BlockIdDetails> innerMap = new HashMap<>();
 
-                long containerID = keyLocation.getBlockID().getContainerID();
-                long blockID = keyLocation.getBlockID().getLocalID();
-                blockIdDetails.setBucketName(keyInfo.getBucketName());
-                blockIdDetails.setBlockVol(keyInfo.getVolumeName());
-                blockIdDetails.setKeyName(keyInfo.getKeyName());
+                    long containerID = keyLocation.getBlockID()
+                        .getContainerID();
+                    long blockID = keyLocation.getBlockID().getLocalID();
+                    blockIdDetails.setBucketName(keyInfo.getBucketName());
+                    blockIdDetails.setBlockVol(keyInfo.getVolumeName());
+                    blockIdDetails.setKeyName(keyInfo.getKeyName());
 
-                List<Map<Long, BlockIdDetails>> innerList = new ArrayList<>();
-                innerMap.put(blockID, blockIdDetails);
+                    List<Map<Long, BlockIdDetails>> innerList =
+                        new ArrayList<>();
+                    innerMap.put(blockID, blockIdDetails);
 
-                if (dataMap.containsKey(containerID)) {
-                  innerList = dataMap.get(containerID);
-                }
+                    if (dataMap.containsKey(containerID)) {
+                      innerList = dataMap.get(containerID);
+                    }
 
-                innerList.add(innerMap);
-                dataMap.put(containerID, innerList);
-              }
+                    innerList.add(innerMap);
+                    dataMap.put(containerID, innerList);
+                  });
             }
           }
         }

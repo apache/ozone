@@ -1109,7 +1109,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           // Get block keys as a list.
           for(OmKeyInfo info : infoList.getOmKeyInfoList()){
             OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
-            List<BlockID> item = latest.getLocationList().stream()
+            List<BlockID> item = latest.getLocationLists().stream()
+                .flatMap(List::stream)
                 .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
                 .collect(Collectors.toList());
             BlockGroup keyBlocks = BlockGroup.newBuilder()
