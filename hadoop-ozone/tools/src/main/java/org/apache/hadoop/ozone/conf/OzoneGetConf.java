@@ -84,9 +84,4 @@ public class OzoneGetConf extends GenericCli {
     conf.addResource(new OzoneConfiguration());
     new OzoneGetConf(conf).run(argv);
   }
-
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
 }

@@ -305,6 +305,8 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
     return allProperties;
   }
 
-  protected abstract void reconfigurePropertyImpl(
-      String property, String newVal) throws ReconfigurationException;
+  protected void reconfigurePropertyImpl(
+      String property, String newVal) throws ReconfigurationException {
+
+  }
 }

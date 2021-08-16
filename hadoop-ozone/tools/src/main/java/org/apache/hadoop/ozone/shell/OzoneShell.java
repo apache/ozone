@@ -58,9 +58,4 @@ public class OzoneShell extends Shell {
         });
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
 }

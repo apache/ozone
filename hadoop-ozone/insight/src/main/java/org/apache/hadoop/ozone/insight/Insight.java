@@ -39,11 +39,6 @@ public class Insight extends GenericCli {
     super(Insight.class);
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public static void main(String[] args) throws Exception {
     new Insight().run(args);
   }

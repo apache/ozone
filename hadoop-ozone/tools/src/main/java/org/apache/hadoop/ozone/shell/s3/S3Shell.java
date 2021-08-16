@@ -46,11 +46,6 @@ public class S3Shell extends Shell {
         });
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   /**
    * Main for the S3Shell Command handling.
    *

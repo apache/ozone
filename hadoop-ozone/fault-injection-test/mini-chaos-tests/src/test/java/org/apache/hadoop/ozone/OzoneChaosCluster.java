@@ -43,11 +43,6 @@ public class OzoneChaosCluster extends GenericCli {
     super.execute(argv);
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public static void main(String[] args) {
     new OzoneChaosCluster().run(args);
   }

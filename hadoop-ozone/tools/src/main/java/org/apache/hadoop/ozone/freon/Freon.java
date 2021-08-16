@@ -92,11 +92,6 @@ public class Freon extends GenericCli {
     super.execute(argv);
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public void stopHttpServer() {
     if (freonHttpServer != null) {
       try {

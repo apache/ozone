@@ -71,11 +71,6 @@ public class DatanodeLayout extends GenericCli
     return null;
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public static void main(String[] args) {
     new DatanodeLayout().run(args);
   }

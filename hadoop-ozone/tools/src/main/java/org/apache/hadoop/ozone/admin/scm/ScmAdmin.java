@@ -58,11 +58,6 @@ public class ScmAdmin extends GenericCli  implements SubcommandWithParent {
   }
 
   @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
-  @Override
   public Class<?> getParentType() {
     return OzoneAdmin.class;
   }

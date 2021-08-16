@@ -127,11 +127,6 @@ public class ReconServer extends GenericCli {
     return null;
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   /**
    * Need a way to restart services from tests.
    */

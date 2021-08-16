@@ -72,11 +72,6 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
     return null;
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public ClientProtocol createClient(String omServiceId) throws Exception {
     OzoneConfiguration conf = parent.getOzoneConf();
     if (OmUtils.isOmHAServiceId(conf, omServiceId)) {

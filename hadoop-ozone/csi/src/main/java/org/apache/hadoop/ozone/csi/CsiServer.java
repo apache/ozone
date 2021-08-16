@@ -85,11 +85,6 @@ public class CsiServer extends GenericCli implements Callable<Void> {
     return null;
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public static void main(String[] args) {
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
         CsiServer.class, args, LOG);

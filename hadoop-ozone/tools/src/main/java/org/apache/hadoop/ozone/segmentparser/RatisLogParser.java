@@ -48,11 +48,6 @@ public class RatisLogParser extends GenericCli implements SubcommandWithParent {
     super.execute(argv);
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public static void main(String[] args) {
     new RatisLogParser().run(args);
   }

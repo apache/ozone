@@ -78,9 +78,4 @@ public class OzoneAdmin extends GenericCli {
           return null;
         });
   }
-
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
 }

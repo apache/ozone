@@ -83,10 +83,6 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
     return null;
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-  }
-
   /**
    * Generate ozone-site.xml at specified path.
    * @param path

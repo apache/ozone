@@ -40,11 +40,6 @@ public class OzoneDebug extends GenericCli {
     super(OzoneDebug.class);
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public OzoneConfiguration getOzoneConf() {
     if (ozoneConf == null) {
       ozoneConf = createOzoneConfiguration();

@@ -60,11 +60,6 @@ public class Gateway extends GenericCli {
     return null;
   }
 
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
-
   public void start() throws IOException {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);

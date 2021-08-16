@@ -58,9 +58,4 @@ public class AuditParser extends GenericCli {
   public String getDatabase(){
     return database;
   }
-
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
 }

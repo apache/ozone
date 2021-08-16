@@ -190,9 +190,4 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     cluster.startChaos(5, 10, TimeUnit.SECONDS);
     loadGenerator.startIO(120, TimeUnit.SECONDS);
   }
-
-  @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
-
-  }
 }
