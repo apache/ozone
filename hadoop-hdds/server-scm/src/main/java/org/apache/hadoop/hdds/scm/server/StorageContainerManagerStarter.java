@@ -21,12 +21,10 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.ReconfigurationException;
-import org.apache.hadoop.hdds.cli.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -38,7 +36,6 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
-import java.util.Collection;
 
 /**
  * This class provides a command line interface to start the SCM

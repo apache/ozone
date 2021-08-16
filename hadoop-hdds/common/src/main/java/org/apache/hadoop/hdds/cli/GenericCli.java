@@ -55,8 +55,7 @@ import javax.xml.bind.JAXBException;
 /**
  * This is a generic parent class for all the ozone related cli tools.
  */
-public abstract class GenericCli extends Configured implements Callable<Void>, GenericParentCommand
-    {
+public abstract class GenericCli extends Configured implements Callable<Void>, GenericParentCommand {
 
   @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
@@ -69,10 +68,7 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
   private String configurationPath;
 
   @Option(names = {"--start"})
-  private String reconfigStart;
-
-//  @Option(names = {"-status"})
-//  private String reconfigStatus;
+  private boolean reconfigStart;
 
   private final CommandLine cmd;
 
@@ -90,20 +86,12 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
 
   static List<OzoneConfiguration.Property> oldProperties = getOldProperties();
 
-  /** Background thread to reload configuration. */
+  /**
+   * Background thread to reload configuration.
+   */
   private Thread reconfigThread = null;
   private volatile boolean shouldRun = true;
   private Object reconfigLock = new Object();
-
-  /**
-   * The timestamp when the <code>reconfigThread</code> starts.
-   */
-  private long startTime = 0;
-
-  /**
-   * The timestamp when the <code>reconfigThread</code> finishes.
-   */
-  private long endTime = 0;
 
   /**
    * A map of <changed property, error message>. If error message is present,
@@ -186,7 +174,7 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
   }
 
   public boolean startReconfiguration() throws IOException {
-    return true;
+    return reconfigStart;
   }
 
   @VisibleForTesting
@@ -209,7 +197,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
       this.parent = base;
     }
 
-    // See {@link ReconfigurationServlet#applyChanges}
     public void run() {
       LOG.info("Starting reconfiguration task.");
       OzoneConfiguration oc = new OzoneConfiguration();
@@ -217,8 +204,7 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
       if (cL == null) {
         cL = OzoneConfiguration.class.getClassLoader();
       }
-      File file = new File("/Users/chenchao/IdeaProjects/ozone-722/hadoop-hdds/common/src/main/resources/" +
-          "ozone-site.xml");
+      File file = new File("ozone-site.xml");
       URL url = null;
       List<OzoneConfiguration.Property> allProperties = null;
       try {
@@ -228,9 +214,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
       }
       try {
         allProperties = oc.readPropertyFromXml(url);
-        for (OzoneConfiguration.Property property : allProperties) {
-          property.getName();
-        }
       } catch (JAXBException e) {
         e.printStackTrace();
       }
@@ -252,7 +235,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
       }
 
       synchronized (parent.reconfigLock) {
-        parent.endTime = Time.now();
         parent.status = Collections.unmodifiableMap(results);
         parent.reconfigThread = null;
       }
@@ -263,7 +245,7 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
    * Start a reconfiguration task to reload configuration in background.
    */
   public void startReconfigurationTask() throws IOException {
-    while(true) {
+    while (true) {
       synchronized (reconfigLock) {
         if (!shouldRun) {
           String errorMessage = "The server is stopped.";
@@ -279,7 +261,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
         reconfigThread.setDaemon(true);
         reconfigThread.setName("Reconfiguration Task");
         reconfigThread.start();
-        startTime = Time.now();
       }
       try {
         synchronized (monitor) {
@@ -288,32 +269,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }
-    }
-  }
-
-  public ReconfigurationTaskStatus getReconfigurationTaskStatus() {
-    synchronized (reconfigLock) {
-      if (reconfigThread != null) {
-        return new ReconfigurationTaskStatus(startTime, 0, null);
-      }
-      return new ReconfigurationTaskStatus(startTime, endTime, status);
-    }
-  }
-
-  public void shutdownReconfigurationTask() {
-    Thread tempThread;
-    synchronized (reconfigLock) {
-      shouldRun = false;
-      if (reconfigThread == null) {
-        return;
-      }
-      tempThread = reconfigThread;
-      reconfigThread = null;
-    }
-
-    try {
-      tempThread.join();
-    } catch (InterruptedException e) {
     }
   }
 
