@@ -1340,6 +1340,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public void stop() {
     try {
+      LOG.info("Stopping Container Balancer service.");
+      containerBalancer.stop();
+    } catch (Exception e) {
+      LOG.error("Failed to stop Container Balancer service.");
+    }
+
+    try {
       LOG.info("Stopping Replication Manager Service.");
       replicationManager.stop();
     } catch (Exception ex) {
