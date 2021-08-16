@@ -174,13 +174,9 @@ public class TestMultipartUploadWithCopy {
 
   @Test
   public void testMultipartIfModifiedIsTrue() throws Exception {
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(KEY);
-
     // True/ifModifiedSince = beforeSourceKeyModificationTime
     // True/ifUnmodifiedSince = afterSourceKeyModificationTimeStr
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+    uploadPartWithCopy(
         beforeSourceKeyModificationTimeStr,
         afterSourceKeyModificationTimeStr
     );
@@ -188,54 +184,38 @@ public class TestMultipartUploadWithCopy {
     // True/ifModifiedSince = beforeSourceKeyModificationTime
     // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
     try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+      uploadPartWithCopy(
           beforeSourceKeyModificationTimeStr,
           beforeSourceKeyModificationTimeStr
       );
-      fail("testMultipartIfModifiedSinceError");
+      fail("testMultipartIfModifiedIsTrue");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
 
     // True/ifModifiedSince = beforeSourceKeyModificationTime
     // Null
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        beforeSourceKeyModificationTimeStr,
-        null
-    );
+    uploadPartWithCopy(beforeSourceKeyModificationTimeStr, null);
 
     // True/ifModifiedSince = beforeSourceKeyModificationTime
-    // fUture
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        beforeSourceKeyModificationTimeStr,
-        tomorrowTimeStr
-    );
+    // Future
+    uploadPartWithCopy(beforeSourceKeyModificationTimeStr, tomorrowTimeStr);
 
     // True/ifModifiedSince = beforeSourceKeyModificationTime
     // Bad
-    uploadPartWithCopy(KEY, uploadID, 1,
-        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-        beforeSourceKeyModificationTimeStr,
-        badTimeStr
-    );
+    uploadPartWithCopy(beforeSourceKeyModificationTimeStr, badTimeStr);
   }
 
   @Test
   public void testMultipartIfModifiedIsFalse() throws Exception {
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(KEY);
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // True/ifUnmodifiedSince = afterSourceKeyModificationTime
     try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+      uploadPartWithCopy(
           afterSourceKeyModificationTimeStr,
           afterSourceKeyModificationTimeStr
       );
-      fail("testMultipartIfModifiedSinceError");
+      fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
@@ -243,12 +223,11 @@ public class TestMultipartUploadWithCopy {
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // False/ifUnmodifiedSince = beforeSourceKeyModificationTime,
     try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+      uploadPartWithCopy(
           afterSourceKeyModificationTimeStr,
           beforeSourceKeyModificationTimeStr
       );
-      fail("testMultipartIfModifiedSinceError");
+      fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
@@ -256,36 +235,24 @@ public class TestMultipartUploadWithCopy {
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // Null
     try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTimeStr,
-          null
-      );
-      fail("testMultipartIfModifiedSinceError");
+      uploadPartWithCopy(afterSourceKeyModificationTimeStr, null);
+      fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
     // False/ifModifiedSince = afterSourceKeyModificationTime
-    // fUture
+    // Future
     try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTimeStr,
-          tomorrowTimeStr
-      );
-      fail("testMultipartIfModifiedSinceError");
+      uploadPartWithCopy(afterSourceKeyModificationTimeStr, tomorrowTimeStr);
+      fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
     // False/ifModifiedSince = afterSourceKeyModificationTime
     // Bad
     try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTimeStr,
-          badTimeStr
-      );
-      fail("testMultipartIfModifiedSinceError");
+      uploadPartWithCopy(afterSourceKeyModificationTimeStr, badTimeStr);
+      fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
@@ -294,57 +261,35 @@ public class TestMultipartUploadWithCopy {
 
   @Test
   public void testInvalidOrNullTimes() throws Exception {
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(KEY);
     String[] invalidOrNullTimes = {null, badTimeStr, tomorrowTimeStr};
 
     for (String ts: invalidOrNullTimes) {
       // null/bad/future
       // True/ifUnmodifiedSince = afterSourceKeyModificationTimeStr
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-	  ts,
-          afterSourceKeyModificationTimeStr
-      );
+      uploadPartWithCopy(ts, afterSourceKeyModificationTimeStr);
   
       // null/bad/future
       // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
       try {
-        uploadPartWithCopy(KEY, uploadID, 1,
-            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-            ts,
-            beforeSourceKeyModificationTimeStr
-        );
-        fail("testMultipartIfModifiedSinceError");
+        uploadPartWithCopy(ts, beforeSourceKeyModificationTimeStr);
+        fail("testInvalidOrNullTimes");
       } catch (OS3Exception ex) {
         assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
       }
   
       // null/bad/future
       // Null
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-	  ts,
-          null
-      );
+      uploadPartWithCopy(ts, null);
   
       // null/bad/future
       // True/ifModifiedSince = beforeSourceKeyModificationTime
-      // fUture
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-	  ts,
-          tomorrowTimeStr
-      );
+      // Future
+      uploadPartWithCopy(ts, tomorrowTimeStr);
   
       // null/bad/future
       // True/ifModifiedSince = beforeSourceKeyModificationTime
       // Bad
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-	  ts,
-          badTimeStr
-      );
+      uploadPartWithCopy(ts, badTimeStr);
     }
   }
 
@@ -385,6 +330,16 @@ public class TestMultipartUploadWithCopy {
       String keyOrigin, String range) throws IOException, OS3Exception {
     return uploadPartWithCopy(key, uploadID, partNumber, keyOrigin,
         range, null, null);
+  }
+
+  private Part uploadPartWithCopy(String ifModifiedSinceStr,
+      String ifUnmodifiedSinceStr) throws IOException, OS3Exception {
+    // Initiate multipart upload
+    String uploadID = initiateMultipartUpload(KEY);
+
+    return uploadPartWithCopy(KEY, uploadID, 1,
+      OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+      ifModifiedSinceStr, ifUnmodifiedSinceStr);
   }
 
   private Part uploadPartWithCopy(String key, String uploadID, int partNumber,
