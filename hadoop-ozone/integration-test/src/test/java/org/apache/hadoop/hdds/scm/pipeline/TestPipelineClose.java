@@ -222,11 +222,7 @@ public class TestPipelineClose {
     Pipeline openPipeline = containerWithPipeline.getPipeline();
     RaftGroupId groupId = RaftGroupId.valueOf(openPipeline.getId().getId());
 
-    try {
-      pipelineManager.getPipeline(openPipeline.getId());
-    } catch (PipelineNotFoundException e) {
-      Assert.assertTrue("pipeline should exist", false);
-    }
+    pipelineManager.getPipeline(openPipeline.getId());
 
     DatanodeDetails datanodeDetails = openPipeline.getNodes().get(0);
     int index = cluster.getHddsDatanodeIndex(datanodeDetails);
@@ -242,7 +238,7 @@ public class TestPipelineClose {
     xceiverRatis.handleNodeLogFailure(groupId, null);
 
     // verify SCM receives a pipeline action report "immediately"
-    Mockito.verify(pipelineActionTest, Mockito.timeout(100))
+    Mockito.verify(pipelineActionTest, Mockito.timeout(500))
         .onMessage(
             actionCaptor.capture(),
             Mockito.any(EventPublisher.class));
