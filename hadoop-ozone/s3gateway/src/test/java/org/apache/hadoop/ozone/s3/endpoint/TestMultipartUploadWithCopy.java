@@ -74,11 +74,11 @@ public class TestMultipartUploadWithCopy {
   private static final String EXISTING_KEY_CONTENT = "testkey";
   private static final OzoneClient CLIENT = new OzoneClientStub();
   private static final long DELAY_MS = 2000;
-  private static long sourceKeyLastModificationTime;
+  private static Long sourceKeyLastModificationTime;
   private static String beforeSourceKeyModificationTimeStr;
   private static String afterSourceKeyModificationTimeStr;
   private static String futureTimeStr;
-  private static final String UNPARSABLE_TIME_STR = "Unparsable time string";
+  private static final String badTimeStr = "Bad time string";
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -172,19 +172,6 @@ public class TestMultipartUploadWithCopy {
     }
   }
 
-  /* The next two tests excercise all the combinations of modification times.
-   * There are two types times, ModifiedSince, and UnmodifiedSince.  Each of
-   * those can be in one of 5 states:
-   * 1. Valid and True
-   * 2. Valid and False
-   * 3. Null
-   * 4. Invalid/Unparseable
-   * 5. Invalid/Future time
-   * Which means there are 25, (5*5), combinations of the two, all of which
-   * are tried below.
-   * The comments above each test list the states for each type being
-   * tested
-   */
   @Test
   public void testMultipartIfModifiedIsFalse() throws Exception {
     // False/ifModifiedSince = afterSourceKeyModificationTime
@@ -228,10 +215,9 @@ public class TestMultipartUploadWithCopy {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
     }
     // False/ifModifiedSince = afterSourceKeyModificationTime
-    // Unparsable
+    // Bad
     try {
-      uploadPartWithCopy(afterSourceKeyModificationTimeStr,
-          UNPARSABLE_TIME_STR);
+      uploadPartWithCopy(afterSourceKeyModificationTimeStr, badTimeStr);
       fail("testMultipartIfModifiedIsFalse");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
@@ -242,14 +228,14 @@ public class TestMultipartUploadWithCopy {
   @Test
   public void testMultipartIfModifiedIsTrueOrInvalid() throws Exception {
     String[] trueOrInvalidTimes = {beforeSourceKeyModificationTimeStr,
-                                   null, UNPARSABLE_TIME_STR, futureTimeStr};
+				   null, badTimeStr, futureTimeStr};
 
     for (String ts: trueOrInvalidTimes) {
-      // True/Null/Unparsable/Future
+      // True/Null/Bad/Future
       // True/ifUnmodifiedSince = afterSourceKeyModificationTimeStr
       uploadPartWithCopy(ts, afterSourceKeyModificationTimeStr);
   
-      // True/Null/Unparsable/Future
+      // True/Null/Bad/Future
       // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
       try {
         uploadPartWithCopy(ts, beforeSourceKeyModificationTimeStr);
@@ -258,17 +244,17 @@ public class TestMultipartUploadWithCopy {
         assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
       }
   
-      // True/Null/Unparsable/Future
+      // True/Null/Bad/Future
       // Null
       uploadPartWithCopy(ts, null);
   
-      // True/Null/Unparsable/Future
+      // True/Null/Bad/Future
       // Future
       uploadPartWithCopy(ts, futureTimeStr);
   
-      // True/Null/Unparsable/Future
-      // Unparsable
-      uploadPartWithCopy(ts, UNPARSABLE_TIME_STR);
+      // True/Null/Bad/Future
+      // Bad
+      uploadPartWithCopy(ts, badTimeStr);
     }
   }
 
