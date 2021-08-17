@@ -359,7 +359,7 @@ public final class SCMContainerPlacementRackAware
   }
 
   @Override
-  protected int getRequiredRackCount() {
+  protected int getRequiredRackCount(int numReplicas) {
     return REQUIRED_RACKS;
   }
 }
