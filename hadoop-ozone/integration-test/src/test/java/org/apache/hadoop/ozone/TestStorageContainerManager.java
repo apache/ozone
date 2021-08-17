@@ -750,10 +750,9 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
 
       helper.createKeys(10, 4096);
-      GenericTestUtils.waitFor(() -> {
-        return cluster.getStorageContainerManager().getContainerManager().
-            getContainers() != null;
-      }, 1000, 10000);
+      GenericTestUtils.waitFor(() ->
+          cluster.getStorageContainerManager().getContainerManager()
+              .getContainers() != null, 1000, 10000);
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<ContainerInfo> containers = cluster.getStorageContainerManager()

@@ -514,7 +514,8 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(newContainer, 3);
 
     ContainerReplicaCount counts =
-        scm.getReplicationManager().getContainerReplicaCount(newContainer);
+        scm.getReplicationManager()
+          .getContainerReplicaCount(newContainer.containerID());
     assertEquals(1, counts.getMaintenanceCount());
     assertTrue(counts.isSufficientlyReplicated());
 
@@ -541,7 +542,8 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(nextContainer, 3);
     // There should be no IN_MAINTENANCE node:
     assertEquals(0, nm.getNodeCount(IN_MAINTENANCE, null));
-    counts = scm.getReplicationManager().getContainerReplicaCount(newContainer);
+    counts = scm.getReplicationManager()
+      .getContainerReplicaCount(newContainer.containerID());
     assertEquals(0, counts.getMaintenanceCount());
     assertTrue(counts.isSufficientlyReplicated());
   }
