@@ -328,4 +328,31 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       healthyList.removeAll(nodeManager.getPeerList(dn));
     }
   }
+
+  /**
+   * Check If a datanode is an available node.
+   * @param datanodeDetails - the datanode to check.
+   * @param metadataSizeRequired - the required size for metadata.
+   * @param dataSizeRequired - the required size for data.
+   * @return true if the datanode is available.
+   */
+  public boolean isValidNode(DatanodeDetails datanodeDetails,
+      long metadataSizeRequired, long dataSizeRequired) {
+    DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
+        .getNodeByUuid(datanodeDetails.getUuidString());
+    if (datanodeInfo == null) {
+      LOG.error("Failed to find the DatanodeInfo for datanode {}",
+          datanodeDetails);
+    } else {
+      if (datanodeInfo.getNodeStatus().isNodeWritable() &&
+          (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
+              dataSizeRequired))) {
+        LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
+                "required data size is {}",
+            datanodeDetails.toString(), metadataSizeRequired, dataSizeRequired);
+        return true;
+      }
+    }
+    return false;
+  }
 }
