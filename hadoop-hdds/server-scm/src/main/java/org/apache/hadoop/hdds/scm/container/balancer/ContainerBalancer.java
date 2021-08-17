@@ -722,6 +722,12 @@ public class ContainerBalancer {
       }
       balancerRunning = false;
       currentBalancingThread.interrupt();
+      currentBalancingThread.join(1000);
+
+      // allow garbage collector to collect balancing thread
+      currentBalancingThread = null;
+    } catch (InterruptedException e) {
+      LOG.warn("Interrupted while waiting for balancing thread to join.");
     } finally {
       lock.unlock();
     }
