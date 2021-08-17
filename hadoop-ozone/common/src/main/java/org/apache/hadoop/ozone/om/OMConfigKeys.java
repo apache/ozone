@@ -240,6 +240,15 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
 
+  public static final String OZONE_DEFAULT_SERVER_REPLICATION_KEY =
+      "ozone.server.replication";
+  public static final String OZONE_DEFAULT_SERVER_REPLICATION_DEFAULT = "3";
+
+  public static final String OZONE_DEFAULT_SERVER_REPLICATION_TYPE_KEY =
+      "ozone.server.replication.type";
+  public static final String OZONE_DEFAULT_SERVER_REPLICATION_TYPE_DEFAULT =
+      "RATIS";
+
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 
   public static final String OZONE_FS_TRASH_INTERVAL_KEY =

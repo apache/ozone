@@ -34,9 +34,6 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -589,12 +586,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          long transactionLogIndex, long objectID, boolean isRatisEnabled)
+          long transactionLogIndex, long objectID, boolean isRatisEnabled,
+          ReplicationConfig replicationConfig)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
             locations, encInfo, prefixManager, omBucketInfo, null,
-            transactionLogIndex, objectID, isRatisEnabled);
+            transactionLogIndex, objectID, isRatisEnabled, replicationConfig);
   }
 
   /**
@@ -612,7 +610,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfoWithFSO omPathInfo,
           long transactionLogIndex, long objectID,
-          boolean isRatisEnabled)
+          boolean isRatisEnabled, ReplicationConfig replicationConfig)
           throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
@@ -635,32 +633,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       return dbKeyInfo;
     }
 
-    ReplicationConfig replicationConfig = null;
-    if (keyArgs.getType() != HddsProtos.ReplicationType.NONE) {
-      // 1. Client passed the replication config.
-      // Let's use it.
-      final HddsProtos.ReplicationType type = keyArgs.getType();
-      replicationConfig = ReplicationConfig
-          .fromProto(keyArgs.getType(), keyArgs.getFactor(),
-              keyArgs.getEcReplicationConfig());
-    } else {
-      // 1. Client did not pass replication config.
-      // Now lets try bucket defaults
-      if (omBucketInfo.getDefaultReplicationConfig() != null) {
-        // Since Bucket defaults are available, let's inherit
-        replicationConfig = ReplicationConfig.fromProto(ReplicationType
-                .toProto(omBucketInfo.getDefaultReplicationConfig().getType()),
-            ReplicationFactor.toProto(
-                omBucketInfo.getDefaultReplicationConfig().getFactor()),
-            omBucketInfo.getDefaultReplicationConfig().getEcReplicationConfig()
-                .toProto());
-      }
-      //Else:  1. Client did not pass replication
-      // 2. Bucket does not have default replication config.
-      // Now lets set server defaults for key.
-      // TODO: This can happen once we remove configs from ozone-default.xml
-
-    }
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
     return createFileInfo(keyArgs, locations, replicationConfig,

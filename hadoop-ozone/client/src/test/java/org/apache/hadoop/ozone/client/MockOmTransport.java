@@ -181,6 +181,7 @@ public class MockOmTransport implements OmTransport {
             .addAllKeyLocations(
                 blockAllocator.allocateBlock(createKeyRequest.getKeyArgs()))
             .build());
+
     if (keyArgs.getType() == HddsProtos.ReplicationType.NONE) {
       // 1. Client did not pass replication config.
       // Now lets try bucket defaults

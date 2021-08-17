@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -125,8 +126,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
       type = useRatis ? HddsProtos.ReplicationType.RATIS :
           HddsProtos.ReplicationType.STAND_ALONE;
     }
-    ReplicationConfig repConfig = ReplicationConfig.fromProto(
-        type, factor, keyArgs.getEcReplicationConfig());
+
+    final OmBucketInfo bucketInfo = ozoneManager
+        .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
+    final ReplicationConfig repConfig = OzoneConfigUtil
+        .resolveReplicationConfigPreference(type, factor,
+            keyArgs.getEcReplicationConfig(),
+            bucketInfo.getDefaultReplicationConfig(),
+            ozoneManager.getDefaultReplicationConfig());
 
     // TODO: Here we are allocating block with out any check for
     //  bucket/key/volume or not and also with out any authorization checks.
@@ -246,12 +253,17 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
+      final ReplicationConfig repConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo.getDefaultReplicationConfig(),
+              ozoneManager.getDefaultReplicationConfig());
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          ozoneManager.isRatisEnabled());
+          ozoneManager.isRatisEnabled(), repConfig);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createFileRequest.getClientID();

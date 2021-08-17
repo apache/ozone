@@ -359,6 +359,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         acl.getName(), (BitSet) acl.getAclBitSet().clone(),
         acl.getAclScope())));
 
+    if (defaultReplicationConfig != null) {
+      builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());
+    }
+
     return builder.build();
   }
 

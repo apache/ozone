@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -142,8 +143,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         type = useRatis ? HddsProtos.ReplicationType.RATIS :
             HddsProtos.ReplicationType.STAND_ALONE;
       }
-      ReplicationConfig repConfig = ReplicationConfig.fromProto(
-          type, factor, keyArgs.getEcReplicationConfig());
+      final OmBucketInfo bucketInfo = ozoneManager
+          .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
+      final ReplicationConfig repConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(type, factor,
+              keyArgs.getEcReplicationConfig(),
+              bucketInfo.getDefaultReplicationConfig(),
+              ozoneManager.getDefaultReplicationConfig());
 
       // TODO: Here we are allocating block with out any check for
       //  bucket/key/volume or not and also with out any authorization checks.
@@ -278,11 +284,17 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         numMissingParents = missingParentInfos.size();
       }
 
+      ReplicationConfig replicationConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo.getDefaultReplicationConfig(),
+              ozoneManager.getDefaultReplicationConfig());
+
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          ozoneManager.isRatisEnabled());
+          ozoneManager.isRatisEnabled(), replicationConfig);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
@@ -305,7 +317,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // commitKey.
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
-          * omKeyInfo.getReplicationConfig().getRequiredNodes();
+          * replicationConfig.getRequiredNodes();
       // check bucket and volume quota
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);

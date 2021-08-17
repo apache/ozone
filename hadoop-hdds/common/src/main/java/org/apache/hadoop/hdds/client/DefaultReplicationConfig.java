@@ -44,12 +44,24 @@ public class DefaultReplicationConfig {
     this.ecReplicationConfig = ecReplicationConfig;
   }
 
+  public DefaultReplicationConfig(ReplicationType type,
+      ReplicationFactor factor, ECReplicationConfig ecReplicationConfig) {
+    this.type = type;
+    this.factor = factor;
+    this.ecReplicationConfig = ecReplicationConfig;
+  }
+
   public ReplicationType getType() {
     return this.type;
   }
 
   public ReplicationFactor getFactor() {
     return this.factor;
+  }
+
+  public DefaultReplicationConfig copy() {
+    return new DefaultReplicationConfig(this.type, this.factor,
+        this.ecReplicationConfig);
   }
 
   public ECReplicationConfig getEcReplicationConfig() {
