@@ -193,7 +193,6 @@ public class TestKeyManagerImpl {
     keyManager =
         new KeyManagerImpl(scm.getBlockProtocolServer(),
             mockScmContainerClient, metadataManager, conf, "om1", null);
-    keyManager.setIsFSOBucketCheckEnabled(false);
     prefixManager = new PrefixManagerImpl(metadataManager, false);
 
     Mockito.when(mockScmBlockLocationProtocol

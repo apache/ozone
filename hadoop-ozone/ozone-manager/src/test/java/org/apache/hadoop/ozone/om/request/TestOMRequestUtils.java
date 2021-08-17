@@ -37,14 +37,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -99,6 +92,15 @@ public final class TestOMRequestUtils {
     addVolumeToDB(volumeName, omMetadataManager);
 
     addBucketToDB(volumeName, bucketName, omMetadataManager);
+  }
+
+  public static void addVolumeAndBucketToDB(String volumeName,
+      String bucketName, OMMetadataManager omMetadataManager,
+      BucketLayout bucketLayout) throws Exception {
+
+    addVolumeToDB(volumeName, omMetadataManager);
+
+    addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
   }
 
   @SuppressWarnings("parameterNumber")
@@ -432,6 +434,21 @@ public final class TestOMRequestUtils {
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName).setCreationTime(Time.now()).build();
+
+    // Add to cache.
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
+        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+  }
+
+  public static void addBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
+      throws Exception {
+
+    OmBucketInfo omBucketInfo =
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName).setCreationTime(Time.now())
+            .setBucketLayout(bucketLayout).build();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
