@@ -49,6 +49,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
@@ -151,7 +152,10 @@ public final class HttpServer2 implements FilterContainer {
   // idle timeout in milliseconds
   private static final String HTTP_IDLE_TIMEOUT_MS_KEY =
       "hadoop.http.idle_timeout.ms";
-  private static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 10000;
+  // This value will never be used because the default value is set in
+  // core-default.xml from hadoop-common and ozone-default.xml. The value
+  // 60k here is aligned to the value in ozone-default.xml.
+  private static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 60000;
   private static final String HTTP_TEMP_DIR_KEY = "hadoop.http.temp.dir";
 
   private static final String FILTER_INITIALIZER_PROPERTY
@@ -1752,5 +1756,10 @@ public final class HttpServer2 implements FilterContainer {
     headers.put(HTTP_HEADER_PREFIX + splitVal[0],
         splitVal[1]);
     return headers;
+  }
+
+  @VisibleForTesting
+  protected List<ServerConnector> getListeners() {
+    return listeners;
   }
 }
