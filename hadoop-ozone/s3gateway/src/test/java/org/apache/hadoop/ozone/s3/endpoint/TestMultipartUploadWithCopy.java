@@ -180,9 +180,9 @@ public class TestMultipartUploadWithCopy {
    * 3. Null
    * 4. Invalid/Unparseable
    * 5. Invalid/Future time
-   * Which means there are 25, (5*5), combinations of the two all of which
+   * Which means there are 25, (5*5), combinations of the two, all of which
    * are tried below.
-   * The comments above each test list which state for each type is being
+   * The comments above each test list the states for each type being
    * tested
    */
   @Test
