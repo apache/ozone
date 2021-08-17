@@ -169,18 +169,15 @@ public class MockOmTransport implements OmTransport {
     final BucketInfo bucketInfo =
         buckets.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName());
 
-    final KeyInfo.Builder keyInfoBuilder = KeyInfo.newBuilder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(keyArgs.getKeyName())
-        .setCreationTime(now)
-        .setModificationTime(now)
-        .setDataSize(keyArgs.getDataSize())
-        .setLatestVersion(0L)
-        .addKeyLocationList(KeyLocationList.newBuilder()
-            .addAllKeyLocations(
+    final KeyInfo.Builder keyInfoBuilder =
+        KeyInfo.newBuilder().setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(keyArgs.getKeyName()).setCreationTime(now)
+            .setModificationTime(now).setDataSize(keyArgs.getDataSize())
+            .setLatestVersion(0L).addKeyLocationList(
+            KeyLocationList.newBuilder().addAllKeyLocations(
                 blockAllocator.allocateBlock(createKeyRequest.getKeyArgs()))
-            .build());
+                .build());
 
     if (keyArgs.getType() == HddsProtos.ReplicationType.NONE) {
       // 1. Client did not pass replication config.
@@ -196,18 +193,20 @@ public class MockOmTransport implements OmTransport {
           keyInfoBuilder.setEcReplicationConfig(
               bucketInfo.getDefaultReplicationConfig()
                   .getEcReplicationConfig());
+          break;
         case RATIS:
         case STAND_ALONE:
           keyInfoBuilder
               .setFactor(bucketInfo.getDefaultReplicationConfig().getFactor());
+          break;
         default:
-          //keyInfoBuilder.setReplicationConfig(replicationConfig);
+          throw new UnsupportedOperationException(
+              "Unknown replication type: " + type);
         }
+      } else {
+        keyInfoBuilder.setType(HddsProtos.ReplicationType.RATIS);
+        keyInfoBuilder.setFactor(HddsProtos.ReplicationFactor.THREE);
       }
-      // Else: 1. Client did not passed replication
-      // 2. Bucket does not have default replication config.
-      // Now lets set server defaults for key.
-      // TODO:
     } else {
       // 1. Client passed the replication config.
       // Let's use it.
@@ -216,20 +215,21 @@ public class MockOmTransport implements OmTransport {
       switch (type) {
       case EC:
         keyInfoBuilder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+        break;
       case RATIS:
       case STAND_ALONE:
         keyInfoBuilder.setFactor(keyArgs.getFactor());
+        break;
       default:
-        //keyInfoBuilder.setReplicationConfig(replicationConfig);
+        throw new UnsupportedOperationException(
+            "Unknown replication type: " + type);
       }
     }
 
     final KeyInfo keyInfo = keyInfoBuilder.build();
     openKeys.get(keyInfo.getVolumeName()).get(keyInfo.getBucketName())
         .put(keyInfo.getKeyName(), keyInfo);
-    return CreateKeyResponse.newBuilder()
-        .setOpenVersion(0L)
-        .setKeyInfo(keyInfo)
+    return CreateKeyResponse.newBuilder().setOpenVersion(0L).setKeyInfo(keyInfo)
         .build();
   }
 
