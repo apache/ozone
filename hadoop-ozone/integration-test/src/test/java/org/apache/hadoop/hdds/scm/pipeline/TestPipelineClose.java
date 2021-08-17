@@ -205,7 +205,7 @@ public class TestPipelineClose {
   }
 
   @Test
-  @Ignore
+  @Ignore("HDDS-5604")
   public void testPipelineCloseWithLogFailure() throws IOException {
 
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
