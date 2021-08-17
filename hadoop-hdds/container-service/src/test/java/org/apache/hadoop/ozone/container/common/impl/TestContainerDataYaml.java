@@ -268,15 +268,10 @@ public class TestContainerDataYaml {
    * Test to verify disabled checksum with incorrect checksum.
    */
   @Test
-  public void testDisabledChecksum(){
-    try {
-      KeyValueContainerData kvData = getKeyValueContainerData();
-      conf.setBoolean(HddsConfigKeys.
-                      HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
-      ContainerUtils.verifyChecksum(kvData, conf);
-    } catch (Exception ex) {
-      fail("testDisabledChecksum failed");
-    }
-
+  public void testDisabledChecksum() throws IOException {
+    KeyValueContainerData kvData = getKeyValueContainerData();
+    conf.setBoolean(HddsConfigKeys.
+                    HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
+    ContainerUtils.verifyChecksum(kvData, conf);
   }
 }
