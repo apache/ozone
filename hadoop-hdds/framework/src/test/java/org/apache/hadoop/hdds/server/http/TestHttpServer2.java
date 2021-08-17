@@ -25,8 +25,17 @@ import java.net.URI;
 
 import static org.junit.Assert.assertEquals;
 
+/**
+ * Testing HttpServer2.
+ */
 public class TestHttpServer2 {
 
+  /**
+   * Test hadoop.http.idle_timeout.ms correctly loaded, and not being default
+   * value from core-default.xml of hadoop-common.
+   *
+   * @throws Exception
+   */
   @Test
   public void testIdleTimeout() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
