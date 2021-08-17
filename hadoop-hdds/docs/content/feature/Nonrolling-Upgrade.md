@@ -1,8 +1,5 @@
 ---
-title: Non-rolling upgrades and downgrades
-summary: Steps to do a non rolling upgrade of Ozone.
-date: 2021-02-15
-author: Aravindan Vijayan 
+title: Non-Rolling Upgrades and Downgrades
 menu:
    main:
       parent: Features
