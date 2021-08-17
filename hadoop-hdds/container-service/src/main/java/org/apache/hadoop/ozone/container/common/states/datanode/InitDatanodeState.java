@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.ReconEndpointType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -105,7 +106,8 @@ public class InitDatanodeState implements DatanodeState,
         connectionManager.addSCMServer(addr);
         this.context.addEndpoint(addr);
       }
-      InetSocketAddress reconAddress = getReconAddresses(conf);
+      InetSocketAddress reconAddress = getReconAddresses(conf,
+          ReconEndpointType.RPC);
       if (reconAddress != null) {
         connectionManager.addReconServer(reconAddress);
         this.context.addEndpoint(reconAddress);

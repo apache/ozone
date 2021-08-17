@@ -57,6 +57,7 @@ import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESE
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
@@ -300,8 +301,13 @@ public final class HddsUtils {
    * @throws IllegalArgumentException If the configuration is invalid
    */
   public static InetSocketAddress getReconAddresses(
-      ConfigurationSource conf) {
-    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
+      ConfigurationSource conf, ReconEndpointType type) {
+    String name = "";
+    if (type == ReconEndpointType.RPC) {
+      name = conf.get(OZONE_RECON_ADDRESS_KEY);
+    } else if (type == ReconEndpointType.WEB_HTTP) {
+      name = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
+    }
     if (StringUtils.isEmpty(name)) {
       return null;
     }

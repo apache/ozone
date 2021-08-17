@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.ReconEndpointType;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -214,7 +215,8 @@ public class ReconServer extends GenericCli {
           reconConfig.getKerberosPrincipal(),
           reconConfig.getKerberosKeytab());
       UserGroupInformation.setConfiguration(conf);
-      InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
+      InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf,
+          ReconEndpointType.RPC);
       SecurityUtil.login(conf,
           OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
           OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
