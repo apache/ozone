@@ -351,7 +351,7 @@ public final class ChunkUtils {
     }
   }
 
-  private static StorageContainerException wrapInStorageContainerException(
+  public static StorageContainerException wrapInStorageContainerException(
       IOException e) {
     ContainerProtos.Result result = translate(e);
     return new StorageContainerException(e, result);

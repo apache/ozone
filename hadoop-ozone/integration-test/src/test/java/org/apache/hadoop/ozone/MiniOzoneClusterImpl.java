@@ -694,6 +694,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >=3 ? 3 : 1);
+      // set chunk data validation to true by default
+      conf.setBoolean("hdds.datanode.chunk.data.validation.check", true);
       configureTrace();
     }
 
