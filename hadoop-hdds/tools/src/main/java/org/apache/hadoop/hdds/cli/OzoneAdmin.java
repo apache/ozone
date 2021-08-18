@@ -28,7 +28,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import picocli.CommandLine;
 
-import java.io.IOException;
 import java.util.function.Supplier;
 
 /**

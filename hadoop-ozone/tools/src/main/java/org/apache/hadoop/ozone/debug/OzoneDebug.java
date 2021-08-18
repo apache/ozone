@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.debug;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
-import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
 

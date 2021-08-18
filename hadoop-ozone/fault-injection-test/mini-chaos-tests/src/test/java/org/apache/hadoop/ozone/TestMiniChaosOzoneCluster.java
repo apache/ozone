@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;

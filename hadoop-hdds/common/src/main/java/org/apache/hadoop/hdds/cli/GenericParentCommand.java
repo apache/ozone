@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.cli;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
-import javax.xml.bind.JAXBException;
 import java.io.IOException;
 
 /**

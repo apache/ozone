@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.cli;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.util.ArrayList;
@@ -42,7 +41,8 @@ public class ReconfigurationUtil {
   }
 
   public static Collection<PropertyChange>
-  getChangedProperties(List<OzoneConfiguration.Property> newConf, List<OzoneConfiguration.Property> oldConf) {
+      getChangedProperties(List<OzoneConfiguration.Property> newConf,
+                       List<OzoneConfiguration.Property> oldConf) {
     Map<String, PropertyChange> changes = new HashMap<String, PropertyChange>();
 
     // iterate over old configuration
@@ -69,7 +69,6 @@ public class ReconfigurationUtil {
     for (OzoneConfiguration.Property newEntry: newConf) {
       String newkey = newEntry.getName();
       String newVal = newEntry.getValue();
-      for (OzoneConfiguration.Property oldEntry: oldConf)
       if (!oldKeys.contains(newkey)) {
         changes.put(newkey, new PropertyChange(newkey, newVal, null));
       }
@@ -79,7 +78,8 @@ public class ReconfigurationUtil {
   }
 
   public Collection<PropertyChange> parseChangedProperties(
-      List<OzoneConfiguration.Property> newConf, List<OzoneConfiguration.Property> oldConf) {
+      List<OzoneConfiguration.Property> newConf,
+      List<OzoneConfiguration.Property> oldConf) {
     return getChangedProperties(newConf, oldConf);
   }
 }

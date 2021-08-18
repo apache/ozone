@@ -21,7 +21,6 @@ import java.io.PrintStream;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.util.NativeCodeLoader;
 import org.apache.log4j.ConsoleAppender;

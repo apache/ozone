@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;

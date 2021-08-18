@@ -75,7 +75,8 @@ public class StorageContainerManagerStarter extends GenericCli {
   }
 
   @Override
-  protected void reconfigurePropertyImpl(String property, String newVal) throws ReconfigurationException {
+  protected void reconfigurePropertyImpl(String property, String newVal)
+      throws ReconfigurationException {
 
   }
 

@@ -21,26 +21,18 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.concurrent.Callable;
 
-import com.google.common.collect.Maps;
-import org.apache.hadoop.conf.ConfigRedactor;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.conf.Reconfigurable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.util.Time;
-import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -55,7 +47,8 @@ import javax.xml.bind.JAXBException;
 /**
  * This is a generic parent class for all the ozone related cli tools.
  */
-public abstract class GenericCli extends Configured implements Callable<Void>, GenericParentCommand {
+public abstract class GenericCli extends Configured
+    implements Callable<Void>, GenericParentCommand {
 
   @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
@@ -84,7 +77,8 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
 
   private final Object monitor = new Object();
 
-  static List<OzoneConfiguration.Property> oldProperties = getOldProperties();
+  private static List<OzoneConfiguration.Property>
+      oldProperties = getOldProperties();
 
   /**
    * Background thread to reload configuration.
@@ -92,14 +86,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
   private Thread reconfigThread = null;
   private volatile boolean shouldRun = true;
   private Object reconfigLock = new Object();
-
-  /**
-   * A map of <changed property, error message>. If error message is present,
-   * it contains the messages about the error occurred when applies the particular
-   * change. Otherwise, it indicates that the change has been successfully applied.
-   */
-  private Map<ReconfigurationUtil.PropertyChange, Optional<String>> status = null;
-
 
   public GenericCli(Class<?> type) {
     this();
@@ -220,7 +206,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
 
       final Collection<ReconfigurationUtil.PropertyChange> changes =
           parent.getChangedProperties(allProperties, oldProperties);
-      Map<ReconfigurationUtil.PropertyChange, Optional<String>> results = Maps.newHashMap();
       for (ReconfigurationUtil.PropertyChange change : changes) {
         LOG.info("Change property: " + change.prop + " from \""
             + ((change.oldVal == null) ? "<default>" : change.oldVal)
@@ -232,11 +217,6 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
         } catch (ReconfigurationException e) {
           e.printStackTrace();
         }
-      }
-
-      synchronized (parent.reconfigLock) {
-        parent.status = Collections.unmodifiableMap(results);
-        parent.reconfigThread = null;
       }
     }
   }
@@ -274,7 +254,8 @@ public abstract class GenericCli extends Configured implements Callable<Void>, G
 
   @VisibleForTesting
   public Collection<ReconfigurationUtil.PropertyChange> getChangedProperties(
-      List<OzoneConfiguration.Property> newConf, List<OzoneConfiguration.Property> oldConf) {
+      List<OzoneConfiguration.Property> newConf,
+      List<OzoneConfiguration.Property> oldConf) {
     return reconfigurationUtil.parseChangedProperties(newConf, oldConf);
   }
 

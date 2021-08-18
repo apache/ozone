@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.shell.s3;
 
 import java.util.function.Supplier;
 
-import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
 

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.insight;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
-import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import picocli.CommandLine;
 
 /**

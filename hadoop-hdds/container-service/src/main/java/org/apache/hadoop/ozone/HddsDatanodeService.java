@@ -324,25 +324,25 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     CertificateClient.InitResponse response = dnCertClient.init();
     LOG.info("Init response: {}", response);
     switch (response) {
-      case SUCCESS:
-        LOG.info("Initialization successful, case:{}.", response);
-        break;
-      case GETCERT:
-        getSCMSignedCert(config);
-        LOG.info("Successfully stored SCM signed certificate, case:{}.",
+    case SUCCESS:
+      LOG.info("Initialization successful, case:{}.", response);
+      break;
+    case GETCERT:
+      getSCMSignedCert(config);
+      LOG.info("Successfully stored SCM signed certificate, case:{}.",
             response);
-        break;
-      case FAILURE:
-        LOG.error("DN security initialization failed, case:{}.", response);
-        throw new RuntimeException("DN security initialization failed.");
-      case RECOVER:
-        LOG.error("DN security initialization failed, case:{}. OM certificate " +
+      break;
+    case FAILURE:
+      LOG.error("DN security initialization failed, case:{}.", response);
+      throw new RuntimeException("DN security initialization failed.");
+    case RECOVER:
+      LOG.error("DN security initialization failed, case:{}. OM certificate " +
             "is missing.", response);
-        throw new RuntimeException("DN security initialization failed.");
-      default:
-        LOG.error("DN security initialization failed. Init response: {}",
+      throw new RuntimeException("DN security initialization failed.");
+    default:
+      LOG.error("DN security initialization failed. Init response: {}",
             response);
-        throw new RuntimeException("DN security initialization failed.");
+      throw new RuntimeException("DN security initialization failed.");
     }
   }
 
@@ -445,10 +445,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void reconfigurePropertyImpl(String property, String newVal)
       throws ReconfigurationException {
     switch (property) {
-      case HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD: {
-        LOG.info("Reconfiguring {} to {}", property, newVal);
-//        return getConf().get(HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD);
-      }
+    case HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD:
+      LOG.info("Reconfiguring {} to {}", property, newVal);
+      break;
+    default:
+      LOG.info("Reconfiguring {} to {}", property, newVal);
+      break;
     }
     throw new ReconfigurationException(
         property, newVal, getConf().get(property));

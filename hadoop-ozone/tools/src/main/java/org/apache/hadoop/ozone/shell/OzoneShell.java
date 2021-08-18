@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.shell;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.ReconfigurationException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import picocli.CommandLine.Command;
