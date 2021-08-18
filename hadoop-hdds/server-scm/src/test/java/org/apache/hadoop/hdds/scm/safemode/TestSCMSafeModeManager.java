@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -257,7 +257,7 @@ public class TestSCMSafeModeManager {
           0.9);
       MockNodeManager mockNodeManager = new MockNodeManager(true, 10);
       PipelineManager pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+          PipelineManagerImpl.newPipelineManager(
               conf,
               MockSCMHAManager.getInstance(true),
               mockNodeManager,
@@ -283,7 +283,7 @@ public class TestSCMSafeModeManager {
           200);
       MockNodeManager mockNodeManager = new MockNodeManager(true, 10);
       PipelineManager pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+          PipelineManagerImpl.newPipelineManager(
               conf,
               MockSCMHAManager.getInstance(true),
               mockNodeManager,
@@ -308,7 +308,7 @@ public class TestSCMSafeModeManager {
       conf.setDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT, -1.0);
       MockNodeManager mockNodeManager = new MockNodeManager(true, 10);
       PipelineManager pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+          PipelineManagerImpl.newPipelineManager(
               conf,
               MockSCMHAManager.getInstance(true),
               mockNodeManager,
@@ -339,8 +339,8 @@ public class TestSCMSafeModeManager {
     containers.addAll(HddsTestUtils.getContainerInfo(containerCount));
 
     MockNodeManager mockNodeManager = new MockNodeManager(true, nodeCount);
-    PipelineManagerV2Impl pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+    PipelineManagerImpl pipelineManager =
+        PipelineManagerImpl.newPipelineManager(
             conf,
             MockSCMHAManager.getInstance(true),
             mockNodeManager,
@@ -593,8 +593,8 @@ public class TestSCMSafeModeManager {
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
 
-      PipelineManagerV2Impl pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+      PipelineManagerImpl pipelineManager =
+          PipelineManagerImpl.newPipelineManager(
               config,
               MockSCMHAManager.getInstance(true),
               nodeManager,
@@ -658,8 +658,8 @@ public class TestSCMSafeModeManager {
     config.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
 
-    PipelineManagerV2Impl pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+    PipelineManagerImpl pipelineManager =
+        PipelineManagerImpl.newPipelineManager(
             config,
             MockSCMHAManager.getInstance(true),
             nodeManager,

@@ -25,6 +25,7 @@ import javax.crypto.CipherOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.security.InvalidKeyException;
+import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -491,7 +492,8 @@ public class RpcClient implements ClientProtocol {
         .setSourceBucket(bucketArgs.getSourceBucket())
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
-        .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
+        .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
+        .setBucketLayout(bucketArgs.getBucketLayout());
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
@@ -743,7 +745,8 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedBytes(),
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
-        bucketInfo.getQuotaInNamespace()
+        bucketInfo.getQuotaInNamespace(),
+        bucketInfo.getBucketLayout()
     );
   }
 
@@ -831,9 +834,28 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     // check crypto protocol version
     OzoneKMSUtil.checkCryptoProtocolVersion(feInfo);
-    KeyProvider.KeyVersion decrypted;
-    decrypted = OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
-        getKeyProvider());
+    KeyProvider.KeyVersion decrypted = null;
+    try {
+      // Do proxy thing only when current UGI not matching with login UGI
+      // In this way, proxying is done only for s3g where
+      // s3g can act as proxy to end user.
+      UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+      if (!ugi.getShortUserName().equals(loginUser.getShortUserName())) {
+        UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
+            ugi.getShortUserName(), loginUser);
+        decrypted = proxyUser.doAs(
+            (PrivilegedExceptionAction<KeyProvider.KeyVersion>) () -> {
+              return OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
+                  getKeyProvider());
+            });
+      } else {
+        decrypted = OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
+            getKeyProvider());
+      }
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted during decrypt key", ex);
+    }
     return decrypted;
   }
 
@@ -919,7 +941,6 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     List<OmKeyInfo> keys = ozoneManagerClient.listKeys(
         volumeName, bucketName, prevKey, keyPrefix, maxListResult);
-
     return keys.stream().map(key -> new OzoneKey(
         key.getVolumeName(),
         key.getBucketName(),

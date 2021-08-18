@@ -59,31 +59,6 @@ public class TestSCMHAConfiguration {
   }
 
   @Test
-  public void testSetStorageDir() {
-    SCMHAConfiguration scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    scmhaConfiguration.setRatisStorageDir("scm-ratis");
-    conf.setFromObject(scmhaConfiguration);
-
-    scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    Assert.assertEquals("scm-ratis", scmhaConfiguration.getRatisStorageDir());
-  }
-
-  @Test
-  public void testRaftLogPurgeEnabled() {
-    SCMHAConfiguration scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    scmhaConfiguration.setRaftLogPurgeEnabled(true);
-    conf.setFromObject(scmhaConfiguration);
-
-    scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    Assert.assertEquals(true, scmhaConfiguration.getRaftLogPurgeEnabled());
-  }
-
-
-  @Test
   public void testSCMHAConfig() throws Exception {
     String scmServiceId = "scmserviceId";
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);

@@ -82,7 +82,8 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void finalizeUpgrade(StorageContainerManager scm)
       throws UpgradeException {
-    super.finalizeUpgrade(scm::getScmStorageConfig);
+    super.finalizeUpgrade(lf -> ((HDDSLayoutFeature) lf)::scmAction,
+        scm.getScmStorageConfig());
   }
 
   public void postFinalizeUpgrade(StorageContainerManager scm)
@@ -146,7 +147,7 @@ public class SCMUpgradeFinalizer extends
       for (Pipeline pipeline : pipelineManager.getPipelines()) {
         if (pipeline.getPipelineState() != CLOSED) {
           pipelineFound = true;
-          pipelineManager.closePipeline(pipeline, false);
+          pipelineManager.closePipeline(pipeline, true);
         }
       }
       try {

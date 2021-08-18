@@ -296,7 +296,7 @@ public class TestNetworkTopologyImpl {
   }
 
   @Test
-  public void testGetNodesWithLevel() {
+  public void testGetNumOfNodesWithLevel() {
     int maxLevel = cluster.getMaxLevel();
     try {
       assertEquals(1, cluster.getNumOfNodes(0));
@@ -331,6 +331,30 @@ public class TestNetworkTopologyImpl {
     // leaf nodes
     assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
     assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
+  }
+
+  @Test
+  public void testGetNodesWithLevel() {
+    int maxLevel = cluster.getMaxLevel();
+    try {
+      assertNotNull(cluster.getNodes(0));
+      fail("level 0 is not supported");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().startsWith("Invalid level"));
+    }
+
+    try {
+      assertNotNull(cluster.getNodes(maxLevel + 1));
+      fail("level out of scope");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().startsWith("Invalid level"));
+    }
+
+    // root node
+    assertEquals(1, cluster.getNodes(1).size());
+    // leaf nodes
+    assertEquals(dataNodes.length, cluster.getNodes(maxLevel).size());
+    assertEquals(dataNodes.length, cluster.getNodes(maxLevel).size());
   }
 
   @Test
