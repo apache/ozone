@@ -565,8 +565,7 @@ public class TestStorageContainerManager {
   @VisibleForTesting
   public static void validateRatisGroupExists(OzoneConfiguration conf,
       String clusterId) throws IOException {
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
-    final RaftProperties properties = RatisUtil.newRaftProperties(haConf, conf);
+    final RaftProperties properties = RatisUtil.newRaftProperties(conf);
     final RaftGroupId raftGroupId =
         SCMRatisServerImpl.buildRaftGroupId(clusterId);
     final AtomicBoolean found = new AtomicBoolean(false);
