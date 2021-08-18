@@ -89,9 +89,8 @@ public final class TestOMRequestUtils {
   public static void addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager) throws Exception {
 
-    addVolumeToDB(volumeName, omMetadataManager);
-
-    addBucketToDB(volumeName, bucketName, omMetadataManager);
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
   }
 
   public static void addVolumeAndBucketToDB(String volumeName,
@@ -431,14 +430,8 @@ public final class TestOMRequestUtils {
   public static void addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager) throws Exception {
 
-    OmBucketInfo omBucketInfo =
-        OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now()).build();
-
-    // Add to cache.
-    omMetadataManager.getBucketTable().addCacheEntry(
-        new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+    addBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
   }
 
   public static void addBucketToDB(String volumeName, String bucketName,
