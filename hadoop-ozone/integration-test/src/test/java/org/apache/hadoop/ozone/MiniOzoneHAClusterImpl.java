@@ -31,6 +31,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
-import java.net.ServerSocket;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -970,30 +971,16 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return getStorageContainerManagers().get(0);
   }
 
-  private int getFreePort() {
-    ServerSocket ss = null;
-    try {
-      ss = new ServerSocket(0);
-      return ss.getLocalPort();
-    } catch (IOException e) {
-      e.printStackTrace();
-    } finally {
-      if (ss != null) {
-        try {
-          ss.close();
-        } catch (IOException e) {
-          LOG.error("Got exception while closing ServerSocket: " +
-              e.getMessage());
-        }
-      }
-    }
-    return -1;
-  }
-
   private Set<Integer> getFreePortSet(int size) {
     Set<Integer> portSet = new HashSet<>();
     while (portSet.size() < size) {
-      portSet.add(getFreePort());
+      try {
+        InetSocketAddress inetSocketAddress =
+            SCMTestUtils.getReuseableAddress();
+        portSet.add(inetSocketAddress.getPort());
+      } catch (IOException e) {
+        LOG.error("Can not get reusable Address: " + e);
+      }
     }
     return portSet;
   }
