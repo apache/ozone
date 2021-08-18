@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.block.ScmBlockDeletingServiceMetrics;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -174,7 +175,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(10000000);
+    String value = RandomStringUtils.random(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -289,7 +290,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(1000000);
+    String value = RandomStringUtils.random(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -354,6 +355,7 @@ public class TestBlockDeletion {
 
     cluster.shutdownHddsDatanode(0);
     scm.getReplicationManager().processAll();
+    ((EventQueue)scm.getEventQueue()).processAll(1000);
     containerInfos = scm.getContainerManager().getContainers();
     containerInfos.stream().forEach(container ->
         Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
@@ -363,24 +365,33 @@ public class TestBlockDeletion {
     logCapturer.clearOutput();
 
     scm.getReplicationManager().processAll();
+    ((EventQueue)scm.getEventQueue()).processAll(1000);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-        .contains("Resend delete Container"), 500, 5000);
+        .contains("Resend delete Container"), 500, 3000);
     cluster.restartHddsDatanode(0, true);
-    Thread.sleep(100);
+    Thread.sleep(1000);
 
     scm.getReplicationManager().processAll();
-    containerInfos = scm.getContainerManager().getContainers();
-    containerInfos.stream().forEach(container -> {
-      Assert.assertEquals(HddsProtos.LifeCycleState.DELETED,
-          container.getState());
+    ((EventQueue)scm.getEventQueue()).processAll(1000);
+    GenericTestUtils.waitFor(() -> {
+      List<ContainerInfo> infos = scm.getContainerManager().getContainers();
       try {
-        Assert.assertTrue(scm.getScmMetadataStore().getContainerTable()
-            .get(container.containerID()).getState() ==
-            HddsProtos.LifeCycleState.DELETED);
-      } catch (IOException e) {
-        Assert.fail("Container from SCM DB should be marked as DELETED");
+        infos.stream().forEach(container -> {
+          Assert.assertEquals(HddsProtos.LifeCycleState.DELETED,
+              container.getState());
+          try {
+            Assert.assertTrue(scm.getScmMetadataStore().getContainerTable()
+                .get(container.containerID()).getState() ==
+                HddsProtos.LifeCycleState.DELETED);
+          } catch (IOException e) {
+            Assert.fail("Container from SCM DB should be marked as DELETED");
+          }
+        });
+      } catch (Throwable e) {
+        return false;
       }
-    });
+      return true;
+    }, 500, 5000);
     LOG.info(metrics.toString());
   }
 
