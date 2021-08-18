@@ -43,11 +43,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -700,12 +703,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     while (true) {
       try {
-        basePort = 10000 + RANDOM.nextInt(1000) * 4;
-        if (!isPortAvailable(basePort)) {
-          throw new BindException();
-        }
+        Set<Integer> portSet = getFreePortSet(4);
         OzoneConfiguration newConf = addNewOMToConfig(getOMServiceId(),
-            omNodeId, basePort);
+            omNodeId, portSet);
 
         om = bootstrapNewOM(omNodeId);
 
@@ -741,7 +741,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * Set the configs for new OMs.
    */
   private OzoneConfiguration addNewOMToConfig(String omServiceId,
-      String omNodeId, int basePort) {
+      String omNodeId, Set<Integer> portSet) {
     OzoneConfiguration newConf = getConf();
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
@@ -758,10 +758,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     String omRatisPortKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
-    newConf.set(omAddrKey, "127.0.0.1:" + basePort);
-    newConf.set(omHttpAddrKey, "127.0.0.1:" + (basePort + 2));
-    newConf.set(omHttpsAddrKey, "127.0.0.1:" + (basePort + 3));
-    newConf.setInt(omRatisPortKey, basePort + 4);
+    Integer[] portArray = portSet.toArray(new Integer[]{});
+    newConf.set(omAddrKey, "127.0.0.1:" + portArray[0]);
+    newConf.set(omHttpAddrKey, "127.0.0.1:" + portArray[1]);
+    newConf.set(omHttpsAddrKey, "127.0.0.1:" + portArray[2]);
+    newConf.setInt(omRatisPortKey, portArray[3]);
 
     newConf.set(omNodesKey, omNodesKeyValue.toString());
 
@@ -970,11 +971,31 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return getStorageContainerManagers().get(0);
   }
 
-  private boolean isPortAvailable(int port) {
-    try (Socket ignored = new Socket("localhost", port)) {
-      return false;
-    } catch (IOException ignored) {
-      return true;
+  private int getFreePort() {
+    ServerSocket ss = null;
+    try {
+      ss = new ServerSocket(0);
+      return ss.getLocalPort();
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      if (ss != null) {
+        try {
+          ss.close();
+        } catch (IOException e) {
+          LOG.error("Got exception while closing ServerSocket: " +
+              e.getMessage() );
+        }
+      }
     }
+    return -1;
+  }
+
+  private Set<Integer> getFreePortSet(int size) {
+    Set<Integer> portSet = new HashSet<>();
+    while (portSet.size() < size) {
+      portSet.add(getFreePort());
+    }
+    return portSet;
   }
 }
