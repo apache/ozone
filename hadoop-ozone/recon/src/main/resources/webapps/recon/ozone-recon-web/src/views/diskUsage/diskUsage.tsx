@@ -375,7 +375,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               <Row>
                 <Col>
                   <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><Icon type='left'/> </Button>
+                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><Icon type='left'/></Button>
                   </div>
                   <div className='input-bar'>
                     <h3>Path</h3>
