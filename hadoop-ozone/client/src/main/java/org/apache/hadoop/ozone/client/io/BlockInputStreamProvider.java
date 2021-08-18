@@ -26,9 +26,9 @@ import org.apache.hadoop.security.token.Token;
 /**
  * Interface used to create BlockInputStreams.
  */
-public interface BlockInputStreamFactory {
+public interface BlockInputStreamProvider {
 
-  BlockInputStream create(BlockID blockId, long blockLen, Pipeline pipeline,
+  BlockInputStream provide(BlockID blockId, long blockLen, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum);
 
 }

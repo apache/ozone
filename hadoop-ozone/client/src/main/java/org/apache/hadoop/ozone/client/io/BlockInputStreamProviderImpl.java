@@ -30,19 +30,19 @@ import java.util.function.Function;
  * Concrete implementation of a BlockInputStreamFactory to create
  * BlockInputSteams in a real cluster.
  */
-public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
+public class BlockInputStreamProviderImpl implements BlockInputStreamProvider {
 
   private final XceiverClientFactory xceiverClientFactory;
   private final Function<BlockID, Pipeline> refreshFunction;
 
-  public BlockInputStreamFactoryImpl(XceiverClientFactory xceiverFactory,
+  public BlockInputStreamProviderImpl(XceiverClientFactory xceiverFactory,
       Function<BlockID, Pipeline> refreshFunction) {
     this.xceiverClientFactory = xceiverFactory;
     this.refreshFunction = refreshFunction;
   }
 
   @Override
-  public BlockInputStream create(BlockID blockId, long blockLen,
+  public BlockInputStream provide(BlockID blockId, long blockLen,
       Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
       boolean verifyChecksum) {
     return new BlockInputStream(blockId, blockLen, pipeline, token,

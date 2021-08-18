@@ -50,7 +50,7 @@ public class ECBlockInputStream extends InputStream
 
   private final ECReplicationConfig repConfig;
   private final int ecChunkSize;
-  private final BlockInputStreamFactory streamFactory;
+  private final BlockInputStreamProvider streamProvider;
   private final boolean verifyChecksum;
   private final OmKeyLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
@@ -63,12 +63,12 @@ public class ECBlockInputStream extends InputStream
 
   public ECBlockInputStream(ECReplicationConfig repConfig, int ecChunkSize,
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
-      BlockInputStreamFactory streamFactory) {
+      BlockInputStreamProvider streamProvider) {
     this.repConfig = repConfig;
     this.ecChunkSize = ecChunkSize;
     this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;
-    this.streamFactory = streamFactory;
+    this.streamProvider = streamProvider;
     this.maxLocations = repConfig.getData() + repConfig.getParity();
     this.dataLocations = new DatanodeDetails[repConfig.getData()];
     this.parityLocations = new DatanodeDetails[repConfig.getParity()];
@@ -130,7 +130,7 @@ public class ECBlockInputStream extends InputStream
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
-      stream = streamFactory.create(blockInfo.getBlockID(),
+      stream = streamProvider.provide(blockInfo.getBlockID(),
           internalBlockLength(ind+1), pipeline, blockInfo.getToken(),
           verifyChecksum);
       blockStreams[ind] = stream;
