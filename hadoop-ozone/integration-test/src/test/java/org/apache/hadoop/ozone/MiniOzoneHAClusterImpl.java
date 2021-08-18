@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -700,6 +701,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     while (true) {
       try {
         basePort = 10000 + RANDOM.nextInt(1000) * 4;
+        if (!isPortAvailable(basePort)) {
+          throw new BindException();
+        }
         OzoneConfiguration newConf = addNewOMToConfig(getOMServiceId(),
             omNodeId, basePort);
 
@@ -966,4 +970,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return getStorageContainerManagers().get(0);
   }
 
+  private boolean isPortAvailable(int port) {
+    try (Socket ignored = new Socket("localhost", port)) {
+      return false;
+    } catch (IOException ignored) {
+      return true;
+    }
+  }
 }
