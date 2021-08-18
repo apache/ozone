@@ -47,6 +47,7 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -204,6 +205,7 @@ public class TestPipelineClose {
   }
 
   @Test
+  @Ignore("HDDS-5604")
   public void testPipelineCloseWithLogFailure() throws IOException {
 
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
