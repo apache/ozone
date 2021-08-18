@@ -384,7 +384,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                     </form>
                   </div>
                   <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><Icon type='redo'/> </Button>
+                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><Icon type='redo'/></Button>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown overlay={menu} placement='bottomCenter'>
