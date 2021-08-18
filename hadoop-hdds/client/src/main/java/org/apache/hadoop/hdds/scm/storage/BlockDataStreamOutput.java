@@ -270,38 +270,8 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     writtenDataLength += len;
   }
 
-  private void writeChunkIfNeeded() throws IOException {
-    if (currentBufferRemaining == 0) {
-      writeChunk(currentBuffer);
-    }
-  }
-
-  private void doFlushOrWatchIfNeeded() throws IOException {
-    if (currentBufferRemaining == 0) {
-      if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
-        updateFlushLength();
-        executePutBlock(false, false);
-      }
-      // Data in the bufferPool can not exceed streamBufferMaxSize
-      if (bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity()) {
-        handleFullBuffer();
-      }
-    }
-  }
-
-  private void allocateNewBufferIfNeeded() {
-    if (currentBufferRemaining == 0) {
-      currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
-      currentBufferRemaining = currentBuffer.remaining();
-    }
-  }
-
   private void updateFlushLength() {
     totalDataFlushedLength = writtenDataLength;
-  }
-
-  private boolean isBufferPoolFull() {
-    return bufferPool.computeBufferData() == config.getStreamBufferMaxSize();
   }
 
   /**
