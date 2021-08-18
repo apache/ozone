@@ -19,13 +19,13 @@
 import React from 'react';
 import axios from 'axios';
 import Plot from 'react-plotly.js';
-import {Row, Col, Icon, Button, Input} from 'antd';
+import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
 import * as Plotly from 'plotly.js';
 import {showDataFetchError} from 'utils/common';
 import './diskUsage.less';
 
-const DISPLAY_LIMIT = 20;
+const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
 
 interface IDUSubpath {
@@ -54,6 +54,7 @@ interface IDUState {
   panelValues: string[];
   returnPath: string;
   inputPath: string;
+  displayLimit: number;
 }
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
@@ -67,7 +68,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       panelKeys: [],
       panelValues: [],
       returnPath: '/',
-      inputPath: '/'
+      inputPath: '/',
+      displayLimit: DEFAULT_DISPLAY_LIMIT
     };
   }
 
@@ -92,11 +94,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   handleSubmit = _e => {
     // Avoid empty request trigger 400 response
     if (!this.state.inputPath) {
-      this.updatePieChart('/');
+      this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
       return;
     }
 
-    this.updatePieChart(this.state.inputPath);
+    this.updatePieChart(this.state.inputPath, DEFAULT_DISPLAY_LIMIT);
   };
 
   // The returned path is passed in, which should have been
@@ -112,12 +114,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       parentPath = '/';
     }
 
-    this.updatePieChart(parentPath);
+    this.updatePieChart(parentPath, DEFAULT_DISPLAY_LIMIT);
   };
 
   // Take the request path, make a DU request, inject response
   // into the pie chart
-  updatePieChart = (path: string) => {
+  updatePieChart = (path: string, limit: number) => {
     this.setState({
       isLoading: true
     });
@@ -136,12 +138,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       subpaths.sort((a, b) => (a.size < b.size) ? 1 : -1);
 
-      // Only show 20 blocks with the most DU,
+      // Only show top n blocks with the most DU,
       // other blocks are merged as a single block
-      if (subpaths.length > DISPLAY_LIMIT) {
-        subpaths = subpaths.slice(0, DISPLAY_LIMIT);
+      if (subpaths.length > limit) {
+        subpaths = subpaths.slice(0, limit);
         let topSize = 0;
-        for (let i = 0; i < DISPLAY_LIMIT; ++i) {
+        for (let i = 0; i < limit; ++i) {
           topSize += subpaths[i].size;
         }
 
@@ -154,8 +156,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         // The return subPath must be normalized in a format with
         // a leading slash and without trailing slash
         const pieces = subpath.path.split('/');
+        const subpathName = pieces[pieces.length - 1];
         // Differentiate key without trailing slash
-        return (subpath.isKey) ? pieces[pieces.length - 1] : pieces[pieces.length - 1] + '/';
+        return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
       });
 
       const percentage = subpaths.map(subpath => {
@@ -171,6 +174,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         showPanel: false,
         inputPath: duResponse.path,
         returnPath: duResponse.path,
+        displayLimit: limit,
         duResponse,
         plotData: [{
           type: 'pie',
@@ -195,17 +199,38 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       isLoading: true
     });
     // By default render the DU for root path
-    this.updatePieChart('/');
+    this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
   }
 
   clickPieSection(e, curPath: string): void {
     const subPath: string = e.points[0].label;
-    const path = (curPath === '/') ? `${curPath}${subPath}` : `${curPath}/${subPath}`;
-    if (path === OTHER_PATH_NAME) {
+    if (subPath === OTHER_PATH_NAME) {
       return;
     }
 
-    this.updatePieChart(path);
+    const path = (curPath === '/') ? `${curPath}${subPath}` : `${curPath}/${subPath}`;
+
+    // Reset to default everytime
+    this.updatePieChart(path, DEFAULT_DISPLAY_LIMIT);
+  }
+
+  refreshCurPath(e, path: string): void {
+    if (!path) {
+      return;
+    }
+
+    this.updatePieChart(path, this.state.displayLimit);
+  }
+
+  updateDisplayLimit(e): void {
+    let res = -1;
+    if (e.key === 'all') {
+      res = Number.MAX_VALUE;
+    } else {
+      res = Number.parseInt(e.key, 10);
+    }
+
+    this.updatePieChart(this.state.inputPath, res);
   }
 
   // Show the right side panel that display metadata details of path
@@ -319,7 +344,26 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   render() {
-    const {plotData, duResponse, returnPath, panelKeys, panelValues, showPanel, isLoading, inputPath} = this.state;
+    const {plotData, duResponse, returnPath, panelKeys, panelValues, showPanel, isLoading, inputPath, displayLimit} = this.state;
+    const menu = (
+      <Menu onClick={e => this.updateDisplayLimit(e)}>
+        <Menu.Item key='5'>
+          5
+        </Menu.Item>
+        <Menu.Item key='10'>
+          10
+        </Menu.Item>
+        <Menu.Item key='15'>
+          15
+        </Menu.Item>
+        <Menu.Item key='20'>
+          20
+        </Menu.Item>
+        <Menu.Item key='all'>
+          All
+        </Menu.Item>
+      </Menu>
+    );
     return (
       <div className='du-container'>
         <div className='page-header'>
@@ -331,13 +375,21 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               <Row>
                 <Col>
                   <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><Icon type='left'/>Back</Button>
+                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><Icon type='left'/> </Button>
                   </div>
                   <div className='input-bar'>
                     <h3>Path</h3>
                     <form className='input' id='input-form' onSubmit={this.handleSubmit}>
                       <Input placeholder='/' value={inputPath} onChange={this.handleChange}/>
                     </form>
+                  </div>
+                  <div className='go-back-button'>
+                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><Icon type='redo'/> </Button>
+                  </div>
+                  <div className='dropdown-button'>
+                    <Dropdown overlay={menu} placement='bottomCenter'>
+                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? 'All' : displayLimit}</Button>
+                    </Dropdown>
                   </div>
                   <div className='metadata-button'>
                     <Button type='primary' onClick={e => this.showMetadataDetails(e, returnPath)}>
@@ -365,10 +417,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                           height: 750,
                           font: {
                             family: 'Arial',
-                            size: 18
+                            size: 14
                           },
                           showlegend: true,
-                          title: 'Disk Usage for ' + returnPath + '<br>(Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
+                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
                         }
                       }
                       onClick={e => this.clickPieSection(e, returnPath)}/>) :

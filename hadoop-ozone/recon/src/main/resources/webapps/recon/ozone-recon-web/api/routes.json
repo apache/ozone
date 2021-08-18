@@ -20,6 +20,7 @@
   "/namespace/du?path=/vol:id/bucket:id/key:id*": "/key",
   "/namespace/du?path=/dummyVolume/dummyBucket/key:id*": "/key",
   "/namespace/du?path=/vol1/bucket1/empty&files=true": "/empty",
+  "/namespace/du?path=/clunky&files=true": "/clunky",
   "/namespace/summary?path=*": "/metadata",
   "/namespace/quota?path=*": "/quota"
 }

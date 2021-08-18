@@ -1083,5 +1083,140 @@
     "allowed": 1000000000,
     "used": 5000000,
     "status": "OK"
+  },
+  "clunky": {
+    "status": "OK",
+    "path": "/clunky",
+    "size": 250000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/nested/b1",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b2",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b3",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b4",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b5",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b6",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b7",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b8",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b9",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b10",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b11",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b12",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b13",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b14",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b15",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b16",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b17",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b18",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b19",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b20",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b21",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b22",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b23",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b24",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b25",
+        "size": 10000,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 0
   }
 }
