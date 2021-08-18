@@ -156,4 +156,72 @@ public class TestSCMContainerPlacementRandom {
     // Only expect 1 more replica to give us one rack on this policy.
     assertEquals(0, status.misReplicationCount(), 3);
   }
+
+  @Test
+  public void testIsValidNode() throws SCMException {
+    //given
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // We are using small units here
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        1, StorageUnit.BYTES);
+
+    List<DatanodeInfo> datanodes = new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          MockDatanodeDetails.randomDatanodeDetails(),
+          NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
+
+      StorageReportProto storage1 = TestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          100L, 0, 100L, null);
+      MetadataStorageReportProto metaStorage1 =
+          TestUtils.createMetadataStorageReport(
+              "/metadata1-" + datanodeInfo.getUuidString(),
+              100L, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+      datanodeInfo.updateMetaDataStorageReports(
+          new ArrayList<>(Arrays.asList(metaStorage1)));
+
+      datanodes.add(datanodeInfo);
+    }
+
+    StorageReportProto storage1 = TestUtils.createStorageReport(
+        datanodes.get(1).getUuid(),
+        "/data1-" + datanodes.get(1).getUuidString(),
+        100L, 90L, 10L, null);
+    datanodes.get(1).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage1)));
+
+    MetadataStorageReportProto metaStorage2 =
+        TestUtils.createMetadataStorageReport(
+            "/metadata1-" + datanodes.get(2).getUuidString(),
+            100L, 90, 10L, null);
+    datanodes.get(2).updateMetaDataStorageReports(
+        new ArrayList<>(Arrays.asList(metaStorage2)));
+
+    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
+        .thenReturn(new ArrayList<>(datanodes));
+    when(mockNodeManager.getNodeByUuid(datanodes.get(0).getUuidString()))
+        .thenReturn(datanodes.get(0));
+    when(mockNodeManager.getNodeByUuid(datanodes.get(1).getUuidString()))
+        .thenReturn(datanodes.get(1));
+    when(mockNodeManager.getNodeByUuid(datanodes.get(2).getUuidString()))
+        .thenReturn(datanodes.get(2));
+
+    SCMContainerPlacementRandom scmContainerPlacementRandom =
+        new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
+            null);
+
+    Assert.assertTrue(
+        scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));
+    Assert.assertFalse(
+        scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L));
+    Assert.assertFalse(
+        scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L));
+
+  }
+
 }

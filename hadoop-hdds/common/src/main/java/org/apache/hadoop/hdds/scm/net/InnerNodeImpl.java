@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -100,6 +101,32 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       }
     }
     return count;
+  }
+
+  /**
+   * @return all nodes at level <i>level</i>. Here level is a relative level.
+   * If level is 1, means node itself. If level is 2, means its direct
+   * children, and so on.
+   **/
+  @Override
+  public List<Node> getNodes(int level) {
+    Preconditions.checkArgument(level > 0);
+    List<Node> result = new ArrayList<>();
+    if (level == 1) {
+      result.add(this);
+    } else if (level == 2) {
+      result.addAll(childrenMap.values());
+    } else {
+      for (Node node: childrenMap.values()) {
+        if (node instanceof InnerNode) {
+          result.addAll(((InnerNode)node).getNodes(level -1));
+        } else {
+          throw new RuntimeException("Cannot support Level:" + level +
+              " on this node " + this.toString());
+        }
+      }
+    }
+    return result;
   }
 
   /**
