@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -164,9 +165,14 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
 
-      final ReplicationConfig replicationConfig =
-          ReplicationConfig.fromTypeAndFactor(
-              keyArgs.getType(), keyArgs.getFactor());
+      final OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+          .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+      final ReplicationConfig replicationConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo != null ?
+                  bucketInfo.getDefaultReplicationConfig() :
+                  null, ozoneManager.getDefaultReplicationConfig());
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
@@ -176,9 +182,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .build();
-
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
 
       omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(volumeName)

@@ -147,9 +147,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(type, factor,
-              keyArgs.getEcReplicationConfig(),
-              bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              keyArgs.getEcReplicationConfig(), bucketInfo != null ?
+                  bucketInfo.getDefaultReplicationConfig() :
+                  null, ozoneManager.getDefaultReplicationConfig());
 
       // TODO: Here we are allocating block with out any check for
       //  bucket/key/volume or not and also with out any authorization checks.

@@ -37,12 +37,12 @@ public final class OzoneConfigUtil {
       DefaultReplicationConfig bucketDefaultReplicationConfig,
       ReplicationConfig omDefaultReplicationConfig) {
     ReplicationConfig replicationConfig = null;
-    // If type is NONE, then look for bucket defaults
     if (clientType != HddsProtos.ReplicationType.NONE) {
       // Client passed the replication config, so let's use it.
       replicationConfig = ReplicationConfig
           .fromProto(clientType, clientFactor, clientECReplicationConfig);
     } else {
+      // type is NONE, so, let's look for the bucket defaults.
       if (bucketDefaultReplicationConfig != null) {
         // Since Bucket defaults are available, let's inherit
         replicationConfig = ReplicationConfig.fromProto(

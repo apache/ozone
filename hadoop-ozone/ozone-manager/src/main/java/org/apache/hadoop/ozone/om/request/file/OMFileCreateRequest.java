@@ -131,9 +131,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
         .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
     final ReplicationConfig repConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(type, factor,
-            keyArgs.getEcReplicationConfig(),
-            bucketInfo.getDefaultReplicationConfig(),
-            ozoneManager.getDefaultReplicationConfig());
+            keyArgs.getEcReplicationConfig(), bucketInfo != null ?
+                bucketInfo.getDefaultReplicationConfig() :
+                null, ozoneManager.getDefaultReplicationConfig());
 
     // TODO: Here we are allocating block with out any check for
     //  bucket/key/volume or not and also with out any authorization checks.
@@ -251,17 +251,17 @@ public class OMFileCreateRequest extends OMKeyRequest {
       }
 
       // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
+      omBucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
-              bucketInfo.getDefaultReplicationConfig(),
+              omBucketInfo.getDefaultReplicationConfig(),
               ozoneManager.getDefaultReplicationConfig());
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
-          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
+          ozoneManager.getPrefixManager(), omBucketInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled(), repConfig);
 
@@ -279,8 +279,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .stream().map(OmKeyLocationInfo::getFromProtobuf)
           .collect(Collectors.toList());
       omKeyInfo.appendNewBlocks(newLocationList, false);
-
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
