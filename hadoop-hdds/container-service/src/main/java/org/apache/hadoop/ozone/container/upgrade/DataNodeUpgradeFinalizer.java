@@ -81,7 +81,8 @@ public class DataNodeUpgradeFinalizer extends
   @Override
   public void finalizeUpgrade(DatanodeStateMachine dsm)
       throws UpgradeException {
-    super.finalizeUpgrade(dsm::getLayoutStorage);
+    super.finalizeUpgrade(lf -> ((HDDSLayoutFeature) lf)::datanodeAction,
+        dsm.getLayoutStorage());
   }
 
   @Override
