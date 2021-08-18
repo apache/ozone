@@ -166,8 +166,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     this.bufferPool = bufferPool;
     this.token = token;
 
-    //number of buffers used before doing a flush
-    refreshCurrentBuffer(bufferPool);
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
         .getStreamBufferSize());
 
@@ -207,12 +205,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
     return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
         .stream(message.getContent().asReadOnlyByteBuffer());
-  }
-
-  private void refreshCurrentBuffer(BufferPool pool) {
-    currentBuffer = pool.getCurrentBuffer();
-    currentBufferRemaining =
-        currentBuffer != null ? currentBuffer.remaining() : 0;
   }
 
   public BlockID getBlockID() {
@@ -345,7 +337,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
   // only contain data which have not been sufficiently replicated
   private void adjustBuffersOnException() {
     commitWatcher.releaseBuffersOnException();
-    refreshCurrentBuffer(bufferPool);
   }
 
   /**
@@ -375,7 +366,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
       setIoException(ioe);
       throw getIoException();
     }
-    refreshCurrentBuffer(bufferPool);
 
   }
 
