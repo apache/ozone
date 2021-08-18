@@ -124,10 +124,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
   //number of buffers used before doing a flush/putBlock.
   private int flushPeriod;
-  //bytes remaining to write in the current buffer.
-  private int currentBufferRemaining;
-  //current buffer allocated to write
-  private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
@@ -273,7 +269,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    * @throws IOException if error occurred
    */
 
-  // In this case, the data is already cached in the currentBuffer.
   // FIXME: drop bufferPool breaks writeOnRetry
   public void writeOnRetry(long len) throws IOException {
     if (len == 0) {
