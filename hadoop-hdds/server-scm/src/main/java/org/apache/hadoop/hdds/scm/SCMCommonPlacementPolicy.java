@@ -269,9 +269,11 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * to meet the placement policy. For simple policies that are not rack aware
    * we return 1, from this default implementation.
    * should have
+   *
+   * @param numReplicas - The desired replica counts
    * @return The number of racks containers should span to meet the policy
    */
-  protected int getRequiredRackCount() {
+  protected int getRequiredRackCount(int numReplicas) {
     return 1;
   }
 
@@ -292,7 +294,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public ContainerPlacementStatus validateContainerPlacement(
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
-    int requiredRacks = getRequiredRackCount();
+    int requiredRacks = getRequiredRackCount(replicas);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
@@ -327,5 +329,32 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     if (shouldRemovePeers) {
       healthyList.removeAll(nodeManager.getPeerList(dn));
     }
+  }
+
+  /**
+   * Check If a datanode is an available node.
+   * @param datanodeDetails - the datanode to check.
+   * @param metadataSizeRequired - the required size for metadata.
+   * @param dataSizeRequired - the required size for data.
+   * @return true if the datanode is available.
+   */
+  public boolean isValidNode(DatanodeDetails datanodeDetails,
+      long metadataSizeRequired, long dataSizeRequired) {
+    DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
+        .getNodeByUuid(datanodeDetails.getUuidString());
+    if (datanodeInfo == null) {
+      LOG.error("Failed to find the DatanodeInfo for datanode {}",
+          datanodeDetails);
+    } else {
+      if (datanodeInfo.getNodeStatus().isNodeWritable() &&
+          (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
+              dataSizeRequired))) {
+        LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
+                "required data size is {}",
+            datanodeDetails.toString(), metadataSizeRequired, dataSizeRequired);
+        return true;
+      }
+    }
+    return false;
   }
 }
