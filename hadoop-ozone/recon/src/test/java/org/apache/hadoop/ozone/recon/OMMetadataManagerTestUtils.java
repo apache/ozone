@@ -210,6 +210,29 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static void writeKeyToOm(OMMetadataManager omMetadataManager,
+                                  long parentObjectId,
+                                  long objectId,
+                                  String volName,
+                                  String bucketName,
+                                  String keyName,
+                                  String fileName,
+                                  List<OmKeyLocationInfoGroup> locationVersions)
+          throws IOException {
+    String omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
+    omMetadataManager.getKeyTable().put(omKey,
+            new OmKeyInfo.Builder()
+                    .setBucketName(bucketName)
+                    .setVolumeName(volName)
+                    .setKeyName(keyName)
+                    .setOmKeyLocationInfos(locationVersions)
+                    .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+                    .setObjectID(objectId)
+                    .setParentObjectID(parentObjectId)
+                    .build());
+  }
+
   public static void writeDirToOm(OMMetadataManager omMetadataManager,
                                   long objectId,
                                   long parentObjectId,

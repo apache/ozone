@@ -17,12 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
@@ -45,11 +40,14 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -552,12 +550,14 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public boolean startContainerBalancer(Optional<Double>threshold,
-                Optional<Integer> idleiterations,
-                Optional<Integer> maxDatanodesToBalance,
-                Optional<Long> maxSizeToMoveInGB) throws IOException {
+  public boolean startContainerBalancer(
+      Optional<Double> threshold, Optional<Integer> idleiterations,
+      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB)
+      throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
-        idleiterations, maxDatanodesToBalance, maxSizeToMoveInGB);
+        idleiterations, maxDatanodesRatioToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB);
   }
 
   @Override

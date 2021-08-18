@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -69,6 +70,7 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
+import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerDummyImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -97,6 +99,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -429,6 +432,20 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
+      ChunkLayOutVersion layoutVersion =
+          ChunkLayOutVersion.getConfiguredVersion(conf);
+      if (layoutVersion == FILE_PER_BLOCK &&
+          // ChunkManagerDummyImpl doesn't persist to disk, don't check here
+          !chunkManager.getClass()
+              .isAssignableFrom(ChunkManagerDummyImpl.class)) {
+        File blockFile = layoutVersion
+            .getChunkFile(kvContainer.getContainerData(),
+                blockData.getBlockID(), null);
+        // ensure that the putBlock length <= blockFile length
+        Preconditions.checkArgument(blockFile.length() >= blockData.getSize(),
+            "BlockData in putBlock() has more length "
+                + "than the actual data written into the disk");
+      }
 
       boolean incrKeyCount = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -447,7 +464,7 @@ public class KeyValueHandler extends Handler {
       metrics.incContainerBytesStats(Type.PutBlock, numBytes);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
-    } catch (IOException ex) {
+    } catch (IOException | IllegalArgumentException ex) {
       return ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Put Key failed", ex, IO_EXCEPTION),
           request);
