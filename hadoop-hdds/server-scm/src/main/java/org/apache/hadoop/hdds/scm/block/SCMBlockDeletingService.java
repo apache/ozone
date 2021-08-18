@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
@@ -67,12 +66,12 @@ public class SCMBlockDeletingService extends BackgroundService
 
   private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;
   private final DeletedBlockLog deletedBlockLog;
-  private final ContainerManagerV2 containerManager;
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
   private final SCMContext scmContext;
 
   private int blockDeleteLimitSize;
+  private ScmBlockDeletingServiceMetrics metrics;
 
   /**
    * SCMService related variables.
@@ -82,17 +81,17 @@ public class SCMBlockDeletingService extends BackgroundService
 
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
-      ContainerManagerV2 containerManager, NodeManager nodeManager,
+              NodeManager nodeManager,
       EventPublisher eventPublisher, SCMContext scmContext,
       SCMServiceManager serviceManager, Duration interval, long serviceTimeout,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, ScmBlockDeletingServiceMetrics metrics) {
     super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
     this.deletedBlockLog = deletedBlockLog;
-    this.containerManager = containerManager;
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
+    this.metrics = metrics;
 
     blockDeleteLimitSize =
         conf.getObject(ScmConfig.class).getBlockDeletionLimit();
@@ -156,6 +155,8 @@ public class SCMBlockDeletingService extends BackgroundService
               command.setTerm(scmContext.getTermOfLeader());
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId, command));
+              metrics.incrBlockDeletionCommandSent();
+              metrics.incrBlockDeletionTransactionSent(dnTXs.size());
               if (LOG.isDebugEnabled()) {
                 LOG.debug(
                     "Added delete block command for datanode {} in the queue,"
@@ -228,5 +229,10 @@ public class SCMBlockDeletingService extends BackgroundService
   @Override
   public void stop() {
     throw new RuntimeException("Not supported operation.");
+  }
+
+  @VisibleForTesting
+  public ScmBlockDeletingServiceMetrics getMetrics() {
+    return this.metrics;
   }
 }

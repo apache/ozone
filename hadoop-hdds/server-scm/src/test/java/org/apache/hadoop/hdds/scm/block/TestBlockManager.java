@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -88,7 +88,7 @@ public class TestBlockManager {
   private StorageContainerManager scm;
   private ContainerManagerV2 mapping;
   private MockNodeManager nodeManager;
-  private PipelineManagerV2Impl pipelineManager;
+  private PipelineManagerImpl pipelineManager;
   private BlockManagerImpl blockManager;
   private SCMHAManager scmHAManager;
   private SequenceIdGenerator sequenceIdGen;
@@ -136,7 +136,7 @@ public class TestBlockManager {
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+        PipelineManagerImpl.newPipelineManager(
             conf,
             scmHAManager,
             nodeManager,

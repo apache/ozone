@@ -11,6 +11,7 @@ The first stable release of Apache Ozone is 1.0, the previous alpha and beta rel
 | 0.4.1 (alpha) | :x:                |
 | 0.5.0 (beta)  | :x:                |
 | 1.0           | :white_check_mark: |
+| 1.1           | :white_check_mark: |
 
 ## Reporting a Vulnerability
 

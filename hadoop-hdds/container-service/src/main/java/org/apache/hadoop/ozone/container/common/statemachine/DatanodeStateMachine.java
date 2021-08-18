@@ -88,7 +88,7 @@ public class DatanodeStateMachine implements Closeable {
   private final ReportManager reportManager;
   private long commandsHandled;
   private final AtomicLong nextHB;
-  private Thread stateMachineThread = null;
+  private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
 
@@ -172,7 +172,8 @@ public class DatanodeStateMachine implements Closeable {
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
-            conf))
+            conf, dnConf.getBlockDeleteThreads(),
+            dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
@@ -476,7 +477,7 @@ public class DatanodeStateMachine implements Closeable {
    * be sent by datanode.
    */
   public void triggerHeartbeat() {
-    if (stateMachineThread != null) {
+    if (stateMachineThread != null && isDaemonStarted()) {
       stateMachineThread.interrupt();
     }
   }
@@ -515,6 +516,10 @@ public class DatanodeStateMachine implements Closeable {
     } catch (IOException e) {
       LOG.error("Stop ozone container server failed.", e);
     }
+  }
+
+  public boolean isDaemonStarted() {
+    return this.getContext().getExecutionCount() > 0;
   }
 
   /**
