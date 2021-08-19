@@ -2447,7 +2447,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
       metrics.incNumBucketInfos();
-      return bucketManager.getBucketInfo(volume, bucket);
+      final OmBucketInfo bucketInfo =
+          bucketManager.getBucketInfo(volume, bucket);
+      if(bucketInfo.getDefaultReplicationConfig() == null){
+        bucketInfo.setDefaultReplicationConfig(getDefaultReplicationConfig());
+      }
+      return bucketInfo;
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;

@@ -266,6 +266,12 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public short getDefaultReplication() {
+    if (replicationConfig == null) {
+      // to provide backward compatibility, we are just retuning 3;
+      // However we need to handle with the correct behavior.
+      // TODO: Please see HDDS-5646
+      return (short) ReplicationFactor.THREE.getValue();
+    }
     return (short) replicationConfig.getRequiredNodes();
   }
 
@@ -309,16 +315,21 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
+      ReplicationConfig replConfig = this.replicationConfig;
+      // Since the bucket has the right default replication, we are using it.
+      if (bucket.getReplicationConfig() != null) {
+        replConfig = bucket.getReplicationConfig();
+      }
       OzoneOutputStream ozoneOutputStream = null;
       if (replication == ReplicationFactor.ONE.getValue()
           || replication == ReplicationFactor.THREE.getValue()) {
 
         ozoneOutputStream = bucket.createFile(key, 0,
-            ReplicationConfig.adjustReplication(replicationConfig, replication),
+            ReplicationConfig.adjustReplication(replConfig, replication),
             overWrite, recursive);
       } else {
         ozoneOutputStream =
-            bucket.createFile(key, 0, replicationConfig, overWrite, recursive);
+            bucket.createFile(key, 0, replConfig, overWrite, recursive);
       }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {

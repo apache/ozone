@@ -160,6 +160,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public short getDefaultReplication() {
+    if (replicationConfig == null) {
+      // to provide backward compatibility, we are just retuning 3;
+      // However we need to handle with the correct behavior.
+      // TODO: Please see HDDS-5646
+      return (short) ReplicationFactor.THREE.getValue();
+    }
     return (short) replicationConfig.getRequiredNodes();
   }
 
@@ -194,19 +200,24 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
       OzoneOutputStream ozoneOutputStream = null;
+      ReplicationConfig replConfig = this.replicationConfig;
+      // Since the bucket has the right default replication, we are using it.
+      if (bucket.getReplicationConfig() != null) {
+        replConfig = bucket.getReplicationConfig();
+      }
       if (replication == ReplicationFactor.ONE.getValue()
           || replication == ReplicationFactor.THREE.getValue()) {
 
         ReplicationConfig customReplicationConfig =
             ReplicationConfig.adjustReplication(
-                replicationConfig, replication
+                replConfig, replication
             );
         ozoneOutputStream =
             bucket.createFile(key, 0, customReplicationConfig, overWrite,
                 recursive);
       } else {
         ozoneOutputStream =
-            bucket.createFile(key, 0, replicationConfig, overWrite, recursive);
+            bucket.createFile(key, 0, replConfig, overWrite, recursive);
       }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
