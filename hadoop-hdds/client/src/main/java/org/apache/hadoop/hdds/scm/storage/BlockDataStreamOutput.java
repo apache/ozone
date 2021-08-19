@@ -224,23 +224,8 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     return xceiverClient;
   }
 
-  @VisibleForTesting
-  public long getTotalDataFlushedLength() {
-    return totalDataFlushedLength;
-  }
-
-  @VisibleForTesting
-  public BufferPool getBufferPool() {
-    return bufferPool;
-  }
-
   public IOException getIoException() {
     return ioException.get();
-  }
-
-  @VisibleForTesting
-  public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
-    return commitWatcher.getCommitIndex2flushedDataMap();
   }
 
   @Override
@@ -269,7 +254,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    * @throws IOException if error occurred
    */
 
-  // FIXME: drop bufferPool breaks writeOnRetry
+  // TODO: We need add new retry policy without depend on bufferPool
   public void writeOnRetry(long len) throws IOException {
     if (len == 0) {
       return;
@@ -421,9 +406,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
                 "Adding index " + asyncReply.getLogIndex() + " commitMap size "
                     + commitWatcher.getCommitInfoMapSize() + " flushLength "
                     + flushPos + " numBuffers " + byteBufferList.size()
-                    + " blockID " + blockID + " bufferPool size" + bufferPool
-                    .getSize() + " currentBufferIndex " + bufferPool
-                    .getCurrentBufferIndex());
+                    + " blockID " + blockID);
           }
           // for standalone protocol, logIndex will always be 0.
           commitWatcher
