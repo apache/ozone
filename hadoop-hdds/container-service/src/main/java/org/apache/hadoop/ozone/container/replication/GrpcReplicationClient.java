@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServi
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
@@ -74,7 +75,8 @@ public class GrpcReplicationClient implements AutoCloseable{
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (certClient != null) {
         sslContextBuilder
-            .trustManager(certClient.getCACertificate())
+            .trustManager(HAUtils.buildCAX509List(certClient,
+                secConfig.getConfiguration()))
             .clientAuth(ClientAuth.REQUIRE)
             .keyManager(certClient.getPrivateKey(),
                 certClient.getCertificate());
