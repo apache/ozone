@@ -59,7 +59,10 @@ import static org.apache.hadoop.hdds.protocol.proto.
     SCMRatisProtocol.RequestType.MOVE;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationDatanodeThrottling;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationPriorityQueues;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationPriorityQueues.ReplicationWork;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
@@ -204,6 +207,17 @@ public class ReplicationManager implements SCMService {
       CompletableFuture<MoveResult>> inflightMoveFuture;
 
   /**
+   * Queues for containers that should be replicated in the order
+   * of defined priority.
+   */
+  private final ReplicationPriorityQueues replicationPriorityQueues;
+
+  /**
+   * Tracks throttling info for each datanode.
+   */
+  private final ReplicationDatanodeThrottling replicationDatanodeThrottling;
+
+  /**
    * ReplicationManager specific configuration.
    */
   private final ReplicationManagerConfiguration rmConf;
@@ -213,6 +227,12 @@ public class ReplicationManager implements SCMService {
    * interval and processes all the containers.
    */
   private Thread replicationMonitor;
+
+  /**
+   * ReplicationHandler thread wakes up at configured interval and
+   * send out all replication commands for containers in the order of priority.
+   */
+  private Thread replicationHandler;
 
   /**
    * Flag used for checking if the ReplicationMonitor thread is running or
@@ -290,6 +310,10 @@ public class ReplicationManager implements SCMService {
         .setRatisServer(scmhaManager.getRatisServer())
         .setMoveTable(moveTable).build();
 
+    this.replicationDatanodeThrottling = new ReplicationDatanodeThrottling(
+        rmConf.getStreamsLimit());
+    this.replicationPriorityQueues = new ReplicationPriorityQueues();
+
     // register ReplicationManager to SCMServiceManager.
     serviceManager.register(this);
 
@@ -298,7 +322,7 @@ public class ReplicationManager implements SCMService {
   }
 
   /**
-   * Starts Replication Monitor thread.
+   * Starts Replication Monitor & Handler threads.
    */
   @Override
   public synchronized void start() {
@@ -310,13 +334,18 @@ public class ReplicationManager implements SCMService {
       replicationMonitor.setName("ReplicationMonitor");
       replicationMonitor.setDaemon(true);
       replicationMonitor.start();
+      LOG.info("Starting Replication Handler Thread.");
+      replicationHandler = new Thread(this::handleDeferred);
+      replicationHandler.setName("ReplicationHandler");
+      replicationHandler.setDaemon(true);
+      replicationHandler.start();
     } else {
-      LOG.info("Replication Monitor Thread is already running.");
+      LOG.info("Replication Monitor & Handler Threads are already running.");
     }
   }
 
   /**
-   * Returns true if the Replication Monitor Thread is running.
+   * Returns true if the Replication Monitor & Handler Threads are running.
    *
    * @return true if running, false otherwise
    */
@@ -324,25 +353,29 @@ public class ReplicationManager implements SCMService {
     if (!running) {
       synchronized (this) {
         return replicationMonitor != null
-            && replicationMonitor.isAlive();
+            && replicationMonitor.isAlive()
+            && replicationHandler != null
+            && replicationHandler.isAlive();
       }
     }
     return true;
   }
 
   /**
-   * Stops Replication Monitor thread.
+   * Stops Replication Monitor & Handler threads.
    */
   public synchronized void stop() {
     if (running) {
-      LOG.info("Stopping Replication Monitor Thread.");
+      LOG.info("Stopping Replication Monitor & Handler Threads.");
       inflightReplication.clear();
       inflightDeletion.clear();
+      replicationPriorityQueues.clear();
+      replicationDatanodeThrottling.clear();
       running = false;
       metrics.unRegister();
       notifyAll();
     } else {
-      LOG.info("Replication Monitor Thread is not running.");
+      LOG.info("Replication Monitor & Handler Threads are not running.");
     }
   }
 
@@ -365,17 +398,56 @@ public class ReplicationManager implements SCMService {
    * ReplicationMonitor thread runnable. This wakes up at configured
    * interval and processes all the containers in the system.
    */
-  private synchronized void run() {
+  private void run() {
     try {
       while (running) {
         processAll();
-        wait(rmConf.getInterval());
+        Thread.sleep(rmConf.getInterval());
       }
     } catch (Throwable t) {
       // When we get runtime exception, we should terminate SCM.
       LOG.error("Exception in Replication Monitor Thread.", t);
       ExitUtil.terminate(1, t);
     }
+  }
+
+  public synchronized void dispatchAll() {
+    if (!shouldRun()) {
+      return;
+    }
+
+    final long start = clock.millis();
+    final List<ReplicationWork> repWorks = replicationPriorityQueues.pollN(
+        replicationDatanodeThrottling);
+    repWorks.forEach(work -> {
+      sendReplicateCommand(work.getContainer(), work.getDest(),
+          work.getSources());
+    });
+
+    LOG.info("Replication Handler Thread took {} milliseconds for" +
+            " dispatching {} replication commands.", clock.millis() - start,
+        repWorks.size());
+  }
+
+  private void handleDeferred() {
+    try {
+      while (running) {
+        dispatchAll();
+        Thread.sleep(rmConf.getHandlerInterval());
+      }
+    } catch (Throwable t) {
+      // When we get runtime exception, we should terminate SCM.
+      LOG.error("Exception in Replication Handler Thread.", t);
+      ExitUtil.terminate(1, t);
+    }
+  }
+
+  private void deferReplication(ContainerInfo container,
+      List<DatanodeDetails> dests, List<DatanodeDetails> sources,
+      ContainerReplicaCount replicaSet,
+      ContainerPlacementStatus placementStatus) {
+    replicationPriorityQueues.offer(container, dests, sources,
+        replicaSet, placementStatus);
   }
 
   /**
@@ -546,38 +618,53 @@ public class ReplicationManager implements SCMService {
     if (inflightActions.containsKey(id)) {
       final List<InflightAction> actions = inflightActions.get(id);
 
-      Iterator<InflightAction> iter = actions.iterator();
-      while(iter.hasNext()) {
-        try {
-          InflightAction a = iter.next();
-          NodeStatus status = nodeManager.getNodeStatus(a.datanode);
-          boolean isUnhealthy = status.getHealth() != NodeState.HEALTHY;
-          boolean isCompleted = filter.test(a);
-          boolean isTimeout = a.time < deadline;
-          boolean isNotInService = status.getOperationalState() !=
-              NodeOperationalState.IN_SERVICE;
-          if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
-            iter.remove();
+      synchronized (actions) {
+        Iterator<InflightAction> iter = actions.iterator();
+        while (iter.hasNext()) {
+          try {
+            InflightAction a = iter.next();
+            NodeStatus status = nodeManager.getNodeStatus(a.datanode);
+            boolean isUnhealthy = status.getHealth() != NodeState.HEALTHY;
+            boolean isCompleted = filter.test(a);
+            boolean isTimeout = a.time < deadline;
+            boolean isNotInService = status.getOperationalState() !=
+                NodeOperationalState.IN_SERVICE;
+            if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
+              iter.remove();
 
-            if (isTimeout) {
-              timeoutCounter.run();
-            } else if (isCompleted) {
-              completedCounter.run();
+              if (isTimeout) {
+                timeoutCounter.run();
+              } else if (isCompleted) {
+                completedCounter.run();
+              }
+
+              updateThrottlingIfNeeded(container, a, inflightActions);
+
+              updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
+                  isNotInService, container, a.datanode, inflightActions);
             }
-
-            updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
-                isNotInService, container, a.datanode, inflightActions);
+          } catch (NodeNotFoundException | ContainerNotFoundException e) {
+            // Should not happen, but if it does, just remove the action as the
+            // node somehow does not exist;
+            iter.remove();
           }
-        } catch (NodeNotFoundException | ContainerNotFoundException e) {
-          // Should not happen, but if it does, just remove the action as the
-          // node somehow does not exist;
-          iter.remove();
+        }
+        if (actions.isEmpty()) {
+          inflightActions.remove(id);
         }
       }
-      if (actions.isEmpty()) {
-        inflightActions.remove(id);
-      }
     }
+  }
+
+  private void updateThrottlingIfNeeded(final ContainerInfo container,
+      final InflightAction action,
+      final Map<ContainerID, List<InflightAction>> inflightActions) {
+    if (!inflightActions.equals(inflightReplication)) {
+      return;
+    }
+
+    replicationDatanodeThrottling.forgetDatanodeForContainer(
+        action.getDatanode(), container.containerID());
   }
 
   /**
@@ -1158,9 +1245,8 @@ public class ReplicationManager implements SCMService {
           // the number of pending mis-replication has improved. No point in
           // creating new replicas for mis-replicated containers unless it
           // improves things.
-          for (DatanodeDetails datanode : selectedDatanodes) {
-            sendReplicateCommand(container, datanode, source);
-          }
+          deferReplication(container, selectedDatanodes, source,
+              replicaSet, placementStatus);
         } else {
           LOG.warn("Container {} is mis-replicated, requiring {} additional " +
               "replicas. After selecting new nodes, mis-replication has not " +
@@ -1498,9 +1584,12 @@ public class ReplicationManager implements SCMService {
     final ContainerID id = container.containerID();
     final ReplicateContainerCommand replicateCommand =
         new ReplicateContainerCommand(id.getId(), sources);
-    inflightReplication.computeIfAbsent(id, k -> new ArrayList<>());
+    inflightReplication.computeIfAbsent(id,
+        k -> Collections.synchronizedList(new ArrayList<>()));
     sendAndTrackDatanodeCommand(datanode, replicateCommand,
         action -> inflightReplication.get(id).add(action));
+
+    replicationDatanodeThrottling.recordDatanodeForContainer(datanode, id);
 
     metrics.incrNumReplicationCmdsSent();
     metrics.incrNumReplicationBytesTotal(container.getUsedBytes());
@@ -1628,7 +1717,7 @@ public class ReplicationManager implements SCMService {
     private final long time;
 
     private InflightAction(final DatanodeDetails datanode,
-                           final long time) {
+        final long time) {
       this.datanode = datanode;
       this.time = time;
     }
@@ -1657,6 +1746,20 @@ public class ReplicationManager implements SCMService {
             "which that thread runs."
     )
     private long interval = Duration.ofSeconds(300).toMillis();
+
+    /**
+     * The frequency in which ReplicationHandler thread should run.
+     */
+    @Config(key = "handler.thread.interval",
+        type = ConfigType.TIME,
+        defaultValue = "120s",
+        tags = {SCM, OZONE},
+        description = "There is a replication handler thread running inside " +
+            "SCM which takes care of dispatch real replication commands to " +
+            "datanodes in the cluster. This property is used to configure " +
+            "the interval in which that thread runs."
+    )
+    private long handlerInterval = Duration.ofSeconds(120).toMillis();
 
     /**
      * Timeout for container replication & deletion command issued by
@@ -1693,6 +1796,18 @@ public class ReplicationManager implements SCMService {
             " entering maintenance state until a new replica is created.")
     private int maintenanceReplicaMinimum = 2;
 
+    /**
+     * The max number of container replication commands to be send to
+     * a single DN.
+     */
+    @Config(key = "streams.limit",
+        type = ConfigType.INT,
+        defaultValue = "10",
+        tags = {SCM, OZONE},
+        description = "The max number of container replication commands " +
+            "to be send to a single datanode.")
+    private int streamsLimit = 10;
+
     public void setMaintenanceReplicaMinimum(int replicaCount) {
       this.maintenanceReplicaMinimum = replicaCount;
     }
@@ -1707,6 +1822,22 @@ public class ReplicationManager implements SCMService {
 
     public int getMaintenanceReplicaMinimum() {
       return maintenanceReplicaMinimum;
+    }
+
+    public long getHandlerInterval() {
+      return handlerInterval;
+    }
+
+    public void setHandlerInterval(Duration handlerInterval) {
+      this.handlerInterval = handlerInterval.toMillis();
+    }
+
+    public int getStreamsLimit() {
+      return this.streamsLimit;
+    }
+
+    public void setStreamsLimit(int streamsLimit) {
+      this.streamsLimit = streamsLimit;
     }
   }
 
