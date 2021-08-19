@@ -121,7 +121,7 @@ public class TestECBlockInputStream {
   @Test
   public void testCorrectBlockSizePassedToBlockStreamLessThanCell()
       throws IOException {
-    ByteBuffer buf = ByteBuffer.allocate(3*ONEMB);
+    ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, ONEMB - 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
@@ -137,7 +137,7 @@ public class TestECBlockInputStream {
   @Test
   public void testCorrectBlockSizePassedToBlockStreamTwoCells()
       throws IOException {
-    ByteBuffer buf = ByteBuffer.allocate(3*ONEMB);
+    ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, ONEMB + 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
@@ -152,7 +152,7 @@ public class TestECBlockInputStream {
   @Test
   public void testCorrectBlockSizePassedToBlockStreamThreeCells()
       throws IOException {
-    ByteBuffer buf = ByteBuffer.allocate(3*ONEMB);
+    ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 2 * ONEMB + 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
@@ -168,7 +168,7 @@ public class TestECBlockInputStream {
   @Test
   public void testCorrectBlockSizePassedToBlockStreamThreeFullAndPartialStripe()
       throws IOException {
-    ByteBuffer buf = ByteBuffer.allocate(3*ONEMB);
+    ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 10 * ONEMB + 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
@@ -184,7 +184,7 @@ public class TestECBlockInputStream {
   @Test
   public void testCorrectBlockSizePassedToBlockStreamSingleFullCell()
       throws IOException {
-    ByteBuffer buf = ByteBuffer.allocate(3*ONEMB);
+    ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, ONEMB);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
@@ -198,7 +198,7 @@ public class TestECBlockInputStream {
   @Test
   public void testCorrectBlockSizePassedToBlockStreamSeveralFullCells()
       throws IOException {
-    ByteBuffer buf = ByteBuffer.allocate(3*ONEMB);
+    ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 9 * ONEMB);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
