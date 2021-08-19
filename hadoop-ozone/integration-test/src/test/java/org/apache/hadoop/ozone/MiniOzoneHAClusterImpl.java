@@ -31,7 +31,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -44,16 +43,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
@@ -703,7 +700,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     while (true) {
       try {
-        Set<Integer> portSet = getFreePortSet(4);
+        List<Integer> portSet = getFreePortList(4);
         OzoneConfiguration newConf = addNewOMToConfig(getOMServiceId(),
             omNodeId, portSet);
 
@@ -741,7 +738,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * Set the configs for new OMs.
    */
   private OzoneConfiguration addNewOMToConfig(String omServiceId,
-      String omNodeId, Set<Integer> portSet) {
+      String omNodeId, List<Integer> portList) {
     OzoneConfiguration newConf = getConf();
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
@@ -758,11 +755,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     String omRatisPortKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
-    Integer[] portArray = portSet.toArray(new Integer[]{});
-    newConf.set(omAddrKey, "127.0.0.1:" + portArray[0]);
-    newConf.set(omHttpAddrKey, "127.0.0.1:" + portArray[1]);
-    newConf.set(omHttpsAddrKey, "127.0.0.1:" + portArray[2]);
-    newConf.setInt(omRatisPortKey, portArray[3]);
+    newConf.set(omAddrKey, "127.0.0.1:" + portList.get(0));
+    newConf.set(omHttpAddrKey, "127.0.0.1:" + portList.get(1));
+    newConf.set(omHttpsAddrKey, "127.0.0.1:" + portList.get(2));
+    newConf.setInt(omRatisPortKey, portList.get(3));
 
     newConf.set(omNodesKey, omNodesKeyValue.toString());
 
@@ -971,17 +967,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return getStorageContainerManagers().get(0);
   }
 
-  private Set<Integer> getFreePortSet(int size) {
-    Set<Integer> portSet = new HashSet<>();
-    while (portSet.size() < size) {
-      try {
-        InetSocketAddress inetSocketAddress =
-            SCMTestUtils.getReuseableAddress();
-        portSet.add(inetSocketAddress.getPort());
-      } catch (IOException e) {
-        LOG.error("Can not get reusable Address: " + e);
-      }
-    }
-    return portSet;
+  private List<Integer> getFreePortList(int size) {
+    return org.apache.ratis.util.NetUtils.createLocalServerAddress(size)
+        .stream()
+        .map(inetSocketAddress -> inetSocketAddress.getPort())
+        .collect(Collectors.toList());
   }
 }
