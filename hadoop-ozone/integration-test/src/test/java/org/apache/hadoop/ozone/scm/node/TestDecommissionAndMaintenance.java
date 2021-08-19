@@ -39,9 +39,12 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +56,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -98,8 +104,123 @@ public class TestDecommissionAndMaintenance {
 
   private ContainerOperationClient scmClient;
 
-  @Before
-  public void setUp() throws Exception {
+  private static MiniClusterProvider clusterProvider;
+
+  /**
+   * Class to create mini-clusters in the background.
+   */
+  public static class MiniClusterProvider {
+
+    private int preCreatedLimit = 1;
+
+    private final OzoneConfiguration conf;
+    private final MiniOzoneCluster.Builder builder;
+    private boolean shouldRun = true;
+    private boolean shouldReap = true;
+    private Thread createThread;
+    private Thread reapThread;
+
+    private final BlockingQueue<MiniOzoneCluster> clusters
+        = new ArrayBlockingQueue<>(preCreatedLimit);
+    private final BlockingQueue<MiniOzoneCluster> expiredClusters
+        = new ArrayBlockingQueue<>(1024);
+
+
+    public MiniClusterProvider(OzoneConfiguration conf,
+        MiniOzoneCluster.Builder builder) {
+      this.conf = conf;
+      this.builder = builder;
+      createThread = createClusters();
+      reapThread = reapClusters();
+    }
+
+    public MiniOzoneCluster provide() throws InterruptedException {
+      return clusters.poll(100, SECONDS);
+    }
+
+    public void destroy(MiniOzoneCluster c) throws InterruptedException {
+      expiredClusters.put(c);
+    }
+
+    public void shutdown() throws InterruptedException {
+      shouldRun = false;
+      createThread.interrupt();
+      createThread.join();
+      destroyRemainingClusters();
+      shouldReap = false;
+      reapThread.join();
+    }
+
+    private Thread reapClusters() {
+      Thread t = new Thread(() -> {
+        while(shouldReap || !expiredClusters.isEmpty()) {
+          try {
+            MiniOzoneCluster c = expiredClusters.take();
+            c.shutdown();
+          } catch (InterruptedException e) {
+            break;
+          }
+        }
+      });
+      t.start();
+      return t;
+    }
+
+    private Thread createClusters() {
+      Thread t = new Thread(() -> {
+        while (shouldRun && !Thread.interrupted()) {
+          MiniOzoneCluster cluster = null;
+          try {
+            builder.setClusterId(UUID.randomUUID().toString());
+
+            OzoneConfiguration newConf = new OzoneConfiguration(conf);
+            List<Integer> portList = getFreePortList(4);
+            newConf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+                "127.0.0.1:" + portList.get(0));
+            newConf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY,
+                "127.0.0.1:" + portList.get(1));
+            newConf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
+                "127.0.0.1:" + portList.get(2));
+            newConf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY,
+                portList.get(3));
+            builder.setConf(newConf);
+
+            cluster = builder.build();
+            cluster.waitForClusterToBeReady();
+            clusters.put(cluster);
+          } catch (InterruptedException e) {
+            if (cluster != null) {
+              cluster.shutdown();
+            }
+          } catch (IOException | TimeoutException e) {
+            throw new RuntimeException("Unable to build cluster", e);
+          }
+        }
+      });
+      t.start();
+      return t;
+    }
+
+    private void destroyRemainingClusters() throws InterruptedException {
+      while(!clusters.isEmpty()) {
+        try {
+          expiredClusters.add(clusters.poll(100, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+          // Do nothing
+        }
+      }
+    }
+
+    private List<Integer> getFreePortList(int size) {
+      return org.apache.ratis.util.NetUtils.createLocalServerAddress(size)
+          .stream()
+          .map(inetSocketAddress -> inetSocketAddress.getPort())
+          .collect(Collectors.toList());
+    }
+  }
+
+  @BeforeClass
+  public static void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int interval = 100;
 
@@ -121,20 +242,31 @@ public class TestDecommissionAndMaintenance {
     replicationConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(replicationConf);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    setManagers();
+    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(numOfDatanodes);
 
+    clusterProvider = new MiniClusterProvider(conf, builder);
+  }
+
+  @AfterClass
+  public static void shutdown() throws InterruptedException {
+    if (clusterProvider != null) {
+      clusterProvider.shutdown();
+    }
+  }
+
+  @Before
+  public void setUp() throws Exception {
+    cluster = clusterProvider.provide();
+    setManagers();
     bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
-    scmClient = new ContainerOperationClient(conf);
+    scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws InterruptedException {
     if (cluster != null) {
-      cluster.shutdown();
+      clusterProvider.destroy(cluster);
     }
   }
 
