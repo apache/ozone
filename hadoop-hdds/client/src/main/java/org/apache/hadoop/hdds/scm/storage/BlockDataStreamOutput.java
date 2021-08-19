@@ -254,62 +254,11 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    * @throws IOException if error occurred
    */
 
-  // TODO: We need add new retry policy without depend on bufferPool
+  // TODO: We need add new retry policy without depend on bufferPool.
   public void writeOnRetry(long len) throws IOException {
-    if (len == 0) {
-      return;
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Retrying write length {} for blockID {}", len, blockID);
-    }
-    Preconditions.checkArgument(len <= config.getStreamBufferMaxSize());
-    int count = 0;
-    while (len > 0) {
-      ChunkBuffer buffer = bufferPool.getBuffer(count);
-      long writeLen = Math.min(buffer.position(), len);
-      if (!buffer.hasRemaining()) {
-        writeChunk(buffer);
-      }
-      len -= writeLen;
-      count++;
-      writtenDataLength += writeLen;
-      // we should not call isBufferFull/shouldFlush here.
-      // The buffer might already be full as whole data is already cached in
-      // the buffer. We should just validate
-      // if we wrote data of size streamBufferMaxSize/streamBufferFlushSize to
-      // call for handling full buffer/flush buffer condition.
-      if (writtenDataLength % config.getStreamBufferFlushSize() == 0) {
-        // reset the position to zero as now we will be reading the
-        // next buffer in the list
-        updateFlushLength();
-        executePutBlock(false, false);
-      }
-      if (writtenDataLength == config.getStreamBufferMaxSize()) {
-        handleFullBuffer();
-      }
-    }
+
   }
 
-  /**
-   * This is a blocking call. It will wait for the flush till the commit index
-   * at the head of the commitIndex2flushedDataMap gets replicated to all or
-   * majority.
-   * @throws IOException
-   */
-  private void handleFullBuffer() throws IOException {
-    try {
-      checkOpen();
-      if (!commitWatcher.getFutureMap().isEmpty()) {
-        waitOnFlushFutures();
-      }
-    } catch (ExecutionException e) {
-      handleExecutionException(e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      handleInterruptedException(ex, true);
-    }
-    watchForCommit(true);
-  }
 
 
   // It may happen that once the exception is encountered , we still might
@@ -432,24 +381,11 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     return flushFuture;
   }
 
+  // TODO We are no longer using the bufferPool, so we do not need to flush the
+  //  data in it. We can discuss whether add other behaviors here.
   @Override
   public void flush() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient != null
-        && bufferPool != null && bufferPool.getSize() > 0
-        && (!config.isStreamBufferFlushDelay() ||
-            writtenDataLength - totalDataFlushedLength
-                >= config.getStreamBufferSize())) {
-      try {
-        handleFlush(false);
-      } catch (ExecutionException e) {
-        // just set the exception here as well in order to maintain sanctity of
-        // ioException field
-        handleExecutionException(e);
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-        handleInterruptedException(ex, true);
-      }
-    }
+
   }
 
   private void writeChunk(ChunkBuffer buffer)
