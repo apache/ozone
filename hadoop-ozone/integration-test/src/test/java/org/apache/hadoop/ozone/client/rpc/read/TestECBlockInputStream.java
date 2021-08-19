@@ -247,7 +247,7 @@ public class TestECBlockInputStream {
   @Test
   public void testReadCrossingMultipleECChunkBounds() throws IOException {
     // EC-3-2, 5MB block, so all 3 data locations are needed
-    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 5*ONEMB);
+    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 5 * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, 100,
         keyInfo, true, streamProvider)) {
 
