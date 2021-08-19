@@ -172,7 +172,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    commitWatcher = new CommitWatcher(bufferPool, xceiverClient);
+    commitWatcher = new CommitWatcher(xceiverClient);
     bufferList = null;
     totalDataFlushedLength = 0;
     writtenDataLength = 0;

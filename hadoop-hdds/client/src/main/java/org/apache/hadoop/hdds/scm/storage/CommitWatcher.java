@@ -84,6 +84,13 @@ public class CommitWatcher {
     futureMap = new ConcurrentHashMap<>();
   }
 
+  public CommitWatcher(XceiverClientSpi xceiverClient) {
+    this.xceiverClient = xceiverClient;
+    commitIndex2flushedDataMap = new ConcurrentSkipListMap<>();
+    totalAckDataLength = 0;
+    futureMap = new ConcurrentHashMap<>();
+  }
+
   /**
    * just update the totalAckDataLength. In case of failure,
    * we will read the data starting from totalAckDataLength.
@@ -105,9 +112,8 @@ public class CommitWatcher {
           LOG.error("Existing acknowledged data: " + key);
         }
       }
-      Preconditions.checkNotNull(remove);
-      // if size of bufferPool is 0, we are not using bufferPool
-      if (bufferPool.getSize() > 0) {
+      // if bufferPool is null, we are not using bufferPool
+      if (bufferPool != null) {
         for (ChunkBuffer byteBuffer : buffers) {
           bufferPool.releaseBuffer(byteBuffer);
         }
