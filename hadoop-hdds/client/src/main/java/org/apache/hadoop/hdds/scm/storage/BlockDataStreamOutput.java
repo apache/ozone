@@ -229,17 +229,28 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
   }
 
   @Override
-  public void write(ByteBuf b) throws IOException {
+  public void write(ByteBuf buf) throws IOException {
     checkOpen();
-    if (b == null) {
+    if (buf == null) {
       throw new NullPointerException();
     }
-    final int len = b.readableBytes();
+    final int len = buf.readableBytes();
     if (len == 0) {
       return;
     }
-    ChunkBuffer chunk = ChunkBuffer.wrap(b.nioBuffer());
-    writeChunk(chunk.duplicate(len, len)); // pretend as write buffer
+
+    // This data in the buffer will be pushed to datanode and a reference will
+    // be added to the bufferList. Once putBlock gets executed, this list will
+    // be marked null. Hence, during first writeChunk call after every putBlock
+    // call or during the first call to writeChunk here, the list will be null.
+    if (bufferList == null) {
+      bufferList = new ArrayList<>();
+    }
+
+    ChunkBuffer chunk = ChunkBuffer.wrap(buf.nioBuffer());
+    bufferList.add(chunk);
+    writeChunkToContainer(chunk, buf);
+
     writtenDataLength += len;
   }
 
@@ -388,20 +399,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
   }
 
-  private void writeChunk(ChunkBuffer buffer)
-      throws IOException {
-    // This data in the buffer will be pushed to datanode and a reference will
-    // be added to the bufferList. Once putBlock gets executed, this list will
-    // be marked null. Hence, during first writeChunk call after every putBlock
-    // call or during the first call to writeChunk here, the list will be null.
-
-    if (bufferList == null) {
-      bufferList = new ArrayList<>();
-    }
-    bufferList.add(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()));
-  }
-
   /**
    * @param close whether the flush is happening as part of closing the stream
    */
@@ -544,12 +541,15 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
    */
-  private void writeChunkToContainer(ChunkBuffer chunk) throws IOException {
-    int effectiveChunkSize = chunk.remaining();
-    final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
-    final ByteString data = chunk.toByteString(
-        bufferPool.byteStringConversion());
+  private void writeChunkToContainer(ChunkBuffer chunk, ByteBuf buf)
+      throws IOException {
+    // TODO This chunk is only use to get ChecksumData. Buffer copy is generated
+    //  during computeChecksum. So we need to consider whether we can remove
+    //  check sum or choose a better way.
     ChecksumData checksumData = checksum.computeChecksum(chunk);
+
+    int effectiveChunkSize = buf.readableBytes();
+    final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
@@ -564,21 +564,22 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
     CompletableFuture<DataStreamReply> future =
         (needSync(offset + effectiveChunkSize) ?
-        out.writeAsync(data.asReadOnlyByteBuffer(), StandardWriteOption.SYNC) :
-        out.writeAsync(data.asReadOnlyByteBuffer()))
-        .whenCompleteAsync((r, e) -> {
-          if (e != null || !r.isSuccess()) {
-            if (e == null) {
-              e = new IOException("result is not success");
-            }
-            String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
-                " " + "into block " + blockID;
-            LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-            CompletionException ce = new CompletionException(msg, e);
-            setIoException(ce);
-            throw ce;
-          }
-        }, responseExecutor);
+            out.writeAsync(buf.nioBuffer(), StandardWriteOption.SYNC) :
+            out.writeAsync(buf.nioBuffer()))
+            .whenCompleteAsync((r, e) -> {
+              if (e != null || !r.isSuccess()) {
+                if (e == null) {
+                  e = new IOException("result is not success");
+                }
+                String msg =
+                    "Failed to write chunk " + chunkInfo.getChunkName() +
+                        " " + "into block " + blockID;
+                LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+                CompletionException ce = new CompletionException(msg, e);
+                setIoException(ce);
+                throw ce;
+              }
+            }, responseExecutor);
 
     futures.add(future);
     containerBlockData.addChunks(chunkInfo);
