@@ -127,18 +127,16 @@ public class TestNodeStateMap {
    */
   @Test
   public void testConcurrency() throws Exception {
-    NodeStateMap nodeStateMap = new NodeStateMap();
-
     final DatanodeDetails datanodeDetails =
         MockDatanodeDetails.randomDatanodeDetails();
 
-    nodeStateMap.addNode(datanodeDetails, NodeStatus.inServiceHealthy(), null);
+    map.addNode(datanodeDetails, NodeStatus.inServiceHealthy(), null);
 
     UUID dnUuid = datanodeDetails.getUuid();
 
-    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(1L));
-    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(2L));
-    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(3L));
+    map.addContainer(dnUuid, ContainerID.valueOf(1L));
+    map.addContainer(dnUuid, ContainerID.valueOf(2L));
+    map.addContainer(dnUuid, ContainerID.valueOf(3L));
 
     CountDownLatch elementRemoved = new CountDownLatch(1);
     CountDownLatch loopStarted = new CountDownLatch(1);
@@ -146,7 +144,7 @@ public class TestNodeStateMap {
     new Thread(() -> {
       try {
         loopStarted.await();
-        nodeStateMap.removeContainer(dnUuid, ContainerID.valueOf(1L));
+        map.removeContainer(dnUuid, ContainerID.valueOf(1L));
         elementRemoved.countDown();
       } catch (Exception e) {
         e.printStackTrace();
@@ -155,7 +153,7 @@ public class TestNodeStateMap {
     }).start();
 
     boolean first = true;
-    for (ContainerID key : nodeStateMap.getContainers(dnUuid)) {
+    for (ContainerID key : map.getContainers(dnUuid)) {
       if (first) {
         loopStarted.countDown();
         elementRemoved.await();

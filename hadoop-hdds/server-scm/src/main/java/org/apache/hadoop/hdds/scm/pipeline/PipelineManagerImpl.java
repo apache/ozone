@@ -64,9 +64,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * All the write operations for pipelines must come via PipelineManager.
  * It synchronises all write and read operations via a ReadWriteLock.
  */
-public class PipelineManagerV2Impl implements PipelineManager {
+public class PipelineManagerImpl implements PipelineManager {
   private static final Logger LOG =
-      LoggerFactory.getLogger(PipelineManagerV2Impl.class);
+      LoggerFactory.getLogger(PipelineManagerImpl.class);
 
   // Limit the number of on-going ratis operation to be 1.
   private final Lock lock;
@@ -86,13 +86,13 @@ public class PipelineManagerV2Impl implements PipelineManager {
   // SCM is already out of SafeMode.
   private AtomicBoolean freezePipelineCreation;
 
-  protected PipelineManagerV2Impl(ConfigurationSource conf,
-                                 SCMHAManager scmhaManager,
-                                 NodeManager nodeManager,
-                                 StateManager pipelineStateManager,
-                                 PipelineFactory pipelineFactory,
-                                 EventPublisher eventPublisher,
-                                 SCMContext scmContext) {
+  protected PipelineManagerImpl(ConfigurationSource conf,
+                                SCMHAManager scmhaManager,
+                                NodeManager nodeManager,
+                                StateManager pipelineStateManager,
+                                PipelineFactory pipelineFactory,
+                                EventPublisher eventPublisher,
+                                SCMContext scmContext) {
     this.lock = new ReentrantLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
@@ -111,7 +111,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
     this.freezePipelineCreation = new AtomicBoolean();
   }
 
-  public static PipelineManagerV2Impl newPipelineManager(
+  public static PipelineManagerImpl newPipelineManager(
       ConfigurationSource conf,
       SCMHAManager scmhaManager,
       NodeManager nodeManager,
@@ -132,7 +132,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
         nodeManager, stateManager, conf, eventPublisher, scmContext);
 
     // Create PipelineManager
-    PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
+    PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
         scmhaManager, nodeManager, stateManager, pipelineFactory,
         eventPublisher, scmContext);
 
