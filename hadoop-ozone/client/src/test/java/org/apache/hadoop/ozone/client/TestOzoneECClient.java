@@ -294,7 +294,7 @@ public class TestOzoneECClient {
       }
 
       for (int i = 0; i < lastChunk.length - 1; i++) {
-        out.write(lastChunk);
+        out.write(lastChunk[i]);
       }
     }
 
