@@ -118,6 +118,7 @@ public final class SCMContainerPlacementRackScatter
           mutableFavoredNodes.add(datanodeDetails);
         }
       }
+      Collections.shuffle(mutableFavoredNodes);
     }
     if (excludedNodes != null) {
       mutableFavoredNodes.removeAll(excludedNodes);
