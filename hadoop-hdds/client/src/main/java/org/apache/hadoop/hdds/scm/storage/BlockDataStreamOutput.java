@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -105,14 +106,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
   // effective data write attempted so far for the block
   private long writtenDataLength;
-
-  // List containing buffers for which the putBlock call will
-  // update the length in the datanodes. This list will just maintain
-  // references to the buffers in the BufferPool which will be cleared
-  // when the watchForCommit acknowledges a putBlock logIndex has been
-  // committed on all datanodes. This list will be a  place holder for buffers
-  // which got written between successive putBlock calls.
-  private List<ChunkBuffer> bufferList;
 
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
@@ -173,7 +166,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
     commitWatcher = new CommitWatcher(xceiverClient);
-    bufferList = null;
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
@@ -239,16 +231,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
       return;
     }
 
-    // This data in the buffer will be pushed to datanode and a reference will
-    // be added to the bufferList. Once putBlock gets executed, this list will
-    // be marked null. Hence, during first writeChunk call after every putBlock
-    // call or during the first call to writeChunk here, the list will be null.
-    if (bufferList == null) {
-      bufferList = new ArrayList<>();
-    }
-
     ChunkBuffer chunk = ChunkBuffer.wrap(buf.nioBuffer());
-    bufferList.add(chunk);
     writeChunkToContainer(chunk, buf);
 
     writtenDataLength += len;
@@ -291,7 +274,8 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     checkOpen();
     try {
       XceiverClientReply reply = bufferFull ?
-          commitWatcher.watchOnFirstIndex() : commitWatcher.watchOnLastIndex();
+          commitWatcher.streamWatchOnFirstIndex() :
+          commitWatcher.streamWatchOnLastIndex();
       if (reply != null) {
         List<DatanodeDetails> dnList = reply.getDatanodes();
         if (!dnList.isEmpty()) {
@@ -319,16 +303,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
-    final List<ChunkBuffer> byteBufferList;
-    if (!force) {
-      Preconditions.checkNotNull(bufferList);
-      byteBufferList = bufferList;
-      bufferList = null;
-      Preconditions.checkNotNull(byteBufferList);
-    } else {
-      byteBufferList = null;
-    }
-
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
     } catch (Exception e) {
@@ -365,12 +339,11 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
             LOG.debug(
                 "Adding index " + asyncReply.getLogIndex() + " commitMap size "
                     + commitWatcher.getCommitInfoMapSize() + " flushLength "
-                    + flushPos + " numBuffers " + byteBufferList.size()
-                    + " blockID " + blockID);
+                    + flushPos + " blockID " + blockID);
           }
           // for standalone protocol, logIndex will always be 0.
           commitWatcher
-              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
+              .updateCommitInfoMap(asyncReply.getLogIndex(), new LinkedList<>());
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -496,10 +469,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     xceiverClientFactory = null;
     xceiverClient = null;
     commitWatcher.cleanup();
-    if (bufferList !=  null) {
-      bufferList.clear();
-    }
-    bufferList = null;
     responseExecutor.shutdown();
   }
 

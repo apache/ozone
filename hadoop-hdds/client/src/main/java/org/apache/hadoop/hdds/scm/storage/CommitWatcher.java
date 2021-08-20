@@ -112,11 +112,9 @@ public class CommitWatcher {
           LOG.error("Existing acknowledged data: " + key);
         }
       }
-      // if bufferPool is null, we are not using bufferPool
-      if (bufferPool != null) {
-        for (ChunkBuffer byteBuffer : buffers) {
-          bufferPool.releaseBuffer(byteBuffer);
-        }
+      Preconditions.checkNotNull(remove);
+      for (ChunkBuffer byteBuffer : buffers) {
+        bufferPool.releaseBuffer(byteBuffer);
       }
     }
     return totalAckDataLength;
@@ -178,6 +176,53 @@ public class CommitWatcher {
     }
   }
 
+  /**
+   * Calls watch for commit for the first index in commitIndex2flushedDataMap to
+   * the Ratis client.
+   * @return {@link XceiverClientReply} reply from raft client
+   * @throws IOException in case watchForCommit fails
+   */
+  public XceiverClientReply streamWatchOnFirstIndex() throws IOException {
+    if (!commitIndex2flushedDataMap.isEmpty()) {
+      // wait for the  first commit index in the commitIndex2flushedDataMap
+      // to get committed to all or majority of nodes in case timeout
+      // happens.
+      long index =
+          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).min()
+              .getAsLong();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("waiting for first index {} to catch up", index);
+      }
+      return streamWatchForCommit(index);
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Calls watch for commit for the last index in commitIndex2flushedDataMap to
+   * the Ratis client.
+   * @return {@link XceiverClientReply} reply from raft client
+   * @throws IOException in case watchForCommit fails
+   */
+  public XceiverClientReply streamWatchOnLastIndex()
+      throws IOException {
+    if (!commitIndex2flushedDataMap.isEmpty()) {
+      // wait for the  commit index in the commitIndex2flushedDataMap
+      // to get committed to all or majority of nodes in case timeout
+      // happens.
+      long index =
+          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).max()
+              .getAsLong();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("waiting for last flush Index {} to catch up", index);
+      }
+      return streamWatchForCommit(index);
+    } else {
+      return null;
+    }
+  }
+
   private void adjustBuffers(long commitIndex) {
     List<Long> keyList = commitIndex2flushedDataMap.keySet().stream()
         .filter(p -> p <= commitIndex).collect(Collectors.toList());
@@ -212,6 +257,35 @@ public class CommitWatcher {
         index = reply.getLogIndex();
       }
       adjustBuffers(index);
+      return reply;
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      throw getIOExceptionForWatchForCommit(commitIndex, e);
+    } catch (TimeoutException | ExecutionException e) {
+      throw getIOExceptionForWatchForCommit(commitIndex, e);
+    }
+  }
+
+  /**
+   * calls watchForCommit API of the Ratis Client. This method is for streaming
+   * and no longer requires releaseBuffers
+   * @param commitIndex log index to watch for
+   * @return minimum commit index replicated to all nodes
+   * @throws IOException IOException in case watch gets timed out
+   */
+  public XceiverClientReply streamWatchForCommit(long commitIndex)
+      throws IOException {
+    long index;
+    try {
+      XceiverClientReply reply =
+          xceiverClient.watchForCommit(commitIndex);
+      if (reply == null) {
+        index = 0;
+      } else {
+        index = reply.getLogIndex();
+      }
+//      adjustBuffers(index);
       return reply;
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
