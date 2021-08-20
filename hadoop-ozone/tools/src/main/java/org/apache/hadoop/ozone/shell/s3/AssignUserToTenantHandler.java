@@ -29,16 +29,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ozone s3 user create.
+ * ozone s3 user assign.
  */
-@CommandLine.Command(name = "create",
-    description = "Create one or more tenant users")
-public class TenantUserCreateHandler extends S3Handler {
+@CommandLine.Command(name = "assign",
+    description = "Assign user to tenant")
+public class AssignUserToTenantHandler extends S3Handler {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "List of tenant user short names")
+  @CommandLine.Parameters(description = "List of tenant short user names")
   private List<String> usernames = new ArrayList<>();
 
   @CommandLine.Option(names = "-t",
@@ -54,13 +54,13 @@ public class TenantUserCreateHandler extends S3Handler {
     if (usernames.size() > 0) {
       for (String username : usernames) {
         try {
-          S3SecretValue res = objStore.createTenantUser(username, tenantName);
-          out().println("Successfully created user " + username + ":");
+          S3SecretValue res = objStore.assignUserToTenant(username, tenantName);
+          out().println("Assigned '" + username + "' to '" + tenantName + "'.");
           out().println("export AWS_ACCESS_KEY_ID=" + res.getAwsAccessKey());
           out().println("export AWS_SECRET_ACCESS_KEY=" + res.getAwsSecret());
         } catch (IOException e) {
-          out().println("Failed to create user " + username + ": " +
-              e.getMessage());
+          out().println("Failed to assign '" + username + "' to '" +
+              tenantName + "': " + e.getMessage());
         }
       }
     } else {

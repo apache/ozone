@@ -573,12 +573,12 @@ public interface ClientProtocol {
 //  void deleteTenant(String tenantName) throws IOException;
 
   /**
-   * Create tenant user.
-   * @param tenantUsername tenant user name.
+   * Assign user to tenant.
+   * @param username user name to be assigned.
    * @param tenantName tenant name.
    * @throws IOException
    */
-  S3SecretValue createTenantUser(String tenantUsername, String tenantName)
+  S3SecretValue assignUserToTenant(String username, String tenantName)
       throws IOException;
 
   // TODO: modify, delete

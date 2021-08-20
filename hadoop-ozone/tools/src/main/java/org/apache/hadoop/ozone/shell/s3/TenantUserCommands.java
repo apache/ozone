@@ -35,7 +35,7 @@ import java.util.concurrent.Callable;
 @CommandLine.Command(name = "user",
     description = "Tenant user management",
     subcommands = {
-        TenantUserCreateHandler.class,
+        AssignUserToTenantHandler.class,
         TenantUserModifyHandler.class,
         TenantUserDeleteHandler.class
     },

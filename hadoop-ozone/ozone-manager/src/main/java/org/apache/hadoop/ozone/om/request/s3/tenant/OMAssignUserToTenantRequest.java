@@ -36,8 +36,9 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantUserCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
@@ -86,20 +87,20 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
  */
 
 /**
- * Handles OMTenantUserCreate request.
+ * Handles OMAssignUserToTenantRequest.
  */
-public class OMTenantUserCreateRequest extends OMVolumeRequest {
+public class OMAssignUserToTenantRequest extends OMVolumeRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMTenantUserCreateRequest.class);
+      LoggerFactory.getLogger(OMAssignUserToTenantRequest.class);
 
-  public OMTenantUserCreateRequest(OMRequest omRequest) {
+  public OMAssignUserToTenantRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    final CreateTenantUserRequest request =
-        getOmRequest().getCreateTenantUserRequest();
+    final OzoneManagerProtocolProtos.AssignUserToTenantRequest request =
+        getOmRequest().getAssignUserToTenantRequest();
     final String tenantUsername = request.getTenantUsername();
     final String tenantName = request.getTenantName();
 
@@ -151,8 +152,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
     OzoneMultiTenantPrincipal tenantPrincipal = null;
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    final CreateTenantUserRequest request =
-        getOmRequest().getCreateTenantUserRequest();
+    final AssignUserToTenantRequest request =
+        getOmRequest().getAssignUserToTenantRequest();
     final String tenantName = request.getTenantName();
     final String tenantUsername = request.getTenantUsername();
     final String volumeName = tenantName;  // TODO: Configurable
@@ -201,9 +202,11 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
       omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, principal);
       acquiredS3SecretLock = false;
 
+      // Also inform the MultiTenantManager of the user assignment so it can
+      //  initialize some policies in Ranger.
       userId = ozoneManager.getMultiTenantManager()
-          .createUser(tenantName, tenantUsername);
-      LOG.info("userId = {}", userId);
+          .assignUserToTenant(tenantName, tenantUsername);
+      LOG.debug("userId = {}", userId);
 
       // Add to tenantUserTable
       omMetadataManager.getTenantUserTable().addCacheEntry(
@@ -221,8 +224,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
           new CacheKey<>(principal),
           new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
-      omResponse.setCreateTenantUserResponse(
-          CreateTenantUserResponse.newBuilder().setSuccess(true)
+      omResponse.setAssignUserToTenantResponse(
+          AssignUserToTenantResponse.newBuilder().setSuccess(true)
               .setS3Secret(S3Secret.newBuilder()
                   .setAwsSecret(awsSecret).setKerberosID(principal))
               .build());
@@ -233,8 +236,8 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
           tenantName, tenantUsername);
       exception = ex;
       // Set response success flag to false
-      omResponse.setCreateTenantUserResponse(
-          CreateTenantUserResponse.newBuilder().setSuccess(false).build());
+      omResponse.setAssignUserToTenantResponse(
+          AssignUserToTenantResponse.newBuilder().setSuccess(false).build());
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
@@ -253,15 +256,17 @@ public class OMTenantUserCreateRequest extends OMVolumeRequest {
     // Audit
     auditMap.put(OzoneConsts.TENANT, tenantName);
     auditLog(ozoneManager.getAuditLogger(),
-        buildAuditMessage(OMAction.CREATE_TENANT_USER, auditMap, exception,
+        buildAuditMessage(OMAction.ASSIGN_USER_TO_TENANT, auditMap, exception,
             getOmRequest().getUserInfo()));
 
     if (exception == null) {
-      LOG.info("Created user: {}, in tenant: {}. Principal: {}",
+      LOG.info("Assigned user '{}' to tenant '{}'. Principal: {}",
           tenantUsername, tenantName, principal);
       // TODO: omMetrics.incNumTenantUsers()
     } else {
-      LOG.error("Failed to create tenant user {}", tenantName, exception);
+      LOG.error("Failed to assign user '{}' to tenant '{}': {}",
+          tenantUsername, tenantName, exception.getMessage());
+      // TODO: Check if the exception message is sufficient.
       // TODO: omMetrics.incNumTenantUserCreateFails()
     }
     return omClientResponse;

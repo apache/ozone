@@ -82,7 +82,7 @@ import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantDeleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantModifyRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserCreateRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserDeleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserModifyRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
@@ -264,8 +264,8 @@ public final class OzoneManagerRatisUtils {
       return new OMTenantModifyRequest(omRequest);
     case DeleteTenant:
       return new OMTenantDeleteRequest(omRequest);
-    case CreateTenantUser:
-      return new OMTenantUserCreateRequest(omRequest);
+    case AssignUserToTenant:
+      return new OMAssignUserToTenantRequest(omRequest);
     case ModifyTenantUser:
       return new OMTenantUserModifyRequest(omRequest);
     case DeleteTenantUser:
