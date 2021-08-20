@@ -203,11 +203,11 @@ public class PipelineStateManagerV2Impl implements StateManager {
     lock.writeLock().lock();
     try {
       PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
+      Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
+      nodeManager.removePipeline(pipeline);
       if (pipelineStore != null) {
         transactionBuffer.removeFromBuffer(pipelineStore, pipelineID);
       }
-      Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
-      nodeManager.removePipeline(pipeline);
       LOG.info("Pipeline {} removed.", pipeline);
     } catch (PipelineNotFoundException pnfe) {
       LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"

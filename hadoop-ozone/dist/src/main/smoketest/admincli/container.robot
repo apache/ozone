@@ -75,7 +75,6 @@ Incomplete command
                         Should contain   ${output}   Incomplete command
                         Should contain   ${output}   list
                         Should contain   ${output}   info
-                        Should contain   ${output}   delete
                         Should contain   ${output}   create
                         Should contain   ${output}   close
 
@@ -88,6 +87,3 @@ Cannot close container without admin privilege
 
 Cannot create container without admin privilege
     Requires admin privilege    ozone admin container create
-
-Cannot delete container without admin privilege
-    Requires admin privilege    ozone admin container delete "${CONTAINER}"

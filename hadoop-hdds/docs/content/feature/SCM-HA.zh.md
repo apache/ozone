@@ -1,9 +1,9 @@
 ---
-title: "高可用SCM"
+title: "高可用 SCM"
 weight: 1
 menu:
    main:
-      parent: 特点
+      parent: 特性
 summary: Storage Container Manager 的 HA 设置可以避免任何单点故障。
 ---
 <!---
