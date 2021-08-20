@@ -52,8 +52,6 @@ public class ReplicationServer {
 
   private SecurityConfig secConf;
 
-  private ConfigurationSource config;
-
   private CertificateClient caClient;
 
   private ContainerController controller;
