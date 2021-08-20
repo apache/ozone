@@ -229,10 +229,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_TYPE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -2449,7 +2449,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumBucketInfos();
       final OmBucketInfo bucketInfo =
           bucketManager.getBucketInfo(volume, bucket);
-      if(bucketInfo.getDefaultReplicationConfig() == null){
+      if (bucketInfo != null && bucketInfo
+          .getDefaultReplicationConfig() == null) {
         bucketInfo.setDefaultReplicationConfig(getDefaultReplicationConfig());
       }
       return bucketInfo;
@@ -4072,10 +4073,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
-    String replication = configuration.get(OZONE_DEFAULT_SERVER_REPLICATION_KEY,
-        OZONE_DEFAULT_SERVER_REPLICATION_DEFAULT);
-    String type = configuration.get(OZONE_DEFAULT_SERVER_REPLICATION_TYPE_KEY,
-        OZONE_DEFAULT_SERVER_REPLICATION_TYPE_DEFAULT);
+    String replication = configuration.get(OZONE_SERVER_DEFAULT_REPLICATION_KEY,
+        OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
+    String type = configuration.get(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
+        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
     return ReplicationConfig
         .fromTypeAndString(ReplicationType.valueOf(type), replication);
   }

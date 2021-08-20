@@ -71,8 +71,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -140,8 +140,8 @@ public class TestCleanupTableInfo {
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
     when(om.getDefaultReplicationConfig()).thenReturn(ReplicationConfig
         .fromTypeAndString(ReplicationType
-                .valueOf(OZONE_DEFAULT_SERVER_REPLICATION_TYPE_DEFAULT),
-            OZONE_DEFAULT_SERVER_REPLICATION_DEFAULT));
+                .valueOf(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT),
+            OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT));
     addVolumeToMetaTable(aVolumeArgs());
     addBucketToMetaTable(aBucketInfo());
   }

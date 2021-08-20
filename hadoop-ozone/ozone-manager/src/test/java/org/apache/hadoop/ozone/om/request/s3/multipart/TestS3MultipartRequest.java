@@ -49,8 +49,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_SERVER_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -88,8 +88,8 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
         ReplicationConfig.fromTypeAndString(ReplicationType
-                .valueOf(OZONE_DEFAULT_SERVER_REPLICATION_TYPE_DEFAULT),
-            OZONE_DEFAULT_SERVER_REPLICATION_DEFAULT));
+                .valueOf(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT),
+            OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT));
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
         any(OMClientRequest.class)))
