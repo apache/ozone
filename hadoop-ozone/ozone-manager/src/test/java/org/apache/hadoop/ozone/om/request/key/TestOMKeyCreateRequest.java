@@ -105,8 +105,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Write to DB like key commit.
     omMetadataManager.getKeyTable().put(
-        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
-        omMetadataManager.getOpenKeyTable().get(openKey));
+        getOzoneKey(), omMetadataManager.getOpenKeyTable().get(openKey));
 
     // Override same key again
     modifiedOmRequest =
@@ -567,6 +566,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   protected String getOpenKey(long id) throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName,
             keyName, id);
+  }
+
+  protected String getOzoneKey() throws IOException {
+    return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
   }
 
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
