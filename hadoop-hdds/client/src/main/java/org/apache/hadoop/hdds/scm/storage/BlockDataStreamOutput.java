@@ -94,7 +94,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
   private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
-  private final BufferPool bufferPool;
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
   // request will fail upfront.
@@ -130,13 +129,11 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    * @param blockID              block ID
    * @param xceiverClientManager client manager that controls client
    * @param pipeline             pipeline where block will be written
-   * @param bufferPool           pool of buffers
    */
   public BlockDataStreamOutput(
       BlockID blockID,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
-      BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token
   ) throws IOException {
@@ -152,7 +149,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
         (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream();
-    this.bufferPool = bufferPool;
     this.token = token;
 
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
@@ -414,10 +410,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
       } finally {
         cleanup(false);
       }
-      // TODO: Turn the below buffer empty check on when Standalone pipeline
-      // is removed in the write path in tests
-      // Preconditions.checkArgument(buffer.position() == 0);
-      // bufferPool.checkBufferPoolEmpty();
 
     }
   }

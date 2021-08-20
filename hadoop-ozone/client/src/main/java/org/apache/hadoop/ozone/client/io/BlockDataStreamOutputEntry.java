@@ -52,15 +52,12 @@ public final class BlockDataStreamOutputEntry
   private long currentPosition;
   private final Token<OzoneBlockTokenIdentifier> token;
 
-  private BufferPool bufferPool;
-
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   private BlockDataStreamOutputEntry(
       BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       long length,
-      BufferPool bufferPool,
       Token<OzoneBlockTokenIdentifier> token,
       OzoneClientConfig config
   ) {
@@ -73,7 +70,6 @@ public final class BlockDataStreamOutputEntry
     this.token = token;
     this.length = length;
     this.currentPosition = 0;
-    this.bufferPool = bufferPool;
   }
 
   long getLength() {
@@ -98,7 +94,7 @@ public final class BlockDataStreamOutputEntry
     if (this.byteBufStreamOutput == null) {
       this.byteBufStreamOutput =
           new BlockDataStreamOutput(blockID, xceiverClientManager,
-              pipeline, bufferPool, config, token);
+              pipeline, config, token);
     }
   }
 
@@ -198,7 +194,6 @@ public final class BlockDataStreamOutputEntry
     private XceiverClientFactory xceiverClientManager;
     private Pipeline pipeline;
     private long length;
-    private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
 
@@ -230,12 +225,6 @@ public final class BlockDataStreamOutputEntry
       return this;
     }
 
-
-    public Builder setBufferPool(BufferPool pool) {
-      this.bufferPool = pool;
-      return this;
-    }
-
     public Builder setConfig(OzoneClientConfig clientConfig) {
       this.config = clientConfig;
       return this;
@@ -252,7 +241,6 @@ public final class BlockDataStreamOutputEntry
           xceiverClientManager,
           pipeline,
           length,
-          bufferPool,
           token, config);
     }
   }
@@ -280,10 +268,6 @@ public final class BlockDataStreamOutputEntry
 
   public long getCurrentPosition() {
     return currentPosition;
-  }
-
-  public BufferPool getBufferPool() {
-    return bufferPool;
   }
 
   public void setCurrentPosition(long curPosition) {

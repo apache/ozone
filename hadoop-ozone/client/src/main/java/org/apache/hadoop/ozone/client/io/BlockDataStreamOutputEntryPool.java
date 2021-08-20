@@ -58,7 +58,6 @@ public class BlockDataStreamOutputEntryPool {
   private final OmKeyArgs keyArgs;
   private final XceiverClientFactory xceiverClientFactory;
   private final String requestID;
-  private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
@@ -86,13 +85,6 @@ public class BlockDataStreamOutputEntryPool {
     this.requestID = requestId;
     this.openID = openID;
     this.excludeList = new ExcludeList();
-
-    this.bufferPool =
-        new BufferPool(config.getStreamBufferSize(),
-            (int) (config.getStreamBufferMaxSize() / config
-                .getStreamBufferSize()),
-            ByteStringConversion
-                .createByteBufferConversion(unsafeByteBufferConversion));
   }
 
   /**
@@ -114,8 +106,6 @@ public class BlockDataStreamOutputEntryPool {
     config.setStreamBufferFlushDelay(false);
     requestID = null;
     int chunkSize = 0;
-    bufferPool = new BufferPool(chunkSize, 1);
-
     currentStreamIndex = 0;
     openID = -1;
     excludeList = new ExcludeList();
@@ -154,7 +144,6 @@ public class BlockDataStreamOutputEntryPool {
             .setPipeline(subKeyInfo.getPipeline())
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
-            .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken());
     streamEntries.add(builder.build());
   }
@@ -293,16 +282,9 @@ public class BlockDataStreamOutputEntryPool {
     return streamEntries.get(currentStreamIndex);
   }
 
-  long computeBufferData() {
-    return bufferPool.computeBufferData();
-  }
-
   void cleanup() {
     if (excludeList != null) {
       excludeList.clear();
-    }
-    if (bufferPool != null) {
-      bufferPool.clearBufferPool();
     }
 
     if (streamEntries != null) {
