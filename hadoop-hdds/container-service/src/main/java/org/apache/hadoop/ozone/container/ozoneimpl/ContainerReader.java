@@ -131,8 +131,9 @@ public class ContainerReader implements Runnable {
         // There are 1 or more storage directories. We only care about the
         // cluster ID directory.
         if (!clusterIDDir.exists()) {
-          LOG.error("Volume {} is in Inconsistent state. Expected directory" +
-              "{} not found.", hddsVolumeRootDir, clusterIDDir);
+          LOG.error("Volume {} is in an inconsistent state. Expected " +
+              "clusterID directory {} not found.", hddsVolumeRootDir,
+              clusterIDDir);
           volumeSet.failVolume(hddsVolumeRootDir.getPath());
           return;
         }

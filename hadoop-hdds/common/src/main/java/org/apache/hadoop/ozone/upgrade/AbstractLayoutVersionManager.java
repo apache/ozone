@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
@@ -46,39 +47,45 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractLayoutVersionManager.class);
 
-  protected int metadataLayoutVersion; // MLV.
-  protected int softwareLayoutVersion; // SLV.
-  protected TreeMap<Integer, T> features = new TreeMap<>();
-  protected Map<String, T> featureMap = new HashMap<>();
-  protected volatile Status currentUpgradeState = FINALIZATION_REQUIRED;
+  private int metadataLayoutVersion; // MLV.
+  private int softwareLayoutVersion; // SLV.
+  @VisibleForTesting
+  protected final TreeMap<Integer, T> features = new TreeMap<>();
+  @VisibleForTesting
+  protected final Map<String, T> featureMap = new HashMap<>();
+  private volatile Status currentUpgradeState = FINALIZATION_REQUIRED;
   // Allows querying upgrade state while an upgrade is in progress.
   // Note that MLV may have been incremented during the upgrade
   // by the time the value is read/used.
-  private ReentrantReadWriteLock lock;
+  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
   protected void init(int version, T[] lfs) throws IOException {
-    lock = new ReentrantReadWriteLock();
-    metadataLayoutVersion = version;
-    initializeFeatures(lfs);
-    softwareLayoutVersion = features.lastKey();
-    if (softwareIsBehindMetaData()) {
-      throw new IOException(
-          String.format("Cannot initialize VersionManager. Metadata " +
-                  "layout version (%d) > software layout version (%d)",
-              metadataLayoutVersion, softwareLayoutVersion));
-    } else if (metadataLayoutVersion == softwareLayoutVersion) {
-      currentUpgradeState = ALREADY_FINALIZED;
+    lock.writeLock().lock();
+    try {
+      metadataLayoutVersion = version;
+      initializeFeatures(lfs);
+      softwareLayoutVersion = features.lastKey();
+      if (softwareIsBehindMetaData()) {
+        throw new IOException(
+            String.format("Cannot initialize VersionManager. Metadata " +
+                    "layout version (%d) > software layout version (%d)",
+                metadataLayoutVersion, softwareLayoutVersion));
+      } else if (metadataLayoutVersion == softwareLayoutVersion) {
+        currentUpgradeState = ALREADY_FINALIZED;
+      }
+
+      LayoutFeature mlvFeature = features.get(metadataLayoutVersion);
+      LayoutFeature slvFeature = features.get(softwareLayoutVersion);
+      LOG.info("Initializing Layout version manager with metadata layout" +
+              " = {} (version = {}), software layout = {} (version = {})",
+          mlvFeature, mlvFeature.layoutVersion(),
+          slvFeature, slvFeature.layoutVersion());
+
+      MBeans.register("LayoutVersionManager",
+          getClass().getSimpleName(), this);
+    } finally {
+      lock.writeLock().unlock();
     }
-
-    LayoutFeature mlvFeature = features.get(metadataLayoutVersion);
-    LayoutFeature slvFeature = features.get(softwareLayoutVersion);
-    LOG.info("Initializing Layout version manager with metadata layout" +
-        " = {} (version = {}), software layout = {} (version = {})",
-        mlvFeature, mlvFeature.layoutVersion(),
-        slvFeature, slvFeature.layoutVersion());
-
-    MBeans.register("LayoutVersionManager",
-        getClass().getSimpleName(), this);
   }
 
   public Status getUpgradeState() {

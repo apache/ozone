@@ -73,7 +73,6 @@ public final class OMLayoutVersionManager
 
   /**
    * Initialize the OM Layout Features and current Layout Version.
-   * @param storage to read the current layout version.
    * @throws OMException on error.
    */
   private void init(int layoutVersion) throws OMException {
@@ -83,7 +82,7 @@ public final class OMLayoutVersionManager
       throw new OMException(
           String.format("Cannot initialize VersionManager. Metadata " +
                   "layout version (%d) > software layout version (%d)",
-              metadataLayoutVersion, softwareLayoutVersion),
+              getMetadataLayoutVersion(), getSoftwareLayoutVersion()),
           e,
           NOT_SUPPORTED_OPERATION);
     }

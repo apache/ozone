@@ -186,8 +186,6 @@ public final class HddsVolumeUtil {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
     File clusterDir = new File(hddsRoot, clusterId);
-    String errorPrefix = "Volume " + volumeRoot + " is in an inconsistent " +
-        "state.";
 
     try {
       hddsVolume.format(clusterId);
@@ -228,8 +226,9 @@ public final class HddsVolumeUtil {
           upgradeVolumeIfNeeded(hddsVolume, clusterId);
     } else {
       if (!clusterDir.exists()) {
-        logger.error("{} {} files found but cluster ID directory {} does not " +
-            "exist.", errorPrefix, hddsFiles.length, clusterDir);
+        logger.error("Volume {} is in an inconsistent state. {} files found " +
+            "but cluster ID directory {} does not exist.", volumeRoot,
+            hddsFiles.length, clusterDir);
         return false;
       }
       return true;

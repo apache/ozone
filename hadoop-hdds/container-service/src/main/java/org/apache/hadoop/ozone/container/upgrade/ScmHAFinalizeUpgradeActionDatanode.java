@@ -115,7 +115,7 @@ public class ScmHAFinalizeUpgradeActionDatanode
       // More than one subdirectory. As long as the cluster ID directory
       // exists we are ok.
       if (!clusterIDDir.exists()) {
-        LOG.error("Volume {} is in Inconsistent state. Expected directory" +
+        LOG.error("Volume {} is in an inconsistent state. Expected directory" +
             "{} not found.", hddsVolumeDir, clusterIDDir);
         success = false;
       } else {
