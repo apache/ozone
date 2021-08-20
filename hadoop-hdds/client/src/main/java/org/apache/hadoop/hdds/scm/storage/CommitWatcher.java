@@ -276,16 +276,9 @@ public class CommitWatcher {
    */
   public XceiverClientReply streamWatchForCommit(long commitIndex)
       throws IOException {
-    long index;
     try {
       XceiverClientReply reply =
           xceiverClient.watchForCommit(commitIndex);
-      if (reply == null) {
-        index = 0;
-      } else {
-        index = reply.getLogIndex();
-      }
-//      adjustBuffers(index);
       return reply;
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException

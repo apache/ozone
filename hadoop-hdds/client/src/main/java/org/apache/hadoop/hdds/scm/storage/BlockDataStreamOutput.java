@@ -43,7 +43,6 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +50,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -338,8 +336,8 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
                     + flushPos + " blockID " + blockID);
           }
           // for standalone protocol, logIndex will always be 0.
-          commitWatcher
-              .updateCommitInfoMap(asyncReply.getLogIndex(), new LinkedList<>());
+          commitWatcher.updateCommitInfoMap(
+              asyncReply.getLogIndex(), new LinkedList<>());
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
