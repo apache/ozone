@@ -28,7 +28,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -146,7 +145,6 @@ public class TestSCMUpdateServiceGrpcServer {
     }
   }
 
-  @Ignore("HDDS-5319")
   @Test
   public void testClientUpdateWithDelayedRevoke() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -218,7 +216,6 @@ public class TestSCMUpdateServiceGrpcServer {
     return crlId.get();
   }
 
-  @Ignore("HDDS-5319")
   @Test
   public void testClientUpdateWithRestart() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
