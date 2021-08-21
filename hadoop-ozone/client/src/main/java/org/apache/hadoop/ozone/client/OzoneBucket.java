@@ -230,18 +230,18 @@ public class OzoneBucket extends WithMetadata {
       String sourceVolume, String sourceBucket, long usedBytes,
       long usedNamespace, long quotaInBytes, long quotaInNamespace,
       BucketLayout bucketLayout,
-      DefaultReplicationConfig defaultReplicationCOnfig) {
+      DefaultReplicationConfig defaultReplicationConfig) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, modificationTime, metadata, encryptionKeyName,
         sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
         quotaInNamespace);
     this.bucketLayout = bucketLayout;
     this.defaultReplication =
-        defaultReplicationCOnfig.getType() == ReplicationType.EC ?
-            defaultReplicationCOnfig.getEcReplicationConfig() :
+        defaultReplicationConfig.getType() == ReplicationType.EC ?
+            defaultReplicationConfig.getEcReplicationConfig() :
             ReplicationConfig
-                .fromTypeAndFactor(defaultReplicationCOnfig.getType(),
-                    defaultReplicationCOnfig.getFactor());
+                .fromTypeAndFactor(defaultReplicationConfig.getType(),
+                    defaultReplicationConfig.getFactor());
   }
 
   /**
