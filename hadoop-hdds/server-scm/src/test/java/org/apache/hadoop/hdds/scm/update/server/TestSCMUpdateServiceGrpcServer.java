@@ -184,11 +184,11 @@ public class TestSCMUpdateServiceGrpcServer {
       Assert.assertEquals(0, client.getErrorCount());
 
       // revoke cert 5 with 10 seconds delay
-      revokeCert(certIds.get(5), Instant.now().plus(Duration.ofSeconds(8)));
+      revokeCert(certIds.get(5), Instant.now().plus(Duration.ofSeconds(5)));
       server.notifyCrlUpdate();
       GenericTestUtils.waitFor(() -> client.getUpdateCount()>1,
           100, 2000);
-      Assert.assertTrue(2 >= client.getUpdateCount());
+      Assert.assertTrue(2 <= client.getUpdateCount());
       Assert.assertEquals(0, client.getErrorCount());
       Assert.assertTrue(1 >= client.getClientCRLStore()
           .getPendingCrlIds().size());
