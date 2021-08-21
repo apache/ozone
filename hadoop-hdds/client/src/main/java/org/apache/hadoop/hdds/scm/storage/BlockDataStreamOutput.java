@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -224,9 +223,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     if (len == 0) {
       return;
     }
-
-    ChunkBuffer chunk = ChunkBuffer.wrap(buf.nioBuffer());
-    writeChunkToContainer(chunk, buf);
+    writeChunkToContainer(buf);
 
     writtenDataLength += len;
   }
@@ -500,12 +497,11 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
    */
-  private void writeChunkToContainer(ChunkBuffer chunk, ByteBuf buf)
+  private void writeChunkToContainer(ByteBuf buf)
       throws IOException {
-    // TODO This chunk is only use to get ChecksumData. Buffer copy is generated
-    //  during computeChecksum. So we need to consider whether we can remove
-    //  check sum or choose a better way.
-    ChecksumData checksumData = checksum.computeChecksum(chunk);
+    // The Checksum action is time-consuming. Do we need to remove it?
+    // Because in HDDS-5483. We had Validate block file length during put block.
+    ChecksumData checksumData = checksum.computeChecksum(buf.nioBuffer());
 
     int effectiveChunkSize = buf.readableBytes();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
