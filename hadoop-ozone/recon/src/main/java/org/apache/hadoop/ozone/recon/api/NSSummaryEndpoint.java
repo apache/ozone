@@ -275,6 +275,13 @@ public class NSSummaryEndpoint {
       long bucketObjectId = getBucketObjectId(names);
       NSSummary bucketNSSummary =
               reconNamespaceSummaryManager.getNSSummary(bucketObjectId);
+      // empty bucket, because it's not a parent of any directory or key
+      if (bucketNSSummary == null) {
+        if (withReplica) {
+          duResponse.setSizeWithReplica(0L);
+        }
+        break;
+      }
 
       // get object IDs for all its subdirectories
       Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
@@ -320,6 +327,14 @@ public class NSSummaryEndpoint {
       long dirObjectId = getDirObjectId(names);
       NSSummary dirNSSummary =
               reconNamespaceSummaryManager.getNSSummary(dirObjectId);
+      // Empty directory
+      if (dirNSSummary == null) {
+        if (withReplica) {
+          duResponse.setSizeWithReplica(0L);
+        }
+        break;
+      }
+
       Set<Long> subdirs = dirNSSummary.getChildDir();
 
       duResponse.setKeySize(dirNSSummary.getSizeOfFiles());
@@ -908,6 +923,7 @@ public class NSSummaryEndpoint {
         String subpath = buildSubpath(normalizedPath,
             keyInfo.getFileName());
         diskUsage.setSubpath(subpath);
+        diskUsage.setKey(true);
         diskUsage.setSize(keyInfo.getDataSize());
 
         if (withReplica) {
