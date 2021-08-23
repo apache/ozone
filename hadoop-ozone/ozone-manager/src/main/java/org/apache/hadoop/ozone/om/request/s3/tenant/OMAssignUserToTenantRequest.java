@@ -266,7 +266,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
                   .setAwsSecret(awsSecret).setKerberosID(principal))
               .build());
       omClientResponse = new OMAssignUserToTenantResponse(omResponse.build(),
-          s3SecretValue, principal, tenantName, defaultGroupName, roleName,
+          s3SecretValue, principal, defaultGroupName, roleName,
           accessId, omDBAccessIdInfo, userId, omDBKerberosPrincipalInfo);
     } catch (IOException ex) {
       ozoneManager.getMultiTenantManager().destroyUser(

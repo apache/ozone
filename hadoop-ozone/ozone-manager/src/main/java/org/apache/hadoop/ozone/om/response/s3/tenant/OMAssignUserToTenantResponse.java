@@ -50,7 +50,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
 public class OMAssignUserToTenantResponse extends OMClientResponse {
 
   private S3SecretValue s3SecretValue;
-  private String principal, tenantName, groupName, roleName, accessId, userId;
+  private String principal, groupName, roleName, accessId, userId;
   private OmDBAccessIdInfo omDBAccessIdInfo;
   private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
 
@@ -58,7 +58,6 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
   public OMAssignUserToTenantResponse(@Nonnull OMResponse omResponse,
       @Nonnull S3SecretValue s3SecretValue,
       @Nonnull String principal,
-      @Nonnull String tenantName,
       @Nonnull String groupName,
       @Nonnull String roleName,
       @Nonnull String accessId,
@@ -69,7 +68,6 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
     super(omResponse);
     this.s3SecretValue = s3SecretValue;
     this.principal = principal;
-    this.tenantName = tenantName;
     this.groupName = groupName;
     this.roleName = roleName;
     this.accessId = accessId;
