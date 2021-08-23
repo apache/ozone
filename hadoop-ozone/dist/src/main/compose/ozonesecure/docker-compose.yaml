@@ -87,7 +87,6 @@ services:
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9888:9888
-      - 9889:9889
     env_file:
       - ./docker-config
     environment:
