@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMAssignUserToTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -106,7 +105,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    final OzoneManagerProtocolProtos.AssignUserToTenantRequest request =
+    final AssignUserToTenantRequest request =
         getOmRequest().getAssignUserToTenantRequest();
     final String tenantUsername = request.getTenantUsername();
     final String tenantName = request.getTenantName();

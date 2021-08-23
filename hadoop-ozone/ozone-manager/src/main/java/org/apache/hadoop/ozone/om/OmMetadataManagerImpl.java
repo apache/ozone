@@ -135,17 +135,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *
    * Multi-Tenant Tables:
    * |----------------------------------------------------------------------|
-   * | tenantAccessIdTable       |  accessId -> OmDBAccessIdInfo            |
+   * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
    * |----------------------------------------------------------------------|
    * | principalToAccessIdsTable | Principal -> OmDBKerberosPrincipalInfo   |
    * |----------------------------------------------------------------------|
-   * | tenantStateTable          |  accessId -> OmDBTenantInfo              |
+   * | tenantStateTable          | accessId -> OmDBTenantInfo               |
    * |----------------------------------------------------------------------|
-   * | tenantGroupTable          |  accessId -> [tenant group A, B, ...]    |
+   * | tenantGroupTable          | accessId -> [tenant group A, B, ...]     |
    * |----------------------------------------------------------------------|
-   * | tenantRoleTable           |  accessId -> roles [admin, roleB, ...]   |
+   * | tenantRoleTable           | accessId -> roles [admin, roleB, ...]    |
    * |----------------------------------------------------------------------|
-   * | tenantPolicyTable         |  policyGroup -> [policyId1, policyId2]   |
+   * | tenantPolicyTable         | policyGroup -> [policyId1, policyId2]    |
    * |----------------------------------------------------------------------|
    *
    * Simple Tables:
