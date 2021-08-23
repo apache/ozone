@@ -227,4 +227,14 @@ public final class MockPipelineManager implements PipelineManager {
   public Map<String, Integer> getPipelineInfo() {
     return null;
   }
+
+  @Override
+  public void acquireLock() {
+
+  }
+
+  @Override
+  public void releaseLock() {
+
+  }
 }

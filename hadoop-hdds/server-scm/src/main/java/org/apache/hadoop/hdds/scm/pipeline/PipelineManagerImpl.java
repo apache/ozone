@@ -631,4 +631,14 @@ public class PipelineManagerImpl implements PipelineManager {
   protected Lock getLock() {
     return lock;
   }
+
+  @Override
+  public void acquireLock() {
+    lock.lock();
+  }
+
+  @Override
+  public void releaseLock() {
+    lock.unlock();
+  }
 }
