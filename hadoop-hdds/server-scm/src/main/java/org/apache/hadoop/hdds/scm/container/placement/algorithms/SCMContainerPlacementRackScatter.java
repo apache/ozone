@@ -149,13 +149,11 @@ public final class SCMContainerPlacementRackScatter
 
       // Refill toChooseRacks, we put skippedRacks in front of toChooseRacks
       // for a even distribution
-      if (toChooseRacks.size() == 0) {
-        toChooseRacks.addAll(racks);
-        if (!skippedRacks.isEmpty()) {
-          toChooseRacks.removeAll(skippedRacks);
-          toChooseRacks.addAll(0, skippedRacks);
-          skippedRacks.clear();
-        }
+      toChooseRacks.addAll(racks);
+      if (!skippedRacks.isEmpty()) {
+        toChooseRacks.removeAll(skippedRacks);
+        toChooseRacks.addAll(0, skippedRacks);
+        skippedRacks.clear();
       }
 
       if (mutableFavoredNodes.size() > 0) {
@@ -181,29 +179,25 @@ public final class SCMContainerPlacementRackScatter
         break;
       }
 
-      List<Node> chosenRacksInForLoop = new ArrayList<>();
       for (Node rack : toChooseRacks) {
-        List<Node> nodes = ((InnerNode)rack).getNodes(2);
-        if (nodes.size() > 0) {
-          Node affinityNode = nodes.get(0);
-          Node node = chooseNode(unavailableNodes, affinityNode,
-              metadataSizeRequired, dataSizeRequired);
-          if (node != null) {
-            chosenNodes.add(node);
-            mutableFavoredNodes.remove(node);
-            unavailableNodes.add(node);
-            nodesRequired--;
-            if (nodesRequired == 0) {
-              break;
-            }
+        Node node = chooseNode(rack.getNetworkFullPath(), unavailableNodes,
+            metadataSizeRequired, dataSizeRequired);
+        if (node != null) {
+          chosenNodes.add(node);
+          mutableFavoredNodes.remove(node);
+          unavailableNodes.add(node);
+          nodesRequired--;
+          if (nodesRequired == 0) {
+            break;
           }
         } else {
           // Store the skipped racks to check them first in next outer loop
           skippedRacks.add(rack);
         }
-        chosenRacksInForLoop.add(rack);
       }
-      toChooseRacks.removeAll(chosenRacksInForLoop);
+      // Clear toChooseRacks for this loop
+      toChooseRacks.clear();
+
       // If chosenNodes not changed, increase the retryCount
       if (chosenListSize == chosenNodes.size()) {
         retryCount++;
@@ -227,29 +221,23 @@ public final class SCMContainerPlacementRackScatter
    * whether fallback is allowed when this class is instantiated.
    *
    *
+   * @param scope - the rack we are searching nodes under
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
-   * @param affinityNode - the chosen nodes should be on the same rack as
-   *                    affinityNode. Can be null.
    * @param dataSizeRequired - size required for the container.
    * @param metadataSizeRequired - size required for Ratis metadata.
-   * @return List of chosen datanodes.
-   * @throws SCMException  SCMException
+   * @return the chosen datanode.
    */
-  private Node chooseNode(List<Node> excludedNodes, Node affinityNode,
-      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
-    int ancestorGen = RACK_LEVEL;
+  private Node chooseNode(String scope, List<Node> excludedNodes,
+      long metadataSizeRequired, long dataSizeRequired) {
     int maxRetry = INNER_LOOP_MAX_RETRY;
-    List<String> excludedNodesForCapacity = null;
     while(true) {
       metrics.incrDatanodeChooseAttemptCount();
-      Node node = networkTopology.chooseRandom(NetConstants.ROOT,
-          excludedNodesForCapacity, excludedNodes, affinityNode, ancestorGen);
+      Node node = networkTopology.chooseRandom(scope, excludedNodes);
       if (node == null) {
         // cannot find the node which meets all constrains
         LOG.warn("Failed to find the datanode for container. excludedNodes:" +
             (excludedNodes == null ? "" : excludedNodes.toString()) +
-            ", affinityNode:" +
-            (affinityNode == null ? "" : affinityNode.getNetworkFullPath()));
+            ", rack:" + scope);
         return null;
       }
 
@@ -271,10 +259,6 @@ public final class SCMContainerPlacementRackScatter
         LOG.info(errMsg);
         return null;
       }
-      if (excludedNodesForCapacity == null) {
-        excludedNodesForCapacity = new ArrayList<>();
-      }
-      excludedNodesForCapacity.add(node.getNetworkFullPath());
     }
   }
 
