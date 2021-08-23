@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,8 +136,13 @@ public class FilePerBlockStrategy implements ChunkManager {
       throw e;
     }
 
-    ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, len,
-        volume);
+    // check whether offset matches block file length if its an overwrite
+    if (!overwrite) {
+      ChunkUtils.validateChunkSize(chunkFile, info);
+    }
+
+    ChunkUtils
+        .writeData(channel, chunkFile.getName(), data, offset, len, volume);
 
     containerData.updateWriteStats(len, overwrite);
   }

@@ -348,6 +348,8 @@ public class ContainerStateMachine extends BaseStateMachine {
               .setWriteChunk(commitWriteChunkProto)
               .setTraceID(proto.getTraceID())
               .build();
+      Preconditions.checkArgument(write.hasData());
+      Preconditions.checkArgument(!write.getData().isEmpty());
 
       return TransactionContext.newBuilder()
           .setClientRequest(request)
@@ -415,6 +417,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       long startTime) {
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
+    Preconditions.checkArgument(!write.getData().isEmpty());
     try {
       if (server.getDivision(gid).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
@@ -650,6 +653,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (requestProto.getCmdType() == Type.WriteChunk) {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
         ByteString data = stateMachineDataCache.get(entry.getIndex());
+        Preconditions.checkArgument(data.isEmpty());
         if (data != null) {
           future.complete(data);
           return future;
