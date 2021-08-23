@@ -51,6 +51,10 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.commons.net.util.Base64;
@@ -59,9 +63,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -232,18 +233,19 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String response = getReponseData(conn);
     String groupIDCreated = null;
     try {
-      JSONObject jResonse = new JSONObject(response);
-      JSONArray info = jResonse.getJSONArray("vXGroups");
-      int numIndex = info.length();
+      JsonObject jResonse = new JsonParser().parse(response).getAsJsonObject();
+      JsonArray info = jResonse.get("vXGroups").getAsJsonArray();
+      int numIndex = info.size();
       for (int i = 0; i < numIndex; ++i) {
-        if (info.getJSONObject(i).getString("name")
+        if (info.get(i).getAsJsonObject().get("name").getAsString()
             .equals(principal.getFullMultiTenantPrincipalID())) {
-          groupIDCreated = info.getJSONObject(i).getString("id");
+          groupIDCreated =
+              info.get(i).getAsJsonObject().get("id").getAsString();
           break;
         }
       }
       System.out.println("Group ID is : " + groupIDCreated);
-    } catch (JSONException e) {
+    } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
@@ -262,18 +264,19 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String response = getReponseData(conn);
     String userIDCreated = null;
     try {
-      JSONObject jResonse = new JSONObject(response);
-      JSONArray userinfo = jResonse.getJSONArray("vXUsers");
-      int numIndex = userinfo.length();
+      JsonObject jResonse = new JsonParser().parse(response).getAsJsonObject();
+      JsonArray userinfo = jResonse.get("vXUsers").getAsJsonArray();
+      int numIndex = userinfo.size();
       for (int i = 0; i < numIndex; ++i) {
-        if (userinfo.getJSONObject(i).getString("name")
+        if (userinfo.get(i).getAsJsonObject().get("name").getAsString()
             .equals(principal.getFullMultiTenantPrincipalID())) {
-          userIDCreated = userinfo.getJSONObject(i).getString("id");
+          userIDCreated =
+              userinfo.get(i).getAsJsonObject().get("id").getAsString();
           break;
         }
       }
       System.out.println("User ID is : " + userIDCreated);
-    } catch (JSONException e) {
+    } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
@@ -294,10 +297,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String userInfo = getReponseData(conn);
     String userIDCreated;
     try {
-      JSONObject jObject = new JSONObject(userInfo.toString());
-      userIDCreated = jObject.getString("id");
+      JsonObject jObject = new JsonParser().parse(userInfo).getAsJsonObject();
+      userIDCreated = jObject.get("id").getAsString();
       System.out.println("User ID is : " + userIDCreated);
-    } catch (JSONException e) {
+    } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
@@ -325,10 +328,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String groupInfo = getReponseData(conn);
     String groupIdCreated;
     try {
-      JSONObject jObject = new JSONObject(groupInfo.toString());
-      groupIdCreated = jObject.getString("id");
+      JsonObject jObject = new JsonParser().parse(groupInfo).getAsJsonObject();
+      groupIdCreated = jObject.get("id").getAsString();
       System.out.println("GroupID is : " + groupIdCreated);
-    } catch (JSONException e) {
+    } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
@@ -345,10 +348,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String policyInfo = getReponseData(conn);
     String policyID;
     try {
-      JSONObject jObject = new JSONObject(policyInfo.toString());
-      policyID = jObject.getString("id");
+      JsonObject jObject = new JsonParser().parse(policyInfo).getAsJsonObject();
+      policyID = jObject.get("id").getAsString();
       System.out.println("policyID is : " + policyID);
-    } catch (JSONException e) {
+    } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
@@ -364,8 +367,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);
     String policyInfo = getReponseData(conn);
-    JSONArray jArry = new JSONArray(policyInfo);
-    JSONObject jsonObject = jArry.getJSONObject(0);
+    JsonArray jArry = new JsonParser().parse(policyInfo).getAsJsonArray();
+    JsonObject jsonObject = jArry.get(0).getAsJsonObject();
     AccessPolicy policy = new RangerAccessPolicy(policyName);
     policy.deserializePolicyFromJsonString(jsonObject);
     return policy;
