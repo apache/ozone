@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -312,6 +313,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // been done outside the lock.
       flushAndSyncDB();
       updateContainerData(containerData::quasiCloseContainer);
+      // move the db to the closed container cache
+      ContainerCache cache = ContainerCache.getInstance(config);
+      cache.markContainerClosed(containerData.getDbFile().getAbsolutePath());
     } finally {
       writeUnlock();
     }
@@ -328,6 +332,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // been done outside the lock.
       flushAndSyncDB();
       updateContainerData(containerData::closeContainer);
+      // move the db to the closed container cache
+      ContainerCache cache = ContainerCache.getInstance(config);
+      cache.markContainerClosed(containerData.getDbFile().getAbsolutePath());
     } finally {
       writeUnlock();
     }

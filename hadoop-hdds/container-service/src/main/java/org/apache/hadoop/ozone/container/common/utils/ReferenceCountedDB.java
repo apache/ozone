@@ -91,6 +91,10 @@ public class ReferenceCountedDB implements Closeable {
     return store;
   }
 
+  public String getContainerDBPath() {
+    return containerDBPath;
+  }
+
   @Override
   public void close() {
     decrementReference();

@@ -19,12 +19,16 @@
 package org.apache.hadoop.ozone.container.common.utils;
 
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
@@ -46,6 +50,7 @@ public final class ContainerCache extends LRUMap {
   private static ContainerCache cache;
   private static final float LOAD_FACTOR = 0.75f;
   private final Striped<Lock> rocksDBLock;
+  private final Map<String, ReferenceCountedDB> openContainerCache;
   private static ContainerCacheMetrics metrics;
   /**
    * Constructs a cache that holds DBHandle references.
@@ -54,6 +59,7 @@ public final class ContainerCache extends LRUMap {
       scanUntilRemovable) {
     super(maxSize, loadFactor, scanUntilRemovable);
     rocksDBLock = Striped.lazyWeakLock(stripes);
+    openContainerCache = new ConcurrentHashMap<>();
   }
 
   @VisibleForTesting
@@ -93,16 +99,27 @@ public final class ContainerCache extends LRUMap {
       while (iterator.hasNext()) {
         iterator.next();
         ReferenceCountedDB db = (ReferenceCountedDB) iterator.getValue();
-        Preconditions.checkArgument(cleanupDb(db), "refCount:",
-            db.getReferenceCount());
+        assertZeroRefCount(db);
       }
+
+      Iterator<Map.Entry<String, ReferenceCountedDB>> openCacheIterator  = openContainerCache.entrySet().iterator();
+      while (openCacheIterator.hasNext()) {
+        Map.Entry<String, ReferenceCountedDB> db2 = openCacheIterator.next();
+        assertZeroRefCount(db2.getValue());
+      } 
+
       // reset the cache
       cache.clear();
+      openContainerCache.clear();
     } finally {
       lock.unlock();
     }
   }
 
+  private void assertZeroRefCount(ReferenceCountedDB db) {
+    Preconditions.checkArgument(cleanupDb(db), "refCount:%d Path:%s",
+        db.getReferenceCount(), db.getContainerDBPath());
+  }
   /**
    * {@inheritDoc}
    */
@@ -122,13 +139,13 @@ public final class ContainerCache extends LRUMap {
    * Returns a DB handle if available, create the handler otherwise.
    *
    * @param containerID - ID of the container.
-   * @param containerDBType - DB type of the container.
+   * @param containerState - DB state of the container.
    * @param containerDBPath - DB path of the container.
    * @param schemaVersion - Schema version of the container.
    * @param conf - Hadoop Configuration.
    * @return ReferenceCountedDB.
    */
-  public ReferenceCountedDB getDB(long containerID, String containerDBType,
+  public ReferenceCountedDB getDB(long containerID, State containerState,
                                   String containerDBPath,
                                   String schemaVersion,
                                   ConfigurationSource conf)
@@ -142,6 +159,18 @@ public final class ContainerCache extends LRUMap {
     try {
       lock.lock();
       try {
+        boolean isContainerOpen = isContainerOpen(containerState);
+        if (isContainerOpen) {
+          db = openContainerCache.get(containerDBPath);
+          if (db == null) {
+            metrics.incNumOpenContainerGetsFailures();
+            throw new IOException("All open container should be present in the"
+                + "cache, path:" + containerDBPath);
+          }
+          metrics.incNumOpenContainerGetsSuccess();
+          db.incrementReference();
+          return db;
+        }
         db = (ReferenceCountedDB) this.get(containerDBPath);
         if (db != null) {
           metrics.incNumCacheHits();
@@ -227,9 +256,39 @@ public final class ContainerCache extends LRUMap {
   public void addDB(String containerDBPath, ReferenceCountedDB db) {
     lock.lock();
     try {
-      this.putIfAbsent(containerDBPath, db);
+      openContainerCache.putIfAbsent(containerDBPath, db);
+      metrics.incNumOpenContainerInserts();
     } finally {
       lock.unlock();
+    }
+  }
+
+  public void markContainerClosed(String containerPath) {
+    lock.lock();
+    try {
+      ReferenceCountedDB db = openContainerCache.remove(containerPath);
+      Preconditions.checkNotNull(db,"Null Container DB for open/closing" +
+          "Container:" + containerPath);
+      this.putIfAbsent(containerPath, db);
+      metrics.incNumOpenContainerRemoves();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private boolean isContainerOpen(State state) {
+    switch (state) {
+      case CLOSED:
+      case QUASI_CLOSED:
+        return false;
+      case CLOSING:
+      case OPEN:
+      case UNHEALTHY:
+        return true;
+      case INVALID:
+      case DELETED:
+      default:
+        throw new IllegalArgumentException("Invalid ContainerState:" + state);
     }
   }
 }

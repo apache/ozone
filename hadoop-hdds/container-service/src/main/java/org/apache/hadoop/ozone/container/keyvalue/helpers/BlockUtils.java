@@ -119,7 +119,7 @@ public final class BlockUtils {
     Preconditions.checkNotNull(containerData.getDbFile());
     try {
       return cache.getDB(containerData.getContainerID(), containerData
-          .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
+          .getState(), containerData.getDbFile().getAbsolutePath(),
               containerData.getSchemaVersion(), conf);
     } catch (IOException ex) {
       onFailure(containerData.getVolume());
