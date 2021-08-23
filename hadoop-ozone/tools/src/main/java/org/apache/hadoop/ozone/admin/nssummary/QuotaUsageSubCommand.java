@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
+import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printFSOReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printKVSeparator;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
@@ -34,6 +35,9 @@ import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printSpa
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printTypeNA;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printWithUnderline;
 
+/**
+ * Quota Usage Subcommand.
+ */
 @CommandLine.Command(
     name = "quota",
     description = "Get quota usage for a path request.",
@@ -43,7 +47,7 @@ import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printWit
 
 public class QuotaUsageSubCommand implements Callable {
   @CommandLine.ParentCommand
-  NSSummaryAdmin parent;
+  private NSSummaryAdmin parent;
 
   @CommandLine.Parameters(index = "0", arity = "0..1",
       description = "Non-empty path request without any protocol prefix.")
@@ -51,7 +55,7 @@ public class QuotaUsageSubCommand implements Callable {
 
   private static final String ENDPOINT = "/api/v1/namespace/quota";
 
-  private String URL = null;
+  private StringBuffer url = new StringBuffer();
 
   @Override
   public Void call() throws Exception {
@@ -59,25 +63,37 @@ public class QuotaUsageSubCommand implements Callable {
       printEmptyPathRequest();
       return null;
     }
-    URL = parent.getReconWebAddress() + ENDPOINT;
-
-    String response = makeHttpCall(URL, path);
-    HashMap<String, Object> quotaResponse = getResponseMap(response);
+    url.append(parent.getReconWebAddress()).append(ENDPOINT);
 
     printNewLines(1);
+    String response = makeHttpCall(url, path,
+        parent.isSecurityEnabled(), parent.getOzoneConfig());
+    if (response == null) {
+      printNewLines(1);
+      return null;
+    }
+
+    HashMap<String, Object> quotaResponse = getResponseMap(response);
+
     if (quotaResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
     } else if (quotaResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("Quota");
     } else {
+      if (!parent.isFSOEnabled()) {
+        printFSOReminder();
+      }
+
       printWithUnderline("Quota", true);
       long quotaAllowed = (long)(double)quotaResponse.get("allowed");
       long quotaUsed = (long)(double)quotaResponse.get("used");
+      printSpaces(2);
+      System.out.print("Allowed");
+      printKVSeparator();
       if (quotaAllowed != -1) {
-        printSpaces(2);
-        System.out.print("Allowed");
-        printKVSeparator();
         System.out.println(FileUtils.byteCountToDisplaySize(quotaAllowed));
+      } else {
+        System.out.println("Quota not set");
       }
 
       printSpaces(2);
@@ -85,12 +101,14 @@ public class QuotaUsageSubCommand implements Callable {
       printKVSeparator();
       System.out.println(FileUtils.byteCountToDisplaySize(quotaUsed));
 
+      printSpaces(2);
+      System.out.print("Remaining");
+      printKVSeparator();
       if (quotaAllowed != -1) {
-        printSpaces(2);
-        System.out.print("Remaining");
-        printKVSeparator();
         System.out.println(
             FileUtils.byteCountToDisplaySize(quotaAllowed - quotaUsed));
+      } else {
+        System.out.println("Unknown");
       }
     }
     printNewLines(1);

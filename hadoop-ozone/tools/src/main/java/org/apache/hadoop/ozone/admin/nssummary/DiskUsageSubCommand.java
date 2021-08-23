@@ -30,13 +30,18 @@ import java.util.concurrent.Callable;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
+import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.parseInputPath;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
+import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printFSOReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printKVSeparator;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printSpaces;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printWithUnderline;
 
+/**
+ * Disk Usage Subcommand.
+ */
 @CommandLine.Command(
     name = "du",
     description = "Get disk usage for a path request.",
@@ -46,7 +51,7 @@ import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printWit
 
 public class DiskUsageSubCommand implements Callable {
   @CommandLine.ParentCommand
-  NSSummaryAdmin parent;
+  private NSSummaryAdmin parent;
 
   @CommandLine.Parameters(index = "0", arity = "0..1",
       description = "Non-empty path request without any protocol prefix.")
@@ -60,12 +65,25 @@ public class DiskUsageSubCommand implements Callable {
       description = "Show disk usage with replication.")
   private boolean withReplica;
 
+  @CommandLine.Option(names = {"-n", "--no-header"},
+      description = "Show DU without the header for current path.")
+  private boolean noHeader;
+
+
   @CommandLine.Mixin
-  ListOptions listOptions;
+  private ListOptions listOptions;
 
   private static final String ENDPOINT = "/api/v1/namespace/du";
 
-  private String URL = null;
+  // For text alignment
+  private static final String SIZE_HEADER = "Size";
+  private static final String DU_HEADER = "Disk Usage";
+  private static final String PATH_HEADER = "Path Name";
+  private static final int SIZE_INDENT = 2;
+  private static final int DU_INDENT = 12;
+  private static final int PATH_INDENT = 27;
+
+  private StringBuffer url = new StringBuffer();
 
   @Override
   public Void call() throws Exception {
@@ -73,105 +91,125 @@ public class DiskUsageSubCommand implements Callable {
       printEmptyPathRequest();
       return null;
     }
-    URL = parent.getReconWebAddress() + ENDPOINT;
-    String response = makeHttpCall(URL, path, listFiles, withReplica);
-    HashMap<String, Object> duResponse = getResponseMap(response);
+    url.append(parent.getReconWebAddress()).append(ENDPOINT);
+
+    String response = makeHttpCall(url, parseInputPath(path), listFiles,
+        withReplica, parent.isSecurityEnabled(), parent.getOzoneConfig());
 
     printNewLines(1);
-    if (!duResponse.get("status").equals("OK")) {
-      printPathNotFound();
+    if (response == null) {
       printNewLines(1);
       return null;
     }
-    printWithUnderline("Path", false);
-    printKVSeparator();
-    System.out.println(duResponse.get("path"));
 
-    printWithUnderline("Total Size", false);
-    printKVSeparator();
-    long totalSize = (long)(double)duResponse.get("size");
-    System.out.println(FileUtils.byteCountToDisplaySize(totalSize));
+    HashMap<String, Object> duResponse = getResponseMap(response);
 
-    if (withReplica) {
-      printWithUnderline("Total Disk Usage", false);
-      printKVSeparator();
-      long du = (long)(double)duResponse.get("sizeWithReplica");
-      System.out.println(FileUtils.byteCountToDisplaySize(du));
-    }
-
-    long sizeDirectKey = (long)(double)duResponse.get("sizeDirectKey");
-    if (!listFiles && sizeDirectKey != -1) {
-      printWithUnderline("Size of Direct Keys", false);
-      printKVSeparator();
-      System.out.println(FileUtils.byteCountToDisplaySize(sizeDirectKey));
-    }
-
-    if ((double)duResponse.get("subPathCount") == 0) {
-      if (totalSize == 0) {
-        // the object is empty
-        System.out.println("The object is empty.\n" +
-            "Put more files into it to visualize DU");
-      } else {
-        System.out.println("There's no immediate sub-path under this object.");
-        // remind clients if listFiles is not enabled
-        if (!listFiles) {
-          System.out.println("Add -f as an option to visualize files as sub-path, if any.");
-        }
-      }
+    if (duResponse.get("status").equals("PATH_NOT_FOUND")) {
+      printPathNotFound();
     } else {
-      printNewLines(1);
-      printWithUnderline("DU", true);
-      printSpaces(2);
-      printDUHeader(withReplica);
-      int limit = listOptions.getLimit();
-      String seekStr = listOptions.getPrefix();
-      if (seekStr == null) {
-        seekStr = "";
+      if (!parent.isFSOEnabled()) {
+        printFSOReminder();
       }
 
-      ArrayList duData = (ArrayList)duResponse.get("subPaths");
-      int cnt = 0;
-      for (int i = 0; i < duData.size(); ++i) {
-        if (cnt >= limit) {
-          break;
+      long totalSize = (long)(double)duResponse.get("size");
+
+      if (!noHeader) {
+        printWithUnderline("Path", false);
+        printKVSeparator();
+        System.out.println(duResponse.get("path"));
+
+        printWithUnderline("Total Size", false);
+        printKVSeparator();
+        System.out.println(FileUtils.byteCountToDisplaySize(totalSize));
+
+        if (withReplica) {
+          printWithUnderline("Total Disk Usage", false);
+          printKVSeparator();
+          long du = (long)(double)duResponse.get("sizeWithReplica");
+          System.out.println(FileUtils.byteCountToDisplaySize(du));
         }
-        LinkedTreeMap subPathDU = (LinkedTreeMap) duData.get(i);
-        String subPath = subPathDU.get("path").toString();
-        // differentiate key from other types
-        if (!(boolean)subPathDU.get("isKey")) {
-          subPath += OM_KEY_PREFIX;
+
+        long sizeDirectKey = (long)(double)duResponse.get("sizeDirectKey");
+        if (!listFiles && sizeDirectKey != -1) {
+          printWithUnderline("Size of Direct Keys", false);
+          printKVSeparator();
+          System.out.println(FileUtils.byteCountToDisplaySize(sizeDirectKey));
         }
-        long size = (long)(double)subPathDU.get("size");
-        long sizeWithReplica = (long)(double)subPathDU.get("sizeWithReplica");
-        if (subPath.startsWith(seekStr)) {
-          printSpaces(2);
-          printDURow(subPath, size, sizeWithReplica);
-          ++cnt;
+        printNewLines(1);
+      }
+
+      if ((double)duResponse.get("subPathCount") == 0) {
+        if (totalSize == 0) {
+          // the object is empty
+          System.out.println("The object is empty.\n" +
+              "Put more files into it to visualize DU");
+        } else {
+          System.out.println("There's no immediate " +
+              "sub-path under this object.");
+          // remind clients if listFiles is not enabled
+          if (!listFiles) {
+            System.out.println("Add -f as an option to visualize files " +
+                "as sub-path, if any.");
+          }
+        }
+      } else {
+        printWithUnderline("DU", true);
+        printDUHeader();
+        int limit = listOptions.getLimit();
+        String seekStr = listOptions.getPrefix();
+        if (seekStr == null) {
+          seekStr = "";
+        }
+
+        ArrayList duData = (ArrayList)duResponse.get("subPaths");
+        int cnt = 0;
+        for (int i = 0; i < duData.size(); ++i) {
+          if (cnt >= limit) {
+            break;
+          }
+          LinkedTreeMap subPathDU = (LinkedTreeMap) duData.get(i);
+          String subPath = subPathDU.get("path").toString();
+          // differentiate key from other types
+          if (!(boolean)subPathDU.get("isKey")) {
+            subPath += OM_KEY_PREFIX;
+          }
+          long size = (long)(double)subPathDU.get("size");
+          long sizeWithReplica = (long)(double)subPathDU.get("sizeWithReplica");
+          if (subPath.startsWith(seekStr)) {
+            printDURow(subPath, size, sizeWithReplica);
+            ++cnt;
+          }
         }
       }
     }
-
     printNewLines(1);
     return null;
   }
 
-  private void printDUHeader(boolean withReplica) {
-    System.out.print("Size");
-    printSpaces(5);
+  private void printDUHeader() {
+    printSpaces(SIZE_INDENT);
+    System.out.print(SIZE_HEADER);
+    printSpaces(DU_INDENT - SIZE_INDENT - SIZE_HEADER.length());
     if (withReplica) {
-      System.out.print("Disk Usage");
-      printSpaces(5);
+      System.out.print(DU_HEADER);
+      printSpaces(PATH_INDENT - DU_INDENT - DU_HEADER.length());
+      System.out.println(PATH_HEADER);
+    } else {
+      System.out.println(PATH_HEADER);
     }
-    System.out.println("Sub-path");
   }
 
-  private void printDURow(String path, long size, long sizeWithReplica) {
-    System.out.print(FileUtils.byteCountToDisplaySize(size));
-    printSpaces(5);
+  private void printDURow(String subPath, long size, long sizeWithReplica) {
+    printSpaces(SIZE_INDENT);
+    String dataSize = FileUtils.byteCountToDisplaySize(size);
+    System.out.print(dataSize);
+    printSpaces(DU_INDENT - SIZE_INDENT - dataSize.length());
     if (sizeWithReplica != -1) {
-      System.out.print(FileUtils.byteCountToDisplaySize(sizeWithReplica));
-      printSpaces(5);
+      String dataSizeWithReplica =
+          FileUtils.byteCountToDisplaySize(sizeWithReplica);
+      System.out.print(dataSizeWithReplica);
+      printSpaces(PATH_INDENT - DU_INDENT - dataSizeWithReplica.length());
     }
-    System.out.println(path);
+    System.out.println(subPath);
   }
 }

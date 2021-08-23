@@ -24,18 +24,20 @@ import picocli.CommandLine;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
-import java.util.stream.IntStream;
 
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printKVSeparator;
+import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printFSOReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printSpaces;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printTypeNA;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printWithUnderline;
 
+/**
+ * File Size Distribution Subcommand.
+ */
 @CommandLine.Command(
     name = "dist",
     description = "Get file size distribution for a path request.",
@@ -45,7 +47,7 @@ import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printWit
 
 public class FileSizeDistSubCommand implements Callable {
   @CommandLine.ParentCommand
-  NSSummaryAdmin parent;
+  private NSSummaryAdmin parent;
 
   @CommandLine.Parameters(index = "0", arity = "0..1",
       description = "Non-empty path request without any protocol prefix.")
@@ -53,7 +55,7 @@ public class FileSizeDistSubCommand implements Callable {
 
   private static final String ENDPOINT = "/api/v1/namespace/dist";
 
-  private String URL = null;
+  private StringBuffer url = new StringBuffer();
 
   @Override
   public Void call() throws Exception {
@@ -61,17 +63,27 @@ public class FileSizeDistSubCommand implements Callable {
       printEmptyPathRequest();
       return null;
     }
-    URL = parent.getReconWebAddress() + ENDPOINT;
-
-    String response = makeHttpCall(URL, path);
-    HashMap<String, Object> distResponse = getResponseMap(response);
+    url.append(parent.getReconWebAddress()).append(ENDPOINT);
 
     printNewLines(1);
+    String response = makeHttpCall(url, path,
+        parent.isSecurityEnabled(), parent.getOzoneConfig());
+
+    if (response == null) {
+      printNewLines(1);
+      return null;
+    }
+    HashMap<String, Object> distResponse = getResponseMap(response);
+
     if (distResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
     } else if (distResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("File Size Distribution");
     } else {
+      if (!parent.isFSOEnabled()) {
+        printFSOReminder();
+      }
+
       printWithUnderline("File Size Distribution", true);
       ArrayList fileSizeDist = (ArrayList) distResponse.get("dist");
       double sum = 0;

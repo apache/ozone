@@ -878,6 +878,11 @@ public class NSSummaryEndpoint {
 
     // handle nested keys (DFS)
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+    // empty bucket
+    if (nsSummary == null) {
+      return 0;
+    }
+
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
       totalDU += calculateDUUnderObject(subDirId);

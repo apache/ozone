@@ -18,11 +18,11 @@
 package org.apache.hadoop.ozone.admin.nssummary;
 
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.ReconEndpointType;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.kohsuke.MetaInfServices;
@@ -59,12 +59,6 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
   @Override
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
-    if (!isFSOEnabled()) {
-      System.out.println("[Warning] FSO is NOT enabled. " +
-          "Namespace CLI is only designed for FSO mode.\n" +
-          "To enable FSO set ozone.om.enable.filesystem.paths to true " +
-          "and ozone.om.metadata.layout to PREFIX.");
-    }
     return null;
   }
 
@@ -73,9 +67,9 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     return OzoneAdmin.class;
   }
 
-  private boolean isFSOEnabled() {
+  public boolean isFSOEnabled() {
     OzoneConfiguration conf = parent.getOzoneConf();
-    return conf.getBoolean("ozone.om.enable.filesystem.paths", true)
+    return conf.getBoolean("ozone.om.enable.filesystem.paths", false)
         && conf.get("ozone.om.metadata.layout").equalsIgnoreCase("PREFIX");
   }
 
@@ -85,11 +79,21 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     InetSocketAddress reconSocket = null;
     if (OzoneSecurityUtil.isHttpSecurityEnabled(conf)) {
       protocolPrefix = "https://";
-      reconSocket = HddsUtils.getReconAddresses(conf, ReconEndpointType.WEB_HTTPS);
+      reconSocket = HddsUtils.getReconHTTPSAddresses(conf);
     } else {
       protocolPrefix = "http://";
-      reconSocket = HddsUtils.getReconAddresses(conf, ReconEndpointType.WEB_HTTP);
+      reconSocket = HddsUtils.getReconHTTPAddresses(conf);
     }
-    return protocolPrefix + reconSocket.getHostName() + ":" + reconSocket.getPort();
+    return protocolPrefix + reconSocket.getHostName()
+        + ":" + reconSocket.getPort();
+  }
+
+  public boolean isSecurityEnabled() {
+    OzoneConfiguration conf = parent.getOzoneConf();
+    return OzoneSecurityUtil.isHttpSecurityEnabled(conf);
+  }
+
+  public ConfigurationSource getOzoneConfig() {
+    return parent.getOzoneConf();
   }
 }

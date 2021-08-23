@@ -1,78 +1,90 @@
 package org.apache.hadoop.ozone.admin.nssummary;
 
 import com.google.gson.Gson;
-import org.apache.commons.io.FileUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.util.EntityUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import picocli.CommandLine.Help.Ansi;
 
-import java.io.IOException;
+import javax.security.sasl.AuthenticationException;
+import java.io.InputStream;
 import java.net.ConnectException;
-import java.net.URI;
-import java.util.ArrayList;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.List;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.ozone.recon.ReconUtils.getFileSizeUpperBound;
 
-public class NSSummaryCLIUtils {
+/**
+ * Utility class to support Namespace CLI.
+ */
+public final class NSSummaryCLIUtils {
 
-  private static CloseableHttpClient httpClient = HttpClientBuilder
-      .create()
-      .build();
+  private NSSummaryCLIUtils() {
 
-  public static String makeHttpCall(String url, String path) throws Exception {
-    return makeHttpCall(url, path, false, false);
   }
 
-  public static String makeHttpCall(String url, String path,
-                                        boolean listFile, boolean withReplica)
+  private static final String OFS_PREFIX = "ofs://";
+
+  public static String makeHttpCall(StringBuffer url, String path,
+                                    boolean isSpnegoEnabled,
+                                    ConfigurationSource conf)
       throws Exception {
-    List parameterList = new ArrayList();
-    parameterList.add(new BasicNameValuePair("path", path));
+    return makeHttpCall(url, path, false, false, isSpnegoEnabled, conf);
+  }
+
+  public static String makeHttpCall(StringBuffer url, String path,
+                                    boolean listFile, boolean withReplica,
+                                    boolean isSpnegoEnabled,
+                                    ConfigurationSource conf)
+      throws Exception {
+
+    url.append("?path=").append(path);
 
     if (listFile) {
-      parameterList.add(new BasicNameValuePair("files", "true"));
+      url.append("&files=true");
     }
     if (withReplica) {
-      parameterList.add(new BasicNameValuePair("replica", "true"));
+      url.append("&replica=true");
     }
 
-    HttpGet httpGet = new HttpGet(url);
-    URI uri = new URIBuilder(httpGet.getURI())
-        .addParameters(parameterList)
-        .build();
-    httpGet.setURI(uri);
+    System.out.println("Connecting to Recon: " + url + "...");
+    final URLConnectionFactory connectionFactory =
+        URLConnectionFactory.newDefaultURLConnectionFactory(
+            (Configuration) conf);
+
+    HttpURLConnection httpURLConnection;
 
     try {
-      HttpResponse response = httpClient.execute(httpGet);
-      int errorCode = response.getStatusLine().getStatusCode();
-      HttpEntity entity = response.getEntity();
+      httpURLConnection = (HttpURLConnection)
+          connectionFactory.openConnection(new URL(url.toString()),
+              isSpnegoEnabled);
+      httpURLConnection.connect();
+      int errorCode = httpURLConnection.getResponseCode();
+      InputStream inputStream = httpURLConnection.getInputStream();
 
       if ((errorCode == HTTP_OK) || (errorCode == HTTP_CREATED)) {
-        return EntityUtils.toString(entity);
+        return IOUtils.toString(inputStream, StandardCharsets.UTF_8);
       }
 
-      if (entity != null) {
-        throw new IOException("Recon is being initialized..." +
-            "\nPlease wait a moment.");
+      if (httpURLConnection.getErrorStream() != null) {
+        System.out.println("Recon is being initialized. Please wait a moment");
+        return null;
       } else {
-        throw new IOException("Unexpected null in http payload," +
+        System.out.println("Unexpected null in http payload," +
             " while processing request");
       }
+      return null;
     } catch (ConnectException ex) {
       System.err.println("Connection Refused. Please make sure the " +
           "Recon Server has been started.");
+      return null;
+    } catch (AuthenticationException authEx) {
+      System.err.println("Authentication Failed. Please make sure you " +
+          "have login or disable Ozone security settings.");
       return null;
     }
   }
@@ -120,5 +132,25 @@ public class NSSummaryCLIUtils {
     } else {
       System.out.print(Ansi.AUTO.string(markupStr));
     }
+  }
+
+  public static void printFSOReminder() {
+    printNewLines(1);
+    System.out.println("[Warning] FSO is NOT enabled. " +
+        "Namespace CLI is only designed for FSO mode.\n" +
+        "To enable FSO set ozone.om.enable.filesystem.paths to true " +
+        "and ozone.om.metadata.layout to PREFIX.");
+    printNewLines(1);
+  }
+
+  public static String parseInputPath(String path) {
+    if (!path.startsWith("ofs://")) {
+      return path;
+    }
+    int idx = path.indexOf("/", OFS_PREFIX.length());
+    if (idx == -1) {
+      return path.substring(OFS_PREFIX.length());
+    }
+    return path.substring(idx);
   }
 }
