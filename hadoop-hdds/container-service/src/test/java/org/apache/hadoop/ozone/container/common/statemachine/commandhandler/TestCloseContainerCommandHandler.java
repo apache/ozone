@@ -35,13 +35,10 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -72,8 +69,6 @@ public class TestCloseContainerCommandHandler {
   private PipelineID nonExistentPipelineID = PipelineID.randomId();
   private ContainerController controller;
   private ContainerSet containerSet;
-  private static final Logger LOG =
-          LoggerFactory.getLogger(ContainerController.class);
   private CloseContainerCommandHandler subject =
       new CloseContainerCommandHandler();
 
@@ -212,27 +207,28 @@ public class TestCloseContainerCommandHandler {
   }
 
   @Test
-  public void closeNonExistenceContainer() throws IOException {
+  public void closeNonExistenceContainer() {
     long containerID = 1L;
-    GenericTestUtils.LogCapturer logCapturer =
-            GenericTestUtils.LogCapturer.captureLogs(LOG);
-    controller.markContainerForClose(containerID);
-    logCapturer.stopCapturing();
-    String warning = "The Container is not found. ContainerID: "+containerID;
-    Assert.assertTrue(logCapturer.getOutput().contains(warning));
+    try {
+      controller.markContainerForClose(containerID);
+    } catch (IOException e) {
+
+      GenericTestUtils.assertExceptionContains("The Container " +
+                      "is not found. ContainerID: "+containerID, e);
+    }
   }
 
   @Test
-  public void closeMissingContainer() throws IOException {
+  public void closeMissingContainer() {
     long containerID = 2L;
-    GenericTestUtils.LogCapturer logCapturer =
-            GenericTestUtils.LogCapturer.captureLogs(LOG);
     containerSet.getMissingContainerSet().add(containerID);
-    controller.markContainerForClose(containerID);
-    logCapturer.stopCapturing();
-    String warning = "The Container is in the MissingContainerSet " +
-            "hence we can't close it. ContainerID: "+containerID;
-    Assert.assertTrue(logCapturer.getOutput().contains(warning));
+    try {
+      controller.markContainerForClose(containerID);
+    } catch (IOException e) {
+      GenericTestUtils.assertExceptionContains("The Container is in " +
+              "the MissingContainerSet hence we can't close it. " +
+              "ContainerID: "+containerID, e);
+    }
   }
 
   private CloseContainerCommand closeWithKnownPipeline() {

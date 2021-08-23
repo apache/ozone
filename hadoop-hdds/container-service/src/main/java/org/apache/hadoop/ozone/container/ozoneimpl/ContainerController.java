@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -48,7 +49,7 @@ public class ContainerController {
   private final ContainerSet containerSet;
   private final Map<ContainerType, Handler> handlers;
   private static final Logger LOG =
-          LoggerFactory.getLogger(ContainerController.class);
+      LoggerFactory.getLogger(ContainerController.class);
 
   public ContainerController(final ContainerSet containerSet,
       final Map<ContainerType, Handler> handlers) {
@@ -84,14 +85,18 @@ public class ContainerController {
   public void markContainerForClose(final long containerId)
       throws IOException {
     Container container = containerSet.getContainer(containerId);
-    if (container==null) {
+    if (container == null) {
+      String warning;
       Set<Long> missingContainerSet = containerSet.getMissingContainerSet();
       if (missingContainerSet.contains(containerId)) {
-        LOG.warn("The Container is in the MissingContainerSet " +
-                "hence we can't close it. ContainerID: {}", containerId);
+        warning = "The Container is in the MissingContainerSet " +
+                "hence we can't close it. ContainerID: "+containerId;
+        LOG.warn(warning);
       } else {
-        LOG.warn("The Container is not found. ContainerID: {}", containerId);
+        warning = "The Container is not found. ContainerID: "+ containerId;
+        LOG.warn(warning);
       }
+      throw new ContainerNotFoundException(warning);
     } else {
       if (container.getContainerState() == State.OPEN) {
         getHandler(container).markContainerForClose(container);
