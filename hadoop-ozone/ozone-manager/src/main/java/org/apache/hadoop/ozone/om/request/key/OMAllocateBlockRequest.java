@@ -186,7 +186,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, clientID);
-      openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKeyName);
+      openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
             KEY_NOT_FOUND);
@@ -213,7 +213,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKeyName),
           new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 

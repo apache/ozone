@@ -67,8 +67,8 @@ public class OMKeyCommitResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     // Delete from OpenKey table
-    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        openKeyName);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .deleteWithBatch(batchOperation, openKeyName);
 
     omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
         omKeyInfo);

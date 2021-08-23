@@ -91,7 +91,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omClientResponse.getOMResponse().getStatus());
 
     // Entry should be deleted from openKey Table.
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(ozoneKey);
     Assert.assertNull(omKeyInfo);
 
     // Now entry should be created in key Table.
@@ -147,7 +148,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omClientResponse.getOMResponse().getStatus());
 
     // Entry should be deleted from openKey Table.
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(ozoneKey);
     Assert.assertNull(omKeyInfo);
 
     // Now entry should be created in key Table.

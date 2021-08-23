@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -70,7 +67,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     Assert.assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -128,7 +126,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -199,7 +198,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     Assert.assertNull(
             omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -222,5 +222,10 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     // Create parent dirs for the path
     parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
             dirName, omMetadataManager);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

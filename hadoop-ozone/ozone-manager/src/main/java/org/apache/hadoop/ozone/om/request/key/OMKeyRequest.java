@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -95,6 +96,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   protected KeyArgs resolveBucketLink(
@@ -452,15 +457,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       acquireLock = omMetadataManager.getLock().acquireReadLock(
           BUCKET_LOCK, volumeName, bucketName);
       try {
-
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
-        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(
-            omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
-                resolvedBucket.realBucket(), keyArgs.getKeyName(),
-                keyArgs.getMultipartUploadID()));
-
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(getBucketLayout()).get(
+                omMetadataManager.getMultipartKey(volumeName, bucketName,
+                    keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
         if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
@@ -721,8 +723,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
               .getMultipartKey(args.getVolumeName(), args.getBucketName(),
                       args.getKeyName(), uploadID);
     }
-    OmKeyInfo partKeyInfo = omMetadataManager.getOpenKeyTable().get(
-            multipartKey);
+    OmKeyInfo partKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey);
     if (partKeyInfo == null) {
       throw new OMException("No such Multipart upload is with specified " +
               "uploadId " + uploadID,

@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto
@@ -303,13 +304,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmKeyInfo> getOpenKeyTable() {
-    // TODO: Refactor the below function by reading bucketLayout.
-    //  Jira: HDDS-5636
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      return openFileTable;
+  public Table getOpenKeyTable(BucketLayout bucketLayout) {
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      return openKeyTable;
     }
-    return openKeyTable;
+    return openFileTable;
   }
 
   @Override
@@ -1139,7 +1138,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     List<String> expiredKeys = Lists.newArrayList();
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+                 keyValueTableIterator = getOpenKeyTable(getBucketLayout()).iterator()) {
 
       while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
@@ -1300,5 +1299,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(uploadId);
     return openKey.toString();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

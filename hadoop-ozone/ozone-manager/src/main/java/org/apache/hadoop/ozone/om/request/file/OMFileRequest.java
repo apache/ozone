@@ -40,12 +40,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -463,7 +458,7 @@ public final class OMFileRequest {
       keyInfoOptional = Optional.of(omFileInfo);
     }
 
-    omMetadataManager.getOpenKeyTable().addCacheEntry(
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             new CacheKey<>(dbOpenFileName),
             new CacheValue<>(keyInfoOptional, trxnLogIndex));
   }
@@ -511,8 +506,8 @@ public final class OMFileRequest {
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             openKeySessionID);
 
-    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, dbOpenFileKey,
-            omFileInfo);
+    omMetadataMgr.getOpenKeyTable(getBucketLayout())
+        .putWithBatch(batchOp, dbOpenFileKey, omFileInfo);
   }
 
   /**
@@ -533,8 +528,8 @@ public final class OMFileRequest {
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             uploadID);
 
-    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, multipartFileKey,
-            omFileInfo);
+    omMetadataMgr.getOpenKeyTable(getBucketLayout())
+        .putWithBatch(batchOp, multipartFileKey, omFileInfo);
 
     return multipartFileKey;
   }
@@ -579,7 +574,7 @@ public final class OMFileRequest {
 
     OmKeyInfo dbOmKeyInfo;
     if (openFileTable) {
-      dbOmKeyInfo = omMetadataMgr.getOpenKeyTable().get(dbOpenFileKey);
+      dbOmKeyInfo = omMetadataMgr.getOpenKeyTable(getBucketLayout()).get(dbOpenFileKey);
     } else {
       dbOmKeyInfo = omMetadataMgr.getKeyTable().get(dbOpenFileKey);
     }
@@ -968,5 +963,9 @@ public final class OMFileRequest {
       throw new OMException("Bucket not found",
           BUCKET_NOT_FOUND);
     }
+  }
+
+  public static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

@@ -169,7 +169,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
 
     Table<String, OmKeyInfo> openFileTable =
-            cluster.getOzoneManager().getMetadataManager().getOpenKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getOpenKeyTable(getBucketLayout());
 
     // before file creation
     verifyKeyInFileTable(openFileTable, file, 0, true);
@@ -225,7 +226,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
 
     Table<String, OmKeyInfo> openFileTable =
-            cluster.getOzoneManager().getMetadataManager().getOpenKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getOpenKeyTable(getBucketLayout());
 
     String data = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
@@ -760,6 +762,10 @@ public class TestObjectStoreWithFSO {
       Assert.assertEquals("Invalid Key", parentID,
               omKeyInfo.getParentObjectID());
     }
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   /**

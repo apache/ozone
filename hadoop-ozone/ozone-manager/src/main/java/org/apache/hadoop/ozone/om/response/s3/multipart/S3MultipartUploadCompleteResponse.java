@@ -80,8 +80,8 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     // 1. Delete multipart key from OpenKeyTable, MPUTable
-    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        multipartOpenKey);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .deleteWithBatch(batchOperation, multipartOpenKey);
     omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
         multipartKey);
 

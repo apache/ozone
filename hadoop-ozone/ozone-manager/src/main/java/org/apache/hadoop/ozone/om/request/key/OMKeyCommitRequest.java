@@ -174,7 +174,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
+      omKeyInfo =
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
@@ -192,7 +193,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache of open key table and key table.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 

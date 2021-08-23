@@ -20,13 +20,10 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .PartKeyInfo;
 import org.apache.hadoop.util.Time;
@@ -71,7 +68,8 @@ public class TestS3MultipartUploadAbortResponse
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -130,7 +128,8 @@ public class TestS3MultipartUploadAbortResponse
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 

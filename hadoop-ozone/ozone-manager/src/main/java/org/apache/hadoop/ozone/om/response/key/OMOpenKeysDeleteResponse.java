@@ -62,7 +62,8 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable();
+    Table<String, OmKeyInfo> openKeyTable =
+        omMetadataManager.getOpenKeyTable(getBucketLayout());
 
     for (Map.Entry<String, OmKeyInfo> keyInfoPair: keysToDelete.entrySet()) {
       addDeletionToBatch(omMetadataManager, batchOperation, openKeyTable,

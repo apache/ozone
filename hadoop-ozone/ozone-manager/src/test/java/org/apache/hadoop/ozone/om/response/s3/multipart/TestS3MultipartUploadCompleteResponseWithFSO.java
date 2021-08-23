@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -96,8 +97,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     Assert.assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assert.assertNotNull(
-        omMetadataManager.getOpenKeyTable().get(dbMultipartOpenKey));
+    Assert.assertNotNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartOpenKey));
 
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
@@ -113,8 +114,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     Assert.assertNotNull(omMetadataManager.getKeyTable().get(dbKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assert.assertNull(
-            omMetadataManager.getOpenKeyTable().get(dbMultipartOpenKey));
+    Assert.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartOpenKey));
 
     // As no parts are created, so no entries should be there in delete table.
     Assert.assertEquals(0, omMetadataManager.countRowsInTable(
@@ -180,8 +181,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     Assert.assertNotNull(omMetadataManager.getKeyTable().get(dbKey));
     Assert.assertNull(
             omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assert.assertNull(
-            omMetadataManager.getOpenKeyTable().get(dbMultipartOpenKey));
+    Assert.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartOpenKey));
 
     // As 1 unused parts exists, so 1 unused entry should be there in delete
     // table.
@@ -214,7 +215,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -275,5 +277,9 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             batchOperation);
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
