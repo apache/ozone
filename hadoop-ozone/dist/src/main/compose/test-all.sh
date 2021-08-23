@@ -44,6 +44,7 @@ if [ "$OZONE_WITH_COVERAGE" ]; then
   cp /tmp/jacoco-combined.exec "$SCRIPT_DIR"/result
 fi
 
-generate_report "acceptance" "${ALL_RESULT_DIR}"
+generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
+
 
 exit $RESULT

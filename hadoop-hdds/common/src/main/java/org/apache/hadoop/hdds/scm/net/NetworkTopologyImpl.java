@@ -287,6 +287,23 @@ public class NetworkTopologyImpl implements NetworkTopology{
   }
 
   /**
+   * Return the node at level <i>level</i>.
+   * @param level topology level, start from 1, which means ROOT
+   * @return the nodes on the level
+   */
+  @Override
+  public List<Node> getNodes(int level) {
+    Preconditions.checkArgument(level > 0 && level <= maxLevel,
+        "Invalid level");
+    netlock.readLock().lock();
+    try {
+      return clusterTree.getNodes(level);
+    } finally {
+      netlock.readLock().unlock();
+    }
+  }
+
+  /**
    * Randomly choose a node in the scope.
    * @param scope range of nodes from which a node will be chosen. If scope
    *              starts with ~, choose one from the all nodes except for the
