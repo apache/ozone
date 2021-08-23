@@ -468,10 +468,11 @@ public interface OzoneManagerProtocol
    * Assign user to tenant.
    * @param username user name to be assigned.
    * @param tenantName tenant name.
+   * @param accessId access ID.
    * @throws IOException
    */
-  S3SecretValue assignUserToTenant(String username, String tenantName)
-      throws IOException;
+  S3SecretValue assignUserToTenant(String username, String tenantName,
+      String accessId) throws IOException;
 
   // TODO: modify, delete
 

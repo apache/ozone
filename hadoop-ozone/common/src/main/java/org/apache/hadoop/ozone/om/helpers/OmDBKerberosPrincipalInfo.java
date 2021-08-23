@@ -87,9 +87,6 @@ public final class OmDBKerberosPrincipalInfo {
   public static final class Builder {
     private Set<String> accessIds;
 
-    private Builder() {
-    }
-
     public Builder setAccessIds(Set<String> accessIds) {
       this.accessIds = accessIds;
       return this;

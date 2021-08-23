@@ -644,12 +644,15 @@ public class RpcClient implements ClientProtocol {
    */
   @Override
   public S3SecretValue assignUserToTenant(
-      String username, String tenantName) throws IOException {
+      String username, String tenantName, String accessId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(username),
-        "username cannot be null or empty.");
+        "username can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName cannot be null or empty.");
-    return ozoneManagerClient.assignUserToTenant(username, tenantName);
+        "tenantName can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    return ozoneManagerClient.assignUserToTenant(
+        username, tenantName, accessId);
   }
 
   // TODO: modify, delete

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -38,33 +39,64 @@ public class AssignUserToTenantHandler extends S3Handler {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "List of tenant short user names")
+  @CommandLine.Parameters(description = "List of tenant short user name(s)")
   private List<String> usernames = new ArrayList<>();
 
-  @CommandLine.Option(names = "-t",
+  @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
   private String tenantName;
+
+  @CommandLine.Option(names = {"-a", "--access-ids", "--accessIds"},
+      description = "(Optional) List of manually-specified access ID(s)")
+  private List<String> accessIds;
+
+  // TODO: support dry-run?
+//  @CommandLine.Option(names = {"--dry-run"},
+//      description = "Dry-run")
+//  private boolean dryRun;
+
+  private boolean isEmptyList(List<String> list) {
+    return list == null || list.size() == 0;
+  }
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
-    if (tenantName == null || tenantName.length() == 0) {
+
+    if (isEmptyList(usernames)) {
+      GenericCli.missingSubcommand(spec);
+      return;
+    }
+
+    if (!isEmptyList(accessIds) && usernames.size() != accessIds.size()) {
+      err().println("Access ID list length (" + accessIds.size() + ") "
+          + "doesn't match user list's (" + usernames.size() + "). "
+          + "Double check your command line.");
+      return;
+    }
+
+    if (StringUtils.isEmpty(tenantName)) {
       tenantName = objStore.getS3VolumeName();
     }
-    if (usernames.size() > 0) {
-      for (String username : usernames) {
-        try {
-          S3SecretValue res = objStore.assignUserToTenant(username, tenantName);
-          out().println("Assigned '" + username + "' to '" + tenantName + "'.");
-          out().println("export AWS_ACCESS_KEY_ID=" + res.getAwsAccessKey());
-          out().println("export AWS_SECRET_ACCESS_KEY=" + res.getAwsSecret());
-        } catch (IOException e) {
-          out().println("Failed to assign '" + username + "' to '" +
-              tenantName + "': " + e.getMessage());
+
+    for (int i = 0; i < usernames.size(); i++) {
+      final String username = usernames.get(i);
+      try {
+        final String accessId;
+        if (!isEmptyList(accessIds) && StringUtils.isEmpty(accessIds.get(i))) {
+          accessId = accessIds.get(i);
+        } else {
+          accessId = username;
         }
+        final S3SecretValue resp =
+            objStore.assignUserToTenant(username, tenantName, accessId);
+        err().println("Assigned '" + username + "' to '" + tenantName + "'.");
+        out().println("export AWS_ACCESS_KEY_ID=" + resp.getAwsAccessKey());
+        out().println("export AWS_SECRET_ACCESS_KEY=" + resp.getAwsSecret());
+      } catch (IOException e) {
+        err().println("Failed to assign '" + username + "' to '" +
+            tenantName + "': " + e.getMessage());
       }
-    } else {
-      GenericCli.missingSubcommand(spec);
     }
   }
 }

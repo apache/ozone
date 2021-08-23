@@ -191,11 +191,12 @@ public class ObjectStore {
    * Assign user to tenant.
    * @param username user name to be assigned.
    * @param tenantName tenant name.
+   * @param accessId access ID.
    * @throws IOException
    */
   public S3SecretValue assignUserToTenant(
-      String username, String tenantName) throws IOException {
-    return proxy.assignUserToTenant(username, tenantName);
+      String username, String tenantName, String accessId) throws IOException {
+    return proxy.assignUserToTenant(username, tenantName, accessId);
   }
 
   // TODO: modify, delete

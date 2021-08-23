@@ -3066,7 +3066,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Assign user to tenant.
    */
   public S3SecretValue assignUserToTenant(
-      String username, String tenantName) throws IOException {
+      String username, String tenantName, String accessId) throws IOException {
     throw new NotImplementedException(
         "non-Ratis assignUserToTenant() is not implemented");
   }

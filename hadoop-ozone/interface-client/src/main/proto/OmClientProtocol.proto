@@ -1384,6 +1384,7 @@ message DeleteTenantRequest {
 message AssignUserToTenantRequest {
     optional string tenantUsername = 1;
     optional string tenantName = 2;
+    optional string accessId = 3;
 }
 
 message ModifyTenantUserRequest {

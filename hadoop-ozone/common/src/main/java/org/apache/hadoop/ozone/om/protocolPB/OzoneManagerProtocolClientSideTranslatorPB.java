@@ -903,7 +903,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public S3SecretValue assignUserToTenant(
-      String username, String tenantName) throws IOException {
+      String username, String tenantName, String accessId) throws IOException {
 
     final AssignUserToTenantRequest request =
         AssignUserToTenantRequest.newBuilder()
