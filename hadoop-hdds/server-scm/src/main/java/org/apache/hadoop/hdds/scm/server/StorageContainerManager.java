@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.De
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolExecutor;
+import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -157,6 +158,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
@@ -248,6 +250,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private MetricsSystem ms;
+  private final Map<String, RatisDropwizardExports> ratisMetricsMap =
+      new ConcurrentHashMap<>();
   private String primaryScmNodeId;
 
   /**
@@ -606,7 +610,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmContext,
           serviceManager,
           scmNodeManager,
-          new MonotonicClock(ZoneOffset.UTC));
+          new MonotonicClock(ZoneOffset.UTC),
+          scmHAManager,
+          getScmMetadataStore().getMoveTable());
     }
     if(configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
@@ -1257,6 +1263,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
 
+    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
+
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
 
@@ -1337,6 +1345,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void stop() {
+    try {
+      LOG.info("Stopping Container Balancer service.");
+      containerBalancer.stop();
+    } catch (Exception e) {
+      LOG.error("Failed to stop Container Balancer service.");
+    }
+
     try {
       LOG.info("Stopping Replication Manager Service.");
       replicationManager.stop();

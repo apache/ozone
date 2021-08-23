@@ -104,6 +104,13 @@ public interface NetworkTopology {
   int getNumOfNodes(int level);
 
   /**
+   * Return the nodes at level <i>level</i>.
+   * @param level topology level, start from 1, which means ROOT
+   * @return the nodes on the level
+   */
+  List<Node> getNodes(int level);
+
+  /**
    * Randomly choose a node in the scope.
    * @param scope range of nodes from which a node will be chosen. If scope
    *              starts with ~, choose one from the all nodes except for the

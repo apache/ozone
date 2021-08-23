@@ -274,7 +274,7 @@ public class NSSummaryEndpoint {
     case BUCKET:
       long bucketObjectId = getBucketObjectId(names);
       NSSummary bucketNSSummary =
-          reconNamespaceSummaryManager.getNSSummary(bucketObjectId);
+              reconNamespaceSummaryManager.getNSSummary(bucketObjectId);
       // empty bucket, because it's not a parent of any directory or key
       if (bucketNSSummary == null) {
         if (withReplica) {
@@ -326,7 +326,7 @@ public class NSSummaryEndpoint {
     case DIRECTORY:
       long dirObjectId = getDirObjectId(names);
       NSSummary dirNSSummary =
-          reconNamespaceSummaryManager.getNSSummary(dirObjectId);
+              reconNamespaceSummaryManager.getNSSummary(dirObjectId);
       // Empty directory
       if (dirNSSummary == null) {
         if (withReplica) {
