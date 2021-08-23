@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.util.Time;
@@ -61,7 +62,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     String ozoneKey = getOzoneKey();
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey, null);
+            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -113,6 +114,24 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     Assert.assertTrue(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
+  }
+
+  @Test
+  public void testAddToDBBatchOnOverwrite() throws Exception {
+    omBucketInfo = OmBucketInfo.newBuilder()
+            .setVolumeName(volumeName).setBucketName(bucketName)
+            .setCreationTime(Time.now()).build();
+    OmKeyInfo omKeyInfo = getOmKeyInfo();
+    keysToDelete =
+            OmUtils.prepareKeyForDeleteWithoutUpdateID(omKeyInfo, null);
+    Assert.assertNotNull(keysToDelete);
+    testAddToDBBatch();
+
+    RepeatedOmKeyInfo keysInDeleteTable =
+            omMetadataManager.getDeletedTable().get(getOzoneKey());
+    Assert.assertNotNull(keysInDeleteTable);
+    Assert.assertEquals(1, keysInDeleteTable.getOmKeyInfoList().size());
+
   }
 
   @NotNull

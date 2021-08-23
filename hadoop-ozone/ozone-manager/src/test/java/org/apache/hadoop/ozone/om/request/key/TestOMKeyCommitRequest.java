@@ -346,17 +346,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(allocatedLocationList,
             omKeyInfo.getLatestVersionLocations().getLocationList());
     Assert.assertEquals(1, omKeyInfo.getKeyLocationVersions().size());
-
-    /*
-    // Make sure it's in deleted table
-    RepeatedOmKeyInfo deleted =
-     omMetadataManager.getDeletedTable().get(ozoneKey);
-    Assert.assertNotNull(deleted);
-    Assert.assertEquals(1, deleted.getOmKeyInfoList().size());
-    omKeyInfo = deleted.getOmKeyInfoList().get(0);
-    Assert.assertEquals(0L,
-     omKeyInfo.getLatestVersionLocations().getVersion());
-     */
   }
 
   /**
