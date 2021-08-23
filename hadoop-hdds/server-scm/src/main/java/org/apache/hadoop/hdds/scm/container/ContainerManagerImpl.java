@@ -177,11 +177,15 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       final ReplicationConfig replicationConfig, final String owner)
       throws IOException {
     lock.lock();
+    // Acquire pipeline manager lock, to avoid any updates to pipeline
+    // while allocate container happens. This is to avoid scenario like
+    // mentioned in HDDS-5655.
     try {
-      // Acquire pipeline manager lock, to avoid any updates to pipeline
-      // while allocate container happens. This is to avoid scenario like
-      // mentioned in HDDS-5655.
       pipelineManager.acquireLock();
+    } catch (Exception ex) {
+      lock.unlock();
+    }
+    try {
       final List<Pipeline> pipelines = pipelineManager
           .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
 
