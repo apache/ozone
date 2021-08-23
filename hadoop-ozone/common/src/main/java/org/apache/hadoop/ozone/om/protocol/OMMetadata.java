@@ -36,12 +36,8 @@ public final class OMMetadata {
 
   private OMMetadata(List<OMNodeDetails> inMemoryNodeList,
       List<OMNodeDetails> onDiskNodeList) {
-    if (inMemoryNodeList != null) {
-      this.omNodesInMemory.addAll(inMemoryNodeList);
-    }
-    if (onDiskNodeList != null) {
-      this.omNodesInNewConf.addAll(onDiskNodeList);
-    }
+    this.omNodesInMemory.addAll(inMemoryNodeList);
+    this.omNodesInNewConf.addAll(onDiskNodeList);
   }
 
   /**

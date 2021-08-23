@@ -53,6 +53,8 @@ public class OMMetadataProtocolClientSideImpl implements
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
+  private static final int MAX_RETRIES = 10;
+  private static final int INTERVAL_BETWEEN_RETRIES_IN_MS = 1000;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMMetadataProtocolClientSideImpl.class);
@@ -65,14 +67,15 @@ public class OMMetadataProtocolClientSideImpl implements
       throws IOException {
 
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
-        OMInterServiceProtocolPB.class, ProtobufRpcEngine.class);
+        OMMetadataProtocolPB.class, ProtobufRpcEngine.class);
 
     this.omNodeID = omNodeId;
 
     // OM metadata is requested from a specific OM and hence there is no need
     // of any failover provider.
     RetryPolicy connectionRetryPolicy = RetryPolicies
-        .failoverOnNetworkException(0);
+        .retryUpToMaximumCountWithFixedSleep(MAX_RETRIES,
+            INTERVAL_BETWEEN_RETRIES_IN_MS, TimeUnit.MILLISECONDS);
     Configuration hadoopConf = LegacyHadoopConfigurationSource
         .asHadoopConfiguration(conf);
 

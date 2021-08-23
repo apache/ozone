@@ -711,12 +711,11 @@ public final class OmUtils {
     List<OMNodeDetails> omNodesList = new ArrayList<>();
     Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf, omServiceId);
 
-    String rpcAddrKey, rpcAddrStr, hostAddr, httpAddr, httpsAddr;
+    String rpcAddrStr, hostAddr, httpAddr, httpsAddr;
     int rpcPort, ratisPort;
     if (omNodeIds.size() == 0) {
       //Check if it is non-HA cluster
-      rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY);
-      rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
+      rpcAddrStr = OmUtils.getOmRpcAddress(conf, OZONE_OM_ADDRESS_KEY);
       if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
         return omNodesList;
       }
