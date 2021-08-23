@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.junit.Assert;
 import org.junit.Test;
 

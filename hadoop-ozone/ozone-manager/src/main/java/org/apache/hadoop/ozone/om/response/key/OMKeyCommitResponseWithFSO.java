@@ -62,8 +62,8 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
                            BatchOperation batchOperation) throws IOException {
 
     // Delete from OpenKey table
-    omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(batchOperation,
-            getOpenKeyName());
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .deleteWithBatch(batchOperation, getOpenKeyName());
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
             getOmKeyInfo());

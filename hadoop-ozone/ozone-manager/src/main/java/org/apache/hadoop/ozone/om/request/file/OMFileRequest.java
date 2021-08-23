@@ -40,7 +40,13 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -574,7 +580,8 @@ public final class OMFileRequest {
 
     OmKeyInfo dbOmKeyInfo;
     if (openFileTable) {
-      dbOmKeyInfo = omMetadataMgr.getOpenKeyTable(getBucketLayout()).get(dbOpenFileKey);
+      dbOmKeyInfo =
+          omMetadataMgr.getOpenKeyTable(getBucketLayout()).get(dbOpenFileKey);
     } else {
       dbOmKeyInfo = omMetadataMgr.getKeyTable().get(dbOpenFileKey);
     }

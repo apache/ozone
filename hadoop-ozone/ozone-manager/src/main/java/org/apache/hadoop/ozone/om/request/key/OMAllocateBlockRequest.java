@@ -184,9 +184,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
 
-      openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
-          keyName, clientID);
-      openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
+      openKeyName = omMetadataManager
+          .getOpenKey(volumeName, bucketName, keyName, clientID);
+      openKeyInfo =
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
             KEY_NOT_FOUND);

@@ -1137,18 +1137,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
     List<String> expiredKeys = Lists.newArrayList();
 
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = getOpenKeyTable(getBucketLayout()).iterator()) {
+    try (
+        TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+            keyValueTableIterator = getOpenKeyTable(
+            getBucketLayout()).iterator()) {
 
       while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String openKey = openKeyValue.getKey();
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
-        Duration openKeyAge =
-                Duration.between(
-                        Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
-                        Instant.now());
+        Duration openKeyAge = Duration
+            .between(Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
+                Instant.now());
 
         if (openKeyAge.compareTo(expirationDuration) >= 0) {
           expiredKeys.add(openKey);
