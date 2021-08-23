@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -295,11 +294,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     KeyArgs keyArgs = modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
 
     // Key should be there in key table, as validateAndUpdateCache is called.
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(getOzonePathKey());
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable().get(getOzonePathKey());
 
     Assert.assertNotNull(omKeyInfo);
     // Previously committed version
-    Assert.assertEquals(0L, omKeyInfo.getLatestVersionLocations().getVersion());
+    Assert.assertEquals(0L,
+            omKeyInfo.getLatestVersionLocations().getVersion());
 
     // Append new blocks
     List<OmKeyLocationInfo> allocatedLocationList =
@@ -324,7 +325,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
-    Assert.assertEquals(version, omKeyInfo.getLatestVersionLocations().getVersion());
+    Assert.assertEquals(version,
+            omKeyInfo.getLatestVersionLocations().getVersion());
     // DB keyInfo format
     verifyKeyName(omKeyInfo);
 
@@ -335,9 +337,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Check block location.
     List<OmKeyLocationInfo> locationInfoListFromCommitKeyRequest =
-            commitKeyRequest.getKeyArgs()
-                    .getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
-                    .collect(Collectors.toList());
+        commitKeyRequest.getKeyArgs()
+        .getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
 
     Assert.assertEquals(locationInfoListFromCommitKeyRequest,
             omKeyInfo.getLatestVersionLocations().getLocationList());
@@ -347,11 +349,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     /*
     // Make sure it's in deleted table
-    RepeatedOmKeyInfo deleted = omMetadataManager.getDeletedTable().get(ozoneKey);
+    RepeatedOmKeyInfo deleted =
+     omMetadataManager.getDeletedTable().get(ozoneKey);
     Assert.assertNotNull(deleted);
     Assert.assertEquals(1, deleted.getOmKeyInfoList().size());
     omKeyInfo = deleted.getOmKeyInfoList().get(0);
-    Assert.assertEquals(0L, omKeyInfo.getLatestVersionLocations().getVersion());
+    Assert.assertEquals(0L,
+     omKeyInfo.getLatestVersionLocations().getVersion());
      */
   }
 

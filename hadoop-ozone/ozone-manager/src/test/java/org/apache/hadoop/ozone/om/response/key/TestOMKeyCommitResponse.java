@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.util.Time;
