@@ -489,6 +489,11 @@ public final class ScmConfigKeys {
   public static final String
           OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT = "16KB";
 
+  public static final String OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM =
+      "ozone.scm.ha.ratis.log.appender.queue.num-elements";
+  public static final int
+      OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM_DEFAULT = 1024;
+
   public static final String OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT =
           "ozone.scm.ha.ratis.log.appender.queue.byte-limit";
   public static final String
