@@ -105,7 +105,9 @@ regenerate_resources() {
 
   if [ $(basename $PARENT_OF_PARENT) == "k8s" ]; then
     #running from src dir
-    OZONE_ROOT=$(realpath ../../../../../target/ozone-0.6.0-SNAPSHOT)
+    local version
+    version=$(cd ../../../../.. && mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
+    OZONE_ROOT=$(realpath ../../../../../target/ozone-${version})
   else
     #running from dist
     OZONE_ROOT=$(realpath ../../..)
