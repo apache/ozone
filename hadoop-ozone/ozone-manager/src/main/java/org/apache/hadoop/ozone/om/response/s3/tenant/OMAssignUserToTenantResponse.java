@@ -54,6 +54,7 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
   private OmDBAccessIdInfo omDBAccessIdInfo;
   private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
 
+  @SuppressWarnings("checkstyle:parameternumber")
   public OMAssignUserToTenantResponse(@Nonnull OMResponse omResponse,
       @Nonnull S3SecretValue s3SecretValue,
       @Nonnull String principal,
