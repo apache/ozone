@@ -52,6 +52,18 @@ public final class ContainerCacheMetrics {
   @Metric("Number of Container Cache Evictions")
   private MutableCounterLong numCacheEvictions;
 
+  @Metric("Number of Open Container fetched successfully")
+  private MutableCounterLong numOpenContainerGetsSuccess;
+
+  @Metric("Number of Open Container fetches which failed")
+  private MutableCounterLong numOpenContainerGetsFailures;
+
+  @Metric("Number of Open Container added to Cache")
+  private MutableCounterLong numOpenContainerInserts;
+
+  @Metric("Number of Open Container removed from")
+  private MutableCounterLong numOpenContainerRemoves;
+
   private ContainerCacheMetrics(String name, MetricsSystem ms) {
     this.name = name;
     this.ms = ms;
@@ -110,5 +122,41 @@ public final class ContainerCacheMetrics {
 
   public long getNumCacheEvictions() {
     return numCacheEvictions.value();
+  }
+
+  public void incNumOpenContainerGetsSuccess() {
+    numOpenContainerGetsSuccess.incr();
+  }
+
+  public void incNumOpenContainerGetsFailures() {
+    numOpenContainerGetsFailures.incr();
+  }
+
+  public long getNumOpenContainerGetsSuccess() {
+    return numOpenContainerGetsSuccess.value();
+  }
+
+  public long getNumOpenContainerGetsFailures() {
+    return numOpenContainerGetsFailures.value();
+  }
+
+  public void incNumOpenContainerInserts() {
+    numOpenContainerInserts.incr();
+  }
+
+  public void incNumOpenContainerRemoves() {
+    numOpenContainerRemoves.incr();
+  }
+
+  public long getNumOpenContainerInserts() {
+    return numOpenContainerInserts.value();
+  }
+
+  public long getNumOpenContainerRemoves() {
+    return numOpenContainerRemoves.value();
+  }
+
+  public long getNumOpenCacheEntries() {
+    return numOpenContainerInserts.value() - numOpenContainerRemoves.value();
   }
 }
