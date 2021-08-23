@@ -107,26 +107,35 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final AssignUserToTenantRequest request =
         getOmRequest().getAssignUserToTenantRequest();
+
+    // Note: Tenant username _is_ the Kerberos principal of the user
     final String tenantUsername = request.getTenantUsername();
     final String tenantName = request.getTenantName();
 
-    // Check tenantUsername validity
+    // Check tenantUsername (user's Kerberos principal) validity. TODO: Check
     if (tenantUsername.contains(OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER)) {
-      throw new OMException("Invalid tenant user name " + tenantUsername +
-          ". Tenant user name should not contain delimiter.",
+      throw new OMException("Invalid tenant username '" + tenantUsername +
+          "'. Tenant username shouldn't contain delimiter.",
           OMException.ResultCodes.INVALID_TENANT_USER_NAME);
     }
-    // Tenant and tenant user existence check won't be performed here
 
-    // Generate S3 secret
-    final String principal = tenantName +
-        OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + tenantUsername;
+    // Check tenant name validity.
+    if (tenantName.contains(OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER)) {
+      throw new OMException("Invalid tenant name '" + tenantUsername +
+          "'. Tenant name shouldn't contain delimiter.",
+          OMException.ResultCodes.INVALID_TENANT_NAME);
+    }
+
+    // Won't check tenant existence in preExecute.
+    // Won't check Kerberos principal existence at all. TODO: Confirm this.
+
+    // Generate random S3 secret
     final String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
 
     final UpdateGetS3SecretRequest updateGetS3SecretRequest =
         UpdateGetS3SecretRequest.newBuilder()
             .setAwsSecret(s3Secret)
-            .setKerberosID(principal).build();
+            .setKerberosID(tenantUsername).build();
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
@@ -162,6 +171,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
     final AssignUserToTenantRequest request =
         getOmRequest().getAssignUserToTenantRequest();
     final String tenantName = request.getTenantName();
+    // tenantUsername == principal in this context
     final String tenantUsername = request.getTenantUsername();
     final String accessId = request.getAccessId();
     final String volumeName = tenantName;  // TODO: Configurable
@@ -194,26 +204,27 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
       // Add to S3SecretTable.
       // TODO: dedupe - S3GetSecretRequest
       acquiredS3SecretLock = omMetadataManager.getLock()
-          .acquireWriteLock(S3_SECRET_LOCK, principal);
+          .acquireWriteLock(S3_SECRET_LOCK, accessId);
 
-      // Sanity check. principal should not exist in S3SecretTable
-      if (omMetadataManager.getS3SecretTable().isExist(principal)) {
-        LOG.error("Unexpected '{}' entry in S3SecretTable", principal);
-        throw new OMException("Unexpected principal entry in S3SecretTable",
+      // Sanity check. accessId shouldn't exist in S3SecretTable
+      if (omMetadataManager.getS3SecretTable().isExist(accessId)) {
+        LOG.error("Unexpected '{}' entry in S3SecretTable", accessId);
+        throw new OMException("Unexpected accessId entry in S3SecretTable",
             OMException.ResultCodes.INVALID_REQUEST);
       }
 
       final S3SecretValue s3SecretValue =
-          new S3SecretValue(principal, awsSecret);
+          new S3SecretValue(accessId, awsSecret);
       omMetadataManager.getS3SecretTable().addCacheEntry(
-          new CacheKey<>(principal),
+          new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));
 
-      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, principal);
+      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
       acquiredS3SecretLock = false;
 
       // Also inform the MultiTenantManager of the user assignment so it can
       //  initialize some policies in Ranger.
+      // TODO: userId from MultiTenantManager no longer useful?
       userId = ozoneManager.getMultiTenantManager()
           .assignUserToTenant(tenantName, tenantUsername);
       LOG.debug("userId = {}", userId);
@@ -221,7 +232,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantName(tenantName)
-          .setKerberosPrincipal(userId)  // TODO: Or principal? Ask/Double check
+          .setKerberosPrincipal(principal)  // TODO: CHK
           .setSharedSecret(s3SecretValue.getAwsSecret())
           .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
@@ -230,7 +241,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
 
       // Add to principalToAccessIdsTable
       OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo = omMetadataManager
-          .getPrincipalToAccessIdsTable().getIfExist(userId /* TODO: CHECK */);
+          .getPrincipalToAccessIdsTable().getIfExist(principal /* TODO: CHK */);
 
       // TODO: Potential TOC-TOU if we need to worry about concurrency.
       //  Won't be an issue if leader OM handles Ratis requests one-by-one.
@@ -242,7 +253,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
         omDBKerberosPrincipalInfo.addAccessId(accessId);
       }
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
-          new CacheKey<>(userId),  // TODO: Or principal? Ask/Double check
+          new CacheKey<>(principal),  // TODO: CHK
           new CacheValue<>(Optional.of(omDBKerberosPrincipalInfo),
               transactionLogIndex));
 
@@ -266,7 +277,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
               .build());
       omClientResponse = new OMAssignUserToTenantResponse(omResponse.build(),
           s3SecretValue, principal, defaultGroupName, roleName,
-          accessId, omDBAccessIdInfo, userId, omDBKerberosPrincipalInfo);
+          accessId, omDBAccessIdInfo, omDBKerberosPrincipalInfo);
     } catch (IOException ex) {
       ozoneManager.getMultiTenantManager().destroyUser(
           tenantName, tenantUsername);

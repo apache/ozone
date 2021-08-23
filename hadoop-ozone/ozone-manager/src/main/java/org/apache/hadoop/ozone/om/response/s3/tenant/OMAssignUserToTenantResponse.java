@@ -50,7 +50,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
 public class OMAssignUserToTenantResponse extends OMClientResponse {
 
   private S3SecretValue s3SecretValue;
-  private String principal, groupName, roleName, accessId, userId;
+  private String principal, groupName, roleName, accessId;
   private OmDBAccessIdInfo omDBAccessIdInfo;
   private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
 
@@ -62,7 +62,6 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
       @Nonnull String roleName,
       @Nonnull String accessId,
       @Nonnull OmDBAccessIdInfo omDBAccessIdInfo,
-      @Nonnull String userId,
       @Nonnull OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo
   ) {
     super(omResponse);
@@ -72,7 +71,6 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
     this.roleName = roleName;
     this.accessId = accessId;
     this.omDBAccessIdInfo = omDBAccessIdInfo;
-    this.userId = userId;
     this.omDBKerberosPrincipalInfo = omDBKerberosPrincipalInfo;
   }
 
@@ -91,14 +89,15 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
 
     if (s3SecretValue != null &&
         getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+      assert(accessId.equals(s3SecretValue.getKerberosID()));
       omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
-          s3SecretValue.getKerberosID(), s3SecretValue);
+          accessId, s3SecretValue);
     }
 
     omMetadataManager.getTenantAccessIdTable().putWithBatch(
         batchOperation, accessId, omDBAccessIdInfo);
     omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
-        batchOperation, userId /* TODO: CHECK */, omDBKerberosPrincipalInfo);
+        batchOperation, principal, omDBKerberosPrincipalInfo);
     omMetadataManager.getTenantGroupTable().putWithBatch(
         batchOperation, principal, groupName);
     omMetadataManager.getTenantRoleTable().putWithBatch(
