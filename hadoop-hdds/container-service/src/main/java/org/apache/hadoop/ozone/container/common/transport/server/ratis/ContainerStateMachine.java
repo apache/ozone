@@ -497,11 +497,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
-    int hash = Objects.hashCode(req.getBlockID());
-    if (hash == Integer.MIN_VALUE) {
-      hash = Integer.MAX_VALUE;
-    }
-    int i = Math.abs(hash) % chunkExecutors.size();
+    int i = (int)(req.getBlockID().getLocalID() % chunkExecutors.size());
     return chunkExecutors.get(i);
   }
 
