@@ -120,7 +120,7 @@ public class KeyValueHandler extends Handler {
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
-  private final boolean validateChunkData;
+  private final boolean validateChunkChecksumData;
 
   // A lock that is held during container creation.
   private final AutoCloseableLock containerCreationLock;
@@ -131,7 +131,7 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    validateChunkData = conf.getObject(
+    validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
@@ -602,10 +602,11 @@ public class KeyValueHandler extends Handler {
 
       data = chunkManager.readChunk(kvContainer, blockID, chunkInfo,
           dispatcherContext);
-      // Validate data only if the read chunk is issued by Ratis for its internal logic.
+      // Validate data only if the read chunk is issued by Ratis for its
+      // internal logic.
       //  For client reads, the client is expected to validate.
       if (dispatcherContext.isReadFromTmpFile()) {
-        validateChunkData(data, chunkInfo);
+        validateChunkChecksumData(data, chunkInfo);
       }
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
@@ -678,7 +679,7 @@ public class KeyValueHandler extends Handler {
 
   private void validateChunkChecksumData(ChunkBuffer data, ChunkInfo info)
       throws StorageContainerException {
-    if (validateChunkData) {
+    if (validateChunkChecksumData) {
       try {
         Checksum.verifyChecksum(data.toByteString(byteBufferToByteString),
             info.getChecksumData(), 0);
@@ -721,7 +722,7 @@ public class KeyValueHandler extends Handler {
           stage == WriteChunkStage.COMBINED) {
         data =
             ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
-        validateChunkData(data, chunkInfo);
+        validateChunkChecksumData(data, chunkInfo);
       }
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
@@ -785,7 +786,7 @@ public class KeyValueHandler extends Handler {
       // here. There is no need to maintain this info in openContainerBlockMap.
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
-      validateChunkData(data, chunkInfo);
+      validateChunkChecksumData(data, chunkInfo);
       chunkManager.finishWriteChunks(kvContainer, blockData);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();

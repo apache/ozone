@@ -376,7 +376,7 @@ public final class ChunkUtils {
   }
 
   /**
-   * Checks if the block file length is equal to the chunk offset
+   * Checks if the block file length is equal to the chunk offset.
    *
    */
   public static void validateChunkSize(File chunkFile, ChunkInfo chunkInfo) {

@@ -220,7 +220,8 @@ public class DatanodeConfiguration {
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
-      description = "Enable safety checks such as checksum validation for Ratis calls."
+      description = "Enable safety checks such as checksum validation"
+          + " for Ratis calls."
   )
   private boolean isChunkDataValidationCheck =
       CHUNK_DATA_VALIDATION_CHECK_DEFAULT;
