@@ -51,6 +51,8 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_ADDRESS_KEY =
       "ozone.om.address";
+  public static final String OZONE_OM_BIND_HOST_KEY =
+      "ozone.om.bind.host";
   public static final String OZONE_OM_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_OM_PORT_DEFAULT = 9862;

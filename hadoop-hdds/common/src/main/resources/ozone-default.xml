@@ -495,7 +495,8 @@
     <tag>OM, REQUIRED</tag>
     <description>
       The address of the Ozone OM service. This allows clients to discover
-      the address of the OM.
+      the address of the OM. When ozone.om.bind.host is undefined, it falls
+      back to this configuration for server side port number.
     </description>
   </property>
   <property>

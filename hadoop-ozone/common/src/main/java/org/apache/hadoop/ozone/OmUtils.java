@@ -62,6 +62,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_DEFAULT;
@@ -110,6 +111,15 @@ public final class OmUtils {
   }
 
   /**
+   * Retrieve the socket address that is bound by OM server.
+   * @param conf
+   * @return Target InetSocketAddress for the SCM service endpoint.
+   */
+  public static InetSocketAddress getOmBindAddress(ConfigurationSource conf) {
+    return NetUtils.createSocketAddr(getOmRpcBindAddress(conf));
+  }
+
+  /**
    * Return list of OM addresses by service ids - when HA is enabled.
    *
    * @param conf {@link ConfigurationSource}
@@ -148,6 +158,21 @@ public final class OmUtils {
 
     return host.orElse(OZONE_OM_BIND_HOST_DEFAULT) + ":" +
         getOmRpcPort(conf);
+  }
+
+
+  /**
+   * Retrieve the socket address that is bound by OM. If undefined,
+   * it falls back to the value from OZONE_OM_ADDRESS_KEY.
+   * @param conf
+   * @return Target InetSocketAddress for the SCM service endpoint.
+   */
+  public static String getOmRpcBindAddress(ConfigurationSource conf) {
+    final String host = conf.get(OZONE_OM_BIND_HOST_KEY);
+    if (host != null) {
+      return host;
+    }
+    return getOmRpcAddress(conf);
   }
 
   /**

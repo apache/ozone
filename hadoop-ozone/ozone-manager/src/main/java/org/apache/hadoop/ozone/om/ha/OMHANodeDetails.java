@@ -57,6 +57,7 @@ public class OMHANodeDetails {
       OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY,
       OMConfigKeys.OZONE_OM_DB_DIRS,
       OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+      OMConfigKeys.OZONE_OM_BIND_HOST_KEY,
   };
 
   public static final Logger LOG =
@@ -192,8 +193,9 @@ public class OMHANodeDetails {
       if (found == 1) {
 
         LOG.info("Found matching OM address with OMServiceId: {}, " +
-                "OMNodeId: {}, RPC Address: {} and Ratis port: {}",
-            localOMServiceId, localOMNodeId,
+                "OMNodeId: {}, RPC Listen Address: {}, RPC Address: {} " +
+                "and Ratis port: {}",
+            localOMServiceId, localOMNodeId, OmUtils.getOmBindAddress(conf),
             NetUtils.getHostPortString(localRpcAddress), localRatisPort);
 
         ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,

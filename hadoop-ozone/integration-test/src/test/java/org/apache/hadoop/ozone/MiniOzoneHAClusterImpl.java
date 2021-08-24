@@ -463,6 +463,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             config.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "");
             config.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "");
 
+            String omBindAddrKey = ConfUtils.addKeySuffixes(
+                    OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, nodeId);
+            String omBindAddr = config.get(omBindAddrKey);
+            config.set(OMConfigKeys.OZONE_OM_BIND_HOST_KEY, omBindAddr);
+
             // Set metadata/DB dir base path
             String metaDirPath = path + "/" + nodeId;
             config.set(OZONE_METADATA_DIRS, metaDirPath);

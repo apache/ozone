@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
 import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -183,6 +184,31 @@ public class TestOmUtils {
     Assert.assertTrue(hosts.contains("om1-host"));
 
     Assert.assertTrue(getOmHostsFromConfig(conf, "newId").isEmpty());
+  }
+
+  @Test
+  public void testBindAddressFromConfig() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "1.2.3.4:9999");
+    conf.set(OZONE_OM_BIND_HOST_KEY, "0.0.0.0:10042");
+
+    Assert.assertEquals("1.2.3.4",
+            OmUtils.getOmAddress(conf).getHostName());
+    Assert.assertEquals("0.0.0.0",
+            OmUtils.getOmBindAddress(conf).getHostName());
+    Assert.assertEquals(10042, OmUtils.getOmBindAddress(conf).getPort());
+  }
+
+  @Test
+  public void testBindAddressFromEmptyConfig() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "1.2.3.4:9999");
+
+    Assert.assertEquals("1.2.3.4",
+            OmUtils.getOmAddress(conf).getHostName());
+    Assert.assertEquals("1.2.3.4",
+            OmUtils.getOmBindAddress(conf).getHostName());
+    Assert.assertEquals(9999, OmUtils.getOmBindAddress(conf).getPort());
   }
 }
 

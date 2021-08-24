@@ -206,6 +206,7 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
+import static org.apache.hadoop.ozone.OmUtils.getOmBindAddress;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
@@ -228,6 +229,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
@@ -290,6 +292,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
   private InetSocketAddress omRpcAddress;
+  private InetSocketAddress omRpcBindAddress;
   private String omId;
 
   private OMMetadataManager metadataManager;
@@ -457,7 +460,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
 
-    InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
     scmContainerClient = getScmContainerClient(configuration);
@@ -523,8 +525,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Start Om Rpc Server.
     omRpcServer = getRpcServer(configuration);
+
+    // This address is for clients (including HA)
+    InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddress = updateRPCListenAddress(configuration,
         OZONE_OM_ADDRESS_KEY, omNodeRpcAddr, omRpcServer);
+
+    InetSocketAddress omNodeRpcBindAddr = getOmBindAddress(configuration);
+    omRpcBindAddress = updateRPCListenAddress(configuration,
+            OZONE_OM_BIND_HOST_KEY, omNodeRpcBindAddr, omRpcServer);
 
     shutdownHook = () -> {
       saveOmMetrics();
@@ -937,7 +946,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omRpcServer;
     }
 
-    InetSocketAddress omNodeRpcAddr = OmUtils.getOmAddress(conf);
+    InetSocketAddress omNodeRpcAddr = OmUtils.getOmBindAddress(conf);
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
         OZONE_OM_HANDLER_COUNT_DEFAULT);
@@ -1268,7 +1277,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
-        omRpcAddress));
+        omRpcBindAddress));
 
     metadataManager.start(configuration);
 
@@ -1351,7 +1360,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     initFSOLayout();
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
-        omRpcAddress));
+        omRpcBindAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
