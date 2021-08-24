@@ -178,12 +178,13 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       throws IOException {
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
-    // mentioned in HDDS-5655..
+    // mentioned in HDDS-5655.
     pipelineManager.acquireLock();
     try {
       lock.lock();
     } catch (Exception ex) {
-      // Release pipeline manager lock and throw exception.
+      // If any exception during container manager acquire lock, release
+      // pipeline manager lock and throw exception
       pipelineManager.releaseLock();
       throw ex;
     }
