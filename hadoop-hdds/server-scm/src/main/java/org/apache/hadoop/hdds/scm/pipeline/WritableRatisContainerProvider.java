@@ -87,6 +87,9 @@ public class WritableRatisContainerProvider
     while (true) {
       List<Pipeline> availablePipelines;
       Pipeline pipeline;
+      // Acquire pipeline manager lock, to avoid any updates to pipeline
+      // while allocate container happens. This is to avoid scenario like
+      // mentioned in HDDS-5655.
       pipelineManager.acquireLock();
       try {
         availablePipelines = pipelineManager.getPipelines(repConfig,
@@ -99,8 +102,8 @@ public class WritableRatisContainerProvider
               .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
         }
         if (availablePipelines.size() != 0) {
-         containerInfo = selectContainer(availablePipelines, size, owner,
-             excludeList);
+          containerInfo = selectContainer(availablePipelines, size, owner,
+              excludeList);
         }
         if (containerInfo != null) {
           return containerInfo;
@@ -109,8 +112,6 @@ public class WritableRatisContainerProvider
         pipelineManager.releaseLock();
       }
 
-      boolean exception = false;
-      boolean pipelineCreated = false;
       if (availablePipelines.size() == 0) {
         try {
           // TODO: #CLUTIL Remove creation logic when all replication types
@@ -119,7 +120,7 @@ public class WritableRatisContainerProvider
 
           // wait until pipeline is ready
           pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-          pipelineCreated = true;
+
         } catch (SCMException se) {
           LOG.warn("Pipeline creation failed for repConfig {} " +
               "Datanodes may be used up.", repConfig, se);
@@ -127,34 +128,32 @@ public class WritableRatisContainerProvider
         } catch (IOException e) {
           LOG.warn("Pipeline creation failed for repConfig: {}. "
               + "Retrying get pipelines call once.", repConfig, e);
-          exception = true;
         }
-        if (exception || pipelineCreated) {
-          pipelineManager.acquireLock();
-          try {
-            // Exception occurred do one final try to fetch pipelines.
+
+        pipelineManager.acquireLock();
+        try {
+          // Exception occurred do one final try to fetch pipelines.
+          availablePipelines = pipelineManager
+              .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
+                  excludeList.getDatanodes(), excludeList.getPipelineIds());
+          if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
+            // if no pipelines can be found, try finding pipeline without
+            // exclusion
             availablePipelines = pipelineManager
-                .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
-                    excludeList.getDatanodes(), excludeList.getPipelineIds());
-            if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-              // if no pipelines can be found, try finding pipeline without
-              // exclusion
-              availablePipelines = pipelineManager
-                  .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
-            }
-            if (availablePipelines.size() == 0) {
-              LOG.info("Could not find available pipeline of repConfig: {} "
-                  + "even after retrying", repConfig);
-              break;
-            }
-            containerInfo = selectContainer(availablePipelines, size, owner,
-                excludeList);
-            if (containerInfo != null) {
-              return containerInfo;
-            }
-          } finally {
-            pipelineManager.releaseLock();
+                .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
           }
+          if (availablePipelines.size() == 0) {
+            LOG.info("Could not find available pipeline of repConfig: {} "
+                + "even after retrying", repConfig);
+            break;
+          }
+          containerInfo = selectContainer(availablePipelines, size, owner,
+              excludeList);
+          if (containerInfo != null) {
+            return containerInfo;
+          }
+        } finally {
+          pipelineManager.releaseLock();
         }
       }
     }
@@ -169,7 +168,7 @@ public class WritableRatisContainerProvider
 
   private ContainerInfo selectContainer(List<Pipeline> availablePipelines,
       long size, String owner, ExcludeList excludeList) {
-    Pipeline pipeline = null;
+    Pipeline pipeline;
     ContainerInfo containerInfo;
 
     PipelineRequestInformation pri =

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Paths;
 import java.util.ArrayList;
