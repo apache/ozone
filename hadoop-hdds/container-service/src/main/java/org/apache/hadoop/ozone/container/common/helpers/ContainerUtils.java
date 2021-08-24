@@ -35,6 +35,8 @@ import java.security.NoSuchAlgorithmException;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -185,21 +187,27 @@ public final class ContainerUtils {
    * Verify that the checksum stored in containerData is equal to the
    * computed checksum.
    */
-  public static void verifyChecksum(ContainerData containerData)
-      throws IOException {
-    String storedChecksum = containerData.getChecksum();
+  public static void verifyChecksum(ContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    boolean enabled = conf.getBoolean(
+            HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
+            HddsConfigKeys.
+                    HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
+    if(enabled) {
+      String storedChecksum = containerData.getChecksum();
 
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-        containerData.getContainerType());
-    containerData.computeAndSetChecksum(yaml);
-    String computedChecksum = containerData.getChecksum();
+      Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+              containerData.getContainerType());
+      containerData.computeAndSetChecksum(yaml);
+      String computedChecksum = containerData.getChecksum();
 
-    if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
-      throw new StorageContainerException("Container checksum error for " +
-          "ContainerID: " + containerData.getContainerID() + ". " +
-          "\nStored Checksum: " + storedChecksum +
-          "\nExpected Checksum: " + computedChecksum,
-          CONTAINER_CHECKSUM_ERROR);
+      if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
+        throw new StorageContainerException("Container checksum error for " +
+                "ContainerID: " + containerData.getContainerID() + ". " +
+                "\nStored Checksum: " + storedChecksum +
+                "\nExpected Checksum: " + computedChecksum,
+                CONTAINER_CHECKSUM_ERROR);
+      }
     }
   }
 
