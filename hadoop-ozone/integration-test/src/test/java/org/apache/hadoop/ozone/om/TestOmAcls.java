@@ -161,7 +161,8 @@ public class TestOmAcls {
       // Allow bucket read access. While creating key, we access bucket to
       // inherit the replication config.
       if (((OzoneObjInfo) ozoneObject).getResourceType().toString()
-          .equals("bucket")) {
+          .equals("bucket") && "READ"
+          .equals(context.getAclRights().toString())) {
         return true;
       }
       return TestOmAcls.aclAllow;

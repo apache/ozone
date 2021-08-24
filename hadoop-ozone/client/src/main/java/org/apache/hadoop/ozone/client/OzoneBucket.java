@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -236,12 +237,22 @@ public class OzoneBucket extends WithMetadata {
         sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
         quotaInNamespace);
     this.bucketLayout = bucketLayout;
-    this.defaultReplication =
-        defaultReplicationConfig.getType() == ReplicationType.EC ?
-            defaultReplicationConfig.getEcReplicationConfig() :
-            ReplicationConfig
-                .fromTypeAndFactor(defaultReplicationConfig.getType(),
-                    defaultReplicationConfig.getFactor());
+    if (defaultReplicationConfig != null) {
+      this.defaultReplication =
+          defaultReplicationConfig.getType() == ReplicationType.EC ?
+              defaultReplicationConfig.getEcReplicationConfig() :
+              ReplicationConfig
+                  .fromTypeAndFactor(defaultReplicationConfig.getType(),
+                      defaultReplicationConfig.getFactor());
+    } else {
+      // This can happen when talk to old server. So, using old client side
+      // defaults.
+      this.defaultReplication = ReplicationConfig.fromTypeAndString(
+          ReplicationType.valueOf(conf.get(OzoneConfigKeys.OZONE_REPLICATION,
+              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT)),
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+              OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
+    }
   }
 
   /**
