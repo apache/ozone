@@ -170,11 +170,10 @@ public final class RatisUtil {
                 ScmConfigKeys.OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT,
                 StorageUnit.BYTES)));
     Log.Appender.setBufferElementLimit(properties,
-        (int) ozoneConf.getStorageSize(
-                ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        ozoneConf.getInt(
+                ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM,
                 ScmConfigKeys.
-                        OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-                StorageUnit.BYTES));
+                        OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM_DEFAULT));
     Log.Appender.setBufferByteLimit(properties, SizeInBytes.valueOf(
         (long) ozoneConf.getStorageSize(
               ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
