@@ -602,9 +602,8 @@ public class KeyValueHandler extends Handler {
 
       data = chunkManager.readChunk(kvContainer, blockID, chunkInfo,
           dispatcherContext);
-      // Validate data only if the read chunk issued as a result of
-      // ratis call internally. For client reads, validation happens
-      // on the client
+      // Validate data only if the read chunk is issued by Ratis for its internal logic.
+      //  For client reads, the client is expected to validate.
       if (dispatcherContext.isReadFromTmpFile()) {
         validateChunkData(data, chunkInfo);
       }
