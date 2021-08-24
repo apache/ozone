@@ -46,6 +46,23 @@ public final class OzoneTestUtils {
   }
 
   /**
+   * Triggers Close container event for containers which contain the blocks
+   * listed in omKeyLocationInfoGroups.
+   *
+   * @param omKeyLocationInfoGroups locationInfos for a key.
+   * @param scm StorageContainerManager instance.
+   * @throws Exception
+   */
+  public static void triggerCloseContainerEvent(
+      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups,
+      StorageContainerManager scm) throws Exception {
+    performOperationOnKeyContainers((blockID) -> scm.getEventQueue()
+            .fireEvent(SCMEvents.CLOSE_CONTAINER,
+                ContainerID.valueOf(blockID.getContainerID())),
+        omKeyLocationInfoGroups);
+  }
+
+  /**
    * Close containers which contain the blocks listed in
    * omKeyLocationInfoGroups.
    *

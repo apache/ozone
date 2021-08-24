@@ -136,6 +136,7 @@ public class ChunkKeyHandler extends KeyHandler implements
             xceiverClient, datanodeBlockID, keyLocation.getToken());
       } catch (InterruptedException e) {
         LOG.error("Execution interrupted due to " + e);
+        Thread.currentThread().interrupt();
       }
       JsonArray responseFromAllNodes = new JsonArray();
       for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>

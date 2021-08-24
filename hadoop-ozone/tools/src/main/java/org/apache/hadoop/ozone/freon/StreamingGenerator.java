@@ -61,14 +61,14 @@ public class StreamingGenerator extends BaseFreonGenerator
   private int numberOfFiles;
 
   @CommandLine.Option(names = {"--size"},
-          description = "Size of the generated files.",
-          defaultValue = "104857600")
+      description = "Size of the generated files.",
+      defaultValue = "104857600")
   private int fileSize;
 
+  private static final String SUB_DIR_NAME = "dir1";
 
-  private int port = 1234;
+  private ThreadLocal<Integer> counter = new ThreadLocal<>();
 
-  private String subdir = "dir1";
   private Timer timer;
 
 
@@ -76,42 +76,49 @@ public class StreamingGenerator extends BaseFreonGenerator
   public Void call() throws Exception {
     init();
 
-    generateBaseData();
-
     timer = getMetrics().timer("streaming");
-    setThreadNo(1);
     runTests(this::copyDir);
 
     return null;
   }
 
-  private void generateBaseData() throws IOException {
-    Path sourceDir = testRoot.resolve("streaming-0");
-    if (Files.exists(sourceDir)) {
-      deleteDirRecursive(sourceDir);
-    }
-    Path subDir = sourceDir.resolve(subdir);
-    Files.createDirectories(subDir);
-    ContentGenerator contentGenerator = new ContentGenerator(fileSize,
-        1024);
-
-    for (int i = 0; i < numberOfFiles; i++) {
-      try (FileOutputStream out = new FileOutputStream(
-          subDir.resolve("file-" + i).toFile())
-      ) {
-        contentGenerator.write(out);
+  private void generateBaseData() {
+    try {
+      final Path sourceDirParent = threadRootDir();
+      Path sourceDir = sourceDirParent.resolve("streaming-0");
+      if (Files.exists(sourceDirParent)) {
+        deleteDirRecursive(sourceDirParent);
       }
+      Path subDir = sourceDir.resolve(SUB_DIR_NAME);
+      Files.createDirectories(subDir);
+      ContentGenerator contentGenerator = new ContentGenerator(fileSize,
+          1024);
+
+      for (int i = 0; i < numberOfFiles; i++) {
+        try (FileOutputStream out = new FileOutputStream(
+            subDir.resolve("file-" + i).toFile())
+        ) {
+          contentGenerator.write(out);
+        }
+      }
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
     }
   }
 
   private void copyDir(long l) {
-    Path sourceDir = testRoot.resolve("streaming-" + l);
-    Path destinationDir = testRoot.resolve("streaming-" + (l + 1));
+    Integer index = counter.get();
+    if (index == null) {
+      generateBaseData();
+      index = 0;
+    }
+    Path sourceDir = threadRootDir().resolve("streaming-" + index);
+    Path destinationDir = threadRootDir().resolve("streaming-" + (index + 1));
+    counter.set(index + 1);
 
+    int port = (int) (1234 + (l % 64000));
     try (StreamingServer server =
-             new StreamingServer(new DirectoryServerSource(sourceDir),
-                 1234)) {
-
+             new StreamingServer(new DirectoryServerSource(sourceDir), port)) {
       server.start();
       LOG.info("Starting streaming server on port {} to publish dir {}",
           port, sourceDir);
@@ -121,7 +128,7 @@ public class StreamingGenerator extends BaseFreonGenerator
                    new DirectoryServerDestination(
                        destinationDir))) {
 
-        timer.time(() -> client.stream(subdir));
+        timer.time(() -> client.stream(SUB_DIR_NAME));
 
       }
       LOG.info("Replication has been finished to {}", sourceDir);
@@ -129,6 +136,13 @@ public class StreamingGenerator extends BaseFreonGenerator
       deleteDirRecursive(sourceDir);
 
     }
+  }
+
+  /**
+   * Return the thread specific test root directory.
+   */
+  private Path threadRootDir() {
+    return testRoot.resolve(Thread.currentThread().getName());
   }
 
   private void deleteDirRecursive(Path destinationDir) {

@@ -43,7 +43,6 @@ import picocli.CommandLine.Spec;
     subcommands = {
         ListSubcommand.class,
         InfoSubcommand.class,
-        DeleteSubcommand.class,
         CreateSubcommand.class,
         CloseSubcommand.class
     })

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -122,14 +124,14 @@ public class ReconServer extends GenericCli {
     start();
     isStarted = true;
 
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+    ShutdownHookManager.get().addShutdownHook(() -> {
       try {
         stop();
         join();
       } catch (Exception e) {
         LOG.error("Error during stop Recon server", e);
       }
-    }));
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
@@ -243,6 +245,11 @@ public class ReconServer extends GenericCli {
   @VisibleForTesting
   public ReconContainerMetadataManager getReconContainerMetadataManager() {
     return reconContainerMetadataManager;
+  }
+
+  @VisibleForTesting
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
   }
 
   @VisibleForTesting

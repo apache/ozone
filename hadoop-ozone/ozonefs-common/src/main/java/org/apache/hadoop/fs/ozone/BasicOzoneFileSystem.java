@@ -115,9 +115,10 @@ public class BasicOzoneFileSystem extends FileSystem {
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
     setConf(conf);
-    Objects.requireNonNull(name.getScheme(), "No scheme provided in " + name);
+    Preconditions.checkNotNull(name.getScheme(),
+        "No scheme provided in %s", name);
     Preconditions.checkArgument(getScheme().equals(name.getScheme()),
-        "Invalid scheme provided in " + name);
+        "Invalid scheme provided in %s", name);
 
     String authority = name.getAuthority();
     if (authority == null) {

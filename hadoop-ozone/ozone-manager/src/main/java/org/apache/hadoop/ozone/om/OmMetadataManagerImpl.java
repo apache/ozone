@@ -286,6 +286,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
+  public Table<String, OmKeyInfo> getFileTable() {
+    return fileTable;
+  }
+
+  @Override
   public Table<String, RepeatedOmKeyInfo> getDeletedTable() {
     return deletedTable;
   }

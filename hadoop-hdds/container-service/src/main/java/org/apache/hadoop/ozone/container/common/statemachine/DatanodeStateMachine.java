@@ -88,7 +88,7 @@ public class DatanodeStateMachine implements Closeable {
   private final ReportManager reportManager;
   private long commandsHandled;
   private final AtomicLong nextHB;
-  private Thread stateMachineThread = null;
+  private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
 
@@ -164,7 +164,7 @@ public class DatanodeStateMachine implements Closeable {
     replicatorMetrics = new MeasuredReplicator(replicator);
 
     supervisor =
-        new ReplicationSupervisor(container.getContainerSet(),
+        new ReplicationSupervisor(container.getContainerSet(), context,
             replicatorMetrics, dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
@@ -172,7 +172,8 @@ public class DatanodeStateMachine implements Closeable {
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
-            conf))
+            conf, dnConf.getBlockDeleteThreads(),
+            dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
@@ -284,6 +285,7 @@ public class DatanodeStateMachine implements Closeable {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
             //triggerHeartbeat is called during the sleep
+            Thread.currentThread().interrupt();
           }
         }
       }
@@ -475,7 +477,7 @@ public class DatanodeStateMachine implements Closeable {
    * be sent by datanode.
    */
   public void triggerHeartbeat() {
-    if (stateMachineThread != null) {
+    if (stateMachineThread != null && isDaemonStarted()) {
       stateMachineThread.interrupt();
     }
   }
@@ -514,6 +516,10 @@ public class DatanodeStateMachine implements Closeable {
     } catch (IOException e) {
       LOG.error("Stop ozone container server failed.", e);
     }
+  }
+
+  public boolean isDaemonStarted() {
+    return this.getContext().getExecutionCount() > 0;
   }
 
   /**
@@ -558,6 +564,7 @@ public class DatanodeStateMachine implements Closeable {
             }
           } catch (InterruptedException e) {
             // Ignore this exception.
+            Thread.currentThread().interrupt();
           }
         }
       }

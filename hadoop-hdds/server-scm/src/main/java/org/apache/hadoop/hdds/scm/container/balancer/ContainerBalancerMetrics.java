@@ -76,9 +76,13 @@ public final class ContainerBalancerMetrics {
     return dataSizeBalancedGB;
   }
 
-  public void setDataSizeBalancedGB(
-      LongMetric dataSizeBalancedGB) {
+  public void setDataSizeBalancedGB(LongMetric dataSizeBalancedGB) {
     this.dataSizeBalancedGB = dataSizeBalancedGB;
+  }
+
+  public long incrementDataSizeBalancedGB(long valueToAdd) {
+    this.dataSizeBalancedGB.add(valueToAdd);
+    return this.dataSizeBalancedGB.get();
   }
 
   public LongMetric getMovedContainersNum() {
@@ -88,6 +92,11 @@ public final class ContainerBalancerMetrics {
   public void setMovedContainersNum(
       LongMetric movedContainersNum) {
     this.movedContainersNum = movedContainersNum;
+  }
+
+  public long incrementMovedContainersNum(long valueToAdd) {
+    this.movedContainersNum.add(valueToAdd);
+    return this.movedContainersNum.get();
   }
 
   public LongMetric getDatanodesNumToBalance() {

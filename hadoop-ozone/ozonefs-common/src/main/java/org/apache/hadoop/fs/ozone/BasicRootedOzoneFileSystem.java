@@ -111,9 +111,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
     setConf(conf);
-    Objects.requireNonNull(name.getScheme(), "No scheme provided in " + name);
+    Preconditions.checkNotNull(name.getScheme(),
+        "No scheme provided in %s", name);
     Preconditions.checkArgument(getScheme().equals(name.getScheme()),
-        "Invalid scheme provided in " + name);
+        "Invalid scheme provided in %s", name);
 
     String authority = name.getAuthority();
     if (authority == null) {
@@ -309,7 +310,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IOException("Cannot rename a key to a different bucket");
     }
     OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketLayout())) {
       return renameFSO(bucket, ofsSrc, ofsDst);
     }
 
@@ -531,7 +532,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
       if (!ofsPath.isVolume() && !ofsPath.isBucket()) {
         OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
-        if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+        if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketLayout())) {
           String ofsKeyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
               OZONE_URI_DELIMITER + ofsPath.getKeyName();
           return adapterImpl.deleteObject(ofsKeyPath, recursive);
