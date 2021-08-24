@@ -37,7 +37,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -50,6 +49,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import static java.nio.channels.FileChannel.open;
 import static java.util.Collections.unmodifiableSet;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_WRITE_SIZE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
@@ -379,12 +379,14 @@ public final class ChunkUtils {
    * Checks if the block file length is equal to the chunk offset.
    *
    */
-  public static void validateChunkSize(File chunkFile, ChunkInfo chunkInfo) {
+  public static void validateChunkSize(File chunkFile, ChunkInfo chunkInfo)
+      throws StorageContainerException {
     long offset = chunkInfo.getOffset();
     long len = chunkFile.length();
     if (chunkFile.length() != offset) {
-      Preconditions.checkArgument(offset == len,
-          " Offset " + offset + "does not match blockFile length " + len);
+      throw new StorageContainerException(
+          "Chunk file offset " + offset + " does not match blockFile length " +
+          len, CHUNK_FILE_INCONSISTENCY);
     }
   }
 }

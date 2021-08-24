@@ -653,8 +653,8 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (requestProto.getCmdType() == Type.WriteChunk) {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
         ByteString data = stateMachineDataCache.get(entry.getIndex());
-        Preconditions.checkArgument(data.isEmpty());
         if (data != null) {
+          Preconditions.checkArgument(!data.isEmpty());
           future.complete(data);
           return future;
         }
