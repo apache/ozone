@@ -263,6 +263,8 @@ public class TestDatanodeHddsVolumeFailureDetection {
         .ONE, OzoneConsts.OZONE);
     Assert.assertTrue(c2.getContainerInfo().getState()
         .equals(HddsProtos.LifeCycleState.OPEN));
+    Container c2Container = oc.getContainerSet().getContainer(2);
+    c2Container.close();
 
     // corrupt db by rename dir->file
     File metadataDir = new File(c1.getContainerFile().getParent());

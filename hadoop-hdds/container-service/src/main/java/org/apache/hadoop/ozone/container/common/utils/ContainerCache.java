@@ -56,9 +56,10 @@ public final class ContainerCache {
   /**
    * Constructs a cache that holds DBHandle references.
    */
-  private ContainerCache(int maxSize, int stripes, float loadFactor, boolean
-      scanUntilRemovable) {
-    this.closeContainerCache = new CloseContainerCache(maxSize, loadFactor, scanUntilRemovable);
+  private ContainerCache(int maxSize, int stripes, float loadFactor,
+                         boolean scanUntilRemovable) {
+    this.closeContainerCache =
+        new CloseContainerCache(maxSize, loadFactor, scanUntilRemovable);
     this.rocksDBLock = Striped.lazyWeakLock(stripes);
     this.openContainerCache = new ConcurrentHashMap<>();
   }
@@ -285,7 +286,10 @@ public final class ContainerCache {
     return closeContainerCache;
   }
 
-  public class CloseContainerCache extends LRUMap {
+  /**
+   * Cache of closed containers.
+   */
+  public final class CloseContainerCache extends LRUMap {
     private CloseContainerCache(int maxSize, float loadFactor,
                                 boolean scanUntilRemovable) {
       super(maxSize, loadFactor, scanUntilRemovable);
