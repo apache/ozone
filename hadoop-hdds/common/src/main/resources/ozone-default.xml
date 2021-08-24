@@ -2949,6 +2949,15 @@
   </property>
 
   <property>
+    <name>hdds.container.checksum.verification.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description> To enable/disable checksum verification of the
+      containers.
+    </description>
+  </property>
+
+  <property>
     <name>hadoop.http.idle_timeout.ms</name>
     <value>60000</value>
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
