@@ -99,7 +99,8 @@ public class WritableRatisContainerProvider
               .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
         }
         if (availablePipelines.size() != 0) {
-         containerInfo = selectContainer(availablePipelines, size, owner, excludeList);
+         containerInfo = selectContainer(availablePipelines, size, owner,
+             excludeList);
         }
         if (containerInfo != null) {
           return containerInfo;
@@ -146,7 +147,8 @@ public class WritableRatisContainerProvider
                   + "even after retrying", repConfig);
               break;
             }
-            containerInfo = selectContainer(availablePipelines, size, owner, excludeList);
+            containerInfo = selectContainer(availablePipelines, size, owner,
+                excludeList);
             if (containerInfo != null) {
               return containerInfo;
             }
