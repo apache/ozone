@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -497,11 +496,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
-    int hash = Objects.hashCode(req.getBlockID());
-    if (hash == Integer.MIN_VALUE) {
-      hash = Integer.MAX_VALUE;
-    }
-    int i = Math.abs(hash) % chunkExecutors.size();
+    int i = (int)(req.getBlockID().getLocalID() % chunkExecutors.size());
     return chunkExecutors.get(i);
   }
 
