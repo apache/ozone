@@ -99,8 +99,8 @@ public class WritableRatisContainerProvider
         }
         if (availablePipelines.size() == 0) {
           try {
-            // TODO: #CLUTIL Remove creation logic when all replication types and
-            // factors are handled by pipeline creator
+            // TODO: #CLUTIL Remove creation logic when all replication types
+            //  and factors are handled by pipeline creator
             pipeline = pipelineManager.createPipeline(repConfig);
 
             // wait until pipeline is ready
