@@ -780,7 +780,8 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .addAllMetadata(metadata)
-        .setAcls(getAclList());
+        .setAcls(getAclList())
+        .setLatestVersionLocation(getLatestVersionLocation);
 
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try{
@@ -1253,6 +1254,7 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
+        .setLatestVersionLocation(getLatestVersionLocation)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
