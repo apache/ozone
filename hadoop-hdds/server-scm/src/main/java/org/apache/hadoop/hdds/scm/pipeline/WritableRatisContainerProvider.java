@@ -84,66 +84,71 @@ public class WritableRatisContainerProvider
     //in downstream managers.
 
     while (true) {
-      List<Pipeline> availablePipelines =
-          pipelineManager
-              .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
-                  excludeList.getDatanodes(), excludeList.getPipelineIds());
-      Pipeline pipeline = null;
-      if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-        // if no pipelines can be found, try finding pipeline without
-        // exclusion
-        availablePipelines = pipelineManager
-            .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
-      }
-      if (availablePipelines.size() == 0) {
-        try {
-          // TODO: #CLUTIL Remove creation logic when all replication types and
-          // factors are handled by pipeline creator
-          pipeline = pipelineManager.createPipeline(repConfig);
-
-          // wait until pipeline is ready
-          pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-        } catch (SCMException se) {
-          LOG.warn("Pipeline creation failed for repConfig {} " +
-              "Datanodes may be used up.", repConfig, se);
-          break;
-        } catch (IOException e) {
-          LOG.warn("Pipeline creation failed for repConfig: {}. "
-              + "Retrying get pipelines call once.", repConfig, e);
+      pipelineManager.acquireLock();
+      try {
+        List<Pipeline> availablePipelines =
+            pipelineManager
+                .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
+                    excludeList.getDatanodes(), excludeList.getPipelineIds());
+        Pipeline pipeline = null;
+        if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
+          // if no pipelines can be found, try finding pipeline without
+          // exclusion
           availablePipelines = pipelineManager
-              .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
-                  excludeList.getDatanodes(), excludeList.getPipelineIds());
-          if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-            // if no pipelines can be found, try finding pipeline without
-            // exclusion
-            availablePipelines = pipelineManager
-                .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
-          }
-          if (availablePipelines.size() == 0) {
-            LOG.info(
-                "Could not find available pipeline of repConfig: {} "
-                    + "even after retrying",
-                repConfig);
+              .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
+        }
+        if (availablePipelines.size() == 0) {
+          try {
+            // TODO: #CLUTIL Remove creation logic when all replication types and
+            // factors are handled by pipeline creator
+            pipeline = pipelineManager.createPipeline(repConfig);
+
+            // wait until pipeline is ready
+            pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+          } catch (SCMException se) {
+            LOG.warn("Pipeline creation failed for repConfig {} " +
+                "Datanodes may be used up.", repConfig, se);
             break;
+          } catch (IOException e) {
+            LOG.warn("Pipeline creation failed for repConfig: {}. "
+                + "Retrying get pipelines call once.", repConfig, e);
+            availablePipelines = pipelineManager
+                .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
+                    excludeList.getDatanodes(), excludeList.getPipelineIds());
+            if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
+              // if no pipelines can be found, try finding pipeline without
+              // exclusion
+              availablePipelines = pipelineManager
+                  .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
+            }
+            if (availablePipelines.size() == 0) {
+              LOG.info(
+                  "Could not find available pipeline of repConfig: {} "
+                      + "even after retrying",
+                  repConfig);
+              break;
+            }
           }
         }
-      }
 
-      if (null == pipeline) {
-        PipelineRequestInformation pri =
-            PipelineRequestInformation.Builder.getBuilder()
-                .setSize(size)
-                .build();
-        pipeline = pipelineChoosePolicy.choosePipeline(
-            availablePipelines, pri);
-      }
+        if (null == pipeline) {
+          PipelineRequestInformation pri =
+              PipelineRequestInformation.Builder.getBuilder()
+                  .setSize(size)
+                  .build();
+          pipeline = pipelineChoosePolicy.choosePipeline(
+              availablePipelines, pri);
+        }
 
-      // look for OPEN containers that match the criteria.
-      containerInfo = containerManager.getMatchingContainer(size, owner,
-          pipeline, excludeList.getContainerIds());
+        // look for OPEN containers that match the criteria.
+        containerInfo = containerManager.getMatchingContainer(size, owner,
+            pipeline, excludeList.getContainerIds());
 
-      if (containerInfo != null) {
-        return containerInfo;
+        if (containerInfo != null) {
+          return containerInfo;
+        }
+      } finally {
+        pipelineManager.releaseLock();
       }
     }
 
