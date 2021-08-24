@@ -33,7 +33,7 @@ execute_robot_test ${SCM} freon
 
 execute_robot_test ${SCM} basic/links.robot
 
-execute_robot_test ${SCM} s3
+#execute_robot_test ${SCM} s3
 
 execute_robot_test ${SCM} admincli
 
