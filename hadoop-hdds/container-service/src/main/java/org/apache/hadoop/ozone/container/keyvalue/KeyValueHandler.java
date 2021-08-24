@@ -677,7 +677,7 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void validateChunkData(ChunkBuffer data, ChunkInfo info)
+  private void validateChunkChecksumData(ChunkBuffer data, ChunkInfo info)
       throws StorageContainerException {
     if (validateChunkData) {
       try {
