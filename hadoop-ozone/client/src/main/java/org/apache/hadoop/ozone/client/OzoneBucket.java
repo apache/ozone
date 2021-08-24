@@ -248,10 +248,11 @@ public class OzoneBucket extends WithMetadata {
       // This can happen when talk to old server. So, using old client side
       // defaults.
       this.defaultReplication = ReplicationConfig.fromTypeAndString(
-          ReplicationType.valueOf(conf.get(OzoneConfigKeys.OZONE_REPLICATION,
-              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT)),
-          conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-              OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
+          ReplicationType.valueOf(
+              conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+                  OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT)),
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION,
+              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT));
     }
   }
 
