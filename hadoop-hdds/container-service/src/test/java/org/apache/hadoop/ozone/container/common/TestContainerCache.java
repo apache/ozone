@@ -76,8 +76,8 @@ public class TestContainerCache {
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
 
     ContainerCache cache = ContainerCache.getInstance(conf);
-    cache.clear();
-    Assert.assertEquals(0, cache.size());
+    cache.getCloseContainerCache().clear();
+    Assert.assertEquals(0, cache.getCloseContainerCache().size());
     File containerDir1 = new File(root, "cont1");
     File containerDir2 = new File(root, "cont2");
     File containerDir3 = new File(root, "cont3");
@@ -125,9 +125,11 @@ public class TestContainerCache {
         VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
     Assert.assertEquals(1, db4.getReferenceCount());
 
-    Assert.assertEquals(2, cache.size());
-    Assert.assertNotNull(cache.get(containerDir1.getPath()));
-    Assert.assertNull(cache.get(containerDir2.getPath()));
+    Assert.assertEquals(2, cache.getCloseContainerCache().size());
+    Assert.assertNotNull(cache.getCloseContainerCache()
+        .get(containerDir1.getPath()));
+    Assert.assertNull(cache.getCloseContainerCache()
+        .get(containerDir2.getPath()));
 
     // Now close both the references for container1
     db1.close();
@@ -160,8 +162,8 @@ public class TestContainerCache {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
     ContainerCache cache = ContainerCache.getInstance(conf);
-    cache.clear();
-    Assert.assertEquals(0, cache.size());
+    cache.getCloseContainerCache().clear();
+    Assert.assertEquals(0, cache.getCloseContainerCache().size());
     File containerDir = new File(root, "cont1");
     createContainerDB(conf, containerDir);
     ExecutorService executorService = Executors.newFixedThreadPool(2);
@@ -192,7 +194,7 @@ public class TestContainerCache {
     db.close();
     db.close();
     db.close();
-    Assert.assertEquals(1, cache.size());
+    Assert.assertEquals(1, cache.getCloseContainerCache().size());
     db.cleanup();
   }
 
@@ -205,8 +207,8 @@ public class TestContainerCache {
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
 
     ContainerCache cache = ContainerCache.getInstance(conf);
-    cache.clear();
-    Assert.assertEquals(0, cache.size());
+    cache.getCloseContainerCache().clear();
+    Assert.assertEquals(0, cache.getCloseContainerCache().size());
     File containerDir1 = new File(root, "cont1");
     File containerDir2 = new File(root, "cont2");
 

@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletio
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -215,6 +216,8 @@ public class TestBlockDeletingService {
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();
       data.setSchemaVersion(schemaVersion);
+      ContainerCache cCache = ContainerCache.getInstance(conf);
+      cCache.markContainerClosed(data.getDbFile().getAbsolutePath());
       if (schemaVersion.equals(SCHEMA_V1)) {
         createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
             containerID, numOfChunksPerBlock, buffer, chunkManager, container);

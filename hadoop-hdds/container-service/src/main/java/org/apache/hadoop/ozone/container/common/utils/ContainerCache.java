@@ -43,13 +43,14 @@ import org.slf4j.LoggerFactory;
 /**
  * container cache is a LRUMap that maintains the DB handles.
  */
-public final class ContainerCache extends LRUMap {
+public final class ContainerCache {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerCache.class);
   private final Lock lock = new ReentrantLock();
   private static ContainerCache cache;
   private static final float LOAD_FACTOR = 0.75f;
   private final Striped<Lock> rocksDBLock;
+  private final CloseContainerCache closeContainerCache;
   private final Map<String, ReferenceCountedDB> openContainerCache;
   private static ContainerCacheMetrics metrics;
   /**
@@ -57,9 +58,9 @@ public final class ContainerCache extends LRUMap {
    */
   private ContainerCache(int maxSize, int stripes, float loadFactor, boolean
       scanUntilRemovable) {
-    super(maxSize, loadFactor, scanUntilRemovable);
-    rocksDBLock = Striped.lazyWeakLock(stripes);
-    openContainerCache = new ConcurrentHashMap<>();
+    this.closeContainerCache = new CloseContainerCache(maxSize, loadFactor, scanUntilRemovable);
+    this.rocksDBLock = Striped.lazyWeakLock(stripes);
+    this.openContainerCache = new ConcurrentHashMap<>();
   }
 
   @VisibleForTesting
@@ -95,21 +96,22 @@ public final class ContainerCache extends LRUMap {
     lock.lock();
     try {
       // iterate the cache and close each db
-      MapIterator iterator = cache.mapIterator();
+      MapIterator iterator = closeContainerCache.mapIterator();
       while (iterator.hasNext()) {
         iterator.next();
         ReferenceCountedDB db = (ReferenceCountedDB) iterator.getValue();
         assertZeroRefCount(db);
       }
 
-      Iterator<Map.Entry<String, ReferenceCountedDB>> openCacheIterator  = openContainerCache.entrySet().iterator();
+      Iterator<Map.Entry<String, ReferenceCountedDB>> openCacheIterator =
+          openContainerCache.entrySet().iterator();
       while (openCacheIterator.hasNext()) {
         Map.Entry<String, ReferenceCountedDB> db2 = openCacheIterator.next();
         assertZeroRefCount(db2.getValue());
       } 
 
       // reset the cache
-      cache.clear();
+      closeContainerCache.clear();
       openContainerCache.clear();
     } finally {
       lock.unlock();
@@ -119,20 +121,6 @@ public final class ContainerCache extends LRUMap {
   private void assertZeroRefCount(ReferenceCountedDB db) {
     Preconditions.checkArgument(cleanupDb(db), "refCount:%d Path:%s",
         db.getReferenceCount(), db.getContainerDBPath());
-  }
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  protected boolean removeLRU(LinkEntry entry) {
-    ReferenceCountedDB db = (ReferenceCountedDB) entry.getValue();
-    lock.lock();
-    try {
-      metrics.incNumCacheEvictions();
-      return cleanupDb(db);
-    } finally {
-      lock.unlock();
-    }
   }
 
   /**
@@ -171,7 +159,7 @@ public final class ContainerCache extends LRUMap {
           db.incrementReference();
           return db;
         }
-        db = (ReferenceCountedDB) this.get(containerDBPath);
+        db = (ReferenceCountedDB) closeContainerCache.get(containerDBPath);
         if (db != null) {
           metrics.incNumCacheHits();
           db.incrementReference();
@@ -198,7 +186,7 @@ public final class ContainerCache extends LRUMap {
       lock.lock();
       try {
         ReferenceCountedDB currentDB =
-            (ReferenceCountedDB) this.get(containerDBPath);
+            (ReferenceCountedDB) closeContainerCache.get(containerDBPath);
         if (currentDB != null) {
           // increment the reference before returning the object
           currentDB.incrementReference();
@@ -206,7 +194,7 @@ public final class ContainerCache extends LRUMap {
           cleanupDb(db);
           return currentDB;
         } else {
-          this.put(containerDBPath, db);
+          closeContainerCache.put(containerDBPath, db);
           // increment the reference before returning the object
           db.incrementReference();
           return db;
@@ -227,12 +215,13 @@ public final class ContainerCache extends LRUMap {
   public void removeDB(String containerDBPath) {
     lock.lock();
     try {
-      ReferenceCountedDB db = (ReferenceCountedDB)this.get(containerDBPath);
+      ReferenceCountedDB db =
+          (ReferenceCountedDB)closeContainerCache.get(containerDBPath);
       if (db != null) {
         Preconditions.checkArgument(cleanupDb(db), "refCount:",
             db.getReferenceCount());
       }
-      this.remove(containerDBPath);
+      closeContainerCache.remove(containerDBPath);
     } finally {
       lock.unlock();
     }
@@ -267,9 +256,9 @@ public final class ContainerCache extends LRUMap {
     lock.lock();
     try {
       ReferenceCountedDB db = openContainerCache.remove(containerPath);
-      Preconditions.checkNotNull(db,"Null Container DB for open/closing" +
-          "Container:" + containerPath);
-      this.putIfAbsent(containerPath, db);
+      Preconditions.checkNotNull(db, "Container not found in open cache:" +
+          containerPath);
+      closeContainerCache.putIfAbsent(containerPath, db);
       metrics.incNumOpenContainerRemoves();
     } finally {
       lock.unlock();
@@ -278,17 +267,43 @@ public final class ContainerCache extends LRUMap {
 
   private boolean isContainerOpen(State state) {
     switch (state) {
-      case CLOSED:
-      case QUASI_CLOSED:
-        return false;
-      case CLOSING:
-      case OPEN:
-      case UNHEALTHY:
-        return true;
-      case INVALID:
-      case DELETED:
-      default:
-        throw new IllegalArgumentException("Invalid ContainerState:" + state);
+    case CLOSED:
+    case QUASI_CLOSED:
+      return false;
+    case CLOSING:
+    case OPEN:
+    case UNHEALTHY:
+      return true;
+    case INVALID:
+    case DELETED:
+    default:
+      throw new IllegalArgumentException("Invalid ContainerState:" + state);
+    }
+  }
+
+  public CloseContainerCache getCloseContainerCache() {
+    return closeContainerCache;
+  }
+
+  public class CloseContainerCache extends LRUMap {
+    private CloseContainerCache(int maxSize, float loadFactor,
+                                boolean scanUntilRemovable) {
+      super(maxSize, loadFactor, scanUntilRemovable);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected boolean removeLRU(LinkEntry entry) {
+      ReferenceCountedDB db = (ReferenceCountedDB) entry.getValue();
+      lock.lock();
+      try {
+        metrics.incNumCacheEvictions();
+        return cleanupDb(db);
+      } finally {
+        lock.unlock();
+      }
     }
   }
 }

@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -345,6 +346,11 @@ public class TestKeyValueContainer {
    * Set container state to CLOSED.
    */
   private void closeContainer() {
+    if (keyValueContainerData.getDbFile() != null) {
+      ContainerCache.getInstance(CONF)
+          .markContainerClosed(keyValueContainerData
+              .getDbFile().getAbsolutePath());
+    }
     keyValueContainerData.setState(
         ContainerProtos.ContainerDataProto.State.CLOSED);
   }

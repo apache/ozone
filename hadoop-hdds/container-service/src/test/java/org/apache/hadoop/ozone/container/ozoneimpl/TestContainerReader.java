@@ -276,7 +276,7 @@ public class TestContainerReader {
         new MutableVolumeSet(datanodeId.toString(), clusterId, conf, null,
             StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerCache cache = ContainerCache.getInstance(conf);
-    cache.clear();
+    cache.getCloseContainerCache().clear();
 
     RoundRobinVolumeChoosingPolicy policy =
         new RoundRobinVolumeChoosingPolicy();
@@ -329,6 +329,6 @@ public class TestContainerReader {
         containerSet.getContainerMap().entrySet().size());
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
-    Assert.assertEquals(0, cache.size());
+    Assert.assertEquals(0, cache.getCloseContainerCache().size());
   }
 }
