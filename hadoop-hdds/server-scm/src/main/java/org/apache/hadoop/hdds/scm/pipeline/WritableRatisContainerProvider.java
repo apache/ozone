@@ -78,40 +78,60 @@ public class WritableRatisContainerProvider
       So we can use different kind of policies.
     */
 
-    ContainerInfo containerInfo;
+    ContainerInfo containerInfo = null;
 
     //TODO we need to continue the refactor to use repConfig everywhere
     //in downstream managers.
 
+
     while (true) {
+      List<Pipeline> availablePipelines;
+      Pipeline pipeline;
       pipelineManager.acquireLock();
       try {
-        List<Pipeline> availablePipelines =
-            pipelineManager
-                .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
-                    excludeList.getDatanodes(), excludeList.getPipelineIds());
-        Pipeline pipeline = null;
+        availablePipelines = pipelineManager.getPipelines(repConfig,
+            Pipeline.PipelineState.OPEN, excludeList.getDatanodes(),
+            excludeList.getPipelineIds());
         if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
           // if no pipelines can be found, try finding pipeline without
           // exclusion
           availablePipelines = pipelineManager
               .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
         }
-        if (availablePipelines.size() == 0) {
-          try {
-            // TODO: #CLUTIL Remove creation logic when all replication types
-            //  and factors are handled by pipeline creator
-            pipeline = pipelineManager.createPipeline(repConfig);
+        if (availablePipelines.size() != 0) {
+         containerInfo = selectContainer(availablePipelines, size, owner, excludeList);
+        }
+        if (containerInfo != null) {
+          return containerInfo;
+        }
+      } finally {
+        pipelineManager.releaseLock();
+      }
 
-            // wait until pipeline is ready
-            pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-          } catch (SCMException se) {
-            LOG.warn("Pipeline creation failed for repConfig {} " +
-                "Datanodes may be used up.", repConfig, se);
-            break;
-          } catch (IOException e) {
-            LOG.warn("Pipeline creation failed for repConfig: {}. "
-                + "Retrying get pipelines call once.", repConfig, e);
+      boolean exception = false;
+      boolean pipelineCreated = false;
+      if (availablePipelines.size() == 0) {
+        try {
+          // TODO: #CLUTIL Remove creation logic when all replication types
+          //  and factors are handled by pipeline creator
+          pipeline = pipelineManager.createPipeline(repConfig);
+
+          // wait until pipeline is ready
+          pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+          pipelineCreated = true;
+        } catch (SCMException se) {
+          LOG.warn("Pipeline creation failed for repConfig {} " +
+              "Datanodes may be used up.", repConfig, se);
+          break;
+        } catch (IOException e) {
+          LOG.warn("Pipeline creation failed for repConfig: {}. "
+              + "Retrying get pipelines call once.", repConfig, e);
+          exception = true;
+        }
+        if (exception || pipelineCreated) {
+          pipelineManager.acquireLock();
+          try {
+            // Exception occurred do one final try to fetch pipelines.
             availablePipelines = pipelineManager
                 .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
                     excludeList.getDatanodes(), excludeList.getPipelineIds());
@@ -122,33 +142,18 @@ public class WritableRatisContainerProvider
                   .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
             }
             if (availablePipelines.size() == 0) {
-              LOG.info(
-                  "Could not find available pipeline of repConfig: {} "
-                      + "even after retrying",
-                  repConfig);
+              LOG.info("Could not find available pipeline of repConfig: {} "
+                  + "even after retrying", repConfig);
               break;
             }
+            containerInfo = selectContainer(availablePipelines, size, owner, excludeList);
+            if (containerInfo != null) {
+              return containerInfo;
+            }
+          } finally {
+            pipelineManager.releaseLock();
           }
         }
-
-        if (null == pipeline) {
-          PipelineRequestInformation pri =
-              PipelineRequestInformation.Builder.getBuilder()
-                  .setSize(size)
-                  .build();
-          pipeline = pipelineChoosePolicy.choosePipeline(
-              availablePipelines, pri);
-        }
-
-        // look for OPEN containers that match the criteria.
-        containerInfo = containerManager.getMatchingContainer(size, owner,
-            pipeline, excludeList.getContainerIds());
-
-        if (containerInfo != null) {
-          return containerInfo;
-        }
-      } finally {
-        pipelineManager.releaseLock();
       }
     }
 
@@ -158,6 +163,25 @@ public class WritableRatisContainerProvider
         "Unable to allocate a block for the size: {}, repConfig: {}",
         size, repConfig);
     return null;
+  }
+
+  private ContainerInfo selectContainer(List<Pipeline> availablePipelines,
+      long size, String owner, ExcludeList excludeList) {
+    Pipeline pipeline = null;
+    ContainerInfo containerInfo;
+
+    PipelineRequestInformation pri =
+        PipelineRequestInformation.Builder.getBuilder().setSize(size)
+                .build();
+    pipeline = pipelineChoosePolicy.choosePipeline(
+            availablePipelines, pri);
+
+    // look for OPEN containers that match the criteria.
+    containerInfo = containerManager.getMatchingContainer(size, owner,
+        pipeline, excludeList.getContainerIds());
+
+    return containerInfo;
+
   }
 
 }
