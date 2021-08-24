@@ -250,15 +250,16 @@ of objects under the path.
 
 `status` is `OK` if path exists, `PATH_NOT_FOUND` otherwise.
 
+Example: /api/v1/namespace/summary?path=/
 ```json
-     {
-     	"status": OK,
-     	"type": ROOT,
-     	"numVolume": 10,
-        "numBucket": 100,
-        "numDir": 1000,
-        "numKey": 10000
-     }
+    {
+      "status": OK,
+      "type": ROOT,
+      "numVolume": 10,
+      "numBucket": 100,
+      "numDir": 1000,
+      "numKey": 10000
+    }
 ```
 
 If any `num` field is `-1`, the path request is not applicable to such an entity type.
@@ -287,44 +288,44 @@ Returns disk usage of all sub-paths under the path. Normalizes `path` fields, re
 total size of keys directly under the path as `sizeDirectKey`, and returns 
 `size`/`sizeWithReplica` in number of bytes. 
 
-`status` is `OK` if path exists, 
-`PATH_NOT_FOUND` otherwise.
+`status` is `OK` if path exists, `PATH_NOT_FOUND` otherwise.
 
+Example: /api/v1/namespace/du?path=/vol1/bucket1&files=true&replica=true
 ```json
-     {
-     	"status": OK,
-        "path": "/vol1/bucket1",
-        "size": 100000,
-        "sizeWithReplica": 300000,
-        "subPathCount": 4,
-        "subPaths": [
-          {
-            "path": "/vol1/bucket1/dir1-1",
-            "size": 30000,
-            "sizeWithReplica": 90000,
-            "isKey": false
-          },
-          {
-            "path": "/vol1/bucket1/dir1-2",
-            "size": 30000,
-            "sizeWithReplica": 90000,
-            "isKey": false
-          },
-          {
-            "path": "/vol1/bucket1/dir1-3",
-            "size": 30000,
-            "sizeWithReplica": 90000,
-            "isKey": false
-          },
-          {
-            "path": "/vol1/bucket1/key1-1",
-            "size": 10000,
-            "sizeWithReplica": 30000,
-            "isKey": true
-          }
-        ],
-        "sizeDirectKey": 10000
-     }
+    {
+      "status": OK,
+      "path": "/vol1/bucket1",
+      "size": 100000,
+      "sizeWithReplica": 300000,
+      "subPathCount": 4,
+      "subPaths": [
+        {
+          "path": "/vol1/bucket1/dir1-1",
+          "size": 30000,
+          "sizeWithReplica": 90000,
+          "isKey": false
+        },
+        {
+          "path": "/vol1/bucket1/dir1-2",
+          "size": 30000,
+          "sizeWithReplica": 90000,
+          "isKey": false
+        },
+        {
+          "path": "/vol1/bucket1/dir1-3",
+          "size": 30000,
+          "sizeWithReplica": 90000,
+          "isKey": false
+        },
+        {
+          "path": "/vol1/bucket1/key1-1",
+          "size": 10000,
+          "sizeWithReplica": 30000,
+          "isKey": true
+        }
+      ],
+      "sizeDirectKey": 10000
+    }
 ```
 If `files` is set to `false`, sub-path `/vol1/bucket1/key1-1` is omitted.
 If `replica` is set to `false`, `sizeWithReplica` returns `-1`. If the path's entity type
@@ -344,15 +345,16 @@ Returns the quota allowed and used under the path. Only volumes and buckets
 have quota. Other types are not applicable to the quota request.
 
 `status` is `OK` if the request is valid, `PATH_NOT_FOUND` if path doesn't exist,
-`TYPE_NOT_APPLIABLE` if path exists, but the path's entity type is not applicable
+`TYPE_NOT_APPLICABLE` if path exists, but the path's entity type is not applicable
 to the request.
 
+Example: /api/v1/namespace/quota?path=/vol
 ```json
-     {
-     	"status": OK,
-        "allowed": 200000,
-        "used": 160000
-     }
+    {
+      "status": OK,
+      "allowed": 200000,
+      "used": 160000
+    }
 ```
 
 If quota is not set, `allowed` returns `-1`. More on [Quota in Ozone]
@@ -372,29 +374,31 @@ If quota is not set, `allowed` returns `-1`. More on [Quota in Ozone]
 Returns the file size distribution of all keys under the path.
 
 `status` is `OK` if the request is valid, `PATH_NOT_FOUND` if path doesn't exist,
-`TYPE_NOT_APPLIABLE` if path exists, but the path is a key, which does not have
+`TYPE_NOT_APPLICABLE` if path exists, but the path is a key, which does not have
 a file size distribution.
 
+Example: /api/v1/namespace/dist?path=/
 ```json
-     {
-     	"status": OK,
-        "dist": [
-          0,
-          0,
-          10,
-          20,
-          0,
-          30,
-          0,
-          100,
-          ...
-        ]
-     }
+    {
+      "status": OK,
+      "dist": [
+        0,
+        0,
+        10,
+        20,
+        0,
+        30,
+        0,
+        100,
+        ...
+      ]
+    }
 ```
-Recon keeps track of all keys with size from `1KB` to `1PB`. For keys smaller than `1KB`,
-map to the first bin (index); for keys larger than `1PB`, map to the last bin (index).
 
-Each index of `dist` is mapped to a file size range (e.g. `1MB` - `2MB`).
+Recon keeps track of all keys with size from `1 KB` to `1 PB`. For keys smaller than `1 KB`,
+map to the first bin (index); for keys larger than `1 PB`, map to the last bin (index).
+
+Each index of `dist` is mapped to a file size range (e.g. `1 MB` - `2 MB`).
 
 ## ClusterState
 
