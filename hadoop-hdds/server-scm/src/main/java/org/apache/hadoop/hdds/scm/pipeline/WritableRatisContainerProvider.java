@@ -132,7 +132,8 @@ public class WritableRatisContainerProvider
 
         pipelineManager.acquireLock();
         try {
-          // Exception occurred do one final try to fetch pipelines.
+          // If Exception occurred or successful creation of pipeline do one
+          // final try to fetch pipelines.
           availablePipelines = pipelineManager
               .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
                   excludeList.getDatanodes(), excludeList.getPipelineIds());
