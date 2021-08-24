@@ -55,10 +55,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-s3gateway</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-csi</artifactId>
     </dependency>
     <dependency>

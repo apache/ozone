@@ -25,7 +25,6 @@ import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
-import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 
 import java.util.Arrays;
 import org.junit.Rule;
@@ -49,7 +48,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         new Class[] {OzoneConfigKeys.class, ScmConfigKeys.class,
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconServerConfigKeys.class,
-            S3GatewayConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
             ScmConfig.ConfigStrings.class
@@ -62,6 +60,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
+    xmlPrefixToSkipCompare.add("ozone.s3g");
+    configurationPrefixToSkipCompare.add("ozone.s3g");
     configurationPropsToSkipCompare
         .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
     // This property is tested in TestHttpServer2 instead
