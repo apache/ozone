@@ -184,7 +184,9 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       pipelineManager.acquireLock();
     } catch (Exception ex) {
       lock.unlock();
+      throw ex;
     }
+
     try {
       final List<Pipeline> pipelines = pipelineManager
           .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
