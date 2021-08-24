@@ -212,7 +212,7 @@ public class ContainerReader implements Runnable {
             config);
         containerSet.addContainer(kvContainer);
         DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, true);
+            kvContainerData, config, false);
         String dbPath = kvContainerData.getDbFile().getAbsolutePath();
         ReferenceCountedDB db = new ReferenceCountedDB(store, dbPath);
         BlockUtils.addDB(db, dbPath, config);
