@@ -279,27 +279,7 @@ public class KeyDataStreamOutput implements ByteBufStreamOutput {
     }
     Pipeline pipeline = streamEntry.getPipeline();
     PipelineID pipelineId = pipeline.getId();
-    long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
-    //set the correct length for the current stream
-    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
-    long bufferedDataLen = blockDataStreamOutputEntryPool.computeBufferData();
-    if (containerExclusionException) {
-      LOG.debug(
-          "Encountered exception {}. The last committed block length is {}, "
-              + "uncommitted data length is {} retry count {}", exception,
-          totalSuccessfulFlushedData, bufferedDataLen, retryCount);
-    } else {
-      LOG.warn(
-          "Encountered exception {} on the pipeline {}. "
-              + "The last committed block length is {}, "
-              + "uncommitted data length is {} retry count {}", exception,
-          pipeline, totalSuccessfulFlushedData, bufferedDataLen, retryCount);
-    }
-    Preconditions.checkArgument(
-        bufferedDataLen <= config.getStreamBufferMaxSize());
-    Preconditions.checkArgument(
-        offset - blockDataStreamOutputEntryPool.getKeyLength() ==
-        bufferedDataLen);
+
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
     Preconditions.checkNotNull(failedServers);
@@ -336,13 +316,6 @@ public class KeyDataStreamOutput implements ByteBufStreamOutput {
       // blocks
       blockDataStreamOutputEntryPool
           .discardPreallocatedBlocks(-1, pipelineId);
-    }
-    if (bufferedDataLen > 0) {
-      // If the data is still cached in the underlying stream, we need to
-      // allocate new block and write this data in the datanode.
-      handleRetry(exception, bufferedDataLen);
-      // reset the retryCount after handling the exception
-      retryCount = 0;
     }
   }
 
