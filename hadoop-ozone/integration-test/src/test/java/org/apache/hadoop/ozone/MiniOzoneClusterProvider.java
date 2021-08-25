@@ -15,7 +15,70 @@ import java.util.stream.Collectors;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
- * Class to create mini-clusters in the background.
+ * Class to create mini-clusters in the background. In general creating a mini
+ * Cluster takes 15 - 30 seconds and destroying one can take about 10 seconds.
+ *
+ * When there are tests that must create a new cluster per test, the time taken
+ * to create the clusters can greatly increase the test runtime. If the test
+ * logic runs for longer than the time to create the cluster, then it can make
+ * sense to create a new cluster in the background while the first test is
+ * running. Then when test 1 completes, we can destroy its cluster in the
+ * background and immediately give a new cluster to test 2.
+ *
+ * If the runtime of the test logic is very fast (only a second or two) after
+ * the cluster is started, this class may not help much, as there will be no
+ * time to create the new cluster in the background before the next test starts,
+ * however shutting down the cluster in the background while the new cluster is
+ * getting created will likely save about 10 seconds per test.
+ *
+ * To use this class, setup the Cluster Provider in a static method annotated
+ * with @BeforeClass, eg:
+ *
+ *   @BeforeClass
+ *   public static void init() {
+ *     OzoneConfiguration conf = new OzoneConfiguration();
+ *     final int interval = 100;
+ *
+ *     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+ *         interval, TimeUnit.MILLISECONDS);
+ *     ...
+ *
+ *     ReplicationManagerConfiguration replicationConf =
+ *         conf.getObject(ReplicationManagerConfiguration.class);
+ *     replicationConf.setInterval(Duration.ofSeconds(1));
+ *     conf.setFromObject(replicationConf);
+ *
+ *     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
+ *         .setNumDatanodes(numOfDatanodes);
+ *
+ *     clusterProvider = new MiniOzoneClusterProvider(conf, builder);
+ *   }
+ *
+ * Ensure you shutdown the provider in a @AfterClass annotated method:
+ *
+ *   @AfterClass
+ *   public static void shutdown() throws InterruptedException {
+ *     if (clusterProvider != null) {
+ *       clusterProvider.shutdown();
+ *     }
+ *   }
+ *
+ * Then in the @Before method, or in the test itself, obtain a cluster:
+ *
+ *   @Before
+ *   public void setUp() throws Exception {
+ *     cluster = clusterProvider.provide();
+ *   }
+ *
+ *   @After
+ *   public void tearDown() throws InterruptedException, IOException {
+ *     if (cluster != null) {
+ *       clusterProvider.destroy(cluster);
+ *     }
+ *   }
+ *
+ *  This only works if the same config / builder object can be passed to each
+ *  cluster in the test suite.
  */
 public class MiniOzoneClusterProvider {
 
