@@ -112,6 +112,7 @@ public class TestDecommissionAndMaintenance {
   public static class MiniClusterProvider {
 
     private int preCreatedLimit = 1;
+    private boolean shutdown = false;
 
     private final OzoneConfiguration conf;
     private final MiniOzoneCluster.Builder builder;
@@ -123,7 +124,6 @@ public class TestDecommissionAndMaintenance {
     private final BlockingQueue<MiniOzoneCluster> expiredClusters
         = new ArrayBlockingQueue<>(1024);
 
-
     public MiniClusterProvider(OzoneConfiguration conf,
         MiniOzoneCluster.Builder builder) {
       this.conf = conf;
@@ -132,20 +132,31 @@ public class TestDecommissionAndMaintenance {
       reapThread = reapClusters();
     }
 
-    public MiniOzoneCluster provide() throws InterruptedException {
+    public synchronized MiniOzoneCluster provide()
+        throws InterruptedException, IOException {
+      ensureNotShutdown();
       return clusters.poll(100, SECONDS);
     }
 
-    public void destroy(MiniOzoneCluster c) throws InterruptedException {
+    public synchronized void destroy(MiniOzoneCluster c)
+        throws InterruptedException, IOException {
+      ensureNotShutdown();
       expiredClusters.put(c);
     }
 
-    public void shutdown() throws InterruptedException {
+    public synchronized void shutdown() throws InterruptedException {
       createThread.interrupt();
       createThread.join();
       destroyRemainingClusters();
       reapThread.interrupt();
       reapThread.join();
+      shutdown = true;
+    }
+
+    private void ensureNotShutdown() throws IOException {
+      if (shutdown) {
+        throw new IOException("The mini-cluster provider is shutdown");
+      }
     }
 
     private Thread reapClusters() {
@@ -268,7 +279,7 @@ public class TestDecommissionAndMaintenance {
   }
 
   @After
-  public void tearDown() throws InterruptedException {
+  public void tearDown() throws InterruptedException, IOException {
     if (cluster != null) {
       clusterProvider.destroy(cluster);
     }
