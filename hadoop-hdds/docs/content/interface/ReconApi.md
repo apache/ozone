@@ -262,6 +262,18 @@ Example: /api/v1/namespace/summary?path=/
     }
 ```
 
+Example: /api/v1/namespace/summary?path=/vol1
+```json
+    {
+      "status": OK,
+      "type": VOLUME,
+      "numVolume": -1,
+      "numBucket": 10,
+      "numDir": 100,
+      "numKey": 1000
+    }
+```
+
 If any `num` field is `-1`, the path request is not applicable to such an entity type.
 
 ### GET /api/v1/namespace/du
@@ -274,12 +286,12 @@ If any `num` field is `-1`, the path request is not applicable to such an entity
 
 * files (optional)
 
-  A boolean with a default value of `false`. If set to `true`, compute disk usage for keys 
-  directly under the path.
+  A boolean with a default value of `false`. If set to `true`, computes disk usage for keys 
+  under the path.
 
 * replica (optional)
 
-  A boolean with a default value of `false`. If set to `true`, compute disk usage with replicated
+  A boolean with a default value of `false`. If set to `true`, computes disk usage with replicated
 size of keys.
 
 **Returns**
