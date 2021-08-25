@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
-import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ByteBufStreamOutput;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -52,15 +51,12 @@ public final class BlockDataStreamOutputEntry
   private long currentPosition;
   private final Token<OzoneBlockTokenIdentifier> token;
 
-  private BufferPool bufferPool;
-
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   private BlockDataStreamOutputEntry(
       BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       long length,
-      BufferPool bufferPool,
       Token<OzoneBlockTokenIdentifier> token,
       OzoneClientConfig config
   ) {
@@ -73,7 +69,6 @@ public final class BlockDataStreamOutputEntry
     this.token = token;
     this.length = length;
     this.currentPosition = 0;
-    this.bufferPool = bufferPool;
   }
 
   long getLength() {
@@ -98,7 +93,7 @@ public final class BlockDataStreamOutputEntry
     if (this.byteBufStreamOutput == null) {
       this.byteBufStreamOutput =
           new BlockDataStreamOutput(blockID, xceiverClientManager,
-              pipeline, bufferPool, config, token);
+              pipeline, config, token);
     }
   }
 
@@ -133,20 +128,6 @@ public final class BlockDataStreamOutputEntry
       return  ((BlockDataStreamOutput) byteBufStreamOutput).isClosed();
     }
     return false;
-  }
-
-  long getTotalAckDataLength() {
-    if (byteBufStreamOutput != null) {
-      BlockDataStreamOutput out =
-          (BlockDataStreamOutput) this.byteBufStreamOutput;
-      blockID = out.getBlockID();
-      return out.getTotalAckDataLength();
-    } else {
-      // For a pre allocated block for which no write has been initiated,
-      // the ByteBufStreamOutput will be null here.
-      // In such cases, the default blockCommitSequenceId will be 0
-      return 0;
-    }
   }
 
   Collection<DatanodeDetails> getFailedServers() {
@@ -198,7 +179,6 @@ public final class BlockDataStreamOutputEntry
     private XceiverClientFactory xceiverClientManager;
     private Pipeline pipeline;
     private long length;
-    private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
 
@@ -230,12 +210,6 @@ public final class BlockDataStreamOutputEntry
       return this;
     }
 
-
-    public Builder setBufferPool(BufferPool pool) {
-      this.bufferPool = pool;
-      return this;
-    }
-
     public Builder setConfig(OzoneClientConfig clientConfig) {
       this.config = clientConfig;
       return this;
@@ -252,7 +226,6 @@ public final class BlockDataStreamOutputEntry
           xceiverClientManager,
           pipeline,
           length,
-          bufferPool,
           token, config);
     }
   }
@@ -280,10 +253,6 @@ public final class BlockDataStreamOutputEntry
 
   public long getCurrentPosition() {
     return currentPosition;
-  }
-
-  public BufferPool getBufferPool() {
-    return bufferPool;
   }
 
   public void setCurrentPosition(long curPosition) {
