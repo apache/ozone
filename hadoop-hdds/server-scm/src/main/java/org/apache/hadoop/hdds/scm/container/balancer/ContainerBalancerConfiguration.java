@@ -111,10 +111,14 @@ public final class ContainerBalancerConfiguration {
    */
   public ContainerBalancerConfiguration(
       OzoneConfiguration ozoneConfiguration) {
-    this.ozoneConfiguration = ozoneConfiguration;
+    if (ozoneConfiguration == null) {
+      this.ozoneConfiguration = new OzoneConfiguration();
+    } else {
+      this.ozoneConfiguration = ozoneConfiguration;
+    }
 
     // balancing interval should be greater than DUFactory refresh period
-    duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
+    duConf = this.ozoneConfiguration.getObject(DUFactory.Conf.class);
     balancingInterval = duConf.getRefreshPeriod().toMillis() +
         Duration.ofMinutes(10).toMillis();
   }
@@ -273,6 +277,15 @@ public final class ContainerBalancerConfiguration {
       LOG.warn("Balancing interval duration must be greater than du refresh " +
           "period, {} milliseconds", duConf.getRefreshPeriod().toMillis());
     }
+  }
+
+  /**
+   * Gets the {@link OzoneConfiguration} using which this configuration was
+   * constructed.
+   * @return the {@link OzoneConfiguration} being used by this configuration
+   */
+  public OzoneConfiguration getOzoneConfiguration() {
+    return this.ozoneConfiguration;
   }
 
   @Override
