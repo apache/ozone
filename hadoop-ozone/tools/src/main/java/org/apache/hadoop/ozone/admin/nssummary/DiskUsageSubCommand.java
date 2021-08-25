@@ -69,7 +69,6 @@ public class DiskUsageSubCommand implements Callable {
       description = "Show DU without the header for current path.")
   private boolean noHeader;
 
-
   @CommandLine.Mixin
   private ListOptions listOptions;
 
@@ -94,7 +93,7 @@ public class DiskUsageSubCommand implements Callable {
     url.append(parent.getReconWebAddress()).append(ENDPOINT);
 
     String response = makeHttpCall(url, parseInputPath(path), listFiles,
-        withReplica, parent.isSecurityEnabled(), parent.getOzoneConfig());
+        withReplica, parent.isHTTPSEnabled(), parent.getOzoneConfig());
 
     printNewLines(1);
     if (response == null) {

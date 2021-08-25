@@ -67,7 +67,7 @@ public class QuotaUsageSubCommand implements Callable {
 
     printNewLines(1);
     String response = makeHttpCall(url, path,
-        parent.isSecurityEnabled(), parent.getOzoneConfig());
+        parent.isHTTPSEnabled(), parent.getOzoneConfig());
     if (response == null) {
       printNewLines(1);
       return null;

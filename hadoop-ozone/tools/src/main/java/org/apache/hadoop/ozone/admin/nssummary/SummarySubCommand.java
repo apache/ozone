@@ -66,7 +66,7 @@ public class SummarySubCommand implements Callable<Void> {
 
     printNewLines(1);
     String response = makeHttpCall(url, parseInputPath(path),
-        parent.isSecurityEnabled(), parent.getOzoneConfig());
+        parent.isHTTPSEnabled(), parent.getOzoneConfig());
     if (response == null) {
       printNewLines(1);
       return null;

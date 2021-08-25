@@ -57,8 +57,6 @@ import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESE
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
@@ -304,48 +302,6 @@ public final class HddsUtils {
   public static InetSocketAddress getReconAddresses(
       ConfigurationSource conf) {
     String name = conf.get(OZONE_RECON_ADDRESS_KEY);
-    if (StringUtils.isEmpty(name)) {
-      return null;
-    }
-    Optional<String> hostname = getHostName(name);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Recon: "
-          + name);
-    }
-    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return NetUtils.createSocketAddr(hostname.get(), port);
-  }
-
-  /**
-   * Retrieve the socket addresses of recon HTTP.
-   *
-   * @return Recon address
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static InetSocketAddress getReconHTTPAddresses(
-      ConfigurationSource conf) {
-    String name = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
-    if (StringUtils.isEmpty(name)) {
-      return null;
-    }
-    Optional<String> hostname = getHostName(name);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Recon: "
-          + name);
-    }
-    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return NetUtils.createSocketAddr(hostname.get(), port);
-  }
-
-  /**
-   * Retrieve the socket addresses of recon HTTPS.
-   *
-   * @return Recon address
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static InetSocketAddress getReconHTTPSAddresses(
-      ConfigurationSource conf) {
-    String name = conf.get(OZONE_RECON_HTTPS_ADDRESS_KEY);
     if (StringUtils.isEmpty(name)) {
       return null;
     }

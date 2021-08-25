@@ -17,18 +17,29 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
-import java.net.InetSocketAddress;
+import java.util.Optional;
+
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTPS_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 
 /**
  * Subcommand for admin operations related to OM.
@@ -76,21 +87,39 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
   public String getReconWebAddress() {
     OzoneConfiguration conf = parent.getOzoneConf();
     String protocolPrefix = "";
-    InetSocketAddress reconSocket = null;
-    if (OzoneSecurityUtil.isHttpSecurityEnabled(conf)) {
+    HttpConfig.Policy webPolicy = getHttpPolicy(conf);
+
+    String name = null;
+
+    if (webPolicy == HttpConfig.Policy.HTTPS_ONLY) {
       protocolPrefix = "https://";
-      reconSocket = HddsUtils.getReconHTTPSAddresses(conf);
+      name = conf.get(OZONE_RECON_HTTPS_ADDRESS_KEY,
+          OZONE_RECON_HTTPS_ADDRESS_DEFAULT);
     } else {
       protocolPrefix = "http://";
-      reconSocket = HddsUtils.getReconHTTPAddresses(conf);
+      name = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY,
+          OZONE_RECON_HTTP_ADDRESS_DEFAULT);
     }
-    return protocolPrefix + reconSocket.getHostName()
-        + ":" + reconSocket.getPort();
+
+    if (StringUtils.isEmpty(name)) {
+      return null;
+    }
+
+    String reconDefaultAddress = conf.get(OZONE_RECON_ADDRESS_KEY,
+        OZONE_RECON_ADDRESS_DEFAULT);
+    Optional<String> hostname = getHostName(reconDefaultAddress);
+    if (!hostname.isPresent()) {
+      throw new IllegalArgumentException("Invalid hostname for Recon: "
+          + reconDefaultAddress);
+    }
+
+    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
+    return protocolPrefix + hostname.get() + ":" + port;
   }
 
-  public boolean isSecurityEnabled() {
+  public boolean isHTTPSEnabled() {
     OzoneConfiguration conf = parent.getOzoneConf();
-    return OzoneSecurityUtil.isHttpSecurityEnabled(conf);
+    return getHttpPolicy(conf) == HttpConfig.Policy.HTTPS_ONLY;
   }
 
   public ConfigurationSource getOzoneConfig() {
