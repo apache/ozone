@@ -115,8 +115,6 @@ public class TestDecommissionAndMaintenance {
 
     private final OzoneConfiguration conf;
     private final MiniOzoneCluster.Builder builder;
-    private boolean shouldRun = true;
-    private boolean shouldReap = true;
     private Thread createThread;
     private Thread reapThread;
 
@@ -143,32 +141,36 @@ public class TestDecommissionAndMaintenance {
     }
 
     public void shutdown() throws InterruptedException {
-      shouldRun = false;
       createThread.interrupt();
       createThread.join();
       destroyRemainingClusters();
-      shouldReap = false;
+      reapThread.interrupt();
       reapThread.join();
     }
 
     private Thread reapClusters() {
       Thread t = new Thread(() -> {
-        while(shouldReap || !expiredClusters.isEmpty()) {
+        boolean shouldRun = true;
+        while(shouldRun || !expiredClusters.isEmpty()) {
           try {
+            if (Thread.interrupted()) {
+              throw new InterruptedException();
+            }
             MiniOzoneCluster c = expiredClusters.take();
             c.shutdown();
           } catch (InterruptedException e) {
-            break;
+            shouldRun = false;
           }
         }
       });
+      t.setName("Mini-Cluster-Provider-Reap");
       t.start();
       return t;
     }
 
     private Thread createClusters() {
       Thread t = new Thread(() -> {
-        while (shouldRun && !Thread.interrupted()) {
+        while (!Thread.interrupted()) {
           MiniOzoneCluster cluster = null;
           try {
             builder.setClusterId(UUID.randomUUID().toString());
@@ -192,11 +194,13 @@ public class TestDecommissionAndMaintenance {
             if (cluster != null) {
               cluster.shutdown();
             }
+            break;
           } catch (IOException | TimeoutException e) {
             throw new RuntimeException("Unable to build cluster", e);
           }
         }
       });
+      t.setName("Mini-Cluster-Provider-Create");
       t.start();
       return t;
     }
