@@ -909,6 +909,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         AssignUserToTenantRequest.newBuilder()
         .setTenantUsername(username)
         .setTenantName(tenantName)
+        .setAccessId(accessId)
         .build();
     final OMRequest omRequest = createOMRequest(Type.AssignUserToTenant)
         .setAssignUserToTenantRequest(request)
