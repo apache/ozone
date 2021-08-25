@@ -90,7 +90,7 @@ public class WritableRatisContainerProvider
       // Acquire pipeline manager lock, to avoid any updates to pipeline
       // while allocate container happens. This is to avoid scenario like
       // mentioned in HDDS-5655.
-      pipelineManager.acquireLock();
+      pipelineManager.acquireReadLock();
       try {
         availablePipelines = pipelineManager.getPipelines(repConfig,
             Pipeline.PipelineState.OPEN, excludeList.getDatanodes(),
@@ -109,7 +109,7 @@ public class WritableRatisContainerProvider
           return containerInfo;
         }
       } finally {
-        pipelineManager.releaseLock();
+        pipelineManager.releaseReadLock();
       }
 
       if (availablePipelines.size() == 0) {
@@ -130,7 +130,7 @@ public class WritableRatisContainerProvider
               + "Retrying get pipelines call once.", repConfig, e);
         }
 
-        pipelineManager.acquireLock();
+        pipelineManager.acquireReadLock();
         try {
           // If Exception occurred or successful creation of pipeline do one
           // final try to fetch pipelines.
@@ -154,7 +154,7 @@ public class WritableRatisContainerProvider
             return containerInfo;
           }
         } finally {
-          pipelineManager.releaseLock();
+          pipelineManager.releaseReadLock();
         }
       }
     }
