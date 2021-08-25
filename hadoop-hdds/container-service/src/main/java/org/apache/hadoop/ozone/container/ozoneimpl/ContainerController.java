@@ -90,12 +90,11 @@ public class ContainerController {
       Set<Long> missingContainerSet = containerSet.getMissingContainerSet();
       if (missingContainerSet.contains(containerId)) {
         warning = "The Container is in the MissingContainerSet " +
-                "hence we can't close it. ContainerID: "+containerId;
-        LOG.warn(warning);
+                "hence we can't close it. ContainerID: " + containerId;
       } else {
-        warning = "The Container is not found. ContainerID: "+ containerId;
-        LOG.warn(warning);
+        warning = "The Container is not found. ContainerID: " + containerId;
       }
+      LOG.warn(warning);
       throw new ContainerNotFoundException(warning);
     } else {
       if (container.getContainerState() == State.OPEN) {
