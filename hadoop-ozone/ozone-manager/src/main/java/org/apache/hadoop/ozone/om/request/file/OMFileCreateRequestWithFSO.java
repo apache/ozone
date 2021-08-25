@@ -211,7 +211,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // attribute in response object.
       int clientVersion = getOmRequest().getVersion();
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omFileInfo.getProtobuf(keyName, clientVersion))
+          .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
+              keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);

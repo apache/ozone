@@ -130,6 +130,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
     const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '';
+    const duLink = '/DiskUsage';
     const containersElement = missingContainersCount > 0 ? (
       <span>
         <Tooltip placement='bottom' title={`${missingContainersCount} ${containersTooltip}`}>
@@ -174,7 +175,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         </Row>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox'/>
+            <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={duLink}/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open'/>

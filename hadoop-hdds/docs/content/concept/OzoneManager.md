@@ -41,7 +41,7 @@ This is very different from HDFS which provides a single rooted file system.
 
 Ozone's namespace is a collection of volumes or is a forest instead of a
 single rooted tree as in HDFS. This property makes it easy to deploy multiple
-OMs for scaling.
+OMs for scaling(pending future development).
 
 ## Ozone Manager Metadata
 

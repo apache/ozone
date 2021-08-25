@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
@@ -27,6 +26,7 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
@@ -86,10 +86,11 @@ public class ReplicationServer {
             sslContextBuilder, secConf.getGrpcSslProvider());
 
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        sslContextBuilder.trustManager(caClient.getCACertificate());
+        sslContextBuilder.trustManager(HAUtils.buildCAX509List(caClient,
+            secConf.getConfiguration()));
 
         nettyServerBuilder.sslContext(sslContextBuilder.build());
-      } catch (SSLException ex) {
+      } catch (IOException ex) {
         throw new IllegalArgumentException(
             "Unable to setup TLS for secure datanode replication GRPC "
                 + "endpoint.", ex);

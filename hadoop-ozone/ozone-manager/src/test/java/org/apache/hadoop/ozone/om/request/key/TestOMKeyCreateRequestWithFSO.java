@@ -129,6 +129,19 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   }
 
   @Override
+  protected String getOzoneKey() throws IOException {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+    if (omBucketInfo != null) {
+      return omMetadataManager.getOzonePathKey(omBucketInfo.getObjectID(),
+          keyName);
+    } else {
+      return omMetadataManager.getOzonePathKey(1000, keyName);
+    }
+  }
+
+  @Override
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
     return new OMKeyCreateRequestWithFSO(omRequest);
   }
