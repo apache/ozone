@@ -262,7 +262,7 @@ Example: /api/v1/namespace/summary?path=/
     }
 ```
 
-Example: /api/v1/namespace/summary?path=/vol1
+Example: /api/v1/namespace/summary?path=/volume1
 ```json
     {
       "status": OK,
@@ -271,6 +271,42 @@ Example: /api/v1/namespace/summary?path=/vol1
       "numBucket": 10,
       "numDir": 100,
       "numKey": 1000
+    }
+```
+
+Example: /api/v1/namespace/summary?path=/volume1/bucket1
+```json
+    {
+      "status": OK,
+      "type": BUCKET,
+      "numVolume": -1,
+      "numBucket": -1,
+      "numDir": 50,
+      "numKey": 500
+    }
+```
+
+Example: /api/v1/namespace/summary?path=/volume1/bucket1/dir
+```json
+    {
+      "status": OK,
+      "type": DIRECTORY,
+      "numVolume": -1,
+      "numBucket": -1,
+      "numDir": 10,
+      "numKey": 100
+    }
+```
+
+Example: /api/v1/namespace/summary?path=/volume1/bucket1/dir/nestedDir
+```json
+    {
+      "status": OK,
+      "type": DIRECTORY,
+      "numVolume": -1,
+      "numBucket": -1,
+      "numDir": 5,
+      "numKey": 50
     }
 ```
 
