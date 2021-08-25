@@ -27,8 +27,8 @@ import org.apache.hadoop.security.token.Token;
 import java.util.function.Function;
 
 /**
- * Concrete implementation of a BlockInputStreamFactory to create
- * BlockInputSteams in a real cluster.
+ * Concrete implementation of a BlockInputStreamProvider to create
+ * BlockInputStreams in a real cluster.
  */
 public class BlockInputStreamProviderImpl implements BlockInputStreamProvider {
 
