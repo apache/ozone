@@ -124,3 +124,6 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
+
+OZONE-SITE.XML_ozone.om.ranger.https-address=https://ranger:6182
+
