@@ -1608,7 +1608,7 @@
       <dependency>
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
-        <version>6.8.1</version>
+        <version>6.20.3</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>
