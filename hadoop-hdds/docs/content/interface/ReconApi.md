@@ -262,6 +262,54 @@ Example: /api/v1/namespace/summary?path=/
     }
 ```
 
+Example: /api/v1/namespace/summary?path=/volume1
+```json
+    {
+      "status": OK,
+      "type": VOLUME,
+      "numVolume": -1,
+      "numBucket": 10,
+      "numDir": 100,
+      "numKey": 1000
+    }
+```
+
+Example: /api/v1/namespace/summary?path=/volume1/bucket1
+```json
+    {
+      "status": OK,
+      "type": BUCKET,
+      "numVolume": -1,
+      "numBucket": -1,
+      "numDir": 50,
+      "numKey": 500
+    }
+```
+
+Example: /api/v1/namespace/summary?path=/volume1/bucket1/dir
+```json
+    {
+      "status": OK,
+      "type": DIRECTORY,
+      "numVolume": -1,
+      "numBucket": -1,
+      "numDir": 10,
+      "numKey": 100
+    }
+```
+
+Example: /api/v1/namespace/summary?path=/volume1/bucket1/dir/nestedDir
+```json
+    {
+      "status": OK,
+      "type": DIRECTORY,
+      "numVolume": -1,
+      "numBucket": -1,
+      "numDir": 5,
+      "numKey": 50
+    }
+```
+
 If any `num` field is `-1`, the path request is not applicable to such an entity type.
 
 ### GET /api/v1/namespace/du
@@ -274,12 +322,12 @@ If any `num` field is `-1`, the path request is not applicable to such an entity
 
 * files (optional)
 
-  A boolean with a default value of `false`. If set to `true`, compute disk usage for keys 
-  directly under the path.
+  A boolean with a default value of `false`. If set to `true`, computes disk usage for keys 
+  under the path.
 
 * replica (optional)
 
-  A boolean with a default value of `false`. If set to `true`, compute disk usage with replicated
+  A boolean with a default value of `false`. If set to `true`, computes disk usage with replicated
 size of keys.
 
 **Returns**
