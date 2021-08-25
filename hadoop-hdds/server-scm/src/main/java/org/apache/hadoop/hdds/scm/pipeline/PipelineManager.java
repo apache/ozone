@@ -132,4 +132,24 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    */
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
+
+  /**
+   * Acquire read lock.
+   */
+  void acquireReadLock();
+
+  /**
+   * Release read lock.
+   */
+  void releaseReadLock();
+
+  /**
+   * Acquire write lock.
+   */
+  void acquireWriteLock();
+
+  /**
+   * Release write lock.
+   */
+  void releaseWriteLock();
 }

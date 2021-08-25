@@ -55,8 +55,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * SCM Pipeline Manager implementation.
@@ -68,7 +67,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       LoggerFactory.getLogger(PipelineManagerV2Impl.class);
 
   // Limit the number of on-going ratis operation to be 1.
-  private final Lock lock;
+  private final ReentrantReadWriteLock lock;
   private PipelineFactory pipelineFactory;
   private StateManager stateManager;
   private BackgroundPipelineCreatorV2 backgroundPipelineCreator;
@@ -89,7 +88,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
                                  PipelineFactory pipelineFactory,
                                  EventPublisher eventPublisher,
                                  SCMContext scmContext) {
-    this.lock = new ReentrantLock();
+    this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
     this.conf = conf;
@@ -151,7 +150,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");
     }
-    lock.lock();
+    acquireWriteLock();
     try {
       Pipeline pipeline = pipelineFactory.create(replicationConfig);
       stateManager.addPipeline(pipeline.getProtobufMessage(
@@ -164,7 +163,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -260,7 +259,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
-    lock.lock();
+    acquireWriteLock();
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
       if (pipeline.isClosed()) {
@@ -274,7 +273,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       metrics.incNumPipelineCreated();
       metrics.createPerPipelineMetrics(pipeline);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -287,7 +286,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
   protected void removePipeline(Pipeline pipeline) throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
-    lock.lock();
+    acquireWriteLock();
     try {
       stateManager.removePipeline(pipelineID.getProtobuf());
       metrics.incNumPipelineDestroyed();
@@ -295,7 +294,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       metrics.incNumPipelineDestroyFailed();
       throw ex;
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -322,7 +321,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
     PipelineID pipelineID = pipeline.getId();
-    lock.lock();
+    acquireWriteLock();
     try {
       if (!pipeline.isClosed()) {
         stateManager.updatePipelineState(pipelineID.getProtobuf(),
@@ -331,7 +330,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
       }
       metrics.removePipelineMetrics(pipelineID);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
     // close containers.
     closeContainersForPipeline(pipelineID);
@@ -417,12 +416,12 @@ public class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
-    lock.lock();
+    acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineID.getProtobuf(),
               HddsProtos.PipelineState.PIPELINE_OPEN);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -435,12 +434,12 @@ public class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
-    lock.lock();
+    acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineID.getProtobuf(),
           HddsProtos.PipelineState.PIPELINE_DORMANT);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -603,7 +602,23 @@ public class PipelineManagerV2Impl implements PipelineManager {
     }
   }
 
-  protected Lock getLock() {
-    return lock;
+  @Override
+  public void acquireReadLock() {
+    lock.readLock().lock();
+  }
+
+  @Override
+  public void releaseReadLock() {
+    lock.readLock().unlock();
+  }
+
+  @Override
+  public void acquireWriteLock() {
+    lock.writeLock().lock();
+  }
+
+  @Override
+  public void releaseWriteLock() {
+    lock.writeLock().unlock();
   }
 }

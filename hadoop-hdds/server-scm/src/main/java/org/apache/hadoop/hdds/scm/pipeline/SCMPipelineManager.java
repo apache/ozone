@@ -771,4 +771,28 @@ public class SCMPipelineManager implements
   protected static Logger getLog() {
     return LOG;
   }
+
+
+  // This class is obsolete and used only in tests. Hence, doing the minimum
+  // change to compile.
+  @Override
+  public void acquireReadLock() {
+
+  }
+
+  @Override
+  public void releaseReadLock() {
+
+  }
+
+  @Override
+  public void acquireWriteLock() {
+
+  }
+
+  @Override
+  public void releaseWriteLock() {
+
+  }
+
 }
