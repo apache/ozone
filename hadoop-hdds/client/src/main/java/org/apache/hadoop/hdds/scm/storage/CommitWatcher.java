@@ -84,13 +84,6 @@ public class CommitWatcher {
     futureMap = new ConcurrentHashMap<>();
   }
 
-  public CommitWatcher(XceiverClientSpi xceiverClient) {
-    this.xceiverClient = xceiverClient;
-    commitIndex2flushedDataMap = new ConcurrentSkipListMap<>();
-    totalAckDataLength = 0;
-    futureMap = new ConcurrentHashMap<>();
-  }
-
   /**
    * just update the totalAckDataLength. In case of failure,
    * we will read the data starting from totalAckDataLength.
@@ -132,7 +125,7 @@ public class CommitWatcher {
   /**
    * Calls watch for commit for the first index in commitIndex2flushedDataMap to
    * the Ratis client.
-   * @return {@link XceiverClientReply} reply from raft client
+   * @return reply reply from raft client
    * @throws IOException in case watchForCommit fails
    */
   public XceiverClientReply watchOnFirstIndex() throws IOException {
@@ -153,9 +146,9 @@ public class CommitWatcher {
   }
 
   /**
-   * Calls watch for commit for the last index in commitIndex2flushedDataMap to
+   * Calls watch for commit for the first index in commitIndex2flushedDataMap to
    * the Ratis client.
-   * @return {@link XceiverClientReply} reply from raft client
+   * @return reply reply from raft client
    * @throws IOException in case watchForCommit fails
    */
   public XceiverClientReply watchOnLastIndex()
@@ -171,53 +164,6 @@ public class CommitWatcher {
         LOG.debug("waiting for last flush Index {} to catch up", index);
       }
       return watchForCommit(index);
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * Calls watch for commit for the first index in commitIndex2flushedDataMap to
-   * the Ratis client.
-   * @return {@link XceiverClientReply} reply from raft client
-   * @throws IOException in case watchForCommit fails
-   */
-  public XceiverClientReply streamWatchOnFirstIndex() throws IOException {
-    if (!commitIndex2flushedDataMap.isEmpty()) {
-      // wait for the  first commit index in the commitIndex2flushedDataMap
-      // to get committed to all or majority of nodes in case timeout
-      // happens.
-      long index =
-          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).min()
-              .getAsLong();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for first index {} to catch up", index);
-      }
-      return streamWatchForCommit(index);
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * Calls watch for commit for the last index in commitIndex2flushedDataMap to
-   * the Ratis client.
-   * @return {@link XceiverClientReply} reply from raft client
-   * @throws IOException in case watchForCommit fails
-   */
-  public XceiverClientReply streamWatchOnLastIndex()
-      throws IOException {
-    if (!commitIndex2flushedDataMap.isEmpty()) {
-      // wait for the  commit index in the commitIndex2flushedDataMap
-      // to get committed to all or majority of nodes in case timeout
-      // happens.
-      long index =
-          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).max()
-              .getAsLong();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for last flush Index {} to catch up", index);
-      }
-      return streamWatchForCommit(index);
     } else {
       return null;
     }
@@ -257,28 +203,6 @@ public class CommitWatcher {
         index = reply.getLogIndex();
       }
       adjustBuffers(index);
-      return reply;
-    } catch (InterruptedException e) {
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-      throw getIOExceptionForWatchForCommit(commitIndex, e);
-    } catch (TimeoutException | ExecutionException e) {
-      throw getIOExceptionForWatchForCommit(commitIndex, e);
-    }
-  }
-
-  /**
-   * calls watchForCommit API of the Ratis Client. This method is for streaming
-   * and no longer requires releaseBuffers
-   * @param commitIndex log index to watch for
-   * @return minimum commit index replicated to all nodes
-   * @throws IOException IOException in case watch gets timed out
-   */
-  public XceiverClientReply streamWatchForCommit(long commitIndex)
-      throws IOException {
-    try {
-      XceiverClientReply reply =
-          xceiverClient.watchForCommit(commitIndex);
       return reply;
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException

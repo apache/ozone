@@ -47,7 +47,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -315,12 +314,12 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "Adding index " + asyncReply.getLogIndex() + " commitMap size "
-                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                    + commitWatcher.getCommitInfoSetSize() + " flushLength "
                     + flushPos + " blockID " + blockID);
           }
           // for standalone protocol, logIndex will always be 0.
-          commitWatcher.updateCommitInfoMap(
-              asyncReply.getLogIndex(), new LinkedList<>());
+          commitWatcher.updateCommitInfoSet(
+              asyncReply.getLogIndex());
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -487,10 +486,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    */
   private void writeChunkToContainer(ByteBuf buf)
       throws IOException {
-    // The Checksum action is time-consuming. Do we need to remove it?
-    // Because in HDDS-5483. We had Validate block file length during put block.
     ChecksumData checksumData = checksum.computeChecksum(buf.nioBuffer());
-
     int effectiveChunkSize = buf.readableBytes();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()

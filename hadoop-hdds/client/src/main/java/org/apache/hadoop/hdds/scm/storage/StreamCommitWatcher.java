@@ -24,23 +24,18 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -53,11 +48,7 @@ public class StreamCommitWatcher {
   private static final Logger LOG =
       LoggerFactory.getLogger(StreamCommitWatcher.class);
 
-  // The map should maintain the keys (logIndexes) in order so that while
-  // removing we always end up updating incremented data flushed length.
-  // Also, corresponding to the logIndex, the corresponding list of buffers will
-  // be released from the buffer pool.
-  private Map<Long, List<ChunkBuffer>> commitIndex2flushedDataMap;
+  private Set<Long> commitIndexSet;
 
   // future Map to hold up all putBlock futures
   private ConcurrentHashMap<Long,
@@ -72,20 +63,18 @@ public class StreamCommitWatcher {
 
   public StreamCommitWatcher(XceiverClientSpi xceiverClient) {
     this.xceiverClient = xceiverClient;
-    commitIndex2flushedDataMap = new ConcurrentSkipListMap<>();
+    commitIndexSet = new ConcurrentSkipListSet();
     totalAckDataLength = 0;
     futureMap = new ConcurrentHashMap<>();
   }
 
-  public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
-    commitIndex2flushedDataMap.computeIfAbsent(index, k -> new LinkedList<>())
-        .addAll(buffers);
+  public void updateCommitInfoSet(long index) {
+    commitIndexSet.add(index);
   }
 
-  int getCommitInfoMapSize() {
-    return commitIndex2flushedDataMap.size();
+  int getCommitInfoSetSize() {
+    return commitIndexSet.size();
   }
-
 
   /**
    * Calls watch for commit for the first index in commitIndex2flushedDataMap to
@@ -94,12 +83,12 @@ public class StreamCommitWatcher {
    * @throws IOException in case watchForCommit fails
    */
   public XceiverClientReply streamWatchOnFirstIndex() throws IOException {
-    if (!commitIndex2flushedDataMap.isEmpty()) {
+    if (!commitIndexSet.isEmpty()) {
       // wait for the  first commit index in the commitIndex2flushedDataMap
       // to get committed to all or majority of nodes in case timeout
       // happens.
       long index =
-          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).min()
+          commitIndexSet.stream().mapToLong(v -> v).min()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
         LOG.debug("waiting for first index {} to catch up", index);
@@ -118,12 +107,12 @@ public class StreamCommitWatcher {
    */
   public XceiverClientReply streamWatchOnLastIndex()
       throws IOException {
-    if (!commitIndex2flushedDataMap.isEmpty()) {
+    if (!commitIndexSet.isEmpty()) {
       // wait for the  commit index in the commitIndex2flushedDataMap
       // to get committed to all or majority of nodes in case timeout
       // happens.
       long index =
-          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).max()
+          commitIndexSet.stream().mapToLong(v -> v).max()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
         LOG.debug("waiting for last flush Index {} to catch up", index);
@@ -175,12 +164,12 @@ public class StreamCommitWatcher {
   }
 
   public void cleanup() {
-    if (commitIndex2flushedDataMap != null) {
-      commitIndex2flushedDataMap.clear();
+    if (commitIndexSet != null) {
+      commitIndexSet.clear();
     }
     if (futureMap != null) {
       futureMap.clear();
     }
-    commitIndex2flushedDataMap = null;
+    commitIndexSet = null;
   }
 }
