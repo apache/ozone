@@ -39,16 +39,17 @@ public class AssignUserToTenantHandler extends S3Handler {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "List of tenant short user name(s)")
-  private List<String> usernames = new ArrayList<>();
+  @CommandLine.Parameters(description = "List of user Kerberos principal(s)")
+  private List<String> principal = new ArrayList<>();
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
   private String tenantName;
 
-  @CommandLine.Option(names = {"-a", "--access-ids", "--accessIds"},
-      description = "(Optional) List of manually-specified access ID(s)")
-  private List<String> accessIds;
+  @CommandLine.Option(names = {"-a", "--access-id", "--accessId"},
+      description = "(Optional) Specify the accessId for user in this tenant. "
+          + "If unspecified, accessId(s) would be the same as principal(s).")
+  private String accessId;
 
   // TODO: support dry-run?
 //  @CommandLine.Option(names = {"--dry-run"},
@@ -63,15 +64,17 @@ public class AssignUserToTenantHandler extends S3Handler {
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
 
-    if (isEmptyList(usernames)) {
+    if (isEmptyList(principal)) {
       GenericCli.missingSubcommand(spec);
       return;
     }
 
-    if (!isEmptyList(accessIds) && usernames.size() != accessIds.size()) {
-      err().println("Access ID list length (" + accessIds.size() + ") "
-          + "doesn't match user list's (" + usernames.size() + "). "
-          + "Double check your command line.");
+    if (StringUtils.isEmpty(accessId)) {
+      accessId = principal.get(0);
+    } else if (principal.size() > 1) {
+      err().println("Manually specifying accessId is only supported when there "
+          + "is one user principal in the command line. Reduce the number of "
+          + "principal to one and try again.");
       return;
     }
 
@@ -79,18 +82,16 @@ public class AssignUserToTenantHandler extends S3Handler {
       tenantName = objStore.getS3VolumeName();
     }
 
-    for (int i = 0; i < usernames.size(); i++) {
-      final String username = usernames.get(i);
+    for (int i = 0; i < principal.size(); i++) {
+      final String username = principal.get(i);
       try {
-        final String accessId;
-        if (!isEmptyList(accessIds) && StringUtils.isEmpty(accessIds.get(i))) {
-          accessId = accessIds.get(i);
-        } else {
+        if (i >= 1) {
           accessId = username;
         }
         final S3SecretValue resp =
             objStore.assignUserToTenant(username, tenantName, accessId);
-        err().println("Assigned '" + username + "' to '" + tenantName + "'.");
+        err().println("Assigned '" + username + "' to '" + tenantName +
+            "' under accessId '" + accessId + "'.");
         out().println("export AWS_ACCESS_KEY_ID=" + resp.getAwsAccessKey());
         out().println("export AWS_SECRET_ACCESS_KEY=" + resp.getAwsSecret());
       } catch (IOException e) {
