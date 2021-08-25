@@ -34,7 +34,7 @@ public class OzoneMultiTenantPrincipalImpl
   // TODO: This separator should come from Ozone Config.
   private static final String TENANT_ID_SEPARATOR =
       OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
-  private OzonePrincipalType  principalType = USER_PRINCIPAL;
+  private OzonePrincipalType principalType = USER_PRINCIPAL;
   private Principal principalUserIDPart;
   private Principal principalTenantIDPart;
 
@@ -47,7 +47,8 @@ public class OzoneMultiTenantPrincipalImpl
 
   @Override
   public String getFullMultiTenantPrincipalID() {
-    return getTenantID() + TENANT_ID_SEPARATOR + getUserID();
+    return getUserID();
+//    return getTenantID() + TENANT_ID_SEPARATOR + getUserID();
   }
 
   @Override
