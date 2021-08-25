@@ -57,14 +57,9 @@ public class StreamCommitWatcher {
 
   private XceiverClientSpi xceiverClient;
 
-  // total data which has been successfully flushed and acknowledged
-  // by all servers
-  private long totalAckDataLength;
-
   public StreamCommitWatcher(XceiverClientSpi xceiverClient) {
     this.xceiverClient = xceiverClient;
     commitIndexSet = new ConcurrentSkipListSet();
-    totalAckDataLength = 0;
     futureMap = new ConcurrentHashMap<>();
   }
 
@@ -157,10 +152,6 @@ public class StreamCommitWatcher {
         CompletableFuture<
             ContainerCommandResponseProto>> getFutureMap() {
     return futureMap;
-  }
-
-  public long getTotalAckDataLength() {
-    return totalAckDataLength;
   }
 
   public void cleanup() {

@@ -279,9 +279,6 @@ public class KeyDataStreamOutput implements ByteBufStreamOutput {
     }
     Pipeline pipeline = streamEntry.getPipeline();
     PipelineID pipelineId = pipeline.getId();
-    long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
-    //set the correct length for the current stream
-    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
 
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();

@@ -191,10 +191,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     return blockID.get();
   }
 
-  public long getTotalAckDataLength() {
-    return commitWatcher.getTotalAckDataLength();
-  }
-
   public long getWrittenDataLength() {
     return writtenDataLength;
   }

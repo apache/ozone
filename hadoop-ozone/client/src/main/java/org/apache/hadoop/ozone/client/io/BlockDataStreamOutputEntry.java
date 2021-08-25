@@ -130,20 +130,6 @@ public final class BlockDataStreamOutputEntry
     return false;
   }
 
-  long getTotalAckDataLength() {
-    if (byteBufStreamOutput != null) {
-      BlockDataStreamOutput out =
-          (BlockDataStreamOutput) this.byteBufStreamOutput;
-      blockID = out.getBlockID();
-      return out.getTotalAckDataLength();
-    } else {
-      // For a pre allocated block for which no write has been initiated,
-      // the ByteBufStreamOutput will be null here.
-      // In such cases, the default blockCommitSequenceId will be 0
-      return 0;
-    }
-  }
-
   Collection<DatanodeDetails> getFailedServers() {
     if (byteBufStreamOutput != null) {
       BlockDataStreamOutput out =
