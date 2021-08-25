@@ -230,7 +230,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);
-    String response = getReponseData(conn);
+    String response = getResponseData(conn);
     String groupIDCreated = null;
     try {
       JsonObject jResonse = new JsonParser().parse(response).getAsJsonObject();
@@ -261,7 +261,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);
-    String response = getReponseData(conn);
+    String response = getResponseData(conn);
     String userIDCreated = null;
     try {
       JsonObject jResonse = new JsonParser().parse(response).getAsJsonObject();
@@ -294,7 +294,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonCreateUserString, "POST", false);
-    String userInfo = getReponseData(conn);
+    String userInfo = getResponseData(conn);
     String userIDCreated;
     try {
       JsonObject jObject = new JsonParser().parse(userInfo).getAsJsonObject();
@@ -325,12 +325,12 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonCreateGroupString,
         "POST", false);
-    String groupInfo = getReponseData(conn);
+    String groupInfo = getResponseData(conn);
     String groupIdCreated;
     try {
       JsonObject jObject = new JsonParser().parse(groupInfo).getAsJsonObject();
       groupIdCreated = jObject.get("id").getAsString();
-      System.out.println("GroupID is : " + groupIdCreated);
+      System.out.println("GroupID is: " + groupIdCreated);
     } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
@@ -345,7 +345,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         policy.serializePolicyToJsonString(),
         "POST", false);
-    String policyInfo = getReponseData(conn);
+    String policyInfo = getResponseData(conn);
     String policyID;
     try {
       JsonObject jObject = new JsonParser().parse(policyInfo).getAsJsonObject();
@@ -366,7 +366,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);
-    String policyInfo = getReponseData(conn);
+    String policyInfo = getResponseData(conn);
     JsonArray jArry = new JsonParser().parse(policyInfo).getAsJsonArray();
     JsonObject jsonObject = jArry.get(0).getAsJsonObject();
     AccessPolicy policy = new RangerAccessPolicy(policyName);
@@ -427,16 +427,16 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     }
   }
 
-  private String getReponseData(HttpsURLConnection urlConnection)
+  private String getResponseData(HttpsURLConnection urlConnection)
       throws IOException {
     StringBuilder response = new StringBuilder();
     try (BufferedReader br = new BufferedReader(
         new InputStreamReader(urlConnection.getInputStream(), "utf-8"))) {
-      String responseLine = null;
+      String responseLine;
       while ((responseLine = br.readLine()) != null) {
         response.append(responseLine.trim());
       }
-      System.out.println(response.toString());
+      System.out.println(response);
     } catch (Exception e) {
       e.printStackTrace();
       throw e;
