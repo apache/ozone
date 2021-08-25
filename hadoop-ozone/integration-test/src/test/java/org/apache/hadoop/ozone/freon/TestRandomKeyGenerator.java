@@ -30,13 +30,11 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
-@Ignore("HDDS-3290")
 public class TestRandomKeyGenerator {
 
   private static MiniOzoneCluster cluster;
@@ -127,7 +125,6 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  @Ignore("HDDS-2011")
   public void bigFileThan2GB() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
