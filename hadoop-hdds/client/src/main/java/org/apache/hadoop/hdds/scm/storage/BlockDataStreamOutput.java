@@ -106,7 +106,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
   // be released from the buffer pool.
-  private final CommitWatcher commitWatcher;
+  private final StreamCommitWatcher commitWatcher;
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -158,7 +158,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    commitWatcher = new CommitWatcher(xceiverClient);
+    commitWatcher = new StreamCommitWatcher(xceiverClient);
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
@@ -244,15 +244,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
   }
 
-
-
-  // It may happen that once the exception is encountered , we still might
-  // have successfully flushed up to a certain index. Make sure the buffers
-  // only contain data which have not been sufficiently replicated
-  private void adjustBuffersOnException() {
-    commitWatcher.releaseBuffersOnException();
-  }
-
   /**
    * calls watchForCommit API of the Ratis Client. For Standalone client,
    * it is a no op.
@@ -294,12 +285,7 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
-    try {
-      CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
-    } catch (Exception e) {
-      LOG.warn("Failed to write all chunks through stream: " + e);
-      throw new IOException(e);
-    }
+    flush();
     if (close) {
       dataStreamCloseReply = out.closeAsync();
     }
@@ -356,11 +342,14 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     return flushFuture;
   }
 
-  // TODO We are no longer using the bufferPool, so we do not need to flush the
-  //  data in it. We can discuss whether add other behaviors here.
   @Override
   public void flush() throws IOException {
-
+    try {
+      CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
+    } catch (Exception e) {
+      LOG.warn("Failed to write all chunks through stream: " + e);
+      throw new IOException(e);
+    }
   }
 
   /**
@@ -469,7 +458,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
     if (isClosed()) {
       throw new IOException("BlockDataStreamOutput has been closed.");
     } else if (getIoException() != null) {
-      adjustBuffersOnException();
       throw getIoException();
     }
   }
@@ -571,7 +559,6 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    */
   private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
-    adjustBuffersOnException();
     throw getIoException();
   }
 }
