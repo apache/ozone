@@ -90,7 +90,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false -Dtrust_all_cert=true -Djavax.net.ssl.trustStore=/usr/lib/jvm/jre/lib/security/cacerts
+      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
     command: ["/opt/hadoop/bin/ozone","recon"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -115,7 +115,6 @@ services:
     volumes:
       - ./mockserverInitialization.json:/config/mockserverInitialization.json
     ports:
-      - 6080:6080
       - 6182:6182
     environment:
       MOCKSERVER_MAX_EXPECTATIONS: 100
