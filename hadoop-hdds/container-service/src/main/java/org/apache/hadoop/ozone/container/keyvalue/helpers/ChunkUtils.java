@@ -49,6 +49,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import static java.nio.channels.FileChannel.open;
 import static java.util.Collections.unmodifiableSet;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_WRITE_SIZE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
@@ -351,7 +352,7 @@ public final class ChunkUtils {
     }
   }
 
-  private static StorageContainerException wrapInStorageContainerException(
+  public static StorageContainerException wrapInStorageContainerException(
       IOException e) {
     ContainerProtos.Result result = translate(e);
     return new StorageContainerException(e, result);
@@ -372,5 +373,20 @@ public final class ChunkUtils {
     }
 
     return CONTAINER_INTERNAL_ERROR;
+  }
+
+  /**
+   * Checks if the block file length is equal to the chunk offset.
+   *
+   */
+  public static void validateChunkSize(File chunkFile, ChunkInfo chunkInfo)
+      throws StorageContainerException {
+    long offset = chunkInfo.getOffset();
+    long len = chunkFile.length();
+    if (chunkFile.length() != offset) {
+      throw new StorageContainerException(
+          "Chunk file offset " + offset + " does not match blockFile length " +
+          len, CHUNK_FILE_INCONSISTENCY);
+    }
   }
 }
