@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -80,7 +82,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Default replication factor to be used while creating keys.
    */
-  private final ReplicationConfig defaultReplication;
+  private ReplicationConfig defaultReplication;
 
   /**
    * Type of storage to be used for this bucket.
@@ -219,6 +221,39 @@ public class OzoneBucket extends WithMetadata {
         sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
         quotaInNamespace);
     this.bucketLayout = bucketLayout;
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket, long usedBytes,
+      long usedNamespace, long quotaInBytes, long quotaInNamespace,
+      BucketLayout bucketLayout,
+      DefaultReplicationConfig defaultReplicationConfig) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, modificationTime, metadata, encryptionKeyName,
+        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
+        quotaInNamespace);
+    this.bucketLayout = bucketLayout;
+    if (defaultReplicationConfig != null) {
+      this.defaultReplication =
+          defaultReplicationConfig.getType() == ReplicationType.EC ?
+              defaultReplicationConfig.getEcReplicationConfig() :
+              ReplicationConfig
+                  .fromTypeAndFactor(defaultReplicationConfig.getType(),
+                      defaultReplicationConfig.getFactor());
+    } else {
+      // This can happen when talk to old server. So, using old client side
+      // defaults.
+      this.defaultReplication = ReplicationConfig.fromTypeAndString(
+          ReplicationType.valueOf(
+              conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+                  OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT)),
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION,
+              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT));
+    }
   }
 
   /**
@@ -1218,5 +1253,9 @@ public class OzoneBucket extends WithMetadata {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  public ReplicationConfig getReplicationConfig(){
+    return this.defaultReplication;
   }
 }

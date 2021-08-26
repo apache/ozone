@@ -585,12 +585,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          long transactionLogIndex, long objectID, boolean isRatisEnabled)
+          long transactionLogIndex, long objectID, boolean isRatisEnabled,
+          ReplicationConfig replicationConfig)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
             locations, encInfo, prefixManager, omBucketInfo, null,
-            transactionLogIndex, objectID, isRatisEnabled);
+            transactionLogIndex, objectID, isRatisEnabled, replicationConfig);
   }
 
   /**
@@ -608,7 +609,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfoWithFSO omPathInfo,
           long transactionLogIndex, long objectID,
-          boolean isRatisEnabled)
+          boolean isRatisEnabled, ReplicationConfig replicationConfig)
           throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
@@ -633,11 +634,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
-    return createFileInfo(keyArgs, locations, ReplicationConfig
-            .fromProto(keyArgs.getType(), keyArgs.getFactor(),
-                keyArgs.getEcReplicationConfig()), keyArgs.getDataSize(),
-        encInfo, prefixManager, omBucketInfo, omPathInfo, transactionLogIndex,
-        objectID);
+    return createFileInfo(keyArgs, locations, replicationConfig,
+            keyArgs.getDataSize(), encInfo, prefixManager,
+            omBucketInfo, omPathInfo, transactionLogIndex, objectID);
   }
 
   /**
@@ -654,7 +653,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfoWithFSO omPathInfo,
       long transactionLogIndex, long objectID) {
-
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())

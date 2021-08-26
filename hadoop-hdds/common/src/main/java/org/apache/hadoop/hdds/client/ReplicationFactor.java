@@ -71,6 +71,22 @@ public enum ReplicationFactor {
     }
   }
 
+  public static HddsProtos.ReplicationFactor toProto(
+       ReplicationFactor replicationFactor) {
+    if (replicationFactor == null) {
+      return null;
+    }
+    switch (replicationFactor) {
+    case ONE:
+      return HddsProtos.ReplicationFactor.ONE;
+    case THREE:
+      return HddsProtos.ReplicationFactor.THREE;
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported ProtoBuf replication factor: " + replicationFactor);
+    }
+  }
+
   /**
    * Returns integer representation of ReplicationFactor.
    * @return replication value

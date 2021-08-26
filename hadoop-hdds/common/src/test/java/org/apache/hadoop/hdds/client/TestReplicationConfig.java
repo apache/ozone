@@ -30,13 +30,10 @@ import org.junit.Test;
 public class TestReplicationConfig {
 
   @Test
-  public void testGetDefaultShouldCreateReplicationConfigFromDefaultConf() {
+  public void testGetDefaultShouldReturnNullIfNotSetClientSide() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
-    Assert.assertEquals(
-        org.apache.hadoop.hdds.client.ReplicationType.RATIS.name(),
-        replicationConfig.getReplicationType().name());
-    Assert.assertEquals(3, replicationConfig.getRequiredNodes());
+    Assert.assertNull(replicationConfig);
   }
 
   @Test
