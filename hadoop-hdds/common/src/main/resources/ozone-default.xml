@@ -2853,6 +2853,13 @@
     <description>Byte limit for Raft's Log Worker queue.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Number of operation pending with Raft's Log Worker.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ha.ratis.log.purge.enabled</name>
     <value>false</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
