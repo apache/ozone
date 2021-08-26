@@ -526,7 +526,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       clusterMap = new NetworkTopologyImpl(conf);
     }
-
+    // This needs to be done before initializing Ratis.
+    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -1262,8 +1263,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
-
-    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
