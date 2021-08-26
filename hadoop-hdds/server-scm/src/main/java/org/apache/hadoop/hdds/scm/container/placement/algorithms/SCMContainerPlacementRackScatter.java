@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -131,7 +130,7 @@ public final class SCMContainerPlacementRackScatter
     }
 
     List<Node> toChooseRacks = new LinkedList<>(racks);
-    List<Node> chosenNodes = new ArrayList<>();
+    List<DatanodeDetails> chosenNodes = new ArrayList<>();
     List<Node> unavailableNodes = new ArrayList<>();
     Set<Node> skippedRacks = new HashSet<>();
     if (excludedNodes != null) {
@@ -183,7 +182,7 @@ public final class SCMContainerPlacementRackScatter
         Node node = chooseNode(rack.getNetworkFullPath(), unavailableNodes,
             metadataSizeRequired, dataSizeRequired);
         if (node != null) {
-          chosenNodes.add(node);
+          chosenNodes.add((DatanodeDetails) node);
           mutableFavoredNodes.remove(node);
           unavailableNodes.add(node);
           nodesRequired--;
@@ -206,16 +205,14 @@ public final class SCMContainerPlacementRackScatter
         retryCount = 0;
       }
     }
-    List<DatanodeDetails> results = Arrays.asList(
-        chosenNodes.toArray(new DatanodeDetails[0]));
     ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(results, nodesRequired);
+        validateContainerPlacement(chosenNodes, nodesRequired);
     if (!placementStatus.isPolicySatisfied()) {
-      LOG.warn("ContainerPlacementPolicy not met, currentRacks is " +
-          placementStatus.actualPlacementCount() + ", desired racks is " +
-          placementStatus.expectedPlacementCount() + ".");
+      LOG.warn("ContainerPlacementPolicy not met, currentRacks is {}," +
+          " desired racks is {}.", placementStatus.actualPlacementCount(),
+          placementStatus.expectedPlacementCount());
     }
-    return results;
+    return chosenNodes;
   }
 
   @Override
