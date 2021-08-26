@@ -48,4 +48,24 @@ public enum ReplicationType {
           "Unsupported ProtoBuf replication type: " + replicationType);
     }
   }
+
+  public static HddsProtos.ReplicationType toProto(
+       ReplicationType replicationType) {
+    if (replicationType == null) {
+      return null;
+    }
+    switch (replicationType) {
+    case RATIS:
+      return HddsProtos.ReplicationType.RATIS;
+    case STAND_ALONE:
+      return HddsProtos.ReplicationType.STAND_ALONE;
+    case CHAINED:
+      return HddsProtos.ReplicationType.CHAINED;
+    case EC:
+      return HddsProtos.ReplicationType.EC;
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported replication type: " + replicationType);
+    }
+  }
 }

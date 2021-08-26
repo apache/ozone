@@ -543,6 +543,7 @@ message BucketInfo {
     optional int64 quotaInNamespace = 16 [default = -2];
     optional uint64 usedNamespace = 17;
     optional BucketLayoutProto bucketLayout = 18;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 19;
 }
 
 enum StorageTypeProto {
@@ -620,6 +621,7 @@ message BucketArgs {
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
     optional uint64 quotaInNamespace = 9;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 10;
 }
 
 message PrefixInfo {
@@ -756,8 +758,8 @@ message KeyArgs {
     required string bucketName = 2;
     required string keyName = 3;
     optional uint64 dataSize = 4;
-    optional hadoop.hdds.ReplicationType type = 5;
-    optional hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ReplicationType type = 5 [default = NONE];
+    optional hadoop.hdds.ReplicationFactor factor = 6 [default = ZERO];
     repeated KeyLocation keyLocations = 7;
     optional bool isMultipartKey = 8;
     optional string multipartUploadID = 9;

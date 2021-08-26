@@ -261,16 +261,24 @@ enum ReplicationType {
     STAND_ALONE = 2;
     CHAINED = 3;
     EC = 4;
+    NONE = -1; // Invalid Type
 }
 
 enum ReplicationFactor {
     ONE = 1;
     THREE = 3;
+    ZERO = 0; // Invalid Factor
 }
 
 message ECReplicationConfig {
     required int32 data = 1;
     required int32 parity = 2;
+}
+
+message DefaultReplicationConfig {
+    required ReplicationType type = 1;
+    optional ReplicationFactor factor = 2;
+    optional ECReplicationConfig ecReplicationConfig = 3;
 }
 
 enum ScmOps {

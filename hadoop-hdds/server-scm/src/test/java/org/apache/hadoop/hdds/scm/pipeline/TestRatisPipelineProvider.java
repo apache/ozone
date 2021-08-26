@@ -263,6 +263,9 @@ public class TestRatisPipelineProvider {
     largeContainerConf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
     init(1, largeContainerConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
+      if (factor == ReplicationFactor.ZERO) {
+        continue;
+      }
       try {
         provider.create(new RatisReplicationConfig(factor));
         Assert.fail("Expected SCMException for large container size with " +
@@ -276,6 +279,9 @@ public class TestRatisPipelineProvider {
     largeMetadataConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "100TB");
     init(1, largeMetadataConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
+      if (factor == ReplicationFactor.ZERO) {
+        continue;
+      }
       try {
         provider.create(new RatisReplicationConfig(factor));
         Assert.fail("Expected SCMException for large metadata size with " +

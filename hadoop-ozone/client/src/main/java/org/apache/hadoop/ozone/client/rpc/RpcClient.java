@@ -43,6 +43,7 @@ import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -500,6 +501,12 @@ public class RpcClient implements ClientProtocol {
       builder.setBucketEncryptionKey(bek);
     }
 
+    DefaultReplicationConfig defaultReplicationConfig =
+        bucketArgs.getDefaultReplicationConfig();
+    if (defaultReplicationConfig != null) {
+      builder.setDefaultReplicationConfig(defaultReplicationConfig);
+    }
+
     LOG.info("Creating Bucket: {}/{}, with Versioning {} and " +
             "Storage Type set to {} and Encryption set to {} ",
         volumeName, bucketName, isVersionEnabled, storageType, bek != null);
@@ -718,7 +725,8 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInNamespace(),
-        bucketInfo.getBucketLayout()
+        bucketInfo.getBucketLayout(),
+        bucketInfo.getDefaultReplicationConfig()
     );
   }
 
@@ -771,7 +779,7 @@ public class RpcClient implements ClientProtocol {
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
-    HddsClientUtils.checkNotNull(keyName, replicationConfig);
+    HddsClientUtils.checkNotNull(keyName);
     String requestId = UUID.randomUUID().toString();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
@@ -1394,14 +1402,14 @@ public class RpcClient implements ClientProtocol {
       keyOutputStream = new ECKeyOutputStream.Builder().setHandler(openKey)
           .setXceiverClientManager(xceiverClientManager)
           .setOmClient(ozoneManagerClient).setRequestID(requestId)
-          .setReplicationConfig(replicationConfig)
+          .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
           .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
           .setConfig(clientConfig).build();
     } else {
       keyOutputStream = new KeyOutputStream.Builder().setHandler(openKey)
           .setXceiverClientManager(xceiverClientManager)
           .setOmClient(ozoneManagerClient).setRequestID(requestId)
-          .setReplicationConfig(replicationConfig)
+          .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
           .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
           .setConfig(clientConfig).build();
     }

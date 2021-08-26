@@ -28,7 +28,8 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -356,8 +357,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setCreationTime(keyArgs.getModificationTime())
         .setModificationTime(keyArgs.getModificationTime())
         .setDataSize(0)
-        .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
+        .setReplicationConfig(new StandaloneReplicationConfig(
+            HddsProtos.ReplicationFactor.ONE))
         .setObjectID(objectId)
         .setUpdateID(objectId);
   }
