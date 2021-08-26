@@ -72,7 +72,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  *     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
  *         .setNumDatanodes(numOfDatanodes);
  *
- *     clusterProvider = new MiniOzoneClusterProvider(conf, builder);
+ *     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 5);
  *   }
  *
  * Ensure you shutdown the provider in a @AfterClass annotated method:
@@ -100,30 +100,51 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  *
  *  This only works if the same config / builder object can be passed to each
  *  cluster in the test suite.
+ *
+ *  Also note that the expected number of clusters must be passed to the
+ *  provider. As things stand, the provider always starts creating a new cluster
+ *  each time a cluster is requested, so it always has one in reserve. This will
+ *  result in an extra cluster getting created which is not needed. To avoid
+ *  this, pass the number of expected clusters into the provider. This will
+ *  avoid the extra cluster creation, but if you request more clusters than the
+ *  limit an error will be thrown.
+ *
  */
 public class MiniOzoneClusterProvider {
 
-  private static Logger LOG
+  private static final Logger LOG
       = LoggerFactory.getLogger(MiniOzoneClusterProvider.class);
 
-  private int preCreatedLimit = 1;
+  private static final int PRE_CREATE_LIMIT = 1;
+  private static final int EXPIRED_LIMIT = 4;
   private volatile boolean shutdown = false;
+  private final int clusterLimit;
+  private int consumedClusterCount = 0;
 
   private final OzoneConfiguration conf;
   private final MiniOzoneCluster.Builder builder;
-  private Thread createThread;
-  private Thread reapThread;
+  private final Thread createThread;
+  private final Thread reapThread;
 
   private final Set<MiniOzoneCluster> createdClusters = new HashSet<>();
   private final BlockingQueue<MiniOzoneCluster> clusters
-      = new ArrayBlockingQueue<>(preCreatedLimit);
+      = new ArrayBlockingQueue<>(PRE_CREATE_LIMIT);
   private final BlockingQueue<MiniOzoneCluster> expiredClusters
-      = new ArrayBlockingQueue<>(4);
+      = new ArrayBlockingQueue<>(EXPIRED_LIMIT);
 
+  /**
+   *
+   * @param conf The configuration to use when creating the cluster
+   * @param builder A builder object with all cluster options set
+   * @param clusterLimit The total number of clusters this provider should
+   *                     create. If another is requested after this limit has
+   *                     been reached, an exception will be thrown.
+   */
   public MiniOzoneClusterProvider(OzoneConfiguration conf,
-      MiniOzoneCluster.Builder builder) {
+      MiniOzoneCluster.Builder builder, int clusterLimit) {
     this.conf = conf;
     this.builder = builder;
+    this.clusterLimit = clusterLimit;
     createThread = createClusters();
     reapThread = reapClusters();
   }
@@ -131,8 +152,14 @@ public class MiniOzoneClusterProvider {
   public synchronized MiniOzoneCluster provide()
       throws InterruptedException, IOException {
     ensureNotShutdown();
+    if (consumedClusterCount >= clusterLimit) {
+      throw new IOException("The cluster limit of " + clusterLimit + " has "
+          + "been reached for this provider. Please increase the value set "
+          + "in the constructor");
+    }
     MiniOzoneCluster cluster = clusters.poll(100, SECONDS);
     createdClusters.add(cluster);
+    consumedClusterCount++;
     return cluster;
   }
 
@@ -183,7 +210,8 @@ public class MiniOzoneClusterProvider {
 
   private Thread createClusters() {
     Thread t = new Thread(() -> {
-      while (!Thread.interrupted()) {
+      int createdCount = 0;
+      while (!Thread.interrupted() && createdCount < clusterLimit) {
         MiniOzoneCluster cluster = null;
         try {
           builder.setClusterId(UUID.randomUUID().toString());
@@ -202,6 +230,7 @@ public class MiniOzoneClusterProvider {
 
           cluster = builder.build();
           cluster.waitForClusterToBeReady();
+          createdCount++;
           clusters.put(cluster);
         } catch (InterruptedException e) {
           if (cluster != null) {
