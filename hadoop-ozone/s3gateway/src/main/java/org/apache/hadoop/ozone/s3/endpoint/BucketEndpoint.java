@@ -149,6 +149,11 @@ public class BucketEndpoint extends EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+      } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.FILE_NOT_FOUND, bucketName);
+      } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_FOUND) {
+        throw S3ErrorTable
+            .newError(S3ErrorTable.DIRECTORY_NOT_FOUND, bucketName);
       } else {
         throw ex;
       }

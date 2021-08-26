@@ -120,6 +120,12 @@ public final class S3ErrorTable {
       "NotImplemented", "This part of feature is not implemented yet.",
       HTTP_NOT_IMPLEMENTED);
 
+  public static final OS3Exception FILE_NOT_FOUND = new OS3Exception(
+      "FileNotFind", "File is not found.", HTTP_NOT_FOUND);
+
+  public static final OS3Exception DIRECTORY_NOT_FOUND = new OS3Exception(
+      "DirectoryNotFind", "Directory is not found.", HTTP_NOT_FOUND);
+
   /**
    * Create a new instance of Error.
    * @param e Error Template
