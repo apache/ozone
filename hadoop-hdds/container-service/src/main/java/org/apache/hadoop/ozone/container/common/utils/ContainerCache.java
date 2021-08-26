@@ -266,7 +266,7 @@ public final class ContainerCache {
     }
   }
 
-  private boolean isContainerOpen(State state) {
+  public boolean isContainerOpen(State state) {
     switch (state) {
     case CLOSED:
     case QUASI_CLOSED:

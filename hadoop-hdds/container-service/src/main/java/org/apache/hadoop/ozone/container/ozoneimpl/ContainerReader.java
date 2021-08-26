@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -211,11 +212,14 @@ public class ContainerReader implements Runnable {
         KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
             config);
         containerSet.addContainer(kvContainer);
-        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, false);
-        String dbPath = kvContainerData.getDbFile().getAbsolutePath();
-        ReferenceCountedDB db = new ReferenceCountedDB(store, dbPath);
-        BlockUtils.addDB(db, dbPath, config);
+        ContainerCache cache = ContainerCache.getInstance(config);
+        if (cache.isContainerOpen(kvContainerData.getState())) {
+          DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
+              kvContainerData, config, false);
+          String dbPath = kvContainerData.getDbFile().getAbsolutePath();
+          ReferenceCountedDB db = new ReferenceCountedDB(store, dbPath);
+          cache.addDB(dbPath, db);
+        }
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
             "ContainerType is KeyValueContainer but cast to " +

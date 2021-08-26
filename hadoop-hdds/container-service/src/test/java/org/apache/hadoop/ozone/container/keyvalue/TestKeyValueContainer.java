@@ -516,6 +516,7 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    closeContainer();
 
     try (ReferenceCountedDB db =
         BlockUtils.getDB(keyValueContainerData, CONF)) {
