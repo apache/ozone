@@ -823,7 +823,7 @@
   <property>
     <name>ozone.scm.container.placement.ec.impl</name>
     <value>
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter
     </value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>

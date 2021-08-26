@@ -169,7 +169,8 @@ public class TestContainerPlacementFactory {
   public void testECPolicy() throws IOException {
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getECPolicy(conf, null, null, true, null);
-    Assert.assertSame(SCMContainerPlacementRandom.class, policy.getClass());
+    Assert.assertSame(SCMContainerPlacementRackScatter.class,
+        policy.getClass());
   }
 
   /**
