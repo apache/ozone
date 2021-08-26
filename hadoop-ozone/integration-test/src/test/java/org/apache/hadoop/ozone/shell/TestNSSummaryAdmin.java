@@ -25,6 +25,9 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+
 /**
  * Test for Namespace CLI.
  */
@@ -40,6 +43,7 @@ public class TestNSSummaryAdmin {
     conf = new OzoneConfiguration();
     conf.setBoolean("ozone.om.enable.filesystem.paths", true);
     conf.set("ozone.om.metadata.layout", "PREFIX");
+    conf.set(OZONE_RECON_ADDRESS_KEY, OZONE_RECON_ADDRESS_DEFAULT);
     cluster = MiniOzoneCluster.newBuilder(conf).includeRecon(true).build();
     cluster.waitForClusterToBeReady();
   }

@@ -91,7 +91,7 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
 
     String name = null;
 
-    if (webPolicy == HttpConfig.Policy.HTTPS_ONLY) {
+    if (webPolicy.isHttpsEnabled()) {
       protocolPrefix = "https://";
       name = conf.get(OZONE_RECON_HTTPS_ADDRESS_KEY,
           OZONE_RECON_HTTPS_ADDRESS_DEFAULT);
