@@ -19,9 +19,13 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -99,14 +103,18 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  */
 public class MiniOzoneClusterProvider {
 
+  private static Logger LOG
+      = LoggerFactory.getLogger(MiniOzoneClusterProvider.class);
+
   private int preCreatedLimit = 1;
-  private boolean shutdown = false;
+  private volatile boolean shutdown = false;
 
   private final OzoneConfiguration conf;
   private final MiniOzoneCluster.Builder builder;
   private Thread createThread;
   private Thread reapThread;
 
+  private final Set<MiniOzoneCluster> createdClusters = new HashSet<>();
   private final BlockingQueue<MiniOzoneCluster> clusters
       = new ArrayBlockingQueue<>(preCreatedLimit);
   private final BlockingQueue<MiniOzoneCluster> expiredClusters
@@ -123,12 +131,15 @@ public class MiniOzoneClusterProvider {
   public synchronized MiniOzoneCluster provide()
       throws InterruptedException, IOException {
     ensureNotShutdown();
-    return clusters.poll(100, SECONDS);
+    MiniOzoneCluster cluster = clusters.poll(100, SECONDS);
+    createdClusters.add(cluster);
+    return cluster;
   }
 
   public synchronized void destroy(MiniOzoneCluster c)
       throws InterruptedException, IOException {
     ensureNotShutdown();
+    createdClusters.remove(c);
     expiredClusters.put(c);
   }
 
@@ -136,9 +147,8 @@ public class MiniOzoneClusterProvider {
     createThread.interrupt();
     createThread.join();
     destroyRemainingClusters();
-    reapThread.interrupt();
-    reapThread.join();
     shutdown = true;
+    reapThread.join();
   }
 
   private void ensureNotShutdown() throws IOException {
@@ -149,16 +159,20 @@ public class MiniOzoneClusterProvider {
 
   private Thread reapClusters() {
     Thread t = new Thread(() -> {
-      boolean shouldRun = true;
-      while(shouldRun || !expiredClusters.isEmpty()) {
+      while(!shutdown || !expiredClusters.isEmpty()) {
         try {
-          if (Thread.interrupted()) {
-            throw new InterruptedException();
+          // Why not just call take and wait forever until interrupt is
+          // thrown? Inside MiniCluster.shutdown, there are places where it
+          // waits on things to happen, and the interrupt can interrupt those
+          // and prevent the shutdown from happening correctly. Therefore it is
+          // safer to just poll and avoid interrupting this thread.
+          MiniOzoneCluster c = expiredClusters.poll(100,
+              TimeUnit.MILLISECONDS);
+          if (c != null) {
+            c.shutdown();
           }
-          MiniOzoneCluster c = expiredClusters.take();
-          c.shutdown();
-        } catch (InterruptedException e) {
-          shouldRun = false;
+        } catch (Exception e) {
+          LOG.error("Unexpected exception received", e);
         }
       }
     });
@@ -204,14 +218,31 @@ public class MiniOzoneClusterProvider {
     return t;
   }
 
-  private void destroyRemainingClusters() throws InterruptedException {
+  private void destroyRemainingClusters() {
     while(!clusters.isEmpty()) {
       try {
-        expiredClusters.add(clusters.poll(100, TimeUnit.MILLISECONDS));
-      } catch (InterruptedException e) {
-        // Do nothing
+        MiniOzoneCluster cluster = clusters.poll();
+        if (cluster != null) {
+          destroy(cluster);
+        }
+      } catch (InterruptedException | IOException e) {
+        LOG.error("Caught exception when destroying clusters", e);
+        // Do nothing as we want to ensure all clusters try to shutdown.
       }
     }
+    // If there are any clusters remaining in createdClusters, then destroy
+    // them too. This could be due to a test failing to return the cluster
+    // for some reason
+    MiniOzoneCluster[] remaining
+        = createdClusters.toArray(new MiniOzoneCluster[0]);
+    for (MiniOzoneCluster c : remaining) {
+      try {
+        destroy(c);
+      } catch (InterruptedException | IOException e) {
+        LOG.error("Caught exception when destroying remaining clusters", e);
+      }
+    }
+    createdClusters.clear();
   }
 
   private List<Integer> getFreePortList(int size) {
