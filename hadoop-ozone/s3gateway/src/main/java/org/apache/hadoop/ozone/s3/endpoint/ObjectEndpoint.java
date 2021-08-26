@@ -115,6 +115,8 @@ public class ObjectEndpoint extends EndpointBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectEndpoint.class);
 
+  private static String delimiter = "/";
+
   @Context
   private HttpHeaders headers;
 
@@ -191,8 +193,12 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       OzoneBucket bucket = getBucket(bucketName);
 
-      output = bucket.createKey(keyPath, length, replicationType,
-          replicationFactor, new HashMap<>());
+      if (keyPath.endsWith(delimiter)) {
+        bucket.createDirectory(keyPath);
+      } else {
+        output = bucket.createKey(keyPath, length, replicationType,
+            replicationFactor, new HashMap<>());
+      }
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
