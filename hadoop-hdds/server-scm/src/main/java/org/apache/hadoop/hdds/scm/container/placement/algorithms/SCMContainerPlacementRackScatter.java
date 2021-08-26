@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
@@ -205,8 +206,16 @@ public final class SCMContainerPlacementRackScatter
         retryCount = 0;
       }
     }
-
-    return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
+    List<DatanodeDetails> results = Arrays.asList(
+        chosenNodes.toArray(new DatanodeDetails[0]));
+    ContainerPlacementStatus placementStatus =
+        validateContainerPlacement(results, nodesRequired);
+    if (!placementStatus.isPolicySatisfied()) {
+      LOG.warn("ContainerPlacementPolicy not met, currentRacks is " +
+          placementStatus.actualPlacementCount() + ", desired racks is " +
+          placementStatus.expectedPlacementCount() + ".");
+    }
+    return results;
   }
 
   @Override
