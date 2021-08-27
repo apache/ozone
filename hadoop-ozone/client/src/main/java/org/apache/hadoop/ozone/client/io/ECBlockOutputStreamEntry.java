@@ -32,14 +32,16 @@ import java.io.IOException;
  * Helper for {@link ECBlockOutputStream}.
  */
 public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
+  private final boolean isParityStreamEntry;
   private ECBlockOutputStream out;
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
       BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config) {
+      OzoneClientConfig config, boolean isParityStream) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
         token, config);
+    this.isParityStreamEntry = isParityStream;
   }
 
   @Override
@@ -51,6 +53,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
 
   void executePutBlock() throws IOException {
     this.out.executePutBlock(false, true);
+  }
+
+  public boolean isParityStreamEntry() {
+    return this.isParityStreamEntry;
   }
 
   /**
@@ -66,6 +72,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
+    private boolean isParityStreamEntry;
 
     public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -113,6 +120,12 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       return this;
     }
 
+    public ECBlockOutputStreamEntry.Builder setIsParityStreamEntry(
+        boolean isParity) {
+      this.isParityStreamEntry = isParity;
+      return this;
+    }
+
     public ECBlockOutputStreamEntry build() {
       return new ECBlockOutputStreamEntry(blockID,
           key,
@@ -120,7 +133,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
           pipeline,
           length,
           bufferPool,
-          token, config);
+          token, config, isParityStreamEntry);
     }
   }
 }

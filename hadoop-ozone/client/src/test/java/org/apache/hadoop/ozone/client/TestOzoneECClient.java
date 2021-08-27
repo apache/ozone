@@ -69,6 +69,8 @@ public class TestOzoneECClient {
   private OzoneClient client;
   private ObjectStore store;
   private String keyName = UUID.randomUUID().toString();
+  private String volumeName = UUID.randomUUID().toString();
+  private String bucketName = UUID.randomUUID().toString();
   private byte[][] inputChunks = new byte[dataBlocks][chunkSize];
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
@@ -225,11 +227,91 @@ public class TestOzoneECClient {
     }
   }
 
+  @Test
+  public void testPartialStripeWithSingleChunkAndPadding() throws IOException {
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, 2000,
+        new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
+      for (int i = 0; i < inputChunks[0].length; i++) {
+        out.write(inputChunks[0][i]);
+      }
+    }
+
+    OzoneKey key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[1024];
+      Assert.assertEquals(inputChunks[0].length, is.read(fileContent));
+      Assert.assertEquals(new String(inputChunks[0], UTF_8),
+          new String(fileContent, UTF_8));
+    }
+  }
+
+  @Test
+  public void testPartialStripeLessThanSingleChunkWithPadding()
+      throws IOException {
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, 2000,
+        new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
+      for (int i = 0; i < inputChunks[0].length-1; i++) {
+        out.write(inputChunks[0][i]);
+      }
+    }
+
+    OzoneKey key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[1023];
+      Assert.assertEquals(inputChunks[0].length - 1, is.read(fileContent));
+      Assert.assertEquals(
+          new String(Arrays.copyOf(inputChunks[0], inputChunks[0].length - 1),
+              UTF_8), new String(fileContent, UTF_8));
+    }
+  }
+
+  @Test
+  public void testPartialStripeWithPartialLastChunk()
+      throws IOException {
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    byte[] lastChunk = inputChunks[inputChunks.length - 1];
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, 2000,
+        new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
+      for (int i = 0; i < inputChunks.length - 1; i++) {
+        out.write(inputChunks[i]);
+      }
+
+      for (int i = 0; i < lastChunk.length - 1; i++) {
+        out.write(lastChunk[i]);
+      }
+    }
+
+    // Making sure to keep only the 3rd node in pipeline, so that 3rd chunk can
+    // be read.
+    updatePipelineToKeepSingleNode(3);
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[1023];
+      Assert.assertEquals(lastChunk.length - 1, is.read(fileContent));
+      Assert.assertEquals(
+          new String(Arrays.copyOf(lastChunk, lastChunk.length - 1), UTF_8),
+          new String(fileContent, UTF_8));
+    }
+  }
 
   private OzoneBucket writeIntoECKey(byte[][] chunks, String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     if (defaultReplicationConfig != null) {
