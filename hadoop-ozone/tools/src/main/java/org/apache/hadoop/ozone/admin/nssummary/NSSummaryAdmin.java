@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
@@ -28,10 +27,6 @@ import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
-import java.util.Optional;
-
-import static org.apache.hadoop.hdds.HddsUtils.getHostName;
-import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTPS_ADDRESS_DEFAULT;
