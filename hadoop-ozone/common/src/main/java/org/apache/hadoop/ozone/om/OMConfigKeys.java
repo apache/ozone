@@ -276,4 +276,9 @@ public final class OMConfigKeys {
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
+  public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
+      "ozone.om.s3.grpc.server_enabled";
+  public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
+      false;
+
 }
