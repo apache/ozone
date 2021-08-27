@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -41,6 +40,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys
+    .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys
+    .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 
 /**
@@ -60,6 +63,7 @@ public class GrpcOmTransport implements OmTransport {
 
   private String host = "om";
   private int port = 8981;
+  private int maxSize;
 
   public GrpcOmTransport(ConfigurationSource conf,
                           UserGroupInformation ugi, String omServiceId)
@@ -70,6 +74,8 @@ public class GrpcOmTransport implements OmTransport {
 
     port = conf.getObject(GrpcOmTransportConfig.class).getPort();
 
+    maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
+        OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
   }
 
   public void start() {
@@ -80,7 +86,7 @@ public class GrpcOmTransport implements OmTransport {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
             .usePlaintext()
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+            .maxInboundMessageSize(maxSize);
 
     channel = channelBuilder.build();
     client = OzoneManagerServiceGrpc.newBlockingStub(channel);

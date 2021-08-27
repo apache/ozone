@@ -276,4 +276,9 @@ public final class OMConfigKeys {
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
+  public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
+      "ozone.om.grpc.maximum.response.length";
+  /** Default value for GRPC_MAXIMUM_RESPONSE_LENGTH. */
+  public static final int OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT =
+      128 * 1024 * 1024;
 }
