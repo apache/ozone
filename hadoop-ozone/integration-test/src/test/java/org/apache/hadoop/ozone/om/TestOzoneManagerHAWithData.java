@@ -60,20 +60,15 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   /**
    * Test a client request when all OM nodes are running. The request should
-   * succeed.
+   * succeed. Repeat with one OM node down.
    * @throws Exception
    */
   @Test
-  public void testAllOMNodesRunning() throws Exception {
+  public void testAllOMNodesRunningAndOneDown() throws Exception {
     createVolumeTest(true);
     createKeyTest(true);
-  }
 
-  /**
-   * Test client request succeeds even if one OM is down.
-   */
-  @Test
-  public void testOneOMNodeDown() throws Exception {
+    // Repeat the test with one OM down
     getCluster().stopOzoneManager(1);
     Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
@@ -109,11 +104,17 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
+    testMultipartUploadWithOneOmNodeDown();
   }
 
-
   @Test
-  public void testFileOperationsWithRecursive() throws Exception {
+  public void testFileOperationsAndDelete() throws Exception {
+    testFileOperationsWithRecursive();
+    testFileOperationsWithNonRecursive();
+    testKeysDelete();
+  }
+
+  private void testFileOperationsWithRecursive() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
 
     String data = "random data";
@@ -152,8 +153,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   }
 
-  @Test
-  public void testKeysDelete() throws Exception {
+  private void testKeysDelete() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String data = "random data";
     String keyName1 = "dir/file1";
@@ -193,8 +193,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
 
-  @Test
-  public void testFileOperationsWithNonRecursive() throws Exception {
+  private void testFileOperationsWithNonRecursive() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
 
     String data = "random data";
@@ -250,8 +249,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   }
 
-  @Test
-  public void testMultipartUploadWithOneOmNodeDown() throws Exception {
+  private void testMultipartUploadWithOneOmNodeDown() throws Exception {
 
     OzoneBucket ozoneBucket = setupBucket();
 
