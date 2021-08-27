@@ -657,8 +657,8 @@ public class TestNetworkTopologyImpl {
                       affinityNode.getNetworkFullPath())) {
                     continue;
                   } else {
-                  fail("Node is not picked when sequentially going " +
-                      "through ancestor node's leaf nodes. node:" +
+                    fail("Node is not picked when sequentially going " +
+                        "through ancestor node's leaf nodes. node:" +
                         key.getNetworkFullPath() + ", ancestor node:" +
                         affinityAncestor.getNetworkFullPath() +
                         ", excludedScope: " + pathList.toString() + ", " +
