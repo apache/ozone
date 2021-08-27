@@ -84,7 +84,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
               .setXceiverClientManager(getXceiverClientFactory())
               .setPipeline(pipeline).setConfig(getConfig())
               .setLength(subKeyInfo.getLength()).setBufferPool(getBufferPool())
-              .setToken(subKeyInfo.getToken());
+              .setToken(subKeyInfo.getToken())
+              .setIsParityStreamEntry(i >= ecReplicationConfig.getData());
       getStreamEntries().add(builder.build());
     }
   }
@@ -100,17 +101,15 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     return locationInfoList;
   }
 
+  @Override
   long getKeyLength() {
-    long totalLength = getStreamEntries().stream().filter(c -> {
-      return (c.getPipeline().getReplicaIndex(
-          c.getPipeline().getNodes().iterator()
-              .next())) <= ecReplicationConfig.getData();
-    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
-    totalLength += finishedStreamEntries.stream().filter(c -> {
-      return (c.getPipeline().getReplicaIndex(
-          c.getPipeline().getNodes().iterator()
-              .next())) <= ecReplicationConfig.getData();
-    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    long totalLength = getStreamEntries().stream()
+        .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+
+    totalLength += finishedStreamEntries.stream()
+        .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
     return totalLength;
   }
 
@@ -130,8 +129,24 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
 
   void executePutBlockForAll() throws IOException {
     List<BlockOutputStreamEntry> streamEntries = getStreamEntries();
+    int failedStreams = 0;
     for (int i = 0; i < streamEntries.size(); i++) {
-      ((ECBlockOutputStreamEntry) streamEntries.get(i)).executePutBlock();
+      ECBlockOutputStreamEntry ecBlockOutputStreamEntry =
+          (ECBlockOutputStreamEntry) streamEntries.get(i);
+      if (!ecBlockOutputStreamEntry.isClosed()) {
+        if(!ecBlockOutputStreamEntry.isInitialized()){
+          // Stream not initialized. Means this stream was not used to write.
+          continue;
+        }
+        ecBlockOutputStreamEntry.executePutBlock();
+      }else{
+        failedStreams++;
+      }
+    }
+    if(failedStreams > ecReplicationConfig.getParity()) {
+      throw new IOException(
+          "There are " + failedStreams + " failures than supported tolerance: "
+              + ecReplicationConfig.getParity());
     }
   }
 

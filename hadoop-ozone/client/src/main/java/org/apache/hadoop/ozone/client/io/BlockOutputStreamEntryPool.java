@@ -299,8 +299,8 @@ public class BlockOutputStreamEntryPool {
     this.currentStreamIndex = currIdx;
   }
 
-  public void updateToNextStream(int rotation){
-    currentStreamIndex = (currentStreamIndex+1) % rotation;
+  public void updateToNextStream(int rotation) {
+    currentStreamIndex = (currentStreamIndex + 1) % rotation;
   }
 
   BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {

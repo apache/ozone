@@ -72,20 +72,23 @@ public class TestOzoneClient {
   @Before
   public void init() throws IOException {
     ConfigurationSource config = new InMemoryConfiguration();
+    createNewClient(config, new SinglePipelineBlockAllocator());
+  }
+
+  private void createNewClient(ConfigurationSource config,
+      MockBlockAllocator blkAllocator) throws IOException {
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(
-          String omServiceId)
+      protected OmTransport createOmTransport(String omServiceId)
           throws IOException {
-        return new MockOmTransport();
+        return new MockOmTransport(blkAllocator);
       }
 
       @NotNull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates)
-          throws IOException {
+          List<X509Certificate> x509Certificates) throws IOException {
         return new MockXceiverClientFactory();
       }
     });
@@ -186,6 +189,11 @@ public class TestOzoneClient {
 
   @Test
   public void testPutKeyWithECReplicationConfig() throws IOException {
+    close();
+    ConfigurationSource config = new InMemoryConfiguration();
+    int data = 3;
+    int parity = 2;
+    createNewClient(config, new MultiNodePipelineBlockAllocator(data + parity));
     String value = new String(new byte[1024], UTF_8);
     OzoneBucket bucket = getOzoneBucket();
 
@@ -193,7 +201,7 @@ public class TestOzoneClient {
       String keyName = UUID.randomUUID().toString();
       try (OzoneOutputStream out = bucket
           .createKey(keyName, value.getBytes(UTF_8).length,
-              new ECReplicationConfig(3, 2), new HashMap<>())) {
+              new ECReplicationConfig(data, parity), new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
         out.write(value.getBytes(UTF_8));
       }
