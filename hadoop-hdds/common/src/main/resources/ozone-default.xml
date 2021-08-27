@@ -2333,6 +2333,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.address</name>
+    <value>0.0.0.0:9891</value>
+    <tag>RECON, MANAGEMENT</tag>
+    <description>
+      The host and port the Recon server RPC will listen on.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
     <tag>RECON, MANAGEMENT</tag>
