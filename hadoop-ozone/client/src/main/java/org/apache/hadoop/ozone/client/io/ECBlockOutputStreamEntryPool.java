@@ -103,13 +103,13 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
 
   @Override
   long getKeyLength() {
-    long totalLength = getStreamEntries().stream().filter(c -> {
-      return (!((ECBlockOutputStreamEntry) c).isParityStreamEntry());
-    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    long totalLength = getStreamEntries().stream()
+        .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
 
-    totalLength += finishedStreamEntries.stream().filter(c -> {
-      return (!((ECBlockOutputStreamEntry) c).isParityStreamEntry());
-    }).mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    totalLength += finishedStreamEntries.stream()
+        .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
     return totalLength;
   }
 
