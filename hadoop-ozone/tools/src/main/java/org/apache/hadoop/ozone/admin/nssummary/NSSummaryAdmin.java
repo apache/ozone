@@ -34,12 +34,13 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTPS_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
+import static org.apache.hadoop.http.HttpServer2.HTTPS_SCHEME;
+import static org.apache.hadoop.http.HttpServer2.HTTP_SCHEME;
 
 /**
  * Subcommand for admin operations related to OM.
@@ -84,37 +85,50 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
         && conf.get("ozone.om.metadata.layout").equalsIgnoreCase("PREFIX");
   }
 
-  public String getReconWebAddress() {
-    OzoneConfiguration conf = parent.getOzoneConf();
-    String protocolPrefix = "";
-    HttpConfig.Policy webPolicy = getHttpPolicy(conf);
+  /**
+   * e.g. Input: "0.0.0.0:9891" -> Output: "0.0.0.0"
+   */
+  private String getHostOnly(String host) {
+    return host.split(":", 2)[0];
+  }
 
-    String name = null;
+  /**
+   * e.g. Input: "0.0.0.0:9891" -> Output: "9891"
+   */
+  private String getPort(String host) {
+    return host.split(":", 2)[1];
+  }
+
+  public String getReconWebAddress() {
+    final OzoneConfiguration conf = parent.getOzoneConf();
+    final String protocol;
+    final HttpConfig.Policy webPolicy = getHttpPolicy(conf);
+
+    final boolean isHostDefault;
+    String host;
 
     if (webPolicy.isHttpsEnabled()) {
-      protocolPrefix = "https://";
-      name = conf.get(OZONE_RECON_HTTPS_ADDRESS_KEY,
+      protocol = HTTPS_SCHEME;
+      host = conf.get(OZONE_RECON_HTTPS_ADDRESS_KEY,
           OZONE_RECON_HTTPS_ADDRESS_DEFAULT);
+      isHostDefault = getHostOnly(host).equals(
+          getHostOnly(OZONE_RECON_HTTPS_ADDRESS_DEFAULT));
     } else {
-      protocolPrefix = "http://";
-      name = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY,
+      protocol = HTTP_SCHEME;
+      host = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY,
           OZONE_RECON_HTTP_ADDRESS_DEFAULT);
+      isHostDefault = getHostOnly(host).equals(
+          getHostOnly(OZONE_RECON_HTTP_ADDRESS_DEFAULT));
     }
 
-    if (StringUtils.isEmpty(name)) {
-      return null;
+    if (isHostDefault) {
+      // Fallback to <Recon RPC host name>:<Recon http(s) address port>
+      final String rpcHost =
+          conf.get(OZONE_RECON_ADDRESS_KEY, OZONE_RECON_ADDRESS_DEFAULT);
+      host = getHostOnly(rpcHost) + ":" + getPort(host);
     }
 
-    String reconDefaultAddress = conf.get(OZONE_RECON_ADDRESS_KEY,
-        OZONE_RECON_ADDRESS_DEFAULT);
-    Optional<String> hostname = getHostName(reconDefaultAddress);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Recon: "
-          + reconDefaultAddress);
-    }
-
-    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return protocolPrefix + hostname.get() + ":" + port;
+    return protocol + "://" + host;
   }
 
   public boolean isHTTPSEnabled() {

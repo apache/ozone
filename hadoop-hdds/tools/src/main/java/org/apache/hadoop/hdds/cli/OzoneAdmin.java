@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.cli;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.NativeCodeLoader;
@@ -44,6 +45,12 @@ public class OzoneAdmin extends GenericCli {
 
   public OzoneAdmin() {
     super(OzoneAdmin.class);
+  }
+
+  @VisibleForTesting
+  public OzoneAdmin(OzoneConfiguration conf) {
+    super(OzoneAdmin.class);
+    ozoneConf = conf;
   }
 
   public OzoneConfiguration getOzoneConf() {

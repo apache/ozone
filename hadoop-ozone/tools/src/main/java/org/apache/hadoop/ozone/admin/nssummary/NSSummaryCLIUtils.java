@@ -69,7 +69,7 @@ public final class NSSummaryCLIUtils {
       url.append("&replica=true");
     }
 
-    System.out.println("Connecting to Recon: " + url + "...");
+    System.out.println("Connecting to Recon: " + url + " ...");
     final URLConnectionFactory connectionFactory =
         URLConnectionFactory.newDefaultURLConnectionFactory(
             (Configuration) conf);

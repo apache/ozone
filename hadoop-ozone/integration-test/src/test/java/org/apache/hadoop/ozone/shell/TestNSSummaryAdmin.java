@@ -39,13 +39,14 @@ public class TestNSSummaryAdmin {
 
   @BeforeClass
   public static void init() throws Exception {
-    ozoneAdmin = new OzoneAdmin();
     conf = new OzoneConfiguration();
     conf.setBoolean("ozone.om.enable.filesystem.paths", true);
     conf.set("ozone.om.metadata.layout", "PREFIX");
-    conf.set(OZONE_RECON_ADDRESS_KEY, OZONE_RECON_ADDRESS_DEFAULT);
+    conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
     cluster = MiniOzoneCluster.newBuilder(conf).includeRecon(true).build();
     cluster.waitForClusterToBeReady();
+    // Client uses server conf for this test
+    ozoneAdmin = new OzoneAdmin(conf);
   }
 
   @AfterClass
