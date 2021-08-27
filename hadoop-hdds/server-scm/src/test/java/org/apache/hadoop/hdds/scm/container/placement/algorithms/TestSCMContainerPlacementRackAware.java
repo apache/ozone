@@ -529,11 +529,7 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @Test
-  public void testOutOfServiceNodesNotSelected() throws SCMException {
-    List<DatanodeDetails> datanodeDetails =
-        policy.chooseDatanodes(null, null, 1, 0, 0);
-    Assert.assertEquals(1, datanodeDetails.size());
-
+  public void testOutOfServiceNodesNotSelected() {
     // Set all the nodes to out of service
     for (DatanodeInfo dn : dnInfos) {
       dn.setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
@@ -544,15 +540,14 @@ public class TestSCMContainerPlacementRackAware {
       int index = new Random().nextInt(dnInfos.size());
       dnInfos.get(index).setNodeStatus(NodeStatus.inServiceHealthy());
       try {
-        datanodeDetails =
+        List<DatanodeDetails> datanodeDetails =
             policy.chooseDatanodes(null, null, 1, 0, 0);
         Assert.assertEquals(dnInfos.get(index), datanodeDetails.get(0));
       } catch (SCMException e) {
         // If we get SCMException: No satisfied datanode to meet the ... this is
         // ok, as there is only 1 IN_SERVICE node and with the retry logic we
-        // many never find it.
+        // may never find it.
       }
-
       dnInfos.get(index).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
     }
   }
