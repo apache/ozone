@@ -528,9 +528,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
 
     for (int i = 1; i < numDataBlks; i++) {
-      // Pad zero bytes to make all cells exactly the size of parityCellSize
-      // If internal block is smaller than parity block, pad zero bytes.
-      // Also pad zero bytes to all parity cells
       final int position = buffers[i].position();
       assert position <= parityCellSize : "If an internal block is smaller"
           + " than parity block, then its last cell should be small than last"
@@ -549,12 +546,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private boolean isPartialStripe() {
-    final long lastStripeSize =
-        currentBlockGroupLen % (numDataBlks * ecChunkSize);
-    if (lastStripeSize == 0) {
-      return false;
-    }
-    return true;
+    return currentBlockGroupLen % (numDataBlks * ecChunkSize) > 0;
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
