@@ -41,6 +41,20 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   @Test
+  public void testRunAllTests() throws Exception {
+    testAddBucketAcl();
+    testRemoveBucketAcl();
+    testSetBucketAcl();
+
+    testAddKeyAcl();
+    testRemoveKeyAcl();
+    testSetKeyAcl();
+
+    testAddPrefixAcl();
+    testRemovePrefixAcl();
+    testSetPrefixAcl();
+  }
+
   public void testAddBucketAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -55,7 +69,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
     testAddAcl(remoteUserName, ozoneObj, defaultUserAcl);
   }
-  @Test
+
   public void testRemoveBucketAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -72,7 +86,6 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   }
 
-  @Test
   public void testSetBucketAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -112,7 +125,6 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     return false;
   }
 
-  @Test
   public void testAddKeyAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -131,7 +143,6 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     testAddAcl(remoteUserName, ozoneObj, userAcl);
   }
 
-  @Test
   public void testRemoveKeyAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -151,7 +162,6 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   }
 
-  @Test
   public void testSetKeyAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -171,7 +181,6 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   }
 
-  @Test
   public void testAddPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -188,7 +197,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
     testAddAcl(remoteUserName, ozoneObj, defaultUserAcl);
   }
-  @Test
+
   public void testRemovePrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
@@ -225,7 +234,6 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   }
 
-  @Test
   public void testSetPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
