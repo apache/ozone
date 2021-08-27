@@ -277,7 +277,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     String newLeaderOMNodeId =
         omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
-    Assert.assertTrue(leaderOMNodeId != newLeaderOMNodeId);
+    Assert.assertTrue(!leaderOMNodeId.equals(newLeaderOMNodeId));
   }
 
   /**
