@@ -127,7 +127,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     axios.get(duEndpoint).then(response => {
       const duResponse: IDUResponse[] = response.data;
       const status = duResponse.status;
-      if (status !== 'OK') {
+      if (status === 'PATH_NOT_FOUND') {
         this.setState({isLoading: false});
         showDataFetchError(`Invalid Path: ${path}`);
         return;
@@ -272,7 +272,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         return;
       }
 
-      if (summaryResponse.status !== 'OK') {
+      if (summaryResponse.status === 'PATH_NOT_FOUND') {
         showDataFetchError(`Invalid Path: ${path}`);
         return;
       }

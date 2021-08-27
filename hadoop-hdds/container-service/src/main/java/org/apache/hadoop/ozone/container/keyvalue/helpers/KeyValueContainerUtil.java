@@ -169,7 +169,7 @@ public final class KeyValueContainerUtil {
     File metadataPath = new File(kvContainerData.getMetadataPath());
 
     // Verify Checksum
-    ContainerUtils.verifyChecksum(kvContainerData);
+    ContainerUtils.verifyChecksum(kvContainerData, config);
 
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         metadataPath, containerID);

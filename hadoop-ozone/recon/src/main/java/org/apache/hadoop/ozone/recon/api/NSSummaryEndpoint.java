@@ -106,12 +106,19 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
+    NamespaceSummaryResponse namespaceSummaryResponse = null;
+    if (!isInitializationComplete()) {
+      namespaceSummaryResponse =
+          new NamespaceSummaryResponse(EntityType.UNKNOWN);
+      namespaceSummaryResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(namespaceSummaryResponse).build();
+    }
+
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
 
     EntityType type = getEntityType(normalizedPath, names);
 
-    NamespaceSummaryResponse namespaceSummaryResponse = null;
     switch (type) {
     case ROOT:
       namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.ROOT);
@@ -197,11 +204,16 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
+    DUResponse duResponse = new DUResponse();
+    if (!isInitializationComplete()) {
+      duResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(duResponse).build();
+    }
+
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
-    DUResponse duResponse = new DUResponse();
     duResponse.setPath(normalizedPath);
     switch (type) {
     case ROOT:
@@ -418,11 +430,16 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
+    QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
+    if (!isInitializationComplete()) {
+      quotaUsageResponse.setResponseCode(ResponseStatus.INITIALIZING);
+      return Response.ok(quotaUsageResponse).build();
+    }
+
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
-    QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     if (type == EntityType.ROOT) {
       List<OmVolumeArgs> volumes = listVolumes();
       List<OmBucketInfo> buckets = listBucketsUnderVolume(null);
@@ -494,12 +511,17 @@ public class NSSummaryEndpoint {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
+    FileSizeDistributionResponse distResponse =
+        new FileSizeDistributionResponse();
+    if (!isInitializationComplete()) {
+      distResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(distResponse).build();
+    }
+
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
-    FileSizeDistributionResponse distResponse =
-        new FileSizeDistributionResponse();
     switch (type) {
     case ROOT:
       List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
@@ -1016,6 +1038,20 @@ public class NSSummaryEndpoint {
       return EntityType.DIRECTORY;
     }
     return EntityType.UNKNOWN;
+  }
+
+  /**
+   * Return if all OMDB tables that will be used are initialized.
+   * @return
+   */
+  private boolean isInitializationComplete() {
+    if (omMetadataManager == null) {
+      return false;
+    }
+    return omMetadataManager.getVolumeTable() != null
+        && omMetadataManager.getBucketTable() != null
+        && omMetadataManager.getDirectoryTable() != null
+        && omMetadataManager.getFileTable() != null;
   }
 
   private static String normalizePath(String path) {

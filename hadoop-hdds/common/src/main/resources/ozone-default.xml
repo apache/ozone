@@ -2853,6 +2853,13 @@
     <description>Byte limit for Raft's Log Worker queue.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Number of operation pending with Raft's Log Worker.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ha.ratis.log.purge.enabled</name>
     <value>false</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
@@ -2946,6 +2953,15 @@
     <tag>OZONE, SECURITY, KERBEROS, S3GATEWAY</tag>
     <description>The S3Gateway service principal.
       Ex: s3g/_HOST@REALM.COM</description>
+  </property>
+
+  <property>
+    <name>hdds.container.checksum.verification.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description> To enable/disable checksum verification of the
+      containers.
+    </description>
   </property>
 
   <property>
