@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.http.HttpServer2;
@@ -48,7 +49,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     configurationClasses =
         new Class[] {OzoneConfigKeys.class, ScmConfigKeys.class,
             OMConfigKeys.class, HddsConfigKeys.class,
-            ReconServerConfigKeys.class,
+            ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
@@ -83,6 +84,11 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
+        ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
+        ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
+        ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
+        ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
+        ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
         ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
         ReconServerConfigKeys
