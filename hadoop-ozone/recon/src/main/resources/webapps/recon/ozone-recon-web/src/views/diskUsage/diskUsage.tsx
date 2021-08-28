@@ -161,8 +161,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
       });
 
-      const percentage = subpaths.map(subpath => {
+      const values = subpaths.map(subpath => {
         return subpath.size / dataSize;
+      });
+
+      const percentage = values.map(value => {
+        return (value * 100).toFixed(2);
       });
 
       const sizeStr = subpaths.map(subpath => {
@@ -179,11 +183,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         plotData: [{
           type: 'pie',
           hole: 0.2,
-          values: percentage,
+          values: values,
+          customdata: percentage,
           labels: pathLabels,
           text: sizeStr,
-          textinfo: 'label+percent',
-          hovertemplate: 'Total Data Size: %{text}<extra></extra>'
+          textinfo: 'label',
+          hovertemplate: 'Percentage: %{customdata}%<br>Total Data Size: %{text}<extra></extra>'
         }]
       });
     }).catch(error => {
