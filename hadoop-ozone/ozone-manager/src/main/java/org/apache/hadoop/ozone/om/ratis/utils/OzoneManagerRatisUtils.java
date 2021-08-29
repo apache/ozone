@@ -143,7 +143,15 @@ public final class OzoneManagerRatisUtils {
    * @throws IOException
    */
   public static OMClientRequest createClientRequest(OMRequest omRequest,
-      OzoneManager ozoneManager) {
+      OzoneManager ozoneManager) throws IOException {
+
+    // Handling of exception by createClientRequest(OMRequest, OzoneManger):
+    // Either the code will take FSO or non FSO path, both classes has a
+    // validateAndUpdateCache() function which also contains
+    // validateBucketAndVolume() function which validates bucket and volume and
+    // throws necessary exceptions if required. validateAndUpdateCache()
+    // function has catch block which catches the exception if required and
+    // handles it appropriately.
     Type cmdType = omRequest.getCmdType();
     OzoneManagerProtocolProtos.KeyArgs keyArgs;
     switch (cmdType) {
@@ -481,7 +489,7 @@ public final class OzoneManagerRatisUtils {
       buckInfo =
           ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
     } catch (IOException e) {
-      e.printStackTrace();
+      LOG.debug("Failed to get the value for the key: " + buckKey);
     }
     return buckInfo;
   }

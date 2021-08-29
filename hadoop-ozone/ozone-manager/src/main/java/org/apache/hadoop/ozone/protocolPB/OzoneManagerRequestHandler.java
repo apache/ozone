@@ -240,8 +240,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) {
-    OMClientRequest omClientRequest =
-        OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
+    OMClientRequest omClientRequest = null;
+    try {
+      omClientRequest =
+          OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
+    } catch (IOException e) {
+      LOG.debug("Exception: " + e);
+    }
     OMClientResponse omClientResponse =
         omClientRequest.validateAndUpdateCache(getOzoneManager(),
             transactionLogIndex, ozoneManagerDoubleBuffer::add);

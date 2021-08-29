@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -49,6 +51,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public abstract class OMKeyAclRequest extends OMClientRequest {
 
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OMKeyAclRequest.class);
 
   public OMKeyAclRequest(OMRequest omRequest) {
     super(omRequest);
@@ -164,7 +168,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         buckInfo =
             ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
       } catch (IOException e) {
-        e.printStackTrace();
+        LOG.debug("Failed to get the value for the key: " + buckKey);
       }
     } catch (OMException ome) {
         // Handle exception
