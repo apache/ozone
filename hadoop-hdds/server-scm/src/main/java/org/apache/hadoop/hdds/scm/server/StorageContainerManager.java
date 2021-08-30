@@ -913,6 +913,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.info("Skipping clusterId validation during bootstrap command.  "
               + "ClusterId id {}, SCM id {}", persistedClusterId,
           scmStorageConfig.getScmId());
+
+      // Initialize security if security is enabled later.
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)
+          && scmStorageConfig.getScmCertSerialId() == null) {
+        HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
+            getScmAddress(scmhaNodeDetails, conf), true);
+        scmStorageConfig.forceInitialize();
+        LOG.info("SCM unsecure cluster is converted to secure cluster. " +
+                "Persisted SCM Certificate SerialID {}",
+            scmStorageConfig.getScmCertSerialId());
+      }
+
       return true;
     }
 
@@ -934,6 +946,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 + "is {}", persistedClusterId, fetchedId);
         return false;
       }
+
+      // Initialize security if security is enabled later.
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)
+          && scmStorageConfig.getScmCertSerialId() == null) {
+        HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
+            getScmAddress(scmhaNodeDetails, conf), true);
+        scmStorageConfig.forceInitialize();
+        LOG.info("SCM unsecure cluster is converted to secure cluster. " +
+                "Persisted SCM Certificate SerialID {}",
+            scmStorageConfig.getScmCertSerialId());
+      }
+
     } else {
       try {
         scmStorageConfig.setClusterId(fetchedId);
