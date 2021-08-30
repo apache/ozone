@@ -148,7 +148,7 @@ public final class ContainerCache {
     try {
       lock.lock();
       try {
-        boolean isContainerOpen = isContainerOpen(containerState);
+        boolean isContainerOpen = isContainerWriteable(containerState);
         if (isContainerOpen) {
           db = openContainerCache.get(containerDBPath);
           if (db == null) {
@@ -238,18 +238,22 @@ public final class ContainerCache {
   }
 
   /**
-   * Add a DB handler into cache.
+   * Add a DB handler into container cache
+   * only if the container is in OPEN State.
    *
    * @param containerDBPath - DB path of the container.
    * @param db - DB handler
    */
-  public void addDB(String containerDBPath, ReferenceCountedDB db) {
-    lock.lock();
-    try {
-      openContainerCache.putIfAbsent(containerDBPath, db);
-      metrics.incNumOpenContainerInserts();
-    } finally {
-      lock.unlock();
+  public void addDB(String containerDBPath, ReferenceCountedDB db,
+                    State state) {
+    if (isContainerWriteable(state)) {
+      lock.lock();
+      try {
+        openContainerCache.putIfAbsent(containerDBPath, db);
+        metrics.incNumOpenContainerInserts();
+      } finally {
+        lock.unlock();
+      }
     }
   }
 
@@ -266,7 +270,7 @@ public final class ContainerCache {
     }
   }
 
-  public boolean isContainerOpen(State state) {
+  private boolean isContainerWriteable(State state) {
     switch (state) {
     case CLOSED:
     case QUASI_CLOSED:

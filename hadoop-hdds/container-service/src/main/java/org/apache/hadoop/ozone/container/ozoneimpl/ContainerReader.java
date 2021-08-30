@@ -213,13 +213,11 @@ public class ContainerReader implements Runnable {
             config);
         containerSet.addContainer(kvContainer);
         ContainerCache cache = ContainerCache.getInstance(config);
-        if (cache.isContainerOpen(kvContainerData.getState())) {
-          DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
-              kvContainerData, config, false);
-          String dbPath = kvContainerData.getDbFile().getAbsolutePath();
-          ReferenceCountedDB db = new ReferenceCountedDB(store, dbPath);
-          cache.addDB(dbPath, db);
-        }
+        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
+            kvContainerData, config, false);
+        String dbPath = kvContainerData.getDbFile().getAbsolutePath();
+        ReferenceCountedDB db = new ReferenceCountedDB(store, dbPath);
+        cache.addDB(dbPath, db, kvContainerData.getState());
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
             "ContainerType is KeyValueContainer but cast to " +

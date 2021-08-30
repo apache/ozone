@@ -24,7 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -117,7 +117,7 @@ public final class KeyValueContainerUtil {
     ReferenceCountedDB db =
         new ReferenceCountedDB(store, dbFile.getAbsolutePath());
     //add db handler into cache
-    BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf);
+    BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf, State.OPEN);
   }
 
   /**

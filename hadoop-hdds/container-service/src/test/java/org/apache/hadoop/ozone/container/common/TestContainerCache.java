@@ -234,8 +234,8 @@ public class TestContainerCache {
     Assert.assertEquals(numOpenGetsFails + 1,
         metrics.getNumOpenContainerGetsFailures());
 
-    cache.addDB(containerDir1.getPath(), db1);
-    cache.addDB(containerDir2.getPath(), db2);
+    cache.addDB(containerDir1.getPath(), db1, State.OPEN);
+    cache.addDB(containerDir2.getPath(), db2, State.OPEN);
 
     Assert.assertEquals(2, metrics.getNumOpenCacheEntries());
 

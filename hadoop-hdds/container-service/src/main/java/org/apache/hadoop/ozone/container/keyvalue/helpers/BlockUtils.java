@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -160,10 +161,10 @@ public final class BlockUtils {
    * @param conf configuration.
    */
   public static void addDB(ReferenceCountedDB db, String containerDBPath,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, State state) {
     ContainerCache cache = ContainerCache.getInstance(conf);
     Preconditions.checkNotNull(cache);
-    cache.addDB(containerDBPath, db);
+    cache.addDB(containerDBPath, db, state);
   }
 
   /**
