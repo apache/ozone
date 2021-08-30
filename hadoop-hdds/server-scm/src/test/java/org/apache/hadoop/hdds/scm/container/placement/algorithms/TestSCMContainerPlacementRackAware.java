@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.commons.math3.stat.clustering.Cluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -280,6 +281,21 @@ public class TestSCMContainerPlacementRackAware {
     Assert.assertTrue(cluster.isSameParent(
         datanodeDetails.get(0), excludedNodes.get(0)) ||
         cluster.isSameParent(datanodeDetails.get(0), excludedNodes.get(1)));
+  }
+
+  @Test
+  public void testSingleNodeRack() throws SCMException {
+    // make sure there is a single node rack
+    assumeTrue(datanodeCount % NODE_PER_RACK == 1);
+    List<DatanodeDetails> excludeNodes = new ArrayList<>();
+    excludeNodes.add(datanodes.get(datanodeCount - 1));
+    excludeNodes.add(datanodes.get(0));
+    List<DatanodeDetails> chooseDatanodes =
+        policy.chooseDatanodes(excludeNodes, null, 1, 0, 0);
+    Assert.assertTrue(chooseDatanodes.size() == 1);
+    // the selected node should be on the same rack as the second exclude node
+    Assert.assertTrue(chooseDatanodes.get(0).toString(),
+        cluster.isSameParent(chooseDatanodes.get(0), excludeNodes.get(1)));
   }
 
   @Test
