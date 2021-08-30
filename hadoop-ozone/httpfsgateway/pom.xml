@@ -36,26 +36,22 @@
     <httpfs.source.revision>REVISION NOT AVAIL</httpfs.source.revision>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ssZ</maven.build.timestamp.format>
     <httpfs.build.timestamp>${maven.build.timestamp}</httpfs.build.timestamp>
-    <kerberos.realm>LOCALHOST</kerberos.realm>
-    <test.exclude.kerberos.test>**/TestHttpFSWithKerberos.java</test.exclude.kerberos.test>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-filesystem-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-filesystem</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-auth</artifactId>
+      <groupId>com.googlecode.json-simple</groupId>
+      <artifactId>json-simple</artifactId>
       <scope>compile</scope>
-      <version>3.3.1</version>
     </dependency>
     <dependency>
       <groupId>com.sun.jersey</groupId>
@@ -68,19 +64,13 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
+      <groupId>com.sun.jersey</groupId>
+      <artifactId>jersey-servlet</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-guava</artifactId>
-      <scope>compile</scope>
-      <version>1.1.1</version>
-    </dependency>
-    <dependency>
-      <groupId>com.googlecode.json-simple</groupId>
-      <artifactId>json-simple</artifactId>
-      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -91,98 +81,9 @@
       <artifactId>jetty-webapp</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <scope>compile</scope>
-      <version>3.3.1</version>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.xml.stream</groupId>
-          <artifactId>stax-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.servlet.jsp</groupId>
-          <artifactId>jsp-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-server</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-util</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>servlet-api-2.5</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jdt</groupId>
-          <artifactId>core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-      <scope>compile</scope>
-      <version>3.3.1</version>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-cli</groupId>
-          <artifactId>commons-cli</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-server</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>jetty-util</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>servlet-api-2.5</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jdt</groupId>
-          <artifactId>core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs-client</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <scope>test</scope>
-      <type>test-jar</type>
-      <version>3.3.1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-      <scope>test</scope>
-      <type>test-jar</type>
-      <version>3.3.1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-auth</artifactId>
-      <scope>test</scope>
-      <type>test-jar</type>
-      <version>3.3.1</version>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>log4j</groupId>
@@ -199,11 +100,31 @@
       <artifactId>slf4j-log4j12</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk15on</artifactId>
-      <scope>test</scope>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>apache-curator</artifactId>
+      <version>2.4.0</version>
+      <type>pom</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-test</artifactId>
+      <version>2.4.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-client</artifactId>
+      <version>2.4.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-framework</artifactId>
+      <version>2.4.0</version>
+    </dependency>
+    <dependency>
+      <groupId>javax.xml.bind</groupId>
+      <artifactId>jaxb-api</artifactId>
+      <version>2.3.0</version>
     </dependency>
   </dependencies>
 
@@ -228,16 +149,10 @@
       <testResource>
         <directory>${basedir}/src/test/resources</directory>
         <filtering>false</filtering>
-        <excludes>
-          <exclude>krb5.conf</exclude>
-        </excludes>
       </testResource>
       <testResource>
         <directory>${basedir}/src/test/resources</directory>
         <filtering>true</filtering>
-        <includes>
-          <include>krb5.conf</include>
-        </includes>
       </testResource>
     </testResources>
 
@@ -264,21 +179,12 @@
           <testFailureIgnore>${ignoreTestFailure}</testFailureIgnore>
           <threadCount>1</threadCount>
           <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
-          <systemPropertyVariables>
-            <java.security.krb5.conf>${project.build.directory}/test-classes/krb5.conf</java.security.krb5.conf>
-            <kerberos.realm>${kerberos.realm}</kerberos.realm>
-          </systemPropertyVariables>
           <properties>
             <property>
               <name>listener</name>
               <value>org.apache.hadoop.test.TimedOutTestsListener</value>
             </property>
           </properties>
-          <excludes>
-            <exclude>**/${test.exclude}.java</exclude>
-            <exclude>${test.exclude.pattern}</exclude>
-            <exclude>${test.exclude.kerberos.test}</exclude>
-          </excludes>
         </configuration>
       </plugin>
       <plugin>
@@ -308,11 +214,6 @@
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
-        <configuration>
-          <excludes>
-            <exclude>src/test/resources/classutils.txt</exclude>
-          </excludes>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -362,38 +263,6 @@
   </build>
 
   <profiles>
-    <profile>
-      <id>testKerberos</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <properties>
-        <test.exclude.kerberos.test>_</test.exclude.kerberos.test>
-      </properties>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <testFailureIgnore>${ignoreTestFailure}</testFailureIgnore>
-              <forkCount>1</forkCount>
-              <reuseForks>true</reuseForks>
-              <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
-              <systemPropertyVariables>
-                <java.security.krb5.conf>${project.build.directory}/test-classes/krb5.conf</java.security.krb5.conf>
-                <kerberos.realm>${kerberos.realm}</kerberos.realm>
-                <httpfs.http.hostname>localhost</httpfs.http.hostname>
-              </systemPropertyVariables>
-              <includes>
-                <include>**/TestHttpFSWithKerberos.java</include>
-              </includes>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    
     <profile>
       <id>dist</id>
       <activation>

@@ -28,11 +28,15 @@ share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-logging.jar
+share/ozone/lib/commons-math.jar
 share/ozone/lib/commons-math3.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
+share/ozone/lib/curator-client.jar
+share/ozone/lib/curator-framework.jar
+share/ozone/lib/curator-test.jar
 share/ozone/lib/derby.jar
 share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
@@ -130,16 +134,19 @@ share/ozone/lib/jetty-util-ajax.v20201120.jar
 share/ozone/lib/jetty-util.v20201120.jar
 share/ozone/lib/jetty-webapp.v20201120.jar
 share/ozone/lib/jetty-xml.v20201120.jar
+share/ozone/lib/jline.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/joda-time.jar
 share/ozone/lib/jooq-codegen.jar
 share/ozone/lib/jooq-meta.jar
 share/ozone/lib/jooq.jar
 share/ozone/lib/jsch.jar
+share/ozone/lib/json-simple.jar
 share/ozone/lib/json-smart.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
+share/ozone/lib/junit.jar
 share/ozone/lib/kerb-admin.jar
 share/ozone/lib/kerb-client.jar
 share/ozone/lib/kerb-common.jar
@@ -175,6 +182,7 @@ share/ozone/lib/netty-resolver.Final.jar
 share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/netty-transport.Final.jar
+share/ozone/lib/netty.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar
 share/ozone/lib/okio.jar
@@ -191,6 +199,7 @@ share/ozone/lib/ozone-filesystem-common.jar
 share/ozone/lib/ozone-filesystem-hadoop2.jar
 share/ozone/lib/ozone-filesystem-hadoop3.jar
 share/ozone/lib/ozone-filesystem.jar
+share/ozone/lib/ozone-httpfsgateway.jar
 share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar
 share/ozone/lib/ozone-interface-storage.jar
@@ -237,3 +246,4 @@ share/ozone/lib/token-provider.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/weld-servlet.Final.jar
 share/ozone/lib/woodstox-core.jar
+share/ozone/lib/zookeeper.jar

@@ -21,7 +21,6 @@ import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -48,6 +47,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Metrics(about="HttpFSServer metrics", context="httpfs")
 public class HttpFSServerMetrics {
 
+  private static final String DFS_METRICS_SESSION_ID_KEY
+      = "dfs.metrics.session-id";
   private @Metric MutableCounterLong bytesWritten;
   private @Metric MutableCounterLong bytesRead;
 
@@ -78,7 +79,7 @@ public class HttpFSServerMetrics {
 
   public static HttpFSServerMetrics create(Configuration conf,
       String serverName) {
-    String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
+    String sessionId = conf.get(DFS_METRICS_SESSION_ID_KEY);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     JvmMetrics jm = JvmMetrics.create("HttpFSServer", sessionId, ms);
     String name = "ServerActivity-"+ (serverName.isEmpty()

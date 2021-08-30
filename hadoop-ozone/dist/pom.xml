@@ -74,8 +74,8 @@
               </outputDirectory>
               <includes>*.classpath</includes>
               <includeArtifactIds>
-                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-insight,
-                ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools
+                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-httpfsgateway,
+                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools
               </includeArtifactIds>
             </configuration>
           </execution>
@@ -222,6 +222,11 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-insight</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-httpfsgateway</artifactId>
+      <version>1.2.0-SNAPSHOT</version>
     </dependency>
   </dependencies>
   <profiles>

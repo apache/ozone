@@ -76,6 +76,8 @@ run mkdir -p ./bin
 run mkdir -p ./sbin
 run mkdir -p ./etc
 run mkdir -p ./libexec
+run mkdir -p ./log
+run mkdir -p ./temp
 run mkdir -p ./tests
 
 run cp -r "${ROOT}/hadoop-hdds/common/src/main/conf/" "etc/hadoop"
