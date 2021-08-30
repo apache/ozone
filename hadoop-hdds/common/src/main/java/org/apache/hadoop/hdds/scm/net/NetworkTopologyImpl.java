@@ -514,13 +514,15 @@ public class NetworkTopologyImpl implements NetworkTopology{
       List<String> excludedScopes, Collection<Node> excludedNodes,
       Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(scope != null);
-    LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = {},"
-            + " excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
-        scope, leafIndex, (excludedScopes == null ? "" :
-            excludedScopes.stream().collect(Collectors.joining(", "))),
-        (excludedNodes == null ? "" : excludedNodes.stream()
-            .map(Object::toString).collect(Collectors.joining(", "))),
-        affinityNode == null ? "" : affinityNode.toString(), ancestorGen);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = {},"
+              + " excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
+          scope, leafIndex, (excludedScopes == null ? "" :
+              excludedScopes.stream().collect(Collectors.joining(", "))),
+          (excludedNodes == null ? "" : excludedNodes.stream()
+              .map(Object::toString).collect(Collectors.joining(", "))),
+          affinityNode == null ? "" : affinityNode.toString(), ancestorGen);
+    }
 
     String finalScope = scope;
     if (affinityNode != null && ancestorGen > 0) {
