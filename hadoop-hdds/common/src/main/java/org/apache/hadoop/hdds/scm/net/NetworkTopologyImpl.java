@@ -515,8 +515,8 @@ public class NetworkTopologyImpl implements NetworkTopology{
       Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(scope != null);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = {},"
-              + " excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
+      LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = "
+              + "{}, excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
           scope, leafIndex, (excludedScopes == null ? "" :
               excludedScopes.stream().collect(Collectors.joining(", "))),
           (excludedNodes == null ? "" : excludedNodes.stream()
