@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -14,16 +14,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * <p>
+ * Namespace related cli tools.
  */
-
-package org.apache.hadoop.ozone.recon.api.types;
 
 /**
- * Enum class for a path request's status.
+ * Ozone Namespace CLI tools.
  */
-public enum ResponseStatus {
-  OK, // Path exist
-  INITIALIZING, // Recon is initializing
-  PATH_NOT_FOUND, // Path not found
-  TYPE_NOT_APPLICABLE // Path exists, but namespace is not applicable to request
-}
+package org.apache.hadoop.ozone.admin.nssummary;
