@@ -453,12 +453,12 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
       float blocksPerSec = execSecs != 0 ? (float) blocks / execSecs : blocks;
 
       System.out.println("***************************************");
-      System.out.printf("Total allocated blocks: %d\n",
+      System.out.printf("Total allocated blocks: %d%n",
           succBlockCounter.get());
-      System.out.printf("Total failed blocks: %d\n",
+      System.out.printf("Total failed blocks: %d%n",
           failBlockCounter.get());
-      System.out.printf("Execution Time: %s\n", getFormattedTime());
-      System.out.printf("Throughput: %f (ops)\n", blocksPerSec);
+      System.out.printf("Execution Time: %s%n", getFormattedTime());
+      System.out.printf("Throughput: %f (ops)%n", blocksPerSec);
       System.out.println("***************************************");
     }
 
@@ -537,15 +537,15 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
           TimeUnit.NANOSECONDS);
       long containers = succContainerCounter.get();
       float containersPerSec = execSecs != 0 ?
-          containers / execSecs : containers;
+          (float)containers / execSecs : containers;
 
       System.out.println("***************************************");
-      System.out.printf("Total allocated containers: %d\n",
+      System.out.printf("Total allocated containers: %d%n",
           succContainerCounter.get());
-      System.out.printf("Total failed containers: %d\n",
+      System.out.printf("Total failed containers: %d%n",
           failContainerCounter.get());
-      System.out.printf("Execution Time: %s\n", getFormattedTime());
-      System.out.printf("Throughput: %f (ops)\n", containersPerSec);
+      System.out.printf("Execution Time: %s%n", getFormattedTime());
+      System.out.printf("Throughput: %f (ops)%n", containersPerSec);
       System.out.println("***************************************");
     }
 
@@ -675,13 +675,13 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
           (float) succReportsProcessed / execSecs : succReportsProcessed;
 
       System.out.println("***************************************");
-      System.out.printf("Total container reports processed: %d\n",
+      System.out.printf("Total container reports processed: %d%n",
           succReportsProcessed);
-      System.out.printf("Total container reports failed: %d\n",
+      System.out.printf("Total container reports failed: %d%n",
           failReportsProcessed);
-      System.out.printf("Containers per report: %d\n", containersPerReport);
-      System.out.printf("Execution Time: %s\n", getFormattedTime());
-      System.out.printf("Throughput: %f (ops)\n", reportsPerSec);
+      System.out.printf("Containers per report: %d%n", containersPerReport);
+      System.out.printf("Execution Time: %s%n", getFormattedTime());
+      System.out.printf("Throughput: %f (ops)%n", reportsPerSec);
       System.out.println("***************************************");
     }
 
@@ -802,8 +802,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
           .setContainerReport(containerReport)
           .setDataNodeLayoutVersion(UpgradeUtils.defaultLayoutVersionProto())
           .build();
-      SCMHeartbeatResponseProto response =
-          datanodeScmClient.sendHeartbeat(heartbeatRequest);
+      datanodeScmClient.sendHeartbeat(heartbeatRequest);
       // scm commands are ignored
     }
 
