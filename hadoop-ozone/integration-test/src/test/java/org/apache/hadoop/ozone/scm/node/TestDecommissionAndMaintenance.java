@@ -36,12 +36,15 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,8 +101,10 @@ public class TestDecommissionAndMaintenance {
 
   private ContainerOperationClient scmClient;
 
-  @Before
-  public void setUp() throws Exception {
+  private static MiniOzoneClusterProvider clusterProvider;
+
+  @BeforeClass
+  public static void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int interval = 100;
 
@@ -121,20 +126,31 @@ public class TestDecommissionAndMaintenance {
     replicationConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(replicationConf);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    setManagers();
+    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(numOfDatanodes);
 
+    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 11);
+  }
+
+  @AfterClass
+  public static void shutdown() throws InterruptedException {
+    if (clusterProvider != null) {
+      clusterProvider.shutdown();
+    }
+  }
+
+  @Before
+  public void setUp() throws Exception {
+    cluster = clusterProvider.provide();
+    setManagers();
     bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
-    scmClient = new ContainerOperationClient(conf);
+    scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws InterruptedException, IOException {
     if (cluster != null) {
-      cluster.shutdown();
+      clusterProvider.destroy(cluster);
     }
   }
 
