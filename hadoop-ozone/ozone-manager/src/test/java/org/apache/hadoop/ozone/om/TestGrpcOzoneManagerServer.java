@@ -39,7 +39,7 @@ public class TestGrpcOzoneManagerServer {
   private GrpcOzoneManagerServer server;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public Timeout timeout = Timeout.seconds(30);
 
   @Test
   public void testStartStop() throws Exception {
