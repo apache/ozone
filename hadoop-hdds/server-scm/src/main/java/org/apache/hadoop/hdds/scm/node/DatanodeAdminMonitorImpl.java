@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Monitor thread which watches for nodes to be decommissioned, recommissioned
@@ -275,6 +276,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     int sufficientlyReplicated = 0;
     int underReplicated = 0;
     int unhealthy = 0;
+    List<ContainerID> underReplicatedIDs = new ArrayList<>();
+    List<ContainerID> unhealthyIDs = new ArrayList<>();
     Set<ContainerID> containers =
         nodeManager.getContainers(dn);
     for (ContainerID cid : containers) {
@@ -284,9 +287,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         if (replicaSet.isSufficientlyReplicated()) {
           sufficientlyReplicated++;
         } else {
+          underReplicatedIDs.add(cid);
           underReplicated++;
         }
         if (!replicaSet.isHealthy()) {
+          unhealthyIDs.add(cid);
           unhealthy++;
         }
       } catch (ContainerNotFoundException e) {
@@ -297,6 +302,14 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
+              "containers", dn, underReplicated,
+          underReplicatedIDs.stream().map(
+              Object::toString).collect(Collectors.joining(", ")),
+          unhealthy, unhealthyIDs.stream().map(
+              Object::toString).collect(Collectors.joining(", ")));
+    }
     return underReplicated == 0 && unhealthy == 0;
   }
 
