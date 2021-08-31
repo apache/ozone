@@ -55,9 +55,12 @@ public class TestS3GrpcOmTransport {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestS3GrpcOmTransport.class);
 
+  private final String leaderOMNodeId = "TestOM";
+
   private final OMResponse omResponse = OMResponse.newBuilder()
                   .setSuccess(true)
                   .setStatus(Status.OK)
+                  .setLeaderOMNodeId(leaderOMNodeId)
                   .setCmdType(Type.AllocateBlock)
                   .build();
 
@@ -75,10 +78,6 @@ public class TestS3GrpcOmTransport {
                                               .OzoneManagerProtocolProtos
                                               .OMResponse>
                                           responseObserver) {
-                  LOG.info("GrpcOzoneManagerServer: "
-                      + "OzoneManagerServiceImplBase "
-                      + "processing s3g client submit request");
-
                   responseObserver.onNext(omResponse);
                   responseObserver.onCompleted();
                 }
@@ -125,5 +124,6 @@ public class TestS3GrpcOmTransport {
 
     final OMResponse resp = client.submitRequest(omRequest);
     Assert.assertEquals(resp.getStatus(), OK);
+    Assert.assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
   }
 }

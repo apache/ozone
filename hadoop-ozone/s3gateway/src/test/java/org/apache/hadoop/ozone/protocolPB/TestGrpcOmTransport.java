@@ -38,7 +38,7 @@ public class TestGrpcOmTransport {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGrpcOmTransport.class);
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public Timeout timeout = Timeout.seconds(30);
 
 
   @Test
