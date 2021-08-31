@@ -239,6 +239,8 @@ public class SCMDatanodeProtocolServer implements
       eventPublisher.fireEvent(PIPELINE_REPORT,
               new PipelineReportFromDatanode(datanodeDetails,
                       pipelineReportsProto));
+    } else {
+      auditSuccess = false;
     }
     try {
       return getRegisteredResponse(registeredCommand);
@@ -251,6 +253,9 @@ public class SCMDatanodeProtocolServer implements
       if(auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.REGISTER, auditMap));
+      } else {
+        AUDIT.logWriteFailure(
+            buildAuditMessageForFailure(SCMAction.REGISTER, auditMap, null));
       }
     }
   }
