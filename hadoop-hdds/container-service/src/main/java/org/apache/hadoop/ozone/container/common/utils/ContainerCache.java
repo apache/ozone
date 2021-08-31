@@ -274,10 +274,10 @@ public final class ContainerCache {
     switch (state) {
     case CLOSED:
     case QUASI_CLOSED:
+    case UNHEALTHY:
       return false;
     case CLOSING:
     case OPEN:
-    case UNHEALTHY:
       return true;
     case INVALID:
     case DELETED:
