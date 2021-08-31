@@ -722,8 +722,10 @@ public class ContainerBalancer {
         return;
       }
       balancerRunning = false;
-      currentBalancingThread.join(500);
-      currentBalancingThread.interrupt();
+      if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
+        currentBalancingThread.interrupt();
+        currentBalancingThread.join(100);
+      }
 
       // allow garbage collector to collect balancing thread
       currentBalancingThread = null;
