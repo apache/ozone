@@ -11,6 +11,36 @@ The post-commit workflow, (which also has the name "build-branch" on the GA page
 
 #### build-info
 
-The build-info job runs before the others and determines which of the other jobs are to be run.  If the workflow was caused by some event other than a PR, then all jobs/tests are run.  It makes that determination by generating a list of files that are changed by the pr.  
+The build-info job runs before the others and determines which of the other jobs are to be run.  If the workflow was caused by some event other than a PR, then all jobs/tests are run.  Otherwise, it decides which jobs to run, by generating a list of files that are changed by the pr.  It compares that list against a series of regex's, each of which is associated with a different job.  It sets the appropriate flag for each match, which is subsequently used by the workflow to decide if the corresponding job should be run.
+
+In addition, if the PR has a label containing the following string, "full tests needed", all jobs are run.
+
+For example, the following regex is used to determine if the Kubernetes tests should be run:
+```
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/kubernetes.sh"
+        "^hadoop-ozone/dist/src/main/k8s"
+    )
+```
+If so, this flag is set: "needs-kubernetes-tests"
+
+
+#### compile
+Builds the Java 8 and 11 versions of the jars, and saves the java 8 version for some of the subsequent jobs.
+
+#### basic
+Runs a subset of the following jobs depending on what was selected by build-info
+
+##### author
+Verifies none of the Java files contain the @author annotation
+
+#### bats
+Checks bash scripts, (using the [Bash Automated Testing System](https://github.com/sstephenson/bats))
+
+#### checkstyle
+Runs mvn checkstyle plugin to confirm source abides by Ozone coding conventions
+
+
+
 
 
