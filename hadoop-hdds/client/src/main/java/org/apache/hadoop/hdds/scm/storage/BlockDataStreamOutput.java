@@ -209,16 +209,16 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   @Override
-  public void write(ByteBuffer b) throws IOException {
+  public void write(ByteBuffer b, int off, int len) throws IOException {
     checkOpen();
     if (b == null) {
       throw new NullPointerException();
     }
-    final int len = b.remaining();
     if (len == 0) {
       return;
     }
-    writeChunkToContainer(b);
+    writeChunkToContainer(
+            (ByteBuffer) b.asReadOnlyBuffer().position(off).limit(off + len));
 
     writtenDataLength += len;
   }

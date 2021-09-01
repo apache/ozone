@@ -40,8 +40,8 @@ public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   @Override
-  public void write(ByteBuffer b) throws IOException {
-    byteBufferStreamOutput.write(b);
+  public void write(ByteBuffer b, int off, int len) throws IOException {
+    byteBufferStreamOutput.write(b, off, len);
   }
 
   @Override

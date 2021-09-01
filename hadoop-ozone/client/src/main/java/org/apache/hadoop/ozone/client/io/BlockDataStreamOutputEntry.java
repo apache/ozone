@@ -98,10 +98,9 @@ public final class BlockDataStreamOutputEntry
   }
 
   @Override
-  public void write(ByteBuffer b) throws IOException {
+  public void write(ByteBuffer b, int off, int len) throws IOException {
     checkStream();
-    final int len = b.remaining();
-    byteBufferStreamOutput.write(b);
+    byteBufferStreamOutput.write(b, off, len);
     this.currentPosition += len;
   }
 

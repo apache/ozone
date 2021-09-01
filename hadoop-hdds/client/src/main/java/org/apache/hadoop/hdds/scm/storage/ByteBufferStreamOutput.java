@@ -33,7 +33,9 @@ public interface ByteBufferStreamOutput extends Closeable {
    * @param b the data.
    * @exception IOException if an I/O error occurs.
    */
-  void write(ByteBuffer b) throws IOException;
+  default void write(ByteBuffer b) throws IOException {
+    write(b, b.position(), b.remaining());
+  }
 
   /**
    * Try to write the [off:off + len) slice in ByteBuf b to DataStream.
@@ -43,9 +45,7 @@ public interface ByteBufferStreamOutput extends Closeable {
    * @param len the number of bytes to write.
    * @exception  IOException  if an I/O error occurs.
    */
-  default void write(ByteBuffer b, int off, int len) throws IOException {
-    write((ByteBuffer) b.asReadOnlyBuffer().position(off).limit(off + len));
-  }
+  void write(ByteBuffer b, int off, int len) throws IOException;
 
   /**
    * Flushes this DataStream output and forces any buffered output bytes

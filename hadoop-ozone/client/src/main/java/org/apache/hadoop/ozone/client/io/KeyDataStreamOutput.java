@@ -185,13 +185,12 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   @Override
-  public void write(ByteBuffer b) throws IOException {
+  public void write(ByteBuffer b, int off, int len) throws IOException {
     checkNotClosed();
     if (b == null) {
       throw new NullPointerException();
     }
-    final int len = b.remaining();
-    handleWrite(b, b.position(), len, false);
+    handleWrite(b, off, len, false);
     writeOffset += len;
   }
 
