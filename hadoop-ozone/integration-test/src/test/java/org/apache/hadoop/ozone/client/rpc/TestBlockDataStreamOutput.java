@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,6 +37,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -136,7 +136,7 @@ public class TestBlockDataStreamOutput {
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength1)
             .getBytes(UTF_8);
-    key1.write(Unpooled.copiedBuffer(data1));
+    key1.write(ByteBuffer.wrap(data1));
     // now close the stream, It will update the key length.
     key1.close();
     validateData(keyName1, data1);
@@ -149,7 +149,7 @@ public class TestBlockDataStreamOutput {
     byte[] data2 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength2)
             .getBytes(UTF_8);
-    key2.write(Unpooled.copiedBuffer(data2));
+    key2.write(ByteBuffer.wrap(data2));
     // now close the stream, It will update the key length.
     key2.close();
     validateData(keyName2, data2);
@@ -162,7 +162,7 @@ public class TestBlockDataStreamOutput {
     byte[] data3 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength3)
             .getBytes(UTF_8);
-    key3.write(Unpooled.copiedBuffer(data3));
+    key3.write(ByteBuffer.wrap(data3));
     // now close the stream, It will update the key length.
     key3.close();
     validateData(keyName3, data3);

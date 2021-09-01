@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.netty.buffer.ByteBuf;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -32,7 +31,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.storage.ByteBufStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -48,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +63,7 @@ import java.util.stream.Collectors;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput implements ByteBufStreamOutput {
+public class KeyDataStreamOutput implements ByteBufferStreamOutput {
 
   private OzoneClientConfig config;
 
@@ -185,17 +185,17 @@ public class KeyDataStreamOutput implements ByteBufStreamOutput {
   }
 
   @Override
-  public void write(ByteBuf b) throws IOException {
+  public void write(ByteBuffer b) throws IOException {
     checkNotClosed();
     if (b == null) {
       throw new NullPointerException();
     }
-    final int len = b.readableBytes();
-    handleWrite(b, b.readerIndex(), len, false);
+    final int len = b.remaining();
+    handleWrite(b, b.position(), len, false);
     writeOffset += len;
   }
 
-  private void handleWrite(ByteBuf b, int off, long len, boolean retry)
+  private void handleWrite(ByteBuffer b, int off, long len, boolean retry)
       throws IOException {
     while (len > 0) {
       try {
@@ -227,7 +227,7 @@ public class KeyDataStreamOutput implements ByteBufStreamOutput {
   }
 
   private int writeToDataStreamOutput(BlockDataStreamOutputEntry current,
-      boolean retry, long len, ByteBuf b, int writeLen, int off,
+      boolean retry, long len, ByteBuffer b, int writeLen, int off,
       long currentPos) throws IOException {
     try {
       if (retry) {

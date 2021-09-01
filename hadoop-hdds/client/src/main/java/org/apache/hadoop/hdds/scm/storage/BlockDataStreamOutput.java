@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.netty.buffer.ByteBuf;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -46,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -59,7 +59,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
 /**
- * An {@link ByteBufStreamOutput} used by the REST service in combination
+ * An {@link ByteBufferStreamOutput} used by the REST service in combination
  * with the SCMClient to write the value of a key to a sequence
  * of container chunks.  Writes are buffered locally and periodically written to
  * the container as a new chunk.  In order to preserve the semantics that
@@ -74,7 +74,7 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
  * This class encapsulates all state management for buffering and writing
  * through to the container.
  */
-public class BlockDataStreamOutput implements ByteBufStreamOutput {
+public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
   public static final String EXCEPTION_MSG =
@@ -209,16 +209,16 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
   }
 
   @Override
-  public void write(ByteBuf buf) throws IOException {
+  public void write(ByteBuffer b) throws IOException {
     checkOpen();
-    if (buf == null) {
+    if (b == null) {
       throw new NullPointerException();
     }
-    final int len = buf.readableBytes();
+    final int len = b.remaining();
     if (len == 0) {
       return;
     }
-    writeChunkToContainer(buf);
+    writeChunkToContainer(b);
 
     writtenDataLength += len;
   }
@@ -480,11 +480,11 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
    */
-  private void writeChunkToContainer(ByteBuf buf)
+  private void writeChunkToContainer(ByteBuffer b)
       throws IOException {
-    ChecksumData checksumData = checksum.computeChecksum(buf.nioBuffer());
-    int effectiveChunkSize = buf.readableBytes();
+    final int effectiveChunkSize = b.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
+    ChecksumData checksumData = checksum.computeChecksum(b);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
@@ -499,8 +499,8 @@ public class BlockDataStreamOutput implements ByteBufStreamOutput {
 
     CompletableFuture<DataStreamReply> future =
         (needSync(offset + effectiveChunkSize) ?
-            out.writeAsync(buf.nioBuffer(), StandardWriteOption.SYNC) :
-            out.writeAsync(buf.nioBuffer()))
+            out.writeAsync(b, StandardWriteOption.SYNC) :
+            out.writeAsync(b))
             .whenCompleteAsync((r, e) -> {
               if (e != null || !r.isSuccess()) {
                 if (e == null) {
