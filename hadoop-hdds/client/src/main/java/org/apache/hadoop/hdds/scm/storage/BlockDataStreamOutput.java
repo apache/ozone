@@ -484,7 +484,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       throws IOException {
     final int effectiveChunkSize = b.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
-    ChecksumData checksumData = checksum.computeChecksum(b);
+    ChecksumData checksumData = checksum.computeChecksum(b.asReadOnlyBuffer());
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
