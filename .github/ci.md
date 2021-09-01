@@ -27,7 +27,7 @@ If so, this flag is set: "needs-kubernetes-tests"
 In addition, if the PR has a label containing the following string, "full tests needed", all jobs are run.
 
 #### compile
-Builds the Java 8 and 11 versions of the jars, and saves the java 8 version for some of the subsequent jobs.
+[Builds](../hadoop-ozone/dev-support/checks/build.sh) the Java 8 and 11 versions of the jars, and saves the java 8 version for some of the subsequent jobs.
 
 #### basic
 Runs a subset of the following jobs depending on what was selected by build-info
