@@ -127,41 +127,29 @@ public class TestBlockDataStreamOutput {
   }
 
   @Test
+  public void testHalfChunkWrite() throws Exception {
+    testWrite(chunkSize / 2);
+  }
+
+  @Test
   public void testSingleChunkWrite() throws Exception {
-    String keyName = getKeyName();
-    OzoneDataStreamOutput key = createKey(
-        keyName, ReplicationType.RATIS, 0);
-    int dataLength = chunkSize/2;
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
-    key.write(ByteBuffer.wrap(data));
-    // now close the stream, It will update the key length.
-    key.close();
-    validateData(keyName, data);
+    testWrite(chunkSize);
   }
 
   @Test
   public void testMultiChunkWrite() throws Exception {
-    String keyName = getKeyName();
-    OzoneDataStreamOutput key = createKey(
-        keyName, ReplicationType.RATIS, 0);
-    int dataLength = chunkSize + 50;
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
-    key.write(ByteBuffer.wrap(data));
-    // now close the stream, It will update the key length.
-    key.close();
-    validateData(keyName, data);
+    testWrite(chunkSize + 50);
   }
 
   @Test
   public void testMultiBlockWrite() throws Exception {
+    testWrite(blockSize + 50);
+  }
+
+  private void testWrite(int dataLength) throws Exception {
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, 0);
-    int dataLength = blockSize + 50;
     byte[] data =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
@@ -170,7 +158,6 @@ public class TestBlockDataStreamOutput {
     key.close();
     validateData(keyName, data);
   }
-
   private OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
       long size) throws Exception {
     return TestHelper.createStreamKey(
