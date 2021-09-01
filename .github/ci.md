@@ -34,13 +34,42 @@ Runs a subset of the following jobs depending on what was selected by build-info
 ##### author
 Verifies none of the Java files contain the @author annotation
 
-#### bats
+##### bats
 Checks bash scripts, (using the [Bash Automated Testing System](https://github.com/sstephenson/bats))
 
-#### checkstyle
+##### checkstyle
 Runs mvn checkstyle plugin to confirm source abides by Ozone coding conventions
 
+##### docs
+Builds website with [Hugo](https://gohugo.io/)
 
+##### findbugs
+Runs spotbugs static analysis on bytecode
 
+##### rat (release audit tool) 
+Make sure source files include licenses
 
+##### unit
+Runs mvn test for all non integration tests
+
+#### dependency  
+Confirms hadoop-ozone/dist/src/main/license/bin/LICENSE.txt is up to date, (references latest jar files)
+
+#### acceptance
+smoketests using robot framework and real docker compose cluster
+
+#### kubernetes
+[k8s](./hadoop-ozone/dist/src/main/k8s/examples) tests
+
+#### integration
+mvn test for all integration/minicluster tests split into 3 subjobs:
+- client
+- filesystem-hdds
+- ozone
+
+#### coverage
+merges the coverage of the following jobs that were run earlier
+- acceptance
+- basic
+- integration
 
