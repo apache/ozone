@@ -127,45 +127,48 @@ public class TestBlockDataStreamOutput {
   }
 
   @Test
+  public void testSingleChunkWrite() throws Exception {
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(
+        keyName, ReplicationType.RATIS, 0);
+    int dataLength = chunkSize/2;
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+            .getBytes(UTF_8);
+    key.write(ByteBuffer.wrap(data));
+    // now close the stream, It will update the key length.
+    key.close();
+    validateData(keyName, data);
+  }
+
+  @Test
   public void testMultiChunkWrite() throws Exception {
-    // write data less than 1 chunk size use streaming.
-    String keyName1 = getKeyName();
-    OzoneDataStreamOutput key1 = createKey(
-        keyName1, ReplicationType.RATIS, 0);
-    int dataLength1 = chunkSize/2;
-    byte[] data1 =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength1)
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(
+        keyName, ReplicationType.RATIS, 0);
+    int dataLength = chunkSize + 50;
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
-    key1.write(ByteBuffer.wrap(data1));
+    key.write(ByteBuffer.wrap(data));
     // now close the stream, It will update the key length.
-    key1.close();
-    validateData(keyName1, data1);
+    key.close();
+    validateData(keyName, data);
+  }
 
-    // write data more than 1 chunk size use streaming.
-    String keyName2 = getKeyName();
-    OzoneDataStreamOutput key2 = createKey(
-        keyName2, ReplicationType.RATIS, 0);
-    int dataLength2 = chunkSize + 50;
-    byte[] data2 =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength2)
+  @Test
+  public void testMultiBlockWrite() throws Exception {
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(
+        keyName, ReplicationType.RATIS, 0);
+    int dataLength = blockSize + 50;
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
-    key2.write(ByteBuffer.wrap(data2));
+    key.write(ByteBuffer.wrap(data));
     // now close the stream, It will update the key length.
-    key2.close();
-    validateData(keyName2, data2);
-
-    // write data more than 1 block size use streaming.
-    String keyName3 = getKeyName();
-    OzoneDataStreamOutput key3 = createKey(
-        keyName3, ReplicationType.RATIS, 0);
-    int dataLength3 = blockSize + 50;
-    byte[] data3 =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength3)
-            .getBytes(UTF_8);
-    key3.write(ByteBuffer.wrap(data3));
-    // now close the stream, It will update the key length.
-    key3.close();
-    validateData(keyName3, data3);
+    key.close();
+    validateData(keyName, data);
   }
 
   private OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
