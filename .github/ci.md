@@ -5,7 +5,9 @@ The Ozone project uses Github Actions, (GA), for its CI system.  GA are implemen
 ## Workflows
 
 ### build-branch (post-commit.yml)
-[This](./workflows/post-commit.yml) is the most important workflow.  It runs the tests that verify the latest commit.  It runs each time a pull request is created or pushed to, as well as each time a branch in your fork is pushed to.  It also runs on the master branch twice a day, (00:30 and 12:30).
+[This](./workflows/post-commit.yml) is the most important workflow.  It runs the tests that verify the latest commit.  It is triggered each time a pull request is created or pushed to, as well as each time a branch in your fork is pushed to.  It also "scheduled" on the master branch twice a day, (00:30 and 12:30).  (So all build-branch runs marked "scheduled" without a branch label [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml) are run on the master branch.)
+
+The ones marked "Pull request #xxxx synchronize" are triggered by an open PR being updated with more commits, (the remote branch is being synchronized.)
 
 The post-commit workflow, (which also has the name "build-branch" on the GA page,) is divded into a number of different jobs, most of which run in parallel.  Each of the jobs, (except "build-info" and "compile",) runs a subset of the test suite.
 
@@ -52,7 +54,7 @@ Make sure source files include licenses
 ##### unit
 Runs mvn test for all non integration tests
 
-#### dependency  
+#### dependency
 Confirms hadoop-ozone/dist/src/main/license/bin/LICENSE.txt is up to date, (references latest jar files)
 
 #### acceptance
@@ -95,13 +97,12 @@ The following workflows are no longer exist but still exist on the [actions](htt
 - [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml)
 - [pr-check](https://github.com/apache/ozone/actions/workflows/pr.yml)
 
-Note the the deprecated [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml) has the same name as the current [build-branch](https://github.com/apache/ozone/actions/workflows/post-commit.yml), (but can be distinguished by the URL.
+Note the the deprecated [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml) has the same name as the current [build-branch](https://github.com/apache/ozone/actions/workflows/post-commit.yml), (but can be distinguished by the URL.)
 
 
+## Tips
 
-
-
-
-
-
-
+- When a master build fails, it's artifacts are stored (here)[https://elek.github.io/ozone-build-results/].
+- To trigger rerunning the tests push a commit like this to your PR: ```git commit --allow-empty -m 'trigger new CI check'```
+- [This wiki](https://cwiki.apache.org/confluence/display/OZONE/Running+Ozone+Smoke+Tests+and+Unit+Tests) contains tips on running tests locally.
+- [This wiki](https://cwiki.apache.org/confluence/display/OZONE/Github+Actions+tips+and+tricks) contains tips on interacting with the CI system, such as "Executing one test multiple times", or ssh'ing in to the vm running the tests while they workflow is running.
