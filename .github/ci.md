@@ -4,7 +4,7 @@ The Ozone project uses Github Actions, (GA), for its CI system.  GA are implemen
 
 ## Workflows
 
-### post-commit
+### build-branch (post-commit.yml)
 [This](./workflows/post-commit.yml) is the most important workflow.  It runs the tests that verify the latest commit.  It runs each time a pull request is created or pushed to, as well as each time a branch in your fork is pushed to.  It also runs on the master branch twice a day, (00:30 and 12:30).
 
 The post-commit workflow, (which also has the name "build-branch" on the GA page,) is divded into a number of different jobs, most of which run in parallel.  Each of the jobs, (except "build-info" and "compile",) runs a subset of the test suite.
@@ -72,4 +72,36 @@ merges the coverage of the following jobs that were run earlier
 - acceptance
 - basic
 - integration
+
+### Cancelling (cancel-ci.yaml)
+[This](./workflows/cancel-ci.yaml) workflow is triggered each time a build-branch workflow is triggered.  It monitors that run for failure and cancel any continuing jobs after one fails.  This allows it to fail fast.
+
+### close-prs (close-pending.yaml)
+[This](./workflows/close-pending.yaml) workflow is scheduled each day at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
+
+### comment-commands (comments.yaml)
+[This](./workflows/comments.yaml) workflow is triggered each time a PR's comment is added/edited.  It checks to see if one of the following [commands](./comment-commands) has been issued, and invokes it if so:
+- /close : Close pending pull request temporary
+- /help : Show all the available comment commands
+- /label : add new label to the issue: /label <label>
+- /pending : Add a REQUESTED_CHANGE type review to mark issue non-mergeable: /pending <reason>
+- /ready : Dismiss all the blocking reviews by github-actions bot
+- /retest : provide help on how to trigger new CI build
+
+
+## Old/Deprecated Workflows
+The following workflows are no longer exist but still exist on the [actions](https://github.com/apache/ozone/actions) page for historical reasons:
+- [Build](https://github.com/apache/ozone/actions/workflows/main.yml)
+- [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml)
+- [pr-check](https://github.com/apache/ozone/actions/workflows/pr.yml)
+
+Note the the deprecated [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml) has the same name as the current [build-branch](https://github.com/apache/ozone/actions/workflows/post-commit.yml), (but can be distinguished by the URL.
+
+
+
+
+
+
+
+
 
