@@ -5,9 +5,7 @@ The Ozone project uses Github Actions, (GA), for its CI system.  GA are implemen
 ## Workflows
 
 ### build-branch Workflow
-[This](./workflows/post-commit.yml) is the most important workflow.  It runs the tests that verify the latest commit.  It is triggered each time a pull request is created or pushed to, as well as each time a branch in your fork is pushed to.  It is also "scheduled" on the master branch twice a day, (00:30 and 12:30).  (Those are the runs [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml?query=event%3Aschedule++) which are marked "scheduled", and have no branch label.)
-
-The ones marked "Pull request #xxxx synchronize" are triggered by an open PR being updated with more commits, (i.e. the remote branch is being synchronized.)
+[This](./workflows/post-commit.yml) is the most important workflow.  It runs the tests that verify the latest commit.  It is triggered each time a pull request is created or synchronized, (ie when the remote branch is pushed to.)  It is also "scheduled" on the master branch twice a day, (00:30 and 12:30).  (Those are the runs [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml?query=event%3Aschedule++) which are marked "scheduled", and have no branch label.)
 
 The build-branch workflow is divided into a number of different jobs, most of which run in parallel.  Each of the jobs, (except "build-info" and "compile",) runs a subset of the test suite.  They are all described below.
 
