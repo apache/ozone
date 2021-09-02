@@ -68,13 +68,13 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 [This](./workflows/close-pending.yaml) workflow is scheduled each day at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
 
 ### comment-commands Workflow
-[This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if one of the following [commands](./comment-commands) has been issued, and, if so, invokes the corresponding command.
-- /close : Close pending pull request (with message saying author is free to reopen.)
-- /help : Show all the available comment commands
-- /label : add new label to the issue: /label <label>
-- /pending : Add a REQUESTED_CHANGE type review to mark issue non-mergeable: /pending <reason>
-- /ready : Dismiss all the blocking reviews
-- /retest : provide help on how to trigger new CI build
+[This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if body of the comment begins with one of the following strings and, if so, invokes the corresponding command.
+- /close : [Close](./comment-commands/close.sh) pending pull request (with message saying author is free to reopen.)
+- /help : [Show](./comment-commands/help.sh) all the available comment commands
+- /label : [Add](./comment-commands/label.sh) new label to the issue: /label <label>
+- /pending : [Add](./comment-commands/pending.sh) a REQUESTED_CHANGE type review to mark issue non-mergeable: /pending <reason>
+- /ready : [Dismiss](./comment-commands/ready.sh) all the blocking reviews
+- /retest : [Provide](./comment-commands/retest.sh) help on how to trigger new CI build
 
 
 ## Old/Deprecated Workflows
