@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -495,6 +496,20 @@ public class TestOzoneShellHA {
     args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
         state};
+    execute(ozoneAdminShell, args);
+
+    // Test case 3: list THREE replica container
+    String factor = "--factor=THREE";
+    args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        factor};
+    execute(ozoneAdminShell, args);
+
+    // Test case 4: list ONE replica container
+    factor = "--factor=ONE";
+    args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        factor};
     execute(ozoneAdminShell, args);
   }
 

@@ -29,6 +29,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -363,7 +364,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count) throws IOException {
-    return listContainer(startContainerID, count, null);
+    return listContainer(startContainerID, count, null, null);
   }
 
   /**
@@ -379,6 +380,23 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
+    return listContainer(startContainerID, count, state, null);
+  }
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
+   * @param factor Container factor.
+   * @return a list of pipeline.
+   * @throws IOException
+   */
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -386,14 +404,29 @@ public class SCMClientProtocolServer implements
     if (state != null) {
       auditMap.put("state", state.name());
     }
+    if (factor != null) {
+      auditMap.put("factor", factor.name());
+    }
     try {
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      if(null == state) {
+      if(state != null && factor != null) {
+        return scm.getContainerManager().getContainers(state).stream()
+            .filter(info -> info.containerID().getId() >= startContainerID)
+            .filter(info -> info.getReplicationFactor() == factor)
+            .sorted().limit(count).collect(Collectors.toList());
+      } else if (state == null && factor == null) {
         return scm.getContainerManager().getContainers(containerId, count);
+      } else if (state != null) {
+        return scm.getContainerManager().getContainers(state).stream()
+            .filter(info -> info.containerID().getId() >= startContainerID)
+            .sorted().limit(count).collect(Collectors.toList());
+      } else {
+        // factor != null
+        return scm.getContainerManager().getContainers().stream()
+            .filter(info -> info.containerID().getId() >= startContainerID)
+            .filter(info -> info.getReplicationFactor() == factor)
+            .sorted().limit(count).collect(Collectors.toList());
       }
-      return scm.getContainerManager().getContainers(state).stream()
-          .filter(info -> info.containerID().getId() >= startContainerID)
-          .sorted().limit(count).collect(Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(

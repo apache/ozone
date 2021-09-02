@@ -53,6 +53,14 @@ List containers with container state
     ${output} =         Execute          ozone admin container list --state=CLOSED
                         Should Not contain   ${output}   OPEN
 
+List containers with replication factor ONE
+    ${output} =         Execute          ozone admin container list --factor=ONE
+                        Should Not contain   ${output}   THREE
+
+List containers with replication factor THREE
+    ${output} =         Execute          ozone admin container list --factor=THREE
+                        Should Not contain   ${output}   ONE
+
 Container info
     ${output} =         Execute          ozone admin container info "${CONTAINER}"
                         Should contain   ${output}   Container id: ${CONTAINER}
@@ -67,7 +75,7 @@ Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"
     ${output} =         Execute          ozone admin container info "${container}"
-                        Should contain   ${output}   CLOS
+                        Should contain   ${output}   CLOSE
     Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Incomplete command
