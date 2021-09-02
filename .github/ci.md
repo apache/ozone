@@ -13,9 +13,11 @@ This workflow, (which has the name "build-branch" on the GA page,) is divided in
 
 #### build-info
 
-[The build-info job script](../dev-support/ci/selective_ci_checks.sh) runs before the others and determines which of the other jobs are to be run.  If the workflow was triggered by some event other than a PR, then all jobs/tests are run.  Otherwise, build-info selects the jobs/tests, by generating a list of files that are changed by the PR.  It matches that list against a series of regex's, each of which is associated with a different job.  It sets the appropriate flag for each match.  Each of those is subsequently used by the workflow to decide whether to run the corresponding job.
+[The build-info job script](../dev-support/ci/selective_ci_checks.sh) runs before the others and determines which of the other jobs are to be run.  If the workflow was triggered by some event other than a PR, then all jobs/tests are run.  All jobs are also run if the PR has a label containing the following string, "full tests needed".
 
-For example, the following regex is used to determine if the Kubernetes tests should be run:
+Otherwise, build-info first generates a list of files that were changed by the PR.  It matches that list against a series of regex's, each of which is associated with a different job.  It sets the appropriate flag for each match.  Before starting each of the subsequent jobs, the workflow checks the corresponding flag is set.
+
+As an example, a regex like the following is used to determine if the Kubernetes tests should be run:
 ```
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
@@ -23,7 +25,7 @@ For example, the following regex is used to determine if the Kubernetes tests sh
     )
 ```
 
-In addition, if the PR has a label containing the following string, "full tests needed", all jobs are run.
+
 
 #### compile
 [Builds](../hadoop-ozone/dev-support/checks/build.sh) the Java 8 and 11 versions of the jars, and saves the java 8 version for some of the subsequent jobs.
