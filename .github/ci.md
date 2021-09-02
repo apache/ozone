@@ -4,7 +4,7 @@ The Ozone project uses Github Actions, (GA), for its CI system.  GA are implemen
 
 ## Workflows
 
-### build-branch (post-commit.yml)
+### build-branch Workflow
 [This](./workflows/post-commit.yml) is the most important workflow.  It runs the tests that verify the latest commit.  It is triggered each time a pull request is created or pushed to, as well as each time a branch in your fork is pushed to.  It also "scheduled" on the master branch twice a day, (00:30 and 12:30).  (So all build-branch runs [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml?query=event%3Aschedule++) which are marked "scheduled", and have no branch label, are run on the master branch.)
 
 The ones marked "Pull request #xxxx synchronize" are triggered by an open PR being updated with more commits, (i.e. the remote branch is being synchronized.)
@@ -61,13 +61,13 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - basic
 - integration
 
-### Cancelling (cancel-ci.yaml)
+### Cancelling Workflow
 [This](./workflows/cancel-ci.yaml) workflow is triggered each time a build-branch workflow is triggered.  It monitors that run for failure and cancels any continuing jobs after one fails.  This allows it to fail fast.
 
-### close-prs (close-pending.yaml)
+### close-prs Workflow
 [This](./workflows/close-pending.yaml) workflow is scheduled each day at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
 
-### comment-commands (comments.yaml)
+### comment-commands Workflow
 [This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if one of the following [commands](./comment-commands) has been issued, and, if so, invokes the corresponding command.
 - /close : Close pending pull request (with message saying author is free to reopen.)
 - /help : Show all the available comment commands
