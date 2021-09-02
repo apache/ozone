@@ -32,24 +32,13 @@ As an example, a regex like the following is used to determine if the Kubernetes
 
 #### basic
 Runs a subset of the following subjobs depending on what was selected by build-info
-
 - author: [Verifies](../hadoop-ozone/dev-support/checks/author.sh) none of the Java files contain the @author annotation
 - bats: [Checks](../hadoop-ozone/dev-support/checks/bats.sh) bash scripts, (using the [Bash Automated Testing System](https://github.com/bats-core/bats-core#bats-core-bash-automated-testing-system-2018))
-
-##### checkstyle
-[Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
-
-##### docs
-[Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
-
-##### findbugs
-[Runs](../hadoop-ozone/dev-support/checks/findbugs.sh) spotbugs static analysis on bytecode
-
-##### rat (release audit tool) 
-[Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
-
-##### unit
-[Runs](../hadoop-ozone/dev-support/checks/unit.sh) 'mvn test' for all non integration tests
+- checkstyle: [Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
+- docs: [Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
+- findbugs: [Runs](../hadoop-ozone/dev-support/checks/findbugs.sh) spotbugs static analysis on bytecode
+- rat (release audit tool): [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
+- unit: [Runs](../hadoop-ozone/dev-support/checks/unit.sh) 'mvn test' for all non integration tests
 
 #### dependency
 [Confirms](../hadoop-ozone/dev-support/checks/dependency.sh) hadoop-ozone/dist/src/main/license/bin/LICENSE.txt is up to date, (includes references to all the latest jar files).
