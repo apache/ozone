@@ -83,7 +83,7 @@ The following workflows no longer run but still exist on the [actions](https://g
 - [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml)
 - [pr-check](https://github.com/apache/ozone/actions/workflows/pr.yml)
 
-Note the the deprecated [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml) has the same name as the current [build-branch](https://github.com/apache/ozone/actions/workflows/post-commit.yml).  (They can be distinguished by the URL.)
+Note that the deprecated [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml) has the same name as the current [build-branch](https://github.com/apache/ozone/actions/workflows/post-commit.yml).  (They can be distinguished by the URL.)
 
 
 ## Tips
