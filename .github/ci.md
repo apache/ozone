@@ -62,17 +62,17 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - integration
 
 ### Cancelling Workflow
-[This](./workflows/cancel-ci.yaml) workflow is triggered each time a build-branch workflow is triggered.  It monitors that run for failure and cancels any continuing jobs after one fails.  This allows it to fail fast.
+[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [build-branch](ci.md#build-branch-workflow) workflow is triggered.  It monitors that workflow run for failure and cancels any continuing jobs after one fails.  This allows reduces our GA usage.
 
 ### close-prs Workflow
-[This](./workflows/close-pending.yaml) workflow is scheduled each day at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
+[This](./workflows/close-pending.yaml) workflow is scheduled each night at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
 
 ### comment-commands Workflow
-[This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if body of the comment begins with one of the following strings and, if so, invokes the corresponding command.
+[This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if the body of the comment begins with one of the following strings and, if so, invokes the corresponding command.
 - /close : [Close](./comment-commands/close.sh) pending pull request (with message saying author is free to reopen.)
 - /help : [Show](./comment-commands/help.sh) all the available comment commands
-- /label : [Add](./comment-commands/label.sh) new label to the issue: /label <label>
-- /pending : [Add](./comment-commands/pending.sh) a REQUESTED_CHANGE type review to mark issue non-mergeable: /pending <reason>
+- /label : [Add](./comment-commands/label.sh) new label to the issue: /label "label"
+- /pending : [Add](./comment-commands/pending.sh) a REQUESTED_CHANGE type review to mark issue non-mergeable: /pending "reason"
 - /ready : [Dismiss](./comment-commands/ready.sh) all the blocking reviews
 - /retest : [Provide](./comment-commands/retest.sh) help on how to trigger new CI build
 
