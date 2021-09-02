@@ -287,11 +287,15 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         if (replicaSet.isSufficientlyReplicated()) {
           sufficientlyReplicated++;
         } else {
-          underReplicatedIDs.add(cid);
+          if (LOG.isDebugEnabled()) {
+            underReplicatedIDs.add(cid);
+          }
           underReplicated++;
         }
         if (!replicaSet.isHealthy()) {
-          unhealthyIDs.add(cid);
+          if (LOG.isDebugEnabled()) {
+            unhealthyIDs.add(cid);
+          }
           unhealthy++;
         }
       } catch (ContainerNotFoundException e) {
@@ -302,7 +306,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
-    if (LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
+        unhealthyIDs.size() < 10000) {
       LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
               "containers", dn, underReplicated,
           underReplicatedIDs.stream().map(
