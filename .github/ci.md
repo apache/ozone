@@ -31,13 +31,10 @@ As an example, a regex like the following is used to determine if the Kubernetes
 [Builds](../hadoop-ozone/dev-support/checks/build.sh) the Java 8 and 11 versions of the jars, and saves the java 8 version for some of the subsequent jobs.
 
 #### basic
-Runs a subset of the ```author bats checkstyle docs findbugs rat unit``` subjobs depending on what was selected by build-info
+Runs a subset of the following subjobs depending on what was selected by build-info
 
-##### author
-[Verifies](../hadoop-ozone/dev-support/checks/author.sh) none of the Java files contain the @author annotation
-
-##### bats
-[Checks](../hadoop-ozone/dev-support/checks/bats.sh) bash scripts, (using the [Bash Automated Testing System](https://github.com/bats-core/bats-core#bats-core-bash-automated-testing-system-2018))
+- author: [Verifies](../hadoop-ozone/dev-support/checks/author.sh) none of the Java files contain the @author annotation
+- bats: [Checks](../hadoop-ozone/dev-support/checks/bats.sh) bash scripts, (using the [Bash Automated Testing System](https://github.com/bats-core/bats-core#bats-core-bash-automated-testing-system-2018))
 
 ##### checkstyle
 [Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
