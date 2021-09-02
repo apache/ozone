@@ -13,9 +13,9 @@ The build-branch workflow is divided into a number of different jobs, most of wh
 
 #### build-info job
 
-[The build-info job script](../dev-support/ci/selective_ci_checks.sh) runs before the others and determines which of the other jobs are to be run.  If the workflow was triggered by some event other than a PR, then all jobs/tests are run.  All jobs are also run if the PR has a label containing the following string, "full tests needed".
+[The build-info job script](../dev-support/ci/selective_ci_checks.sh) runs before the others and determines which of the other jobs are to be run.  If the workflow was triggered by some event other than a PR, then all jobs/tests are run.  They are also all run if the PR has a label containing the following string, "full tests needed".
 
-Otherwise, build-info first generates a list of files that were changed by the PR.  It matches that list against a series of regex's, each of which is associated with a different job.  It sets the appropriate flag for each match.  Those boolean flags are used later in the run to decide whether a job should be run
+Otherwise, *build-info* first generates a list of files that were changed by the PR.  It matches that list against a series of regex's, each of which is associated with a different job.  It sets the appropriate flag for each match.  Those boolean flags are used later in the run to decide whether the corresponding job should be run
 
 For example, a regex like the following is used to determine if the Kubernetes flag should be set.
 ```
