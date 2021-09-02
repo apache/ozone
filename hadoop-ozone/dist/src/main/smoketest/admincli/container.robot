@@ -75,7 +75,7 @@ Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"
     ${output} =         Execute          ozone admin container info "${container}"
-                        Should contain   ${output}   CLOSE
+                        Should contain   ${output}   CLOS
     Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Incomplete command
