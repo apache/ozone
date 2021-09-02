@@ -35,10 +35,10 @@ Runs a subset of the ```author bats checkstyle docs findbugs rat unit``` subjobs
 [Verifies](../hadoop-ozone/dev-support/checks/author.sh) none of the Java files contain the @author annotation
 
 ##### bats
-[Checks](../hadoop-ozone/dev-support/checks/bats.sh) bash scripts, (using the [Bash Automated Testing System](https://github.com/sstephenson/bats))
+[Checks](../hadoop-ozone/dev-support/checks/bats.sh) bash scripts, (using the [Bash Automated Testing System](https://github.com/bats-core/bats-core#bats-core-bash-automated-testing-system-2018))
 
 ##### checkstyle
-[Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) mvn checkstyle plugin to confirm Java source abides by Ozone coding conventions
+[Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
 
 ##### docs
 [Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
@@ -50,7 +50,7 @@ Runs a subset of the ```author bats checkstyle docs findbugs rat unit``` subjobs
 [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
 
 ##### unit
-[Runs](../hadoop-ozone/dev-support/checks/unit.sh) mvn test for all non integration tests
+[Runs](../hadoop-ozone/dev-support/checks/unit.sh) 'mvn test' for all non integration tests
 
 #### dependency
 [Confirms](../hadoop-ozone/dev-support/checks/dependency.sh) hadoop-ozone/dist/src/main/license/bin/LICENSE.txt is up to date, (includes references to all the latest jar files).
@@ -62,7 +62,7 @@ Runs a subset of the ```author bats checkstyle docs findbugs rat unit``` subjobs
 [Runs](../hadoop-ozone/dev-support/checks/kubernetes.sh) k8s tests
 
 #### integration
-[Runs](../hadoop-ozone/dev-support/checks/integration.sh) mvn test for all integration/minicluster tests split into 3 subjobs:
+[Runs](../hadoop-ozone/dev-support/checks/integration.sh) 'mvn test' for all integration/minicluster tests, split into 3 subjobs:
 - client
 - filesystem-hdds
 - ozone
@@ -74,13 +74,13 @@ Runs a subset of the ```author bats checkstyle docs findbugs rat unit``` subjobs
 - integration
 
 ### Cancelling (cancel-ci.yaml)
-[This](./workflows/cancel-ci.yaml) workflow is triggered each time a build-branch workflow is triggered.  It monitors that run for failure and cancel any continuing jobs after one fails.  This allows it to fail fast.
+[This](./workflows/cancel-ci.yaml) workflow is triggered each time a build-branch workflow is triggered.  It monitors that run for failure and cancels any continuing jobs after one fails.  This allows it to fail fast.
 
 ### close-prs (close-pending.yaml)
 [This](./workflows/close-pending.yaml) workflow is scheduled each day at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
 
 ### comment-commands (comments.yaml)
-[This](./workflows/comments.yaml) workflow is triggered each time a PR's comment is added/edited.  It checks to see if one of the following [commands](./comment-commands) has been issued, and, if so, invokes the corresponding command.
+[This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if one of the following [commands](./comment-commands) has been issued, and, if so, invokes the corresponding command.
 - /close : Close pending pull request (with message saying author is free to reopen.)
 - /help : Show all the available comment commands
 - /label : add new label to the issue: /label <label>
@@ -95,7 +95,7 @@ The following workflows no longer run but still exist on the [actions](https://g
 - [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml)
 - [pr-check](https://github.com/apache/ozone/actions/workflows/pr.yml)
 
-Note the the deprecated [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml) has the same name as the current [build-branch](https://github.com/apache/ozone/actions/workflows/post-commit.).  (They can be distinguished by the URL.)
+Note the the deprecated [build-branch](https://github.com/apache/ozone/actions/workflows/chaos.yml) has the same name as the current [build-branch](https://github.com/apache/ozone/actions/workflows/post-commit.yml).  (They can be distinguished by the URL.)
 
 
 ## Tips
@@ -103,4 +103,4 @@ Note the the deprecated [build-branch](https://github.com/apache/ozone/actions/w
 - When a build of the Ozone master branch fails, it's artifacts are stored [here](https://elek.github.io/ozone-build-results/).
 - To trigger rerunning the tests, push a commit like this to your PR: ```git commit --allow-empty -m 'trigger new CI check'```
 - [This wiki](https://cwiki.apache.org/confluence/display/OZONE/Running+Ozone+Smoke+Tests+and+Unit+Tests) contains tips on running tests locally.
-- [This wiki](https://cwiki.apache.org/confluence/display/OZONE/Github+Actions+tips+and+tricks) contains tips on special handling of the CI system, such as "Executing one test multiple times", or "ssh'ing in to the machine running the tests while they are running".
+- [This wiki](https://cwiki.apache.org/confluence/display/OZONE/Github+Actions+tips+and+tricks) contains tips on special handling of the CI system, such as "Executing one test multiple times", or "ssh'ing in to the CI machine while the tests are running".
