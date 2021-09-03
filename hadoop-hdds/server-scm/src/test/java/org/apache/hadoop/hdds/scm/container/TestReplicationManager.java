@@ -847,7 +847,7 @@ public class TestReplicationManager {
 
     replicationManager.processAll();
     // Wait for EventQueue to call the event handler
-    eventQueue.processAll(100);
+    eventQueue.processAll(1000);
     Assert.assertEquals(2, datanodeCommandHandler.getInvocation());
   }
 
