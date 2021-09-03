@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.metadata.PipelineCodec;
@@ -146,6 +147,11 @@ public class TestSCMStoreImplWithOldPipelineIDKeyFormat
 
   @Override
   public Table<ContainerID, ContainerInfo> getContainerTable() {
+    return null;
+  }
+
+  @Override
+  public Table<ContainerID, MoveDataNodePair> getMoveTable() {
     return null;
   }
 

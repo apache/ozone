@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -131,7 +131,7 @@ public class TestContainerPlacement {
     EventQueue eventQueue = new EventQueue();
 
     PipelineManager pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+        PipelineManagerImpl.newPipelineManager(
             config,
             MockSCMHAManager.getInstance(true),
             scmNodeManager,

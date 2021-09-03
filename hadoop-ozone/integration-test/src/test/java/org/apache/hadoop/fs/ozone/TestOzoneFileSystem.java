@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -134,7 +135,7 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
-  private static boolean isBucketFSOptimized = false;
+  private static BucketLayout bucketLayout = BucketLayout.LEGACY;
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
 
@@ -154,7 +155,7 @@ public class TestOzoneFileSystem {
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    if (isBucketFSOptimized) {
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       TestOMRequestUtils.configureFSOptimizedPaths(conf, enabledFileSystemPaths,
           OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     } else {
@@ -167,7 +168,8 @@ public class TestOzoneFileSystem {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -213,8 +215,8 @@ public class TestOzoneFileSystem {
     return fs;
   }
 
-  public static void setIsBucketFSOptimized(boolean isBucketFSO) {
-    isBucketFSOptimized = isBucketFSO;
+  public static void setBucketLayout(BucketLayout bLayout) {
+    bucketLayout = bLayout;
   }
 
   public static String getBucketName() {

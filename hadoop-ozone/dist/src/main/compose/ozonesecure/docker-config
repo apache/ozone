@@ -50,7 +50,7 @@ HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
 CORE-SITE.XML_dfs.data.transfer.protection=authentication
 CORE-SITE.XML_hadoop.security.authentication=kerberos
-CORE-SITE.XML_hadoop.security.auth_to_local="RULE:[2:$1](testuser2.*) RULE:[2:$1@$0](.*)s/.*/root/"
+CORE-SITE.XML_hadoop.security.auth_to_local="RULE:[2:$1](testuser2.*) RULE:[2:$1](testuser.*) RULE:[2:$1@$0](.*)s/.*/root/"
 CORE-SITE.XML_hadoop.security.key.provider.path=kms://http@kms:9600/kms
 
 
@@ -60,6 +60,9 @@ OZONE-SITE.XML_ozone.om.kerberos.principal=om/om@EXAMPLE.COM
 OZONE-SITE.XML_ozone.om.kerberos.keytab.file=/etc/security/keytabs/om.keytab
 OZONE-SITE.XML_ozone.recon.kerberos.keytab.file=/etc/security/keytabs/recon.keytab
 OZONE-SITE.XML_ozone.recon.kerberos.principal=recon/recon@EXAMPLE.COM
+
+OZONE-SITE.XML_ozone.s3g.kerberos.keytab.file=/etc/security/keytabs/s3g.keytab
+OZONE-SITE.XML_ozone.s3g.kerberos.principal=s3g/s3g@EXAMPLE.COM
 
 OZONE-SITE.XML_hdds.scm.replication.thread.interval=5s
 OZONE-SITE.XML_hdds.scm.replication.event.timeout=10s

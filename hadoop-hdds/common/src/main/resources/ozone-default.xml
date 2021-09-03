@@ -844,6 +844,14 @@
   </description>
   </property>
   <property>
+    <name>ozone.scm.datanode.disallow.same.peers</name>
+    <value>false</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Disallows same set of datanodes to participate in multiple
+      pipelines when set to true. Default is set to false.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ratis.pipeline.limit</name>
     <value>0</value>
     <tag>OZONE, SCM, PIPELINE</tag>
@@ -2805,6 +2813,163 @@
       volume on a datanode to hold a new pipeline.
       Datanodes with all its ratis volumes with space under this value
       will not be allocated a pipeline or container replica.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.storage.dir</name>
+    <value></value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>Storage directory used by SCM to write Ratis logs.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.rpc.type</name>
+    <value>GRPC</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Ratis supports different kinds of transports like
+      netty, GRPC， Hadoop RPC etc. This picks one of those for
+      this cluster.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.segment.size</name>
+    <value>16KB</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The size of the raft segment used by Apache Ratis on
+      SCM. (16 KB by default)
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.segment.preallocated.size</name>
+    <value>16KB</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The size of the buffer which is preallocated for
+      raft segment used by Apache Ratis on SCM.(16 KB by default)
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.byte-limit</name>
+    <value>32MB</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Byte limit for Raft's Log Worker queue.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Number of operation pending with Raft's Log Worker.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.purge.enabled</name>
+    <value>false</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>whether enable raft log purge.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.purge.gap</name>
+    <value>1000000</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The minimum gap between log indices for Raft server to
+      purge its log segments after taking snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.snapshot.threshold</name>
+    <value>1000</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The threshold to trigger a Ratis taking snapshot
+      operation for SCM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.request.timeout</name>
+    <value>30s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The timeout duration for SCM's Ratis server RPC.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.server.retry.cache.timeout</name>
+    <value>60s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Retry Cache entry timeout for SCM's Ratis server.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.leader.election.timeout</name>
+    <value>5s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The minimum timeout duration for SCM ratis leader
+      election. Default is 1s.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.leader.ready.wait.timeout</name>
+    <value>60s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The minimum timeout duration for waiting for
+      leader readiness.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.leader.ready.check.interval</name>
+    <value>2s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The interval between ratis server performing
+      a leader readiness check.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.server.failure.timeout.duration</name>
+    <value>120s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The timeout duration for ratis server failure
+      detection, once the threshold has reached, the ratis state
+      machine will be informed about the failure in the ratis ring.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.snapshot.dir</name>
+    <value></value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The ratis snapshot dir location.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.deadline.interval</name>
+    <value>30m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Deadline for SCM DB checkpoint interval.</description>
+  </property>
+
+
+  <property>
+    <name>ozone.s3g.kerberos.keytab.file</name>
+    <value>/etc/security/keytabs/s3g.keytab</value>
+    <tag>OZONE, SECURITY, KERBEROS, S3GATEWAY</tag>
+    <description> The keytab file used by S3Gateway daemon to login as its
+      service principal. The principal name is configured with
+      ozone.s3g.kerberos.principal.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.kerberos.principal</name>
+    <value>s3g/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, S3GATEWAY</tag>
+    <description>The S3Gateway service principal.
+      Ex: s3g/_HOST@REALM.COM</description>
+  </property>
+
+  <property>
+    <name>hdds.container.checksum.verification.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description> To enable/disable checksum verification of the
+      containers.
+    </description>
+  </property>
+
+  <property>
+    <name>hadoop.http.idle_timeout.ms</name>
+    <value>60000</value>
+    <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
+    <description>
+      OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
     </description>
   </property>
 </configuration>

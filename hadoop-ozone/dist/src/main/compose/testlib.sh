@@ -297,10 +297,15 @@ cleanup_docker_images() {
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
   local dir="${2:-${RESULT_DIR}}"
+  local xunitdir="${3:-}"
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     if [ -z "${xunitdir}" ]; then
+       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     else
+       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
+     fi
   else
      echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
      exit 1

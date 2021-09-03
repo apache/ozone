@@ -251,10 +251,12 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.OzoneManagerInterService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -1140,6 +1142,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (snapshotDir.isDirectory()) {
         FileUtils.moveDirectory(snapshotDir.toPath(),
             omRatisSnapshotDir.toPath());
+      }
+
+      File omRatisDir = new File(omRatisDirectory);
+      String groupIDfromServiceID = RaftGroupId.valueOf(
+          getRaftGroupIdFromOmServiceId(getOMServiceId())).getUuid().toString();
+
+      // If a directory exists in ratis storage dir
+      // Check the Ratis group Dir is same as the one generated from
+      // om service id.
+
+      // This will help to catch if some one has changed service id later on.
+      File[] ratisDirFiles = omRatisDir.listFiles();
+      if (ratisDirFiles != null) {
+        for (File ratisGroupDir : ratisDirFiles) {
+          if (ratisGroupDir.isDirectory()) {
+            if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
+              throw new IOException("Ratis group Dir on disk "
+                  + ratisGroupDir.getName() + " does not match with RaftGroupID"
+                  + groupIDfromServiceID + " generated from service id "
+                  + getOMServiceId() + ". Looks like there is a change to " +
+                  OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY + " value after the " +
+                  "cluster is setup. Currently change to this value is not " +
+                  "supported.");
+            }
+          } else {
+            LOG.warn("Unknown file {} exists in ratis storage dir {}",
+                ratisGroupDir, omRatisDir);
+          }
+        }
       }
 
       if (peerNodesMap != null && !peerNodesMap.isEmpty()) {

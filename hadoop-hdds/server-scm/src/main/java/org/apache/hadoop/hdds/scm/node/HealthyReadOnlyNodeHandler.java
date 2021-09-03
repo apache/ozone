@@ -23,12 +23,14 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
 
 /**
  * Handles non healthy to healthy(ReadOnly) node event.
@@ -65,6 +67,16 @@ public class HealthyReadOnlyNodeHandler
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
             "datanode {}: ", id, datanodeDetails, ex);
       }
+    }
+    //add node back if it is not present in networkTopology
+    NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
+    if (!nt.contains(datanodeDetails)) {
+      nt.add(datanodeDetails);
+      // make sure after DN is added back into topology, DatanodeDetails
+      // instance returned from nodeStateManager has parent correctly set.
+      Preconditions.checkNotNull(
+          nodeManager.getNodeByUuid(datanodeDetails.getUuidString())
+              .getParent());
     }
   }
 }

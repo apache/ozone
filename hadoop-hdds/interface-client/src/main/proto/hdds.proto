@@ -62,6 +62,11 @@ message ExtendedDatanodeDetailsProto {
     optional string buildDate = 5;
 }
 
+message MoveDataNodePairProto {
+    required DatanodeDetailsProto src = 1;
+    required DatanodeDetailsProto tgt = 2;
+}
+
 /**
  Proto message encapsulating information required to uniquely identify a
  OzoneManager.
