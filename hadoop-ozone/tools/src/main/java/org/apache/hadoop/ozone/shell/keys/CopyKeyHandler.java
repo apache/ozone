@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -95,7 +96,8 @@ public class CopyKeyHandler extends BucketHandler {
     }
 
     ReplicationConfig replicationConfig =
-        ReplicationConfig.fromTypeAndString(replicationType, replication);
+        getConf().getObject(ReplicationConfigValidator.class).validate(
+            ReplicationConfig.fromTypeAndString(replicationType, replication));
 
     OzoneKeyDetails keyDetail = bucket.getKey(fromKey);
     Map<String, String> keyMetadata = new HashMap<>(keyDetail.getMetadata());

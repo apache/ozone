@@ -65,13 +65,14 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.De
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolExecutor;
+import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
-import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
@@ -104,7 +105,7 @@ import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -157,6 +158,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
@@ -248,6 +250,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private MetricsSystem ms;
+  private final Map<String, RatisDropwizardExports> ratisMetricsMap =
+      new ConcurrentHashMap<>();
   private String primaryScmNodeId;
 
   /**
@@ -376,7 +380,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     initializeEventHandlers();
 
     containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration, scmContext);
+        containerManager, replicationManager, configuration, scmContext,
+        ContainerPlacementPolicyFactory
+            .getPolicy(conf, scmNodeManager, clusterMap, true,
+                placementMetrics));
     LOG.info(containerBalancer.toString());
 
     // Emit initial safe mode status, as now handlers are registered.
@@ -449,7 +456,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         datanodeStartAdminHandler);
     eventQueue.addHandler(SCMEvents.CMD_STATUS_REPORT, cmdStatusReportHandler);
     eventQueue.addHandler(SCMEvents.DELETE_BLOCK_STATUS,
-        (DeletedBlockLogImplV2) scmBlockManager.getDeletedBlockLog());
+        (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
@@ -519,7 +526,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       clusterMap = new NetworkTopologyImpl(conf);
     }
-
+    // This needs to be done before initializing Ratis.
+    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -564,7 +572,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       pipelineManager = configurator.getPipelineManager();
     } else {
       pipelineManager =
-          PipelineManagerV2Impl.newPipelineManager(
+          PipelineManagerImpl.newPipelineManager(
               conf,
               scmHAManager,
               scmNodeManager,
@@ -603,7 +611,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmContext,
           serviceManager,
           scmNodeManager,
-          new MonotonicClock(ZoneOffset.UTC));
+          new MonotonicClock(ZoneOffset.UTC),
+          scmHAManager,
+          getScmMetadataStore().getMoveTable());
     }
     if(configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
@@ -1028,7 +1038,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // If SCM HA was not being used before pre-finalize, and is being used
       // when the cluster is pre-finalized for the SCM HA feature, init
       // should fail.
-      ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig);
+      ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
+          new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion()));
 
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
@@ -1333,6 +1344,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void stop() {
+    try {
+      LOG.info("Stopping Container Balancer service.");
+      containerBalancer.stop();
+    } catch (Exception e) {
+      LOG.error("Failed to stop Container Balancer service.");
+    }
+
     try {
       LOG.info("Stopping Replication Manager Service.");
       replicationManager.stop();

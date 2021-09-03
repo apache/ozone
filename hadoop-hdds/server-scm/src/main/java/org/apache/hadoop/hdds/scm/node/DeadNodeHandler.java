@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -35,6 +36,8 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 
@@ -84,6 +87,16 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         removeContainerReplicas(datanodeDetails);
       }
 
+      //move dead datanode out of ClusterNetworkTopology
+      NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
+      if (nt.contains(datanodeDetails)) {
+        nt.remove(datanodeDetails);
+        //make sure after DN is removed from topology,
+        //DatanodeDetails instance returned from nodeStateManager has no parent.
+        Preconditions.checkState(
+            nodeManager.getNodeByUuid(datanodeDetails.getUuidString())
+                .getParent() == null);
+      }
     } catch (NodeNotFoundException ex) {
       // This should not happen, we cannot get a dead node event for an
       // unregistered datanode!

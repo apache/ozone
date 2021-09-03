@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
@@ -63,7 +63,7 @@ public class TestOneReplicaPipelineSafeModeRule {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
   private OneReplicaPipelineSafeModeRule rule;
-  private PipelineManagerV2Impl pipelineManager;
+  private PipelineManagerImpl pipelineManager;
   private EventQueue eventQueue;
   private SCMServiceManager serviceManager;
   private SCMContext scmContext;
@@ -90,7 +90,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     SCMMetadataStore scmMetadataStore =
             new SCMMetadataStoreImpl(ozoneConfiguration);
 
-    pipelineManager = PipelineManagerV2Impl.newPipelineManager(
+    pipelineManager = PipelineManagerImpl.newPipelineManager(
         ozoneConfiguration,
         MockSCMHAManager.getInstance(true),
         mockNodeManager,

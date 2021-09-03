@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.junit.Assert.assertTrue;
+
 /**
  * Tests to verify ofs with prefix enabled cases.
  */
@@ -138,6 +140,25 @@ public class TestRootedOzoneFileSystemWithFSO
     Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
+  @Test
+  public void testRenameDir() throws Exception {
+    final String dir = "dir1";
+    final Path source = new Path(getBucketPath(), dir);
+    final Path dest = new Path(source.toString() + ".renamed");
+    // Add a sub-dir to the directory to be moved.
+    final Path subdir = new Path(source, "sub_dir1");
+    getFs().mkdirs(subdir);
+    LOG.info("Created dir {}", subdir);
+    LOG.info("Will move {} to {}", source, dest);
+    getFs().rename(source, dest);
+    assertTrue("Directory rename failed", getFs().exists(dest));
+    // Verify that the subdir is also renamed i.e. keys corresponding to the
+    // sub-directories of the renamed directory have also been renamed.
+    assertTrue("Keys under the renamed directory not renamed",
+        getFs().exists(new Path(dest, "sub_dir1")));
+    // cleanup
+    getFs().delete(dest, true);
+  }
   /**
    *  Cannot rename a directory to its own subdirectory.
    */

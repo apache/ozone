@@ -38,7 +38,6 @@ import org.junit.Assert;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -130,7 +129,7 @@ public class TestOmBlockVersioning {
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(1, highestVersion.getVersion());
-    assertEquals(2, highestVersion.getLocationList().size());
+    assertEquals(1, highestVersion.getLocationList().size());
 
     // 3rd update, version 2
     openKey = ozoneManager.openKey(keyArgs);
@@ -150,7 +149,7 @@ public class TestOmBlockVersioning {
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(2, highestVersion.getVersion());
-    assertEquals(4, highestVersion.getLocationList().size());
+    assertEquals(2, highestVersion.getLocationList().size());
   }
 
   private OmKeyLocationInfoGroup checkVersions(
@@ -159,18 +158,6 @@ public class TestOmBlockVersioning {
     for (OmKeyLocationInfoGroup version : versions) {
       if (currentVersion != null) {
         assertEquals(currentVersion.getVersion() + 1, version.getVersion());
-        for (OmKeyLocationInfo info : currentVersion.getLocationList()) {
-          boolean found = false;
-          // all the blocks from the previous version must present in the next
-          // version
-          for (OmKeyLocationInfo info2 : version.getLocationList()) {
-            if (info.getLocalID() == info2.getLocalID()) {
-              found = true;
-              break;
-            }
-          }
-          assertTrue(found);
-        }
       }
       currentVersion = version;
     }
@@ -212,7 +199,7 @@ public class TestOmBlockVersioning {
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
     assertEquals(1, keyInfo.getLatestVersionLocations().getVersion());
-    assertEquals(2,
+    assertEquals(1,
         keyInfo.getLatestVersionLocations().getLocationList().size());
 
     dataString = RandomStringUtils.randomAlphabetic(200);
@@ -221,7 +208,7 @@ public class TestOmBlockVersioning {
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
     assertEquals(2, keyInfo.getLatestVersionLocations().getVersion());
-    assertEquals(3,
+    assertEquals(1,
         keyInfo.getLatestVersionLocations().getLocationList().size());
   }
 }

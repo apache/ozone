@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
@@ -462,16 +461,13 @@ public class ContainerStateManager {
    * Returns a set of ContainerIDs that match the Container.
    *
    * @param owner  Owner of the Containers.
-   * @param type - Replication Type of the containers
-   * @param factor - Replication factor of the containers.
+   * @param repConfig - Replication Config of the containers
    * @param state - Current State, like Open, Close etc.
    * @return Set of containers that match the specific query parameters.
    */
   NavigableSet<ContainerID> getMatchingContainerIDs(final String owner,
-      final ReplicationType type, final ReplicationFactor factor,
-      final LifeCycleState state) {
-    return containers.getMatchingContainerIDs(state, owner,
-        factor, type);
+      final ReplicationConfig repConfig, final LifeCycleState state) {
+    return containers.getMatchingContainerIDs(state, owner, repConfig);
   }
 
   /**

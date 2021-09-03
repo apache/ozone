@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -43,6 +44,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRLS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.MOVE;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS_V2;
@@ -83,6 +85,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<String, Long> crlSequenceIdTable;
 
   private Table<String, Long> sequenceIdTable;
+
+  private Table<ContainerID, MoveDataNodePair> moveTable;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
@@ -166,6 +170,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       sequenceIdTable = SEQUENCE_ID.getTable(store);
 
       checkTableStatus(sequenceIdTable, SEQUENCE_ID.getName());
+
+      moveTable = MOVE.getTable(store);
+
+      checkTableStatus(moveTable, MOVE.getName());
     }
   }
 
@@ -264,6 +272,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public Table<String, Long> getSequenceIdTable() {
     return sequenceIdTable;
+  }
+
+  @Override
+  public Table<ContainerID, MoveDataNodePair> getMoveTable() {
+    return moveTable;
   }
 
   private void checkTableStatus(Table table, String name) throws IOException {

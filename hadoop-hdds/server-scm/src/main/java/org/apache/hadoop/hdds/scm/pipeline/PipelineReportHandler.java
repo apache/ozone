@@ -93,6 +93,8 @@ public class PipelineReportHandler implements
       } catch(NotLeaderException ex) {
         // Avoid NotLeaderException logging which happens when processing
         // pipeline report on followers.
+      } catch (PipelineNotFoundException e) {
+        LOGGER.error("Could not find pipeline {}", report.getPipelineID());
       } catch(IOException e) {
         LOGGER.error("Could not process pipeline report={} from dn={}.",
             report, dn, e);

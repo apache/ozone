@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -29,6 +30,18 @@ public class DUResponse {
   /** Path status. */
   @JsonProperty("status")
   private ResponseStatus status;
+
+  /** The current path request. */
+  @JsonProperty("path")
+  private String path;
+
+  /** Total size under current path.*/
+  @JsonProperty("size")
+  private long size;
+
+  /** Total size with replicas counted.*/
+  @JsonProperty("sizeWithReplica")
+  private long sizeWithReplica;
 
   /** The number of subpaths under the request path. */
   @JsonProperty("subPathCount")
@@ -43,6 +56,10 @@ public class DUResponse {
 
   public DUResponse() {
     this.status = ResponseStatus.OK;
+    this.duData = new ArrayList<>();
+    // by default, the replication feature is disabled
+    this.sizeWithReplica = -1L;
+    this.keySize = -1L;
   }
 
   public ResponseStatus getStatus() {
@@ -51,6 +68,30 @@ public class DUResponse {
 
   public void setStatus(ResponseStatus status) {
     this.status = status;
+  }
+
+  public long getSize() {
+    return size;
+  }
+
+  public void setSize(long size) {
+    this.size = size;
+  }
+
+  public long getSizeWithReplica() {
+    return sizeWithReplica;
+  }
+
+  public void setSizeWithReplica(long sizeWithReplica) {
+    this.sizeWithReplica = sizeWithReplica;
+  }
+
+  public String getPath() {
+    return path;
+  }
+
+  public void setPath(String path) {
+    this.path = path;
   }
 
   public int getCount() {
@@ -89,6 +130,19 @@ public class DUResponse {
     @JsonProperty("size")
     private long size;
 
+    /** Disk usage with replication under the subpath. */
+    @JsonProperty("sizeWithReplica")
+    private long sizeWithReplica;
+
+    /** Indicate if the path is a key for Web UI. */
+    @JsonProperty("isKey")
+    private boolean isKey;
+
+    public DiskUsage() {
+      this.sizeWithReplica = -1L;
+      this.isKey = false;
+    }
+
     public long getSize() {
       return size;
     }
@@ -97,12 +151,28 @@ public class DUResponse {
       return subpath;
     }
 
+    public long getSizeWithReplica() {
+      return sizeWithReplica;
+    }
+
     public void setSize(long size) {
       this.size = size;
     }
 
     public void setSubpath(String subpath) {
       this.subpath = subpath;
+    }
+
+    public void setSizeWithReplica(long sizeWithReplica) {
+      this.sizeWithReplica = sizeWithReplica;
+    }
+
+    public void setKey(boolean key) {
+      isKey = key;
+    }
+
+    public boolean isKey() {
+      return isKey;
     }
   }
 }
