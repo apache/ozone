@@ -38,7 +38,6 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
@@ -195,14 +194,16 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
-  protected void finalizeUpgrade(Supplier<Storage> storageSuppplier)
-      throws UpgradeException {
+  protected void finalizeUpgrade(Function<LayoutFeature,
+      Function<UpgradeActionType, Optional<? extends UpgradeAction>>>
+      aFunction, Storage storage) throws UpgradeException {
     for (Object obj : versionManager.unfinalizedFeatures()) {
       LayoutFeature lf = (LayoutFeature) obj;
-      Storage layoutStorage = storageSuppplier.get();
-      Optional<? extends UpgradeAction> action = lf.action(ON_FINALIZE);
+      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
+          aFunction.apply(lf);
+      Optional<? extends UpgradeAction> action = function.apply(ON_FINALIZE);
       runFinalizationAction(lf, action);
-      updateLayoutVersionInVersionFile(lf, layoutStorage);
+      updateLayoutVersionInVersionFile(lf, storage);
       versionManager.finalized(lf);
     }
     versionManager.completeFinalization();
@@ -279,12 +280,13 @@ public abstract class BasicUpgradeFinalizer
       if (f.layoutVersion() > versionOnDisk) {
         LOG.info("Executing first upgrade start action {}", action.name());
         action.execute(component);
+
+        storage.setFirstUpgradeActionLayoutVersion(f.layoutVersion());
+        persistStorage(storage);
       } else {
         LOG.info("Skipping action {} since it has already been run.",
             action.name());
       }
-      storage.setFirstUpgradeActionLayoutVersion(f.layoutVersion());
-      persistStorage(storage);
     } catch (Exception ex) {
       String msg = "Exception while running first upgrade run actions " +
           "for feature %s";

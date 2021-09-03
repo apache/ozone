@@ -726,10 +726,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean startContainerBalancer(Optional<Double> threshold,
-                  Optional<Integer> idleiterations,
-                  Optional<Integer> maxDatanodesToBalance,
-                  Optional<Long> maxSizeToMoveInGB) throws IOException{
+  public boolean startContainerBalancer(
+      Optional<Double> threshold, Optional<Integer> idleiterations,
+      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB) throws IOException{
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -741,17 +741,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
           "threshold should to be specified in range [0.0, 1.0).");
       builder.setThreshold(tsd);
     }
-    if (maxSizeToMoveInGB.isPresent()) {
-      long mstm = maxSizeToMoveInGB.get();
+    if (maxSizeToMovePerIterationInGB.isPresent()) {
+      long mstm = maxSizeToMovePerIterationInGB.get();
       Preconditions.checkState(mstm > 0,
-          "maxSizeToMoveInGB must be positive.");
-      builder.setMaxSizeToMoveInGB(mstm);
+          "maxSizeToMovePerIterationInGB must be positive.");
+      builder.setMaxSizeToMovePerIterationInGB(mstm);
     }
-    if (maxDatanodesToBalance.isPresent()) {
-      int mdtb = maxDatanodesToBalance.get();
-      Preconditions.checkState(mdtb > 0,
-          "maxDatanodesToBalance must be positive.");
-      builder.setMaxDatanodesToBalance(mdtb);
+    if (maxDatanodesRatioToInvolvePerIteration.isPresent()) {
+      double mdti = maxDatanodesRatioToInvolvePerIteration.get();
+      Preconditions.checkState(mdti >= 0,
+          "maxDatanodesRatioToInvolvePerIteration must be " +
+              "greater than equal to zero.");
+      Preconditions.checkState(mdti <= 1,
+          "maxDatanodesRatioToInvolvePerIteration must be " +
+              "lesser than equal to one.");
+      builder.setMaxDatanodesRatioToInvolvePerIteration(mdti);
     }
     if (idleiterations.isPresent()) {
       int idi = idleiterations.get();

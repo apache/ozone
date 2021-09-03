@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.recon;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
-
 import com.google.inject.Inject;
 
 /**
@@ -37,12 +37,12 @@ public class ReconHttpServer extends BaseHttpServer {
 
   @Override
   protected String getHttpAddressKey() {
-    return ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
+    return ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
   }
 
   @Override
   protected String getHttpsAddressKey() {
-    return ReconServerConfigKeys.OZONE_RECON_HTTPS_ADDRESS_KEY;
+    return ReconConfigKeys.OZONE_RECON_HTTPS_ADDRESS_KEY;
   }
 
   @Override

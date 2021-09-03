@@ -27,8 +27,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
@@ -45,7 +45,8 @@ public class ScmHAUnfinalizedStateValidationAction
 
   @Override
   public void execute(StorageContainerManager scm) throws IOException {
-    checkScmHA(scm.getConfiguration(), scm.getScmStorageConfig());
+    checkScmHA(scm.getConfiguration(), scm.getScmStorageConfig(),
+        scm.getLayoutVersionManager());
   }
 
   /**
@@ -53,14 +54,12 @@ public class ScmHAUnfinalizedStateValidationAction
    * scm init and the upgrade action run on start.
    */
   public static void checkScmHA(OzoneConfiguration conf,
-      SCMStorageConfig storageConf) throws IOException {
+      SCMStorageConfig storageConf, LayoutVersionManager versionManager)
+      throws IOException {
 
     // Since this action may need to be called outside the upgrade framework
     // during init, it needs to check for pre-finalized state.
-    HDDSLayoutVersionManager versionManager =
-        new HDDSLayoutVersionManager(storageConf.getLayoutVersion());
-
-    if (versionManager.needsFinalization() &&
+    if (!versionManager.isAllowed(SCM_HA) &&
         SCMHAUtils.isSCMHAEnabled(conf) &&
         !storageConf.isSCMHAEnabled()) {
       throw new UpgradeException(String.format("Configuration %s cannot be " +

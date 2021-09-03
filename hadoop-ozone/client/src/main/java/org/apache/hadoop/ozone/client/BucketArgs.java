@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.client;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import java.util.HashMap;
 import java.util.List;
@@ -62,6 +63,11 @@ public final class BucketArgs {
   private long quotaInNamespace;
 
   /**
+   * Bucket Type.
+   */
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
+  /**
    * Private constructor, constructed via builder.
    * @param versioning Bucket version flag.
    * @param storageType Storage type to be used.
@@ -72,12 +78,13 @@ public final class BucketArgs {
    * @param sourceBucket
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
+   * @param bucketLayout Bucket Layouts.
    */
   @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
-      long quotaInBytes, long quotaInNamespace) {
+      long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -87,6 +94,7 @@ public final class BucketArgs {
     this.sourceBucket = sourceBucket;
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
+    this.bucketLayout = bucketLayout;
   }
 
   /**
@@ -164,6 +172,13 @@ public final class BucketArgs {
   }
 
   /**
+   * Returns the Bucket Type.
+   */
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
+  }
+
+  /**
    * Builder for OmBucketInfo.
    */
   public static class Builder {
@@ -176,6 +191,7 @@ public final class BucketArgs {
     private String sourceBucket;
     private long quotaInBytes;
     private long quotaInNamespace;
+    private BucketLayout bucketLayout;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -228,6 +244,11 @@ public final class BucketArgs {
       return this;
     }
 
+    public BucketArgs.Builder setBucketLayout(BucketLayout type) {
+      bucketLayout = type;
+      return this;
+    }
+
 
     /**
      * Constructs the BucketArgs.
@@ -236,7 +257,7 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace);
+          quotaInNamespace, bucketLayout);
     }
   }
 }

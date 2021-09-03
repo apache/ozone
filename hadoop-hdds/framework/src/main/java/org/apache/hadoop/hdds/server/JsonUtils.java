@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.server;
 import java.io.IOException;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -39,6 +40,7 @@ public final class JsonUtils {
   private static final ObjectWriter WRITTER;
   static {
     MAPPER = new ObjectMapper()
+        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
         .registerModule(new JavaTimeModule())
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
     WRITTER = MAPPER.writerWithDefaultPrettyPrinter();

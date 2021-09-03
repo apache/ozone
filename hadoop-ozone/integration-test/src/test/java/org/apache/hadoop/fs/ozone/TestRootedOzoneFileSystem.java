@@ -43,11 +43,13 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -58,6 +60,7 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -154,6 +157,7 @@ public class TestRootedOzoneFileSystem {
   // Store path commonly used by tests that test functionality within a bucket
   private static Path bucketPath;
   private static String rootPath;
+  private static BucketLayout bucketLayout;
 
   @BeforeClass
   public static void init() throws Exception {
@@ -164,9 +168,11 @@ public class TestRootedOzoneFileSystem {
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
+      bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
       TestOMRequestUtils.configureFSOptimizedPaths(conf,
           true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     } else {
+      bucketLayout = BucketLayout.LEGACY;
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }
@@ -178,7 +184,8 @@ public class TestRootedOzoneFileSystem {
     objectStore = cluster.getClient().getObjectStore();
     
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
@@ -1097,7 +1104,9 @@ public class TestRootedOzoneFileSystem {
 
     // Create a new bucket in the same volume
     final String bucketName2 = "trashroottest2";
-    volume1.createBucket(bucketName2);
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setBucketLayout(bucketLayout);
+    volume1.createBucket(bucketName2, builder.build());
     Path bucketPath2 = new Path(volumePath, bucketName2);
     Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
     Path user1Trash2 = new Path(trashRoot2, username);
@@ -1117,7 +1126,8 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(3, fs.getTrashRoots(true).size());
 
     // Create a new volume and a new bucket
-    OzoneBucket bucket3 = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket3 =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     OzoneVolume volume3 = objectStore.getVolume(bucket3.getVolumeName());
     // Need to setOwner to current test user so it has permission to list vols
     volume3.setOwner(username);
@@ -1235,6 +1245,7 @@ public class TestRootedOzoneFileSystem {
    * 3.Create a second Key in different bucket and verify deletion.
    * @throws Exception
    */
+  @Ignore
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
@@ -1243,7 +1254,8 @@ public class TestRootedOzoneFileSystem {
       stream.write(1);
     }
     // create second bucket and write a key in it.
-    OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket2 =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
     String volumeName2 = bucket2.getVolumeName();
     Path volumePath2 = new Path(OZONE_URI_DELIMITER, volumeName2);
     String bucketName2 = bucket2.getName();
@@ -1364,25 +1376,6 @@ public class TestRootedOzoneFileSystem {
         () -> fs.create(path, false));
   }
 
-  @Test
-  public void testRenameDir() throws Exception {
-    final String dir = "dir1";
-    final Path source = new Path(getBucketPath(), dir);
-    final Path dest = new Path(source.toString() + ".renamed");
-    // Add a sub-dir to the directory to be moved.
-    final Path subdir = new Path(source, "sub_dir1");
-    getFs().mkdirs(subdir);
-    LOG.info("Created dir {}", subdir);
-    LOG.info("Will move {} to {}", source, dest);
-    getFs().rename(source, dest);
-    assertTrue("Directory rename failed", getFs().exists(dest));
-    // Verify that the subdir is also renamed i.e. keys corresponding to the
-    // sub-directories of the renamed directory have also been renamed.
-    assertTrue("Keys under the renamed directory not renamed",
-        getFs().exists(new Path(dest, "sub_dir1")));
-    // cleanup
-    getFs().delete(dest, true);
-  }
 
   @Test
   public void testRenameFile() throws Exception {

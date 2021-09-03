@@ -49,7 +49,9 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -61,6 +63,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -68,6 +71,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
@@ -116,6 +120,7 @@ public class KeyValueHandler extends Handler {
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
+  private final boolean validateChunkChecksumData;
 
   // A lock that is held during container creation.
   private final AutoCloseableLock containerCreationLock;
@@ -126,6 +131,8 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
+    validateChunkChecksumData = conf.getObject(
+        DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
     try {
@@ -595,6 +602,12 @@ public class KeyValueHandler extends Handler {
 
       data = chunkManager.readChunk(kvContainer, blockID, chunkInfo,
           dispatcherContext);
+      // Validate data only if the read chunk is issued by Ratis for its
+      // internal logic.
+      //  For client reads, the client is expected to validate.
+      if (dispatcherContext.isReadFromTmpFile()) {
+        validateChunkChecksumData(data, chunkInfo);
+      }
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -664,6 +677,18 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
+  private void validateChunkChecksumData(ChunkBuffer data, ChunkInfo info)
+      throws StorageContainerException {
+    if (validateChunkChecksumData) {
+      try {
+        Checksum.verifyChecksum(data.toByteString(byteBufferToByteString),
+            info.getChecksumData(), 0);
+      } catch (OzoneChecksumException ex) {
+        throw ChunkUtils.wrapInStorageContainerException(ex);
+      }
+    }
+  }
+
   /**
    * Handle Write Chunk operation. Calls ChunkManager to process the request.
    */
@@ -697,8 +722,8 @@ public class KeyValueHandler extends Handler {
           stage == WriteChunkStage.COMBINED) {
         data =
             ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
+        validateChunkChecksumData(data, chunkInfo);
       }
-
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
@@ -761,6 +786,7 @@ public class KeyValueHandler extends Handler {
       // here. There is no need to maintain this info in openContainerBlockMap.
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
+      validateChunkChecksumData(data, chunkInfo);
       chunkManager.finishWriteChunks(kvContainer, blockData);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();

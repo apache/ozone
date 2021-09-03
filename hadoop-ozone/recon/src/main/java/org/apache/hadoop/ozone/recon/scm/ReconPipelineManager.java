@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerV2Impl;
 import org.apache.hadoop.hdds.scm.pipeline.StateManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -47,7 +47,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 /**
  * Recon's overriding implementation of SCM's Pipeline Manager.
  */
-public final class ReconPipelineManager extends PipelineManagerV2Impl {
+public final class ReconPipelineManager extends PipelineManagerImpl {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconPipelineManager.class);
@@ -94,7 +94,7 @@ public final class ReconPipelineManager extends PipelineManagerV2Impl {
    */
   void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
 
-    getLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
@@ -116,12 +116,12 @@ public final class ReconPipelineManager extends PipelineManagerV2Impl {
         removeInvalidPipelines(pipelinesFromScm);
       }
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
 
   public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
-    getLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       // Removing pipelines in Recon that are no longer in SCM.
@@ -151,7 +151,7 @@ public final class ReconPipelineManager extends PipelineManagerV2Impl {
         }
       });
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
   /**
@@ -161,12 +161,12 @@ public final class ReconPipelineManager extends PipelineManagerV2Impl {
    */
   @VisibleForTesting
   public void addPipeline(Pipeline pipeline) throws IOException {
-    getLock().lock();
+    acquireWriteLock();
     try {
       getStateManager().addPipeline(
           pipeline.getProtobufMessage(ClientVersions.CURRENT_VERSION));
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
 }

@@ -17,8 +17,10 @@
  */
 package org.apache.hadoop.hdds.client;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -26,6 +28,28 @@ import org.junit.Test;
  * Test replicationConfig.
  */
 public class TestReplicationConfig {
+
+  @Test
+  public void testGetDefaultShouldCreateReplicationConfigFromDefaultConf() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
+    Assert.assertEquals(
+        org.apache.hadoop.hdds.client.ReplicationType.RATIS.name(),
+        replicationConfig.getReplicationType().name());
+    Assert.assertEquals(3, replicationConfig.getRequiredNodes());
+  }
+
+  @Test
+  public void testGetDefaultShouldCreateReplicationConfFromCustomConfValues() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE, "STAND_ALONE");
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "1");
+    ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
+    Assert.assertEquals(
+        org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE.name(),
+        replicationConfig.getReplicationType().name());
+    Assert.assertEquals(1, replicationConfig.getRequiredNodes());
+  }
 
   @Test
   public void deserializeRatis() {

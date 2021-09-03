@@ -23,6 +23,7 @@ package org.apache.hadoop.ozone.recon.api.types;
  */
 public enum ResponseStatus {
   OK, // Path exist
+  INITIALIZING, // Recon is initializing
   PATH_NOT_FOUND, // Path not found
   TYPE_NOT_APPLICABLE // Path exists, but namespace is not applicable to request
 }

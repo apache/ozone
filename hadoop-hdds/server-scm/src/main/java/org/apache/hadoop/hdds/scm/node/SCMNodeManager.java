@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Collections;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
@@ -64,6 +66,8 @@ import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -883,6 +887,29 @@ public class SCMNodeManager implements NodeManager {
     }
     Preconditions.checkArgument(!pipelineCountList.isEmpty());
     return Collections.min(pipelineCountList);
+  }
+
+  @Override
+  public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
+    HashSet<DatanodeDetails> dns = new HashSet<>();
+    Preconditions.checkNotNull(dn);
+    Set<PipelineID> pipelines =
+        nodeStateManager.getPipelineByDnID(dn.getUuid());
+    PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
+    if (!pipelines.isEmpty()) {
+      pipelines.forEach(id -> {
+        try {
+          Pipeline pipeline = pipelineManager.getPipeline(id);
+          List<DatanodeDetails> peers = pipeline.getNodes();
+          dns.addAll(peers);
+        } catch (PipelineNotFoundException pnfe) {
+          //ignore the pipeline not found exception here
+        }
+      });
+    }
+    // renove self node from the set
+    dns.remove(dn);
+    return dns;
   }
 
   /**
