@@ -4,7 +4,7 @@ weight: 2
 menu:
    main:
       parent: 特性
-summary: 支持Supports atomic rename and delete operation.
+summary: 支持原子的重命名和删除操作。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -32,8 +32,7 @@ summary: 支持Supports atomic rename and delete operation.
 ## OzoneManager 元数据布局格式
 OzoneManager 支持两种元数据布局格式：简单布局格式和基于前缀的布局格式。
 
-在简单布局格式中，OM 采用全路径名来存储每个键的元数据。在基于前缀的优化布局格式中，OM 将中间目录的元数据存储在  `DirectoryTable` 中，将文件的元数据存储在 `FileTable` 中，如下图所示。两张表中的主键要么是目录名，要么是以父目录唯一标识符为前缀的文件名， 形如 `<parent
-     unique-id>/<filename>`。
+在简单布局格式中，OM 采用全路径名来存储每个键的元数据。在基于前缀的优化布局格式中，OM 将中间目录的元数据存储在 `DirectoryTable` 中，将文件的元数据存储在 `FileTable` 中，如下图所示。两张表中的主键是以父目录唯一标识符为前缀的文件名或目录名， 形如 `<parent unique-id>/<filename>`。
      
 ![FSO Format](PrefixFSO-Format.png)
 
@@ -47,7 +46,7 @@ OzoneManager 支持两种元数据布局格式：简单布局格式和基于前�
 ![FSO Rename](PrefixFSO-Rename.png)
 
 ## 配置
-该特性默认未启用，可以通过在 `ozone-site.xml` 进行如下配置启用：
+该特性默认未启用，可以通过在 `ozone-site.xml` 进行如下配置来启用：
 
 ```XML
 <property>
