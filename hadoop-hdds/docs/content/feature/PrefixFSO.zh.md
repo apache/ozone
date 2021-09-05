@@ -32,7 +32,7 @@ summary: 支持原子的重命名和删除操作。
 ## OzoneManager 元数据布局格式
 OzoneManager 支持两种元数据布局格式：简单布局格式和基于前缀的布局格式。
 
-在简单布局格式中，OM 采用全路径名来存储每个键的元数据。在基于前缀的优化布局格式中，OM 将中间目录的元数据存储在 `DirectoryTable` 中，将文件的元数据存储在 `FileTable` 中，如下图所示。两张表中的主键是以父目录唯一标识符为前缀的文件名或目录名， 形如 `<parent unique-id>/<filename>`。
+在简单布局格式中，OM 采用完整路径名来存储每个键的元数据。在基于前缀的优化布局格式中，OM 将中间目录的元数据存储在 `DirectoryTable` 中，将文件的元数据存储在 `FileTable` 中，如下图所示。两张表中的主键是以父目录唯一标识符为前缀的文件名或目录名， 形如 `<parent unique-id>/<filename>`。
      
 ![FSO Format](PrefixFSO-Format.png)
 
