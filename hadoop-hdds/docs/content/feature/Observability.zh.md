@@ -58,7 +58,7 @@ scrape_configs:
 
 分布式追踪可以通过可视化端到端性能来辅助定位性能瓶颈。
 
-Ozone 使用 [jaeger](https://jaegertracing.io) 追踪库来收集追踪数据并发送到任何兼容的后端（Zipkin等）
+Ozone 使用 [jaeger](https://jaegertracing.io) 追踪库来收集追踪数据并发送到任何兼容的后端（Zipkin等）。
 
 追踪默认是关闭的，但可以通过 `ozone-site.xml` 中的 `hdds.tracing.enabled` 参数开启：
 
@@ -79,9 +79,9 @@ JAEGER_AGENT_HOST=jaeger
 
 此配置会记录 1% 的请求来限制性能开销。更多有关 jaeger 采样的信息[请查阅文档](https://www.jaegertracing.io/docs/1.18/sampling/#client-sampling-configuration)
 
-## ozone insight
+## Ozone insight
 
-Ozone insight 是一把查看 Ozone 集群当前状态的瑞士军刀。它可以展示特定组件的日志、指标和配置。
+Ozone insight 是查看 Ozone 集群当前状态的万能工具。它可以展示特定组件的日志、指标和配置。
 
 使用 `ozone insight list` 命令查看可选组件：
 
