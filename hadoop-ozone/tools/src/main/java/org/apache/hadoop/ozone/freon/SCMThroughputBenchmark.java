@@ -93,6 +93,13 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval
  * - allocate blocks (ops)
  * - allocate containers (ops)
  * - process reports(container reports only) (ops)
+ *
+ * Remember to add the following configs to your ozone-site.xml:
+ * - ozone.scm.heartbeat.thread.interval: 1h
+ * - hdds.heartbeat.interval: 1h
+ * - ozone.scm.stale.node.interval: 1d
+ * - ozone.scm.dead.node.interval: 2d
+ * These make the faked datanodes long live.
  */
 @CommandLine.Command(name = "scm-throughput-benchmark",
     aliases = "stb",
