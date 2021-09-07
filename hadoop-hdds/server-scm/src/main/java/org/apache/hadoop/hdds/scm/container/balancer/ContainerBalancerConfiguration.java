@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -111,11 +112,9 @@ public final class ContainerBalancerConfiguration {
    */
   public ContainerBalancerConfiguration(
       OzoneConfiguration ozoneConfiguration) {
-    if (ozoneConfiguration == null) {
-      this.ozoneConfiguration = new OzoneConfiguration();
-    } else {
-      this.ozoneConfiguration = ozoneConfiguration;
-    }
+    Preconditions.checkNotNull(ozoneConfiguration,
+        "OzoneConfiguration should not be null.");
+    this.ozoneConfiguration = ozoneConfiguration;
 
     // balancing interval should be greater than DUFactory refresh period
     duConf = this.ozoneConfiguration.getObject(DUFactory.Conf.class);
