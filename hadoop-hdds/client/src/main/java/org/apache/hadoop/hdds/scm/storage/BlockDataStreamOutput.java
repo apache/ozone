@@ -476,7 +476,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * Writes buffered data as a new chunk to the container and saves chunk
    * information to be used later in putKey call.
    *
-   * @param buf chunk buffer to write, from position to limit
+   * @param buf chunk data to write, from position to limit
    * @throws IOException if there is an I/O error while performing the call
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
