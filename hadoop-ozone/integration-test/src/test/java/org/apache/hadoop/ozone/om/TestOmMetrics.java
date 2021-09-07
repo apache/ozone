@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -269,12 +270,16 @@ public class TestOmMetrics {
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
 
 
-    writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, 0);
-    writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, 0);
-    writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, 0);
+    OpenKeySession keySession = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, keySession.getId());
+    keyArgs = keyArgs.toBuilder().setKeyName(UUID.randomUUID().toString())
+        .build();
+    keySession = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, keySession.getId());
+    keyArgs = keyArgs.toBuilder().setKeyName(UUID.randomUUID().toString())
+        .build();
+    keySession = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
 
 
