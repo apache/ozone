@@ -61,8 +61,19 @@ public class DatanodeUsageInfo {
     if (first.equals(second)) {
       return 0;
     }
-    return first.getScmNodeStat()
-        .compareByRemainingRatio(second.getScmNodeStat());
+    return Double.compare(first.calculateUtilization(),
+        second.calculateUtilization());
+//    return first.getScmNodeStat()
+//        .compareByRemainingRatio(second.getScmNodeStat());
+  }
+
+  private double calculateUtilization() {
+    double capacity = scmNodeStat.getCapacity().get();
+    if (capacity == 0) {
+      return 0;
+    }
+    double numerator = capacity - scmNodeStat.getRemaining().get();
+    return numerator / capacity;
   }
 
   /**
