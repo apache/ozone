@@ -18,7 +18,6 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.ozone.OFSPath;
-import org.apache.hadoop.ozone.OzoneURIParser;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -28,77 +27,6 @@ import java.io.IOException;
  * Testing basic functions of utility class OFSPath.
  */
 public class TestOFSPath {
-
-  @Test
-  public void testOzoneURIParser() {
-    // Note: these cases only checks the effectiveness of OzoneURIParser
-    //  and does not guarantee valid ofs paths.
-    OzoneURIParser parser =
-        new OzoneURIParser("ofs://om1/vol2/bucket3/dir4/key5");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("om1", parser.getAuthority());
-    Assert.assertEquals("/vol2/bucket3/dir4/key5", parser.getPath());
-
-    parser = new OzoneURIParser("ofs://om1:9862/vol2/bucket3/dir4/");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("om1:9862", parser.getAuthority());
-    Assert.assertEquals("/vol2/bucket3/dir4/", parser.getPath());
-
-    parser = new OzoneURIParser("ofs://om1:9862");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("om1:9862", parser.getAuthority());
-    Assert.assertEquals("/", parser.getPath());
-
-    parser = new OzoneURIParser("ofs:///vol2/bucket3/dir4/");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("", parser.getAuthority());
-    Assert.assertEquals("/vol2/bucket3/dir4/", parser.getPath());
-
-    parser = new OzoneURIParser("ofs://om1/vol2/");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("om1", parser.getAuthority());
-    Assert.assertEquals("/vol2/", parser.getPath());
-
-    parser = new OzoneURIParser("ofs://om1/");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("om1", parser.getAuthority());
-    Assert.assertEquals("/", parser.getPath());
-
-    parser = new OzoneURIParser("ofs://om1");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("om1", parser.getAuthority());
-    Assert.assertEquals("/", parser.getPath());
-
-    parser = new OzoneURIParser("ofs:///");
-    Assert.assertEquals("ofs", parser.getScheme());
-    Assert.assertEquals("", parser.getAuthority());
-    Assert.assertEquals("/", parser.getPath());
-
-    parser = new OzoneURIParser(":///");
-    Assert.assertEquals("", parser.getScheme());
-    Assert.assertEquals("", parser.getAuthority());
-    Assert.assertEquals("/", parser.getPath());
-
-    parser = new OzoneURIParser("/");
-    Assert.assertNull(parser.getScheme());
-    Assert.assertEquals("", parser.getAuthority());
-    Assert.assertEquals("/", parser.getPath());
-
-    parser = new OzoneURIParser("/volume1/");
-    Assert.assertNull(parser.getScheme());
-    Assert.assertEquals("", parser.getAuthority());
-    Assert.assertEquals("/volume1/", parser.getPath());
-
-    parser = new OzoneURIParser("");
-    Assert.assertNull(parser.getScheme());
-    Assert.assertEquals("", parser.getAuthority());
-    Assert.assertEquals("/", parser.getPath());
-
-    parser = new OzoneURIParser("volume1/");
-    Assert.assertNull(parser.getScheme());
-    Assert.assertEquals("", parser.getAuthority());
-    Assert.assertEquals("/volume1/", parser.getPath());
-  }
 
   @Test
   public void testParsingPathWithSpace() {

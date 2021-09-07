@@ -69,21 +69,17 @@ public class OFSPath {
   public static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
 
   public OFSPath(Path path) {
-    initOFSPath(path.toUri());
+    initOFSPath(path.toUri(), false);
   }
 
   public OFSPath(String pathStr) {
-    final OzoneURIParser parser = new OzoneURIParser(pathStr);
-    try {
-      URI uri = new URI(
-          parser.getScheme(), parser.getAuthority(), parser.getPath(), "", "");
-      initOFSPath(uri);
-    } catch (URISyntaxException ex) {
-      throw new RuntimeException(ex);
-    }
+    final Path fsPath = new Path(pathStr);
+    // Preserve '/' at the end of a key if any, as fs.Path(String) discards it
+    final boolean endsWithSlash = pathStr.endsWith(OZONE_URI_DELIMITER);
+    initOFSPath(fsPath.toUri(), endsWithSlash);
   }
 
-  private void initOFSPath(URI uri) {
+  private void initOFSPath(URI uri, boolean endsWithSlash) {
     // Scheme is case-insensitive
     String scheme = uri.getScheme();
     if (scheme != null && !scheme.equalsIgnoreCase(OZONE_OFS_URI_SCHEME)) {
@@ -121,6 +117,10 @@ public class OFSPath {
     // Compose key name
     if (token.hasMoreTokens()) {
       keyName = token.nextToken("").substring(1);
+      // Restore the '/' at the end
+      if (endsWithSlash) {
+        keyName += OZONE_URI_DELIMITER;
+      }
     }
   }
 
