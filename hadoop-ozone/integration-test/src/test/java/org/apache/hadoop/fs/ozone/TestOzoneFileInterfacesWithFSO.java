@@ -46,7 +46,8 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
   }
 
   public TestOzoneFileInterfacesWithFSO(boolean setDefaultFs,
-      boolean useAbsolutePath, boolean enabledFileSystemPaths) {
+      boolean useAbsolutePath, boolean enabledFileSystemPaths)
+      throws Exception {
     super(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
   }
 

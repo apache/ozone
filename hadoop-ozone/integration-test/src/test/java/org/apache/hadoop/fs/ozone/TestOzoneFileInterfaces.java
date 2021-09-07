@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -59,6 +58,7 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.junit.Assert.assertEquals;
@@ -103,11 +103,11 @@ public class TestOzoneFileInterfaces {
         {true, false, false}});
   }
 
-  private boolean setDefaultFs;
+  private static boolean setDefaultFs;
 
-  private boolean useAbsolutePath;
+  private static boolean useAbsolutePath;
 
-  private MiniOzoneCluster cluster = null;
+  private static MiniOzoneCluster cluster = null;
 
   private FileSystem fs;
 
@@ -122,31 +122,40 @@ public class TestOzoneFileInterfaces {
   private OMMetrics omMetrics;
 
   @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected boolean enableFileSystemPaths;
+  protected static boolean enableFileSystemPaths;
 
   public TestOzoneFileInterfaces(boolean setDefaultFs,
-      boolean useAbsolutePath, boolean enabledFileSystemPaths) {
-    this.setDefaultFs = setDefaultFs;
-    this.useAbsolutePath = useAbsolutePath;
-    this.enableFileSystemPaths = enabledFileSystemPaths;
+      boolean useAbsolutePath, boolean enabledFileSystemPaths)
+      throws Exception {
+    if (this.setDefaultFs != setDefaultFs
+        || this.useAbsolutePath != useAbsolutePath
+        || this.enableFileSystemPaths != enabledFileSystemPaths) {
+      this.setDefaultFs = setDefaultFs;
+      this.useAbsolutePath = useAbsolutePath;
+      this.enableFileSystemPaths = enabledFileSystemPaths;
+      teardown();
+      init();
+    }
     GlobalStorageStatistics.INSTANCE.reset();
   }
 
-  @Before
   public void init() throws Exception {
-    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-
     OzoneConfiguration conf = getOzoneConfiguration();
-
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+  }
+
+  @Before
+  public void setupTest() throws Exception {
+    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+
+    OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
 
     rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
@@ -172,11 +181,15 @@ public class TestOzoneFileInterfaces {
   }
 
   @After
-  public void teardown() throws IOException {
+  public void closeFs() throws IOException {
+    IOUtils.closeQuietly(fs);
+  }
+
+  @AfterClass
+  public static void teardown() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @Test
