@@ -476,15 +476,16 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * Writes buffered data as a new chunk to the container and saves chunk
    * information to be used later in putKey call.
    *
+   * @param buf chunk buffer to write, from position to limit
    * @throws IOException if there is an I/O error while performing the call
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
    */
-  private void writeChunkToContainer(ByteBuffer b)
+  private void writeChunkToContainer(ByteBuffer buf)
       throws IOException {
-    final int effectiveChunkSize = b.remaining();
+    final int effectiveChunkSize = buf.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
-    ChecksumData checksumData = checksum.computeChecksum(b.asReadOnlyBuffer());
+    ChecksumData checksumData = checksum.computeChecksum(buf.asReadOnlyBuffer());
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
@@ -499,8 +500,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     CompletableFuture<DataStreamReply> future =
         (needSync(offset + effectiveChunkSize) ?
-            out.writeAsync(b, StandardWriteOption.SYNC) :
-            out.writeAsync(b))
+            out.writeAsync(buf, StandardWriteOption.SYNC) :
+            out.writeAsync(buf))
             .whenCompleteAsync((r, e) -> {
               if (e != null || !r.isSuccess()) {
                 if (e == null) {
