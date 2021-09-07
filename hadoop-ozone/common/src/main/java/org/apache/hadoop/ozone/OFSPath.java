@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import java.math.BigInteger;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
