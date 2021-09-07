@@ -187,7 +187,7 @@ jobs:
       - build-info
       - compile
     runs-on: ubuntu-18.04
-    timeout-minutes: 120 # Todo HDDS-5270
+    timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
       matrix:
@@ -261,7 +261,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-18.04
-    timeout-minutes: 150
+    timeout-minutes: 150 # Todo HDDS-5270
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
       matrix:
