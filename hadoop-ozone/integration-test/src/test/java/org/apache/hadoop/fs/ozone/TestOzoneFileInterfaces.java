@@ -56,7 +56,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
-import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -121,30 +120,44 @@ public class TestOzoneFileInterfaces {
 
   private OMMetrics omMetrics;
 
+  private static boolean enableFileSystemPaths;
+
   @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected static boolean enableFileSystemPaths;
+  protected boolean enableFileSystemPathsInstance;
 
   public TestOzoneFileInterfaces(boolean setDefaultFs,
       boolean useAbsolutePath, boolean enabledFileSystemPaths)
       throws Exception {
+    enableFileSystemPathsInstance = enabledFileSystemPaths;
     if (this.setDefaultFs != setDefaultFs
         || this.useAbsolutePath != useAbsolutePath
         || this.enableFileSystemPaths != enabledFileSystemPaths) {
-      this.setDefaultFs = setDefaultFs;
-      this.useAbsolutePath = useAbsolutePath;
-      this.enableFileSystemPaths = enabledFileSystemPaths;
+      setParameters(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
       teardown();
       init();
     }
     GlobalStorageStatistics.INSTANCE.reset();
   }
 
+  private static void setParameters(boolean defaultFs,
+                                    boolean absolutePath,
+                                    boolean fileSystemPaths) {
+    setDefaultFs = defaultFs;
+    useAbsolutePath = absolutePath;
+    enableFileSystemPaths = fileSystemPaths;
+  }
+
+  private static void setCluster(MiniOzoneCluster newCluster) {
+    cluster = newCluster;
+  }
+
   public void init() throws Exception {
     OzoneConfiguration conf = getOzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    MiniOzoneCluster newCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
-    cluster.waitForClusterToBeReady();
+    newCluster.waitForClusterToBeReady();
+    setCluster(newCluster);
   }
 
   @Before
@@ -172,7 +185,6 @@ public class TestOzoneFileInterfaces {
     omMetrics = cluster.getOzoneManager().getMetrics();
   }
 
-  @NotNull
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,

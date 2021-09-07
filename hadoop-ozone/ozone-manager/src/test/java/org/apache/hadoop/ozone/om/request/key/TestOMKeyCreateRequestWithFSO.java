@@ -42,7 +42,6 @@ import java.util.Iterator;
  */
 public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
