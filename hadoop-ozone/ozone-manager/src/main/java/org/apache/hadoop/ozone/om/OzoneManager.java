@@ -2694,27 +2694,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void deleteKey(OmKeyArgs args) throws IOException {
-    Map<String, String> auditMap = args.toAuditMap();
-    try {
-      ResolvedBucket bucket = resolveBucketLink(args);
-      args = bucket.update(args);
-
-      if (isAclEnabled) {
-        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.DELETE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-      }
-
-      metrics.incNumKeyDeletes();
-      keyManager.deleteKey(args);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.DELETE_KEY,
-          auditMap));
-      metrics.decNumKeys();
-    } catch (Exception ex) {
-      metrics.incNumKeyDeleteFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.DELETE_KEY,
-          auditMap, ex));
-      throw ex;
-    }
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
