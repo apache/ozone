@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
@@ -109,6 +110,14 @@ public class AssignUserToTenantHandler extends S3Handler {
       } catch (IOException e) {
         err().println("Failed to assign '" + principal + "' to '" +
             tenantName + "': " + e.getMessage());
+        if (e instanceof OMException) {
+          final OMException omException = (OMException) e;
+          if (omException.getResult().equals(
+              OMException.ResultCodes.TENANT_NOT_FOUND)) {
+            // If tenant does not exist, don't bother continuing the loop
+            break;
+          }
+        }
       }
     }
   }

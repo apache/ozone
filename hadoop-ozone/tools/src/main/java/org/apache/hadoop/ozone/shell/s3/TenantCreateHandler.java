@@ -45,7 +45,7 @@ public class TenantCreateHandler extends S3Handler {
       for (String tenantName : tenants) {
         try {
           client.getObjectStore().createTenant(tenantName);
-          out().println("Successfully created tenant " + tenantName);
+          out().println("Created tenant " + tenantName);
         } catch (IOException e) {
           out().println("Failed to create tenant " + tenantName + ": " +
               e.getMessage());
