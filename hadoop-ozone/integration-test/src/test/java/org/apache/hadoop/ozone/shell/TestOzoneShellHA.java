@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -95,6 +96,7 @@ public class TestOzoneShellHA {
   private static MiniOzoneCluster cluster = null;
   private static OzoneShell ozoneShell = null;
   private static OzoneAdmin ozoneAdminShell = null;
+  private static S3Shell s3Shell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -127,6 +129,7 @@ public class TestOzoneShellHA {
 
     ozoneShell = new OzoneShell();
     ozoneAdminShell = new OzoneAdmin();
+    s3Shell = new S3Shell();
 
     // Init HA cluster
     omServiceId = "om-service-test1";
@@ -854,5 +857,23 @@ public class TestOzoneShellHA {
     objectStore.deleteVolume("vol3");
     objectStore.getVolume("vol4").deleteBucket("buck4");
     objectStore.deleteVolume("vol4");
+  }
+
+  /**
+   * Test ozone tenant commands.
+   */
+  @Test
+  public void testOzoneTenant() {
+    // TODO: tenant subcommand will be moved from s3 to admin later.
+
+    // Test create tenant
+    execute(s3Shell, new String[] {
+        "tenant", "create", "finance",
+        "--om-service-id=" + omServiceId});
+
+    // Test assign user
+    execute(s3Shell, new String[] {
+        "user", "assign", "bob@EXAMPLE.COM", "--tenant=finance",
+        "--om-service-id=" + omServiceId});
   }
 }

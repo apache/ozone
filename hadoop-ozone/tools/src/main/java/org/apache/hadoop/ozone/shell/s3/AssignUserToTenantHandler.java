@@ -29,6 +29,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
+
 /**
  * ozone s3 user assign.
  */
@@ -40,7 +42,7 @@ public class AssignUserToTenantHandler extends S3Handler {
   private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Parameters(description = "List of user Kerberos principal(s)")
-  private List<String> principal = new ArrayList<>();
+  private List<String> principals = new ArrayList<>();
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
@@ -48,7 +50,12 @@ public class AssignUserToTenantHandler extends S3Handler {
 
   @CommandLine.Option(names = {"-a", "--access-id", "--accessId"},
       description = "(Optional) Specify the accessId for user in this tenant. "
-          + "If unspecified, accessId(s) would be the same as principal(s).")
+          + "If unspecified, accessId would be in the form of "
+          + "TenantName$Principal.",
+      hidden = true)
+  // This option is intentionally hidden for now. Because accessId isn't
+  //  restricted in any way so far and this could cause some conflict with
+  //  `s3 getsecret` and leak the secret if an admin isn't careful.
   private String accessId;
 
   // TODO: support dry-run?
@@ -60,42 +67,47 @@ public class AssignUserToTenantHandler extends S3Handler {
     return list == null || list.size() == 0;
   }
 
+  private String getDefaultAccessId(String principal) {
+    return tenantName + TENANT_NAME_USER_NAME_DELIMITER + principal;
+  }
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
 
-    if (isEmptyList(principal)) {
+    if (isEmptyList(principals)) {
       GenericCli.missingSubcommand(spec);
       return;
     }
 
+    if (StringUtils.isEmpty(tenantName)) {
+      err().println("Please specify a tenant name with -t.");
+      return;
+    }
+
     if (StringUtils.isEmpty(accessId)) {
-      accessId = principal.get(0);
-    } else if (principal.size() > 1) {
+      accessId = getDefaultAccessId(principals.get(0));
+    } else if (principals.size() > 1) {
       err().println("Manually specifying accessId is only supported when there "
           + "is one user principal in the command line. Reduce the number of "
           + "principal to one and try again.");
       return;
     }
 
-    if (StringUtils.isEmpty(tenantName)) {
-      tenantName = objStore.getS3VolumeName();
-    }
-
-    for (int i = 0; i < principal.size(); i++) {
-      final String username = principal.get(i);
+    for (int i = 0; i < principals.size(); i++) {
+      final String principal = principals.get(i);
       try {
         if (i >= 1) {
-          accessId = username;
+          accessId = getDefaultAccessId(principal);
         }
         final S3SecretValue resp =
-            objStore.assignUserToTenant(username, tenantName, accessId);
-        err().println("Assigned '" + username + "' to '" + tenantName +
+            objStore.assignUserToTenant(principal, tenantName, accessId);
+        err().println("Assigned '" + principal + "' to '" + tenantName +
             "' under accessId '" + accessId + "'.");
         out().println("export AWS_ACCESS_KEY_ID=" + resp.getAwsAccessKey());
         out().println("export AWS_SECRET_ACCESS_KEY=" + resp.getAwsSecret());
       } catch (IOException e) {
-        err().println("Failed to assign '" + username + "' to '" +
+        err().println("Failed to assign '" + principal + "' to '" +
             tenantName + "': " + e.getMessage());
       }
     }
