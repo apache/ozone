@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.AutoCloseableLock;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -332,7 +333,9 @@ public class KeyValueHandler extends Handler {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           container.getContainerData().getMaxSize());
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-      container.populatePathFields(clusterId, containerVolume, hddsVolumeDir);
+      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+              containerVolume, clusterId);
+      container.populatePathFields(idDir, containerVolume, hddsVolumeDir);
     } finally {
       volumeSet.readUnlock();
     }

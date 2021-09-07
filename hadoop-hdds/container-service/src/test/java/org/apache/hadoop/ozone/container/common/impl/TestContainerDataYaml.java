@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -89,7 +90,8 @@ public class TestContainerDataYaml {
     keyValueContainerData.setMetadataPath(testRoot);
     keyValueContainerData.setChunksPath(testRoot);
     keyValueContainerData.updateDataScanTime(SCAN_TIME);
-    keyValueContainerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
+    keyValueContainerData.setSchemaVersion(
+        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
 
     File containerFile = new File(testRoot, containerPath);
 
@@ -133,7 +135,7 @@ public class TestContainerDataYaml {
                  kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
                  kvData.getDataScanTimestamp().longValue());
-    assertEquals(OzoneConsts.SCHEMA_LATEST,
+    assertEquals(VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(),
             kvData.getSchemaVersion());
 
     // Update ContainerData.
