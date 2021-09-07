@@ -40,9 +40,11 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -68,6 +70,7 @@ public class TestOmMetrics {
   private MiniOzoneCluster.Builder clusterBuilder;
   private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
+  private OzoneManagerProtocol writeClient;
 
   /**
    * The exception used for testing failure metrics.
@@ -89,6 +92,7 @@ public class TestOmMetrics {
     cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
+    writeClient = new RpcClient(conf, cluster.getOMServiceId()).getOzoneManagerClient();
   }
 
   /**
@@ -294,7 +298,7 @@ public class TestOmMetrics {
     ozoneManager.commitKey(keyArgs, 0);
     ozoneManager.openKey(keyArgs);
     ozoneManager.commitKey(keyArgs, 0);
-    ozoneManager.deleteKey(keyArgs);
+    writeClient.deleteKey(keyArgs);
 
 
     omMetrics = getMetrics("OMMetrics");
@@ -514,7 +518,7 @@ public class TestOmMetrics {
     }
 
     try {
-      ozoneManager.deleteKey(keyArgs);
+      writeClient.deleteKey(keyArgs);
     } catch (IOException ignored) {
     }
 
