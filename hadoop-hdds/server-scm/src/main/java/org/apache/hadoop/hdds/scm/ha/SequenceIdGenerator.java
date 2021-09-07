@@ -270,9 +270,9 @@ public class SequenceIdGenerator {
         Table.KeyValue<String, Long> kv = iterator.next();
         final String sequenceIdName = kv.getKey();
         final Long lastId = kv.getValue();
-        org.apache.ratis.util.Preconditions.assertNotNull(sequenceIdName,
+        Preconditions.checkNotNull(sequenceIdName,
             "sequenceIdName should not be null");
-        org.apache.ratis.util.Preconditions.assertNotNull(lastId,
+        Preconditions.checkNotNull(lastId,
             "lastId should not be null");
         sequenceIdToLastIdMap.put(sequenceIdName, lastId);
       }
