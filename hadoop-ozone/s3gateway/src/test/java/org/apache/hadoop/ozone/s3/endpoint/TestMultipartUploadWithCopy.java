@@ -172,7 +172,7 @@ public class TestMultipartUploadWithCopy {
     }
   }
 
-  /* The next two tests excercise all the combinations of modification times.
+  /* The next two tests exercise all the combinations of modification times.
    * There are two types times, ModifiedSince, and UnmodifiedSince.  Each of
    * those can be in one of 5 states:
    * 1. Valid and True
