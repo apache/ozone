@@ -77,6 +77,9 @@ public class ClosePipelineCommandHandler implements CommandHandler {
         server.removeGroup(pipelineIdProto);
         LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
             dn.getUuidString());
+      } else {
+        LOG.debug("Ignoring close pipeline command for pipeline {} " +
+            "as it does not exist", pipelineID);
       }
     } catch (IOException e) {
       LOG.error("Can't close pipeline {}", pipelineID, e);
