@@ -159,7 +159,8 @@ public class TestBlockDeletion {
     cluster.waitForClusterToBeReady();
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
     om = cluster.getOzoneManager();
-    writeClient = new RpcClient(conf, cluster.getOMServiceId()).getOzoneManagerClient();
+    writeClient = new RpcClient(conf, cluster.getOMServiceId())
+      .getOzoneManagerClient();
     scm = cluster.getStorageContainerManager();
     containerIdsWithDeletedBlocks = new HashSet<>();
     metrics = scm.getScmBlockManager().getSCMBlockDeletingService()
