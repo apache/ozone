@@ -38,7 +38,6 @@ public class GrpcOzoneManagerServer {
       LoggerFactory.getLogger(GrpcOzoneManagerServer.class);
 
   private Server server;
-  private final String host = "0.0.0.0";
   private int port = 8981;
 
   public GrpcOzoneManagerServer(GrpcOzoneManagerServerConfig omServerConfig,
@@ -66,13 +65,15 @@ public class GrpcOzoneManagerServer {
   public void stop() {
     try {
       server.shutdown().awaitTermination(10L, TimeUnit.SECONDS);
+      LOG.info("Server {} is shutdown", getClass().getSimpleName());
     } catch (InterruptedException ex) {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
     }
   }
 
   public int getPort() {
-    return port; }
+    return port;
+  }
 
   /**
    * GrpcOzoneManagerServer configuration in Java style configuration class.
