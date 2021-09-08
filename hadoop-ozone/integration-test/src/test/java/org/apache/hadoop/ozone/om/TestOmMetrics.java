@@ -563,7 +563,6 @@ public class TestOmMetrics {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
