@@ -148,12 +148,22 @@ public class OFSPath {
     return keyName;
   }
 
+  private boolean isEmpty() {
+    return StringUtils.isEmpty(authority)
+        && StringUtils.isEmpty(volumeName)
+        && StringUtils.isEmpty(bucketName)
+        && StringUtils.isEmpty(keyName);
+  }
+
   /**
    * Return the reconstructed path string.
    * Directories including volumes and buckets will have a trailing '/'.
    */
   @Override
   public String toString() {
+    if (isEmpty()) {
+      return "";
+    }
     Preconditions.checkNotNull(authority);
     StringBuilder sb = new StringBuilder();
     if (!isMount()) {
@@ -187,11 +197,17 @@ public class OFSPath {
    */
   // Prepend a delimiter at beginning. e.g. /vol1/buc1
   public String getNonKeyPath() {
+    if (isEmpty()) {
+      return "";
+    }
     return OZONE_URI_DELIMITER + getNonKeyPathNoPrefixDelim();
   }
 
   // Don't prepend the delimiter. e.g. vol1/buc1
   public String getNonKeyPathNoPrefixDelim() {
+    if (isEmpty()) {
+      return "";
+    }
     if (isMount()) {
       return mountName;
     } else {

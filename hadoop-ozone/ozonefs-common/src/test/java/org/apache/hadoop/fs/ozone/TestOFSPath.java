@@ -125,8 +125,8 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getVolumeName());
     Assert.assertEquals("", ofsPath.getBucketName());
     Assert.assertEquals("", ofsPath.getKeyName());
-    // NOTE: Do not depend on getNonKeyPath if path string can be empty.
-    Assert.assertEquals("//", ofsPath.getNonKeyPath());
+    Assert.assertEquals("", ofsPath.getNonKeyPath());
+    Assert.assertEquals("", ofsPath.getNonKeyPathNoPrefixDelim());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("", ofsPath.toString());
   }
