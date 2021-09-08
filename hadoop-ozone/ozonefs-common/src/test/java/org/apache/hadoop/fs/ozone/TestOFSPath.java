@@ -119,6 +119,19 @@ public class TestOFSPath {
   }
 
   @Test
+  public void testParsingEmptyInput() {
+    OFSPath ofsPath = new OFSPath("");
+    Assert.assertEquals("", ofsPath.getAuthority());
+    Assert.assertEquals("", ofsPath.getVolumeName());
+    Assert.assertEquals("", ofsPath.getBucketName());
+    Assert.assertEquals("", ofsPath.getKeyName());
+    // NOTE: Do not depend on getNonKeyPath if path string can be empty.
+    Assert.assertEquals("//", ofsPath.getNonKeyPath());
+    Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("", ofsPath.toString());
+  }
+
+  @Test
   public void testParsingWithAuthority() {
     OFSPath ofsPath = new OFSPath("ofs://svc1:9876/volume1/bucket2/dir3/");
     Assert.assertEquals("svc1:9876", ofsPath.getAuthority());
