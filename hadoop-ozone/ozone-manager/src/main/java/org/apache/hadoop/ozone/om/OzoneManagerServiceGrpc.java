@@ -67,7 +67,13 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
           null,
           RPC.RpcKind.RPC_PROTOCOL_BUFFER,
           ClientId.getClientId()));
-
+      // TODO: currently require setting the Server class for each request
+      // with thread context (Server.Call()) that includes retries
+      // and importantly random ClientId.  This is currently necessary for
+      // Om Ratis Server to create createWriteRaftClientRequest.
+      // Look to remove Server class requirement for issuing ratis transactions
+      // for OMRequests.  Test through successful ratis-enabled OMRequest handling
+      // without dependency on hadoop IPC based Server.
       omResponse = this.omTranslator.
           submitRequest(NULL_RPC_CONTROLLER, request);
     } catch (Throwable e) {
