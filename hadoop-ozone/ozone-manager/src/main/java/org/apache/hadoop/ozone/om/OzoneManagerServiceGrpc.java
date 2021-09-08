@@ -72,8 +72,8 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
       // and importantly random ClientId.  This is currently necessary for
       // Om Ratis Server to create createWriteRaftClientRequest.
       // Look to remove Server class requirement for issuing ratis transactions
-      // for OMRequests.  Test through successful ratis-enabled OMRequest handling
-      // without dependency on hadoop IPC based Server.
+      // for OMRequests.  Test through successful ratis-enabled OMRequest 
+      // handling without dependency on hadoop IPC based Server.
       omResponse = this.omTranslator.
           submitRequest(NULL_RPC_CONTROLLER, request);
     } catch (Throwable e) {
