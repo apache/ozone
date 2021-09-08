@@ -170,7 +170,8 @@ public class TestOzoneFileSystem {
             .build();
     cluster.waitForClusterToBeReady();
 
-    writeClient = new RpcClient(conf, cluster.getOMServiceId()).getOzoneManagerClient();
+    writeClient = new RpcClient(conf, cluster.getOMServiceId())
+      .getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);

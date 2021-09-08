@@ -22,9 +22,9 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
+// import static org.mockito.Matchers.any;
+// import static org.mockito.Matchers.anyInt;
+// import static org.mockito.Matchers.anyLong;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,11 +36,12 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
+//import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+//import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,10 +50,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -96,7 +94,8 @@ public class TestOmMetrics {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    writeClient = new RpcClient(conf, cluster.getOMServiceId()).getOzoneManagerClient();
+    writeClient = new RpcClient(conf, cluster.getOMServiceId())
+      .getOzoneManagerClient();
   }
 
   /**
@@ -286,19 +285,20 @@ public class TestOmMetrics {
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
 
+    // KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
+    //     .getInternalState(ozoneManager, "keyManager");
+    // KeyManager mockKm = Mockito.spy(keyManager);
+
     // // inject exception to test for Failure Metrics
-    // Mockito.doThrow(exception).when(mockKm).openKey(any());
-    // Mockito.doThrow(exception).when(mockKm).deleteKey(any());
     // Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
     // Mockito.doThrow(exception).when(mockKm).listKeys(
     //     any(), any(), any(), any(), anyInt());
     // Mockito.doThrow(exception).when(mockKm).listTrash(
     //     any(), any(), any(), any(), anyInt());
-    // Mockito.doThrow(exception).when(mockKm).commitKey(any(), anyLong());
-    // Mockito.doThrow(exception).when(mockKm).initiateMultipartUpload(any());
-
     // HddsWhiteboxTestUtils.setInternalState(
     //     ozoneManager, "keyManager", mockKm);
+
+
     // doKeyOps(keyArgs);
 
     // omMetrics = getMetrics("OMMetrics");
@@ -504,12 +504,14 @@ public class TestOmMetrics {
     }
 
     try {
-      ozoneManager.listKeys(keyArgs.getVolumeName(), keyArgs.getBucketName(), null, null, 0);
+      ozoneManager.listKeys(keyArgs.getVolumeName(),
+                            keyArgs.getBucketName(), null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listTrash(keyArgs.getVolumeName(), keyArgs.getBucketName(), null, null, 0);
+      ozoneManager.listTrash(keyArgs.getVolumeName(),
+                             keyArgs.getBucketName(), null, null, 0);
     } catch (IOException ignored) {
     }
 
