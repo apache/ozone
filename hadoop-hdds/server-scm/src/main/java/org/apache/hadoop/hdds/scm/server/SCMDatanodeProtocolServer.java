@@ -221,7 +221,6 @@ public class SCMDatanodeProtocolServer implements
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(extendedDatanodeDetailsProto);
     boolean auditSuccess = true;
-    boolean registerResult = false;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeDetails", datanodeDetails.toString());
 
@@ -231,7 +230,6 @@ public class SCMDatanodeProtocolServer implements
             layoutInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
-      registerResult = true;
       eventPublisher.fireEvent(CONTAINER_REPORT,
           new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
               datanodeDetails, containerReportsProto));
@@ -243,6 +241,9 @@ public class SCMDatanodeProtocolServer implements
                       pipelineReportsProto));
     }
     try {
+      Preconditions.checkState(registeredCommand.getError()
+              == SCMRegisteredResponseProto.ErrorCode.success,
+          "DataNode has higher Software Layout Version than SCM.");
       return getRegisteredResponse(registeredCommand);
     } catch (Exception ex) {
       auditSuccess = false;
@@ -253,12 +254,6 @@ public class SCMDatanodeProtocolServer implements
       if(auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.REGISTER, auditMap));
-      }
-      if (!registerResult) {
-        AUDIT.logWriteFailure(
-            buildAuditMessageForFailure(SCMAction.REGISTER, auditMap,
-                new Exception("The register dn layout version "
-                    + "lower than scm version")));
       }
     }
   }
