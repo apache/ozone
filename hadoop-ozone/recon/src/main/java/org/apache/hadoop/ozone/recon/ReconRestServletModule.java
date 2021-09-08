@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.recon.api.ReconAdminFilter;
+import org.apache.hadoop.ozone.recon.api.ReconAuthFilter;
 import org.glassfish.hk2.api.ServiceLocator;
 import org.glassfish.jersey.internal.inject.InjectionManager;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -98,6 +100,8 @@ public abstract class ReconRestServletModule extends ServletModule {
       bind(ServletContainer.class).in(Scopes.SINGLETON);
       for (String path : paths) {
         serve(path).with(ServletContainer.class, params);
+        filter(path).through(ReconAuthFilter.class);
+        filter(path).through(ReconAdminFilter.class);
       }
     }
   }
