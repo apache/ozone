@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,6 +37,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -127,47 +127,37 @@ public class TestBlockDataStreamOutput {
   }
 
   @Test
-  public void testMultiChunkWrite() throws Exception {
-    // write data less than 1 chunk size use streaming.
-    String keyName1 = getKeyName();
-    OzoneDataStreamOutput key1 = createKey(
-        keyName1, ReplicationType.RATIS, 0);
-    int dataLength1 = chunkSize/2;
-    byte[] data1 =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength1)
-            .getBytes(UTF_8);
-    key1.write(Unpooled.copiedBuffer(data1));
-    // now close the stream, It will update the key length.
-    key1.close();
-    validateData(keyName1, data1);
-
-    // write data more than 1 chunk size use streaming.
-    String keyName2 = getKeyName();
-    OzoneDataStreamOutput key2 = createKey(
-        keyName2, ReplicationType.RATIS, 0);
-    int dataLength2 = chunkSize + 50;
-    byte[] data2 =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength2)
-            .getBytes(UTF_8);
-    key2.write(Unpooled.copiedBuffer(data2));
-    // now close the stream, It will update the key length.
-    key2.close();
-    validateData(keyName2, data2);
-
-    // write data more than 1 block size use streaming.
-    String keyName3 = getKeyName();
-    OzoneDataStreamOutput key3 = createKey(
-        keyName3, ReplicationType.RATIS, 0);
-    int dataLength3 = blockSize + 50;
-    byte[] data3 =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength3)
-            .getBytes(UTF_8);
-    key3.write(Unpooled.copiedBuffer(data3));
-    // now close the stream, It will update the key length.
-    key3.close();
-    validateData(keyName3, data3);
+  public void testHalfChunkWrite() throws Exception {
+    testWrite(chunkSize / 2);
   }
 
+  @Test
+  public void testSingleChunkWrite() throws Exception {
+    testWrite(chunkSize);
+  }
+
+  @Test
+  public void testMultiChunkWrite() throws Exception {
+    testWrite(chunkSize + 50);
+  }
+
+  @Test
+  public void testMultiBlockWrite() throws Exception {
+    testWrite(blockSize + 50);
+  }
+
+  private void testWrite(int dataLength) throws Exception {
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(
+        keyName, ReplicationType.RATIS, 0);
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+            .getBytes(UTF_8);
+    key.write(ByteBuffer.wrap(data));
+    // now close the stream, It will update the key length.
+    key.close();
+    validateData(keyName, data);
+  }
   private OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
       long size) throws Exception {
     return TestHelper.createStreamKey(

@@ -29,8 +29,6 @@ import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.io.IOUtils;
@@ -117,10 +115,8 @@ public class PutKeyHandler extends KeyHandler {
         long off = 0;
         while (len > 0) {
           long writeLen = Math.min(len, chunkSize);
-          ByteBuffer segment =
-              ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
-          ByteBuf buf = Unpooled.wrappedBuffer(segment);
-          out.write(buf);
+          ByteBuffer bb = ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
+          out.write(bb);
           off += writeLen;
           len -= writeLen;
         }
