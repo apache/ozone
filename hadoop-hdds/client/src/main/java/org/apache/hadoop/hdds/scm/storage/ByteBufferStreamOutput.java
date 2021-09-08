@@ -18,23 +18,24 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import io.netty.buffer.ByteBuf;
-
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
 * This interface is for writing an output stream of ByteBuffers.
-* An ByteBufStreamOutput accepts Netty ByteBuf and sends them to some sink.
+* An ByteBufferStreamOutput accepts nio ByteBuffer and sends them to some sink.
 */
-public interface ByteBufStreamOutput extends Closeable {
+public interface ByteBufferStreamOutput extends Closeable {
   /**
    * Try to write all the bytes in ByteBuf b to DataStream.
    *
    * @param b the data.
    * @exception IOException if an I/O error occurs.
    */
-  void write(ByteBuf b) throws IOException;
+  default void write(ByteBuffer b) throws IOException {
+    write(b, b.position(), b.remaining());
+  }
 
   /**
    * Try to write the [off:off + len) slice in ByteBuf b to DataStream.
@@ -44,9 +45,7 @@ public interface ByteBufStreamOutput extends Closeable {
    * @param len the number of bytes to write.
    * @exception  IOException  if an I/O error occurs.
    */
-  default void write(ByteBuf b, int off, int len) throws IOException {
-    write(b.slice(off, len));
-  }
+  void write(ByteBuffer b, int off, int len) throws IOException;
 
   /**
    * Flushes this DataStream output and forces any buffered output bytes
