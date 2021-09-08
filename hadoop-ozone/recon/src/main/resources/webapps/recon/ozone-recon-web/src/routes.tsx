@@ -23,6 +23,7 @@ import {NotFound} from './views/notFound/notFound';
 import {IRoute} from './types/routes.types';
 import {MissingContainers} from './views/missingContainers/missingContainers';
 import {Insights} from './views/insights/insights';
+import {DiskUsage} from './views/diskUsage/diskUsage';
 
 export const routes: IRoute[] = [
   {
@@ -44,6 +45,10 @@ export const routes: IRoute[] = [
   {
     path: '/MissingContainers',
     component: MissingContainers
+  },
+  {
+    path: '/DiskUsage',
+    component: DiskUsage
   },
   {
     path: '/:NotFound',

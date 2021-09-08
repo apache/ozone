@@ -287,6 +287,23 @@ public class NetworkTopologyImpl implements NetworkTopology{
   }
 
   /**
+   * Return the node at level <i>level</i>.
+   * @param level topology level, start from 1, which means ROOT
+   * @return the nodes on the level
+   */
+  @Override
+  public List<Node> getNodes(int level) {
+    Preconditions.checkArgument(level > 0 && level <= maxLevel,
+        "Invalid level");
+    netlock.readLock().lock();
+    try {
+      return clusterTree.getNodes(level);
+    } finally {
+      netlock.readLock().unlock();
+    }
+  }
+
+  /**
    * Randomly choose a node in the scope.
    * @param scope range of nodes from which a node will be chosen. If scope
    *              starts with ~, choose one from the all nodes except for the
@@ -497,6 +514,15 @@ public class NetworkTopologyImpl implements NetworkTopology{
       List<String> excludedScopes, Collection<Node> excludedNodes,
       Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(scope != null);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = "
+              + "{}, excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
+          scope, leafIndex, (excludedScopes == null ? "" :
+              excludedScopes.stream().collect(Collectors.joining(", "))),
+          (excludedNodes == null ? "" : excludedNodes.stream()
+              .map(Object::toString).collect(Collectors.joining(", "))),
+          affinityNode == null ? "" : affinityNode.toString(), ancestorGen);
+    }
 
     String finalScope = scope;
     if (affinityNode != null && ancestorGen > 0) {
@@ -535,12 +561,18 @@ public class NetworkTopologyImpl implements NetworkTopology{
     }
 
     // clone excludedNodes before remove duplicate in it
-    Collection<Node> mutableExNodes = null;
+    Collection<Node> mutableExNodes = new ArrayList<>();
+
+    // add affinity node to mutableExNodes
+    if (affinityNode != null) {
+      mutableExNodes.add(affinityNode);
+    }
 
     // Remove duplicate in excludedNodes
     if (excludedNodes != null) {
+      mutableExNodes.addAll(excludedNodes);
       mutableExNodes =
-          excludedNodes.stream().distinct().collect(Collectors.toList());
+          mutableExNodes.stream().distinct().collect(Collectors.toList());
     }
 
     // remove duplicate in mutableExNodes and mutableExcludedScopes
@@ -578,8 +610,9 @@ public class NetworkTopologyImpl implements NetworkTopology{
           mutableExNodes, ancestorGen);
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Choosing node[index={},random={}] from \"{}\" available " +
-              "nodes, scope=\"{}\", excludedScope=\"{}\", excludeNodes=\"{}\".",
+      LOG.debug("Finish choosing node[index = {}, random = {}] from {} " +
+              "available nodes, scope = {}, excludedScope = {}," +
+              "excludeNodes = {}.",
           nodeIndex, (leafIndex == -1 ? "true" : "false"), availableNodes,
           scopeNode.getNetworkFullPath(), excludedScopes, excludedNodes);
       LOG.debug("Chosen node = {}", (ret == null ? "not found" :

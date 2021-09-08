@@ -416,9 +416,10 @@ public class DeletedBlockLogImpl
             txIDs.add(txn.getTxID());
           }
         }
-
-        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
-        metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
+        if (!txIDs.isEmpty()) {
+          deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
+          metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
+        }
       }
       return transactions;
     } finally {

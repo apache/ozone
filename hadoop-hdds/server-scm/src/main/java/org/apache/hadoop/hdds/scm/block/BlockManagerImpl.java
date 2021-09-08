@@ -32,10 +32,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -69,7 +67,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private final StorageContainerManager scm;
   private final PipelineManager pipelineManager;
-  private final ContainerManagerV2 containerManager;
   private final WritableContainerFactory writableContainerFactory;
 
   private final long containerSize;
@@ -78,7 +75,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private final SCMBlockDeletingService blockDeletingService;
 
   private ObjectName mxBean;
-  private final PipelineChoosePolicy pipelineChoosePolicy;
   private final SequenceIdGenerator sequenceIdGen;
   private ScmBlockDeletingServiceMetrics metrics;
   /**
@@ -94,8 +90,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.scm = scm;
     this.pipelineManager = scm.getPipelineManager();
-    this.containerManager = scm.getContainerManager();
-    this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
     this.sequenceIdGen = scm.getSequenceIdGen();
     this.containerSize = (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -123,7 +117,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
     blockDeletingService =
-        new SCMBlockDeletingService(deletedBlockLog, containerManager,
+        new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
             scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf,
             metrics);

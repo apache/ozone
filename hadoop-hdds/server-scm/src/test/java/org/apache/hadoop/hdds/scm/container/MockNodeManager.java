@@ -21,18 +21,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -58,6 +53,8 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.assertj.core.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -83,6 +80,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
  * Test Helper for testing container Mapping.
  */
 public class MockNodeManager implements NodeManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MockNodeManager.class);
+
   public static final int NUM_PIPELINE_PER_METADATA_DISK = 2;
   private static final NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
@@ -167,6 +168,42 @@ public class MockNodeManager implements NodeManager {
     } else {
       throw new IllegalArgumentException("The argument nodes list must not " +
           "be empty");
+    }
+
+    safemode = false;
+    this.commandMap = new HashMap<>();
+    numHealthyDisksPerDatanode = 1;
+    numRaftLogDisksPerDatanode = 1;
+    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+        NUM_PIPELINE_PER_METADATA_DISK;
+  }
+
+  public MockNodeManager(
+      Map<DatanodeUsageInfo, Set<ContainerID>> usageInfoToCidsMap)
+      throws IllegalArgumentException {
+    if (!usageInfoToCidsMap.isEmpty()) {
+      // for each usageInfo, register it, add containers, and update metrics
+      for (Map.Entry<DatanodeUsageInfo, Set<ContainerID>> entry:
+          usageInfoToCidsMap.entrySet()) {
+        DatanodeUsageInfo usageInfo = entry.getKey();
+        register(usageInfo.getDatanodeDetails(), null, null);
+        try {
+          setContainers(usageInfo.getDatanodeDetails(), entry.getValue());
+        } catch (NodeNotFoundException e) {
+          LOG.warn("Could not find Datanode {} for adding containers to it. " +
+                  "Skipping this node.", usageInfo
+              .getDatanodeDetails().getUuidString());
+          continue;
+        }
+
+        nodeMetricMap
+            .put(usageInfo.getDatanodeDetails(), usageInfo.getScmNodeStat());
+        aggregateStat.add(usageInfo.getScmNodeStat());
+        healthyNodes.add(usageInfo.getDatanodeDetails());
+      }
+    } else {
+      throw new IllegalArgumentException("The provided argument should not be" +
+          " empty");
     }
 
     safemode = false;
@@ -382,7 +419,15 @@ public class MockNodeManager implements NodeManager {
   @Override
   public NodeStatus getNodeStatus(DatanodeDetails dd)
       throws NodeNotFoundException {
-    return null;
+    if (healthyNodes.contains(dd)) {
+      return NodeStatus.inServiceHealthy();
+    } else if (staleNodes.contains(dd)) {
+      return NodeStatus.inServiceStale();
+    } else if (deadNodes.contains(dd)) {
+      return NodeStatus.inServiceDead();
+    } else {
+      throw new NodeNotFoundException();
+    }
   }
 
   /**

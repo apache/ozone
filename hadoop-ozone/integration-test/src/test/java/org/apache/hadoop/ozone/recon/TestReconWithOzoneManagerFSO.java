@@ -23,6 +23,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -118,8 +119,10 @@ public class TestReconWithOzoneManagerFSO {
             (ReconOMMetadataManager)
                     cluster.getReconServer().getOzoneManagerServiceProvider()
                             .getOMMetadataManagerInstance();
+    OzoneStorageContainerManager reconSCM =
+            cluster.getReconServer().getReconStorageContainerManager();
     NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
-            omMetadataManagerInstance);
+            omMetadataManagerInstance, reconSCM);
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();

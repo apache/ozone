@@ -132,7 +132,7 @@ public class OzoneContainer {
     containerSet = new ContainerSet();
     metadataScanner = null;
 
-    buildContainerSet(volumeSet, containerSet, config);
+    buildContainerSet();
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
@@ -208,8 +208,7 @@ public class OzoneContainer {
   /**
    * Build's container map.
    */
-  public static void buildContainerSet(MutableVolumeSet volumeSet,
-        ContainerSet containerSet, ConfigurationSource config) {
+  private void buildContainerSet() {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
