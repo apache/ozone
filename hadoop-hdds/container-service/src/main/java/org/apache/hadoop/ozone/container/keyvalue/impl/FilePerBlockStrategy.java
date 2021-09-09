@@ -92,7 +92,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   @Override
   public void writeChunk(Container container, BlockID blockID, ChunkInfo info,
       ChunkBuffer data, DispatcherContext dispatcherContext)
-      throws StorageContainerException {
+      throws IOException {
 
     checkLayoutVersion(container);
 

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -233,7 +234,7 @@ public final class ChunkUtils {
    *         false otherwise.
    */
   public static boolean validateChunkForOverwrite(File chunkFile,
-      ChunkInfo info) {
+      ChunkInfo info) throws IOException{
 
     if (isOverWriteRequested(chunkFile, info)) {
       if (!isOverWritePermitted(info)) {
@@ -254,14 +255,19 @@ public final class ChunkUtils {
    * @return bool
    */
   public static boolean isOverWriteRequested(File chunkFile, ChunkInfo
-      chunkInfo) {
+      chunkInfo) throws IOException{
 
     if (!chunkFile.exists()) {
       return false;
     }
 
     long offset = chunkInfo.getOffset();
-    return offset < chunkFile.length();
+    FileInputStream inputStream = new FileInputStream(chunkFile);
+    inputStream.getChannel().position(offset);
+    if (inputStream.read() == -1) {
+      return false;
+    }
+    return true;
   }
 
   /**
