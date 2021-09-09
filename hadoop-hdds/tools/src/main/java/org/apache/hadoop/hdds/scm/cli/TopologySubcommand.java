@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.InvalidPropertiesFormatException;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -94,10 +95,13 @@ public class TopologySubcommand extends ScmSubcommand
               info -> info.getNodeOperationalStates(0).toString()
                   .equals(nodeOperationalState)).collect(Collectors.toList());
         }
-        if (nodeState != null) {
+        if (nodeState.equals("HEALTHY") || nodeState.equals("STALE") || nodeState.equals("DEAD")) {
           nodes = nodes.stream().filter(
               info -> info.getNodeStates(0).toString()
                   .equals(nodeState)).collect(Collectors.toList());
+        } else {
+          throw new InvalidPropertiesFormatException("the nodeState isn't HEALTHY/STALE/DEAD " +
+              "the nodeState is" + nodeState);
         }
         if (order) {
           printOrderedByLocation(nodes);
