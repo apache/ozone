@@ -271,6 +271,16 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+
+    // Check for failures
+    //  The delete and lookup in doKeyOps() always fail
+    assertCounter("NumKeyAllocateFails", 0L, omMetrics);
+    assertCounter("NumKeyLookupFails", 1L, omMetrics);
+    assertCounter("NumKeyDeleteFails", 1L, omMetrics);
+    assertCounter("NumKeyListFails", 0L, omMetrics);
+    assertCounter("NumTrashKeyListFails", 0L, omMetrics);
+    assertCounter("NumInitiateMultipartUploadFails", 0L, omMetrics);
+
     assertCounter("NumKeyOps", 7L, omMetrics);
     assertCounter("NumKeyAllocate", 1L, omMetrics);
     assertCounter("NumKeyLookup", 1L, omMetrics);
@@ -279,13 +289,6 @@ public class TestOmMetrics {
     assertCounter("NumTrashKeyLists", 1L, omMetrics);
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
-    // Check for failures
-    assertCounter("NumKeyAllocateFails", 0L, omMetrics);
-    assertCounter("NumKeyLookupFails", 1L, omMetrics);
-    assertCounter("NumKeyDeleteFails", 1L, omMetrics);
-    assertCounter("NumKeyListFails", 0L, omMetrics);
-    assertCounter("NumTrashKeyListFails", 0L, omMetrics);
-    assertCounter("NumInitiateMultipartUploadFails", 0L, omMetrics);
     
 
     keyArgs = createKeyArgs();
