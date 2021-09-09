@@ -95,7 +95,8 @@ public class TopologySubcommand extends ScmSubcommand
               info -> info.getNodeOperationalStates(0).toString()
                   .equals(nodeOperationalState)).collect(Collectors.toList());
         }
-        if (nodeState.equals("HEALTHY") || nodeState.equals("STALE") || nodeState.equals("DEAD")) {
+        if (nodeState.equals("HEALTHY") || nodeState.equals("STALE")
+            || nodeState.equals("DEAD")) {
           nodes = nodes.stream().filter(
               info -> info.getNodeStates(0).toString()
                   .equals(nodeState)).collect(Collectors.toList());
