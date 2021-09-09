@@ -234,7 +234,7 @@ public final class ChunkUtils {
    *         false otherwise.
    */
   public static boolean validateChunkForOverwrite(File chunkFile,
-      ChunkInfo info){
+      ChunkInfo info) {
 
     if (isOverWriteRequested(chunkFile, info)) {
       if (!isOverWritePermitted(info)) {
@@ -255,7 +255,7 @@ public final class ChunkUtils {
    * @return bool
    */
   public static boolean isOverWriteRequested(File chunkFile, ChunkInfo
-      chunkInfo){
+      chunkInfo) {
 
     long offset = chunkInfo.getOffset();
     try {
