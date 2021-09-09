@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -40,6 +39,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -47,6 +47,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -549,33 +550,16 @@ public class TestOmMetrics {
     }
 
   }
-
-  /**
-   * Get Random pipeline.
-   * @return pipeline
-   */
-  private Pipeline getRandomPipeline() {
-    return Pipeline.newBuilder()
-        .setState(Pipeline.PipelineState.OPEN)
-        .setId(PipelineID.randomId())
-        .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.ONE))
-        .setNodes(new ArrayList<>())
-        .build();
-  }
   private OmKeyArgs createKeyArgs() throws IOException {
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    ObjectStore store = cluster.getClient().getObjectStore();
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
 
     String keyName = UUID.randomUUID().toString();
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
-        .setPipeline(getRandomPipeline())
+        .setPipeline(MockPipeline.createSingleNodePipeline())
         .build();
     keyLocationInfo.setCreateVersion(0);
 
