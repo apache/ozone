@@ -236,7 +236,28 @@ public final class ChunkUtils {
   public static boolean validateChunkForOverwrite(File chunkFile,
       ChunkInfo info){
 
-    long offset = info.getOffset();
+    if (isOverWriteRequested(chunkFile, info)) {
+      if (!isOverWritePermitted(info)) {
+        LOG.warn("Duplicate write chunk request. Chunk overwrite " +
+            "without explicit request. {}", info);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Checks if we are getting a request to overwrite an existing range of
+   * chunk.
+   *
+   * @param chunkFile - File
+   * @param chunkInfo - Buffer to write
+   * @return bool
+   */
+  public static boolean isOverWriteRequested(File chunkFile, ChunkInfo
+      chunkInfo){
+
+    long offset = chunkInfo.getOffset();
     try {
       FileInputStream inputStream = new FileInputStream(chunkFile);
       inputStream.getChannel().position(offset);
@@ -250,30 +271,6 @@ public final class ChunkUtils {
     } catch (IOException e) {
       LOG.warn("read path {} file {} error, error message is {}",
           chunkFile.getPath(), chunkFile.getName(), e.getMessage());
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Checks if we are getting a request to overwrite an existing range of
-   * chunk.
-   *
-   * @param chunkFile - File
-   * @param chunkInfo - Buffer to write
-   * @return bool
-   */
-  public static boolean isOverWriteRequested(File chunkFile, ChunkInfo
-      chunkInfo) throws IOException{
-
-    if (!chunkFile.exists()) {
-      return false;
-    }
-
-    long offset = chunkInfo.getOffset();
-    FileInputStream inputStream = new FileInputStream(chunkFile);
-    inputStream.getChannel().position(offset);
-    if (inputStream.read() == -1) {
       return false;
     }
     return true;
