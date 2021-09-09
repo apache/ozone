@@ -54,10 +54,21 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "for 10GB it should be set as 10")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
+  @Option(names = {"-e", "--maxSizeEnteringTarget"},
+      description = "the maximum size that can enter a target datanode while " +
+          "balancing in GB. This is the sum of data from multiple sources.")
+  private Optional<Long> maxSizeEnteringTarget;
+
+  @Option(names = {"-l", "--maxSizeLeavingSource"},
+      description = "maximum size that can leave a source datanode while " +
+          "balancing in GB, it is the sum of data moving to multiple targets.")
+  private Optional<Long> maxSizeLeavingSource;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean result = scmClient.startContainerBalancer(threshold, idleiterations,
-        maxDatanodesRatioToInvolvePerIteration, maxSizeToMovePerIterationInGB);
+        maxDatanodesRatioToInvolvePerIteration, maxSizeToMovePerIterationInGB,
+        maxSizeEnteringTarget, maxSizeLeavingSource);
     if (result) {
       System.out.println("Starting ContainerBalancer Successfully.");
       return;

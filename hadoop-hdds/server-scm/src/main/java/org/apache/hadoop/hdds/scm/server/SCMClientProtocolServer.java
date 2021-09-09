@@ -711,7 +711,9 @@ public class SCMClientProtocolServer implements
   public boolean startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> idleiterations,
       Optional<Double> maxDatanodesRatioToInvolvePerIteration,
-      Optional<Long> maxSizeToMovePerIterationInGB) throws IOException {
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTarget,
+      Optional<Long> maxSizeLeavingSource) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     ContainerBalancerConfiguration cbc =
         new ContainerBalancerConfiguration(scm.getConfiguration());
@@ -734,7 +736,7 @@ public class SCMClientProtocolServer implements
               "greater than equal to zero.");
       Preconditions.checkState(mdti <= 1,
           "maxDatanodesRatioToInvolvePerIteration must be " +
-              "lesser than equal to one.");
+              "lesser than or equal to one.");
       cbc.setMaxDatanodesRatioToInvolvePerIteration(mdti);
     }
     if (idleiterations.isPresent()) {
@@ -744,6 +746,23 @@ public class SCMClientProtocolServer implements
               " -1(infinitly run container balancer).");
       cbc.setIdleIteration(idi);
     }
+
+    if (maxSizeEnteringTarget.isPresent()) {
+      long mset = maxSizeEnteringTarget.get();
+      Preconditions.checkState(mset > 0,
+          "maxSizeEnteringTarget must be " +
+              "greater than zero.");
+      cbc.setMaxSizeEnteringTarget(mset * OzoneConsts.GB);
+    }
+
+    if (maxSizeLeavingSource.isPresent()) {
+      long msls = maxSizeLeavingSource.get();
+      Preconditions.checkState(msls > 0,
+          "maxSizeLeavingSource must be " +
+              "greater than zero.");
+      cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
+    }
+
 
     boolean isStartedSuccessfully = scm.getContainerBalancer().start(cbc);
     if (isStartedSuccessfully) {
