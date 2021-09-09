@@ -172,6 +172,10 @@ public class ContainerBalancer {
    */
   private void balance() {
     this.idleIteration = config.getIdleIteration();
+    if(this.idleIteration == -1) {
+      //run balancer infinitely
+      this.idleIteration = Integer.MAX_VALUE;
+    }
     this.threshold = config.getThreshold();
     this.maxDatanodesRatioToInvolvePerIteration =
         config.getMaxDatanodesRatioToInvolvePerIteration();
