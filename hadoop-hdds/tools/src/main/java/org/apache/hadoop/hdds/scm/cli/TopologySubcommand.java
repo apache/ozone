@@ -90,11 +90,12 @@ public class TopologySubcommand extends ScmSubcommand
       if (nodes != null && nodes.size() > 0) {
         // show node state
         System.out.println("State = " + state.toString());
-        if (nodeOperationalState.equals("IN_SERVICE") ||
+        if (nodeOperationalState != null &&
+            (nodeOperationalState.equals("IN_SERVICE") ||
             nodeOperationalState.equals("DECOMMISSIONING") ||
             nodeOperationalState.equals("DECOMMISSIONED") ||
             nodeOperationalState.equals("ENTERING_MAINTENANCE") ||
-            nodeOperationalState.equals("IN_MAINTENANCE")) {
+            nodeOperationalState.equals("IN_MAINTENANCE"))) {
           nodes = nodes.stream().filter(
               info -> info.getNodeOperationalStates(0).toString()
                   .equals(nodeOperationalState)).collect(Collectors.toList());
@@ -103,16 +104,17 @@ public class TopologySubcommand extends ScmSubcommand
               "the nodeOperationalState isn't " +
               "IN_SERVICE/DECOMMISSIONING/DECOMMISSIONED/" +
               "ENTERING_MAINTENANCE/IN_MAINTENANCE" +
-              " the nodeOperationalState is" + nodeState);
+              " the nodeOperationalState is " + nodeState);
         }
-        if (nodeState.equals("HEALTHY") || nodeState.equals("STALE")
-            || nodeState.equals("DEAD")) {
+        if (nodeState != null && (nodeState.equals("HEALTHY")
+            || nodeState.equals("STALE")
+            || nodeState.equals("DEAD"))) {
           nodes = nodes.stream().filter(
               info -> info.getNodeStates(0).toString()
                   .equals(nodeState)).collect(Collectors.toList());
         } else {
           throw new InvalidPropertiesFormatException("the nodeState isn't " +
-              "HEALTHY/STALE/DEAD the nodeState is" + nodeState);
+              "HEALTHY/STALE/DEAD the nodeState is " + nodeState);
         }
         if (order) {
           printOrderedByLocation(nodes);
