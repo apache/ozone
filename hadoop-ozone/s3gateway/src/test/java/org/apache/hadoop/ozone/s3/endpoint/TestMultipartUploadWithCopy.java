@@ -186,31 +186,60 @@ public class TestMultipartUploadWithCopy {
   // 5. Unparsable 
   //
   public enum CopyIfTimestampTestCase {
-    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_AFTER_TS(afterTimeStr, afterTimeStr, ERROR_CODE),
-    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_BEFORE_TS(afterTimeStr, beforeTimeStr, ERROR_CODE),
-    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_NULL(afterTimeStr, null, ERROR_CODE),
-    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_FUTURE(afterTimeStr, futureTimeStr, ERROR_CODE),
-    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(afterTimeStr, UNPARSABLE_TIME_STR, ERROR_CODE),
-    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_AFTER_TS(beforeTimeStr, afterTimeStr, null),
-    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_BEFORE_TS(beforeTimeStr, beforeTimeStr, ERROR_CODE),
-    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_NULL(beforeTimeStr, null, null),
-    MODIFIED_SINCE_BEFORE_TS_UNMOFIFIED_SINCE_FUTURE(beforeTimeStr,futureTimeStr, null),
-    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(beforeTimeStr, UNPARSABLE_TIME_STR, null),
-    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_AFTER_TS(null, afterTimeStr, null),
-    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_BEFORE_TS(null, beforeTimeStr, ERROR_CODE),
-    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_NULL_TS(null, null, null),
-    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_FUTURE_TS(null, futureTimeStr, null),
-    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(null, UNPARSABLE_TIME_STR, null),
-    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_AFTER_TS(UNPARSABLE_TIME_STR, afterTimeStr, null),
-    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_BEFORE_TS(UNPARSABLE_TIME_STR, beforeTimeStr, ERROR_CODE),
-    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_NULL_TS(UNPARSABLE_TIME_STR, null, null),
-    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_FUTURE_TS(UNPARSABLE_TIME_STR, futureTimeStr, null),
-    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(UNPARSABLE_TIME_STR, UNPARSABLE_TIME_STR, null),
-    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_AFTER_TS(futureTimeStr, afterTimeStr, null),
-    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_BEFORE_TS(futureTimeStr, beforeTimeStr, ERROR_CODE),
-    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_NULL_TS(futureTimeStr, null, null),
-    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_FUTURE_TS(futureTimeStr, futureTimeStr, null),
-    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(futureTimeStr, UNPARSABLE_TIME_STR, null);
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_AFTER_TS(
+        afterTimeStr, afterTimeStr, ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        afterTimeStr, beforeTimeStr, ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_NULL(
+        afterTimeStr, null, ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_FUTURE(
+        afterTimeStr, futureTimeStr, ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        afterTimeStr, UNPARSABLE_TIME_STR, ERROR_CODE),
+
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_AFTER_TS(
+        beforeTimeStr, afterTimeStr, null),
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        beforeTimeStr, beforeTimeStr, ERROR_CODE),
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_NULL(
+        beforeTimeStr, null, null),
+    MODIFIED_SINCE_BEFORE_TS_UNMOFIFIED_SINCE_FUTURE(
+        beforeTimeStr,futureTimeStr, null),
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        beforeTimeStr, UNPARSABLE_TIME_STR, null),
+
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_AFTER_TS(
+        null, afterTimeStr, null),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        null, beforeTimeStr, ERROR_CODE),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_NULL_TS(
+        null, null, null),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_FUTURE_TS(
+        null, futureTimeStr, null),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        null, UNPARSABLE_TIME_STR, null),
+
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_AFTER_TS(
+        UNPARSABLE_TIME_STR, afterTimeStr, null),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        UNPARSABLE_TIME_STR, beforeTimeStr, ERROR_CODE),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_NULL_TS(
+        UNPARSABLE_TIME_STR, null, null),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_FUTURE_TS(
+        UNPARSABLE_TIME_STR, futureTimeStr, null),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        UNPARSABLE_TIME_STR, UNPARSABLE_TIME_STR, null),
+
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_AFTER_TS(
+        futureTimeStr, afterTimeStr, null),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        futureTimeStr, beforeTimeStr, ERROR_CODE),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_NULL_TS(
+        futureTimeStr, null, null),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_FUTURE_TS(
+        futureTimeStr, futureTimeStr, null),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        futureTimeStr, UNPARSABLE_TIME_STR, null);
     private final String modifiedTimestamp;
     private final String unmodifiedTimestamp;
     private final String errorCode;
@@ -242,106 +271,6 @@ public class TestMultipartUploadWithCopy {
           fail("Failed test:" + t );
         }
       }
-    }
-  }
-
-  /* The next two tests exercise all the combinations of modification times.
-   * There are two types times, ModifiedSince, and UnmodifiedSince.  Each of
-   * those can be in one of 5 states:
-   * 1. Valid and True
-   * 2. Valid and False
-   * 3. Null
-   * 4. Invalid/Unparseable
-   * 5. Invalid/Future time
-   * Which means there are 25, (5*5), combinations of the two, all of which
-   * are tried below.
-   * The comments above each test list the states for each type being
-   * tested
-   */
-  @Test
-  public void testMultipartIfModifiedIsFalse() throws Exception {
-    // False/ifModifiedSince = afterSourceKeyModificationTime
-    // True/ifUnmodifiedSince = afterSourceKeyModificationTime
-    try {
-      uploadPartWithCopy(
-          afterTimeStr,
-          afterTimeStr
-      );
-      fail("testMultipartIfModifiedIsFalse");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), ERROR_CODE);
-    }
-
-    // False/ifModifiedSince = afterSourceKeyModificationTime
-    // False/ifUnmodifiedSince = beforeSourceKeyModificationTime,
-    try {
-      uploadPartWithCopy(
-          afterTimeStr,
-          beforeTimeStr
-      );
-      fail("testMultipartIfModifiedIsFalse");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), ERROR_CODE);
-    }
-
-    // False/ifModifiedSince = afterSourceKeyModificationTime
-    // Null
-    try {
-      uploadPartWithCopy(afterTimeStr, null);
-      fail("testMultipartIfModifiedIsFalse");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), ERROR_CODE);
-    }
-    // False/ifModifiedSince = afterSourceKeyModificationTime
-    // Future
-    try {
-      uploadPartWithCopy(afterTimeStr, futureTimeStr);
-      fail("testMultipartIfModifiedIsFalse");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), ERROR_CODE);
-    }
-    // False/ifModifiedSince = afterSourceKeyModificationTime
-    // Unparsable
-    try {
-      uploadPartWithCopy(afterTimeStr,
-          UNPARSABLE_TIME_STR);
-      fail("testMultipartIfModifiedIsFalse");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), ERROR_CODE);
-    }
-
-  }
-  
-  @Test
-  public void testMultipartIfModifiedIsTrueOrInvalid() throws Exception {
-    String[] trueOrInvalidTimes = {beforeTimeStr,
-                                   null, UNPARSABLE_TIME_STR, futureTimeStr};
-
-    for (String ts: trueOrInvalidTimes) {
-      // True/Null/Unparsable/Future
-      // True/ifUnmodifiedSince = afterTimeStr
-      uploadPartWithCopy(ts, afterTimeStr);
-  
-      // True/Null/Unparsable/Future
-      // False/ifUnmodifiedSince = beforeSourceKeyModificationTime
-      try {
-        uploadPartWithCopy(ts, beforeTimeStr);
-        fail("testMultipartIfModifiedIsTrueOrInvalid");
-      } catch (OS3Exception ex) {
-        assertEquals(ex.getCode(), ERROR_CODE);
-      }
-  
-      // True/Null/Unparsable/Future
-      // Null
-      uploadPartWithCopy(ts, null);
-  
-      // True/Null/Unparsable/Future
-      // Future
-      uploadPartWithCopy(ts, futureTimeStr);
-  
-      // True/Null/Unparsable/Future
-      // Unparsable
-      uploadPartWithCopy(ts, UNPARSABLE_TIME_STR);
     }
   }
 
