@@ -434,6 +434,7 @@ public class ContainerBalancer {
       } catch (InterruptedException e) {
         LOG.warn("Container move for container {} was interrupted.",
             moveSelection.getContainerID(), e);
+        Thread.currentThread().interrupt();
       } catch (ExecutionException e) {
         LOG.warn("Container move for container {} completed exceptionally.",
             moveSelection.getContainerID(), e);
@@ -728,6 +729,7 @@ public class ContainerBalancer {
       currentBalancingThread = null;
     } catch (InterruptedException e) {
       LOG.warn("Interrupted while waiting for balancing thread to join.");
+      Thread.currentThread().interrupt();
     } finally {
       lock.unlock();
     }

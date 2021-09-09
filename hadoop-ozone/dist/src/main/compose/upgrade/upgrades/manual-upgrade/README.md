@@ -12,9 +12,8 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-The scripts in this directory define version-specific behavior required for [`testlib.sh`](../testlib.sh).  For example the `ozone admin` command was renamed from `ozone scmcli` in 1.0.0.
+# Manual Upgrade Testing
 
-Interface:
+- Since the release of Ozone's non-rolling upgrade framework in 1.2.0, no manual reformatting steps need to be run on nodes between upgrades.
 
- * `ozone_version_load`: define version-specific variables for the test library
- * `ozone_version_unload`: unset version-specific variables; this reverts test library behavior to the "current" one.
+- The driver for testing this type of upgrade is left here as an example in case it needs to be used for some reason in the future.

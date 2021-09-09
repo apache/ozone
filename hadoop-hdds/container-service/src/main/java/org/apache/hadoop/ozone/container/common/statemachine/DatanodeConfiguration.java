@@ -52,6 +52,8 @@ public class DatanodeConfiguration {
   public static final String DISK_CHECK_TIMEOUT_KEY =
       "hdds.datanode.disk.check.timeout";
 
+  static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
+
   static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
 
   static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
@@ -214,6 +216,16 @@ public class DatanodeConfiguration {
   )
   private long diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
+  @Config(key = "chunk.data.validation.check",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Enable safety checks such as checksum validation"
+          + " for Ratis calls."
+  )
+  private boolean isChunkDataValidationCheck =
+      CHUNK_DATA_VALIDATION_CHECK_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (replicationMaxStreams < 1) {
@@ -340,4 +352,13 @@ public class DatanodeConfiguration {
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
   }
+
+  public boolean isChunkDataValidationCheck() {
+    return isChunkDataValidationCheck;
+  }
+
+  public void setChunkDataValidationCheck(boolean writeChunkValidationCheck) {
+    isChunkDataValidationCheck = writeChunkValidationCheck;
+  }
+
 }

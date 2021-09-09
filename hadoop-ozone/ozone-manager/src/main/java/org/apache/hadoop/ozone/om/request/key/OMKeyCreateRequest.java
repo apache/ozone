@@ -320,7 +320,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()))
+          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+              keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
@@ -369,8 +370,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               createKeyRequest.getKeyArgs().getKeyName());
       break;
     case FAILURE:
-      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +
-          "Exception:{}", createKeyRequest.getKeyArgs().getVolumeName(),
+      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key:{}. ",
+              createKeyRequest.getKeyArgs().getVolumeName(),
               createKeyRequest.getKeyArgs().getBucketName(),
               createKeyRequest.getKeyArgs().getKeyName(), exception);
       break;
