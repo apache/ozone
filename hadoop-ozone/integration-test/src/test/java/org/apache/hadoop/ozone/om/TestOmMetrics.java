@@ -74,8 +74,8 @@ public class TestOmMetrics {
   private MiniOzoneCluster cluster;
   private OzoneManager ozoneManager;
   private OzoneManagerProtocol writeClient;
-  private final String VOLUME_NAME = UUID.randomUUID().toString();
-  private final String BUCKET_NAME = UUID.randomUUID().toString();
+  private final String volumeName = UUID.randomUUID().toString();
+  private final String bucketName = UUID.randomUUID().toString();
   /**
    * The exception used for testing failure metrics.
    */
@@ -95,7 +95,7 @@ public class TestOmMetrics {
     ozoneManager = cluster.getOzoneManager();
     writeClient = new RpcClient(conf, cluster.getOMServiceId())
       .getOzoneManagerClient();
-    TestDataUtil.createVolumeAndBucket(cluster, VOLUME_NAME, BUCKET_NAME);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
   }
 
   /**
@@ -270,7 +270,6 @@ public class TestOmMetrics {
     assertCounter("NumTrashKeyLists", 1L, omMetrics);
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
-
     // Check for failures
     assertCounter("NumKeyAllocateFails", 0L, omMetrics);
     assertCounter("NumKeyLookupFails", 1L, omMetrics);
@@ -280,6 +279,7 @@ public class TestOmMetrics {
     assertCounter("NumInitiateMultipartUploadFails", 0L, omMetrics);
     
 
+    keyArgs = createKeyArgs();
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
     keyArgs = createKeyArgs();
@@ -303,11 +303,11 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
 
-    OMMetadataManager metadataManager = (OMMetadataManager) HddsWhiteboxTestUtils
-        .getInternalState(ozoneManager, "metadataManager");
+    OMMetadataManager metadataManager = (OMMetadataManager)
+        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
     OMMetadataManager mockMm = Mockito.spy(metadataManager);
-    Table<String, OmBucketInfo> bucketTable = (Table<String, OmBucketInfo>) HddsWhiteboxTestUtils
-        .getInternalState(metadataManager, "bucketTable");
+    Table<String, OmBucketInfo> bucketTable = (Table<String, OmBucketInfo>)
+        HddsWhiteboxTestUtils.getInternalState(metadataManager, "bucketTable");
     Table<String, OmBucketInfo> mockBTable = Mockito.spy(bucketTable);
     Mockito.doThrow(exception).when(mockBTable).isExist(any());
     Mockito.doReturn(mockBTable).when(mockMm).getBucketTable();
@@ -547,17 +547,17 @@ public class TestOmMetrics {
   }
 
   private OmKeyArgs createKeyArgs() throws IOException {
-    String keyName = UUID.randomUUID().toString();
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
         .setPipeline(MockPipeline.createSingleNodePipeline())
         .build();
     keyLocationInfo.setCreateVersion(0);
 
+    String keyName = UUID.randomUUID().toString();
     return new OmKeyArgs.Builder()
         .setLocationInfoList(Collections.singletonList(keyLocationInfo))
-        .setVolumeName(VOLUME_NAME)
-        .setBucketName(BUCKET_NAME)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
         .setKeyName(keyName)
         .setAcls(Lists.emptyList())
         .build();
