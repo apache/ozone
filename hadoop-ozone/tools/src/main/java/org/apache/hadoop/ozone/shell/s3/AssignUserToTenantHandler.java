@@ -105,8 +105,10 @@ public class AssignUserToTenantHandler extends S3Handler {
             objStore.assignUserToTenant(principal, tenantName, accessId);
         err().println("Assigned '" + principal + "' to '" + tenantName +
             "' under accessId '" + accessId + "'.");
-        out().println("export AWS_ACCESS_KEY_ID=" + resp.getAwsAccessKey());
-        out().println("export AWS_SECRET_ACCESS_KEY=" + resp.getAwsSecret());
+        out().println("export AWS_ACCESS_KEY_ID='" +
+            resp.getAwsAccessKey() + "'");
+        out().println("export AWS_SECRET_ACCESS_KEY='" +
+            resp.getAwsSecret() + "'");
       } catch (IOException e) {
         err().println("Failed to assign '" + principal + "' to '" +
             tenantName + "': " + e.getMessage());
