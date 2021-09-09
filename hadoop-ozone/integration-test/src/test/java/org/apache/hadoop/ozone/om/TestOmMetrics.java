@@ -83,7 +83,8 @@ public class TestOmMetrics {
   private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
   private OzoneManagerProtocol writeClient;
-
+  private final String VOLUME_NAME = UUID.randomUUID().toString();
+  private final String BUCKET_NAME = UUID.randomUUID().toString();
   /**
    * The exception used for testing failure metrics.
    */
@@ -107,6 +108,7 @@ public class TestOmMetrics {
     ozoneManager = cluster.getOzoneManager();
     writeClient = new RpcClient(conf, cluster.getOMServiceId())
       .getOzoneManagerClient();
+    TestDataUtil.createVolumeAndBucket(cluster, VOLUME_NAME, BUCKET_NAME);
   }
 
   /**
@@ -266,12 +268,6 @@ public class TestOmMetrics {
     assertCounter("NumBuckets", 2L, omMetrics);
   }
 
-  private OmKeyArgs changeKeyName(OmKeyArgs k) {
-    return k.toBuilder()
-      .setKeyName(UUID.randomUUID().toString())
-      .build();
-  }
-
   @Test
   public void testKeyOps() throws IOException {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
@@ -296,10 +292,10 @@ public class TestOmMetrics {
 
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = changeKeyName(keyArgs);
+    keyArgs = createKeyArgs();
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = changeKeyName(keyArgs);
+    keyArgs = createKeyArgs();
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
@@ -329,7 +325,7 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);
 
-    keyArgs = changeKeyName(keyArgs);
+    keyArgs = createKeyArgs();
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
@@ -565,12 +561,8 @@ public class TestOmMetrics {
     }
 
   }
+
   private OmKeyArgs createKeyArgs() throws IOException {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
-
     String keyName = UUID.randomUUID().toString();
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
@@ -580,8 +572,8 @@ public class TestOmMetrics {
 
     return new OmKeyArgs.Builder()
         .setLocationInfoList(Collections.singletonList(keyLocationInfo))
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
         .setKeyName(keyName)
         .setAcls(Lists.emptyList())
         .build();
