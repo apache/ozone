@@ -93,8 +93,8 @@ public class TestOmMetrics {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    writeClient = new RpcClient(conf, cluster.getOMServiceId())
-      .getOzoneManagerClient();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
     TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
   }
 
