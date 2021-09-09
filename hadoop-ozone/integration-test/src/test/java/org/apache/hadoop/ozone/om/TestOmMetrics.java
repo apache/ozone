@@ -257,6 +257,9 @@ public class TestOmMetrics {
 
   @Test
   public void testKeyOps() throws IOException {
+    KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
+        .getInternalState(ozoneManager, "keyManager");
+    KeyManager mockKm = Mockito.spy(keyManager);
     OmKeyArgs keyArgs = createKeyArgs();
     doKeyOps(keyArgs);
 
@@ -270,6 +273,9 @@ public class TestOmMetrics {
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
 
+    assertCounter("NumKeyLookupFails", 1L, omMetrics);
+    assertCounter("NumKeyDeleteFails", 1L, omMetrics);
+    
 
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
@@ -287,10 +293,6 @@ public class TestOmMetrics {
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
 
-    KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
-        .getInternalState(ozoneManager, "keyManager");
-    KeyManager mockKm = Mockito.spy(keyManager);
-
     // inject exception to test for Failure Metrics
     Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
@@ -300,40 +302,20 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
 
-    try {
-    mockKm.lookupKey(null, "b");
-    } catch (IOException e) {
-      System.out.println("gbj got :" + e.toString());
-    }
-
-    // md manager
     OMMetadataManager metadataManager = (OMMetadataManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "metadataManager");
     OMMetadataManager mockMm = Mockito.spy(metadataManager);
-    Table<String, OmVolumeArgs> mockVTable = Mockito.spy(metadataManager.getVolumeTable());
-    Mockito.doThrow(exception).when(mockVTable).isExist(any());
     Table<String, OmBucketInfo> bucketTable = (Table<String, OmBucketInfo>) HddsWhiteboxTestUtils
         .getInternalState(metadataManager, "bucketTable");
     Table<String, OmBucketInfo> mockBTable = Mockito.spy(bucketTable);
     Mockito.doThrow(exception).when(mockBTable).isExist(any());
     Mockito.doReturn(mockBTable).when(mockMm).getBucketTable();
 
-   // Mockito.doThrow(exception).when(mockMm).getBucketKey(any(), any());
-    HddsWhiteboxTestUtils.setInternalState(
-        metadataManager, "volumeTable", mockVTable);
-    HddsWhiteboxTestUtils.setInternalState(
-        metadataManager, "bucketTable", mockBTable);
-
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);
-    try {
-    mockMm.getBucketTable().isExist("b");
-    } catch (IOException e) {
-      System.out.println("gbj2 got :" + e.toString());
-    }
 
-
-
+    keyArgs = keyArgs.toBuilder().setKeyName(UUID.randomUUID().toString())
+        .build();
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
