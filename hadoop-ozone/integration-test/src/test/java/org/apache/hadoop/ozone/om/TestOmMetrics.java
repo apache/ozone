@@ -297,7 +297,7 @@ public class TestOmMetrics {
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
 
-    // inject exception to test for Failure Metrics
+    // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
@@ -306,6 +306,7 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
 
+    // inject exception to test for Failure Metrics on the write path
     OMMetadataManager metadataManager = (OMMetadataManager)
         HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
     OMMetadataManager mockMm = Mockito.spy(metadataManager);
@@ -314,7 +315,6 @@ public class TestOmMetrics {
     Table<String, OmBucketInfo> mockBTable = Mockito.spy(bucketTable);
     Mockito.doThrow(exception).when(mockBTable).isExist(any());
     Mockito.doReturn(mockBTable).when(mockMm).getBucketTable();
-
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);
 
