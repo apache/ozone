@@ -101,7 +101,6 @@ public class TestOmMetrics {
     ozoneManager = cluster.getOzoneManager();
     writeClient = cluster.getRpcClient().getObjectStore()
         .getClientProxy().getOzoneManagerClient();
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
   }
 
   /**
@@ -266,6 +265,7 @@ public class TestOmMetrics {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
     OmKeyArgs keyArgs = createKeyArgs();
     doKeyOps(keyArgs);
 
