@@ -265,8 +265,6 @@ public final class ChunkUtils {
         return false;
       }
     } catch (FileNotFoundException e) {
-      LOG.warn("path {} file {} not found",
-          chunkFile.getPath(), chunkFile.getName());
       return false;
     } catch (IOException e) {
       LOG.warn("read path {} file {} error, error message is {}",
