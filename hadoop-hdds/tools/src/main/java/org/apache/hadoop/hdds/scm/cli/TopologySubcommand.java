@@ -100,8 +100,8 @@ public class TopologySubcommand extends ScmSubcommand
               info -> info.getNodeStates(0).toString()
                   .equals(nodeState)).collect(Collectors.toList());
         } else {
-          throw new InvalidPropertiesFormatException("the nodeState isn't HEALTHY/STALE/DEAD " +
-              "the nodeState is" + nodeState);
+          throw new InvalidPropertiesFormatException("the nodeState isn't " +
+              "HEALTHY/STALE/DEAD the nodeState is" + nodeState);
         }
         if (order) {
           printOrderedByLocation(nodes);
