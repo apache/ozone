@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
@@ -170,8 +169,8 @@ public class TestOzoneFileSystem {
             .build();
     cluster.waitForClusterToBeReady();
 
-    writeClient = new RpcClient(conf, cluster.getOMServiceId())
-      .getOzoneManagerClient();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
