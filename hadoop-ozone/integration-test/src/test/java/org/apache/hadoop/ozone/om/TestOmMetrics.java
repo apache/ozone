@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -264,6 +265,12 @@ public class TestOmMetrics {
     assertCounter("NumBuckets", 2L, omMetrics);
   }
 
+  private OmKeyArgs changeKeyName(OmKeyArgs k) {
+    return k.toBuilder()
+      .setKeyName(UUID.randomUUID().toString())
+      .build();
+  }
+
   @Test
   public void testKeyOps() throws IOException {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
@@ -288,12 +295,10 @@ public class TestOmMetrics {
 
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = keyArgs.toBuilder().setKeyName(UUID.randomUUID().toString())
-        .build();
+    keyArgs = changeKeyName(keyArgs);
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = keyArgs.toBuilder().setKeyName(UUID.randomUUID().toString())
-        .build();
+    keyArgs = changeKeyName(keyArgs);
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
@@ -323,8 +328,7 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);
 
-    keyArgs = keyArgs.toBuilder().setKeyName(UUID.randomUUID().toString())
-        .build();
+    keyArgs = changeKeyName(keyArgs);
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
@@ -526,11 +530,13 @@ public class TestOmMetrics {
     }
 
     try {
+      // Always fails because key is not committed
       writeClient.deleteKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
+      // Always fails because key is not committed
       ozoneManager.lookupKey(keyArgs);
     } catch (IOException ignored) {
     }
