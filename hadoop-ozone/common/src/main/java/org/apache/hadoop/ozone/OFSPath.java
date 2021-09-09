@@ -149,10 +149,11 @@ public class OFSPath {
   }
 
   private boolean isEmpty() {
-    return StringUtils.isEmpty(authority)
-        && StringUtils.isEmpty(volumeName)
-        && StringUtils.isEmpty(bucketName)
-        && StringUtils.isEmpty(keyName);
+    return getAuthority().isEmpty()
+        && getMountName().isEmpty()
+        && getVolumeName().isEmpty()
+        && getBucketName().isEmpty()
+        && getKeyName().isEmpty();
   }
 
   /**
