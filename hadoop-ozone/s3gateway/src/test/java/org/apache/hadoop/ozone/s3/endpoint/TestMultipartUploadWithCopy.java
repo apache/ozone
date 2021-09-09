@@ -75,11 +75,12 @@ public class TestMultipartUploadWithCopy {
   private static final OzoneClient CLIENT = new OzoneClientStub();
   private static final long DELAY_MS = 2000;
   private static long sourceKeyLastModificationTime;
-  private static String beforeTimeStr;
-  private static String afterTimeStr;
+  private static String beforeSourceKeyModificationTimeStr;
+  private static String afterSourceKeyModificationTimeStr;
   private static String futureTimeStr;
   private static final String UNPARSABLE_TIME_STR = "Unparsable time string";
-  private static final String ERROR_CODE = S3ErrorTable.PRECOND_FAILED.getCode();
+  private static final String ERROR_CODE =
+      S3ErrorTable.PRECOND_FAILED.getCode();
   @BeforeClass
   public static void setUp() throws Exception {
     CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
@@ -98,16 +99,16 @@ public class TestMultipartUploadWithCopy {
         .getS3Bucket(OzoneConsts.S3_BUCKET)
         .getKey(EXISTING_KEY)
         .getModificationTime().toEpochMilli();
-    beforeTimeStr =
+    beforeSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
-    afterTimeStr =
+    afterSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
     futureTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime +
             1000 * 60 * 24);
 
     // Make sure DELAY_MS has passed, otherwise
-    //  afterTimeStr will be in the future
+    //  afterSourceKeyModificationTimeStr will be in the future
     //  and thus invalid
     long currentTime = new Date().getTime();
     long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
@@ -148,8 +149,8 @@ public class TestMultipartUploadWithCopy {
     Part part4 =
         uploadPartWithCopy(KEY, uploadID, 3,
             OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-            beforeTimeStr,
-            afterTimeStr
+            beforeSourceKeyModificationTimeStr,
+            afterSourceKeyModificationTimeStr
             );
     partsList.add(part4);
 
@@ -172,79 +173,106 @@ public class TestMultipartUploadWithCopy {
     }
   }
 
-
-  // CopyIfTimestampTestCase captures all the possibilities for the time stamps 
-  // that can be passed into the multipart copy with copy-if flags for 
-  // timestamps. Only some of the cases are valid others should raise an 
-  // exception.
-  // Time stamps can be, 
-  // 1. after the timestamp on the object but still a valid time stamp 
-  // (in regard to wall clock time on server)
-  // 2. before the timestamp on the object
-  // 3. In the Future beyond the wall clock time on the server
-  // 4. Null
-  // 5. Unparsable 
-  //
+  /**
+  * CopyIfTimestampTestCase captures all the possibilities for the time stamps
+  * that can be passed into the multipart copy with copy-if flags for
+  * timestamps. Only some of the cases are valid others should raise an
+  * exception.
+  * Time stamps can be,
+  * 1. after the timestamp on the object but still a valid time stamp
+  * (in regard to wall clock time on server)
+  * 2. before the timestamp on the object
+  * 3. In the Future beyond the wall clock time on the server
+  * 4. Null
+  * 5. Unparsable
+  */
   public enum CopyIfTimestampTestCase {
     MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_AFTER_TS(
-        afterTimeStr, afterTimeStr, ERROR_CODE),
+        afterSourceKeyModificationTimeStr, afterSourceKeyModificationTimeStr,
+        ERROR_CODE),
     MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_BEFORE_TS(
-        afterTimeStr, beforeTimeStr, ERROR_CODE),
+        afterSourceKeyModificationTimeStr, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
     MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_NULL(
-        afterTimeStr, null, ERROR_CODE),
+        afterSourceKeyModificationTimeStr, null,
+        ERROR_CODE),
     MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_FUTURE(
-        afterTimeStr, futureTimeStr, ERROR_CODE),
+        afterSourceKeyModificationTimeStr, futureTimeStr,
+        ERROR_CODE),
     MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
-        afterTimeStr, UNPARSABLE_TIME_STR, ERROR_CODE),
+        afterSourceKeyModificationTimeStr, UNPARSABLE_TIME_STR,
+        ERROR_CODE),
 
     MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_AFTER_TS(
-        beforeTimeStr, afterTimeStr, null),
+        beforeSourceKeyModificationTimeStr, afterSourceKeyModificationTimeStr,
+        null),
     MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_BEFORE_TS(
-        beforeTimeStr, beforeTimeStr, ERROR_CODE),
+        beforeSourceKeyModificationTimeStr, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
     MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_NULL(
-        beforeTimeStr, null, null),
+        beforeSourceKeyModificationTimeStr, null,
+        null),
     MODIFIED_SINCE_BEFORE_TS_UNMOFIFIED_SINCE_FUTURE(
-        beforeTimeStr,futureTimeStr, null),
+        beforeSourceKeyModificationTimeStr, futureTimeStr,
+        null),
     MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
-        beforeTimeStr, UNPARSABLE_TIME_STR, null),
+        beforeSourceKeyModificationTimeStr, UNPARSABLE_TIME_STR,
+        null),
 
     MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_AFTER_TS(
-        null, afterTimeStr, null),
+        null, afterSourceKeyModificationTimeStr,
+        null),
     MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_BEFORE_TS(
-        null, beforeTimeStr, ERROR_CODE),
+        null, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
     MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_NULL_TS(
-        null, null, null),
+        null, null,
+        null),
     MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_FUTURE_TS(
-        null, futureTimeStr, null),
+        null, futureTimeStr,
+        null),
     MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
-        null, UNPARSABLE_TIME_STR, null),
+        null, UNPARSABLE_TIME_STR,
+        null),
 
     MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_AFTER_TS(
-        UNPARSABLE_TIME_STR, afterTimeStr, null),
+        UNPARSABLE_TIME_STR, afterSourceKeyModificationTimeStr,
+        null),
     MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_BEFORE_TS(
-        UNPARSABLE_TIME_STR, beforeTimeStr, ERROR_CODE),
+        UNPARSABLE_TIME_STR, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
     MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_NULL_TS(
-        UNPARSABLE_TIME_STR, null, null),
+        UNPARSABLE_TIME_STR, null,
+        null),
     MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_FUTURE_TS(
-        UNPARSABLE_TIME_STR, futureTimeStr, null),
+        UNPARSABLE_TIME_STR, futureTimeStr,
+        null),
     MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
-        UNPARSABLE_TIME_STR, UNPARSABLE_TIME_STR, null),
+        UNPARSABLE_TIME_STR, UNPARSABLE_TIME_STR,
+        null),
 
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_AFTER_TS(
-        futureTimeStr, afterTimeStr, null),
+        futureTimeStr, afterSourceKeyModificationTimeStr,
+        null),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_BEFORE_TS(
-        futureTimeStr, beforeTimeStr, ERROR_CODE),
+        futureTimeStr, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_NULL_TS(
-        futureTimeStr, null, null),
+        futureTimeStr, null,
+        null),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_FUTURE_TS(
-        futureTimeStr, futureTimeStr, null),
+        futureTimeStr, futureTimeStr,
+        null),
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
-        futureTimeStr, UNPARSABLE_TIME_STR, null);
+        futureTimeStr, UNPARSABLE_TIME_STR,
+        null);
+    
     private final String modifiedTimestamp;
     private final String unmodifiedTimestamp;
     private final String errorCode;
 
-    CopyIfTimestampTestCase(String modifiedTimestamp, String unmodifiedTimestamp, String errorCode) {
+    CopyIfTimestampTestCase(String modifiedTimestamp,
+        String unmodifiedTimestamp, String errorCode) {
       this.modifiedTimestamp = modifiedTimestamp;
       this.unmodifiedTimestamp = unmodifiedTimestamp;
       this.errorCode = errorCode;
@@ -260,7 +288,7 @@ public class TestMultipartUploadWithCopy {
   }
   @Test
   public void testMultipartTSHeaders() throws Exception {
-    for (CopyIfTimestampTestCase t : CopyIfTimestampTestCase.values() ) {
+    for (CopyIfTimestampTestCase t : CopyIfTimestampTestCase.values()) {
       try {
         uploadPartWithCopy(t.modifiedTimestamp, t.unmodifiedTimestamp);
         if (t.errorCode != null) {
@@ -268,7 +296,7 @@ public class TestMultipartUploadWithCopy {
         }
       } catch (OS3Exception ex) {
         if (t.errorCode == null) {
-          fail("Failed test:" + t );
+          fail("Failed test:" + t);
         }
       }
     }
