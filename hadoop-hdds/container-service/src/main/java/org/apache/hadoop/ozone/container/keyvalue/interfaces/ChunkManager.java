@@ -51,7 +51,7 @@ public interface ChunkManager {
    */
   void writeChunk(Container container, BlockID blockID, ChunkInfo info,
       ChunkBuffer data, DispatcherContext dispatcherContext)
-      throws StorageContainerException, IOException;
+      throws StorageContainerException;
 
   default void writeChunk(Container container, BlockID blockID, ChunkInfo info,
       ByteBuffer data, DispatcherContext dispatcherContext)

@@ -234,16 +234,25 @@ public final class ChunkUtils {
    *         false otherwise.
    */
   public static boolean validateChunkForOverwrite(File chunkFile,
-      ChunkInfo info) throws IOException{
+      ChunkInfo info){
 
-    if (isOverWriteRequested(chunkFile, info)) {
-      if (!isOverWritePermitted(info)) {
-        LOG.warn("Duplicate write chunk request. Chunk overwrite " +
-            "without explicit request. {}", info);
+    long offset = info.getOffset();
+    try {
+      FileInputStream inputStream = new FileInputStream(chunkFile);
+      inputStream.getChannel().position(offset);
+      if (inputStream.read() == -1) {
+        return false;
       }
-      return true;
+    } catch (FileNotFoundException e) {
+      LOG.warn("path {} file {} not found",
+          chunkFile.getPath(), chunkFile.getName());
+      return false;
+    } catch (IOException e) {
+      LOG.warn("read path {} file {} error, error message is {}",
+          chunkFile.getPath(), chunkFile.getName(), e.getMessage());
+      return false;
     }
-    return false;
+    return true;
   }
 
   /**
