@@ -1,4 +1,4 @@
-package org.apache.hadoop.ozone.recon.api;
+package org.apache.hadoop.ozone.recon.api.filters;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX;
 import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
@@ -15,6 +15,7 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
@@ -22,19 +23,23 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Filter that can be applied to paths to only allow access by authenticated
+ * kerberos users.
+ */
 @Singleton
 public class ReconAuthFilter implements Filter {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconAuthFilter.class);
 
+  @Inject
   private OzoneConfiguration conf;
   private AuthenticationFilter hadoopAuthFilter;
 
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
-    conf = (OzoneConfiguration) filterConfig.getServletContext().getAttribute("OzoneConfiguration");
     LOG.info("ReconAuthFilter init.");
     hadoopAuthFilter = new AuthenticationFilter();
 
@@ -67,7 +72,9 @@ public class ReconAuthFilter implements Filter {
   }
 
   @Override
-  public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+  public void doFilter(ServletRequest servletRequest,
+      ServletResponse servletResponse, FilterChain filterChain)
+      throws IOException, ServletException {
     LOG.info("AuthFilter doFilter.");
     hadoopAuthFilter.doFilter(servletRequest, servletResponse, filterChain);
   }

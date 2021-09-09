@@ -88,7 +88,7 @@ public class ReconServer extends GenericCli {
         new ReconRestServletModule() {
           @Override
           protected void configureServlets() {
-            rest("/api/v1/*")
+            rest(configuration, "/api/v1/*")
               .packages("org.apache.hadoop.ozone.recon.api");
           }
         }, new ReconSchemaGenerationModule());

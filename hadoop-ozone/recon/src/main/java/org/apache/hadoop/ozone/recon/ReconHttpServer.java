@@ -18,15 +18,12 @@
 package org.apache.hadoop.ozone.recon;
 
 import java.io.IOException;
-import java.util.HashMap;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
-import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.inject.Inject;
-import com.google.inject.servlet.GuiceFilter;
 
 /**
  * Recon http server with recon supplied config defaults.
@@ -37,9 +34,6 @@ public class ReconHttpServer extends BaseHttpServer {
   @Inject
   ReconHttpServer(OzoneConfiguration conf) throws IOException {
     super(conf, "recon");
-    getWebAppContext().setAttribute("OzoneConfiguration", new OzoneConfiguration());
-//    getWebAppContext().addEventListener(new ReconGuiceServletContextListener());
-//    getHttpServer().addFilter("GuiceFilter", GuiceFilter.class.getName(), new HashMap<>());
   }
 
   @Override

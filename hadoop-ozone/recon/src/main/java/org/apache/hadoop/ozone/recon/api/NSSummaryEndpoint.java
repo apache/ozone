@@ -70,6 +70,7 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
  */
 @Path("/namespace")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class NSSummaryEndpoint {
 
   private static final Logger LOG = LoggerFactory.getLogger(
