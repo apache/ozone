@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.rpc.read;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;

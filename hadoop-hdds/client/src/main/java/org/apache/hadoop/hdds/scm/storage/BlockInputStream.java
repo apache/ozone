@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,9 +28,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.fs.ByteBufferReadable;
-import org.apache.hadoop.fs.CanUnbuffer;
-import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -253,8 +249,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
-  protected synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
-      IOException {
+  protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
+      throws IOException {
     Preconditions.checkArgument(strategy != null);
     if (!initialized) {
       initialize();

@@ -19,10 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.hadoop.fs.ByteBufferReadable;
-import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -32,15 +29,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
-import org.apache.hadoop.hdds.scm.storage.ByteArrayReader;
-import org.apache.hadoop.hdds.scm.storage.ByteBufferReader;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
-import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
@@ -58,6 +50,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final BlockInputStream[] blockStreams;
   private final int maxLocations;
 
+  private long position = 0;
   private boolean closed = false;
 
   public ECBlockInputStream(ECReplicationConfig repConfig, int ecChunkSize,
@@ -196,8 +189,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * @throws IOException
    */
   @Override
-  protected synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
-      IOException {
+  protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
+      throws IOException {
     Preconditions.checkArgument(strategy != null);
     checkOpen();
 
@@ -216,12 +209,12 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
-  public long getRemaining() {
+  public synchronized long getRemaining() {
     return blockInfo.getLength() - position;
   }
 
   @Override
-  public long getLength() {
+  public synchronized long getLength() {
     return blockInfo.getLength();
   }
 

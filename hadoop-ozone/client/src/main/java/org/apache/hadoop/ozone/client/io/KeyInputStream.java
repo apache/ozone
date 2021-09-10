@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,10 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.fs.ByteBufferReadable;
-import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -94,20 +90,23 @@ public class KeyInputStream extends ExtendedInputStream {
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
     KeyInputStream keyInputStream = new KeyInputStream();
     keyInputStream.initialize(keyInfo, keyLocationInfos,
-        xceiverClientFactory, verifyChecksum, retryFunction);
+        xceiverClientFactory, verifyChecksum, retryFunction,
+        blockStreamFactory);
 
     return new LengthInputStream(keyInputStream, keyInputStream.length);
   }
 
   public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
-      Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
@@ -138,7 +137,8 @@ public class KeyInputStream extends ExtendedInputStream {
         partsToBlocksMap.entrySet()) {
       KeyInputStream keyInputStream = new KeyInputStream();
       keyInputStream.initialize(keyInfo, entry.getValue(),
-          xceiverClientFactory, verifyChecksum, retryFunction);
+          xceiverClientFactory, verifyChecksum, retryFunction,
+          blockStreamFactory);
       lengthInputStreams.add(new LengthInputStream(keyInputStream,
           partsLengthMap.get(entry.getKey())));
     }
@@ -149,7 +149,8 @@ public class KeyInputStream extends ExtendedInputStream {
   private synchronized void initialize(OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
     this.key = keyInfo.getKeyName();
     this.blockOffsets = new long[blockInfos.size()];
     long keyLength = 0;
@@ -177,7 +178,7 @@ public class KeyInputStream extends ExtendedInputStream {
             } else {
               return null;
             }
-          });
+          }, blockStreamFactory);
 
       this.blockOffsets[i] = keyLength;
       keyLength += omKeyLocationInfo.getLength();
@@ -194,8 +195,9 @@ public class KeyInputStream extends ExtendedInputStream {
   private synchronized void addStream(OmKeyLocationInfo blockInfo,
       XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,
-      Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction) {
-    blockStreams.add(new BlockInputStream(blockInfo.getBlockID(),
+      Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction,
+      BlockInputStreamFactory blockStreamFactory) {
+    blockStreams.add(blockStreamFactory.create(blockInfo.getBlockID(),
         blockInfo.getLength(), blockInfo.getPipeline(), blockInfo.getToken(),
         verifyChecksum, xceiverClientFactory,
         blockID -> refreshPipelineFunction.apply(blockInfo)));
@@ -342,7 +344,7 @@ public class KeyInputStream extends ExtendedInputStream {
   }
 
   @Override
-  public synchronized long getPos() {
+  public synchronized long getPos() throws IOException {
     return length == 0 ? 0 : blockOffsets[blockIndex] +
         blockStreams.get(blockIndex).getPos();
   }
