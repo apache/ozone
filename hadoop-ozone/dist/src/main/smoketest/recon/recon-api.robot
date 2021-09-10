@@ -48,7 +48,12 @@ Kinit as recon admin
 Check http return code
     [Arguments]         ${url}          ${expected_code}
     ${result} =         Execute                             curl --negotiate -u : --write-out '\%{http_code}\n' --silent --show-error --output /dev/null ${url}
-                        Should contain      ${result}       ${expected_code}
+                        IF  '${SECURITY_ENABLED}' == 'true'
+                            Should contain      ${result}       ${expected_code}
+                        ELSE
+                            # All access should succeed without security.
+                            Should contain      ${result}       200
+                        END
 
 *** Test Cases ***
 Generate Freon data

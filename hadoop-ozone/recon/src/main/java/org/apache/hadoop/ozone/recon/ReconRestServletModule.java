@@ -112,12 +112,12 @@ public class ReconRestServletModule extends ServletModule {
         LOG.debug("Added authentication filter to all paths under {}",
             basePath);
       }
-    }
 
-    for (String path: subPaths) {
-      filter(basePath + path).through(ReconAdminFilter.class);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Added admin filter to path {}", basePath + path);
+      for (String path: subPaths) {
+        filter(basePath + path).through(ReconAdminFilter.class);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Added admin filter to path {}", basePath + path);
+        }
       }
     }
   }
