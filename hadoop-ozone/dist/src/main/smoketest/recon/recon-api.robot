@@ -23,7 +23,9 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}       http://recon:9888
-${API_ENDPOINT_URL}   http://recon:9888/api/v1
+${API_ENDPOINT_URL}   ${ENDPOINT_URL}/api/v1
+${ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers
+${NON_ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/clusterState
 
 *** Keywords ***
 Check if Recon picks up container from OM
@@ -33,6 +35,20 @@ Check if Recon picks up container from OM
 
     ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/utilization/fileCount
                         Should contain      ${result}       \"fileSize\":2048,\"count\":10
+
+Kinit as non admin
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     scm     scm.keytab
+
+Kinit as ozone admin
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+
+Kinit as recon admin
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser2           testuser2.keytab
+
+Check http return code
+    [Arguments]         ${url}          ${expected_code}
+    ${result} =         Execute                             curl --negotiate -u : --write-out '\%{http_code}\n' --silent --show-error --output /dev/null ${url}
+                        Should contain      ${result}       ${expected_code}
 
 *** Test Cases ***
 Generate Freon data
@@ -69,3 +85,31 @@ Check if Recon Web UI is up
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -LSs ${ENDPOINT_URL}
                         Should contain      ${result}       Ozone Recon
+
+Check web UI access
+    # Unauthenticated user cannot access web UI, but any authenticated user can.
+    Execute    kdestroy
+    Check http return code      ${ENDPOINT_URL}     401
+
+    kinit as non admin
+    Check http return code      ${ENDPOINT_URL}     200
+
+Check admin only api access
+    Execute    kdestroy
+    Check http return code      ${ADMIN_API_ENDPOINT_URL}       401
+
+    kinit as non admin
+    Check http return code      ${ADMIN_API_ENDPOINT_URL}       403
+
+    kinit as ozone admin
+    Check http return code      ${ADMIN_API_ENDPOINT_URL}       200
+
+    kinit as recon admin
+    Check http return code      ${ADMIN_API_ENDPOINT_URL}       200
+
+Check normal api access
+    Execute    kdestroy
+    Check http return code      ${NON_ADMIN_API_ENDPOINT_URL}   401
+
+    kinit as non admin
+    Check http return code      ${NON_ADMIN_API_ENDPOINT_URL}   200

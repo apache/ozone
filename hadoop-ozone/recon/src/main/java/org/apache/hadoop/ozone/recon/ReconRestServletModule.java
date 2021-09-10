@@ -18,14 +18,9 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import java.net.URL;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.inject.Injector;
+import com.google.inject.Scopes;
+import com.google.inject.servlet.ServletModule;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.AdminOnly;
@@ -45,105 +40,88 @@ import org.reflections.scanners.TypeAnnotationsScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.inject.Injector;
-import com.google.inject.Scopes;
-import com.google.inject.servlet.ServletModule;
-
 import javax.ws.rs.Path;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Class to scan API Service classes and bind them to the injector.
  */
-public abstract class ReconRestServletModule extends ServletModule {
+public class ReconRestServletModule extends ServletModule {
+
+  public static final String BASE_API_PATH = "/api/v1";
+  public static final String API_PACKAGE = "org.apache.hadoop.ozone.recon.api";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconRestServletModule.class);
 
+  private final ConfigurationSource conf;
+
+  public ReconRestServletModule(ConfigurationSource conf) {
+    this.conf = conf;
+  }
+
   @Override
-  protected abstract void configureServlets();
-
-  /**
-   * Interface to provide packages for scanning.
-   */
-  public interface RestKeyBindingBuilder {
-    void packages(String... packages);
+  protected void configureServlets() {
+    configureApi(BASE_API_PATH, API_PACKAGE);
   }
 
-  protected RestKeyBindingBuilder rest(ConfigurationSource conf,
-      String... urlPatterns) {
-    return new RestKeyBindingBuilderImpl(conf, Arrays.asList(urlPatterns));
-  }
+  private void configureApi(String baseApiPath, String... packages) {
+    StringBuilder sb = new StringBuilder();
+    Set<String> adminEndpoints = new HashSet<>();
 
-  private class RestKeyBindingBuilderImpl implements RestKeyBindingBuilder {
-    private final List<String> paths;
-    private final ConfigurationSource conf;
-
-    RestKeyBindingBuilderImpl(ConfigurationSource conf, List<String> paths) {
-      this.conf = conf;
-      this.paths = paths;
-    }
-
-    private void checkIfPackageExistsAndLog(String pkg) {
-      String resourcePath = pkg.replace(".", "/");
-      URL resource = getClass().getClassLoader().getResource(resourcePath);
-      if (resource != null) {
-        LOG.info("rest({}).packages({})", paths, pkg);
-      } else {
-        LOG.info("No Beans in '{}' found. Requests {} will fail.", pkg, paths);
-      }
-    }
-
-    @Override
-    public void packages(String... packages) {
-      StringBuilder sb = new StringBuilder();
-      Set<String> adminEndpoints = new HashSet<>();
-
-      for (String pkg : packages) {
-        if (sb.length() > 0) {
-          sb.append(',');
-        }
-        checkIfPackageExistsAndLog(pkg);
-        sb.append(pkg);
-        // Check for classes marked as admin only that will need an extra
-        // filter applied to their path.
-        Reflections reflections = new Reflections(pkg,
-            new TypeAnnotationsScanner(), new SubTypesScanner());
-        Set<Class<?>> adminEndpointClasses =
-            reflections.getTypesAnnotatedWith(AdminOnly.class);
-        adminEndpointClasses.stream()
-            .map(clss -> clss.getAnnotation(Path.class).value())
-            .forEachOrdered(adminEndpoints::add);
-        LOG.info("--- registered endpoint classes {} as admin only.",
-            adminEndpointClasses);
-      }
-      Map<String, String> params = new HashMap<>();
-      params.put("javax.ws.rs.Application",
-          GuiceResourceConfig.class.getCanonicalName());
+    for (String pkg : packages) {
       if (sb.length() > 0) {
-        params.put("jersey.config.server.provider.packages", sb.toString());
+        sb.append(',');
       }
-      bind(ServletContainer.class).in(Scopes.SINGLETON);
-      for (String path : paths) {
-        serve(path).with(ServletContainer.class, params);
-        addFilters(path, adminEndpoints);
-      }
+      checkIfPackageExistsAndLog(pkg, baseApiPath);
+      sb.append(pkg);
+      // Check for classes marked as admin only that will need an extra
+      // filter applied to their path.
+      Reflections reflections = new Reflections(pkg,
+          new TypeAnnotationsScanner(), new SubTypesScanner());
+      Set<Class<?>> adminEndpointClasses =
+          reflections.getTypesAnnotatedWith(AdminOnly.class);
+      adminEndpointClasses.stream()
+          .map(clss -> clss.getAnnotation(Path.class).value())
+          .forEachOrdered(adminEndpoints::add);
+      LOG.info("--- registered endpoint classes {} as admin only.",
+          adminEndpointClasses);
+    }
+    Map<String, String> params = new HashMap<>();
+    params.put("javax.ws.rs.Application",
+        GuiceResourceConfig.class.getCanonicalName());
+    if (sb.length() > 0) {
+      params.put("jersey.config.server.provider.packages", sb.toString());
+    }
+    bind(ServletContainer.class).in(Scopes.SINGLETON);
+
+    serve(baseApiPath + "/*").with(ServletContainer.class, params);
+    addFilters(baseApiPath, adminEndpoints);
+  }
+
+  private void addFilters(String basePath, Set<String> subPaths) {
+    if (OzoneSecurityUtil.isHttpSecurityEnabled(conf)) {
+      filter(basePath + "/*").through(ReconAuthFilter.class);
+      LOG.info("--- Added auth filter to path {}", basePath + "/*");
     }
 
-    private void addFilters(String basePath, Set<String> subPaths) {
-      if (OzoneSecurityUtil.isHttpSecurityEnabled(conf)) {
-        filter(basePath).through(ReconAuthFilter.class);
-        LOG.info("--- Added auth filter to path {}", basePath);
-      }
+    for (String path: subPaths) {
+      filter(basePath + path).through(ReconAdminFilter.class);
+      LOG.info("--- Added admin filter to path {}", basePath + path);
+    }
+  }
 
-      // TODO: Join this better.
-      if (basePath.endsWith("/*")) {
-        basePath = basePath.substring(0, basePath.length() - 2);
-      }
-
-      for (String path: subPaths) {
-        filter(basePath + path).through(ReconAdminFilter.class);
-        LOG.info("--- Added admin filter to path {}", basePath + path);
-      }
+  private void checkIfPackageExistsAndLog(String pkg, String path) {
+    String resourcePath = pkg.replace(".", "/");
+    URL resource = getClass().getClassLoader().getResource(resourcePath);
+    if (resource != null) {
+      LOG.debug("Using API endpoints from package {} for paths under {}.", pkg, path);
+    } else {
+      LOG.warn("No Beans in '{}' found. Requests {} will fail.", pkg, path);
     }
   }
 }
