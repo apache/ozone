@@ -105,6 +105,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         } else {
           // Container should not exist in CLOSING state without a pipeline
           controller.markContainerUnhealthy(containerId);
+          LOG.info("Marking UNHEALTHY as Container should not be in " +
+              "CLOSING state without pipeline, ContainerID: {}", containerId);
         }
         break;
       case QUASI_CLOSED:
