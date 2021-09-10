@@ -37,10 +37,12 @@ import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteArrayReader;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferReader;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
@@ -52,8 +54,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Maintaining a list of BlockInputStream. Read based on offset.
  */
-public class KeyInputStream extends InputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable {
+public class KeyInputStream extends ExtendedInputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyInputStream.class);
@@ -65,7 +66,7 @@ public class KeyInputStream extends InputStream
   private boolean closed = false;
 
   // List of BlockInputStreams, one for each block in the key
-  private final List<BlockInputStream> blockStreams;
+  private final List<BlockExtendedInputStream> blockStreams;
 
   // blockOffsets[i] stores the index of the first data byte in
   // blockStream w.r.t the key data.
@@ -240,8 +241,9 @@ public class KeyInputStream extends InputStream
     return readWithStrategy(strategy);
   }
 
-  synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
-      IOException {
+  @Override
+  protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
+      throws IOException {
     Preconditions.checkArgument(strategy != null);
     checkOpen();
 
@@ -257,7 +259,7 @@ public class KeyInputStream extends InputStream
       }
 
       // Get the current blockStream and read data from it
-      BlockInputStream current = blockStreams.get(blockIndex);
+      BlockExtendedInputStream current = blockStreams.get(blockIndex);
       int numBytesToRead = Math.min(buffLen, (int)current.getRemaining());
       int numBytesRead = strategy.readFromBlock(current, numBytesToRead);
       if (numBytesRead != numBytesToRead) {
@@ -326,7 +328,7 @@ public class KeyInputStream extends InputStream
     }
 
     // Reset the previous blockStream's position
-    blockStreams.get(blockIndexOfPrevPosition).resetPosition();
+    blockStreams.get(blockIndexOfPrevPosition).seek(0);
 
     // Reset all the blockStreams above the blockIndex. We do this to reset
     // any previous reads which might have updated the blockPosition and
@@ -340,7 +342,7 @@ public class KeyInputStream extends InputStream
   }
 
   @Override
-  public synchronized long getPos() throws IOException {
+  public synchronized long getPos() {
     return length == 0 ? 0 : blockOffsets[blockIndex] +
         blockStreams.get(blockIndex).getPos();
   }
@@ -360,7 +362,7 @@ public class KeyInputStream extends InputStream
   @Override
   public void close() throws IOException {
     closed = true;
-    for (BlockInputStream blockStream : blockStreams) {
+    for (ExtendedInputStream blockStream : blockStreams) {
       blockStream.close();
     }
   }
@@ -400,13 +402,13 @@ public class KeyInputStream extends InputStream
 
   @Override
   public void unbuffer() {
-    for (BlockInputStream is : blockStreams) {
+    for (ExtendedInputStream is : blockStreams) {
       is.unbuffer();
     }
   }
 
   @VisibleForTesting
-  public List<BlockInputStream> getBlockStreams() {
+  public List<BlockExtendedInputStream> getBlockStreams() {
     return blockStreams;
   }
 }

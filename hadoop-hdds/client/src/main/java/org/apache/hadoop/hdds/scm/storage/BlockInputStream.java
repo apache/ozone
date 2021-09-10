@@ -59,13 +59,10 @@ import org.slf4j.LoggerFactory;
  * This class encapsulates all state management for iterating
  * through the sequence of chunks through {@link ChunkInputStream}.
  */
-public class BlockInputStream extends InputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable {
+public class BlockInputStream extends BlockExtendedInputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockInputStream.class);
-
-  private static final int EOF = -1;
 
   private final BlockID blockID;
   private final long length;
@@ -250,45 +247,13 @@ public class BlockInputStream extends InputStream
         xceiverClientFactory, () -> pipeline, verifyChecksum, token);
   }
 
+  @Override
   public synchronized long getRemaining() {
     return length - getPos();
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
-  public synchronized int read() throws IOException {
-    byte[] buf = new byte[1];
-    if (read(buf, 0, 1) == EOF) {
-      return EOF;
-    }
-    return Byte.toUnsignedInt(buf[0]);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
-    if (len == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
-  }
-
-  @Override
-  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
-    int len = strategy.getTargetLength();
-    if (len == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
-  }
-
-  synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
+  protected synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
       IOException {
     Preconditions.checkArgument(strategy != null);
     if (!initialized) {
@@ -448,10 +413,6 @@ public class BlockInputStream extends InputStream
     }
   }
 
-  public synchronized void resetPosition() {
-    this.blockPosition = 0;
-  }
-
   /**
    * Checks if the stream is open.  If not, throw an exception.
    *
@@ -463,10 +424,12 @@ public class BlockInputStream extends InputStream
     }
   }
 
+  @Override
   public BlockID getBlockID() {
     return blockID;
   }
 
+  @Override
   public long getLength() {
     return length;
   }

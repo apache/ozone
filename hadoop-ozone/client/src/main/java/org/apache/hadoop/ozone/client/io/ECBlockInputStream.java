@@ -23,16 +23,19 @@ import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteArrayReader;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferReader;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import java.io.IOException;
@@ -43,10 +46,7 @@ import java.util.Arrays;
 /**
  * Class to read data from an EC Block Group.
  */
-public class ECBlockInputStream extends InputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable {
-
-  private static final int EOF = -1;
+public class ECBlockInputStream extends BlockExtendedInputStream {
 
   private final ECReplicationConfig repConfig;
   private final int ecChunkSize;
@@ -58,7 +58,6 @@ public class ECBlockInputStream extends InputStream
   private final BlockInputStream[] blockStreams;
   private final int maxLocations;
 
-  private int position = 0;
   private boolean closed = false;
 
   public ECBlockInputStream(ECReplicationConfig repConfig, int ecChunkSize,
@@ -105,7 +104,7 @@ public class ECBlockInputStream extends InputStream
    * @return
    */
   private int currentStreamIndex() {
-    return ((position / ecChunkSize) % repConfig.getData());
+    return (int)((position / ecChunkSize) % repConfig.getData());
   }
 
   /**
@@ -188,35 +187,6 @@ public class ECBlockInputStream extends InputStream
     return blockLength() - position;
   }
 
-  @Override
-  public synchronized int read() throws IOException {
-    byte[] buf = new byte[1];
-    if (read(buf, 0, 1) == EOF) {
-      return EOF;
-    }
-    return Byte.toUnsignedInt(buf[0]);
-  }
-
-  @Override
-  public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
-    int bufferLen = strategy.getTargetLength();
-    if (bufferLen == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
-  }
-
-  @Override
-  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
-    int bufferLen = strategy.getTargetLength();
-    if (bufferLen == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
-  }
-
   /**
    * Read from the internal BlockInputStreams one EC cell at a time into the
    * strategy buffer. This call may read from several internal BlockInputStreams
@@ -225,7 +195,8 @@ public class ECBlockInputStream extends InputStream
    * @return
    * @throws IOException
    */
-  private synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
+  @Override
+  protected synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
       IOException {
     Preconditions.checkArgument(strategy != null);
     checkOpen();
@@ -242,6 +213,21 @@ public class ECBlockInputStream extends InputStream
       position += read;
     }
     return totalRead;
+  }
+
+  @Override
+  public long getRemaining() {
+    return blockInfo.getLength() - position;
+  }
+
+  @Override
+  public long getLength() {
+    return blockInfo.getLength();
+  }
+
+  @Override
+  public BlockID getBlockID() {
+    return blockInfo.getBlockID();
   }
 
   /**
@@ -311,7 +297,7 @@ public class ECBlockInputStream extends InputStream
   }
 
   @Override
-  public synchronized long getPos() throws IOException {
+  public synchronized long getPos() {
     return position;
   }
 

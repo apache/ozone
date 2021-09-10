@@ -29,8 +29,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -219,19 +221,21 @@ public abstract class TestInputStreamBase {
     // Verify BlockStreams and ChunkStreams
     int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
         dataLength, BLOCK_SIZE);
-    List<BlockInputStream> blockStreams = keyInputStream.getBlockStreams();
+    List<BlockExtendedInputStream> blockStreams =
+        keyInputStream.getBlockStreams();
     Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
 
     int readBlockLength = 0;
-    for (BlockInputStream blockStream : blockStreams) {
+    for (BlockExtendedInputStream blockStream : blockStreams) {
       int blockStreamLength = Math.min(BLOCK_SIZE,
           dataLength - readBlockLength);
       Assert.assertEquals(blockStreamLength, blockStream.getLength());
 
       int expectedNumChunkStreams =
           BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
-      blockStream.initialize();
-      List<ChunkInputStream> chunkStreams = blockStream.getChunkStreams();
+      ((BlockInputStream)blockStream).initialize();
+      List<ChunkInputStream> chunkStreams =
+          ((BlockInputStream)blockStream).getChunkStreams();
       Assert.assertEquals(expectedNumChunkStreams, chunkStreams.size());
 
       int readChunkLength = 0;
