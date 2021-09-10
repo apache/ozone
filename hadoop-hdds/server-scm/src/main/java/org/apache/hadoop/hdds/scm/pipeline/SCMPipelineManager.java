@@ -791,6 +791,26 @@ public class SCMPipelineManager implements
     backgroundPipelineCreator.resume();
   }
 
+  @Override
+  public void acquireReadLock() {
+
+  }
+
+  @Override
+  public void releaseReadLock() {
+
+  }
+
+  @Override
+  public void acquireWriteLock() {
+
+  }
+
+  @Override
+  public void releaseWriteLock() {
+
+  }
+
   public Table<PipelineID, Pipeline> getPipelineStore() {
     return pipelineStore;
   }

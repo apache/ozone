@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.ShutdownHookManager;
-import org.apache.hadoop.util.Timer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -128,18 +127,6 @@ public class MutableVolumeSet implements VolumeSet {
       maxVolumeFailuresTolerated = dnConf.getFailedDataVolumesTolerated();
     }
 
-    initializeVolumeSet();
-  }
-
-  public MutableVolumeSet(ConfigurationSource conf) throws IOException {
-    this.datanodeUuid = null;
-    this.clusterID = null;
-    this.conf = conf;
-    this.volumeSetRWLock = new ReentrantReadWriteLock();
-    this.volumeChecker = new StorageVolumeChecker(conf, new Timer());
-    this.volumeType = StorageVolume.VolumeType.DATA_VOLUME;
-    this.volumeFactory = new HddsVolumeFactory(conf, null,
-        this, null, null);
     initializeVolumeSet();
   }
 

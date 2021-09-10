@@ -37,7 +37,6 @@ _check_om_mlvs() {
 setup() {
   # OM preparation is not implemented until 1.2.0.
   export OZONE_OM_PREPARE='false'
-  load_version_specifics "$OZONE_UPGRADE_FROM"
 }
 
 with_old_version() {
@@ -55,14 +54,13 @@ with_new_version_pre_finalized() {
   validate new1
 }
 
-# TODO: Run when 1.1.0 is released.
-# with_old_version_downgraded() {
-#   validate old1
-#   validate new1
+with_old_version_downgraded() {
+  validate old1
+  validate new1
 
-#   generate old2
-#   validate old2
-# }
+  generate old2
+  validate old2
+}
 
 with_new_version_finalized() {
   _check_hdds_mlvs 2
@@ -71,8 +69,7 @@ with_new_version_finalized() {
 
   validate old1
   validate new1
-  # TODO: Run when 1.1.0 is released.
-  #validate old2
+  validate old2
 
   generate new2
   validate new2

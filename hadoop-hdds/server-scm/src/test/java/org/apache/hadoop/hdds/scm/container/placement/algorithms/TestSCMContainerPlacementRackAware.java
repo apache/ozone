@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Random;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -49,6 +50,8 @@ import org.mockito.Mockito;
 
 import org.apache.commons.lang3.StringUtils;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
@@ -529,5 +532,29 @@ public class TestSCMContainerPlacementRackAware {
     stat = policy.validateContainerPlacement(dns, 1);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
+  }
+
+  @Test
+  public void testOutOfServiceNodesNotSelected() {
+    // Set all the nodes to out of service
+    for (DatanodeInfo dn : dnInfos) {
+      dn.setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+    }
+
+    for (int i=0; i<10; i++) {
+      // Set a random DN to in_service and ensure it is always picked
+      int index = new Random().nextInt(dnInfos.size());
+      dnInfos.get(index).setNodeStatus(NodeStatus.inServiceHealthy());
+      try {
+        List<DatanodeDetails> datanodeDetails =
+            policy.chooseDatanodes(null, null, 1, 0, 0);
+        Assert.assertEquals(dnInfos.get(index), datanodeDetails.get(0));
+      } catch (SCMException e) {
+        // If we get SCMException: No satisfied datanode to meet the ... this is
+        // ok, as there is only 1 IN_SERVICE node and with the retry logic we
+        // may never find it.
+      }
+      dnInfos.get(index).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+    }
   }
 }

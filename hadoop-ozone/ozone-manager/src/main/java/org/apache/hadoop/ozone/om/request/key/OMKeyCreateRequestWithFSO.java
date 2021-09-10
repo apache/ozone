@@ -201,7 +201,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // attribute in response object.
       int clientVersion = getOmRequest().getVersion();
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-              .setKeyInfo(omFileInfo.getProtobuf(keyName, clientVersion))
+              .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
+                  keyArgs.getLatestVersionLocation()))
               .setID(clientID)
               .setOpenVersion(openVersion).build())
               .setCmdType(Type.CreateKey);

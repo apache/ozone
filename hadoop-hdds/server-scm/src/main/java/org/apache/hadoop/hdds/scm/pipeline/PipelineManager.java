@@ -158,4 +158,24 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Ask pipeline manager to resume creating new pipelines.
    */
   void resumePipelineCreation();
+
+  /**
+   * Acquire read lock.
+   */
+  void acquireReadLock();
+
+  /**
+   * Release read lock.
+   */
+  void releaseReadLock();
+
+  /**
+   * Acquire write lock.
+   */
+  void acquireWriteLock();
+
+  /**
+   * Release write lock.
+   */
+  void releaseWriteLock();
 }

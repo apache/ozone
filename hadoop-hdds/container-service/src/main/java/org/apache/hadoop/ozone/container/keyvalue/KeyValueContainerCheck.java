@@ -92,6 +92,8 @@ public class KeyValueContainerCheck {
       valid = true;
 
     } catch (IOException e) {
+      LOG.info("Marking Container {} UNHEALTHY as it failed metadata check",
+              containerID);
       handleCorruption(e);
     }
 
@@ -170,7 +172,7 @@ public class KeyValueContainerCheck {
     Preconditions
         .checkState(onDiskContainerData != null, "Container File not loaded");
 
-    ContainerUtils.verifyChecksum(onDiskContainerData);
+    ContainerUtils.verifyChecksum(onDiskContainerData, checkConfig);
 
     if (onDiskContainerData.getContainerType()
         != ContainerProtos.ContainerType.KeyValueContainer) {
