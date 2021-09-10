@@ -50,8 +50,12 @@ public class ReconAdminFilter implements Filter {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconAdminFilter.class);
 
+  private final OzoneConfiguration conf;
+
   @Inject
-  private OzoneConfiguration conf;
+  ReconAdminFilter(OzoneConfiguration conf) {
+    this.conf = conf;
+  }
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
