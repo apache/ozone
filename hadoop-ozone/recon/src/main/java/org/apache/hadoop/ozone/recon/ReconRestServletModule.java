@@ -88,8 +88,10 @@ public class ReconRestServletModule extends ServletModule {
       adminEndpointClasses.stream()
           .map(clss -> clss.getAnnotation(Path.class).value())
           .forEachOrdered(adminEndpoints::add);
-      LOG.info("--- registered endpoint classes {} as admin only.",
-          adminEndpointClasses);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Registered the following endpoint classes as admin only: {}",
+            adminEndpointClasses);
+      }
     }
     Map<String, String> params = new HashMap<>();
     params.put("javax.ws.rs.Application",
@@ -106,12 +108,17 @@ public class ReconRestServletModule extends ServletModule {
   private void addFilters(String basePath, Set<String> subPaths) {
     if (OzoneSecurityUtil.isHttpSecurityEnabled(conf)) {
       filter(basePath + "/*").through(ReconAuthFilter.class);
-      LOG.info("--- Added auth filter to path {}", basePath + "/*");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Added authentication filter to all paths under {}",
+            basePath);
+      }
     }
 
     for (String path: subPaths) {
       filter(basePath + path).through(ReconAdminFilter.class);
-      LOG.info("--- Added admin filter to path {}", basePath + path);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Added admin filter to path {}", basePath + path);
+      }
     }
   }
 
@@ -119,7 +126,10 @@ public class ReconRestServletModule extends ServletModule {
     String resourcePath = pkg.replace(".", "/");
     URL resource = getClass().getClassLoader().getResource(resourcePath);
     if (resource != null) {
-      LOG.debug("Using API endpoints from package {} for paths under {}.", pkg, path);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Using API endpoints from package {} for paths under {}.",
+            pkg, path);
+      }
     } else {
       LOG.warn("No Beans in '{}' found. Requests {} will fail.", pkg, path);
     }

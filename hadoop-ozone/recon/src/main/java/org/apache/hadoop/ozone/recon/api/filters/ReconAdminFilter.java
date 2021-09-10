@@ -58,15 +58,12 @@ public class ReconAdminFilter implements Filter {
   }
 
   @Override
-  public void init(FilterConfig filterConfig) throws ServletException {
-    LOG.info("ReconAdminFilter init.");
-  }
+  public void init(FilterConfig filterConfig) throws ServletException { }
 
   @Override
   public void doFilter(ServletRequest servletRequest,
       ServletResponse servletResponse, FilterChain filterChain)
       throws IOException, ServletException {
-    LOG.info("ReconAdminFilter doFilter.");
 
     HttpServletRequest httpServletRequest =
         (HttpServletRequest) servletRequest;
@@ -76,29 +73,35 @@ public class ReconAdminFilter implements Filter {
     final Principal userPrincipal =
         httpServletRequest.getUserPrincipal();
     boolean isAdmin = false;
+    String userName = null;
 
     if (userPrincipal != null) {
       UserGroupInformation ugi =
           UserGroupInformation.createRemoteUser(userPrincipal.getName());
+      userName = ugi.getUserName();
 
       if (hasPermission(ugi)) {
         isAdmin = true;
         filterChain.doFilter(httpServletRequest, httpServletResponse);
       }
-      LOG.info("Requester user principal '{}'. Is admin? {}", ugi.getUserName(),
-          isAdmin);
     }
 
-    if (!isAdmin) {
+    if (isAdmin) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Allowing request from admin user {} to {}",
+            userName, httpServletRequest.getRequestURL());
+      }
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Rejecting request from non admin user {} to {}",
+            userName, httpServletRequest.getRequestURL());
+      }
       httpServletResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
     }
-
   }
 
   @Override
-  public void destroy() {
-    LOG.info("ReconAdminFilter destroy.");
-  }
+  public void destroy() { }
 
   private boolean hasPermission(UserGroupInformation user) {
     Collection<String> admins =

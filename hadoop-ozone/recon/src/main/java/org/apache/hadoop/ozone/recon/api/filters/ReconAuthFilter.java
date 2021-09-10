@@ -15,6 +15,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Map;
@@ -42,7 +43,6 @@ public class ReconAuthFilter implements Filter {
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
-    LOG.info("ReconAuthFilter init.");
     hadoopAuthFilter = new AuthenticationFilter();
 
     Map<String, String> parameters = getFilterConfigMap(conf,
@@ -77,7 +77,11 @@ public class ReconAuthFilter implements Filter {
   public void doFilter(ServletRequest servletRequest,
       ServletResponse servletResponse, FilterChain filterChain)
       throws IOException, ServletException {
-    LOG.info("AuthFilter doFilter.");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Filtering request to {} through authentication filter.",
+          ((HttpServletRequest) servletRequest).getRequestURL());
+    }
+
     hadoopAuthFilter.doFilter(servletRequest, servletResponse, filterChain);
   }
 
@@ -93,7 +97,5 @@ public class ReconAuthFilter implements Filter {
   }
 
   @Override
-  public void destroy() {
-    LOG.info("AuthFilter destroy.");
-  }
+  public void destroy() { }
 }
