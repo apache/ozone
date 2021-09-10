@@ -78,31 +78,49 @@ public class WritableRatisContainerProvider
       So we can use different kind of policies.
     */
 
-    ContainerInfo containerInfo;
+    ContainerInfo containerInfo = null;
 
     //TODO we need to continue the refactor to use repConfig everywhere
     //in downstream managers.
 
+
     while (true) {
-      List<Pipeline> availablePipelines =
-          pipelineManager
-              .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
-                  excludeList.getDatanodes(), excludeList.getPipelineIds());
-      Pipeline pipeline = null;
-      if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-        // if no pipelines can be found, try finding pipeline without
-        // exclusion
-        availablePipelines = pipelineManager
-            .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
+      List<Pipeline> availablePipelines;
+      Pipeline pipeline;
+      // Acquire pipeline manager lock, to avoid any updates to pipeline
+      // while allocate container happens. This is to avoid scenario like
+      // mentioned in HDDS-5655.
+      pipelineManager.acquireReadLock();
+      try {
+        availablePipelines = pipelineManager.getPipelines(repConfig,
+            Pipeline.PipelineState.OPEN, excludeList.getDatanodes(),
+            excludeList.getPipelineIds());
+        if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
+          // if no pipelines can be found, try finding pipeline without
+          // exclusion
+          availablePipelines = pipelineManager
+              .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
+        }
+        if (availablePipelines.size() != 0) {
+          containerInfo = selectContainer(availablePipelines, size, owner,
+              excludeList);
+        }
+        if (containerInfo != null) {
+          return containerInfo;
+        }
+      } finally {
+        pipelineManager.releaseReadLock();
       }
+
       if (availablePipelines.size() == 0) {
         try {
-          // TODO: #CLUTIL Remove creation logic when all replication types and
-          // factors are handled by pipeline creator
+          // TODO: #CLUTIL Remove creation logic when all replication types
+          //  and factors are handled by pipeline creator
           pipeline = pipelineManager.createPipeline(repConfig);
 
           // wait until pipeline is ready
           pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+
         } catch (SCMException se) {
           LOG.warn("Pipeline creation failed for repConfig {} " +
               "Datanodes may be used up.", repConfig, se);
@@ -110,6 +128,12 @@ public class WritableRatisContainerProvider
         } catch (IOException e) {
           LOG.warn("Pipeline creation failed for repConfig: {}. "
               + "Retrying get pipelines call once.", repConfig, e);
+        }
+
+        pipelineManager.acquireReadLock();
+        try {
+          // If Exception occurred or successful creation of pipeline do one
+          // final try to fetch pipelines.
           availablePipelines = pipelineManager
               .getPipelines(repConfig, Pipeline.PipelineState.OPEN,
                   excludeList.getDatanodes(), excludeList.getPipelineIds());
@@ -120,30 +144,18 @@ public class WritableRatisContainerProvider
                 .getPipelines(repConfig, Pipeline.PipelineState.OPEN);
           }
           if (availablePipelines.size() == 0) {
-            LOG.info(
-                "Could not find available pipeline of repConfig: {} "
-                    + "even after retrying",
-                repConfig);
+            LOG.info("Could not find available pipeline of repConfig: {} "
+                + "even after retrying", repConfig);
             break;
           }
+          containerInfo = selectContainer(availablePipelines, size, owner,
+              excludeList);
+          if (containerInfo != null) {
+            return containerInfo;
+          }
+        } finally {
+          pipelineManager.releaseReadLock();
         }
-      }
-
-      if (null == pipeline) {
-        PipelineRequestInformation pri =
-            PipelineRequestInformation.Builder.getBuilder()
-                .setSize(size)
-                .build();
-        pipeline = pipelineChoosePolicy.choosePipeline(
-            availablePipelines, pri);
-      }
-
-      // look for OPEN containers that match the criteria.
-      containerInfo = containerManager.getMatchingContainer(size, owner,
-          pipeline, excludeList.getContainerIds());
-
-      if (containerInfo != null) {
-        return containerInfo;
       }
     }
 
@@ -153,6 +165,25 @@ public class WritableRatisContainerProvider
         "Unable to allocate a block for the size: {}, repConfig: {}",
         size, repConfig);
     return null;
+  }
+
+  private ContainerInfo selectContainer(List<Pipeline> availablePipelines,
+      long size, String owner, ExcludeList excludeList) {
+    Pipeline pipeline;
+    ContainerInfo containerInfo;
+
+    PipelineRequestInformation pri =
+        PipelineRequestInformation.Builder.getBuilder().setSize(size)
+                .build();
+    pipeline = pipelineChoosePolicy.choosePipeline(
+            availablePipelines, pri);
+
+    // look for OPEN containers that match the criteria.
+    containerInfo = containerManager.getMatchingContainer(size, owner,
+        pipeline, excludeList.getContainerIds());
+
+    return containerInfo;
+
   }
 
 }

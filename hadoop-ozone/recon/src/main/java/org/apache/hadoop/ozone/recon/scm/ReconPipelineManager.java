@@ -94,7 +94,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    */
   void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
 
-    getLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
@@ -116,12 +116,12 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         removeInvalidPipelines(pipelinesFromScm);
       }
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
 
   public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
-    getLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       // Removing pipelines in Recon that are no longer in SCM.
@@ -151,7 +151,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         }
       });
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
   /**
@@ -161,12 +161,12 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    */
   @VisibleForTesting
   public void addPipeline(Pipeline pipeline) throws IOException {
-    getLock().lock();
+    acquireWriteLock();
     try {
       getStateManager().addPipeline(
           pipeline.getProtobufMessage(ClientVersions.CURRENT_VERSION));
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
 }

@@ -90,13 +90,12 @@ public class VersionEndpointTask implements
                 "Reply from SCM: clusterId cannot be null");
 
             // If version file does not exist
-            // create version file and also set scmId
-
+            // create version file and also set scm ID or cluster ID.
             for (Map.Entry<String, StorageVolume> entry
                 : volumeMap.entrySet()) {
               StorageVolume volume = entry.getValue();
               boolean result = HddsVolumeUtil.checkVolume((HddsVolume) volume,
-                  scmId, clusterId, LOG);
+                  scmId, clusterId, configuration, LOG);
               if (!result) {
                 volumeSet.failVolume(volume.getStorageDir().getPath());
               }

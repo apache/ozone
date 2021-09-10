@@ -190,8 +190,8 @@ public class TestEndPoint {
       // Now rpcEndpoint should remember the version it got from SCM
       Assert.assertNotNull(rpcEndPoint.getVersion());
 
-      // Now change server scmId, so datanode scmId  will be
-      // different from SCM server response scmId
+      // Now change server cluster ID, so datanode cluster ID will be
+      // different from SCM server response cluster ID.
       String newClusterId = UUID.randomUUID().toString();
       scmServerImpl.setClusterId(newClusterId);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);

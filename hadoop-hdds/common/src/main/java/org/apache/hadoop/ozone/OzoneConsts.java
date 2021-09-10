@@ -272,8 +272,6 @@ public final class OzoneConsts {
   // V2: Metadata, block data, and delete transactions in their own
   // column families.
   public static final String SCHEMA_V2 = "2";
-  // Most recent schema version that all new containers should be created with.
-  public static final String SCHEMA_LATEST = SCHEMA_V2;
 
   public static final String[] SCHEMA_VERSIONS =
       new String[] {SCHEMA_V1, SCHEMA_V2};
