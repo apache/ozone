@@ -349,6 +349,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // mark and persist the container state to be unhealthy
         try {
           handler.markContainerUnhealthy(container);
+          LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {
           // just log the error here in case marking the container fails,
           // Return the actual failure response to the client
