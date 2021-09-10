@@ -407,19 +407,3 @@ prepare_for_runner_image() {
   export OZONE_IMAGE="apache/ozone-runner:${v}"
 }
 
-## @description Activate the version-specific behavior for a given release
-## @param the release for which definitions should be loaded
-load_version_specifics() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  source "${_testlib_dir}/versions/${v}.sh"
-
-  ozone_version_load
-}
-
-## @description Deactivate the previously version-specific behavior,
-##   reverting to the current version's definitions
-unload_version_specifics() {
-  ozone_version_unload
-}

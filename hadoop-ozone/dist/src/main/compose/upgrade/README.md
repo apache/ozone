@@ -23,34 +23,17 @@ an older release of Ozone and a later release (which may be the local build).
 1. Backwards Incompatibility
     - These tests will not catch backwards incompatible changes against commits in between releases.
         - Example:
-            1. After 1.0.0, a change *c1* is made that is backwards compatible with *1.0.0*.
+            1. After 1.0.0, a change *c1* is made that is backwards compatible with 1.0.0.
             2. After *c1*, a new change *c2* is made that is also backwards compatible with 1.0.0 but backwards *incompatible* with *c1*.
 
             - This test suite will not raise an error for *c2*, because it only tests against the last release
             (1.0.0), and not the last commit (*c1*).
 
-2. Downgrade Support
-    - Downgrades will not be supported until upgrading from 1.1.0 to 1.2.0
-
-    - Until 1.1.0 is released, downgrades cannot be tested, so they are commented out of the current non-rolling upgrade tests.
-
 ## Directory Layout
 
 ### upgrades
 
-Each type of upgrade has a subdirectory under the *upgrades* directory. Each upgrade's steps are controlled by a *test.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-from>-\<upgrade-to>* directory. After the test is run, results and docker volume data for the upgrade for these versions will also be placed in this directory. The results of all upgrades run as part of the tests will be placed in a *results* folder in the top level upgrade directory.
-
-#### manual-upgrade
-
-- Any necessary conversion of on disk structures from the old version to the new version must be done explicitly.
-
-- This is primarily for testing upgrades from versions before the non-rolling upgrade framework was introduced.
-
-- Supported Callbacks:
-    1. `setup_with_old_version`: Run before ozone is started in the old version.
-    3. `with_old_version`: Run while ozone is running in the old version.
-    3. `setup_with_new_version`: Run after ozone is stopped in the old version, but before it is restarted in the new version.
-    4. `with_new_version`: Run while ozone is running in the new version.
+Each type of upgrade has a subdirectory under the *upgrades* directory. Each upgrade's steps are controlled by a *driver.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-from>-\<upgrade-to>* directory. After the test is run, results and docker volume data for the upgrade for these versions will also be placed in this directory. The results of all upgrades run as part of the tests will be placed in a *results* folder in the top level upgrade directory.
 
 #### non-rolling-upgrade
 
@@ -67,6 +50,20 @@ Each type of upgrade has a subdirectory under the *upgrades* directory. Each upg
 - Note that on the first upgrade after the non-rolling upgrade framework is added, the old version does not have the non-rolling upgrade framework, but the new version does.
     - The non-rolling upgrade framework can still be used, the only difference is that OMs cannot be prepared before moving from the old version to the new version.
     - Set the variable `OZONE_PREPARE_OMS` to `false` in `callback.sh` setup function to disable OM preparation as part of the upgrade.
+
+#### manual-upgrade
+
+- This is a legacy option that was used before the upgrade framework was introduced in 1.2.0. This option is left as an example in case it needs to be used for some reason in the future.
+
+- Any necessary conversion of on disk structures from the old version to the new version must be done explicitly.
+
+- This is primarily for testing upgrades from versions before the non-rolling upgrade framework was introduced.
+
+- Supported Callbacks:
+    1. `setup_with_old_version`: Run before ozone is started in the old version.
+    3. `with_old_version`: Run while ozone is running in the old version.
+    3. `setup_with_new_version`: Run after ozone is stopped in the old version, but before it is restarted in the new version.
+    4. `with_new_version`: Run while ozone is running in the new version.
 
 ### compose
 

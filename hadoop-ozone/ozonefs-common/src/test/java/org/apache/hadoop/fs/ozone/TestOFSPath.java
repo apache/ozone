@@ -29,6 +29,19 @@ import java.io.IOException;
 public class TestOFSPath {
 
   @Test
+  public void testParsingPathWithSpace() {
+    // Two most common cases: file key and dir key inside a bucket
+    OFSPath ofsPath = new OFSPath("/volume1/bucket2/dir3/key4 space");
+    Assert.assertEquals("", ofsPath.getAuthority());
+    Assert.assertEquals("volume1", ofsPath.getVolumeName());
+    Assert.assertEquals("bucket2", ofsPath.getBucketName());
+    Assert.assertEquals("dir3/key4 space", ofsPath.getKeyName());
+    Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
+    Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("/volume1/bucket2/dir3/key4 space", ofsPath.toString());
+  }
+
+  @Test
   public void testParsingVolumeBucketWithKey() {
     // Two most common cases: file key and dir key inside a bucket
     OFSPath ofsPath = new OFSPath("/volume1/bucket2/dir3/key4");
@@ -103,6 +116,19 @@ public class TestOFSPath {
     Assert.assertEquals("/volume1/", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("/volume1/", ofsPath.toString());
+  }
+
+  @Test
+  public void testParsingEmptyInput() {
+    OFSPath ofsPath = new OFSPath("");
+    Assert.assertEquals("", ofsPath.getAuthority());
+    Assert.assertEquals("", ofsPath.getVolumeName());
+    Assert.assertEquals("", ofsPath.getBucketName());
+    Assert.assertEquals("", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getNonKeyPath());
+    Assert.assertEquals("", ofsPath.getNonKeyPathNoPrefixDelim());
+    Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("", ofsPath.toString());
   }
 
   @Test
