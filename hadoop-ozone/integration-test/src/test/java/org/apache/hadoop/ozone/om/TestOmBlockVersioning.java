@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.AfterClass;
@@ -57,6 +58,7 @@ public class TestOmBlockVersioning {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OzoneManager ozoneManager;
+  private static OzoneManagerProtocol writeClient;
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -74,6 +76,8 @@ public class TestOmBlockVersioning {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
   }
 
   /**
@@ -105,11 +109,11 @@ public class TestOmBlockVersioning {
         .build();
 
     // 1st update, version 0
-    OpenKeySession openKey = ozoneManager.openKey(keyArgs);
+    OpenKeySession openKey = writeClient.openKey(keyArgs);
     // explicitly set the keyLocation list before committing the key.
     keyArgs.setLocationInfoList(openKey.getKeyInfo().getLatestVersionLocations()
         .getBlocksLatestVersionOnly());
-    ozoneManager.commitKey(keyArgs, openKey.getId());
+    writeClient.commitKey(keyArgs, openKey.getId());
 
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     OmKeyLocationInfoGroup highestVersion =
@@ -118,13 +122,13 @@ public class TestOmBlockVersioning {
     assertEquals(1, highestVersion.getLocationList().size());
 
     // 2nd update, version 1
-    openKey = ozoneManager.openKey(keyArgs);
+    openKey = writeClient.openKey(keyArgs);
     //OmKeyLocationInfo locationInfo =
-    //    ozoneManager.allocateBlock(keyArgs, openKey.getId());
+    //    writeClient.allocateBlock(keyArgs, openKey.getId());
     // explicitly set the keyLocation list before committing the key.
     keyArgs.setLocationInfoList(openKey.getKeyInfo().getLatestVersionLocations()
         .getBlocksLatestVersionOnly());
-    ozoneManager.commitKey(keyArgs, openKey.getId());
+    writeClient.commitKey(keyArgs, openKey.getId());
 
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
@@ -132,11 +136,11 @@ public class TestOmBlockVersioning {
     assertEquals(1, highestVersion.getLocationList().size());
 
     // 3rd update, version 2
-    openKey = ozoneManager.openKey(keyArgs);
+    openKey = writeClient.openKey(keyArgs);
 
     // this block will be appended to the latest version of version 2.
     OmKeyLocationInfo locationInfo =
-        ozoneManager.allocateBlock(keyArgs, openKey.getId(),
+        writeClient.allocateBlock(keyArgs, openKey.getId(),
             new ExcludeList());
     List<OmKeyLocationInfo> locationInfoList =
         openKey.getKeyInfo().getLatestVersionLocations()
@@ -144,7 +148,7 @@ public class TestOmBlockVersioning {
     Assert.assertTrue(locationInfoList.size() == 1);
     locationInfoList.add(locationInfo);
     keyArgs.setLocationInfoList(locationInfoList);
-    ozoneManager.commitKey(keyArgs, openKey.getId());
+    writeClient.commitKey(keyArgs, openKey.getId());
 
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());

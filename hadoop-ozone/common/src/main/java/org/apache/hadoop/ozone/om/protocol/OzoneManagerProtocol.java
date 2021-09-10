@@ -180,7 +180,10 @@ public interface OzoneManagerProtocol
    * @return OpenKeySession instance that client uses to talk to container.
    * @throws IOException
    */
-  OpenKeySession openKey(OmKeyArgs args) throws IOException;
+  default OpenKeySession openKey(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
 
   /**
    * Commit a key. This will make the change from the client visible. The client
@@ -190,7 +193,12 @@ public interface OzoneManagerProtocol
    * @param clientID the client identification
    * @throws IOException
    */
-  void commitKey(OmKeyArgs args, long clientID) throws IOException;
+  default void commitKey(OmKeyArgs args, long clientID)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Allocate a new block, it is assumed that the client is having an open key
@@ -203,9 +211,11 @@ public interface OzoneManagerProtocol
    * @return an allocated block
    * @throws IOException
    */
-  OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientID,
-      ExcludeList excludeList) throws IOException;
-
+  default OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientID,
+      ExcludeList excludeList) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
 
   /**
    * Look up for the container of an existing key.

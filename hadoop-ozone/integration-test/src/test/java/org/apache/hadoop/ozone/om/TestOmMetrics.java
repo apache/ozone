@@ -81,7 +81,7 @@ public class TestOmMetrics {
   /**
    * The exception used for testing failure metrics.
    */
-  private OMException exception =
+  private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
 
   /**
@@ -318,6 +318,7 @@ public class TestOmMetrics {
     OMMetadataManager metadataManager = (OMMetadataManager)
         HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
     OMMetadataManager mockMm = Mockito.spy(metadataManager);
+    @SuppressWarnings("unchecked")
     Table<String, OmBucketInfo> bucketTable = (Table<String, OmBucketInfo>)
         HddsWhiteboxTestUtils.getInternalState(metadataManager, "bucketTable");
     Table<String, OmBucketInfo> mockBTable = Mockito.spy(bucketTable);

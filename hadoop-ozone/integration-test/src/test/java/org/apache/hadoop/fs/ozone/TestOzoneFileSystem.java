@@ -579,8 +579,8 @@ public class TestOzoneFileSystem {
         .setLocationInfoList(new ArrayList<>())
         .build();
 
-    OpenKeySession session = cluster.getOzoneManager().openKey(keyArgs);
-    cluster.getOzoneManager().commitKey(keyArgs, session.getId());
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, session.getId());
 
     Path parent = new Path("/");
     FileStatus[] fileStatuses = fs.listStatus(parent);
