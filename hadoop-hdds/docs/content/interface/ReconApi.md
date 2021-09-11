@@ -629,7 +629,7 @@ response object being the upper cap for file size range.
  
 **Parameters**
 
-Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheuslatest/querying/api/) 
+Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheus/latest/querying/api/) 
 for complete documentation on querying. 
 
 **Returns**
