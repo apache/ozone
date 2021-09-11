@@ -78,7 +78,11 @@ public interface OzoneManagerProtocol
    * @param args - Arguments to create Volume.
    * @throws IOException
    */
-  void createVolume(OmVolumeArgs args) throws IOException;
+  default void createVolume(OmVolumeArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Changes the owner of a volume.
@@ -88,7 +92,11 @@ public interface OzoneManagerProtocol
    *         already the owner.
    * @throws IOException
    */
-  boolean setOwner(String volume, String owner) throws IOException;
+  default boolean setOwner(String volume, String owner) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Changes the Quota on a volume.
@@ -97,8 +105,12 @@ public interface OzoneManagerProtocol
    * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
-  void setQuota(String volume, long quotaInNamespace, long quotaInBytes)
-      throws IOException;
+  default void setQuota(String volume, long quotaInNamespace, long quotaInBytes)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Checks if the specified user can access this volume.
@@ -124,7 +136,11 @@ public interface OzoneManagerProtocol
    * @param volume - Name of the volume.
    * @throws IOException
    */
-  void deleteVolume(String volume) throws IOException;
+  default void deleteVolume(String volume) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Lists volumes accessible by a specific user.
@@ -154,7 +170,11 @@ public interface OzoneManagerProtocol
    * @param bucketInfo - BucketInfo to create Bucket.
    * @throws IOException
    */
-  void createBucket(OmBucketInfo bucketInfo) throws IOException;
+  default void createBucket(OmBucketInfo bucketInfo) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Gets the bucket information.
@@ -171,7 +191,11 @@ public interface OzoneManagerProtocol
    * @param args - BucketArgs.
    * @throws IOException
    */
-  void setBucketProperty(OmBucketArgs args) throws IOException;
+  default void setBucketProperty(OmBucketArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Open the given key and return an open key session.
@@ -232,7 +256,11 @@ public interface OzoneManagerProtocol
    * @param toKeyName New name to be used for the Key
    * @throws IOException
    */
-  void renameKey(OmKeyArgs args, String toKeyName) throws IOException;
+  default void renameKey(OmKeyArgs args, String toKeyName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Rename existing keys within a bucket.
@@ -240,7 +268,11 @@ public interface OzoneManagerProtocol
    *                     and fromKey name toKey info Map.
    * @throws IOException
    */
-  void renameKeys(OmRenameKeys omRenameKeys) throws IOException;
+  default void renameKeys(OmRenameKeys omRenameKeys) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Deletes an existing key.
@@ -248,7 +280,11 @@ public interface OzoneManagerProtocol
    * @param args the args of the key.
    * @throws IOException
    */
-  void deleteKey(OmKeyArgs args) throws IOException;
+  default void deleteKey(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Deletes existing key/keys. This interface supports delete
@@ -258,7 +294,11 @@ public interface OzoneManagerProtocol
    * @param deleteKeys
    * @throws IOException
    */
-  void deleteKeys(OmDeleteKeys deleteKeys) throws IOException;
+  default void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Deletes an existing empty bucket from volume.
@@ -266,7 +306,11 @@ public interface OzoneManagerProtocol
    * @param bucket - Name of the bucket.
    * @throws IOException
    */
-  void deleteBucket(String volume, String bucket) throws IOException;
+  default void deleteBucket(String volume, String bucket) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Returns a list of buckets represented by {@link OmBucketInfo}
@@ -399,7 +443,12 @@ public interface OzoneManagerProtocol
    * @return MultipartInfo
    * @throws IOException
    */
-  OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws IOException;
+  default OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
 
   /**
@@ -409,8 +458,12 @@ public interface OzoneManagerProtocol
    * @return OmMultipartCommitUploadPartInfo
    * @throws IOException
    */
-  OmMultipartCommitUploadPartInfo commitMultipartUploadPart(
-      OmKeyArgs omKeyArgs, long clientID) throws IOException;
+  default OmMultipartCommitUploadPartInfo commitMultipartUploadPart(
+      OmKeyArgs omKeyArgs, long clientID) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Complete Multipart upload Request.
@@ -419,16 +472,24 @@ public interface OzoneManagerProtocol
    * @return OmMultipartUploadCompleteInfo
    * @throws IOException
    */
-  OmMultipartUploadCompleteInfo completeMultipartUpload(
+  default OmMultipartUploadCompleteInfo completeMultipartUpload(
       OmKeyArgs omKeyArgs, OmMultipartUploadCompleteList multipartUploadList)
-      throws IOException;
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Abort multipart upload.
    * @param omKeyArgs
    * @throws IOException
    */
-  void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException;
+  default void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Returns list of parts of a multipart upload key.
@@ -463,7 +524,11 @@ public interface OzoneManagerProtocol
    * @param kerberosID
    * @throws IOException
    */
-  void revokeS3Secret(String kerberosID) throws IOException;
+  default void revokeS3Secret(String kerberosID) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * OzoneFS api to get file status for an entry.
@@ -486,7 +551,11 @@ public interface OzoneManagerProtocol
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
-  void createDirectory(OmKeyArgs args) throws IOException;
+  default void createDirectory(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * OzoneFS api to creates an output stream for a file.
@@ -502,8 +571,12 @@ public interface OzoneManagerProtocol
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
-  OpenKeySession createFile(OmKeyArgs keyArgs, boolean overWrite,
-      boolean recursive) throws IOException;
+  default OpenKeySession createFile(OmKeyArgs keyArgs, boolean overWrite,
+      boolean recursive) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * OzoneFS api to lookup for a file.
@@ -538,7 +611,11 @@ public interface OzoneManagerProtocol
    *
    * @throws IOException if there is error.
    * */
-  boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException;
+  default boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Remove acl for Ozone object. Return true if acl is removed successfully
@@ -548,7 +625,11 @@ public interface OzoneManagerProtocol
    *
    * @throws IOException if there is error.
    * */
-  boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException;
+  default boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Acls to be set for given Ozone object. This operations reset ACL for
@@ -558,7 +639,11 @@ public interface OzoneManagerProtocol
    *
    * @throws IOException if there is error.
    * */
-  boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException;
+  default boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Returns list of ACLs for given Ozone object.

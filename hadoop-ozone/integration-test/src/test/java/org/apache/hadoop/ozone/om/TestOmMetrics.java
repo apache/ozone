@@ -115,9 +115,8 @@ public class TestOmMetrics {
 
 
 
-  @Test
-  public void testVolumeOps() throws Exception {
-    startCluster();
+  //  @Test
+  public void testVolumeOps() throws IOException {
     VolumeManager volumeManager =
         (VolumeManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "volumeManager");
@@ -193,9 +192,8 @@ public class TestOmMetrics {
 
   }
 
-  @Test
-  public void testBucketOps() throws Exception {
-    startCluster();
+  //  @Test
+  public void testBucketOps() throws IOException {
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "bucketManager");
@@ -355,8 +353,7 @@ public class TestOmMetrics {
   }
 
   @Test
-  public void testAclOperations() throws Exception {
-    startCluster();
+  public void testAclOperations() throws IOException {
     try {
       // Create a volume.
       cluster.getClient().getObjectStore().createVolume("volumeacl");
@@ -391,7 +388,7 @@ public class TestOmMetrics {
     }
   }
 
-  @Test
+  //  @Test
   public void testAclOperationsHA() throws Exception {
     // This test needs a cluster with DNs and SCM to wait on safemode
     clusterBuilder.setNumDatanodes(3);
