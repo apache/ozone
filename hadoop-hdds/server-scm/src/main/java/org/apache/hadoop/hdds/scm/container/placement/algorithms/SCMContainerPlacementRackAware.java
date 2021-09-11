@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -285,24 +284,13 @@ public final class SCMContainerPlacementRackAware
       }
 
       DatanodeDetails datanodeDetails = (DatanodeDetails)node;
-      DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
-          .getNodeByUuid(datanodeDetails.getUuidString());
-      if (datanodeInfo == null) {
-        LOG.error("Failed to find the DatanodeInfo for datanode {}",
-            datanodeDetails);
-      } else {
-        if (datanodeInfo.getNodeStatus().isNodeWritable() &&
-            (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-                dataSizeRequired))) {
-          LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
-                  "required data size is {}",
-              node.toString(), metadataSizeRequired, dataSizeRequired);
-          metrics.incrDatanodeChooseSuccessCount();
-          if (isFallbacked) {
-            metrics.incrDatanodeChooseFallbackCount();
-          }
-          return node;
+      if (isValidNode(datanodeDetails, metadataSizeRequired,
+          dataSizeRequired)) {
+        metrics.incrDatanodeChooseSuccessCount();
+        if (isFallbacked) {
+          metrics.incrDatanodeChooseFallbackCount();
         }
+        return node;
       }
 
       maxRetry--;
@@ -371,7 +359,7 @@ public final class SCMContainerPlacementRackAware
   }
 
   @Override
-  protected int getRequiredRackCount() {
+  protected int getRequiredRackCount(int numReplicas) {
     return REQUIRED_RACKS;
   }
 }

@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -348,6 +347,8 @@ public class ContainerStateMachine extends BaseStateMachine {
               .setWriteChunk(commitWriteChunkProto)
               .setTraceID(proto.getTraceID())
               .build();
+      Preconditions.checkArgument(write.hasData());
+      Preconditions.checkArgument(!write.getData().isEmpty());
 
       return TransactionContext.newBuilder()
           .setClientRequest(request)
@@ -415,6 +416,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       long startTime) {
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
+    Preconditions.checkArgument(!write.getData().isEmpty());
     try {
       if (server.getDivision(gid).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
@@ -497,11 +499,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
-    int hash = Objects.hashCode(req.getBlockID());
-    if (hash == Integer.MIN_VALUE) {
-      hash = Integer.MAX_VALUE;
-    }
-    int i = Math.abs(hash) % chunkExecutors.size();
+    int i = (int)(req.getBlockID().getLocalID() % chunkExecutors.size());
     return chunkExecutors.get(i);
   }
 
@@ -651,6 +649,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
         ByteString data = stateMachineDataCache.get(entry.getIndex());
         if (data != null) {
+          Preconditions.checkArgument(!data.isEmpty());
           future.complete(data);
           return future;
         }
