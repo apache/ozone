@@ -1932,34 +1932,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Creates a volume.
-   *
-   * @param args - Arguments to create Volume.
-   * @throws IOException
-   */
-  @Override
-  public void createVolume(OmVolumeArgs args) throws IOException {
-    try {
-      metrics.incNumVolumeCreates();
-      if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
-            args.getVolume(), null, null);
-      }
-      volumeManager.createVolume(args);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
-          (args == null) ? null : args.toAuditMap()));
-      metrics.incNumVolumes();
-    } catch (Exception ex) {
-      metrics.incNumVolumeCreateFails();
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(OMAction.CREATE_VOLUME,
-              (args == null) ? null : args.toAuditMap(), ex)
-      );
-      throw ex;
-    }
-  }
-
-  /**
    * Checks if current caller has acl permissions.
    *
    * @param resType - Type of ozone resource. Ex volume, bucket.
@@ -2291,32 +2263,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_VOLUMES,
             auditMap));
       }
-    }
-  }
-
-  /**
-   * Creates a bucket.
-   *
-   * @param bucketInfo - BucketInfo to create bucket.
-   * @throws IOException
-   */
-  @Override
-  public void createBucket(OmBucketInfo bucketInfo) throws IOException {
-    try {
-      if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
-            bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
-      }
-      metrics.incNumBucketCreates();
-      bucketManager.createBucket(bucketInfo);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_BUCKET,
-          (bucketInfo == null) ? null : bucketInfo.toAuditMap()));
-      metrics.incNumBuckets();
-    } catch (Exception ex) {
-      metrics.incNumBucketCreateFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.CREATE_BUCKET,
-          (bucketInfo == null) ? null : bucketInfo.toAuditMap(), ex));
-      throw ex;
     }
   }
 
@@ -2693,15 +2639,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           user.getUserName(), OMException.ResultCodes.USER_MISMATCH);
     }
     return s3SecretManager.getS3Secret(kerberosID);
-  }
-
-  @Override
-  /**
-   * {@inheritDoc}
-   */
-  public void revokeS3Secret(String kerberosID) {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-            "this to be implemented. As write requests use a new approach");
   }
 
   @Override
