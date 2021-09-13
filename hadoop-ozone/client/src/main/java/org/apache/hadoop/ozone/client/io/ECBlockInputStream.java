@@ -25,29 +25,37 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.function.Function;
 
 /**
  * Class to read data from an EC Block Group.
  */
 public class ECBlockInputStream extends BlockExtendedInputStream {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECBlockInputStream.class);
+
   private final ECReplicationConfig repConfig;
   private final int ecChunkSize;
-  private final BlockInputStreamProvider streamProvider;
+  private final BlockInputStreamFactory streamFactory;
   private final boolean verifyChecksum;
+  private final XceiverClientFactory xceiverClientFactory;
+  private final Function<BlockID, Pipeline> refreshFunction;
   private final OmKeyLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
   private final DatanodeDetails[] parityLocations;
-  private final BlockInputStream[] blockStreams;
+  private final BlockExtendedInputStream[] blockStreams;
   private final int maxLocations;
 
   private long position = 0;
@@ -55,16 +63,19 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   public ECBlockInputStream(ECReplicationConfig repConfig, int ecChunkSize,
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
-      BlockInputStreamProvider streamProvider) {
+      XceiverClientFactory xceiverClientFactory, Function<BlockID,
+      Pipeline> refreshFunction, BlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;
     this.ecChunkSize = ecChunkSize;
     this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;
-    this.streamProvider = streamProvider;
+    this.streamFactory = streamFactory;
+    this.xceiverClientFactory = xceiverClientFactory;
+    this.refreshFunction = refreshFunction;
     this.maxLocations = repConfig.getData() + repConfig.getParity();
     this.dataLocations = new DatanodeDetails[repConfig.getData()];
     this.parityLocations = new DatanodeDetails[repConfig.getParity()];
-    this.blockStreams = new BlockInputStream[repConfig.getData()];
+    this.blockStreams = new BlockExtendedInputStream[repConfig.getData()];
 
     setBlockLocations(this.blockInfo.getPipeline());
   }
@@ -106,9 +117,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * stream if it has not been opened already.
    * @return BlockInput stream to read from.
    */
-  private BlockInputStream getOrOpenStream() {
+  private BlockExtendedInputStream getOrOpenStream() {
     int ind = currentStreamIndex();
-    BlockInputStream stream = blockStreams[ind];
+    BlockExtendedInputStream stream = blockStreams[ind];
     if (stream == null) {
       // To read an EC block, we create a STANDALONE pipeline that contains the
       // single location for the block index we want to read. The EC blocks are
@@ -122,9 +133,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
-      stream = streamProvider.provide(blockInfo.getBlockID(),
+      stream = streamFactory.create(blockInfo.getBlockID(),
           internalBlockLength(ind+1), pipeline, blockInfo.getToken(),
-          verifyChecksum);
+          verifyChecksum, xceiverClientFactory, refreshFunction);
       blockStreams[ind] = stream;
     }
     return stream;
@@ -200,7 +211,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
     int totalRead = 0;
     while(strategy.getTargetLength() > 0 && remaining() > 0) {
-      BlockInputStream stream = getOrOpenStream();
+      BlockExtendedInputStream stream = getOrOpenStream();
       int read = readFromStream(stream, strategy);
       totalRead += read;
       position += read;
@@ -232,7 +243,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * @return
    * @throws IOException
    */
-  private int readFromStream(BlockInputStream stream,
+  private int readFromStream(BlockExtendedInputStream stream,
       ByteReaderStrategy strategy)
       throws IOException {
     // Number of bytes left to read from this streams EC cell.
@@ -267,9 +278,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public synchronized void close() {
-    for (BlockInputStream stream : blockStreams) {
+    for (BlockExtendedInputStream stream : blockStreams) {
       if (stream != null) {
-        stream.close();
+        try {
+          stream.close();
+        } catch (IOException e) {
+          LOG.error("Failed to close stream {}", stream, e);
+        }
       }
     }
     closed = true;
@@ -277,7 +292,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public synchronized void unbuffer() {
-    for (BlockInputStream stream : blockStreams) {
+    for (BlockExtendedInputStream stream : blockStreams) {
       if (stream != null) {
         stream.unbuffer();
       }
