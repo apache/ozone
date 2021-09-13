@@ -229,7 +229,7 @@ Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
 
 **Returns**
 
-Returns the UnhealthyContainerMetadata objects for the containers in the givenstate.
+Returns the UnhealthyContainerMetadata objects for the containers in the given state.
 Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
 The response structure is same as `/containers/unhealthy`.
 
@@ -629,7 +629,7 @@ response object being the upper cap for file size range.
  
 **Parameters**
 
-Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheuslatest/querying/api/) 
+Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheus/latest/querying/api/) 
 for complete documentation on querying. 
 
 **Returns**
