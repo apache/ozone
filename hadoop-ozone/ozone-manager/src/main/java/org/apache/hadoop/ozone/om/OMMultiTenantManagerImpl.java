@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
@@ -58,6 +59,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Implements OMMultiTenantManager.
@@ -325,14 +328,14 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       List<String> userGroupIDs = new ArrayList<>();
       userGroupIDs.add(idGroupTenantAllUsers);
 
-      String userID = authorizer.createUser(userPrincipal, userGroupIDs);
+      //String userID = authorizer.createUser(userPrincipal, userGroupIDs);
 
       inMemoryUserNameToTenantNameMap.put(
           userPrincipal.getFullMultiTenantPrincipalID(), tenantName);
       inMemoryUserNameToListOfGroupsMap.put(
           userPrincipal.getFullMultiTenantPrincipalID(), userGroupIDs);
 
-      return userID;
+      return null;
     } catch (Exception e) {
       destroyUser(tenantName, userName);
       LOG.error(e.getMessage());
@@ -366,6 +369,27 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     } finally {
       controlPathLock.writeLock().unlock();
     }
+  }
+
+  @Override
+  public String getUserNameGivenAccessId(String accessId) {
+    Preconditions.checkNotNull(accessId);
+    try {
+      controlPathLock.readLock().lock();
+      OmDBAccessIdInfo omDBAccessIdInfo =
+          omMetadataManager.getTenantAccessIdTable().get(accessId);
+      if (omDBAccessIdInfo != null) {
+        String userName = omDBAccessIdInfo.getKerberosPrincipal();
+        LOG.debug("Username for accessId {} = {}", accessId, userName);
+        return userName;
+      }
+    } catch (IOException ioEx) {
+      LOG.error("Unexpected error while obtaining DB Access Info for {}",
+          accessId, ioEx);
+    } finally {
+      controlPathLock.readLock().unlock();
+    }
+    return null;
   }
 
   @Override

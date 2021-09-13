@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -42,12 +44,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.TestSSLFactory;
 import org.apache.hadoop.security.token.Token;
@@ -345,5 +349,21 @@ public class TestOzoneTokenIdentifier {
     }
     Assert.assertEquals("Deserialize Serialized Token should equal.",
         idWrite, idRead);
+  }
+
+  @Test
+  public void testGetUserFromAccessIdInToken() {
+    OzoneTokenIdentifier id = getIdentifierInst();
+    Assert.assertEquals("User1", id.getUser().getUserName());
+
+    id.setTokenType(S3AUTHINFO);
+    Assert.assertEquals("User1", id.getUser().getUserName());
+
+    id.setGetUserForAccessId(s -> "modified-" + s);
+    Assert.assertEquals("modified-User1", id.getUser().getUserName());
+
+    id.setGetUserForAccessId(s -> null);
+    Assert.assertEquals("User1", id.getUser().getUserName());
+
   }
 }
