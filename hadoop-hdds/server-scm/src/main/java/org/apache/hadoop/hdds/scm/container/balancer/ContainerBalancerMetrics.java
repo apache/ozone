@@ -32,11 +32,11 @@ public final class ContainerBalancerMetrics {
 
   @Metric(about = "The total amount of used space in GigaBytes that needs to " +
       "be balanced.")
-  private LongMetric dataSizeToBalanceGB;
+  private double dataSizeToBalanceGB;
 
   @Metric(about = "The amount of Giga Bytes that have been moved to achieve " +
       "balance.")
-  private LongMetric dataSizeBalancedGB;
+  private double dataSizeBalancedGB;
 
   @Metric(about = "Number of containers that Container Balancer has moved" +
       " until now.")
@@ -56,33 +56,33 @@ public final class ContainerBalancerMetrics {
    * Initialise metrics for ContainerBalancer.
    */
   public ContainerBalancerMetrics() {
-    dataSizeToBalanceGB = new LongMetric(0L);
-    dataSizeBalancedGB = new LongMetric(0L);
+    dataSizeToBalanceGB = 0d;
+    dataSizeBalancedGB = 0d;
     movedContainersNum = new LongMetric(0L);
     datanodesNumToBalance = new LongMetric(0L);
     datanodesNumBalanced = new LongMetric(0L);
     maxDatanodeUtilizedRatio = 0D;
   }
 
-  public LongMetric getDataSizeToBalanceGB() {
+  public double getDataSizeToBalanceGB() {
     return dataSizeToBalanceGB;
   }
 
-  public void setDataSizeToBalanceGB(long size) {
-    this.dataSizeToBalanceGB = new LongMetric(size);
+  public void setDataSizeToBalanceGB(double size) {
+    this.dataSizeToBalanceGB = size;
   }
 
-  public LongMetric getDataSizeBalancedGB() {
+  public double getDataSizeBalancedGB() {
     return dataSizeBalancedGB;
   }
 
-  public void setDataSizeBalancedGB(LongMetric dataSizeBalancedGB) {
+  public void setDataSizeBalancedGB(double dataSizeBalancedGB) {
     this.dataSizeBalancedGB = dataSizeBalancedGB;
   }
 
-  public long incrementDataSizeBalancedGB(long valueToAdd) {
-    this.dataSizeBalancedGB.add(valueToAdd);
-    return this.dataSizeBalancedGB.get();
+  public double incrementDataSizeBalancedGB(double valueToAdd) {
+    this.dataSizeBalancedGB += valueToAdd;
+    return this.dataSizeBalancedGB;
   }
 
   public LongMetric getMovedContainersNum() {

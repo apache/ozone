@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -426,14 +427,15 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-            this.countDatanodesInvolvedPerIteration += 2;
+            metrics.incrementMovedContainersNum(1);
+            LOG.info("Move completed for container {} to target {}",
+                container.containerID(),
+                moveSelection.getTargetNode().getUuidString());
           } catch (ContainerNotFoundException e) {
             LOG.warn("Could not find Container {} while " +
                     "checking move results in ContainerBalancer",
                 moveSelection.getContainerID(), e);
           }
-          metrics.incrementMovedContainersNum(1);
-          metrics.incrementDataSizeBalancedGB(sizeMovedPerIteration);
         }
       } catch (InterruptedException e) {
         LOG.warn("Container move for container {} was interrupted.",
@@ -447,6 +449,10 @@ public class ContainerBalancer {
             moveSelection.getContainerID(), e);
       }
     }
+    countDatanodesInvolvedPerIteration =
+        sourceToTargetMap.size() + selectedTargets.size();
+    metrics.incrementDataSizeBalancedGB(
+        sizeMovedPerIteration / (double) OzoneConsts.GB);
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
             "in this iteration: {}B.",
         countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
@@ -575,7 +581,7 @@ public class ContainerBalancer {
   }
 
   /**
-   * Update targets and selection criteria at the end of an iteration.
+   * Update targets and selection criteria after a move.
    *
    * @param potentialTargets potential target datanodes
    * @param selectedTargets  selected target datanodes
@@ -589,6 +595,15 @@ public class ContainerBalancer {
       Set<DatanodeDetails> selectedTargets,
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
     countDatanodesInvolvedPerIteration += 2;
+    // don't count a source that has been involved in move earlier
+    if (sourceToTargetMap.containsKey(source) ||
+        selectedTargets.contains(source)) {
+      countDatanodesInvolvedPerIteration -= 1;
+    }
+    // don't count a target that has been involved in move earlier
+    if (selectedTargets.contains(moveSelection.getTargetNode())) {
+      countDatanodesInvolvedPerIteration -= 1;
+    }
     incSizeSelectedForMoving(source, moveSelection);
     sourceToTargetMap.put(source, moveSelection);
     selectedTargets.add(moveSelection.getTargetNode());
@@ -596,7 +611,7 @@ public class ContainerBalancer {
     selectionCriteria.setSelectedContainers(selectedContainers);
 
     return potentialTargets.stream()
-        .filter(node -> sizeEnteringNode.get(node) <=
+        .filter(node -> sizeEnteringNode.get(node) <
             config.getMaxSizeEnteringTarget()).collect(Collectors.toList());
   }
 
@@ -652,7 +667,8 @@ public class ContainerBalancer {
 
   /**
    * Checks if specified size can enter specified target datanode
-   * according to configuration.
+   * according to {@link ContainerBalancerConfiguration}
+   * "size.entering.target.max".
    *
    * @param target target datanode in which size is entering
    * @param size   size in bytes
