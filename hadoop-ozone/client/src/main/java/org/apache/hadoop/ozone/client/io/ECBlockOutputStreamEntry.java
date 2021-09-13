@@ -33,6 +33,7 @@ import java.io.IOException;
  */
 public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   private final boolean isParityStreamEntry;
+  private boolean isFailed = false;
   private ECBlockOutputStream out;
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
@@ -59,6 +60,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     return this.isParityStreamEntry;
   }
 
+  public void markFailed() {
+    this.isFailed = true;
+  }
+
+  public boolean isFailed() {
+    return this.isFailed;
+  }
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */

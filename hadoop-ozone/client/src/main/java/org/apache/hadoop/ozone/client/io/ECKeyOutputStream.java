@@ -233,13 +233,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // By this time, we should have finished full stripe. So, lets call
     // executePutBlock for all.
     // TODO: we should alter the put block calls to share CRC to each stream.
-    blockOutputStreamEntryPool.executePutBlockForAll();
-    ecChunkBufferCache.clear();
+    try {
+      blockOutputStreamEntryPool.executePutBlockForAll();
+    } catch (IOException e) {
+      closed = true;
+      throw e;
+    } finally {
+      ecChunkBufferCache.clear(parityCellSize);
 
-    // check if block ends?
-    if (shouldEndBlockGroup()) {
-      blockOutputStreamEntryPool.endECBlock();
-      currentBlockGroupLen = 0;
+      // check if block ends?
+      if (shouldEndBlockGroup()) {
+        blockOutputStreamEntryPool.endECBlock();
+        currentBlockGroupLen = 0;
+      }
     }
   }
 
@@ -309,7 +315,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
             bytesToWrite.array().length, 0, current.getWrittenDataLength(),
             isParity);
       } catch (Exception e) {
-        markStreamClosed();
+        closeAndMarkStreamAsFailed();
       }
     }
   }
@@ -351,9 +357,35 @@ public class ECKeyOutputStream extends KeyOutputStream {
     streamEntry.close();
   }
 
-  private void markStreamClosed() {
-    blockOutputStreamEntryPool.cleanup();
-    closed = true;
+  private void closeAndMarkStreamAsFailed() throws IOException {
+    closeCurrentStream(StreamAction.CLOSE);
+    markStreamAsFailed();
+  }
+
+  private void markStreamAsFailed() throws IOException {
+    ECBlockOutputStreamEntry entry =
+        (ECBlockOutputStreamEntry) blockOutputStreamEntryPool
+            .getCurrentStreamEntry();
+    entry.markFailed();
+    validateNumStreamFailures();
+  }
+
+  private void validateNumStreamFailures() throws IOException {
+    final List<BlockOutputStreamEntry> streamEntries =
+        blockOutputStreamEntryPool.getStreamEntries();
+    int failures = 0;
+    for (BlockOutputStreamEntry entry : streamEntries) {
+      if (((ECBlockOutputStreamEntry) entry).isFailed()) {
+        failures++;
+        if (failures > numParityBlks) {
+          throw new IOException(
+              "Write failure: Cannot proceed to write as we have seen more"
+                  + " failures: " + failures
+                  + " , which are more than allowed failures: "
+                  + numParityBlks);
+        }
+      }
+    }
   }
 
   @Override
@@ -388,8 +420,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
           }
           return;
         } catch (Exception e) {
-          markStreamClosed();
-          throw e;
+          closeAndMarkStreamAsFailed();
         }
       }
     }
@@ -414,8 +445,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
             }
             return;
           } catch (Exception e) {
-            markStreamClosed();
-            throw e;
+            closeAndMarkStreamAsFailed();
           }
         }
       }
@@ -424,25 +454,22 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   private void closeCurrentStream(StreamAction op) throws IOException {
     if (!blockOutputStreamEntryPool.isEmpty()) {
-      List<BlockOutputStreamEntry> allStreamEntries =
-          blockOutputStreamEntryPool.getStreamEntries();
-      for (int i = 0; i < allStreamEntries.size(); i++) {
-        while (true) {
-          try {
-            BlockOutputStreamEntry entry = allStreamEntries.get(i);
-            if (entry != null) {
-              try {
-                handleStreamAction(entry, op);
-              } catch (IOException ioe) {
-                handleException(entry, ioe);
-                continue;
-              }
+      while (true) {
+        try {
+          BlockOutputStreamEntry entry =
+              blockOutputStreamEntryPool.getCurrentStreamEntry();
+          if (entry != null) {
+            try {
+              handleStreamAction(entry, op);
+            } catch (IOException ioe) {
+              handleException(entry, ioe);
+              continue;
             }
-            return;
-          } catch (Exception e) {
-            markStreamClosed();
-            throw e;
           }
+          return;
+        } catch (Exception e) {
+          markStreamAsFailed();
+          validateNumStreamFailures();
         }
       }
     }
@@ -485,8 +512,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
-      if(isPartialStripe()){
+      if (isPartialStripe()) {
         ByteBuffer bytesToWrite =
             ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
                 .getCurrIdx()];
@@ -501,7 +527,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
                 bytesToWrite.position(), 0, current.getWrittenDataLength(),
                 false);
           } catch (Exception e) {
-            markStreamClosed();
+            closeAndMarkStreamAsFailed();
           }
         }
         final int lastStripeSize =
@@ -512,7 +538,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         addPadding(parityCellSize);
         handleParityWrites(parityCellSize);
       }
-
+      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
@@ -692,8 +718,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     private void clear() {
-      clearBuffers(cellSize, dataBuffers);
-      clearBuffers(cellSize, parityBuffers);
+      clear(cellSize);
+    }
+
+    private void clear(int size) {
+      clearBuffers(size, dataBuffers);
+      clearBuffers(size, parityBuffers);
     }
 
     private void release() {

@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,6 +36,20 @@ public class MockXceiverClientFactory
 
   private final Map<DatanodeDetails, MockDatanodeStorage> storage =
       new HashMap<>();
+  private List<DatanodeDetails> failedStorages;
+
+  public void setFailedStorages(List<DatanodeDetails> failedStorages){
+    final Iterator<Map.Entry<DatanodeDetails, MockDatanodeStorage>> iterator =
+        storage.entrySet().iterator();
+    while (iterator.hasNext()) {
+      final Map.Entry<DatanodeDetails, MockDatanodeStorage> next =
+          iterator.next();
+      if (failedStorages.contains(next.getKey())) {
+        final MockDatanodeStorage value = next.getValue();
+        value.setStorageFailed();
+      }
+    }
+  }
 
   @Override
   public void close() throws IOException {

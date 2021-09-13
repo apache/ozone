@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,6 +37,11 @@ public class MockDatanodeStorage {
   private final Map<String, ChunkInfo> chunks = new HashMap<>();
 
   private final Map<String, ByteString> data = new HashMap<>();
+  private boolean failed = false;
+
+  public void setStorageFailed(){
+    this.failed = true;
+  }
 
   public void putBlock(DatanodeBlockID blockID, BlockData blockData) {
     blocks.put(blockID, blockData);
@@ -47,7 +53,10 @@ public class MockDatanodeStorage {
 
   public void writeChunk(
       DatanodeBlockID blockID,
-      ChunkInfo chunkInfo, ByteString bytes) {
+      ChunkInfo chunkInfo, ByteString bytes) throws IOException {
+    if (failed) {
+      throw new IOException("This storage was marked as failed.");
+    }
     data.put(createKey(blockID, chunkInfo),
         ByteString.copyFrom(bytes.toByteArray()));
     chunks.put(createKey(blockID, chunkInfo), chunkInfo);

@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -78,11 +79,17 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
 
   @Override
   public XceiverClientReply sendCommandAsync(
-      ContainerCommandRequestProto request) {
+      ContainerCommandRequestProto request) throws IOException{
     switch (request.getCmdType()) {
     case WriteChunk:
       return result(request,
-          r -> r.setWriteChunk(writeChunk(request.getWriteChunk())));
+          r -> {
+            try {
+              return r.setWriteChunk(writeChunk(request.getWriteChunk()));
+            } catch (IOException e) {
+              return r.setResult(Result.IO_EXCEPTION);
+            }
+          });
     case ReadChunk:
       return result(request,
           r -> r.setReadChunk(readChunk(request.getReadChunk())));
@@ -149,7 +156,7 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   }
 
   private WriteChunkResponseProto writeChunk(
-      WriteChunkRequestProto writeChunk) {
+      WriteChunkRequestProto writeChunk) throws IOException {
     datanodeStorage
         .writeChunk(writeChunk.getBlockID(), writeChunk.getChunkData(),
             writeChunk.getData());

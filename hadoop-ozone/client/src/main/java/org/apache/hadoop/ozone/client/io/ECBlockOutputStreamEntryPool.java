@@ -138,14 +138,23 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
           // Stream not initialized. Means this stream was not used to write.
           continue;
         }
-        ecBlockOutputStreamEntry.executePutBlock();
+        try {
+          ecBlockOutputStreamEntry.executePutBlock();
+        } catch (IOException e) {
+          LOG.warn(
+              "EC internal block output stream failed. Target node:"
+                  + ecBlockOutputStreamEntry.getPipeline(), e);
+          ecBlockOutputStreamEntry.markFailed();
+          failedStreams++;
+        }
       }else{
         failedStreams++;
       }
     }
     if(failedStreams > ecReplicationConfig.getParity()) {
       throw new IOException(
-          "There are " + failedStreams + " failures than supported tolerance: "
+          "There are more failures(" + failedStreams
+              + ") than the supported tolerance: "
               + ecReplicationConfig.getParity());
     }
   }
