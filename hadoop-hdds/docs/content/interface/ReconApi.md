@@ -229,7 +229,7 @@ Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
 
 **Returns**
 
-Returns the UnhealthyContainerMetadata objects for the containers in the givenstate.
+Returns the UnhealthyContainerMetadata objects for the containers in the given state.
 Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
 The response structure is same as `/containers/unhealthy`.
 
