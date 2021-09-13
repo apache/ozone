@@ -295,7 +295,7 @@ public class TestMultipartUploadWithCopy {
           fail("Fail test:" + t);
         }
       } catch (OS3Exception ex) {
-        if (t.errorCode == null) {
+        if ((t.errorCode == null) || (!ex.getCode().equals(ERROR_CODE))) {
           fail("Failed test:" + t);
         }
       }
