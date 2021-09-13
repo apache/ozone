@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -57,8 +56,8 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
-import org.jetbrains.annotations.NotNull;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.junit.Assert.assertEquals;
@@ -103,11 +102,11 @@ public class TestOzoneFileInterfaces {
         {true, false, false}});
   }
 
-  private boolean setDefaultFs;
+  private static boolean setDefaultFs;
 
-  private boolean useAbsolutePath;
+  private static boolean useAbsolutePath;
 
-  private MiniOzoneCluster cluster = null;
+  private static MiniOzoneCluster cluster = null;
 
   private FileSystem fs;
 
@@ -121,32 +120,55 @@ public class TestOzoneFileInterfaces {
 
   private OMMetrics omMetrics;
 
+  private static boolean enableFileSystemPaths;
+
   @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected boolean enableFileSystemPaths;
+  protected boolean enableFileSystemPathsInstance;
 
   public TestOzoneFileInterfaces(boolean setDefaultFs,
-      boolean useAbsolutePath, boolean enabledFileSystemPaths) {
-    this.setDefaultFs = setDefaultFs;
-    this.useAbsolutePath = useAbsolutePath;
-    this.enableFileSystemPaths = enabledFileSystemPaths;
+      boolean useAbsolutePath, boolean enabledFileSystemPaths)
+      throws Exception {
+    enableFileSystemPathsInstance = enabledFileSystemPaths;
+    if (this.setDefaultFs != setDefaultFs
+        || this.useAbsolutePath != useAbsolutePath
+        || this.enableFileSystemPaths != enabledFileSystemPaths) {
+      setParameters(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
+      teardown();
+      init();
+    }
     GlobalStorageStatistics.INSTANCE.reset();
   }
 
-  @Before
+  private static void setParameters(boolean defaultFs,
+                                    boolean absolutePath,
+                                    boolean fileSystemPaths) {
+    setDefaultFs = defaultFs;
+    useAbsolutePath = absolutePath;
+    enableFileSystemPaths = fileSystemPaths;
+  }
+
+  private static void setCluster(MiniOzoneCluster newCluster) {
+    cluster = newCluster;
+  }
+
   public void init() throws Exception {
+    OzoneConfiguration conf = getOzoneConfiguration();
+    MiniOzoneCluster newCluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
+        .build();
+    newCluster.waitForClusterToBeReady();
+    setCluster(newCluster);
+  }
+
+  @Before
+  public void setupTest() throws Exception {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
-    OzoneConfiguration conf = getOzoneConfiguration();
-
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
+    OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
 
     rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
@@ -163,7 +185,6 @@ public class TestOzoneFileInterfaces {
     omMetrics = cluster.getOzoneManager().getMetrics();
   }
 
-  @NotNull
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -172,11 +193,15 @@ public class TestOzoneFileInterfaces {
   }
 
   @After
-  public void teardown() throws IOException {
+  public void closeFs() throws IOException {
+    IOUtils.closeQuietly(fs);
+  }
+
+  @AfterClass
+  public static void teardown() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @Test

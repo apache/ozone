@@ -147,8 +147,8 @@ public class ContainerBalancer {
       }
 
       balancerRunning = true;
-      ozoneConfiguration = new OzoneConfiguration();
       this.config = balancerConfiguration;
+      this.ozoneConfiguration = config.getOzoneConfiguration();
       LOG.info("Starting Container Balancer...{}", this);
 
       //we should start a new balancer thread async
@@ -172,6 +172,10 @@ public class ContainerBalancer {
    */
   private void balance() {
     this.idleIteration = config.getIdleIteration();
+    if(this.idleIteration == -1) {
+      //run balancer infinitely
+      this.idleIteration = Integer.MAX_VALUE;
+    }
     this.threshold = config.getThreshold();
     this.maxDatanodesRatioToInvolvePerIteration =
         config.getMaxDatanodesRatioToInvolvePerIteration();
