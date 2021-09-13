@@ -271,7 +271,7 @@ public class ContainerBalancer {
 
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
-      double utilization = calculateUtilization(datanodeUsageInfo);
+      double utilization = datanodeUsageInfo.calculateUtilization();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} is {}",
             datanodeUsageInfo.getDatanodeDetails().getUuidString(),
@@ -636,23 +636,6 @@ public class ContainerBalancer {
     clusterRemaining = aggregatedStats.getRemaining().get();
 
     return (clusterCapacity - clusterRemaining) / (double) clusterCapacity;
-  }
-
-  /**
-   * Calculates the utilization, that is (capacity - remaining) divided by
-   * capacity, for the given datanodeUsageInfo.
-   *
-   * @param datanodeUsageInfo DatanodeUsageInfo to calculate utilization for
-   * @return Utilization value
-   */
-  public static double calculateUtilization(
-      DatanodeUsageInfo datanodeUsageInfo) {
-    SCMNodeStat stat = datanodeUsageInfo.getScmNodeStat();
-    double capacity = stat.getCapacity().get();
-    double remaining = stat.getRemaining().get();
-    double numerator = capacity - remaining;
-
-    return numerator / capacity;
   }
 
   /**
