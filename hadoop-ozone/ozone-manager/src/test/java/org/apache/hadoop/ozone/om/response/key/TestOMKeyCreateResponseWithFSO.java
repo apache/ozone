@@ -35,7 +35,6 @@ import java.util.ArrayList;
  */
 public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
@@ -46,7 +45,6 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
     return config;
   }
 
-  @NotNull
   @Override
   protected String getOpenKeyName() {
     Assert.assertNotNull(omBucketInfo);
@@ -54,7 +52,6 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
-  @NotNull
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     Assert.assertNotNull(omBucketInfo);

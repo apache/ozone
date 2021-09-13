@@ -81,7 +81,6 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
-  @NotNull
   @Override
   protected String getOzoneKey() {
     Assert.assertNotNull(omBucketInfo);
@@ -89,7 +88,6 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
             keyName);
   }
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();

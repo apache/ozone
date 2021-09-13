@@ -71,7 +71,6 @@ public class TestOMAllocateBlockResponseWithFSO
             omBucketInfo);
   }
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();

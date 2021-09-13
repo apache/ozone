@@ -21,7 +21,6 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -50,7 +49,6 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
     super(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
   }
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();

@@ -117,7 +117,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
             clientID, replicationType, replicationFactor, omMetadataManager);
   }
 
-  @NotNull
   protected String getOzoneKey() {
     Assert.assertNotNull(omBucketInfo);
     return omMetadataManager.getOzoneKey(volumeName,

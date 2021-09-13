@@ -46,7 +46,6 @@ import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,7 +147,6 @@ public class OzoneClientProducer {
     return ozoneClient;
   }
 
-  @NotNull
   @VisibleForTesting
   OzoneClient createOzoneClient() throws IOException {
     if (omServiceID == null) {

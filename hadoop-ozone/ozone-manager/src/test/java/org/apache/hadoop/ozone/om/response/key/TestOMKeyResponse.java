@@ -76,7 +76,6 @@ public class TestOMKeyResponse {
     random = new Random();
   }
 
-  @NotNull
   protected String getOpenKeyName() {
     return omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
             clientID);

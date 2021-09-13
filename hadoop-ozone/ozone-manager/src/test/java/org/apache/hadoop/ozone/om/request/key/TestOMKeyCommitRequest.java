@@ -366,7 +366,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     return parentDir;
   }
 
-  @NotNull
   protected String getOzonePathKey() throws IOException {
     return omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
@@ -382,7 +381,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     return getOzonePathKey();
   }
 
-  @NotNull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
     return new OMKeyCommitRequest(omRequest);
   }

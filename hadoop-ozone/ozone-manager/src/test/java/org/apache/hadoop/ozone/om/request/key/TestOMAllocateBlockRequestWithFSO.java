@@ -39,7 +39,6 @@ import org.junit.Assert;
 public class TestOMAllocateBlockRequestWithFSO
     extends TestOMAllocateBlockRequest {
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();

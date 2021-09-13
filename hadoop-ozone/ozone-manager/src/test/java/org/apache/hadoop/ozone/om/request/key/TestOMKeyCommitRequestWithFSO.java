@@ -86,7 +86,6 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     return omMetadataManager.getOzonePathKey(parentID, fileName);
   }
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
