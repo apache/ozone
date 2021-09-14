@@ -29,7 +29,7 @@ ${NON_ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/clusterState
 
 *** Keywords ***
 Check if Recon picks up container from OM
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit as ozone admin
     ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/containers
                         Should contain      ${result}       \"ContainerID\"
 
