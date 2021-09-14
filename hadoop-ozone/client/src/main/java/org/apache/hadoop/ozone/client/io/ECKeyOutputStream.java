@@ -717,10 +717,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       return pos;
     }
 
-    private void clear() {
-      clear(cellSize);
-    }
-
     private void clear(int size) {
       clearBuffers(size, dataBuffers);
       clearBuffers(size, parityBuffers);

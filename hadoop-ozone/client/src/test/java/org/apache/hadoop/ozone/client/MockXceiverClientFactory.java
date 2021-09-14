@@ -36,7 +36,6 @@ public class MockXceiverClientFactory
 
   private final Map<DatanodeDetails, MockDatanodeStorage> storage =
       new HashMap<>();
-  private List<DatanodeDetails> failedStorages;
 
   public void setFailedStorages(List<DatanodeDetails> failedStorages){
     final Iterator<Map.Entry<DatanodeDetails, MockDatanodeStorage>> iterator =
