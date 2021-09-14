@@ -11,7 +11,7 @@ It is triggered each time a pull request is created or synchronized, (ie when th
 
 The build-branch workflow is divided into a number of different jobs, most of which run in parallel.  Each job is described below.
 
-Some of the jobs are defined using GA's "build matrix" feature.  This allows you define similar jobs with a single job definition. Any differences are specified by a list of values for a specific key.  For example, the "compile" job uses the matrix feature to generate the images with different versions of java.  There, the "java" key has a list of values which specify which version of java to use, (8 or 11.)
+Some of the jobs are defined using GA's "build matrix" feature.  This allows you define similar jobs with a single job definition. Any differences are specified by a list of values for a specific key.  For example, the "compile" job uses the matrix feature to generate the images with different versions of java.  There, the matrix is specified by the "java" key which has a list of values describing which version of java to use, (8 or 11.)
 
 The jobs currently using the "build matrix" feature are: "compile", "basic", "acceptance" and "integration".  These jobs also use GA's fail-fast flag to cancel the other jobs in the same matrix, if one fails. For example, in the "compile" job, if the java 8 build fails, the java 11 build will be cancelled due to this flag, but the other jobs outside the "compile" matrix are unaffected. 
 
@@ -68,7 +68,9 @@ If they don't match, it describes how to make the updates to include the changes
 - integration
 
 ### Cancelling Workflow
-[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [build-branch](ci.md#build-branch-workflow) workflow is triggered.  It reduces GA usage, by cancelling PR workflows that have a job failure.  Specifically, it cancels PR workflows which have a failed job at the time the "Cancelling" workflow is invoked. Any workflows with jobs that fail after that can only be caught by a subsequent run of the "Cancelling" workflow.  Note that it checks the status of all workflows running at that time, not only the one that triggered it.
+[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [build-branch](ci.md#build-branch-workflow) workflow is triggered.  It reduces GA usage, by cancelling PR workflows that have a job failure.  Specifically, it checks all PR workflows running at the time it is invoked. It cancels any of those which have a failed job, (at that time). Any PR workflows with jobs that fail after that will be caught by a subsequent run of the "Cancelling" workflow.
+
+Note that it checks the status of all PR workflows running at that time, not just the one that triggered it.
 
 ### close-prs Workflow
 [This](./workflows/close-pending.yaml) workflow is scheduled each night at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
