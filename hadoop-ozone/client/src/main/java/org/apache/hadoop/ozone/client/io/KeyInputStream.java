@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -163,7 +164,8 @@ public class KeyInputStream extends ExtendedInputStream {
 
       // We also pass in functional reference which is used to refresh the
       // pipeline info for a given OM Key location info.
-      addStream(omKeyLocationInfo, xceiverClientFactory,
+      addStream(keyInfo.getReplicationConfig(), omKeyLocationInfo,
+          xceiverClientFactory,
           verifyChecksum, keyLocationInfo -> {
             OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
             BlockID blockID = keyLocationInfo.getBlockID();
@@ -192,13 +194,13 @@ public class KeyInputStream extends ExtendedInputStream {
    * BlockInputStream is initialized when a read operation is performed on
    * the block for the first time.
    */
-  private synchronized void addStream(OmKeyLocationInfo blockInfo,
-      XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,
+  private synchronized void addStream(ReplicationConfig repConfig,
+      OmKeyLocationInfo blockInfo,
+      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
       Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction,
       BlockInputStreamFactory blockStreamFactory) {
-    blockStreams.add(blockStreamFactory.create(blockInfo.getBlockID(),
-        blockInfo.getLength(), blockInfo.getPipeline(), blockInfo.getToken(),
+    blockStreams.add(blockStreamFactory.create(repConfig, blockInfo,
+        blockInfo.getPipeline(), blockInfo.getToken(),
         verifyChecksum, xceiverClientFactory,
         blockID -> refreshPipelineFunction.apply(blockInfo)));
   }

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -33,16 +33,40 @@ import java.util.function.Function;
  */
 public interface BlockInputStreamFactory {
 
+  /**
+   * Create a new BlockInputStream from the given parameters.
+   * @param blockId The blockID
+   * @param blockLen The Block Length
+   * @param pipeline The pipeline used to read from the block
+   * @param token The block access token
+   * @param verifyChecksum Whether to verify checksums or not
+   * @param xceiverFactory Factor to create the xceiver in the client
+   * @param refreshFunction Function to refresh the pipeline if needed.
+   * @return A BlockInputStream instance
+   */
   BlockExtendedInputStream create(BlockID blockId, long blockLen,
       Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
       boolean verifyChecksum, XceiverClientFactory xceiverFactory,
       Function<BlockID, Pipeline> refreshFunction);
 
-  BlockExtendedInputStream create(ECReplicationConfig repConfig,
+  /**
+   * Create a new BlockInputStream based on the replication Config. If the
+   * replication Config indicates the block is EC, then it will create an
+   * ECBlockInputStream, otherwise a BlockInputStream will be returned.
+   * @param repConfig The replication Config
+   * @param blockInfo The blockInfo representing the block.
+   * @param pipeline The pipeline to be used for reading the block
+   * @param token The block Access Token
+   * @param verifyChecksum Whether to verify checksums or not.
+   * @param xceiverFactory Factory to create the xceiver in the client
+   * @param refreshFunction Function to refresh the pipeline if needed
+   * @return BlockExtendedInputStream of the correct type.
+   */
+  BlockExtendedInputStream create(ReplicationConfig repConfig,
       OmKeyLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
-      XceiverClientFactory xceiverFactory,
-      Function<BlockID, Pipeline> refreshFunction);
+       XceiverClientFactory xceiverFactory,
+       Function<BlockID, Pipeline> refreshFunction);
 
 /*
         new BlockInputStream(blockInfo.getBlockID(),
