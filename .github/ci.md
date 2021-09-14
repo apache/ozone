@@ -88,7 +88,7 @@ Note that the deprecated [build-branch](https://github.com/apache/ozone/actions/
 
 ## Tips
 
-- When a build of the Ozone master branch fails, it's artifacts are stored [here](https://elek.github.io/ozone-build-results/).
+- When a build of the Ozone master branch fails, its artifacts are stored [here](https://elek.github.io/ozone-build-results/).
 - To trigger rerunning the tests, push a commit like this to your PR: ```git commit --allow-empty -m 'trigger new CI check'```
 - [This wiki](https://cwiki.apache.org/confluence/display/OZONE/Running+Ozone+Smoke+Tests+and+Unit+Tests) contains tips on running tests locally.
 - [This wiki](https://cwiki.apache.org/confluence/display/OZONE/Github+Actions+tips+and+tricks) contains tips on special handling of the CI system, such as "Executing one test multiple times", or "ssh'ing in to the CI machine while the tests are running".
