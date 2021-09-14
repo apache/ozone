@@ -589,6 +589,7 @@ public final class TestUtils {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     return getScm(conf, configurator);
   }
 
