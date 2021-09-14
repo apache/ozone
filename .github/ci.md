@@ -9,7 +9,14 @@ This is the most important [workflow](./workflows/post-commit.yml).  It runs the
 
 It is triggered each time a pull request is created or synchronized, (ie when the remote branch is pushed to.)  It is also "scheduled" on the master branch twice a day, (00:30 and 12:30).  (Those are the runs [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml?query=event%3Aschedule++) which are marked "scheduled", and have no branch label.)
 
-The build-branch workflow is divided into a number of different jobs, most of which run in parallel.  Each of the jobs, (except "build-info" and "compile",) runs a subset of the test suite.  They are all described below.
+The build-branch workflow is divided into a number of different jobs, most of which run in parallel.  Each job is described below.
+
+Some of the jobs are defined using GA's 'build matrix' feature.  This allows you define similar jobs with a single job definition. Any differences are specified in a list of values for a specific key.  For example, the 'compile' job uses the matrix feature to compile with different versions of java.  In it, the 'java' key has a list of values which specify which version of java to use, (8 or 11.)
+
+The jobs currently using the 'build matrix' feature are: 'compile', 'basic', 'acceptance' and 'integration'.  These jobs also use GA's fail-fast flag to cancel the other jobs in the same matrix, if one fails. For example, in the 'compile' job, if the java 8 build fails, the java 11 build will be cancelled due to this flag, but the other jobs outside the 'compile' matrix are unaffected. 
+
+While the fail-fast flag only works within a matrix job, the "Cancelling" workflow, (described below,) works across jobs.
+
 
 #### build-info job
 
@@ -41,19 +48,18 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - unit: [Runs](../hadoop-ozone/dev-support/checks/unit.sh) 'mvn test' for all non integration tests
 
 #### dependency job
-[Confirms](../hadoop-ozone/dev-support/checks/dependency.sh) hadoop-ozone/dist/src/main/license/bin/LICENSE.txt is up to date, (includes references to all the latest jar files).
+[Confirms](../hadoop-ozone/dev-support/checks/dependency.sh) that the list of jars included in the current build matches the expected ones defined [here](../hadoop-ozone/dist/src/main/license/jar-report.txt)
+
+If they don't match, it instructs you on how to update the build to include the new ones, (if the addition is intentional).  Otherwise, the changes should be removed.
 
 #### acceptance job
-[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster
+[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster.  There are three iterations, secure, unsecure, and misc, each running in parallel, as different matrix configs.
 
 #### kubernetes job
 [Runs](../hadoop-ozone/dev-support/checks/kubernetes.sh) k8s tests
 
 #### integration job
-[Runs](../hadoop-ozone/dev-support/checks/integration.sh) 'mvn test' for all integration/minicluster tests, split into 3 subjobs:
-- client
-- filesystem-hdds
-- ozone
+[Runs](../hadoop-ozone/dev-support/checks/integration.sh) 'mvn test' for all integration/minicluster tests, split into multiple subjobs, by a matrix config.
 
 #### coverage job
 [Merges](../hadoop-ozone/dev-support/checks/coverage.sh) the coverage data from the following jobs that were run earlier:
@@ -62,7 +68,7 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - integration
 
 ### Cancelling Workflow
-[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [build-branch](ci.md#build-branch-workflow) workflow is triggered.  It monitors all the jobs triggered by that workflow run for failure and cancels any continuing jobs after one fails.  This reduces our GA usage.
+[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [build-branch](ci.md#build-branch-workflow) workflow is triggered.  It reduces GA usage, by cancelling PR workflows that have a job failure.  Specifically, it cancels any that running at the time it is invoked, which also have a job failure. Any job that fails after that time can only be caught by a subsequent run of the cancelling workflow.  Note that it checks the status of all workflows running at that time, not only the one that triggered it.
 
 ### close-prs Workflow
 [This](./workflows/close-pending.yaml) workflow is scheduled each night at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
