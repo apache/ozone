@@ -54,6 +54,9 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
   @Metric
   private MutableCounterLong failed;
 
+  @Metric
+  private MutableCounterLong scheduled;
+
   /**
    * Create SingleThreadExecutor.
    *
@@ -77,6 +80,7 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
       publisher) {
     queued.incr();
     executor.execute(() -> {
+      scheduled.incr();
       try {
         handler.onMessage(message, publisher);
         done.incr();
@@ -100,6 +104,11 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
   @Override
   public long queuedEvents() {
     return queued.value();
+  }
+
+  @Override
+  public long scheduledEvents() {
+    return scheduled.value();
   }
 
   @Override

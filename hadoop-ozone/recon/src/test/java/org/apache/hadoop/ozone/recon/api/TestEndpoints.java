@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -46,6 +48,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -82,6 +85,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -165,6 +169,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .setOwner("test")
         .setPipelineID(pipeline.getId())
         .build();
+
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
 
@@ -334,15 +339,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
+    LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
     try {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
-              containerReportsProto, pipelineReportsProto);
+              containerReportsProto, pipelineReportsProto, layoutInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
-              PipelineReportsProto.newBuilder().build());
+              PipelineReportsProto.newBuilder().build(),
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
@@ -429,6 +436,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       Assert.fail(String.format("Datanode %s not registered",
           hostname));
     }
+    Assert.assertEquals(HDDSLayoutVersionManager.maxLayoutVersion(),
+        datanodeMetadata.getLayoutVersion());
   }
 
   @Test
@@ -457,6 +466,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
               .findFirst().orElse(null);
       return (datanodeMetadata1 != null &&
           datanodeMetadata1.getContainers() == 1 &&
+          datanodeMetadata1.getOpenContainers() == 1 &&
           reconScm.getPipelineManager()
               .getContainersInPipeline(pipeline.getId()).size() == 1);
     });
@@ -689,7 +699,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(0, resultSet.size());
   }
 
-
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
       throws Exception {
     // if container report is processed first, and pipeline does not exist
@@ -699,6 +708,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
+            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);

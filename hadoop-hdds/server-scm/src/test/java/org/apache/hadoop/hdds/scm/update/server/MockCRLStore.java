@@ -98,7 +98,7 @@ public class MockCRLStore implements CRLStore {
 
   public Optional<Long> revokeCert(List<BigInteger> certs,
                                    Instant revokeTime) throws IOException {
-    log.debug("Revoke certs: ", certs.toString());
+    log.debug("Revoke certs: {}", certs);
     Optional<Long> crlId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,
         CRLReason.lookup(CRLReason.keyCompromise),
@@ -106,8 +106,8 @@ public class MockCRLStore implements CRLStore {
     List<CRLInfo> crlInfos =
         scmCertStore.getCrls(ImmutableList.of(crlId.get()));
 
-    if (crlInfos.isEmpty()) {
-      log.debug("CRL[0]: {}", crlInfos.get(0).toString());
+    if (!crlInfos.isEmpty()) {
+      log.debug("CRL[0]: {}", crlInfos.get(0));
     }
     return crlId;
   }

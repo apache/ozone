@@ -31,10 +31,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
@@ -53,6 +55,8 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -259,6 +263,8 @@ public final class OmUtils {
     case GetAcl:
     case DBUpdates:
     case ListMultipartUploads:
+    case FinalizeUpgradeProgress:
+    case PrepareStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -288,6 +294,9 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
+    case FinalizeUpgrade:
+    case Prepare:
+    case CancelPrepare:
     case DeleteOpenKeys:
     case RevokeS3Secret:
     case PurgePaths:
@@ -665,5 +674,27 @@ public final class OmUtils {
     }
 
     return keyName;
+  }
+
+
+  /**
+   * For a given service ID, return th of configured OM hosts.
+   * @param conf configuration
+   * @param omServiceId service id
+   * @return Set of hosts.
+   */
+  public static Set<String> getOmHostsFromConfig(OzoneConfiguration conf,
+                                                 String omServiceId) {
+    Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf,
+        omServiceId);
+    Set<String> omHosts = new HashSet<>();
+    for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
+      String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+          omServiceId, nodeId);
+      String rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
+      Optional<String> hostName = getHostName(rpcAddrStr);
+      hostName.ifPresent(omHosts::add);
+    }
+    return omHosts;
   }
 }

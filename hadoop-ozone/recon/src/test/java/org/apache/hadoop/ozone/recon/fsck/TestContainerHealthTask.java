@@ -342,7 +342,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-        int nodesRequired, long sizeRequired) throws IOException {
+        int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+        throws IOException {
       return null;
     }
 

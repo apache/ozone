@@ -45,7 +45,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import static org.apache.hadoop.util.RunJar.SHUTDOWN_HOOK_PRIORITY;
 
-import org.apache.hadoop.util.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,18 +130,6 @@ public class MutableVolumeSet implements VolumeSet {
     initializeVolumeSet();
   }
 
-  public MutableVolumeSet(ConfigurationSource conf) throws IOException {
-    this.datanodeUuid = null;
-    this.clusterID = null;
-    this.conf = conf;
-    this.volumeSetRWLock = new ReentrantReadWriteLock();
-    this.volumeChecker = new StorageVolumeChecker(conf, new Timer());
-    this.volumeType = StorageVolume.VolumeType.DATA_VOLUME;
-    this.volumeFactory = new HddsVolumeFactory(conf, null,
-        this, null, null);
-    initializeVolumeSet();
-  }
-
   public void setFailedVolumeListener(Runnable runnable) {
     failedVolumeListener = runnable;
   }
@@ -217,7 +204,13 @@ public class MutableVolumeSet implements VolumeSet {
    * failed volumes.
    */
   public void checkAllVolumes() throws IOException {
-    if (volumeChecker == null) {
+    checkAllVolumes(volumeChecker);
+  }
+
+  @Override
+  public void checkAllVolumes(StorageVolumeChecker checker)
+      throws IOException {
+    if (checker == null) {
       LOG.debug("No volumeChecker, skip checkAllVolumes");
       return;
     }
@@ -225,7 +218,7 @@ public class MutableVolumeSet implements VolumeSet {
     List<StorageVolume> allVolumes = getVolumesList();
     Set<? extends StorageVolume> failedVolumes;
     try {
-      failedVolumes = volumeChecker.checkAllVolumes(allVolumes);
+      failedVolumes = checker.checkAllVolumes(allVolumes);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while running disk check", e);
@@ -415,15 +408,17 @@ public class MutableVolumeSet implements VolumeSet {
    * This method, call shutdown on each volume to shutdown volume usage
    * thread and write scmUsed on each volume.
    */
-  private void saveVolumeSetUsed() {
-    for (StorageVolume volume : volumeMap.values()) {
+
+  private synchronized void saveVolumeSetUsed() {
+    for (StorageVolume hddsVolume : volumeMap.values()) {
       try {
-        volume.shutdown();
+        hddsVolume.shutdown();
       } catch (Exception ex) {
-        LOG.error("Failed to shutdown volume : " + volume.getStorageDir(),
+        LOG.error("Failed to shutdown volume : " + hddsVolume.getStorageDir(),
             ex);
       }
     }
+    volumeMap.clear();
   }
 
   /**
@@ -431,9 +426,6 @@ public class MutableVolumeSet implements VolumeSet {
    */
   public void shutdown() {
     saveVolumeSetUsed();
-    if (shutdownHook != null) {
-      ShutdownHookManager.get().removeShutdownHook(shutdownHook);
-    }
   }
 
   @Override

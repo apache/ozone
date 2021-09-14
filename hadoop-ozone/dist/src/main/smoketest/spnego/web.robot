@@ -41,7 +41,7 @@ Verify SPNEGO enabled URL
     [arguments]                      ${url}
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Execute     kdestroy
     ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}
-    Should contain      ${result}       401 Unauthorized
+    Should contain      ${result}       401 Authentication required
 
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
     ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}

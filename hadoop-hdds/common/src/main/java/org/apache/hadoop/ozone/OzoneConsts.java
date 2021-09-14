@@ -49,6 +49,7 @@ public final class OzoneConsts {
 
   public static final String STORAGE_ID = "storageID";
   public static final String DATANODE_UUID = "datanodeUuid";
+  public static final String DATANODE_LAYOUT_VERSION_DIR = "dnlayoutversion";
   public static final String CLUSTER_ID = "clusterID";
   public static final String LAYOUTVERSION = "layOutVersion";
   public static final String CTIME = "ctime";
@@ -270,8 +271,6 @@ public final class OzoneConsts {
   // V2: Metadata, block data, and delete transactions in their own
   // column families.
   public static final String SCHEMA_V2 = "2";
-  // Most recent schema version that all new containers should be created with.
-  public static final String SCHEMA_LATEST = SCHEMA_V2;
 
   public static final String[] SCHEMA_VERSIONS =
       new String[] {SCHEMA_V1, SCHEMA_V2};
@@ -396,6 +395,8 @@ public final class OzoneConsts {
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
+  public static final String PREPARE_MARKER_KEY = "#PREPAREDINFO";
+
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
 
   // SCM HA
@@ -408,6 +409,9 @@ public final class OzoneConsts {
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 
+  // An on-disk marker file used to indicate that the OM is in prepare and
+  // should remain prepared even after a restart.
+  public static final String PREPARE_MARKER = "prepareMarker";
 
   // TODO : rename this to OZONE_RATIS_SNAPSHOT_DIR and use it in both
   // SCM and OM
@@ -415,7 +419,6 @@ public final class OzoneConsts {
   public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
-
 
   // SCM default service Id and node Id in non-HA where config is not defined
   // in non-HA style.
@@ -434,6 +437,9 @@ public final class OzoneConsts {
 
   public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
   public static final String SCM_ROOT_CA_PREFIX = "scm@";
+
+  // Layout Version written into Meta Table ONLY during finalization.
+  public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
 
   // Kerberos constants
   public static final String KERBEROS_CONFIG_VALUE = "kerberos";

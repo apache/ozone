@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 
@@ -73,6 +74,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
+
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * Data generator tool to generate as much keys as possible.
@@ -381,13 +384,12 @@ public final class RandomKeyGenerator implements Callable<Void> {
    * Adds ShutdownHook to print statistics.
    */
   private void addShutdownHook() {
-    Runtime.getRuntime().addShutdownHook(
-        new Thread(() -> {
-          printStats(System.out);
-          if (freon != null) {
-            freon.stopHttpServer();
-          }
-        }));
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      printStats(System.out);
+      if (freon != null) {
+        freon.stopHttpServer();
+      }
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
   }
 
   private void doCleanObjects() throws InterruptedException {
@@ -413,7 +415,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
         }
       }
     } catch (InterruptedException e) {
-      e.printStackTrace();
+      LOG.error("Failed to wait until all Buckets are cleaned", e);
+      Thread.currentThread().interrupt();
     }
 
     executor.shutdown();

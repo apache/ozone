@@ -17,11 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
@@ -43,12 +39,15 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -551,6 +550,27 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public boolean startContainerBalancer(
+      Optional<Double> threshold, Optional<Integer> idleiterations,
+      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB)
+      throws IOException {
+    return storageContainerLocationClient.startContainerBalancer(threshold,
+        idleiterations, maxDatanodesRatioToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB);
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+    storageContainerLocationClient.stopContainerBalancer();
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() throws IOException {
+    return storageContainerLocationClient.getContainerBalancerStatus();
+  }
+
+  @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
   }
@@ -584,5 +604,19 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
+  }
+
+  @Override
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException {
+    return storageContainerLocationClient.finalizeScmUpgrade(upgradeClientID);
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException {
+    return storageContainerLocationClient.queryUpgradeFinalizationProgress(
+        upgradeClientID, force, readonly);
   }
 }

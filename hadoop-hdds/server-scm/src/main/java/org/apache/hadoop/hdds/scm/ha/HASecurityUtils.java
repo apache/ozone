@@ -219,6 +219,7 @@ public final class HASecurityUtils {
     } catch (InterruptedException | ExecutionException| IOException |
         CertificateException  e) {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
+      Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     }
 

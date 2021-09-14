@@ -57,7 +57,7 @@ public class Hadoop27RpcTransport implements OmTransport {
         ProtobufRpcEngine.class);
 
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
-        omServiceId);
+        omServiceId, OzoneManagerProtocolPB.class);
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,

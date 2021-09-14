@@ -68,9 +68,7 @@ public class TestListInfoSubcommand {
   public void testDataNodeOperationalStateAndHealthIncludedInOutput()
       throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(HddsProtos.NodeOperationalState.class),
-        any(HddsProtos.NodeState.class), any(HddsProtos.QueryScope.class),
-        Mockito.anyString()))
+    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> getNodeDetails());
     Mockito.when(scmClient.listPipelines())
         .thenReturn(new ArrayList<>());
@@ -96,8 +94,11 @@ public class TestListInfoSubcommand {
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
-    // Ensure the nodes are ordered by health state HEALTHY, STALE, DEAD
-    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+", Pattern.DOTALL);
+    // Ensure the nodes are ordered by health state HEALTHY,
+    // HEALTHY_READONLY, STALE, DEAD
+    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+HEALTHY_READONLY.+",
+        Pattern.DOTALL);
+
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
@@ -105,7 +106,7 @@ public class TestListInfoSubcommand {
   private List<HddsProtos.Node> getNodeDetails() {
     List<HddsProtos.Node> nodes = new ArrayList<>();
 
-    for (int i=0; i<3; i++) {
+    for (int i=0; i<4; i++) {
       HddsProtos.DatanodeDetailsProto.Builder dnd =
           HddsProtos.DatanodeDetailsProto.newBuilder();
       dnd.setHostName("host" + i);
@@ -125,6 +126,10 @@ public class TestListInfoSubcommand {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.DECOMMISSIONING);
         builder.addNodeStates(HddsProtos.NodeState.DEAD);
+      } else if (i == 2) {
+        builder.addNodeOperationalStates(
+            HddsProtos.NodeOperationalState.IN_SERVICE);
+        builder.addNodeStates(HddsProtos.NodeState.HEALTHY_READONLY);
       } else {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);

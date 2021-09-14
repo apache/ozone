@@ -20,11 +20,12 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
+import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.util.ExitUtil;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 
@@ -144,11 +145,11 @@ public final class HddsVolumeUtil {
     String lvStr = getProperty(props, OzoneConsts.LAYOUTVERSION, versionFile);
 
     int lv = Integer.parseInt(lvStr);
-    if(DataNodeLayoutVersion.getLatestVersion().getVersion() != lv) {
+    if(HDDSVolumeLayoutVersion.getLatestVersion().getVersion() != lv) {
       throw new InconsistentStorageStateException("Invalid layOutVersion. " +
           "Version file has layOutVersion as " + lv + " and latest Datanode " +
           "layOutVersion is " +
-          DataNodeLayoutVersion.getLatestVersion().getVersion());
+          HDDSVolumeLayoutVersion.getLatestVersion().getVersion());
     }
     return lv;
   }
@@ -168,18 +169,23 @@ public final class HddsVolumeUtil {
 
   /**
    * Check Volume is in consistent state or not.
+   * Prior to SCM HA, volumes used the format {@code <volume>/hdds/<scm-id>}.
+   * Post SCM HA, new volumes will use the format {@code <volume>/hdds/<cluster
+   * -id>}.
+   * Existing volumes using SCM ID would have been reformatted to have {@code
+   * <volume>/hdds/<cluster-id>} as a symlink pointing to {@code <volume
+   * >/hdds/<scm-id>}.
+   *
    * @param hddsVolume
-   * @param scmId
    * @param clusterId
    * @param logger
    * @return true - if volume is in consistent state, otherwise false.
    */
-  public static boolean checkVolume(HddsVolume hddsVolume, String scmId, String
-      clusterId, Logger logger) {
+  public static boolean checkVolume(HddsVolume hddsVolume, String scmId,
+      String clusterId, ConfigurationSource conf, Logger logger) {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
     File clusterDir = new File(hddsRoot, clusterId);
-    File scmDir = new File(hddsRoot, scmId);
 
     try {
       hddsVolume.format(clusterId);
@@ -191,47 +197,41 @@ public final class HddsVolumeUtil {
 
     File[] hddsFiles = hddsRoot.listFiles();
 
-    if(hddsFiles == null) {
+    if (hddsFiles == null) {
       // This is the case for IOException, where listFiles returns null.
       // So, we fail the volume.
       return false;
     } else if (hddsFiles.length == 1) {
       // DN started for first time or this is a newly added volume.
-      // So we create scm directory.
-      if (!clusterDir.mkdir()) {
-        logger.error("Unable to create scmDir {}", clusterDir);
+      // The one file is the version file.
+      // So we create cluster ID directory, or SCM ID directory if
+      // pre-finalized for SCM HA.
+      // Either the SCM ID or cluster ID will be used in naming the
+      // volume's subdirectory, depending on the datanode's layout version.
+      String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
+          scmId, clusterId);
+      File idDir = new File(hddsRoot, id);
+      if (!idDir.mkdir()) {
+        logger.error("Unable to create ID directory {} for datanode.", idDir);
         return false;
       }
       return true;
-    } else if(hddsFiles.length == 2) {
-      if (scmDir.exists()) {
-        String msg = "Volume " + volumeRoot +
-            " is in Inconsistent state, and contains the" +
-            "SCM Directory:" + scmDir.getAbsolutePath() +
-            " which is a older format, please upgrade the volume.";
-        logger.error(msg);
-        ExitUtil.terminate(-2, msg);
-        return false;
-      }
-      // The files should be Version and SCM directory
-      if (clusterDir.exists()) {
-        return true;
-      } else {
-        logger.error("Volume {} is in Inconsistent state, expected cluster " +
-                "directory {} does not exist", volumeRoot, clusterDir
-            .getAbsolutePath());
-        return false;
-      }
+    } else if (hddsFiles.length == 2) {
+      // If we are finalized for SCM HA and there is no cluster ID directory,
+      // the volume may have been unhealthy during finalization and been
+      // skipped. Create cluster ID symlink now.
+      // Else, We are still pre-finalized.
+      // The existing directory should be left for backwards compatibility.
+      return VersionedDatanodeFeatures.ScmHA.
+          upgradeVolumeIfNeeded(hddsVolume, clusterId);
     } else {
-      // The hdds root dir should always have 2 files. One is Version file
-      // and other is SCM directory.
-      logger.error("The hdds root dir {} should always have 2 files. " +
-              "One is Version file and other is Cluster directory. " +
-              "Please remove any other extra files from the directory " +
-              "so that DataNode startup can proceed.",
-              hddsRoot.getAbsolutePath());
-      return false;
+      if (!clusterDir.exists()) {
+        logger.error("Volume {} is in an inconsistent state. {} files found " +
+            "but cluster ID directory {} does not exist.", volumeRoot,
+            hddsFiles.length, clusterDir);
+        return false;
+      }
+      return true;
     }
-
   }
 }

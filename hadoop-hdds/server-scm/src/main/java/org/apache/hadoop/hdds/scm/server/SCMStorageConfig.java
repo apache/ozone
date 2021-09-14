@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.server;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.common.Storage;
 
 import java.io.File;
@@ -27,6 +28,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PRIMARY_SCM_NODE_ID;
@@ -43,12 +46,14 @@ public class SCMStorageConfig extends Storage {
    * @throws IOException if any directories are inaccessible.
    */
   public SCMStorageConfig(OzoneConfiguration conf) throws IOException {
-    super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR);
+    super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR,
+        getInitLayoutVersion(conf, HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
+            HDDSLayoutVersionManager::maxLayoutVersion));
   }
 
   public SCMStorageConfig(NodeType type, File root, String sdName)
       throws IOException {
-    super(type, root, sdName);
+    super(type, root, sdName, maxLayoutVersion());
   }
 
   public void setScmId(String scmId) throws IOException {

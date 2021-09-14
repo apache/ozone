@@ -79,8 +79,9 @@ public final class ReportManager {
     executorService.shutdown();
     try {
       executorService.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       LOG.error("Failed to shutdown Report Manager", e);
+      Thread.currentThread().interrupt();
     }
   }
 

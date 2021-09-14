@@ -64,7 +64,6 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     Token<OzoneTokenIdentifier> token = ozoneManager
         .getDelegationToken(new Text(getDelegationTokenRequest.getRenewer()));
 
-
     // Client issues GetDelegationToken request, when received by OM leader
     // it will generate a token. Original GetDelegationToken request is
     // converted to UpdateGetDelegationToken request with the generated token
@@ -181,4 +180,5 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
 
     return omClientResponse;
   }
+
 }

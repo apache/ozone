@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -27,7 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.util.Time;
@@ -49,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * >>/<<dataDir>>}
  * <p>
  * Each hdds volume has its own VERSION file. The hdds volume will have one
- * scmUuid directory for each SCM it is a part of (currently only one SCM is
+ * clusterUuid directory for each SCM it is a part of (currently only one SCM is
  * supported).
  *
  * During DN startup, if the VERSION file exists, we verify that the
@@ -209,7 +210,7 @@ public class HddsVolume extends StorageVolume {
   private void createVersionFile() throws IOException {
     this.storageID = HddsVolumeUtil.generateUuid();
     this.cTime = Time.now();
-    this.layoutVersion = DataNodeLayoutVersion.getLatestVersion().getVersion();
+    this.layoutVersion = getLatestVersion().getVersion();
 
     if (this.clusterID == null || datanodeUuid == null) {
       // HddsDatanodeService does not have the cluster information yet. Wait
@@ -234,7 +235,7 @@ public class HddsVolume extends StorageVolume {
     Preconditions.checkArgument(this.cTime > 0,
         "Creation Time should be positive");
     Preconditions.checkArgument(this.layoutVersion ==
-            DataNodeLayoutVersion.getLatestVersion().getVersion(),
+            getLatestVersion().getVersion(),
         "Version File should have the latest LayOutVersion");
 
     File versionFile = getVersionFile();

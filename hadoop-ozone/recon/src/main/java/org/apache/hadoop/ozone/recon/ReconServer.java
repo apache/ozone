@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -29,10 +30,13 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -56,8 +60,10 @@ public class ReconServer extends GenericCli {
   private Injector injector;
 
   private ReconHttpServer httpServer;
-  private ContainerDBServiceProvider containerDBServiceProvider;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private ReconDBProvider reconDBProvider;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
   private OzoneConfiguration configuration;
 
@@ -93,8 +99,11 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
       loginReconUserIfSecurityEnabled(configuration);
-      this.containerDBServiceProvider =
-          injector.getInstance(ContainerDBServiceProvider.class);
+      this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
+      this.reconContainerMetadataManager =
+          injector.getInstance(ReconContainerMetadataManager.class);
+      this.reconNamespaceSummaryManager =
+          injector.getInstance(ReconNamespaceSummaryManager.class);
 
       ReconSchemaManager reconSchemaManager =
           injector.getInstance(ReconSchemaManager.class);
@@ -115,14 +124,14 @@ public class ReconServer extends GenericCli {
     start();
     isStarted = true;
 
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+    ShutdownHookManager.get().addShutdownHook(() -> {
       try {
         stop();
         join();
       } catch (Exception e) {
         LOG.error("Error during stop Recon server", e);
       }
-    }));
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
@@ -159,8 +168,8 @@ public class ReconServer extends GenericCli {
       if (ozoneManagerServiceProvider != null) {
         ozoneManagerServiceProvider.stop();
       }
-      if (containerDBServiceProvider != null) {
-        containerDBServiceProvider.close();
+      if (reconDBProvider != null) {
+        reconDBProvider.close();
       }
       isStarted = false;
     }
@@ -234,8 +243,13 @@ public class ReconServer extends GenericCli {
   }
 
   @VisibleForTesting
-  public ContainerDBServiceProvider getContainerDBServiceProvider() {
-    return containerDBServiceProvider;
+  public ReconContainerMetadataManager getReconContainerMetadataManager() {
+    return reconContainerMetadataManager;
+  }
+
+  @VisibleForTesting
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
   }
 
   @VisibleForTesting

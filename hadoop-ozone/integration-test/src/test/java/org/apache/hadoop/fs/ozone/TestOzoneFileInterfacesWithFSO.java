@@ -21,7 +21,6 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,15 +45,16 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
   }
 
   public TestOzoneFileInterfacesWithFSO(boolean setDefaultFs,
-      boolean useAbsolutePath, boolean enabledFileSystemPaths) {
+      boolean useAbsolutePath, boolean enabledFileSystemPaths)
+      throws Exception {
     super(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
   }
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, enableFileSystemPaths,
+    TestOMRequestUtils.configureFSOptimizedPaths(conf,
+        enableFileSystemPathsInstance,
         OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     return conf;
   }

@@ -113,9 +113,11 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
+import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -2262,7 +2264,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String partName = commitUploadPartInfo.getPartName();
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    //Overwrite the part by creating part key with same part number.
+    // Overwrite the part by creating part key with same part number
+    // and different content.
     sampleData = "sample Data Changed";
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
@@ -2275,8 +2278,14 @@ public abstract class TestOzoneRpcClientAbstract {
     assertNotNull(commitUploadPartInfo);
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    // PartName should be different from old part Name.
-    assertNotEquals("Part names should be different", partName,
+    // AWS S3 for same content generates same partName during upload part.
+    // In AWS S3 ETag is generated from md5sum. In Ozone right now we
+    // don't do this. For now to make things work for large file upload
+    // through aws s3 cp, the partName are generated in a predictable fashion.
+    // So, when a part is override partNames will still be same irrespective
+    // of content in ozone s3. This will make S3 Mpu completeMPU pass when
+    // comparing part names and large file uploads work using aws cp.
+    assertEquals("Part names should be same", partName,
         commitUploadPartInfo.getPartName());
   }
 
@@ -2316,8 +2325,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String partName = commitUploadPartInfo.getPartName();
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    //Overwrite the part by creating part key with same part number.
-    sampleData = "sample Data Changed";
+    // Overwrite the part by creating part key with same part number
+    // and same content.
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
@@ -2329,8 +2338,14 @@ public abstract class TestOzoneRpcClientAbstract {
     assertNotNull(commitUploadPartInfo);
     assertNotNull(commitUploadPartInfo.getPartName());
 
-    // PartName should be different from old part Name.
-    assertNotEquals("Part names should be different", partName,
+    // AWS S3 for same content generates same partName during upload part.
+    // In AWS S3 ETag is generated from md5sum. In Ozone right now we
+    // don't do this. For now to make things work for large file upload
+    // through aws s3 cp, the partName are generated in a predictable fashion.
+    // So, when a part is override partNames will still be same irrespective
+    // of content in ozone s3. This will make S3 Mpu completeMPU pass when
+    // comparing part names and large file uploads work using aws cp.
+    assertEquals("Part names should be same", partName,
         commitUploadPartInfo.getPartName());
   }
 
@@ -3585,5 +3600,44 @@ public abstract class TestOzoneRpcClientAbstract {
     List<OzoneAcl> ozoneAclList = store.getAcl(s3vVolume);
 
     Assert.assertTrue(ozoneAclList.contains(ozoneAcl));
+  }
+
+  @Test
+  public void testHeadObject() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    ReplicationConfig replicationConfig = fromTypeAndFactor(RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+
+    String keyName = UUID.randomUUID().toString();
+
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, replicationConfig, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    OzoneKey key = bucket.headObject(keyName);
+    Assert.assertEquals(volumeName, key.getVolumeName());
+    Assert.assertEquals(bucketName, key.getBucketName());
+    Assert.assertEquals(keyName, key.getName());
+    Assert.assertEquals(replicationConfig.getReplicationType(),
+        key.getReplicationConfig().getReplicationType());
+    Assert.assertEquals(replicationConfig.getRequiredNodes(),
+        key.getReplicationConfig().getRequiredNodes());
+    Assert.assertEquals(value.getBytes(UTF_8).length, key.getDataSize());
+
+    try {
+      bucket.headObject(UUID.randomUUID().toString());
+    } catch (OMException ex) {
+      Assert.assertEquals(ResultCodes.KEY_NOT_FOUND, ex.getResult());
+    }
+
   }
 }

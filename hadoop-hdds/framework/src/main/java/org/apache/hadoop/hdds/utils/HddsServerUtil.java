@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -561,5 +562,13 @@ public final class HddsServerUtil {
     String output = msg + "; status : " + statusCode
         + "; message : " + errMessage;
     return new IOException(output, e);
+  }
+
+  /**
+   * Add exception classes which server won't log at all.
+   * @param server
+   */
+  public static void addSuppressedLoggingExceptions(RPC.Server server) {
+    server.addSuppressedLoggingExceptions(ServerNotLeaderException.class);
   }
 }

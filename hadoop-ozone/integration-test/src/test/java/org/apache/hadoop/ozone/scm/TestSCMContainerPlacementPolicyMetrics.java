@@ -135,7 +135,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
     } catch (InterruptedException e) {
     }
     cluster.getStorageContainerManager().getReplicationManager()
-        .processContainersNow();
+        .processAll();
     try {
       Thread.sleep(30 * 1000);
     } catch (InterruptedException e) {

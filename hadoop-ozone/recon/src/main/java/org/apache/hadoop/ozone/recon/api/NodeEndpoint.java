@@ -23,16 +23,19 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -62,11 +65,14 @@ public class NodeEndpoint {
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
+  private ReconContainerManager reconContainerManager;
 
   @Inject
   NodeEndpoint(OzoneStorageContainerManager reconSCM) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
+    this.reconContainerManager = 
+        (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
   }
 
@@ -92,7 +98,9 @@ public class NodeEndpoint {
       Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
       List<DatanodePipeline> pipelines = new ArrayList<>();
       AtomicInteger leaderCount = new AtomicInteger();
+      AtomicInteger openContainers = new AtomicInteger();
       DatanodeMetadata.Builder builder = DatanodeMetadata.newBuilder();
+
       pipelineIDs.forEach(pipelineID -> {
         try {
           Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
@@ -108,6 +116,10 @@ public class NodeEndpoint {
           if (datanode.getUuid().equals(pipeline.getLeaderId())) {
             leaderCount.getAndIncrement();
           }
+          int openContainerPerPipeline =
+                  reconContainerManager.getPipelineToOpenContainer()
+                  .getOrDefault(pipelineID, 0);
+          openContainers.getAndAdd(openContainerPerPipeline);
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
               pipelineID.getId(), hostname, ex);
@@ -117,13 +129,17 @@ public class NodeEndpoint {
         }
       });
       try {
-        int containers = nodeManager.getContainers(datanode).size();
-        builder.withContainers(containers);
+        Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
+
+        builder.withContainers(allContainers.size());
+        builder.withOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       }
-      datanodes.add(builder.withHostname(hostname)
+
+      DatanodeInfo dnInfo = (DatanodeInfo) datanode;
+      datanodes.add(builder.withHostname(nodeManager.getHostName(datanode))
           .withDatanodeStorageReport(storageReport)
           .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
           .withState(nodeState)
@@ -131,10 +147,12 @@ public class NodeEndpoint {
           .withPipelines(pipelines)
           .withLeaderCount(leaderCount.get())
           .withUUid(datanode.getUuidString())
-          .withVersion(datanode.getVersion())
-          .withSetupTime(datanode.getSetupTime())
-          .withRevision(datanode.getRevision())
-          .withBuildDate(datanode.getBuildDate())
+          .withVersion(nodeManager.getVersion(datanode))
+          .withSetupTime(nodeManager.getSetupTime(datanode))
+          .withRevision(nodeManager.getRevision(datanode))
+          .withBuildDate(nodeManager.getBuildDate(datanode))
+          .withLayoutVersion(
+              dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
           .build());
     });
 

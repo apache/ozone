@@ -27,6 +27,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 
 /**
  * OMStorage is responsible for management of the StorageDirectories used by
@@ -43,7 +46,9 @@ public class OMStorage extends Storage {
    * @throws IOException if any directories are inaccessible.
    */
   public OMStorage(OzoneConfiguration conf) throws IOException {
-    super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR);
+    super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR,
+        getInitLayoutVersion(conf, OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
+            OMLayoutVersionManager::maxLayoutVersion));
   }
 
   public void setOmCertSerialId(String certSerialId) throws IOException {

@@ -51,13 +51,23 @@ class BackgroundPipelineCreator {
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
   private ScheduledFuture<?> periodicTask;
+  private AtomicBoolean pausePipelineCreation;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       Scheduler scheduler, ConfigurationSource conf) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scheduler = scheduler;
+    this.pausePipelineCreation = new AtomicBoolean(false);
     isPipelineCreatorRunning = new AtomicBoolean(false);
+  }
+
+  public void pause() {
+    pausePipelineCreation.set(true);
+  }
+
+  public void resume() {
+    pausePipelineCreation.set(false);
   }
 
   private boolean shouldSchedulePipelineCreator() {
@@ -114,6 +124,11 @@ class BackgroundPipelineCreator {
 
   private void createPipelines() throws RuntimeException {
     // TODO: #CLUTIL Different replication factor may need to be supported
+
+    if(pausePipelineCreation.get()) {
+      LOG.info("Pipeline Creation is paused.");
+      return;
+    }
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
             OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));

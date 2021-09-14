@@ -212,7 +212,7 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean createIfNotExist) throws IOException {
     Preconditions.checkNotNull(volumeStr);
     Preconditions.checkNotNull(bucketStr);
-    
+
     if (bucketStr.isEmpty()) {
       // throw FileNotFoundException in this case to make Hadoop common happy
       throw new FileNotFoundException(
@@ -223,31 +223,23 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
     } catch (OMException ex) {
-      // Note: always create bucket if volumeStr matches "tmp" so -put works
       if (createIfNotExist) {
-        // Note: getBucketDetails always throws BUCKET_NOT_FOUND, even if
-        // the volume doesn't exist.
-        if (ex.getResult().equals(BUCKET_NOT_FOUND)) {
-          OzoneVolume volume;
+        // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
+        // doesn't exist and ACL is enabled; it can only throw BUCKET_NOT_FOUND
+        // when ACL is disabled. Both exceptions need to be handled.
+        switch (ex.getResult()) {
+        case VOLUME_NOT_FOUND:
+        case BUCKET_NOT_FOUND:
           try {
-            volume = proxy.getVolumeDetails(volumeStr);
-          } catch (OMException getVolEx) {
-            if (getVolEx.getResult().equals(VOLUME_NOT_FOUND)) {
-              // Volume doesn't exist. Create it
-              try {
-                objectStore.createVolume(volumeStr);
-              } catch (OMException newVolEx) {
-                // Ignore the case where another client created the volume
-                if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
-                  throw newVolEx;
-                }
-              }
-            } else {
-              throw getVolEx;
+            objectStore.createVolume(volumeStr);
+          } catch (OMException newVolEx) {
+            // Ignore the case where another client created the volume
+            if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
+              throw newVolEx;
             }
-            // Try get volume again
-            volume = proxy.getVolumeDetails(volumeStr);
           }
+
+          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {
             volume.createBucket(bucketStr);
@@ -257,6 +249,10 @@ public class BasicRootedOzoneClientAdapterImpl
               throw newBucEx;
             }
           }
+          break;
+        default:
+          // Throw unhandled exception
+          throw ex;
         }
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);

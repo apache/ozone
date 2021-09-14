@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyResponse;
@@ -116,11 +117,22 @@ public class MockOmTransport implements OmTransport {
       return response(payload,
           r -> r.setServiceListResponse(
               serviceList(payload.getServiceListRequest())));
+    case AllocateBlock:
+      return response(payload, r -> r.setAllocateBlockResponse(
+          allocateBlock(payload.getAllocateBlockRequest())));
     default:
       throw new IllegalArgumentException(
           "Mock version of om call " + payload.getCmdType()
               + " is not yet implemented");
     }
+  }
+
+  private OzoneManagerProtocolProtos.AllocateBlockResponse allocateBlock(
+      OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest) {
+    return OzoneManagerProtocolProtos.AllocateBlockResponse.newBuilder()
+        .setKeyLocation(
+            blockAllocator.allocateBlock(allocateBlockRequest.getKeyArgs())
+                .iterator().next()).build();
   }
 
   private DeleteVolumeResponse deleteVolume(

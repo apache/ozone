@@ -15,18 +15,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
-ALL_RESULT_DIR="$SCRIPT_DIR/result"
-mkdir -p "$ALL_RESULT_DIR"
-rm "$ALL_RESULT_DIR"/* || true
-source "$SCRIPT_DIR/../testlib.sh"
+# Version that will be run using the local build.
+: "${OZONE_CURRENT_VERSION:=1.2.0}"
+export OZONE_CURRENT_VERSION
 
-tests=$(find_tests)
-cd "$SCRIPT_DIR"
+TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
+source "$TEST_DIR/testlib.sh"
 
-run_test_scripts ${tests}
-RESULT=$?
+# Export variables needed by tests and ../testlib.sh.
+export TEST_DIR
+export COMPOSE_DIR="$TEST_DIR"
 
-generate_report "upgrade" "${ALL_RESULT_DIR}"
+RESULT=0
+run_test_scripts ${tests} || RESULT=$?
 
-exit ${RESULT}
+RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
+
+# Upgrade tests to be run.
+run_test non-rolling-upgrade 1.1.0 1.2.0
+
+generate_report "upgrade" "$ALL_RESULT_DIR"
+
+exit "$RESULT"

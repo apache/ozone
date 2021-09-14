@@ -32,10 +32,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -69,7 +67,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private final StorageContainerManager scm;
   private final PipelineManager pipelineManager;
-  private final ContainerManagerV2 containerManager;
   private final WritableContainerFactory writableContainerFactory;
 
   private final long containerSize;
@@ -78,9 +75,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private final SCMBlockDeletingService blockDeletingService;
 
   private ObjectName mxBean;
-  private final PipelineChoosePolicy pipelineChoosePolicy;
   private final SequenceIdGenerator sequenceIdGen;
-
+  private ScmBlockDeletingServiceMetrics metrics;
   /**
    * Constructor.
    *
@@ -94,8 +90,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.scm = scm;
     this.pipelineManager = scm.getPipelineManager();
-    this.containerManager = scm.getContainerManager();
-    this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
     this.sequenceIdGen = scm.getSequenceIdGen();
     this.containerSize = (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -104,15 +98,17 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     this.writableContainerFactory = scm.getWritableContainerFactory();
 
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
+    metrics = ScmBlockDeletingServiceMetrics.create();
 
     // SCM block deleting transaction log and deleting service.
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm.getContainerManager(),
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scm.getScmHAManager().getDBTransactionBuffer(),
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     Duration svcInterval = conf.getObject(
             ScmConfig.class).getBlockDeletionInterval();
     long serviceTimeout =
@@ -121,9 +117,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
     blockDeletingService =
-        new SCMBlockDeletingService(deletedBlockLog, containerManager,
+        new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
-            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf);
+            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf,
+            metrics);
   }
 
   /**
@@ -284,6 +281,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       deletedBlockLog.close();
     }
     blockDeletingService.shutdown();
+    if (metrics != null) {
+      ScmBlockDeletingServiceMetrics.unRegister();
+      metrics = null;
+    }
     if (mxBean != null) {
       MBeans.unregister(mxBean);
       mxBean = null;
@@ -311,8 +312,4 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public static Logger getLogger() {
     return LOG;
   }
-
-  /**
-   * This class uses system current time milliseconds to generate unique id.
-   */
 }

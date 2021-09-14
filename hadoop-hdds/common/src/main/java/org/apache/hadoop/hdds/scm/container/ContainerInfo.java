@@ -57,6 +57,11 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private Instant stateEnterTime;
   private String owner;
   private long containerID;
+  // Delete Transaction Id is updated when new transaction for a container
+  // is stored in SCM delete Table.
+  // TODO: Replication Manager should consider deleteTransactionId so that
+  // replica with higher deleteTransactionId is preferred over replica with
+  // lower deleteTransactionId.
   private long deleteTransactionId;
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.

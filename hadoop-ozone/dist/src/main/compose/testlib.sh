@@ -118,7 +118,7 @@ wait_for_om_leader() {
 
   #Don't give it up until 120 seconds
   while [[ $SECONDS -lt 120 ]]; do
-    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
       status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
@@ -151,7 +151,7 @@ start_docker_env(){
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
-    OUTPUT_NAME="$COMPOSE_ENV_NAME"
+    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
   fi
@@ -170,7 +170,7 @@ execute_robot_test(){
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
-  OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
@@ -297,10 +297,15 @@ cleanup_docker_images() {
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
   local dir="${2:-${RESULT_DIR}}"
+  local xunitdir="${3:-}"
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     if [ -z "${xunitdir}" ]; then
+       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     else
+       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
+     fi
   else
      echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
      exit 1
@@ -326,6 +331,11 @@ copy_results() {
 
 run_test_script() {
   local d="$1"
+  local test_script="$2"
+
+  if [[ -z "$test_script" ]]; then
+    test_script=./test.sh
+  fi
 
   echo "Executing test in ${d}"
 
@@ -333,7 +343,7 @@ run_test_script() {
   cd "${d}" || return
 
   local ret=0
-  if ! ./test.sh; then
+  if ! "$test_script"; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
   fi
@@ -397,28 +407,3 @@ prepare_for_runner_image() {
   export OZONE_IMAGE="apache/ozone-runner:${v}"
 }
 
-## @description Print the logical version for a specific release
-## @param the release for which logical version should be printed
-get_logical_version() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
-}
-
-## @description Activate the version-specific behavior for a given release
-## @param the release for which definitions should be loaded
-load_version_specifics() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  source "${_testlib_dir}/versions/${v}.sh"
-
-  ozone_version_load
-}
-
-## @description Deactivate the previously version-specific behavior,
-##   reverting to the current version's definitions
-unload_version_specifics() {
-  ozone_version_unload
-}

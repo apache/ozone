@@ -181,7 +181,7 @@ public class TestReplicationSupervisor {
   @Test
   public void testDownloadAndImportReplicatorFailure() {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, mutableReplicator,
+        new ReplicationSupervisor(set, null, mutableReplicator,
             newDirectExecutorService());
 
     // Mock to fetch an exception in the importContainer method.
@@ -216,7 +216,7 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, mutableReplicator, executor);
+        new ReplicationSupervisor(set, null, mutableReplicator, executor);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }

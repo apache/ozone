@@ -33,7 +33,7 @@ public final class HddsConfigKeys {
   public static final String HDDS_CONTAINER_REPORT_INTERVAL =
       "hdds.container.report.interval";
   public static final String HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT =
-      "60s";
+      "60m";
   public static final String HDDS_CRL_STATUS_REPORT_INTERVAL =
       "hdds.crl.status.report.interval";
   public static final String HDDS_CRL_STATUS_REPORT_INTERVAL_DEFAULT =
@@ -265,4 +265,9 @@ public final class HddsConfigKeys {
       "hdds.datanode.ratis.server.request.timeout";
   public static final String
       HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
+  public static final String HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED =
+          "hdds.container.checksum.verification.enabled";
+  public static final boolean
+          HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT = true;
+
 }

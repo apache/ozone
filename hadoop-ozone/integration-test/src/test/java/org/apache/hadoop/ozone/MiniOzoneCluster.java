@@ -76,6 +76,11 @@ public interface MiniOzoneCluster {
   OzoneConfiguration getConf();
 
   /**
+   * Set the configuration for the MiniOzoneCluster.
+   */
+  void setConf(OzoneConfiguration newConf);
+
+  /**
    * Waits for the cluster to be ready, this call blocks till all the
    * configured {@link HddsDatanodeService} registers with
    * {@link StorageContainerManager}.
@@ -290,7 +295,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_PIPELIME_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
-    protected final OzoneConfiguration conf;
+    protected OzoneConfiguration conf;
     protected String path;
 
     protected String clusterId;
@@ -317,6 +322,11 @@ public interface MiniOzoneCluster {
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
 
+
+    protected Optional<Integer> omLayoutVersion = Optional.empty();
+    protected Optional<Integer> scmLayoutVersion = Optional.empty();
+    protected Optional<Integer> dnLayoutVersion = Optional.empty();
+
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
@@ -329,6 +339,11 @@ public interface MiniOzoneCluster {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+    }
+
+    public Builder setConf(OzoneConfiguration config) {
+      this.conf = config;
+      return this;
     }
 
     /**
@@ -553,6 +568,21 @@ public interface MiniOzoneCluster {
 
     public Builder setSCMServiceId(String serviceId) {
       this.scmServiceId = serviceId;
+      return this;
+    }
+
+    public Builder setScmLayoutVersion(int layoutVersion) {
+      scmLayoutVersion = Optional.of(layoutVersion);
+      return this;
+    }
+
+    public Builder setOmLayoutVersion(int layoutVersion) {
+      omLayoutVersion = Optional.of(layoutVersion);
+      return this;
+    }
+
+    public Builder setDnLayoutVersion(int layoutVersion) {
+      dnLayoutVersion = Optional.of(layoutVersion);
       return this;
     }
 

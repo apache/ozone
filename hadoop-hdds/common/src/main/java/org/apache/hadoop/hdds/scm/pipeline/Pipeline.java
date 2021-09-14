@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -386,7 +387,8 @@ public final class Pipeline {
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
-    b.append(", CreationTimestamp").append(getCreationTimestamp());
+    b.append(", CreationTimestamp").append(getCreationTimestamp()
+        .atZone(ZoneId.systemDefault()));
     b.append("]");
     return b.toString();
   }

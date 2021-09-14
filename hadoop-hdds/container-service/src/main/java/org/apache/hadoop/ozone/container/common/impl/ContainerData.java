@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -486,6 +487,7 @@ public abstract class ContainerData {
    * Returns the volume of the Container.
    * @return HddsVolume
    */
+  @JsonIgnore
   public HddsVolume getVolume() {
     return volume;
   }

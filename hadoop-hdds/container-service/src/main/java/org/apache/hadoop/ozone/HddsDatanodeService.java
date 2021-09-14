@@ -55,12 +55,14 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -70,10 +72,14 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
+
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,7 +173,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           HddsDatanodeService.class, args, LOG);
     }
     start(createOzoneConfiguration());
-    join();
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      try {
+        stop();
+        join();
+      } catch (Exception e) {
+        LOG.error("Error during stop Ozone Datanode.", e);
+      }
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
@@ -247,6 +260,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.info("Hdds Datanode login successful.");
       }
 
+      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+          datanodeDetails.getUuidString());
+      if (layoutStorage.getState() != INITIALIZED) {
+        layoutStorage.initialize();
+      }
+
       // initialize datanode CRL store
       dnCRLStore = new DatanodeCRLStoreImpl(conf);
 
@@ -290,7 +309,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * datanode.
    */
   private void startRatisForTest() throws IOException {
-    String scmId = "scm-01";
     String clusterId = "clusterId";
     datanodeStateMachine.getContainer().start(clusterId);
     MutableVolumeSet volumeSet =
@@ -300,8 +318,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
       HddsVolume hddsVolume = (HddsVolume) entry.getValue();
-      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
-          clusterId, LOG);
+      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, clusterId,
+          clusterId, conf, LOG);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }

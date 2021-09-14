@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,12 +124,21 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   @Override
   public boolean moveToTrash(Path path) throws IOException {
     this.fs.getFileStatus(path);
+    String key = path.toUri().getPath();
+    // Check to see if bucket is path item to be deleted.
+    // Cannot moveToTrash if bucket is deleted,
+    // return error for this condition
+    OFSPath ofsPath = new OFSPath(key.substring(1));
+    if (path.isRoot() || ofsPath.isBucket()) {
+      throw new IOException("Recursive rm of bucket "
+          + path.toString() + " not permitted");
+    }
+
     Path trashRoot = this.fs.getTrashRoot(path);
 
-    String key = path.toUri().getPath();
-    LOG.debug("Key path to moveToTrash: "+ key);
+    LOG.debug("Key path to moveToTrash: {}", key);
     String trashRootKey = trashRoot.toUri().getPath();
-    LOG.debug("TrashrootKey for moveToTrash: "+ trashRootKey);
+    LOG.debug("TrashrootKey for moveToTrash: {}", trashRootKey);
 
     if (!OzoneFSUtils.isValidName(key)) {
       throw new InvalidPathException("Invalid path Name " + key);
@@ -201,9 +211,9 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           if (now >= end) {
             Collection<FileStatus> trashRoots;
             trashRoots = fs.getTrashRoots(true); // list all trash dirs
-            LOG.debug("Trash root Size: " + trashRoots.size());
+            LOG.debug("Trash root Size: {}", trashRoots.size());
             for (FileStatus trashRoot : trashRoots) {  // dump each trash
-              LOG.debug("Trashroot:" + trashRoot.getPath().toString());
+              LOG.debug("Trashroot: {}", trashRoot.getPath());
               if (!trashRoot.isDirectory()) {
                 continue;
               }
@@ -238,6 +248,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           executor.awaitTermination(60, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
           LOG.error("Error attempting to shutdown", e);
+          Thread.currentThread().interrupt();
         }
       }
     }
@@ -266,7 +277,10 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     while (true) {
       try {
         fs.rename(current, checkpoint);
-        LOG.debug("Created trash checkpoint: " + checkpoint.toUri().getPath());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Created trash checkpoint: {}",
+                  checkpoint.toUri().getPath());
+        }
         break;
       } catch (FileAlreadyExistsException e) {
         if (++attempt > 1000) {
@@ -280,7 +294,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private void deleteCheckpoint(Path trashRoot, boolean deleteImmediately)
       throws IOException {
-    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: " + trashRoot);
+    LOG.debug("TrashPolicyOzone#deleteCheckpoint for trashRoot: {}",
+            trashRoot);
 
     FileStatus[] dirs = null;
     try {
@@ -303,7 +318,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         time = getTimeFromCheckpoint(name);
       } catch (ParseException e) {
         om.getMetrics().incNumTrashFails();
-        LOG.warn("Unexpected item in trash: "+dir+". Ignoring.");
+        LOG.warn("Unexpected item in trash: {} . Ignoring.", dir);
         continue;
       }
 
@@ -312,7 +327,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           LOG.debug("Deleted trash checkpoint:{} ", dir);
         } else {
           om.getMetrics().incNumTrashFails();
-          LOG.warn("Couldn't delete checkpoint: " + dir + " Ignoring.");
+          LOG.warn("Couldn't delete checkpoint: {} Ignoring.", dir);
         }
       }
     }

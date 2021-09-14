@@ -237,4 +237,5 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
     return auditMap;
   }
+
 }

@@ -41,7 +41,7 @@ public class SimplePipelineProvider
   @Override
   public Pipeline create(StandaloneReplicationConfig replicationConfig)
       throws IOException {
-    List<DatanodeDetails> dns = pickNodesNeverUsed(replicationConfig);
+    List<DatanodeDetails> dns = pickNodesNotUsed(replicationConfig);
     if (dns.size() < replicationConfig.getRequiredNodes()) {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes.",

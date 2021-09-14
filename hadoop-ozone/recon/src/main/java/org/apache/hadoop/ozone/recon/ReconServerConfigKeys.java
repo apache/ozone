@@ -33,10 +33,6 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.http-bind-host";
   public static final String OZONE_RECON_HTTPS_BIND_HOST_KEY =
       "ozone.recon.https-bind-host";
-  public static final String OZONE_RECON_HTTP_ADDRESS_KEY =
-      "ozone.recon.http-address";
-  public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
-      "ozone.recon.https-address";
   public static final String OZONE_RECON_HTTP_KEYTAB_FILE =
       "ozone.recon.http.auth.kerberos.keytab";
   public static final String OZONE_RECON_HTTP_BIND_HOST_DEFAULT =

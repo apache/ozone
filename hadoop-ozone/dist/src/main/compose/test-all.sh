@@ -36,14 +36,15 @@ fi
 tests=$(find_tests)
 cd "$SCRIPT_DIR"
 
-run_test_scripts ${tests}
-RESULT=$?
-
-rebot --nostatusrc -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml
+RESULT=0
+run_test_scripts ${tests} || RESULT=$?
 
 if [ "$OZONE_WITH_COVERAGE" ]; then
   pkill -f JacocoServer
   cp /tmp/jacoco-combined.exec "$SCRIPT_DIR"/result
 fi
+
+generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
+
 
 exit $RESULT

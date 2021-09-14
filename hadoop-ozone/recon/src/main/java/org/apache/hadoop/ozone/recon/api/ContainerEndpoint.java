@@ -59,7 +59,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 
@@ -79,7 +79,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 public class ContainerEndpoint {
 
   @Inject
-  private ContainerDBServiceProvider containerDBServiceProvider;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
@@ -113,8 +113,9 @@ public class ContainerEndpoint {
     Map<Long, ContainerMetadata> containersMap;
     long containersCount;
     try {
-      containersMap = containerDBServiceProvider.getContainers(limit, prevKey);
-      containersCount = containerDBServiceProvider.getCountForContainers();
+      containersMap =
+              reconContainerMetadataManager.getContainers(limit, prevKey);
+      containersCount = reconContainerMetadataManager.getCountForContainers();
     } catch (IOException ioEx) {
       throw new WebApplicationException(ioEx,
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -147,7 +148,7 @@ public class ContainerEndpoint {
     long totalCount;
     try {
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
-          containerDBServiceProvider.getKeyPrefixesForContainer(containerID,
+          reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
               prevKeyPrefix);
 
       // Get set of Container-Key mappings for given containerId.
@@ -204,7 +205,7 @@ public class ContainerEndpoint {
       }
 
       totalCount =
-          containerDBServiceProvider.getKeyCountForContainer(containerID);
+          reconContainerMetadataManager.getKeyCountForContainer(containerID);
     } catch (IOException ioEx) {
       throw new WebApplicationException(ioEx,
           Response.Status.INTERNAL_SERVER_ERROR);

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
@@ -29,12 +30,16 @@ import static org.junit.Assert.assertFalse;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -46,22 +51,27 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.slf4j.event.Level;
 
 /**
  * Tests ozone containers replication.
  */
+@RunWith(Parameterized.class)
 public class TestContainerReplication {
   /**
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);;
+  public Timeout testTimeout = Timeout.seconds(300);
 
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
@@ -69,12 +79,32 @@ public class TestContainerReplication {
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
+  private String placementPolicyClass;
+
+  @Parameterized.Parameters
+  public static List<String> parameters() {
+    List<String> classes = new ArrayList<>();
+    classes.add(SCMContainerPlacementRackAware.class.getCanonicalName());
+    classes.add(SCMContainerPlacementCapacity.class.getCanonicalName());
+    classes.add(SCMContainerPlacementRandom.class.getCanonicalName());
+    return classes;
+  }
+
+  public TestContainerReplication(String placementPolicy) {
+    this.placementPolicyClass = placementPolicy;
+  }
 
   @Before
   public void setUp() throws Exception {
+    GenericTestUtils.setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(SCMContainerPlacementCapacity.LOG,
+        Level.DEBUG);
+    GenericTestUtils.setLogLevel(SCMContainerPlacementRackAware.LOG,
+        Level.DEBUG);
     OzoneConfiguration conf = createConfiguration();
+    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
 
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
 
     client = OzoneClientFactory.getRpcClient(conf);
@@ -99,7 +129,6 @@ public class TestContainerReplication {
 
     cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
 
-    waitForReplicaCount(containerID, 2, cluster);
     waitForReplicaCount(containerID, 3, cluster);
   }
 

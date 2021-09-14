@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -49,6 +51,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   private final NodeManager nodeManager;
   private final Random rand;
   private final ConfigurationSource conf;
+  private final boolean shouldRemovePeers;
 
   /**
    * Return for replication factor 1 containers where the placement policy
@@ -72,6 +75,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     this.nodeManager = nodeManager;
     this.rand = new Random();
     this.conf = conf;
+    this.shouldRemovePeers = ScmUtils.shouldRemovePeers(conf);
   }
 
   /**
@@ -115,14 +119,16 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @param excludedNodes - datanodes with existing replicas
    * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired  - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return list of datanodes chosen.
    * @throws SCMException SCM exception.
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, final long sizeRequired) throws SCMException {
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     if (excludedNodes != null) {
@@ -144,19 +150,30 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
-    List<DatanodeDetails> healthyList = healthyNodes.stream().filter(d ->
-        hasEnoughSpace(d, sizeRequired)).collect(Collectors.toList());
 
-    if (healthyList.size() < nodesRequired) {
-      msg = String.format("Unable to find enough nodes that meet the space " +
-              "requirement of %d bytes in healthy node set." +
-              " Nodes required: %d Found: %d",
-          sizeRequired, nodesRequired, healthyList.size());
+    return filterNodesWithSpace(healthyNodes, nodesRequired,
+        metadataSizeRequired, dataSizeRequired);
+  }
+
+  public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
+    List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
+        .collect(Collectors.toList());
+
+    if (nodesWithSpace.size() < nodesRequired) {
+      String msg = String.format("Unable to find enough nodes that meet the " +
+              "space requirement of %d bytes for metadata and %d bytes for " +
+              "data in healthy node set. Required %d. Found %d.",
+          metadataSizeRequired, dataSizeRequired, nodesRequired,
+          nodesWithSpace.size());
       LOG.error(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
-    return healthyList;
+
+    return nodesWithSpace;
   }
 
   /**
@@ -165,17 +182,43 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @param datanodeDetails DatanodeDetails
    * @return true if we have enough space.
    */
-  public boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
-      long sizeRequired) {
+  public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
+      long metadataSizeRequired, long dataSizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
+    boolean enoughForData = false;
+    boolean enoughForMeta = false;
+
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
-    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-      if (reportProto.getRemaining() > sizeRequired) {
-        return true;
+
+    if (dataSizeRequired > 0) {
+      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
+        if (reportProto.getRemaining() > dataSizeRequired) {
+          enoughForData = true;
+          break;
+        }
       }
+    } else {
+      enoughForData = true;
     }
-    return false;
+
+    if (!enoughForData) {
+      return false;
+    }
+
+    if (metadataSizeRequired > 0) {
+      for (MetadataStorageReportProto reportProto
+          : datanodeInfo.getMetadataStorageReports()) {
+        if (reportProto.getRemaining() > metadataSizeRequired) {
+          enoughForMeta = true;
+          break;
+        }
+      }
+    } else {
+      enoughForMeta = true;
+    }
+
+    return enoughForData && enoughForMeta;
   }
 
   /**
@@ -196,6 +239,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       // invoke the choose function defined in the derived classes.
       DatanodeDetails nodeId = chooseNode(healthyNodes);
       if (nodeId != null) {
+        removePeers(nodeId, healthyNodes);
         results.add(nodeId);
       }
     }
@@ -225,9 +269,11 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * to meet the placement policy. For simple policies that are not rack aware
    * we return 1, from this default implementation.
    * should have
+   *
+   * @param numReplicas - The desired replica counts
    * @return The number of racks containers should span to meet the policy
    */
-  protected int getRequiredRackCount() {
+  protected int getRequiredRackCount(int numReplicas) {
     return 1;
   }
 
@@ -248,7 +294,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public ContainerPlacementStatus validateContainerPlacement(
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
-    int requiredRacks = getRequiredRackCount();
+    int requiredRacks = getRequiredRackCount(replicas);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
@@ -273,5 +319,42 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     }
     return new ContainerPlacementStatusDefault(
         (int)currentRackCount, requiredRacks, numRacks);
+  }
+
+  /**
+   * Removes the datanode peers from all the existing pipelines for this dn.
+   */
+  public void removePeers(DatanodeDetails dn,
+      List<DatanodeDetails> healthyList) {
+    if (shouldRemovePeers) {
+      healthyList.removeAll(nodeManager.getPeerList(dn));
+    }
+  }
+
+  /**
+   * Check If a datanode is an available node.
+   * @param datanodeDetails - the datanode to check.
+   * @param metadataSizeRequired - the required size for metadata.
+   * @param dataSizeRequired - the required size for data.
+   * @return true if the datanode is available.
+   */
+  public boolean isValidNode(DatanodeDetails datanodeDetails,
+      long metadataSizeRequired, long dataSizeRequired) {
+    DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
+        .getNodeByUuid(datanodeDetails.getUuidString());
+    if (datanodeInfo == null) {
+      LOG.error("Failed to find the DatanodeInfo for datanode {}",
+          datanodeDetails);
+    } else {
+      if (datanodeInfo.getNodeStatus().isNodeWritable() &&
+          (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
+              dataSizeRequired))) {
+        LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
+                "required data size is {}",
+            datanodeDetails.toString(), metadataSizeRequired, dataSizeRequired);
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -23,11 +23,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
 import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -152,6 +156,33 @@ public class TestOmUtils {
   @Test
   public void checkMaxTransactionID() {
     Assert.assertEquals((long) (Math.pow(2, 54) - 2), OmUtils.MAX_TRXN_ID);
+  }
+
+  @Test
+  public void testGetOmHostsFromConfig() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String serviceId = "myOmId";
+
+    conf.set(OZONE_OM_NODES_KEY  + "." + serviceId, "omA,omB,omC");
+    conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId + ".omA", "omA-host:9861");
+    conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId + ".omB", "omB-host:9861");
+    conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId + ".omC", "omC-host:9861");
+
+    String serviceId2 = "myOmId2";
+    conf.set(OZONE_OM_NODES_KEY  + "." + serviceId2, "om1");
+    conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId2 + ".om1", "om1-host");
+
+    Set<String> hosts = getOmHostsFromConfig(conf, serviceId);
+    Assert.assertEquals(3, hosts.size());
+    Assert.assertTrue(hosts.contains("omA-host"));
+    Assert.assertTrue(hosts.contains("omB-host"));
+    Assert.assertTrue(hosts.contains("omC-host"));
+
+    hosts = getOmHostsFromConfig(conf, serviceId2);
+    Assert.assertEquals(1, hosts.size());
+    Assert.assertTrue(hosts.contains("om1-host"));
+
+    Assert.assertTrue(getOmHostsFromConfig(conf, "newId").isEmpty());
   }
 }
 

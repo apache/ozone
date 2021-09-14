@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.ozone.common.StorageInfo;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,8 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * This class provides a command line interface to start the SCM
@@ -164,7 +167,14 @@ public class StorageContainerManagerStarter extends GenericCli {
     public void start(OzoneConfiguration conf) throws Exception {
       StorageContainerManager stm = StorageContainerManager.createSCM(conf);
       stm.start();
-      stm.join();
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          stm.stop();
+          stm.join();
+        } catch (Exception e) {
+          LOG.error("Error during stop StorageContainerManager", e);
+        }
+      }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     }
 
     @Override

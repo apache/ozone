@@ -21,7 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for a *unstable* .proto interface.
  */
-
+syntax = "proto2";
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 option java_outer_classname = "StorageContainerLocationProtocolProtos";
 option java_generic_services = true;
@@ -69,6 +69,11 @@ message ScmContainerLocationRequest {
   optional DatanodeUsageInfoRequestProto DatanodeUsageInfoRequest = 30;
   optional GetExistContainerWithPipelinesInBatchRequestProto getExistContainerWithPipelinesInBatchRequest = 31;
   optional GetContainerTokenRequestProto containerTokenRequest = 32;
+  optional StartContainerBalancerRequestProto startContainerBalancerRequest = 33;
+  optional StopContainerBalancerRequestProto stopContainerBalancerRequest = 34;
+  optional ContainerBalancerStatusRequestProto containerBalancerStatusRequest = 35;
+  optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 36;
+  optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
 }
 
 message ScmContainerLocationResponse {
@@ -109,6 +114,11 @@ message ScmContainerLocationResponse {
   optional DatanodeUsageInfoResponseProto DatanodeUsageInfoResponse = 30;
   optional GetExistContainerWithPipelinesInBatchResponseProto getExistContainerWithPipelinesInBatchResponse = 31;
   optional GetContainerTokenResponseProto containerTokenResponse = 32;
+  optional StartContainerBalancerResponseProto startContainerBalancerResponse = 33;
+  optional StopContainerBalancerResponseProto stopContainerBalancerResponse = 34;
+  optional ContainerBalancerStatusResponseProto containerBalancerStatusResponse = 35;
+  optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 36;
+  optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
 
   enum Status {
     OK = 1;
@@ -147,6 +157,11 @@ enum Type {
   DatanodeUsageInfo = 25;
   GetExistContainerWithPipelinesInBatch = 26;
   GetContainerToken = 27;
+  StartContainerBalancer = 28;
+  StopContainerBalancer = 29;
+  GetContainerBalancerStatus = 30;
+  FinalizeScmUpgrade = 31;
+  QueryUpgradeFinalizationProgress = 32;
 }
 
 /**
@@ -430,6 +445,21 @@ message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
 }
 
+message FinalizeScmUpgradeRequestProto {
+  required string upgradeClientId = 1;
+}
+message FinalizeScmUpgradeResponseProto {
+  required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+message QueryUpgradeFinalizationProgressRequestProto {
+  required string upgradeClientId = 1;
+  optional bool takeover = 2;
+  optional bool readonly = 3;
+}
+message QueryUpgradeFinalizationProgressResponseProto {
+  required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
 message ContainerTokenSecretProto {
     required string ownerId = 1;
     required ContainerID containerId = 2;
@@ -443,6 +473,33 @@ message GetContainerTokenRequestProto {
 
 message GetContainerTokenResponseProto {
   required TokenProto token = 1;
+}
+
+message StartContainerBalancerRequestProto {
+  optional string traceID = 1;
+  optional double threshold = 2;
+  optional int32 idleiterations = 3;
+  optional double maxDatanodesRatioToInvolvePerIteration = 4;
+  optional int64 maxSizeToMovePerIterationInGB = 5;
+}
+
+message StartContainerBalancerResponseProto {
+  required bool start = 1;
+}
+
+message StopContainerBalancerRequestProto {
+  optional string traceID = 1;
+}
+
+message StopContainerBalancerResponseProto {
+}
+
+message ContainerBalancerStatusRequestProto {
+  optional string traceID = 1;
+}
+
+message ContainerBalancerStatusResponseProto {
+  required bool isRunning = 1;
 }
 
 /**

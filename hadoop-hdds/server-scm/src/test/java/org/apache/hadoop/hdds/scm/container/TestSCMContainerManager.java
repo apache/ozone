@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -69,7 +69,7 @@ import org.junit.rules.ExpectedException;
 public class TestSCMContainerManager {
   private static SCMContainerManager containerManager;
   private static MockNodeManager nodeManager;
-  private static PipelineManagerV2Impl pipelineManager;
+  private static PipelineManagerImpl pipelineManager;
   private static File testDir;
   private static XceiverClientManager xceiverClientManager;
   private static Random random;
@@ -95,7 +95,7 @@ public class TestSCMContainerManager {
     }
     nodeManager = new MockNodeManager(true, 10);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
-    pipelineManager = PipelineManagerV2Impl.newPipelineManager(
+    pipelineManager = PipelineManagerImpl.newPipelineManager(
         conf,
         MockSCMHAManager.getInstance(true),
         nodeManager,

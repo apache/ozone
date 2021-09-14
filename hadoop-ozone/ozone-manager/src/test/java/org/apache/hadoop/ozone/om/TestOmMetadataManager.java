@@ -33,6 +33,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -623,4 +624,12 @@ public class TestOmMetadataManager {
     }
   }
 
+  @Test
+  public void testAllTablesAreProperInOMMetadataManagerImpl() {
+    Set<String> tablesByDefinition =
+        new HashSet<>(Arrays.asList(OmMetadataManagerImpl.ALL_TABLES));
+    Set<String> tablesInManager = omMetadataManager.listTableNames();
+
+    Assert.assertEquals(tablesByDefinition, tablesInManager);
+  }
 }

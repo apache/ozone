@@ -21,7 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for an *unstable* .proto interface.
  */
-
+syntax = "proto2";
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 option java_outer_classname = "HddsProtos";
 option java_generic_services = true;
@@ -60,6 +60,11 @@ message ExtendedDatanodeDetailsProto {
     optional int64 setupTime = 3;
     optional string revision = 4;
     optional string buildDate = 5;
+}
+
+message MoveDataNodePairProto {
+    required DatanodeDetailsProto src = 1;
+    required DatanodeDetailsProto tgt = 2;
 }
 
 /**
@@ -141,14 +146,15 @@ enum NodeState {
     HEALTHY = 1;
     STALE = 2;
     DEAD = 3;
+    HEALTHY_READONLY = 6;
 }
 
 enum NodeOperationalState {
     IN_SERVICE = 1;
-    DECOMMISSIONING = 2;
-    DECOMMISSIONED = 3;
-    ENTERING_MAINTENANCE = 4;
-    IN_MAINTENANCE = 5;
+    ENTERING_MAINTENANCE = 2;
+    IN_MAINTENANCE = 3;
+    DECOMMISSIONING = 4;
+    DECOMMISSIONED = 5;
 }
 
 enum QueryScope {
@@ -333,6 +339,18 @@ message BlockID {
     optional uint64 blockCommitSequenceId = 2 [default = 0];
 }
 
+message UpgradeFinalizationStatus {
+    enum Status {
+        ALREADY_FINALIZED = 1;
+        STARTING_FINALIZATION = 2;
+        FINALIZATION_IN_PROGRESS = 3;
+        FINALIZATION_DONE = 4;
+        FINALIZATION_REQUIRED = 5;
+    }
+    required Status status = 1;
+    repeated string messages = 2;
+}
+
 /**
  * Information for Certificate Revocation List.
  */
@@ -349,3 +367,4 @@ message CertInfoProto {
     required string x509Certificate = 1;
     required uint64 timestamp = 2;
 }
+

@@ -38,6 +38,26 @@ public class TestContinueToken {
   }
 
   @Test
+  public void encodeDecodeWithNonEnglishOne() throws OS3Exception {
+    ContinueToken ct = new ContinueToken("你好", null);
+
+    ContinueToken parsedToken =
+        ContinueToken.decodeFromString(ct.encodeToString());
+
+    Assert.assertEquals(ct, parsedToken);
+  }
+
+  @Test
+  public void encodeDecodeWithNonEnglishTwo() throws OS3Exception {
+    ContinueToken ct = new ContinueToken("你好", "上海");
+
+    ContinueToken parsedToken =
+        ContinueToken.decodeFromString(ct.encodeToString());
+
+    Assert.assertEquals(ct, parsedToken);
+  }
+
+  @Test
   public void encodeDecodeNullDir() throws OS3Exception {
     ContinueToken ct = new ContinueToken("key1", null);
 

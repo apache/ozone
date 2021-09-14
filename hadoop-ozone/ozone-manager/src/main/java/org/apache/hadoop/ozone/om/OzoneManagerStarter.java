@@ -23,13 +23,17 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * This class provides a command line interface to start the OM
@@ -99,6 +103,47 @@ public class OzoneManagerStarter extends GenericCli {
   }
 
   /**
+   * This function implements a sub-command to allow the OM to be
+   * Removed from prepare mode after an upgrade or downgrade.
+   */
+  @CommandLine.Command(name = "--upgrade",
+      aliases = "--downgrade",
+      customSynopsis = "ozone om [global options] --upgrade",
+      description = "Cancels prepare state in this OM on startup",
+      mixinStandardHelpOptions = true,
+      versionProvider = HddsVersionProvider.class)
+  public void startOmUpgrade() throws Exception {
+    try {
+      commonInit();
+      receiver.startAndCancelPrepare(conf);
+    } catch (Exception ex) {
+      LOG.error("Cancelling prepare to start OM in upgrade mode failed " +
+          "with exception", ex);
+      throw ex;
+    }
+  }
+
+  /**
+   * This function implements a sub-command to allow the OM to be bootstrapped
+   * initialized from the command line. After OM is initialized, it will
+   * contact the leader OM to add itself to the ring. Once the leader OM
+   * responds back affirmatively, bootstrap step is complete and the OM is
+   * functional.
+   */
+  @CommandLine.Command(name = "--bootstrap",
+      customSynopsis = "ozone om [global options] --bootstrap",
+      hidden = false,
+      description = "Initialize if not already initialized and Bootstrap " +
+          "the Ozone Manager",
+      mixinStandardHelpOptions = true,
+      versionProvider = HddsVersionProvider.class)
+  public void bootstrapOM()
+      throws Exception {
+    commonInit();
+    receiver.bootstrap(conf);
+  }
+
+  /**
    * This function should be called by each command to ensure the configuration
    * is set and print the startup banner message.
    */
@@ -124,7 +169,14 @@ public class OzoneManagerStarter extends GenericCli {
         AuthenticationException {
       OzoneManager om = OzoneManager.createOm(conf);
       om.start();
-      om.join();
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          om.stop();
+          om.join();
+        } catch (Exception e) {
+          LOG.error("Error during stop OzoneManager.", e);
+        }
+      }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     }
 
     @Override
@@ -132,6 +184,29 @@ public class OzoneManagerStarter extends GenericCli {
         AuthenticationException {
       return OzoneManager.omInit(conf);
     }
-  }
 
+    @Override
+    public void bootstrap(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      // Initialize the Ozone Manager, if not already initialized.
+      boolean initialize = OzoneManager.omInit(conf);
+      if (!initialize) {
+        throw new IOException("OM Init failed.");
+      }
+      // Bootstrap the OM
+      OzoneManager om = OzoneManager.createOm(conf,
+          OzoneManager.StartupOption.BOOTSTRAP);
+      om.start();
+      om.join();
+    }
+
+    @Override
+    public void startAndCancelPrepare(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      OzoneManager om = OzoneManager.createOm(conf);
+      om.getPrepareState().cancelPrepare();
+      om.start();
+      om.join();
+    }
+  }
 }

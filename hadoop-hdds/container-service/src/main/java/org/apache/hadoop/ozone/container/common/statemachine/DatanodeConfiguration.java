@@ -52,9 +52,11 @@ public class DatanodeConfiguration {
   public static final String DISK_CHECK_TIMEOUT_KEY =
       "hdds.datanode.disk.check.timeout";
 
+  static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
+
   static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
 
-  static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 15;
+  static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
@@ -78,6 +80,7 @@ public class DatanodeConfiguration {
   private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
+  static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -91,6 +94,37 @@ public class DatanodeConfiguration {
           "on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+
+  /**
+   * The maximum number of threads used to handle delete block commands.
+   * It takes about 200ms to open a RocksDB with HDD media, so basically DN
+   * can handle 300 individual container delete tx every 60s if RocksDB cache
+   * missed. With max threads 5, optimistically DN can handle 1500 individual
+   * container delete tx in 60s with RocksDB cache miss.
+   */
+  @Config(key = "block.delete.threads.max",
+      type = ConfigType.INT,
+      defaultValue = "5",
+      tags = {DATANODE},
+      description = "The maximum number of threads used to handle delete " +
+          " blocks on a datanode"
+  )
+  private int blockDeleteThreads = BLOCK_DELETE_THREADS_DEFAULT;
+
+  /**
+   * The maximum number of commands in queued list.
+   * 1440 = 60 * 24, which means if SCM send a delete command every minute,
+   * if the commands are pined up for more than 1 day, DN will start to discard
+   * new comming commands.
+   */
+  @Config(key = "block.delete.queue.limit",
+      type = ConfigType.INT,
+      defaultValue = "1440",
+      tags = {DATANODE},
+      description = "The maximum number of block delete commands queued on "+
+          " a datanode"
+  )
+  private int blockDeleteQueueLimit = 60 * 24;
 
   @Config(key = "block.deleting.service.interval",
           defaultValue = "60s",
@@ -131,7 +165,7 @@ public class DatanodeConfiguration {
   }
 
   @Config(key = "periodic.disk.check.interval.minutes",
-      defaultValue = "15",
+      defaultValue = "60",
       type = ConfigType.LONG,
       tags = { DATANODE },
       description = "Periodic disk check run interval in minutes."
@@ -181,6 +215,16 @@ public class DatanodeConfiguration {
           + " postfix (ns,ms,s,m,h,d)."
   )
   private long diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+
+  @Config(key = "chunk.data.validation.check",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Enable safety checks such as checksum validation"
+          + " for Ratis calls."
+  )
+  private boolean isChunkDataValidationCheck =
+      CHUNK_DATA_VALIDATION_CHECK_DEFAULT;
 
   @PostConstruct
   public void validate() {
@@ -292,4 +336,29 @@ public class DatanodeConfiguration {
   public void setDiskCheckTimeout(Duration duration) {
     this.diskCheckTimeout = duration.toMillis();
   }
+
+  public int getBlockDeleteThreads() {
+    return blockDeleteThreads;
+  }
+
+  public void setBlockDeleteThreads(int threads) {
+    this.blockDeleteThreads = threads;
+  }
+
+  public int getBlockDeleteQueueLimit() {
+    return blockDeleteQueueLimit;
+  }
+
+  public void setBlockDeleteQueueLimit(int queueLimit) {
+    this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public boolean isChunkDataValidationCheck() {
+    return isChunkDataValidationCheck;
+  }
+
+  public void setChunkDataValidationCheck(boolean writeChunkValidationCheck) {
+    isChunkDataValidationCheck = writeChunkValidationCheck;
+  }
+
 }

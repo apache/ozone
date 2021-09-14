@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -25,6 +27,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,8 +74,12 @@ public class OMHANodeDetails {
     return localNodeDetails;
   }
 
-  public List< OMNodeDetails > getPeerNodeDetails() {
-    return peerNodeDetails;
+  public Map<String, OMNodeDetails> getPeerNodesMap() {
+    Map<String, OMNodeDetails> peerNodesMap = new HashMap<>();
+    for (OMNodeDetails peeNode : peerNodeDetails) {
+      peerNodesMap.put(peeNode.getNodeId(), peeNode);
+    }
+    return peerNodesMap;
   }
 
 

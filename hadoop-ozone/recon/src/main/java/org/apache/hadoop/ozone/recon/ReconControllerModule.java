@@ -26,7 +26,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
@@ -38,15 +37,18 @@ import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
@@ -85,15 +87,16 @@ public class ReconControllerModule extends AbstractModule {
   protected void configure() {
     bind(OzoneConfiguration.class).toProvider(ConfigurationProvider.class);
     bind(ReconHttpServer.class).in(Singleton.class);
-    bind(DBStore.class)
-        .toProvider(ReconContainerDBProvider.class).in(Singleton.class);
+    bind(ReconDBProvider.class).in(Singleton.class);
     bind(ReconOMMetadataManager.class)
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
 
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
-    bind(ContainerDBServiceProvider.class)
-        .to(ContainerDBServiceProviderImpl.class).in(Singleton.class);
+    bind(ReconContainerMetadataManager.class)
+        .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
+    bind(ReconNamespaceSummaryManager.class)
+        .to(ReconNamespaceSummaryManagerImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)
         .to(OzoneManagerServiceProviderImpl.class).in(Singleton.class);
     bind(ReconUtils.class).in(Singleton.class);
@@ -121,6 +124,7 @@ public class ReconControllerModule extends AbstractModule {
       taskBinder.addBinding().to(ContainerKeyMapperTask.class);
       taskBinder.addBinding().to(FileSizeCountTask.class);
       taskBinder.addBinding().to(TableCountTask.class);
+      taskBinder.addBinding().to(NSSummaryTask.class);
     }
   }
 

@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.util.StringUtils;
 
 import javax.annotation.Nonnull;
 import java.nio.file.Paths;
-import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -209,25 +207,10 @@ public final class OzoneFSUtils {
   }
 
 
-  /**
-   * Returns true if the bucket is FS Optimised.
-   * @param bucketMetadata
-   * @return
-   */
-  public static boolean isFSOptimizedBucket(
-      Map<String, String> bucketMetadata) {
-    // layout 'PREFIX' represents optimized FS path
-    boolean metadataLayoutEnabled =
-        org.apache.commons.lang3.StringUtils.equalsIgnoreCase(
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX,
-            bucketMetadata
-                .get(OMConfigKeys.OZONE_OM_METADATA_LAYOUT));
 
-    boolean fsEnabled =
-        Boolean.parseBoolean(bucketMetadata
-            .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS));
 
-    return metadataLayoutEnabled && fsEnabled;
+  public static boolean isFSOptimizedBucket(BucketLayout bucketLayout) {
+    return bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   public static String removeTrailingSlashIfNeeded(String key) {

@@ -49,8 +49,12 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -312,6 +316,69 @@ public interface OzoneManagerProtocol
 
   ServiceInfoEx getServiceInfo() throws IOException;
 
+  /**
+   * Initiate metadata upgrade finalization.
+   * This method when called, initiates finalization of Ozone Manager metadata
+   * during an upgrade. The status returned contains the status
+   * - ALREADY_FINALIZED with empty message list when the software layout
+   *    version and the metadata layout version are equal
+   * - STARTING_FINALIZATION with empty message list when the finalization
+   *    has been started successfully
+   * - If a finalization is already in progress, then the method throws an
+   *    {@link OMException} with a result code INVALID_REQUEST
+   *
+   *
+   * The leader Ozone Manager initiates finalization of the followers via
+   * the Raft protocol in other Ozone Managers, and reports progress to the
+   * client via the
+   * {@link #queryUpgradeFinalizationProgress(String, boolean, boolean)}
+   * call.
+   *
+   * The follower Ozone Managers reject this request and directs the client to
+   * the leader.
+   *
+   * @param upgradeClientID String identifier of the upgrade finalizer client
+   * @return the finalization status.
+   * @throws IOException
+   *            when finalization is failed, or this Ozone Manager is not the
+   *                leader.
+   * @throws OMException
+   *            when finalization is already in progress.
+   */
+  StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
+
+  /**
+   * Queries the current status of finalization.
+   * This method when called, returns the status messages from the finalization
+   * progress, if any. The status returned is
+   * - FINALIZATION_IN_PROGRESS, and the messages since the last query if the
+   *    finalization is still running
+   * - FINALIZATION_DONE with a message list containing the messages since
+   *    the last query, if the finalization ended but the messages were not
+   *    yet emitted to the client.
+   * - ALREADY_FINALIZED with an empty message list otherwise
+   * - If finalization is not in progress, but software layout version and
+   *    metadata layout version are different, the method will throw an
+   *    {@link OMException} with a result code INVALID_REQUEST
+   * - If during finalization an other client with different ID than the one
+   *    initiated finalization is calling the method, then an
+   *    {@link OMException} with a result code INVALID_REQUEST is thrown,
+   *    unless the request is forced by a new client, in which case the new
+   *    client takes over the old client and the old client should exit.
+   *
+   * @param takeover set force takeover of output monitoring
+   * @param readonly set readonly of output
+   * @param upgradeClientID String identifier of the upgrade finalizer client
+   * @return the finalization status and status messages.
+   * @throws IOException
+   *            if there was a problem during the query
+   * @throws OMException
+   *            if finalization is needed but not yet started
+   */
+  StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean takeover, boolean readonly
+  ) throws IOException;
+
   /*
    * S3 Specific functionality that is supported by Ozone Manager.
    */
@@ -533,4 +600,42 @@ public interface OzoneManagerProtocol
     return false;
   }
 
+  /**
+   *
+   * @param txnApplyWaitTimeoutSeconds Max time in SECONDS to wait for all
+   *                                   transactions before the prepare request
+   *                                   to be applied to the OM DB.
+   * @param txnApplyCheckIntervalSeconds Time in SECONDS to wait between
+   *                                     successive checks for all transactions
+   *                                     to be applied to the OM DB.
+   * @return
+   */
+  default long prepareOzoneManager(
+      long txnApplyWaitTimeoutSeconds, long txnApplyCheckIntervalSeconds)
+      throws IOException {
+    return -1;
+  }
+
+  /**
+   * Check if Ozone Manager is 'prepared' at a specific Txn Id.
+   * @param txnId passed in Txn Id
+   * @return PrepareStatus response
+   * @throws IOException on exception.
+   */
+  default PrepareStatusResponse getOzoneManagerPrepareStatus(long txnId)
+      throws IOException {
+    return PrepareStatusResponse.newBuilder()
+        .setCurrentTxnIndex(-1)
+        .setStatus(PrepareStatus.NOT_PREPARED)
+        .build();
+  }
+
+  /**
+   * Cancel the prepare state of the Ozone Manager. If ozone manager is not
+   * prepared, has no effect.
+   * @throws IOException on exception.
+   */
+  default CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
+    return CancelPrepareResponse.newBuilder().build();
+  }
 }

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -648,7 +649,8 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Mockito.verify(publisher, Mockito.times(1));
+    Mockito.verify(publisher, Mockito.times(1))
+        .fireEvent(Mockito.any(), Mockito.any(CommandForDatanode.class));
 
     Assert.assertEquals(0, containerManager.getContainerReplicas(
         containerOne.containerID()).size());

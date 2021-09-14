@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import com.google.common.collect.ImmutableList;
 
+import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -32,9 +34,23 @@ public final class ImmutableVolumeSet implements VolumeSet {
     this.volumes = ImmutableList.copyOf(volumes);
   }
 
+  public ImmutableVolumeSet(Collection<? extends StorageVolume> volumes) {
+    this.volumes = ImmutableList.copyOf(volumes);
+  }
+
   @Override
   public List<StorageVolume> getVolumesList() {
     return volumes;
+  }
+
+  @Override
+  public void checkAllVolumes(StorageVolumeChecker checker) throws IOException {
+    try {
+      checker.checkAllVolumes(volumes);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while running disk check", e);
+    }
   }
 
   @Override

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.dn.volume;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -39,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 
@@ -59,6 +61,8 @@ public class TestDatanodeHddsVolumeFailureToleration {
   public void init() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
+    ozoneConfig.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        0, StorageUnit.MB);
     ozoneConfig.setInt(OZONE_REPLICATION, ReplicationFactor.ONE.getValue());
     // set tolerated = 1
     DatanodeConfiguration dnConf =

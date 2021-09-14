@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
@@ -50,6 +51,15 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
+  // TODO: LEGACY should be removed and should not be exposed to the end user
+  // we will revisit during the client side defaulting behaviour
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
+
+  @Option(names = { "--type", "-t" },
+      description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
+      defaultValue = "LEGACY")
+  private AllowedBucketLayouts allowedBucketLayout;
+
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
 
@@ -60,9 +70,13 @@ public class CreateBucketHandler extends BucketHandler {
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    BucketArgs.Builder bb = new BucketArgs.Builder()
-        .setStorageType(StorageType.DEFAULT)
-        .setVersioning(false);
+    BucketArgs.Builder bb;
+    BucketLayout bucketLayout =
+        BucketLayout.valueOf(allowedBucketLayout.toString());
+    bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
+        .setVersioning(false).setBucketLayout(bucketLayout);
+
+    // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {
       bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(isGdprEnforced));

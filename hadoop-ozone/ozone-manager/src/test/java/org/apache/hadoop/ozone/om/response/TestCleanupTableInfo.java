@@ -70,6 +70,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -147,14 +148,20 @@ public class TestCleanupTableInfo {
       Assert.assertTrue(aClass + "does not have annotation of" +
               " CleanupTableInfo",
           aClass.isAnnotationPresent(CleanupTableInfo.class));
-      String[] cleanupTables =
-          aClass.getAnnotation(CleanupTableInfo.class).cleanupTables();
-      Assert.assertTrue(cleanupTables.length >=1);
-      for (String tableName : cleanupTables) {
-        Assert.assertTrue(tables.contains(tableName));
+      CleanupTableInfo annotation =
+          aClass.getAnnotation(CleanupTableInfo.class);
+      String[] cleanupTables = annotation.cleanupTables();
+      boolean cleanupAll = annotation.cleanupAll();
+      if (cleanupTables.length >= 1) {
+        Assert.assertTrue(
+            Arrays.stream(cleanupTables).allMatch(tables::contains)
+        );
+      } else {
+        assertTrue(cleanupAll);
       }
     });
   }
+
 
   private Set<Class<? extends OMClientResponse>> responseClasses() {
     Reflections reflections = new Reflections(OM_RESPONSE_PACKAGE);
@@ -185,8 +192,6 @@ public class TestCleanupTableInfo {
     verify(omMetrics, times(1)).incNumKeyAllocates();
   }
 
-
-
   private Map<String, Integer> recordCacheItemCounts() {
     Map<String, Integer> cacheItemCount = new HashMap<>();
     for (String tableName : om.getMetadataManager().listTableNames()) {
@@ -200,7 +205,8 @@ public class TestCleanupTableInfo {
     return cacheItemCount;
   }
 
-  private void assertCacheItemCounts(Map<String, Integer> cacheItemCount,
+  private void assertCacheItemCounts(
+      Map<String, Integer> cacheItemCount,
       Class<? extends OMClientResponse> responseClass
   ) {
     CleanupTableInfo ann = responseClass.getAnnotation(CleanupTableInfo.class);
@@ -355,7 +361,7 @@ public class TestCleanupTableInfo {
   }
 
   private DatanodeDetailsProto aDatanodeDetailsProto(String s,
-      String host1) {
+                                                     String host1) {
     return DatanodeDetailsProto.newBuilder()
         .setUuid(UUID.randomUUID().toString())
         .setIpAddress(s)

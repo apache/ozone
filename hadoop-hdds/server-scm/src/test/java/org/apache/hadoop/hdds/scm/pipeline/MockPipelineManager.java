@@ -209,6 +209,16 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public void freezePipelineCreation() {
+
+  }
+
+  @Override
+  public void resumePipelineCreation() {
+
+  }
+
+  @Override
   public void close() throws IOException {
 
   }
@@ -216,5 +226,25 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public Map<String, Integer> getPipelineInfo() {
     return null;
+  }
+
+  @Override
+  public void acquireReadLock() {
+
+  }
+
+  @Override
+  public void releaseReadLock() {
+
+  }
+
+  @Override
+  public void acquireWriteLock() {
+
+  }
+
+  @Override
+  public void releaseWriteLock() {
+
   }
 }

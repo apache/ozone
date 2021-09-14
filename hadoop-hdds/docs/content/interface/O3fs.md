@@ -63,6 +63,14 @@ Please add the following entry to the core-site.xml.
 </property>
 ```
 
+<div class="alert alert-warning" role="alert">
+
+Tip: For the [OM HA]({{< ref "feature/OM-HA.md">}}) cluster, you need to specify the ozone service id. For example, 
+if `ozone.om.service.ids = ozone1`, then the URL is `o3fs://bucket.volume.ozone1`.
+For non-HA, it can be `o3fs://bucket.volume`.
+
+</div>
+
 This will make this bucket to be the default Hadoop compatible file system and register the o3fs file system type.
 
 You also need to add the ozone-filesystem-hadoop3.jar file to the classpath:

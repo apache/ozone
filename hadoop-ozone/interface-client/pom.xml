@@ -59,9 +59,69 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <protocArtifact>
-                com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+                com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
               </protocArtifact>
             </configuration>
+          </execution>
+          <execution>
+            <id>compile-protoc3</id>
+            <goals>
+              <goal>compile</goal>
+              <goal>test-compile</goal>
+            </goals>
+            <configuration>
+              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+              <protocArtifact>
+                com.google.protobuf:protoc:${proto3.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
+              </protocArtifact>
+              <outputDirectory>target/generated-sources/protobuf/java/proto3</outputDirectory>
+              <clearOutputDirectory>false</clearOutputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>generate-sources</phase>
+            <configuration>
+              <tasks>
+                <replace token="com.google.protobuf"
+                         value="org.apache.hadoop.thirdparty.protobuf"
+                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
+                </replace>
+                <replace token="com.google.protobuf"
+                         value="org.apache.hadoop.thirdparty.protobuf"
+                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto">
+                </replace>
+                <replace token="org.apache.hadoop.ozone.protocol.proto"
+                         value="org.apache.hadoop.ozone.protocol.proto3"
+                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
+                </replace>
+                <replace token="org.apache.hadoop.ozone.security.proto"
+                         value="org.apache.hadoop.ozone.security.proto3"
+                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto">
+                </replace>
+                <replace token="org.apache.hadoop.hdds.protocol.proto"
+                         value="org.apache.hadoop.hdds.protocol.proto3"
+                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
+                </replace>
+                <replace token="org.apache.hadoop.ozone.security.proto"
+                         value="org.apache.hadoop.ozone.security.proto3"
+                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
+                </replace>
+                <move file="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto"
+                      tofile="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto3"/>
+                <move file="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto"
+                      tofile="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto3"/>
+                <move file="target/generated-sources/protobuf/java/proto3"
+                      tofile="target/generated-sources/protobuf/java/"/>
+              </tasks>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
           </execution>
         </executions>
       </plugin>

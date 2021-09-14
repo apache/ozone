@@ -51,12 +51,12 @@ public class CreateVolumeHandler extends VolumeHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
     if (ownerName == null) {
-      ownerName = UserGroupInformation.getCurrentUser().getUserName();
+      ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
     }
 
     String volumeName = address.getVolumeName();
 
-    String adminName = UserGroupInformation.getCurrentUser().getUserName();
+    String adminName = UserGroupInformation.getCurrentUser().getShortUserName();
     VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(ownerName);

@@ -27,8 +27,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -86,13 +86,11 @@ public class TestSCMInstallSnapshotWithHA {
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-    SCMHAConfiguration scmhaConfiguration =
-        conf.getObject(SCMHAConfiguration.class);
-    scmhaConfiguration.setRaftLogPurgeEnabled(true);
-    scmhaConfiguration.setRaftLogPurgeGap(LOG_PURGE_GAP);
-    scmhaConfiguration.setRatisSnapshotThreshold(SNAPSHOT_THRESHOLD);
-    conf.setFromObject(scmhaConfiguration);
 
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+            SNAPSHOT_THRESHOLD);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
@@ -136,6 +134,13 @@ public class TestSCMInstallSnapshotWithHA {
     // The recently started  should be lagging behind the leader .
     SCMStateMachine followerSM =
         followerSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
+    
+    // Wait & retry for follower to update transactions to leader
+    // snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
+    }, 100, 3000);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
     assertTrue(followerLastAppliedIndex >= 200);

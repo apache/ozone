@@ -77,4 +77,8 @@
     <Class name="org.apache.hadoop.ozone.security.TestOzoneTokenIdentifier"/>
     <Bug pattern="UC_USELESS_OBJECT" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.upgrade.TestOMLayoutFeatureAspect"/>
+    <Bug pattern="BC_IMPOSSIBLE_CAST" />
+  </Match>
 </FindBugsFilter>

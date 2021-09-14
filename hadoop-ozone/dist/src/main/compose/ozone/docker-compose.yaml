@@ -28,7 +28,7 @@ x-common-config:
 x-layout_version:
   &metadata_layout
   OZONE-SITE.XML_ozone.om.metadata.layout: ${OZONE_OM_METADATA_LAYOUT:-SIMPLE}
-  OZONE-SITE.XML_ozone.om.enable.filesystem.paths: ${OZONE_OM_ENABLE_FILESYSTEM_PATHS:-false}
+  OZONE-SITE.XML_ozone.om.enable.filesystem.paths: "${OZONE_OM_ENABLE_FILESYSTEM_PATHS:-false}"
 
 x-replication:
   &replication

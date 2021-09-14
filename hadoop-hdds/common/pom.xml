@@ -34,6 +34,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
@@ -178,6 +183,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>snakeyaml</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.reflections</groupId>
+      <artifactId>reflections</artifactId>
+      <version>0.9.11</version>
+    </dependency>
+    <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
@@ -194,6 +204,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-all</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.codahale.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+      <version>3.0.2</version>
+      <scope>test</scope>
+      <!-- Needed for mocking RaftServerImpl -->
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>

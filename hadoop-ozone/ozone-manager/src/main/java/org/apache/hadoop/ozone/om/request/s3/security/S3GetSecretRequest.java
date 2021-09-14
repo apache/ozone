@@ -190,4 +190,5 @@ public class S3GetSecretRequest extends OMClientRequest {
     }
     return omClientResponse;
   }
+
 }

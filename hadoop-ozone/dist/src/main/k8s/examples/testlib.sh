@@ -37,10 +37,13 @@ grep_log() {
 
 wait_for_startup(){
    print_phase "Waiting until the k8s cluster is running"
-   retry all_pods_are_running
-   retry grep_log scm-0 "SCM exiting safe mode."
-   retry grep_log om-0 "HTTP server of ozoneManager listening"
-   print_phase "Cluster is up and running"
+   if retry all_pods_are_running \
+       && retry grep_log scm-0 "SCM exiting safe mode." \
+       && retry grep_log om-0 "HTTP server of ozoneManager listening"; then
+     print_phase "Cluster is up and running"
+   else
+     return 1
+   fi
 }
 
 all_pods_are_running() {
@@ -72,7 +75,7 @@ start_k8s_env() {
    kubectl delete pvc --all
    kubectl delete pv --all
 
-   print_phase "Applying k8s resources from $1"
+   print_phase "Applying k8s resources from $(basename $(pwd))"
    kubectl apply -f .
    wait_for_startup
 }
@@ -102,7 +105,9 @@ regenerate_resources() {
 
   if [ $(basename $PARENT_OF_PARENT) == "k8s" ]; then
     #running from src dir
-    OZONE_ROOT=$(realpath ../../../../../target/ozone-0.6.0-SNAPSHOT)
+    local version
+    version=$(cd ../../../../.. && mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
+    OZONE_ROOT=$(realpath ../../../../../target/ozone-${version})
   else
     #running from dist
     OZONE_ROOT=$(realpath ../../..)

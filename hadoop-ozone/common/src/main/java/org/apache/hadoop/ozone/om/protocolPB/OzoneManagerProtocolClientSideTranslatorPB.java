@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -55,7 +57,6 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -79,6 +80,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
@@ -144,6 +149,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -154,6 +161,7 @@ import com.google.protobuf.ByteString;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -257,7 +265,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMResponse omResponse = submitRequest(omRequest);
-    OzoneManagerProtocolProtos.SetVolumePropertyResponse response =
+    SetVolumePropertyResponse response =
         handleError(omResponse).getSetVolumePropertyResponse();
 
     return response.getResponse();
@@ -682,6 +690,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize())
         .setSortDatanodes(args.getSortDatanodes())
         .setLatestVersionLocation(args.getLatestVersionLocation())
+        .setHeadOp(args.isHeadOp())
         .build();
     req.setKeyArgs(keyArgs);
 
@@ -1104,6 +1113,54 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(ServiceInfo::getFromProtobuf)
             .collect(Collectors.toList()),
         resp.getCaCertificate(), resp.getCaCertsList());
+  }
+
+  @Override
+  public StatusAndMessages finalizeUpgrade(String upgradeClientID)
+      throws IOException {
+    FinalizeUpgradeRequest req = FinalizeUpgradeRequest.newBuilder()
+        .setUpgradeClientId(upgradeClientID)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.FinalizeUpgrade)
+        .setFinalizeUpgradeRequest(req)
+        .build();
+
+    FinalizeUpgradeResponse response =
+        handleError(submitRequest(omRequest)).getFinalizeUpgradeResponse();
+
+    UpgradeFinalizationStatus status = response.getStatus();
+    return new StatusAndMessages(
+        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        status.getMessagesList()
+    );
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean takeover, boolean readonly
+  ) throws IOException {
+    FinalizeUpgradeProgressRequest req = FinalizeUpgradeProgressRequest
+        .newBuilder()
+        .setUpgradeClientId(upgradeClientID)
+        .setTakeover(takeover)
+        .setReadonly(readonly)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.FinalizeUpgradeProgress)
+        .setFinalizeUpgradeProgressRequest(req)
+        .build();
+
+    FinalizeUpgradeProgressResponse response =
+        handleError(submitRequest(omRequest))
+            .getFinalizeUpgradeProgressResponse();
+
+    UpgradeFinalizationStatus status = response.getStatus();
+
+    return new StatusAndMessages(
+        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        status.getMessagesList()
+    );
   }
 
   /**
@@ -1531,6 +1588,56 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest)).getRecoverTrashResponse();
 
     return recoverResponse.getResponse();
+  }
+
+  @Override
+  public long prepareOzoneManager(
+      long txnApplyWaitTimeoutSeconds, long txnApplyCheckIntervalSeconds)
+      throws IOException {
+    Preconditions.checkArgument(txnApplyWaitTimeoutSeconds > 0,
+        "txnApplyWaitTimeoutSeconds has to be > zero");
+
+    Preconditions.checkArgument(txnApplyCheckIntervalSeconds > 0 &&
+            txnApplyCheckIntervalSeconds < txnApplyWaitTimeoutSeconds / 2,
+        "txnApplyCheckIntervalSeconds has to be > zero and < half "
+            + "of txnApplyWaitTimeoutSeconds to make sense.");
+
+    PrepareRequest prepareRequest =
+        PrepareRequest.newBuilder().setArgs(
+            PrepareRequestArgs.newBuilder()
+                .setTxnApplyWaitTimeoutSeconds(txnApplyWaitTimeoutSeconds)
+                .setTxnApplyCheckIntervalSeconds(txnApplyCheckIntervalSeconds)
+                .build()).build();
+
+    OMRequest omRequest = createOMRequest(Type.Prepare)
+        .setPrepareRequest(prepareRequest).build();
+
+    PrepareResponse prepareResponse =
+        handleError(submitRequest(omRequest)).getPrepareResponse();
+    return prepareResponse.getTxnID();
+  }
+
+  @Override
+  public PrepareStatusResponse getOzoneManagerPrepareStatus(long txnId)
+      throws IOException {
+    PrepareStatusRequest prepareStatusRequest =
+        PrepareStatusRequest.newBuilder().setTxnID(txnId).build();
+    OMRequest omRequest = createOMRequest(Type.PrepareStatus)
+        .setPrepareStatusRequest(prepareStatusRequest).build();
+    PrepareStatusResponse prepareStatusResponse =
+        handleError(submitRequest(omRequest)).getPrepareStatusResponse();
+    return prepareStatusResponse;
+  }
+
+  @Override
+  public CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
+    CancelPrepareRequest cancelPrepareRequest =
+        CancelPrepareRequest.newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.CancelPrepare)
+        .setCancelPrepareRequest(cancelPrepareRequest).build();
+
+    return handleError(submitRequest(omRequest)).getCancelPrepareResponse();
   }
 
   @VisibleForTesting

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,14 +52,17 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Test Recon ICR handler.
  */
 public class TestReconIncrementalContainerReportHandler
     extends AbstractReconContainerManagerTest {
+  private HDDSLayoutVersionManager versionManager;
 
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
@@ -82,8 +86,16 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+
     NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext());
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
+
     nodeManager.register(datanodeDetails, null, null);
 
     ReconContainerManager containerManager = getContainerManager();

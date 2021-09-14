@@ -78,12 +78,13 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
             LOG.info("SCM is in safe mode. No more retries.");
           }
         } while (remainingTime > 0);
-      } catch (Exception ex) {
+      } catch (InterruptedException ex) {
         LOG.info(
             "SCM is not available (yet?). Error is {}. Will retry in 1 sec. "
                 + "Remaining time (sec): {}",
             ex.getMessage(), getRemainingTimeInSec());
         Thread.sleep(1000);
+        Thread.currentThread().interrupt();
       }
     }
     throw new TimeoutException(

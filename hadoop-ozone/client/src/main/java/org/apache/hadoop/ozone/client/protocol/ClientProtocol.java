@@ -736,4 +736,20 @@ public interface ClientProtocol {
    */
   void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException;
+
+  /**
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object.
+   *
+   * If Key exists, return returns OzoneKey.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @return OzoneKey which gives basic information about the key.
+   * @throws IOException
+   */
+  OzoneKey headObject(String volumeName, String bucketName,
+      String keyName) throws IOException;
 }

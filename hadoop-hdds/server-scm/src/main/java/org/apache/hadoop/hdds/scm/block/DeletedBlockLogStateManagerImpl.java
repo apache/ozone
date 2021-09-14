@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -34,6 +36,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,18 +56,19 @@ public class DeletedBlockLogStateManagerImpl
       LoggerFactory.getLogger(DeletedBlockLogStateManagerImpl.class);
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;
+  private ContainerManagerV2 containerManager;
   private final DBTransactionBuffer transactionBuffer;
   private final int maxRetry;
   private final Set<Long> deletingTxIDs;
   private final Set<Long> skippingRetryTxIDs;
 
-  public DeletedBlockLogStateManagerImpl(
-      ConfigurationSource conf,
+  public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
       Table<Long, DeletedBlocksTransaction> deletedTable,
-      DBTransactionBuffer txBuffer) {
+      ContainerManagerV2 containerManager, DBTransactionBuffer txBuffer) {
     this.maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.deletedTable = deletedTable;
+    this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
     final boolean isRatisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
     this.deletingTxIDs = isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
@@ -167,9 +172,14 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
       throws IOException {
+    Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
     for (DeletedBlocksTransaction tx : txs) {
+      long tid = tx.getTxID();
+      containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
+          (k, v) -> v != null && v > tid ? v : tid);
       transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
     }
+    containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
   }
 
   @Override
@@ -242,6 +252,7 @@ public class DeletedBlockLogStateManagerImpl
     private SCMRatisServer scmRatisServer;
     private Table<Long, DeletedBlocksTransaction> table;
     private DBTransactionBuffer transactionBuffer;
+    private ContainerManagerV2 containerManager;
 
     public Builder setConfiguration(final ConfigurationSource config) {
       conf = config;
@@ -264,12 +275,18 @@ public class DeletedBlockLogStateManagerImpl
       return this;
     }
 
+    public Builder setContainerManager(ContainerManagerV2 contManager) {
+      this.containerManager = contManager;
+      return this;
+    }
+
     public DeletedBlockLogStateManager build() {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(table);
 
       final DeletedBlockLogStateManager impl =
-          new DeletedBlockLogStateManagerImpl(conf, table, transactionBuffer);
+          new DeletedBlockLogStateManagerImpl(conf, table, containerManager,
+              transactionBuffer);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.BLOCK,
@@ -280,6 +297,5 @@ public class DeletedBlockLogStateManagerImpl
           new Class<?>[]{DeletedBlockLogStateManager.class},
           invocationHandler);
     }
-
   }
 }

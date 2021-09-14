@@ -27,8 +27,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -41,21 +39,23 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import java.util.Arrays;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
@@ -66,6 +66,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -100,6 +102,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
@@ -113,13 +116,11 @@ import org.junit.Test;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Test class that exercises the StorageContainerManager.
@@ -139,9 +140,6 @@ public class TestStorageContainerManager {
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
-
-  @Rule
-  public TemporaryFolder folder= new TemporaryFolder();
 
   @BeforeClass
   public static void setup() throws IOException {
@@ -404,8 +402,17 @@ public class TestStorageContainerManager {
       GenericTestUtils.waitFor(() -> {
         NodeManager nodeManager = cluster.getStorageContainerManager()
             .getScmNodeManager();
+        LayoutVersionManager versionManager =
+            nodeManager.getLayoutVersionManager();
+        StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo
+            = StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+            .newBuilder()
+            .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+            .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+            .build();
         List<SCMCommand> commands = nodeManager.processHeartbeat(
-            nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0));
+            nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0),
+            layoutInfo);
         if (commands != null) {
           for (SCMCommand cmd : commands) {
             if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
@@ -558,8 +565,7 @@ public class TestStorageContainerManager {
   @VisibleForTesting
   public static void validateRatisGroupExists(OzoneConfiguration conf,
       String clusterId) throws IOException {
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
-    final RaftProperties properties = RatisUtil.newRaftProperties(haConf, conf);
+    final RaftProperties properties = RatisUtil.newRaftProperties(conf);
     final RaftGroupId raftGroupId =
         SCMRatisServerImpl.buildRaftGroupId(clusterId);
     final AtomicBoolean found = new AtomicBoolean(false);
@@ -743,10 +749,9 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
 
       helper.createKeys(10, 4096);
-      GenericTestUtils.waitFor(() -> {
-        return cluster.getStorageContainerManager().getContainerManager().
-            getContainers() != null;
-      }, 1000, 10000);
+      GenericTestUtils.waitFor(() ->
+          cluster.getStorageContainerManager().getContainerManager()
+              .getContainers() != null, 1000, 10000);
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<ContainerInfo> containers = cluster.getStorageContainerManager()
@@ -800,7 +805,7 @@ public class TestStorageContainerManager {
       Thread.sleep(5000);
       // Give ReplicationManager some time to process the containers.
       cluster.getStorageContainerManager()
-          .getReplicationManager().processContainersNow();
+          .getReplicationManager().processAll();
       Thread.sleep(5000);
 
       verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
@@ -820,9 +825,8 @@ public class TestStorageContainerManager {
     }
   }
 
-  @SuppressWarnings("visibilitymodifier")
-  static class CloseContainerCommandMatcher
-      extends ArgumentMatcher<CommandForDatanode> {
+  private static class CloseContainerCommandMatcher
+      implements ArgumentMatcher<CommandForDatanode> {
 
     private final CommandForDatanode cmd;
     private final UUID uuid;
@@ -833,8 +837,7 @@ public class TestStorageContainerManager {
     }
 
     @Override
-    public boolean matches(Object argument) {
-      CommandForDatanode cmdRight = (CommandForDatanode) argument;
+    public boolean matches(CommandForDatanode cmdRight) {
       CloseContainerCommand left = (CloseContainerCommand) cmd.getCommand();
       CloseContainerCommand right =
           (CloseContainerCommand) cmdRight.getCommand();

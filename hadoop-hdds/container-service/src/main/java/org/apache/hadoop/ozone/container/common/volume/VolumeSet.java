@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import org.apache.hadoop.ozone.lock.ReadWriteLockable;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -26,4 +27,6 @@ import java.util.List;
  */
 public interface VolumeSet extends ReadWriteLockable {
   List<StorageVolume> getVolumesList();
+
+  void checkAllVolumes(StorageVolumeChecker checker) throws IOException;
 }

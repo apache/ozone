@@ -139,7 +139,6 @@ public class TestOzoneShellHA {
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
-    conf.setQuietMode(false);
     cluster.waitForClusterToBeReady();
   }
 
@@ -337,7 +336,8 @@ public class TestOzoneShellHA {
         "volume", "create", "o3://" + omServiceId + volumeName};
     execute(ozoneShell, args);
 
-    String bucketName = volumeName + OzoneConsts.OZONE_URI_DELIMITER + "bucket";
+    String bucketName =
+        volumeName + OzoneConsts.OZONE_URI_DELIMITER + "testbucket";
     for (int i = 0; i < numOfBuckets; i++) {
       args = new String[] {
           "bucket", "create", "o3://" + omServiceId + bucketName + i};
@@ -447,17 +447,17 @@ public class TestOzoneShellHA {
     args = new String[] {"bucket", "list", destinationVolume};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(100, getNumOfBuckets("bucket"));
+    Assert.assertEquals(100, getNumOfBuckets("testbucket"));
 
     // Test case 2: test listing buckets for setting --start with last bucket.
     // ozone sh bucket list /volume5 --start=bucket99 /volume5
     // Expectation: Get empty list.
-    final String startBucket = "--start=bucket99";
+    final String startBucket = "--start=testbucket99";
     out.reset();
     args = new String[] {"bucket", "list", startBucket, destinationVolume};
     execute(ozoneShell, args);
     Assert.assertEquals(0, out.size());
-    Assert.assertEquals(0, getNumOfBuckets("bucket"));
+    Assert.assertEquals(0, getNumOfBuckets("testbucket"));
   }
 
   /**

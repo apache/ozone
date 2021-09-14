@@ -78,8 +78,12 @@ Setup dummy credentials for S3
                         Execute                    aws configure set aws_secret_access_key dlfknslnfslf
                         Execute                    aws configure set region us-west-1
 
+Generate Ozone String
+    ${randStr} =         Generate Random String     10  [NUMBERS]
+    [Return]             ozone-test-${randStr}
+
 Create bucket
-    ${postfix} =         Generate Random String  5  [NUMBERS]
+    ${postfix} =         Generate Ozone String
     ${bucket} =          Set Variable               bucket-${postfix}
                          Create bucket with name    ${bucket}
     [Return]             ${bucket}
@@ -88,7 +92,7 @@ Create bucket with name
     [Arguments]          ${bucket}
     ${result} =          Execute AWSS3APICli  create-bucket --bucket ${bucket}
                          Should contain              ${result}         Location
-                         Should contain              ${result}         ${ENDPOINT_URL}/${bucket}
+                         Should contain              ${result}         ${bucket}
 
 Setup s3 tests
     Run Keyword        Generate random prefix
@@ -112,5 +116,5 @@ Create link
     [return]          ${bucket}
 
 Generate random prefix
-    ${random} =          Generate Random String  5  [NUMBERS]
+    ${random} =          Generate Ozone String
                          Set Suite Variable  ${PREFIX}  ${random}

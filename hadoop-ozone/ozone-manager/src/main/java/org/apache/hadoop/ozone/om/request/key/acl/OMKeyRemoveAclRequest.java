@@ -146,5 +146,6 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
     return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
         omDoubleBufferHelper);
   }
+
 }
 

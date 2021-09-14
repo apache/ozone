@@ -119,8 +119,9 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     int numContainers = containerStateManager
         .getMatchingContainerIDs(OzoneConsts.OZONE,
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
+            ReplicationConfig.fromTypeAndFactor(
+                SCMTestUtils.getReplicationType(conf),
+                SCMTestUtils.getReplicationFactor(conf)),
             HddsProtos.LifeCycleState.OPEN).size();
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
         container2.getContainerInfo().getContainerID());
@@ -332,8 +333,9 @@ public class TestContainerStateManagerIntegration {
       InvalidStateTransitionException {
     NavigableSet<ContainerID> containerList = containerStateManager
         .getMatchingContainerIDs(OzoneConsts.OZONE,
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
+            ReplicationConfig.fromTypeAndFactor(
+                SCMTestUtils.getReplicationType(conf),
+                SCMTestUtils.getReplicationFactor(conf)),
             HddsProtos.LifeCycleState.OPEN);
     int containers = containerList == null ? 0 : containerList.size();
     Assert.assertEquals(0, containers);
@@ -346,8 +348,9 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
+        ReplicationConfig.fromTypeAndFactor(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf)),
         HddsProtos.LifeCycleState.OPEN).size();
     Assert.assertEquals(1, containers);
 
@@ -356,8 +359,9 @@ public class TestContainerStateManagerIntegration {
             HddsProtos.LifeCycleEvent.FINALIZE);
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
+        ReplicationConfig.fromTypeAndFactor(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf)),
         HddsProtos.LifeCycleState.CLOSING).size();
     Assert.assertEquals(1, containers);
 
@@ -366,8 +370,9 @@ public class TestContainerStateManagerIntegration {
             HddsProtos.LifeCycleEvent.CLOSE);
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
+        ReplicationConfig.fromTypeAndFactor(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf)),
         HddsProtos.LifeCycleState.CLOSED).size();
     Assert.assertEquals(1, containers);
 
@@ -376,8 +381,9 @@ public class TestContainerStateManagerIntegration {
             HddsProtos.LifeCycleEvent.DELETE);
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
+        ReplicationConfig.fromTypeAndFactor(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf)),
         HddsProtos.LifeCycleState.DELETING).size();
     Assert.assertEquals(1, containers);
 
@@ -386,8 +392,9 @@ public class TestContainerStateManagerIntegration {
             HddsProtos.LifeCycleEvent.CLEANUP);
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
+        ReplicationConfig.fromTypeAndFactor(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf)),
         HddsProtos.LifeCycleState.DELETED).size();
     Assert.assertEquals(1, containers);
 
@@ -405,8 +412,9 @@ public class TestContainerStateManagerIntegration {
             HddsProtos.LifeCycleEvent.CLOSE);
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
+        ReplicationConfig.fromTypeAndFactor(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf)),
         HddsProtos.LifeCycleState.CLOSED).size();
     Assert.assertEquals(1, containers);
   }

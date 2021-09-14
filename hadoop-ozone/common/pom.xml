@@ -72,6 +72,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>spotbugs-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-framework</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

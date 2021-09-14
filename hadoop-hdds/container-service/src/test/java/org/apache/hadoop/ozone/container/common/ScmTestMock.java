@@ -21,6 +21,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -65,6 +67,11 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   public ScmTestMock() {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
+  }
+
+  public ScmTestMock(String clusterId, String scmId) {
+    this.clusterId = clusterId;
+    this.scmId = scmId;
   }
 
   // Map of datanode to containers
@@ -219,10 +226,11 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   @Override
   public StorageContainerDatanodeProtocolProtos
       .SCMRegisteredResponseProto register(
-          ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
-          NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReportsProto)
+      ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
+      NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReportsProto,
+      LayoutVersionProto layoutInfo)
       throws IOException {
     rpcCount.incrementAndGet();
     DatanodeDetailsProto datanodeDetailsProto =
@@ -348,5 +356,9 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
 
   public void setClusterId(String clusterId) {
     this.clusterId = clusterId;
+  }
+
+  public void setScmId(String scmId) {
+    this.scmId = scmId;
   }
 }

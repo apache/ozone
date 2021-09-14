@@ -80,6 +80,7 @@ public class TestReconAsPassiveScm {
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
+    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
   }
 
   @After

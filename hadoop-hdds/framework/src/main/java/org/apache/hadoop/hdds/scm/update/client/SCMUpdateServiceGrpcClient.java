@@ -183,8 +183,9 @@ public class SCMUpdateServiceGrpcClient {
     channel.shutdown();
     try {
       channel.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       LOG.error("Failed to shutdown {} channel", CLIENT_NAME, e);
+      Thread.currentThread().interrupt();
     } finally {
       channel.shutdownNow();
       channel = null;

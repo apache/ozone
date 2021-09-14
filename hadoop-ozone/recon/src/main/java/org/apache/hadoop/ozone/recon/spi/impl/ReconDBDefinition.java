@@ -17,7 +17,6 @@
  *
  */
 package org.apache.hadoop.ozone.recon.spi.impl;
-
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
@@ -25,7 +24,9 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.codec.ContainerReplicaHistoryListCodec;
+import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 
 /**
  * RocksDB definition for the DB internal to Recon.
@@ -65,6 +66,14 @@ public class ReconDBDefinition implements DBDefinition {
           ContainerReplicaHistoryList.class,
           new ContainerReplicaHistoryListCodec());
 
+  public static final DBColumnFamilyDefinition<Long, NSSummary>
+      NAMESPACE_SUMMARY = new DBColumnFamilyDefinition<Long, NSSummary>(
+          "namespaceSummaryTable",
+          Long.class,
+          new LongCodec(),
+          NSSummary.class,
+          new NSSummaryCodec());
+
   @Override
   public String getName() {
     return dbName;
@@ -78,6 +87,6 @@ public class ReconDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {
-        CONTAINER_KEY, CONTAINER_KEY_COUNT, REPLICA_HISTORY};
+        CONTAINER_KEY, CONTAINER_KEY_COUNT, REPLICA_HISTORY, NAMESPACE_SUMMARY};
   }
 }

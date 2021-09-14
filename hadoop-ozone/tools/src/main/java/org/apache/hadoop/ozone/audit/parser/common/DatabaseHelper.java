@@ -85,7 +85,7 @@ public final class DatabaseHelper {
         throw new FileNotFoundException("property file '"
             + ParserConsts.PROPS_FILE + "' not found in the classpath");
       }
-    } catch(Exception e){
+    } catch (Exception e){
       LOG.error(e.getMessage());
     }
 
@@ -124,8 +124,9 @@ public final class DatabaseHelper {
           preparedStatement.executeBatch();
         }
       }
-      if (!auditEntries.isEmpty()) {
-        preparedStatement.executeBatch(); // insert remaining records
+      if (auditEntries.size() % batchSize != 0) {
+        // insert remaining records
+        preparedStatement.executeBatch();
       }
     }
     return true;
@@ -199,8 +200,8 @@ public final class DatabaseHelper {
     StringBuilder result = new StringBuilder();
     ResultSetMetaData rsm;
     try (Connection connection = getConnection(dbName);
-         Statement st = connection.createStatement();
-         ResultSet rs = st.executeQuery(sql)) {
+        PreparedStatement ps = connection.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery()) {
       if (rs != null) {
         rsm = rs.getMetaData();
         int cols = rsm.getColumnCount();

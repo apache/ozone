@@ -118,6 +118,7 @@ public class SCMSnapshotProvider {
       downloadClient.download(targetFile.toPath()).get();
     } catch (ExecutionException | InterruptedException e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
+      Thread.currentThread().interrupt();
       throw new IOException(e);
     }
 

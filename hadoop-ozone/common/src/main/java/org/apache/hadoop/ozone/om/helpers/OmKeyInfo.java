@@ -286,7 +286,6 @@ public final class OmKeyInfo extends WithParentObjectId {
       // it is important that the new version are always at the tail of the list
       OmKeyLocationInfoGroup currentLatestVersion =
           keyLocationVersions.get(keyLocationVersions.size() - 1);
-      // the new version is created based on the current latest version
       OmKeyLocationInfoGroup newVersion =
           currentLatestVersion.generateNextVersion(newLocationList);
       keyLocationVersions.add(newVersion);
@@ -481,13 +480,26 @@ public final class OmKeyInfo extends WithParentObjectId {
   }
 
   /**
-   * For network transmit.
+   * For network transmit to return KeyInfo.
+   * @param clientVersion
+   * @param latestVersion
+   * @return key info.
+   */
+  public KeyInfo getNetworkProtobuf(int clientVersion, boolean latestVersion) {
+    return getProtobuf(false, null, clientVersion, latestVersion);
+  }
+
+  /**
+   * For network transmit to return KeyInfo.
    *
    * @param fullKeyName the user given full key name
+   * @param clientVersion
+   * @param latestVersion
    * @return key info with the user given full key name
    */
-  public KeyInfo getProtobuf(String fullKeyName, int clientVersion) {
-    return getProtobuf(false, fullKeyName, clientVersion);
+  public KeyInfo getNetworkProtobuf(String fullKeyName, int clientVersion,
+      boolean latestVersion) {
+    return getProtobuf(false, fullKeyName, clientVersion, latestVersion);
   }
 
   /**
@@ -496,7 +508,7 @@ public final class OmKeyInfo extends WithParentObjectId {
    * @return
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
-    return getProtobuf(ignorePipeline, null, clientVersion);
+    return getProtobuf(ignorePipeline, null, clientVersion, false);
   }
 
   /**
@@ -507,14 +519,21 @@ public final class OmKeyInfo extends WithParentObjectId {
    * @return key info object
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
-                              int clientVersion) {
+                              int clientVersion, boolean latestVersionBlocks) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
-    for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-      keyLocations.add(locationInfoGroup.getProtobuf(
-          ignorePipeline, clientVersion));
+    if (!latestVersionBlocks) {
+      for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
+        keyLocations.add(locationInfoGroup.getProtobuf(
+            ignorePipeline, clientVersion));
+      }
+    } else {
+      if (latestVersion != -1) {
+        keyLocations.add(keyLocationVersions.get(keyLocationVersions.size() - 1)
+            .getProtobuf(ignorePipeline, clientVersion));
+      }
     }
 
     KeyInfo.Builder kb = KeyInfo.newBuilder()

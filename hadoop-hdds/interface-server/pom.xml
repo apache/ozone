@@ -63,11 +63,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <protocArtifact>
-                com.google.protobuf:protoc:${protobuf-compile.version}:exe:${os.detected.classifier}
+                com.google.protobuf:protoc:${grpc.protobuf-compile.version}:exe:${os.detected.classifier}
               </protocArtifact>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>InterSCMProtocol.proto</include>
+                <include>SCMUpdateProtocol.proto</include>
               </includes>
               <outputDirectory>target/generated-sources/java</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
@@ -85,11 +86,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <protocArtifact>
-                com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+                com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
               </protocArtifact>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
+                <exclude>SCMUpdateProtocol.proto</exclude>
               </excludes>
               <outputDirectory>target/generated-sources/java</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>

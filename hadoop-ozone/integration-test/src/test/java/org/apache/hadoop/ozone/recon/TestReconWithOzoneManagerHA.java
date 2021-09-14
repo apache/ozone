@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
@@ -130,10 +130,10 @@ public class TestReconWithOzoneManagerHA {
     // Sync data to Recon
     impl.syncDataFromOM();
 
-    ContainerDBServiceProvider containerDBServiceProvider =
-        cluster.getReconServer().getContainerDBServiceProvider();
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        cluster.getReconServer().getReconContainerMetadataManager();
     TableIterator iterator =
-        containerDBServiceProvider.getContainerTableIterator();
+        reconContainerMetadataManager.getContainerTableIterator();
     String reconKeyPrefix = null;
     while (iterator.hasNext()) {
       Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
