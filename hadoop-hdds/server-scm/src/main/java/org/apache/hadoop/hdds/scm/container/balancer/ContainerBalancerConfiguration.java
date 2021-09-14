@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -111,10 +112,12 @@ public final class ContainerBalancerConfiguration {
    */
   public ContainerBalancerConfiguration(
       OzoneConfiguration ozoneConfiguration) {
+    Preconditions.checkNotNull(ozoneConfiguration,
+        "OzoneConfiguration should not be null.");
     this.ozoneConfiguration = ozoneConfiguration;
 
     // balancing interval should be greater than DUFactory refresh period
-    duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
+    duConf = this.ozoneConfiguration.getObject(DUFactory.Conf.class);
     balancingInterval = duConf.getRefreshPeriod().toMillis() +
         Duration.ofMinutes(10).toMillis();
   }
@@ -273,6 +276,15 @@ public final class ContainerBalancerConfiguration {
       LOG.warn("Balancing interval duration must be greater than du refresh " +
           "period, {} milliseconds", duConf.getRefreshPeriod().toMillis());
     }
+  }
+
+  /**
+   * Gets the {@link OzoneConfiguration} using which this configuration was
+   * constructed.
+   * @return the {@link OzoneConfiguration} being used by this configuration
+   */
+  public OzoneConfiguration getOzoneConfiguration() {
+    return this.ozoneConfiguration;
   }
 
   @Override

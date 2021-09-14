@@ -297,10 +297,15 @@ cleanup_docker_images() {
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
   local dir="${2:-${RESULT_DIR}}"
+  local xunitdir="${3:-}"
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     if [ -z "${xunitdir}" ]; then
+       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     else
+       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
+     fi
   else
      echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
      exit 1
@@ -402,19 +407,3 @@ prepare_for_runner_image() {
   export OZONE_IMAGE="apache/ozone-runner:${v}"
 }
 
-## @description Activate the version-specific behavior for a given release
-## @param the release for which definitions should be loaded
-load_version_specifics() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  source "${_testlib_dir}/versions/${v}.sh"
-
-  ozone_version_load
-}
-
-## @description Deactivate the previously version-specific behavior,
-##   reverting to the current version's definitions
-unload_version_specifics() {
-  ozone_version_unload
-}

@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -73,6 +74,7 @@ public final class SCMHAUtils {
           .add(SCMException.class)
           .add(NonRetriableException.class)
           .add(PipelineNotFoundException.class)
+          .add(ContainerNotFoundException.class)
           .build();
 
   private SCMHAUtils() {
@@ -127,7 +129,7 @@ public final class SCMHAUtils {
    */
   public static String getSCMRatisDirectory(ConfigurationSource conf) {
     String scmRatisDirectory =
-        conf.getObject(SCMHAConfiguration.class).getRatisStorageDir();
+            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(scmRatisDirectory)) {
       scmRatisDirectory = ServerUtils.getDefaultRatisDirectory(conf);
@@ -137,7 +139,7 @@ public final class SCMHAUtils {
 
   public static String getSCMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir =
-        conf.getObject(SCMHAConfiguration.class).getRatisStorageDir();
+            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
 
     // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
     if (Strings.isNullOrEmpty(snapshotDir)) {

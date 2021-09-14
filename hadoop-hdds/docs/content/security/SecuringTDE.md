@@ -66,3 +66,57 @@ via the encKey and while reading the clients will talk to Key Management
 Server and read the key and decrypt it. In other words, the data stored
 inside Ozone is always encrypted. The fact that data is encrypted at rest
 will be completely transparent to the clients and end users.
+
+### Using Transparent Data Encryption from S3G
+
+There are two ways to create an encrypted bucket that can be accessed via S3 Gateway.
+
+####1. Create a bucket using shell under "/s3v" volume
+
+  ```bash
+  ozone sh bucket create -k encKey /s3v/encryptedBucket
+  ```
+####2. Create a link to an encrypted bucket under "/s3v" volume
+
+  ```bash
+  ozone sh bucket create -k encKey /vol/encryptedBucket
+  ozone sh bucket link  /vol/encryptedBucket /s3v/linkencryptedbucket
+  ```
+Note: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
+After creating an encrypted bucket, all the keys added to this bucket using s3g will be encrypted.
+
+In non-secure mode, the user running the S3Gateway daemon process is the proxy user, 
+while in secure mode the S3Gateway Kerberos principal (ozone.s3g.kerberos.principal) is the proxy user. 
+S3Gateway proxy's all the users accessing the encrypted buckets to decrypt the key. 
+For this purpose on security enabled cluster, during S3Gateway server startup 
+logins using configured 
+**ozone.s3g.kerberos.keytab.file**  and **ozone.s3g.kerberos.principal**. 
+
+The below two configurations must be added to the kms-site.xml to allow the S3Gateway principal to act as a proxy for other users. In this example, "ozone.s3g.kerberos.principal" is assumed to be "s3g"
+
+```
+<property>
+  <name>hadoop.kms.proxyuser.s3g.users</name>
+  <value>user1,user2,user3</value>
+  <description>
+        Here the value can be all the S3G accesskey ids accessing Ozone S3 
+        or set to '*' to allow all the accesskey ids.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.kms.proxyuser.s3g.hosts</name>
+  <value>s3g-host1.com</value>
+  <description>
+         This is the host where the S3Gateway is running. Set this to '*' to allow
+         requests from any hosts to be proxied.
+  </description>
+
+</property>
+
+```
+
+###KMS Authorization
+If Ranger authorization is enabled for KMS, then decrypt key permission should be given to
+access key id user(currently access key is kerberos principal) to decrypt the encrypted key 
+to read/write a key in the encrypted bucket.

@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
@@ -67,7 +66,6 @@ public class SCMBlockDeletingService extends BackgroundService
 
   private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 1;
   private final DeletedBlockLog deletedBlockLog;
-  private final ContainerManagerV2 containerManager;
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
   private final SCMContext scmContext;
@@ -83,14 +81,13 @@ public class SCMBlockDeletingService extends BackgroundService
 
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
-      ContainerManagerV2 containerManager, NodeManager nodeManager,
+              NodeManager nodeManager,
       EventPublisher eventPublisher, SCMContext scmContext,
       SCMServiceManager serviceManager, Duration interval, long serviceTimeout,
       ConfigurationSource conf, ScmBlockDeletingServiceMetrics metrics) {
     super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
     this.deletedBlockLog = deletedBlockLog;
-    this.containerManager = containerManager;
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;

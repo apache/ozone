@@ -147,7 +147,7 @@ public class SCMUpgradeFinalizer extends
       for (Pipeline pipeline : pipelineManager.getPipelines()) {
         if (pipeline.getPipelineState() != CLOSED) {
           pipelineFound = true;
-          pipelineManager.closePipeline(pipeline, false);
+          pipelineManager.closePipeline(pipeline, true);
         }
       }
       try {

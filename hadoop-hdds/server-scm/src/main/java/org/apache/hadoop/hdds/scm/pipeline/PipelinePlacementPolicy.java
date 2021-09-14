@@ -447,7 +447,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   }
 
   @Override
-  protected int getRequiredRackCount() {
+  protected int getRequiredRackCount(int numReplicas) {
     return REQUIRED_RACKS;
   }
 
