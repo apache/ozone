@@ -47,6 +47,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
+
 /**
  * Class to scan API Service classes and bind them to the injector.
  */
@@ -113,10 +116,14 @@ public class ReconRestServletModule extends ServletModule {
             basePath);
       }
 
-      for (String path: subPaths) {
-        filter(basePath + path).through(ReconAdminFilter.class);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Added admin filter to path {}", basePath + path);
+      boolean aclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
+          OZONE_ACL_ENABLED_DEFAULT);
+      if (aclEnabled) {
+        for (String path: subPaths) {
+          filter(basePath + path).through(ReconAdminFilter.class);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Added admin filter to path {}", basePath + path);
+          }
         }
       }
     }
