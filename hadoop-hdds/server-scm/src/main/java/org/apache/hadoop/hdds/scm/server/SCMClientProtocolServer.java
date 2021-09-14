@@ -408,23 +408,26 @@ public class SCMClientProtocolServer implements
     }
     try {
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      if(state != null && factor != null) {
-        return scm.getContainerManager().getContainers(state).stream()
-            .filter(info -> info.containerID().getId() >= startContainerID)
-            .filter(info -> (info.getReplicationFactor() == factor))
-            .sorted().limit(count).collect(Collectors.toList());
-      } else if (state == null && factor == null) {
-        return scm.getContainerManager().getContainers(containerId, count);
-      } else if (state != null) {
-        return scm.getContainerManager().getContainers(state).stream()
-            .filter(info -> info.containerID().getId() >= startContainerID)
-            .sorted().limit(count).collect(Collectors.toList());
+      if (state != null) {
+        if (factor != null) {
+          return scm.getContainerManager().getContainers(state).stream()
+                  .filter(info -> info.containerID().getId() >= startContainerID)
+                  .filter(info -> (info.getReplicationFactor() == factor))
+                  .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(state).stream()
+                  .filter(info -> info.containerID().getId() >= startContainerID)
+                  .sorted().limit(count).collect(Collectors.toList());
+        }
       } else {
-        // factor != null
-        return scm.getContainerManager().getContainers().stream()
-            .filter(info -> info.containerID().getId() >= startContainerID)
-            .filter(info -> info.getReplicationFactor() == factor)
-            .sorted().limit(count).collect(Collectors.toList());
+        if (factor != null) {
+          return scm.getContainerManager().getContainers().stream()
+                  .filter(info -> info.containerID().getId() >= startContainerID)
+                  .filter(info -> info.getReplicationFactor() == factor)
+                  .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(containerId, count);
+        }
       }
     } catch (Exception ex) {
       auditSuccess = false;
