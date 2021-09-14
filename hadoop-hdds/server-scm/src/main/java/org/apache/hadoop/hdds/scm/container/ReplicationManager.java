@@ -426,8 +426,12 @@ public class ReplicationManager implements SCMService {
          * we have to resend close container command to the datanodes.
          */
         if (state == LifeCycleState.CLOSING) {
-          replicas.forEach(replica -> sendCloseCommand(
-              container, replica.getDatanodeDetails(), false));
+          for (ContainerReplica replica: replicas) {
+            if (replica.getState() != State.UNHEALTHY) {
+              sendCloseCommand(
+                  container, replica.getDatanodeDetails(), false);
+            }
+          }
           return;
         }
 
