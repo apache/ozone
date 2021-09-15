@@ -139,7 +139,7 @@ public class S3GetSecretRequest extends OMClientRequest {
         // Not found. Fallback to S3SecretTable
         s3SecretValue = omMetadataManager.getS3SecretTable().get(kerberosID);
 
-        // If s3Secret for user is not in S3Secret table, add the Secret to cache.
+        // If s3Secret for user is not in S3Secret table, add its cache entry
         if (s3SecretValue == null) {
           omMetadataManager.getS3SecretTable().addCacheEntry(
               new CacheKey<>(kerberosID),
