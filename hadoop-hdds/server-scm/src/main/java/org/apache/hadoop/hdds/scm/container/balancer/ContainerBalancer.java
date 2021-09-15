@@ -594,15 +594,14 @@ public class ContainerBalancer {
       Collection<DatanodeDetails> potentialTargets,
       Set<DatanodeDetails> selectedTargets,
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
-    countDatanodesInvolvedPerIteration += 2;
-    // don't count a source that has been involved in move earlier
-    if (sourceToTargetMap.containsKey(source) ||
-        selectedTargets.contains(source)) {
-      countDatanodesInvolvedPerIteration -= 1;
+    // count source if it has not been involved in move earlier
+    if (!sourceToTargetMap.containsKey(source) &&
+        !selectedTargets.contains(source)) {
+      countDatanodesInvolvedPerIteration += 1;
     }
-    // don't count a target that has been involved in move earlier
-    if (selectedTargets.contains(moveSelection.getTargetNode())) {
-      countDatanodesInvolvedPerIteration -= 1;
+    // count target if it has not been involved in move earlier
+    if (!selectedTargets.contains(moveSelection.getTargetNode())) {
+      countDatanodesInvolvedPerIteration += 1;
     }
     incSizeSelectedForMoving(source, moveSelection);
     sourceToTargetMap.put(source, moveSelection);
