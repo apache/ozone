@@ -103,8 +103,8 @@ public class TopologySubcommand extends ScmSubcommand
             throw new InvalidPropertiesFormatException(
                 "the nodeOperationalState isn't " +
                     "IN_SERVICE/DECOMMISSIONING/DECOMMISSIONED/" +
-                    "ENTERING_MAINTENANCE/IN_MAINTENANCE" +
-                    " the nodeOperationalState is " + nodeState);
+                    "ENTERING_MAINTENANCE/IN_MAINTENANCE " +
+                    "the nodeOperationalState is " + nodeState);
           }
         }
         if (nodeState != null) {
