@@ -145,7 +145,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
       // the lengths.
       long blkGRpLen = 0;
       for (BlockOutputStreamEntry internalBlkStream : blkGrpStreams) {
-        blkGRpLen += internalBlkStream.getCurrentPosition();
+        blkGRpLen += !((ECBlockOutputStreamEntry) internalBlkStream)
+            .isParityStreamEntry() ? internalBlkStream.getCurrentPosition() : 0;
         // In EC, only one node per internal block stream.
         final DatanodeDetails nodeDetails =
             internalBlkStream.getPipeline().getNodeSet().iterator().next();
