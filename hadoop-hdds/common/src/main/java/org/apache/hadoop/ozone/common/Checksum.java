@@ -139,10 +139,6 @@ public class Checksum {
    */
   public ChecksumData computeChecksum(ByteBuffer data)
       throws OzoneChecksumException {
-    if (checksumType == ChecksumType.NONE) {
-      // Since type is set to NONE, we do not need to compute the checksums
-      return new ChecksumData(checksumType, bytesPerChecksum);
-    }
     if (!data.isReadOnly()) {
       data = data.asReadOnlyBuffer();
     }
@@ -158,6 +154,11 @@ public class Checksum {
 
   public ChecksumData computeChecksum(ChunkBuffer data)
       throws OzoneChecksumException {
+    if (checksumType == ChecksumType.NONE) {
+      // Since type is set to NONE, we do not need to compute the checksums
+      return new ChecksumData(checksumType, bytesPerChecksum);
+    }
+
     final Function<ByteBuffer, ByteString> function;
     try {
       function = Algorithm.valueOf(checksumType).newChecksumFunction();
