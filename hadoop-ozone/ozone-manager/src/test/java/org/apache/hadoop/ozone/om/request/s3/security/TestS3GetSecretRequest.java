@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3Se
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -130,7 +129,7 @@ public class TestS3GetSecretRequest {
     framework().clearInlineMocks();
   }
 
-  private OMRequest newCreateTenantRequest(String tenantNameStr) {
+  private OMRequest createTenantRequest(String tenantNameStr) {
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
@@ -142,7 +141,7 @@ public class TestS3GetSecretRequest {
         ).build();
   }
 
-  private OMRequest newAssignUserToTenantRequest(
+  private OMRequest assignUserToTenantRequest(
       String tenantNameStr, String userPrincipalStr, String accessIdStr) {
 
     return OMRequest.newBuilder()
@@ -157,7 +156,7 @@ public class TestS3GetSecretRequest {
         ).build();
   }
 
-  private OMRequest newS3GetSecretRequest(String userPrincipalStr) {
+  private OMRequest s3GetSecretRequest(String userPrincipalStr) {
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
@@ -173,87 +172,74 @@ public class TestS3GetSecretRequest {
   public void testS3GetSecretRequest() throws IOException {
     // 1. CreateTenantRequest: Create tenant "finance".
     long txLogIndex = 1;
-    OMRequest request = new OMTenantCreateRequest(
-        newCreateTenantRequest(tenantName))
-        .preExecute(ozoneManager);
     OMTenantCreateRequest omTenantCreateRequest =
-        new OMTenantCreateRequest(request);
+        new OMTenantCreateRequest(
+            new OMTenantCreateRequest(
+                createTenantRequest(tenantName)
+            ).preExecute(ozoneManager)
+        );
 
-    try {
-      final OMClientResponse omClientResponse =
-          omTenantCreateRequest.validateAndUpdateCache(ozoneManager,
-              txLogIndex, ozoneManagerDoubleBufferHelper);
-      Assert.assertTrue(omClientResponse instanceof OMTenantCreateResponse);
+    OMClientResponse omClientResponse =
+        omTenantCreateRequest.validateAndUpdateCache(ozoneManager,
+            txLogIndex, ozoneManagerDoubleBufferHelper);
 
-      final OMTenantCreateResponse response =
-          (OMTenantCreateResponse) omClientResponse;
-      Assert.assertEquals(
-          tenantName, response.getOmDBTenantInfo().getTenantName());
+    Assert.assertTrue(omClientResponse instanceof OMTenantCreateResponse);
+    final OMTenantCreateResponse omTenantCreateResponse =
+        (OMTenantCreateResponse) omClientResponse;
 
-    } catch (IllegalArgumentException ex){
-      GenericTestUtils.assertExceptionContains(
-          "should be greater than zero", ex);
-    }
+    Assert.assertEquals(
+        tenantName, omTenantCreateResponse.getOmDBTenantInfo().getTenantName());
 
     // 2. AssignUserToTenantRequest: Assign "bob@EXAMPLE.COM" to "finance".
     ++txLogIndex;
-    request = new OMAssignUserToTenantRequest(
-        newAssignUserToTenantRequest(tenantName, userPrincipal, accessId))
-        .preExecute(ozoneManager);
     OMAssignUserToTenantRequest omAssignUserToTenantRequest =
-        new OMAssignUserToTenantRequest(request);
+        new OMAssignUserToTenantRequest(
+            new OMAssignUserToTenantRequest(
+                assignUserToTenantRequest(tenantName, userPrincipal, accessId)
+            ).preExecute(ozoneManager)
+        );
 
-    OmDBAccessIdInfo omDBAccessIdInfo = null;
+    omClientResponse =
+        omAssignUserToTenantRequest.validateAndUpdateCache(ozoneManager,
+            txLogIndex, ozoneManagerDoubleBufferHelper);
 
-    try {
-      final OMClientResponse omClientResponse =
-          omAssignUserToTenantRequest.validateAndUpdateCache(ozoneManager,
-              txLogIndex, ozoneManagerDoubleBufferHelper);
-      Assert.assertTrue(
-          omClientResponse instanceof OMAssignUserToTenantResponse);
+    Assert.assertTrue(omClientResponse instanceof OMAssignUserToTenantResponse);
+    final OMAssignUserToTenantResponse omAssignUserToTenantResponse =
+        (OMAssignUserToTenantResponse) omClientResponse;
 
-      final OMAssignUserToTenantResponse response =
-          (OMAssignUserToTenantResponse) omClientResponse;
-      omDBAccessIdInfo = response.getOmDBAccessIdInfo();
-
-    } catch (IllegalArgumentException ex){
-      GenericTestUtils.assertExceptionContains(
-          "should be greater than zero", ex);
-    }
+    final OmDBAccessIdInfo omDBAccessIdInfo =
+        omAssignUserToTenantResponse.getOmDBAccessIdInfo();
     Assert.assertNotNull(omDBAccessIdInfo);
 
     // 3. S3GetSecretRequest: Get secret of "bob@EXAMPLE.COM" (as an admin).
     ++txLogIndex;
-    request = new S3GetSecretRequest(
-        newS3GetSecretRequest(accessId))
-        .preExecute(ozoneManager);
-    S3GetSecretRequest s3GetSecretRequest = new S3GetSecretRequest(request);
+    S3GetSecretRequest s3GetSecretRequest =
+        new S3GetSecretRequest(
+            new S3GetSecretRequest(
+                s3GetSecretRequest(accessId)
+            ).preExecute(ozoneManager)
+        );
 
-    try {
-      final OMClientResponse omClientResponse =
-          s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-              txLogIndex, ozoneManagerDoubleBufferHelper);
-      Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    omClientResponse =
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
+            txLogIndex, ozoneManagerDoubleBufferHelper);
 
-      final S3GetSecretResponse response =
-          (S3GetSecretResponse) omClientResponse;
-      /*
-         response.getS3SecretValue() should be null because the entry is
-         already inserted to DB in the previous request.
-         The entry would be overwritten if it isn't null.
-         See {@link S3GetSecretResponse#addToDBBatch}.
-       */
-      Assert.assertNull(response.getS3SecretValue());
-      // The secret retrieved should be the same as previous response's.
-      final GetS3SecretResponse getS3SecretResponse =
-          response.getOMResponse().getGetS3SecretResponse();
-      Assert.assertEquals(
-          omDBAccessIdInfo.getSharedSecret(),
-          getS3SecretResponse.getS3Secret().getAwsSecret());
+    Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    final S3GetSecretResponse s3GetSecretResponse =
+        (S3GetSecretResponse) omClientResponse;
 
-    } catch (IllegalArgumentException ex){
-      GenericTestUtils.assertExceptionContains(
-          "should be greater than zero", ex);
-    }
+    /*
+       response.getS3SecretValue() should be null because the entry is
+       already inserted to DB in the previous request.
+       The entry would be overwritten if it isn't null.
+       See {@link S3GetSecretResponse#addToDBBatch}.
+     */
+    Assert.assertNull(s3GetSecretResponse.getS3SecretValue());
+    // The secret retrieved should be the same as previous response's.
+    final GetS3SecretResponse getS3SecretResponse =
+        s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
+    Assert.assertEquals(
+        omDBAccessIdInfo.getSharedSecret(),
+        getS3SecretResponse.getS3Secret().getAwsSecret());
   }
 }
