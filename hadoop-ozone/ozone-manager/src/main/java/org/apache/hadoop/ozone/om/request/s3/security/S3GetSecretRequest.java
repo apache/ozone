@@ -151,13 +151,16 @@ public class S3GetSecretRequest extends OMClientRequest {
         }
       } else {
         // Found. Construct S3SecretValue from OmDBAccessIdInfo
-        s3SecretValue = new S3SecretValue(kerberosID,
-            omDBAccessIdInfo.getSharedSecret());
+        awsSecret = omDBAccessIdInfo.getSharedSecret();
+        s3SecretValue = new S3SecretValue(kerberosID, awsSecret);
       }
 
-      GetS3SecretResponse.Builder getS3SecretResponse = GetS3SecretResponse
-          .newBuilder().setS3Secret(S3Secret.newBuilder()
-          .setAwsSecret(awsSecret).setKerberosID(kerberosID));
+      GetS3SecretResponse.Builder getS3SecretResponse =
+          GetS3SecretResponse.newBuilder().setS3Secret(
+              S3Secret.newBuilder()
+                  .setAwsSecret(awsSecret)
+                  .setKerberosID(kerberosID)
+          );
 
       if (s3SecretValue == null) {
         omClientResponse =
