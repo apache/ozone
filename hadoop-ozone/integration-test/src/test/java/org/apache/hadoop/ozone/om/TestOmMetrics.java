@@ -131,7 +131,7 @@ public class TestOmMetrics {
     assertCounter("NumVolumeCheckAccesses", 1L, omMetrics);
     assertCounter("NumVolumeDeletes", 1L, omMetrics);
     assertCounter("NumVolumeLists", 1L, omMetrics);
-    assertCounter("NumVolumes", 1L, omMetrics);
+    assertCounter("NumVolumes", 2L, omMetrics);
 
     volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);
@@ -144,7 +144,7 @@ public class TestOmMetrics {
     omMetrics = getMetrics("OMMetrics");
 
     // Accounting 's3v' volume which is created by default.
-    assertCounter("NumVolumes", 3L, omMetrics);
+    assertCounter("NumVolumes", 4L, omMetrics);
 
 
     // inject exception to test for Failure Metrics on the read path
@@ -185,15 +185,15 @@ public class TestOmMetrics {
     assertCounter("NumVolumeUpdateFails", 1L, omMetrics);
     assertCounter("NumVolumeInfoFails", 1L, omMetrics);
     assertCounter("NumVolumeCheckAccessFails", 2L, omMetrics);
-    assertCounter("NumVolumeDeleteFails", 1L, omMetrics);
+    assertCounter("NumVolumeDeleteFails", 2L, omMetrics);
     assertCounter("NumVolumeListFails", 0L, omMetrics);
 
     // As last call for volumesOps does not increment numVolumes as those are
     // failed.
-    assertCounter("NumVolumes", 3L, omMetrics);
+    assertCounter("NumVolumes", 4L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumVolumes", 3L, omMetrics);
+    assertCounter("NumVolumes", 4L, omMetrics);
 
 
   }
@@ -464,11 +464,16 @@ public class TestOmMetrics {
     OzoneManagerProtocolProtos.OzoneAclInfo aclInfo = OzoneAcl.toProtobuf(
       new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
         IAccessAuthorizer.ACLType.ALL, ACCESS));
+    OmVolumeArgs deleteArgs = createVolumeArgs();
     try {
       writeClient.createVolume(volumeArgs);
     } catch (IOException ignored) {
     }
 
+    try {
+      writeClient.deleteVolume(deleteArgs.getVolume());
+    } catch (IOException ignored) {
+    }
     try {
       ozoneManager.getVolumeInfo(volumeArgs.getVolume());
     } catch (IOException ignored) {
@@ -487,10 +492,6 @@ public class TestOmMetrics {
 
     try {
       ozoneManager.listAllVolumes(volumeArgs.getVolume(), null, 0);
-    } catch (IOException ignored) {
-    }
-    try {
-      writeClient.deleteVolume(volumeArgs.getVolume());
     } catch (IOException ignored) {
     }
 
