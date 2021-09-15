@@ -111,6 +111,10 @@ public class Checksum {
     this.bytesPerChecksum = bytesPerChecksum;
   }
 
+  public ChecksumData noChecksum() throws OzoneChecksumException {
+    return new ChecksumData(ChecksumType.NONE, bytesPerChecksum);
+  }
+
   /**
    * Computes checksum for give data.
    * @param data input data.

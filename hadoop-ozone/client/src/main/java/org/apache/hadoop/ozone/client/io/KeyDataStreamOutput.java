@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.FileRegionStreamOutput;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -45,8 +46,8 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -63,7 +64,8 @@ import java.util.stream.Collectors;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput implements ByteBufferStreamOutput {
+public class KeyDataStreamOutput
+    implements ByteBufferStreamOutput, FileRegionStreamOutput {
 
   private OzoneClientConfig config;
 
@@ -194,6 +196,16 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     writeOffset += len;
   }
 
+  @Override
+  public void write(File f, long off, long len) throws IOException {
+    checkNotClosed();
+    if (f == null) {
+      throw new NullPointerException();
+    }
+    handleWrite(f, off, len, false);
+    writeOffset += len;
+  }
+
   private void handleWrite(ByteBuffer b, int off, long len, boolean retry)
       throws IOException {
     while (len > 0) {
@@ -212,6 +224,36 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
         int writtenLength =
             writeToDataStreamOutput(current, retry, len, b,
                 expectedWriteLen, off, currentPos);
+        if (current.getRemaining() <= 0) {
+          // since the current block is already written close the stream.
+          handleFlushOrClose(StreamAction.FULL);
+        }
+        len -= writtenLength;
+        off += writtenLength;
+      } catch (Exception e) {
+        markStreamClosed();
+        throw new IOException(e);
+      }
+    }
+  }
+
+  private void handleWrite(File f, long off, long len, boolean retry)
+          throws IOException {
+    while (len > 0) {
+      try {
+        BlockDataStreamOutputEntry current =
+                blockDataStreamOutputEntryPool.allocateBlockIfNeeded();
+        // length(len) will be in int range if the call is happening through
+        // write API of blockDataStreamOutput. Length can be in long range
+        // if it comes via Exception path.
+        long expectedWriteLen = Math.min(len, current.getRemaining());
+        long currentPos = current.getWrittenDataLength();
+        // writeLen will be updated based on whether the write was succeeded
+        // or if it sees an exception, how much the actual write was
+        // acknowledged.
+        long writtenLength =
+                writeToDataStreamOutput(current, retry, len, f,
+                        expectedWriteLen, off, currentPos);
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
           handleFlushOrClose(StreamAction.FULL);
@@ -245,6 +287,38 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
       // the buffers
       Preconditions.checkState(!retry || len <= config
           .getStreamBufferMaxSize());
+      int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
+      writeLen = retry ? (int) len : dataWritten;
+      // In retry path, the data written is already accounted in offset.
+      if (!retry) {
+        offset += writeLen;
+      }
+      LOG.debug("writeLen {}, total len {}", writeLen, len);
+      handleException(current, ioe);
+    }
+    return writeLen;
+  }
+
+  private long writeToDataStreamOutput(BlockDataStreamOutputEntry current,
+      boolean retry, long len, File f, long writeLen, long off,
+      long currentPos) throws IOException {
+    try {
+      if (retry) {
+        current.writeOnRetry(len);
+      } else {
+        current.write(f, off, writeLen);
+        offset += writeLen;
+      }
+    } catch (IOException ioe) {
+      // for the current iteration, totalDataWritten - currentPos gives the
+      // amount of data already written to the buffer
+
+      // In the retryPath, the total data to be written will always be equal
+      // to or less than the max length of the buffer allocated.
+      // The len specified here is the combined sum of the data length of
+      // the buffers
+      Preconditions.checkState(!retry || len <= config
+              .getStreamBufferMaxSize());
       int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
       writeLen = retry ? (int) len : dataWritten;
       // In retry path, the data written is already accounted in offset.
@@ -323,6 +397,7 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     closed = true;
   }
 
+/*
   private void handleRetry(IOException exception, long len) throws IOException {
     RetryPolicy retryPolicy = retryPolicyMap
         .get(HddsClientUtils.checkForException(exception).getClass());
@@ -369,6 +444,7 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     }
     handleWrite(null, 0, len, true);
   }
+ */
 
   private void setExceptionAndThrow(IOException ioe) throws IOException {
     isException = true;
