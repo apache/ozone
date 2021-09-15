@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
@@ -47,6 +48,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -161,6 +163,14 @@ public class TestECKeyOutputStream {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);
+      }
+    }
+    byte[] buf = new byte[chunkSize];
+    try (OzoneInputStream in = bucket.readKey(keyString)) {
+      for (int i=0; i< inputChunks.length; i++) {
+        int read = in.read(buf, 0, chunkSize);
+        Assert.assertEquals(chunkSize, read);
+        Assert.assertTrue(Arrays.equals(buf, inputChunks[i]));
       }
     }
   }

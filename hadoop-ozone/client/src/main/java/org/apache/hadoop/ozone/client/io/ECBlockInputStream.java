@@ -48,7 +48,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   private final ECReplicationConfig repConfig;
   // TODO - HDDS-5741
-  private final int ecChunkSize = 1024 * 1024;
+  private final int ecChunkSize = 1024;
   private final BlockInputStreamFactory streamFactory;
   private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
