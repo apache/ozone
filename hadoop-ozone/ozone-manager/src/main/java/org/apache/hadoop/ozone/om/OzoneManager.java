@@ -3063,12 +3063,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // TODO: modify, delete
 
   /**
-   * Create tenant user.
+   * Assign user to tenant.
    */
-  public S3SecretValue createTenantUser(
-      String tenantUsername, String tenantName) throws IOException {
+  public S3SecretValue assignUserToTenant(
+      String username, String tenantName, String accessId) throws IOException {
     throw new NotImplementedException(
-        "non-Ratis createTenantUser() is not implemented");
+        "non-Ratis assignUserToTenant() is not implemented");
   }
 
   // TODO: modify, delete

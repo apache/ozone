@@ -303,7 +303,7 @@ public final class OmUtils {
     case CreateTenant:
     case ModifyTenant:
     case DeleteTenant:
-    case CreateTenantUser:
+    case AssignUserToTenant:
     case ModifyTenantUser:
     case DeleteTenantUser:
       return false;

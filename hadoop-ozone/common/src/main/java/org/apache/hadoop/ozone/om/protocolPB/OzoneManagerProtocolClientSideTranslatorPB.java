@@ -73,8 +73,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantUserResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
@@ -902,19 +902,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public S3SecretValue createTenantUser(
-      String tenantUsername, String tenantName) throws IOException {
+  public S3SecretValue assignUserToTenant(
+      String username, String tenantName, String accessId) throws IOException {
 
-    final CreateTenantUserRequest request = CreateTenantUserRequest.newBuilder()
-        .setTenantUsername(tenantUsername)
+    final AssignUserToTenantRequest request =
+        AssignUserToTenantRequest.newBuilder()
+        .setTenantUsername(username)
         .setTenantName(tenantName)
+        .setAccessId(accessId)
         .build();
-    final OMRequest omRequest = createOMRequest(Type.CreateTenantUser)
-        .setCreateTenantUserRequest(request)
+    final OMRequest omRequest = createOMRequest(Type.AssignUserToTenant)
+        .setAssignUserToTenantRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-    final CreateTenantUserResponse resp = handleError(omResponse)
-        .getCreateTenantUserResponse();
+    final AssignUserToTenantResponse resp = handleError(omResponse)
+        .getAssignUserToTenantResponse();
 
     return S3SecretValue.fromProtobuf(resp.getS3Secret());
   }

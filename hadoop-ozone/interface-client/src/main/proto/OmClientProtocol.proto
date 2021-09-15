@@ -107,7 +107,7 @@ enum Type {
   ModifyTenant = 96;
   DeleteTenant = 97;
 
-  CreateTenantUser = 98;
+  AssignUserToTenant = 98;
   ModifyTenantUser = 99;
   DeleteTenantUser = 100;
 }
@@ -197,7 +197,7 @@ message OMRequest {
   optional ModifyTenantRequest              ModifyTenantRequest            = 96;
   optional DeleteTenantRequest              DeleteTenantRequest            = 97;
 
-  optional CreateTenantUserRequest          CreateTenantUserRequest        = 98;
+  optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 98;
   optional ModifyTenantUserRequest          ModifyTenantUserRequest        = 99;
   optional DeleteTenantUserRequest          DeleteTenantUserRequest        = 100;
 }
@@ -282,8 +282,10 @@ message OMResponse {
   optional ModifyTenantResponse              ModifyTenantResponse          = 96;
   optional DeleteTenantResponse              DeleteTenantResponse          = 97;
 
-  optional CreateTenantUserResponse          CreateTenantUserResponse      = 98;
+  optional AssignUserToTenantResponse        AssignUserToTenantResponse    = 98;
+  // TODO: Remove ModifyTenantUserResponse since it won't be useful anymore?
   optional ModifyTenantUserResponse          ModifyTenantUserResponse      = 99;
+  // TODO: Rename this to UnassignUserFromTenant Response ?
   optional DeleteTenantUserResponse          DeleteTenantUserResponse      = 100;
 }
 
@@ -1379,9 +1381,10 @@ message DeleteTenantRequest {
     optional string tenantName = 1;
 }
 
-message CreateTenantUserRequest {
+message AssignUserToTenantRequest {
     optional string tenantUsername = 1;
     optional string tenantName = 2;
+    optional string accessId = 3;
 }
 
 message ModifyTenantUserRequest {
@@ -1404,7 +1407,7 @@ message DeleteTenantResponse {
     optional bool success = 1;
 }
 
-message CreateTenantUserResponse {
+message AssignUserToTenantResponse {
     optional bool success = 1;
     optional S3Secret s3Secret = 2;
 }

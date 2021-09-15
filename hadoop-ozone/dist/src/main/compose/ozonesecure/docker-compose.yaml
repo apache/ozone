@@ -59,7 +59,7 @@ services:
       - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      OZONE_OPTS:
+      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -109,3 +109,17 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
+  ranger:
+    image: mockserver/mockserver:mockserver-5.11.2
+    hostname: ranger
+    volumes:
+      - ./mockserverInitialization.json:/config/mockserverInitialization.json
+    ports:
+      - 6182:6182
+    environment:
+      MOCKSERVER_MAX_EXPECTATIONS: 100
+      MOCKSERVER_MAX_HEADER_SIZE: 8192
+      MOCKSERVER_WATCH_INITIALIZATION_JSON: "true"
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/mockserverInitialization.json
+    command: -logLevel DEBUG -serverPort 6182
+
