@@ -39,7 +39,7 @@ import java.util.Map;
  * from OzoneManager for EC writes.
  */
 public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
-  private final List<BlockOutputStreamEntry> finishedStreamEntries;
+  private final List<List<BlockOutputStreamEntry>> finishedStreamEntries;
   private final ECReplicationConfig ecReplicationConfig;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
@@ -90,15 +90,35 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     }
   }
 
+  @Override
   public List<OmKeyLocationInfo> getLocationInfoList() {
-    List<OmKeyLocationInfo> locationInfoList;
-    List<OmKeyLocationInfo> currBlocksLocationInfoList =
-        getOmKeyLocationInfos(getStreamEntries());
-    List<OmKeyLocationInfo> prevBlksKeyLocationInfos =
-        getOmKeyLocationInfos(finishedStreamEntries);
-    prevBlksKeyLocationInfos.addAll(currBlocksLocationInfoList);
-    locationInfoList = prevBlksKeyLocationInfos;
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (List<BlockOutputStreamEntry> blk : finishedStreamEntries) {
+      locationInfoList.add(buildKeyLocationForBlock(blk));
+    }
+    List<BlockOutputStreamEntry> currentEntries = getStreamEntries();
+    if (currentEntries.size() > 0) {
+      locationInfoList.add(buildKeyLocationForBlock(getStreamEntries()));
+    }
     return locationInfoList;
+  }
+
+  private OmKeyLocationInfo buildKeyLocationForBlock(
+      List<BlockOutputStreamEntry> blocks) {
+    long length = 0;
+    BlockOutputStreamEntry first = blocks.get(0);
+    for (BlockOutputStreamEntry e : blocks) {
+      if (((ECBlockOutputStreamEntry)e).isParityStreamEntry()) {
+        continue;
+      }
+      length += e.getLength();
+    }
+    OmKeyLocationInfo info =
+        new OmKeyLocationInfo.Builder().setBlockID(first.getBlockID())
+            .setLength(length).setOffset(0)
+            .setToken(first.getToken())
+            .setPipeline(first.getPipeline()).build();
+    return info;
   }
 
   @Override
@@ -107,23 +127,27 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
         .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
         .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
 
-    totalLength += finishedStreamEntries.stream()
-        .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
-        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    for (List<BlockOutputStreamEntry> subList : finishedStreamEntries) {
+      totalLength += subList.stream()
+          .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
+          .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
+    }
     return totalLength;
   }
 
   public void endECBlock() throws IOException {
     List<BlockOutputStreamEntry> entries = getStreamEntries();
+    List<BlockOutputStreamEntry> finishedBlock = new ArrayList<>();
     if (entries.size() > 0) {
       for (int i = entries.size() - 1; i >= 0; i--) {
-        finishedStreamEntries.add(entries.remove(i));
+        finishedBlock.add(entries.remove(i));
       }
     }
 
-    for (BlockOutputStreamEntry entry : finishedStreamEntries) {
+    for (BlockOutputStreamEntry entry : finishedBlock) {
       entry.close();
     }
+    finishedStreamEntries.add(finishedBlock);
     super.cleanup();
   }
 
