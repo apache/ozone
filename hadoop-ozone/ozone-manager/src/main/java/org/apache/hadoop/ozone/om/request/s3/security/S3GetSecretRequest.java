@@ -24,6 +24,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,22 +127,32 @@ public class S3GetSecretRequest extends OMClientRequest {
     String kerberosID = updateGetS3SecretRequest.getKerberosID();
     try {
       String awsSecret = updateGetS3SecretRequest.getAwsSecret();
-      acquiredLock =
-         omMetadataManager.getLock().acquireWriteLock(S3_SECRET_LOCK,
-             kerberosID);
+      // Note: We use the same S3_SECRET_LOCK for TenantAccessIdTable.
+      acquiredLock = omMetadataManager.getLock()
+          .acquireWriteLock(S3_SECRET_LOCK, kerberosID);
 
-      S3SecretValue s3SecretValue =
-          omMetadataManager.getS3SecretTable().get(kerberosID);
+      // Check multi-tenant table first: tenantAccessIdTable
+      final S3SecretValue s3SecretValue;
+      final OmDBAccessIdInfo omDBAccessIdInfo =
+          omMetadataManager.getTenantAccessIdTable().get(kerberosID);
+      if (omDBAccessIdInfo == null) {
+        // Not found. Fallback to S3SecretTable
+        s3SecretValue = omMetadataManager.getS3SecretTable().get(kerberosID);
 
-      // If s3Secret for user is not in S3Secret table, add the Secret to cache.
-      if (s3SecretValue == null) {
-        omMetadataManager.getS3SecretTable().addCacheEntry(
-            new CacheKey<>(kerberosID),
-            new CacheValue<>(Optional.of(new S3SecretValue(kerberosID,
-                awsSecret)), transactionLogIndex));
+        // If s3Secret for user is not in S3Secret table, add the Secret to cache.
+        if (s3SecretValue == null) {
+          omMetadataManager.getS3SecretTable().addCacheEntry(
+              new CacheKey<>(kerberosID),
+              new CacheValue<>(Optional.of(new S3SecretValue(kerberosID,
+                  awsSecret)), transactionLogIndex));
+        } else {
+          // If it already exists, use the existing one.
+          awsSecret = s3SecretValue.getAwsSecret();
+        }
       } else {
-        // If it already exists, use the existing one.
-        awsSecret = s3SecretValue.getAwsSecret();
+        // Found. Construct S3SecretValue from OmDBAccessIdInfo
+        s3SecretValue = new S3SecretValue(kerberosID,
+            omDBAccessIdInfo.getSharedSecret());
       }
 
       GetS3SecretResponse.Builder getS3SecretResponse = GetS3SecretResponse

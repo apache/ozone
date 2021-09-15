@@ -138,6 +138,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>reflections</artifactId>
       <version>0.9.11</version>
     </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-api-mockito2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-module-junit4</artifactId>
+      <scope>test</scope>
+    </dependency>
 
   </dependencies>
   <build>

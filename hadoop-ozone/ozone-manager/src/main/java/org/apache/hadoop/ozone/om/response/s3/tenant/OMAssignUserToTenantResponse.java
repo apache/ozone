@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -102,5 +103,10 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
         batchOperation, principal, groupName);
     omMetadataManager.getTenantRoleTable().putWithBatch(
         batchOperation, principal, roleName);
+  }
+
+  @VisibleForTesting
+  public OmDBAccessIdInfo getOmDBAccessIdInfo() {
+    return omDBAccessIdInfo;
   }
 }

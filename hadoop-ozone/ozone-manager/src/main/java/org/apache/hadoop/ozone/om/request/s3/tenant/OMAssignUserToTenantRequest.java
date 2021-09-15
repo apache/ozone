@@ -179,7 +179,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
     assert(accessId.equals(request.getAccessId()));
     final String volumeName = tenantName;  // TODO: Configurable
     IOException exception = null;
-    String userId = null;
+    String userId;
 
     try {
       // Check ACL: requires ozone admin or tenant admin permission
