@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,7 +64,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 /**
- * Test case to verify S3GetSecretRequest.
+ * Test S3GetSecretRequest.
  */
 public class TestS3GetSecretRequest {
 
@@ -76,17 +75,21 @@ public class TestS3GetSecretRequest {
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
   private AuditLogger auditLogger;
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
+  // Set ozoneManagerDoubleBuffer to do nothing.
+  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
       ((response, transactionIndex) -> null);
+
+  // Multi-tenant related vars
+  private final String adminName = "alice";
+  private final UserGroupInformation ugiAdmin =
+      UserGroupInformation.createRemoteUser(adminName);
+  private final String tenantName = "finance";
+  private final String userPrincipal = "bob@EXAMPLE.COM";
+  private final String accessId =
+      tenantName + OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + userPrincipal;
 
   private OMMultiTenantManager omMultiTenantManager;
   private Tenant tenant;
-  private final String adminname = "alice";
-  private final String tenantname = "finance";
-  private final String username = "bob@EXAMPLE.COM";
-  private final String accessId =
-      tenantname + OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + username;
 
   @Before
   public void setUp() throws Exception {
@@ -94,11 +97,9 @@ public class TestS3GetSecretRequest {
 
     Server.Call call = spy(new Server.Call(1, 1, null, null,
         RPC.RpcKind.RPC_BUILTIN, new byte[] {1, 2, 3}));
-    final UserGroupInformation ugiAdmin =
-        UserGroupInformation.createRemoteUser(adminname);
     // So that ProtobufRpcEngine.Server.getRemoteUser() won't be null.
     when(call.getRemoteUser()).thenReturn(ugiAdmin);
-    // alice is an admin
+    // This effectively makes alice an admin.
     when(ozoneManager.isAdmin(ugiAdmin)).thenReturn(true);
     Server.getCurCall().set(call);
 
@@ -119,7 +120,7 @@ public class TestS3GetSecretRequest {
     // Multi-tenant related initializations
     omMultiTenantManager = mock(OMMultiTenantManager.class);
     tenant = mock(Tenant.class);
-    when(omMultiTenantManager.getTenantInfo(tenantname)).thenReturn(tenant);
+    when(omMultiTenantManager.getTenantInfo(tenantName)).thenReturn(tenant);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
   }
 
@@ -129,64 +130,54 @@ public class TestS3GetSecretRequest {
     framework().clearInlineMocks();
   }
 
-  private OMRequest newCreateTenantRequest(String tenantname) {
-
-    final CreateTenantRequest createTenantRequest =
-        CreateTenantRequest.newBuilder()
-            .setTenantName(tenantname)
-            .build();
+  private OMRequest newCreateTenantRequest(String tenantNameStr) {
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
         .setCmdType(Type.CreateTenant)
-        .setCreateTenantRequest(createTenantRequest)
-        .build();
+        .setCreateTenantRequest(
+            CreateTenantRequest.newBuilder()
+                .setTenantName(tenantNameStr)
+                .build()
+        ).build();
   }
 
   private OMRequest newAssignUserToTenantRequest(
-      String tenantname, String username, String accessId) {
-
-    final AssignUserToTenantRequest assignUserToTenantRequest =
-        AssignUserToTenantRequest.newBuilder()
-            .setTenantName(tenantname)
-            .setTenantUsername(username)
-            .setAccessId(accessId)
-            .build();
+      String tenantNameStr, String userPrincipalStr, String accessIdStr) {
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
         .setCmdType(Type.AssignUserToTenant)
-        .setAssignUserToTenantRequest(assignUserToTenantRequest)
-        .build();
+        .setAssignUserToTenantRequest(
+            AssignUserToTenantRequest.newBuilder()
+                .setTenantName(tenantNameStr)
+                .setTenantUsername(userPrincipalStr)
+                .setAccessId(accessIdStr)
+                .build()
+        ).build();
   }
 
-  private OMRequest newS3GetSecretRequest(String username) {
-
-    final GetS3SecretRequest getS3SecretRequest =
-        GetS3SecretRequest.newBuilder()
-            .setKerberosID(username)
-            .build();
+  private OMRequest newS3GetSecretRequest(String userPrincipalStr) {
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
         .setCmdType(Type.GetS3Secret)
-        .setGetS3SecretRequest(getS3SecretRequest)
-        .build();
+        .setGetS3SecretRequest(
+            GetS3SecretRequest.newBuilder()
+                .setKerberosID(userPrincipalStr)
+                .build()
+        ).build();
   }
 
   @Test
   public void testS3GetSecretRequest() throws IOException {
-    OMRequest request;
-    long txLogIndex = 1;
-
     // 1. CreateTenantRequest: Create tenant "finance".
-    request = newCreateTenantRequest(tenantname);
+    long txLogIndex = 1;
+    OMRequest request = new OMTenantCreateRequest(
+        newCreateTenantRequest(tenantName))
+        .preExecute(ozoneManager);
     OMTenantCreateRequest omTenantCreateRequest =
         new OMTenantCreateRequest(request);
-
-    request = omTenantCreateRequest.preExecute(ozoneManager);
-    // Just in case preExecute returns an updated OMRequest
-    omTenantCreateRequest = new OMTenantCreateRequest(request);
 
     try {
       final OMClientResponse omClientResponse =
@@ -197,22 +188,20 @@ public class TestS3GetSecretRequest {
       final OMTenantCreateResponse response =
           (OMTenantCreateResponse) omClientResponse;
       Assert.assertEquals(
-          tenantname, response.getOmDBTenantInfo().getTenantName());
+          tenantName, response.getOmDBTenantInfo().getTenantName());
+
     } catch (IllegalArgumentException ex){
       GenericTestUtils.assertExceptionContains(
           "should be greater than zero", ex);
     }
-    // Prep for next transaction
-    ++txLogIndex;
 
     // 2. AssignUserToTenantRequest: Assign "bob@EXAMPLE.COM" to "finance".
-    request = newAssignUserToTenantRequest(tenantname, username, accessId);
+    ++txLogIndex;
+    request = new OMAssignUserToTenantRequest(
+        newAssignUserToTenantRequest(tenantName, userPrincipal, accessId))
+        .preExecute(ozoneManager);
     OMAssignUserToTenantRequest omAssignUserToTenantRequest =
         new OMAssignUserToTenantRequest(request);
-
-    request = omAssignUserToTenantRequest.preExecute(ozoneManager);
-    // Just in case preExecute returns an updated OMRequest
-    omAssignUserToTenantRequest = new OMAssignUserToTenantRequest(request);
 
     OmDBAccessIdInfo omDBAccessIdInfo = null;
 
@@ -226,21 +215,19 @@ public class TestS3GetSecretRequest {
       final OMAssignUserToTenantResponse response =
           (OMAssignUserToTenantResponse) omClientResponse;
       omDBAccessIdInfo = response.getOmDBAccessIdInfo();
+
     } catch (IllegalArgumentException ex){
       GenericTestUtils.assertExceptionContains(
           "should be greater than zero", ex);
     }
     Assert.assertNotNull(omDBAccessIdInfo);
-    // Prep for next transaction
+
+    // 3. S3GetSecretRequest: Get secret of "bob@EXAMPLE.COM" (as an admin).
     ++txLogIndex;
-
-    // 3. S3GetSecretRequest: Get secret of "bob@EXAMPLE.COM" as an admin.
-    request = newS3GetSecretRequest(accessId);
+    request = new S3GetSecretRequest(
+        newS3GetSecretRequest(accessId))
+        .preExecute(ozoneManager);
     S3GetSecretRequest s3GetSecretRequest = new S3GetSecretRequest(request);
-
-    request = s3GetSecretRequest.preExecute(ozoneManager);
-    // Just in case preExecute returns an updated OMRequest
-    s3GetSecretRequest = new S3GetSecretRequest(request);
 
     try {
       final OMClientResponse omClientResponse =
@@ -250,8 +237,12 @@ public class TestS3GetSecretRequest {
 
       final S3GetSecretResponse response =
           (S3GetSecretResponse) omClientResponse;
-      // response.getS3SecretValue() should be null because the entry already
-      //  exists in DB, we are not overwriting the value.
+      /*
+         response.getS3SecretValue() should be null because the entry is
+         already inserted to DB in the previous request.
+         The entry would be overwritten if it isn't null.
+         See {@link S3GetSecretResponse#addToDBBatch}.
+       */
       Assert.assertNull(response.getS3SecretValue());
       // The secret retrieved should be the same as previous response's.
       final GetS3SecretResponse getS3SecretResponse =
@@ -259,10 +250,10 @@ public class TestS3GetSecretRequest {
       Assert.assertEquals(
           omDBAccessIdInfo.getSharedSecret(),
           getS3SecretResponse.getS3Secret().getAwsSecret());
+
     } catch (IllegalArgumentException ex){
       GenericTestUtils.assertExceptionContains(
           "should be greater than zero", ex);
     }
-
   }
 }
