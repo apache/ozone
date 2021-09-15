@@ -102,9 +102,6 @@ public final class OmDBAccessIdInfo {
     private String kerberosPrincipal;
     private String sharedSecret;
 
-    private Builder() {
-    }
-
     public Builder setTenantName(String tenantId) {
       this.tenantId = tenantId;
       return this;

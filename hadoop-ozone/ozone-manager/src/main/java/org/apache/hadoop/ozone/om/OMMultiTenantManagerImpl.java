@@ -310,7 +310,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * @return Tenant, or null on error
    */
   @Override
-  public String createUser(String tenantName, String userName) {
+  public String assignUserToTenant(String tenantName, String userName) {
     try {
       controlPathLock.writeLock().lock();
       Tenant tenant = getTenantInfo(tenantName);

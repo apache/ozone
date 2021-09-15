@@ -49,6 +49,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBAccessIdInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBKerberosPrincipalInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
@@ -135,17 +137,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *
    * Multi-Tenant Tables:
    * |----------------------------------------------------------------------|
-   * | tenantAccessIdTable|  accessId -> OmTenantAccessIdInfo               |
+   * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
    * |----------------------------------------------------------------------|
    * | principalToAccessIdsTable | Principal -> OmDBKerberosPrincipalInfo   |
    * |----------------------------------------------------------------------|
-   * | tenantStateTable   |  accessId -> OmDBTenantInfo                     |
+   * | tenantStateTable          | accessId -> OmDBTenantInfo               |
    * |----------------------------------------------------------------------|
-   * | tenantGroupTable   |  accessId -> [tenant group A, B, ...]           |
+   * | tenantGroupTable          | accessId -> [tenant group A, B, ...]     |
    * |----------------------------------------------------------------------|
-   * | tenantRoleTable    |  accessId -> roles [admin, roleB, ...]          |
+   * | tenantRoleTable           | accessId -> roles [admin, roleB, ...]    |
    * |----------------------------------------------------------------------|
-   * | tenantPolicyTable  |  policyGroup -> [policyId1, policyId2]          |
+   * | tenantPolicyTable         | policyGroup -> [policyId1, policyId2]    |
    * |----------------------------------------------------------------------|
    *
    * Simple Tables:
@@ -480,7 +482,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(TransactionInfo.class, new TransactionInfoCodec())
         .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
-        .addCodec(OmDBTenantInfo.class, new OmDBTenantInfoCodec());
+        .addCodec(OmDBTenantInfo.class, new OmDBTenantInfoCodec())
+        .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
+        .addCodec(OmDBKerberosPrincipalInfo.class,
+            new OmDBKerberosPrincipalInfoCodec());
   }
 
   /**

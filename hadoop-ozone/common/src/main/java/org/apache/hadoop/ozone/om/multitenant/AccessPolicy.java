@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.codehaus.jettison.json.JSONObject;
+import com.google.gson.JsonObject;
 
 /**
  * AccessPolicy interface for Ozone Multi-Tenancy.
@@ -113,7 +113,7 @@ public interface AccessPolicy {
    * @return
    * @throws Exception
    */
-  String deserializePolicyFromJsonString(JSONObject jsonObject)
+  String deserializePolicyFromJsonString(JsonObject jsonObject)
       throws Exception;
 
   /**
