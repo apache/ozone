@@ -39,11 +39,13 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
+import org.apache.ratis.io.FilePositionCount;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -74,7 +76,8 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
  * This class encapsulates all state management for buffering and writing
  * through to the container.
  */
-public class BlockDataStreamOutput implements ByteBufferStreamOutput {
+public class BlockDataStreamOutput
+    implements ByteBufferStreamOutput, FileRegionStreamOutput {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
   public static final String EXCEPTION_MSG =
@@ -219,6 +222,20 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     writeChunkToContainer(
             (ByteBuffer) b.asReadOnlyBuffer().position(off).limit(off + len));
+
+    writtenDataLength += len;
+  }
+
+  @Override
+  public void write(File f, long off, long len) throws IOException {
+    checkOpen();
+    if (f == null) {
+      throw new NullPointerException();
+    }
+    if (len == 0) {
+      return;
+    }
+    writeChunkToContainer(FilePositionCount.valueOf(f, off, len));
 
     writtenDataLength += len;
   }
@@ -517,6 +534,46 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
                 throw ce;
               }
             }, responseExecutor);
+
+    futures.add(future);
+    containerBlockData.addChunks(chunkInfo);
+  }
+
+  private void writeChunkToContainer(FilePositionCount fpc)
+          throws IOException {
+    final long effectiveChunkSize = fpc.getCount();
+    final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
+    ChecksumData checksumData = checksum.noChecksum(); //TODO: support checksum
+    ChunkInfo chunkInfo = ChunkInfo.newBuilder()
+            .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
+            .setOffset(offset)
+            .setLen(effectiveChunkSize)
+            .setChecksumData(checksumData.getProtoBufMessage())
+            .build();
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Writing chunk {} length {} at offset {}",
+              chunkInfo.getChunkName(), effectiveChunkSize, offset);
+    }
+
+    CompletableFuture<DataStreamReply> future =
+            (needSync(offset + effectiveChunkSize) ?
+                    out.writeAsync(fpc, StandardWriteOption.SYNC) :
+                    out.writeAsync(fpc))
+                    .whenCompleteAsync((r, e) -> {
+                      if (e != null || !r.isSuccess()) {
+                        if (e == null) {
+                          e = new IOException("result is not success");
+                        }
+                        String msg =
+                                "Failed to write chunk " + chunkInfo.getChunkName() +
+                                        " " + "into block " + blockID;
+                        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+                        CompletionException ce = new CompletionException(msg, e);
+                        setIoException(ce);
+                        throw ce;
+                      }
+                    }, responseExecutor);
 
     futures.add(future);
     containerBlockData.addChunks(chunkInfo);

@@ -17,8 +17,10 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.FileRegionStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -26,45 +28,51 @@ import java.nio.ByteBuffer;
  * OzoneDataStreamOutput is used to write data into Ozone.
  * It uses SCM's {@link KeyDataStreamOutput} for writing the data.
  */
-public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
+public class OzoneDataStreamOutput
+    implements ByteBufferStreamOutput, FileRegionStreamOutput {
 
-  private final ByteBufferStreamOutput byteBufferStreamOutput;
+  private final KeyDataStreamOutput keyDataStreamOutput;
 
   /**
    * Constructs OzoneDataStreamOutput with KeyDataStreamOutput.
    *
-   * @param byteBufferStreamOutput the underlying ByteBufferStreamOutput
+   * @param keyDataStreamOutput the underlying ByteBufferStreamOutput
    */
-  public OzoneDataStreamOutput(ByteBufferStreamOutput byteBufferStreamOutput) {
-    this.byteBufferStreamOutput = byteBufferStreamOutput;
+  public OzoneDataStreamOutput(KeyDataStreamOutput keyDataStreamOutput) {
+    this.keyDataStreamOutput = keyDataStreamOutput;
   }
 
   @Override
   public void write(ByteBuffer b, int off, int len) throws IOException {
-    byteBufferStreamOutput.write(b, off, len);
+    keyDataStreamOutput.write(b, off, len);
+  }
+
+  @Override
+  public void write(File f, long off, long len) throws IOException {
+    keyDataStreamOutput.write(f, off, len);
   }
 
   @Override
   public synchronized void flush() throws IOException {
-    byteBufferStreamOutput.flush();
+    keyDataStreamOutput.flush();
   }
 
   @Override
   public synchronized void close() throws IOException {
     //commitKey can be done here, if needed.
-    byteBufferStreamOutput.close();
+    keyDataStreamOutput.close();
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
+    if (keyDataStreamOutput instanceof KeyDataStreamOutput) {
       return ((KeyDataStreamOutput)
-              byteBufferStreamOutput).getCommitUploadPartInfo();
+              keyDataStreamOutput).getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
   }
 
   public ByteBufferStreamOutput getByteBufStreamOutput() {
-    return byteBufferStreamOutput;
+    return keyDataStreamOutput;
   }
 }

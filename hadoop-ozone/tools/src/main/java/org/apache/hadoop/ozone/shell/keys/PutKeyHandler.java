@@ -131,19 +131,9 @@ public class PutKeyHandler extends KeyHandler {
       if (isVerbose()) {
         out().println("API: streaming");
       }
-      try (RandomAccessFile raf = new RandomAccessFile(dataFile, "r");
-           OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
+      try (OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
                dataFile.length(), replicationConfig, keyMetadata)) {
-        FileChannel ch = raf.getChannel();
-        long len = raf.length();
-        long off = 0;
-        while (len > 0) {
-          long writeLen = Math.min(len, chunkSize);
-          ByteBuffer bb = ch.map(FileChannel.MapMode.READ_ONLY, off, writeLen);
-          out.write(bb);
-          off += writeLen;
-          len -= writeLen;
-        }
+        out.write(dataFile);
       }
     }
   }
