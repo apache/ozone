@@ -2947,13 +2947,20 @@
     <description>The S3Gateway service principal.
       Ex: s3g/_HOST@REALM.COM</description>
   </property>
-
   <property>
     <name>hadoop.http.idle_timeout.ms</name>
     <value>60000</value>
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
     <description>
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.grpc.maximum.response.length</name>
+    <value>134217728</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      OM/S3GATEWAY OMRequest, OMResponse over grpc max message length (bytes).
     </description>
   </property>
 </configuration>
