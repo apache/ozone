@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -111,6 +113,69 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
         .filter(c -> !((ECBlockOutputStreamEntry) c).isParityStreamEntry())
         .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
     return totalLength;
+  }
+
+  @Override
+  List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      List<BlockOutputStreamEntry> streams) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    Map<BlockID, ArrayList<BlockOutputStreamEntry>> blkIdVsStream =
+        new HashMap<>();
+
+    for (BlockOutputStreamEntry streamEntry : streams) {
+      BlockID blkID = streamEntry.getBlockID();
+      final ArrayList<BlockOutputStreamEntry> stream =
+          blkIdVsStream.getOrDefault(blkID, new ArrayList<>());
+      stream.add(streamEntry);
+      blkIdVsStream.put(blkID, stream);
+    }
+
+    final Iterator<Map.Entry<BlockID, ArrayList<BlockOutputStreamEntry>>>
+        iterator = blkIdVsStream.entrySet().iterator();
+
+    while (iterator.hasNext()) {
+      final Map.Entry<BlockID, ArrayList<BlockOutputStreamEntry>>
+          blkGrpIDVsStreams = iterator.next();
+      final ArrayList<BlockOutputStreamEntry> blkGrpStreams =
+          blkGrpIDVsStreams.getValue();
+      List<DatanodeDetails> nodeStatus = new ArrayList<>();
+      Map<DatanodeDetails, Integer> nodeVsIdx = new HashMap<>();
+
+      // Assumption: Irrespective of failures, stream entries must have updated
+      // the lengths.
+      long blkGRpLen = 0;
+      for (BlockOutputStreamEntry internalBlkStream : blkGrpStreams) {
+        blkGRpLen += internalBlkStream.getCurrentPosition();
+        // In EC, only one node per internal block stream.
+        final DatanodeDetails nodeDetails =
+            internalBlkStream.getPipeline().getNodeSet().iterator().next();
+        nodeStatus.add(nodeDetails);
+        nodeVsIdx.put(nodeDetails,
+            internalBlkStream.getPipeline().getReplicaIndex(nodeDetails));
+      }
+
+      // Commit only those blocks to OzoneManager which are not empty
+      final BlockOutputStreamEntry firstStreamInBlockGrp = blkGrpStreams.get(0);
+      Pipeline blockGrpPipeline = Pipeline.newBuilder()
+          .setId(firstStreamInBlockGrp.getPipeline().getId())
+          .setReplicationConfig(
+              firstStreamInBlockGrp.getPipeline().getReplicationConfig())
+          .setState(firstStreamInBlockGrp.getPipeline().getPipelineState())
+          .setNodes(nodeStatus).setReplicaIndexes(nodeVsIdx).build();
+      if (blkGRpLen != 0) {
+        OmKeyLocationInfo info = new OmKeyLocationInfo.Builder()
+            .setBlockID(blkGrpIDVsStreams.getKey()).setLength(blkGRpLen)
+            .setOffset(0).setToken(firstStreamInBlockGrp.getToken())
+            .setPipeline(blockGrpPipeline).build();
+        locationInfoList.add(info);
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("block written " + firstStreamInBlockGrp
+            .getBlockID() + ", length " + blkGRpLen + " bcsID "
+            + firstStreamInBlockGrp.getBlockID().getBlockCommitSequenceId());
+      }
+    }
+    return locationInfoList;
   }
 
   public void endECBlock() throws IOException {
