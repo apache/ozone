@@ -119,24 +119,24 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
   List<OmKeyLocationInfo> getOmKeyLocationInfos(
       List<BlockOutputStreamEntry> streams) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    Map<BlockID, ArrayList<BlockOutputStreamEntry>> blkIdVsStream =
+    Map<BlockID, ArrayList<ECBlockOutputStreamEntry>> blkIdVsStream =
         new HashMap<>();
 
     for (BlockOutputStreamEntry streamEntry : streams) {
       BlockID blkID = streamEntry.getBlockID();
-      final ArrayList<BlockOutputStreamEntry> stream =
+      final ArrayList<ECBlockOutputStreamEntry> stream =
           blkIdVsStream.getOrDefault(blkID, new ArrayList<>());
-      stream.add(streamEntry);
+      stream.add((ECBlockOutputStreamEntry) streamEntry);
       blkIdVsStream.put(blkID, stream);
     }
 
-    final Iterator<Map.Entry<BlockID, ArrayList<BlockOutputStreamEntry>>>
+    final Iterator<Map.Entry<BlockID, ArrayList<ECBlockOutputStreamEntry>>>
         iterator = blkIdVsStream.entrySet().iterator();
 
     while (iterator.hasNext()) {
-      final Map.Entry<BlockID, ArrayList<BlockOutputStreamEntry>>
+      final Map.Entry<BlockID, ArrayList<ECBlockOutputStreamEntry>>
           blkGrpIDVsStreams = iterator.next();
-      final ArrayList<BlockOutputStreamEntry> blkGrpStreams =
+      final ArrayList<ECBlockOutputStreamEntry> blkGrpStreams =
           blkGrpIDVsStreams.getValue();
       List<DatanodeDetails> nodeStatus = new ArrayList<>();
       Map<DatanodeDetails, Integer> nodeVsIdx = new HashMap<>();
@@ -144,9 +144,10 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
       // Assumption: Irrespective of failures, stream entries must have updated
       // the lengths.
       long blkGRpLen = 0;
-      for (BlockOutputStreamEntry internalBlkStream : blkGrpStreams) {
-        blkGRpLen += !((ECBlockOutputStreamEntry) internalBlkStream)
-            .isParityStreamEntry() ? internalBlkStream.getCurrentPosition() : 0;
+      for (ECBlockOutputStreamEntry internalBlkStream : blkGrpStreams) {
+        blkGRpLen += !(internalBlkStream).isParityStreamEntry() ?
+            internalBlkStream.getCurrentPosition() :
+            0;
         // In EC, only one node per internal block stream.
         final DatanodeDetails nodeDetails =
             internalBlkStream.getPipeline().getNodeSet().iterator().next();
@@ -155,7 +156,6 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             internalBlkStream.getPipeline().getReplicaIndex(nodeDetails));
       }
 
-      // Commit only those blocks to OzoneManager which are not empty
       final BlockOutputStreamEntry firstStreamInBlockGrp = blkGrpStreams.get(0);
       Pipeline blockGrpPipeline = Pipeline.newBuilder()
           .setId(firstStreamInBlockGrp.getPipeline().getId())
@@ -163,6 +163,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
               firstStreamInBlockGrp.getPipeline().getReplicationConfig())
           .setState(firstStreamInBlockGrp.getPipeline().getPipelineState())
           .setNodes(nodeStatus).setReplicaIndexes(nodeVsIdx).build();
+      // Commit only those blocks to OzoneManager which are not empty
       if (blkGRpLen != 0) {
         OmKeyLocationInfo info = new OmKeyLocationInfo.Builder()
             .setBlockID(blkGrpIDVsStreams.getKey()).setLength(blkGRpLen)
