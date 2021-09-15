@@ -87,4 +87,28 @@ public class TestPipeline {
     Pipeline pipeline = MockPipeline.createEcPipeline();
     Assert.assertTrue(pipeline.isHealthy());
   }
+
+  @Test
+  public void testBuilderCopiesAllFieldsFromOtherPipeline() {
+    Pipeline original = MockPipeline.createEcPipeline();
+    Pipeline copied = Pipeline.newBuilder(original).build();
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getReplicationConfig(),
+        copied.getReplicationConfig());
+    Assert.assertEquals(original.getPipelineState(), copied.getPipelineState());
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getNodeSet(), copied.getNodeSet());
+    Assert.assertEquals(original.getNodesInOrder(), copied.getNodesInOrder());
+    Assert.assertEquals(original.getLeaderId(), copied.getLeaderId());
+    Assert.assertEquals(original.getCreationTimestamp(),
+        copied.getCreationTimestamp());
+    Assert.assertEquals(original.getSuggestedLeaderId(),
+        copied.getSuggestedLeaderId());
+    for (DatanodeDetails dn : original.getNodes()) {
+      Assert.assertEquals(original.getReplicaIndex(dn),
+          copied.getReplicaIndex(dn));
+    }
+  }
 }
