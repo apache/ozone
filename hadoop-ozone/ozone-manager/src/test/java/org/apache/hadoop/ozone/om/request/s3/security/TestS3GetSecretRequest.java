@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -54,11 +53,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -71,9 +66,6 @@ import static org.mockito.Mockito.when;
 /**
  * Test case to verify S3GetSecretRequest.
  */
-@RunWith(PowerMockRunner.class)
-@PowerMockIgnore("javax.management.*")
-@PrepareForTest(ProtobufRpcEngine.Server.class)
 public class TestS3GetSecretRequest {
 
   @Rule
