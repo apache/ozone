@@ -126,7 +126,7 @@ public class TestS3GetSecretRequest {
     Mockito.framework().clearInlineMocks();
   }
 
-  static OMRequest newCreateTenantRequest(String tenantname) {
+  private static OMRequest newCreateTenantRequest(String tenantname) {
 
     final CreateTenantRequest createTenantRequest =
         CreateTenantRequest.newBuilder()
@@ -140,7 +140,7 @@ public class TestS3GetSecretRequest {
         .build();
   }
 
-  static OMRequest newAssignUserToTenantRequest(
+  private static OMRequest newAssignUserToTenantRequest(
       String tenantname, String username, String accessId) {
 
     final AssignUserToTenantRequest assignUserToTenantRequest =
@@ -157,7 +157,7 @@ public class TestS3GetSecretRequest {
         .build();
   }
 
-  static OMRequest newS3GetSecretRequest(String username) {
+  private static OMRequest newS3GetSecretRequest(String username) {
 
     final GetS3SecretRequest getS3SecretRequest =
         GetS3SecretRequest.newBuilder()
@@ -175,7 +175,6 @@ public class TestS3GetSecretRequest {
   public void testS3GetSecretRequest() throws IOException {
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(0L);
     long txLogIndex = 1;
-//    long expectedObjId = ozoneManager.getObjectIdFromTxId(txLogIndex);
     final String tenantname = "finance";
     final String username = "bob@EXAMPLE.COM";
     final String accessId =
