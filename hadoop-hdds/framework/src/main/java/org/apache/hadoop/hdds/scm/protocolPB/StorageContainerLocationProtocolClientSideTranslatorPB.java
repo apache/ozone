@@ -729,7 +729,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public boolean startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> idleiterations,
       Optional<Double> maxDatanodesRatioToInvolvePerIteration,
-      Optional<Long> maxSizeToMovePerIterationInGB) throws IOException{
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTargetInGB,
+      Optional<Long> maxSizeLeavingSourceInGB) throws IOException{
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -764,6 +766,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
               " -1(infinitly run container balancer).");
       builder.setIdleiterations(idi);
     }
+
+    if (maxSizeEnteringTargetInGB.isPresent()) {
+      long mset = maxSizeEnteringTargetInGB.get();
+      Preconditions.checkState(mset > 0,
+          "maxSizeEnteringTargetInGB must be positive.");
+      builder.setMaxSizeEnteringTargetInGB(mset);
+    }
+
+    if (maxSizeLeavingSourceInGB.isPresent()) {
+      long msls = maxSizeLeavingSourceInGB.get();
+      Preconditions.checkState(msls > 0,
+          "maxSizeLeavingSourceInGB must be positive.");
+      builder.setMaxSizeLeavingSourceInGB(msls);
+    }
+
 
     StartContainerBalancerRequestProto request = builder.build();
     StartContainerBalancerResponseProto response =
