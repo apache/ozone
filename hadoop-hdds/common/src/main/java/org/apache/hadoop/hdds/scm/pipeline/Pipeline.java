@@ -475,6 +475,15 @@ public final class Pipeline {
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
+      this.replicaIndexes = new HashMap<>();
+      if (nodeStatus != null) {
+        for (DatanodeDetails dn : nodeStatus.keySet()) {
+          int index = pipeline.getReplicaIndex(dn);
+          if (index > 0) {
+            replicaIndexes.put(dn, index);
+          }
+        }
+      }
     }
 
     public Builder setId(PipelineID id1) {
