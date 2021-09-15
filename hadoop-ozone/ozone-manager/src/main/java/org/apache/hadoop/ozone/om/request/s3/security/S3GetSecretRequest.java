@@ -84,6 +84,8 @@ public class S3GetSecretRequest extends OMClientRequest {
           OMException.ResultCodes.USER_MISMATCH);
     }
 
+    // Generate secret. Used only when doesn't the kerberosID entry doesn't
+    //  exist in DB, discarded otherwise.
     String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
 
     UpdateGetS3SecretRequest updateGetS3SecretRequest =
@@ -155,7 +157,7 @@ public class S3GetSecretRequest extends OMClientRequest {
         s3SecretValue = new S3SecretValue(kerberosID, awsSecret);
       }
 
-      GetS3SecretResponse.Builder getS3SecretResponse =
+      final GetS3SecretResponse.Builder getS3SecretResponse =
           GetS3SecretResponse.newBuilder().setS3Secret(
               S3Secret.newBuilder()
                   .setAwsSecret(awsSecret)
@@ -163,13 +165,14 @@ public class S3GetSecretRequest extends OMClientRequest {
           );
 
       if (s3SecretValue == null) {
-        omClientResponse =
-            new S3GetSecretResponse(new S3SecretValue(kerberosID, awsSecret),
+        omClientResponse = new S3GetSecretResponse(
+            new S3SecretValue(kerberosID, awsSecret),
             omResponse.setGetS3SecretResponse(getS3SecretResponse).build());
       } else {
-        // As when it already exists, we don't need to add to DB again. So
-        // set the value to null.
-        omClientResponse = new S3GetSecretResponse(null,
+        // If entry already exists, we won't overwrite the entry in DB again.
+        //  Hence, S3SecretValue arg is set to null.
+        omClientResponse = new S3GetSecretResponse(
+            null,
             omResponse.setGetS3SecretResponse(getS3SecretResponse).build());
       }
 

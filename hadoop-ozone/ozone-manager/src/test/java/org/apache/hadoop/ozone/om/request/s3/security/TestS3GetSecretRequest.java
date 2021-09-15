@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -54,7 +56,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
@@ -64,6 +65,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 /**
@@ -88,16 +90,27 @@ public class TestS3GetSecretRequest {
   private OMMultiTenantManager omMultiTenantManager;
   private Tenant tenant;
 
-  private UserGroupInformation ugi;
-
   @Before
   public void setUp() throws Exception {
     ozoneManager = mock(OzoneManager.class);
+
+    Server.Call call = spy(new Server.Call(1, 1, null, null,
+        RPC.RpcKind.RPC_BUILTIN, new byte[] {1, 2, 3}));
+    final UserGroupInformation ugiAdmin =
+        UserGroupInformation.createRemoteUser("alice");
+    // So that ProtobufRpcEngine.Server.getRemoteUser() won't return empty
+    when(call.getRemoteUser()).thenReturn(ugiAdmin);
+    // alice is an admin
+    when(ozoneManager.isAdmin(ugiAdmin)).thenReturn(true);
+    Server.getCurCall().set(call);
+
     omMetrics = OMMetrics.create();
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    // No need to set OzoneConfigKeys.OZONE_ADMINISTRATORS in conf
+    //  as we did the trick earlier with mockito
+    omMetadataManager = new OmMetadataManagerImpl(conf);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
@@ -108,16 +121,11 @@ public class TestS3GetSecretRequest {
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-
+    // Multi-tenant stuff
     omMultiTenantManager = mock(OMMultiTenantManager.class);
     tenant = mock(Tenant.class);
     when(omMultiTenantManager.getTenantInfo("finance")).thenReturn(tenant);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
-
-    // Extras for S3GetSecretRequest
-    ugi = UserGroupInformation.createRemoteUser("bob");
-    PowerMockito.mockStatic(ProtobufRpcEngine.Server.class);
-    PowerMockito.when(ProtobufRpcEngine.Server.getRemoteUser()).thenReturn(ugi);
   }
 
   @After
@@ -175,7 +183,7 @@ public class TestS3GetSecretRequest {
   public void testS3GetSecretRequest() throws IOException {
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(0L);
     long txLogIndex = 1;
-    long expectedObjId = ozoneManager.getObjectIdFromTxId(txLogIndex);
+//    long expectedObjId = ozoneManager.getObjectIdFromTxId(txLogIndex);
     final String tenantname = "finance";
     final String username = "bob@EXAMPLE.COM";
     final String accessId =
@@ -252,8 +260,13 @@ public class TestS3GetSecretRequest {
 
       final S3GetSecretResponse response =
           (S3GetSecretResponse) omClientResponse;
+      // response.getS3SecretValue() should be null because the entry already
+      //  exists in DB, we are not overwriting the value.
+      Assert.assertNull(response.getS3SecretValue());
+      // Verify the secret retrieved from the DB.
       Assert.assertEquals(omDBAccessIdInfo.getSharedSecret(),
-          response.getS3SecretValue().getAwsSecret());
+          response.getOMResponse()
+              .getGetS3SecretResponse().getS3Secret().getAwsSecret());
     } catch (IllegalArgumentException ex){
       GenericTestUtils.assertExceptionContains(
           "should be greater than zero", ex);
