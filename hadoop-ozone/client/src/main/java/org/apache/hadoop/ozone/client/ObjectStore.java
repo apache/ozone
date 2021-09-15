@@ -188,14 +188,15 @@ public class ObjectStore {
   // TODO: modify, delete
 
   /**
-   * Create tenant user.
-   * @param tenantUsername tenant user name.
+   * Assign user to tenant.
+   * @param username user name to be assigned.
    * @param tenantName tenant name.
+   * @param accessId access ID.
    * @throws IOException
    */
-  public S3SecretValue createTenantUser(
-      String tenantUsername, String tenantName) throws IOException {
-    return proxy.createTenantUser(tenantUsername, tenantName);
+  public S3SecretValue assignUserToTenant(
+      String username, String tenantName, String accessId) throws IOException {
+    return proxy.assignUserToTenant(username, tenantName, accessId);
   }
 
   // TODO: modify, delete
