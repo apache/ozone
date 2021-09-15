@@ -411,20 +411,20 @@ public class SCMClientProtocolServer implements
       if (state != null) {
         if (factor != null) {
           return scm.getContainerManager().getContainers(state).stream()
-                  .filter(info -> info.containerID().getId() >= startContainerID)
-                  .filter(info -> (info.getReplicationFactor() == factor))
-                  .sorted().limit(count).collect(Collectors.toList());
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .filter(info -> (info.getReplicationFactor() == factor))
+              .sorted().limit(count).collect(Collectors.toList());
         } else {
           return scm.getContainerManager().getContainers(state).stream()
-                  .filter(info -> info.containerID().getId() >= startContainerID)
-                  .sorted().limit(count).collect(Collectors.toList());
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .sorted().limit(count).collect(Collectors.toList());
         }
       } else {
         if (factor != null) {
           return scm.getContainerManager().getContainers().stream()
-                  .filter(info -> info.containerID().getId() >= startContainerID)
-                  .filter(info -> info.getReplicationFactor() == factor)
-                  .sorted().limit(count).collect(Collectors.toList());
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .filter(info -> info.getReplicationFactor() == factor)
+              .sorted().limit(count).collect(Collectors.toList());
         } else {
           return scm.getContainerManager().getContainers(containerId, count);
         }
