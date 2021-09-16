@@ -184,29 +184,12 @@ public class TestOzoneECClient {
     Assert.assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[1024];
-      Assert.assertEquals(inputChunks[0].length, is.read(fileContent));
-      Assert.assertEquals(new String(inputChunks[0], UTF_8),
-          new String(fileContent, UTF_8));
-    }
-
-    // Since EC read is not ready yet, let's use the regular read by
-    // tweaking the pipeline.
-    // Remove first node in EC pipeline. So, regular read will hit the
-    // first node in pipeline and assert for second chunk in EC data.
-    updatePipelineToKeepSingleNode(2);
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1024];
-      Assert.assertEquals(inputChunks[1].length, is.read(fileContent));
-      Assert.assertEquals(new String(inputChunks[1], UTF_8),
-          new String(fileContent, UTF_8));
-    }
-
-    updatePipelineToKeepSingleNode(3);
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1024];
-      Assert.assertEquals(inputChunks[2].length, is.read(fileContent));
-      Assert.assertEquals(new String(inputChunks[2], UTF_8),
-          new String(fileContent, UTF_8));
+      for (int i=0; i<3; i++) {
+        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
+        Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
+      }
+      // A further read should give EOF
+      Assert.assertEquals(-1, is.read(fileContent));
     }
   }
 
@@ -308,7 +291,10 @@ public class TestOzoneECClient {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    byte[] lastChunk = inputChunks[inputChunks.length - 1];
+    // Last chunk is one byte short of the others.
+    byte[] lastChunk =
+        Arrays.copyOf(inputChunks[inputChunks.length - 1],
+            inputChunks[inputChunks.length - 1].length - 1);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, 2000,
         new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
@@ -316,20 +302,22 @@ public class TestOzoneECClient {
         out.write(inputChunks[i]);
       }
 
-      for (int i = 0; i < lastChunk.length - 1; i++) {
+      for (int i = 0; i < lastChunk.length; i++) {
         out.write(lastChunk[i]);
       }
     }
 
-    // Making sure to keep only the 3rd node in pipeline, so that 3rd chunk can
-    // be read.
-    updatePipelineToKeepSingleNode(3);
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1023];
-      Assert.assertEquals(lastChunk.length - 1, is.read(fileContent));
-      Assert.assertEquals(
-          new String(Arrays.copyOf(lastChunk, lastChunk.length - 1), UTF_8),
-          new String(fileContent, UTF_8));
+      byte[] fileContent = new byte[1024];
+      for (int i=0; i<2; i++) {
+        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
+        Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
+      }
+      Assert.assertEquals(lastChunk.length, is.read(fileContent));
+      Assert.assertTrue(Arrays.equals(lastChunk,
+          Arrays.copyOf(fileContent, lastChunk.length)));
+      // A further read should give EOF
+      Assert.assertEquals(-1, is.read(fileContent));
     }
   }
 
