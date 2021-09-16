@@ -18,8 +18,14 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -60,6 +66,17 @@ public class CreateBucketHandler extends BucketHandler {
       defaultValue = "LEGACY")
   private AllowedBucketLayouts allowedBucketLayout;
 
+  @Option(names = {"--replication", "-r"},
+      description = "Replication value. Example: 3 (for Ratis type) or 1 ( for"
+          + " standalone type). In the case of EC, pass DATA-PARITY, eg 3-2," +
+          " 6-3, 10-4")
+  private String replication;
+
+  @Option(names = {"--replicationtype", "-rt"},
+      description = "Replication type. Supported types are RATIS, STANDALONE,"
+          + " EC")
+  private String replicationType;
+
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
 
@@ -92,6 +109,26 @@ public class CreateBucketHandler extends BucketHandler {
       if (isVerbose()) {
         out().printf("Bucket Encryption enabled with Key Name: %s%n",
             bekName);
+      }
+    }
+
+    if(replicationType!=null) {
+      if (replication != null) {
+        ReplicationConfig replicationConfig = ReplicationConfig
+            .fromTypeAndString(ReplicationType.valueOf(replicationType),
+                replication);
+        boolean isEC = replicationConfig
+            .getReplicationType() == HddsProtos.ReplicationType.EC;
+        bb.setDefaultReplicationConfig(new DefaultReplicationConfig(
+            ReplicationType.fromProto(replicationConfig.getReplicationType()),
+            isEC ?
+                null :
+                ReplicationFactor.valueOf(replicationConfig.getRequiredNodes()),
+            isEC ? (ECReplicationConfig) replicationConfig : null));
+      } else {
+        throw new IOException(
+            "Replication can't be null. Replication type passed was : "
+                + replicationType);
       }
     }
 
