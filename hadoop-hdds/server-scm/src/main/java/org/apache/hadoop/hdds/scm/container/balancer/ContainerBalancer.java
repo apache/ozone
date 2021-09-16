@@ -620,7 +620,7 @@ public class ContainerBalancer {
    * @param nodes List of DatanodeUsageInfo to find the average utilization for
    * @return Average utilization value
    */
-  private double calculateAvgUtilization(List<DatanodeUsageInfo> nodes) {
+  double calculateAvgUtilization(List<DatanodeUsageInfo> nodes) {
     if (nodes.size() == 0) {
       LOG.warn("No nodes to calculate average utilization for in " +
           "ContainerBalancer.");
@@ -753,7 +753,7 @@ public class ContainerBalancer {
    *
    * @return List of DatanodeUsageInfo containing unBalanced nodes.
    */
-  public List<DatanodeUsageInfo> getUnBalancedNodes() {
+  List<DatanodeUsageInfo> getUnBalancedNodes() {
     return unBalancedNodes;
   }
 
