@@ -384,9 +384,9 @@ public class MockNodeManager implements NodeManager {
     }
     Comparator<DatanodeUsageInfo> comparator;
     if (mostUsed) {
-      comparator = DatanodeUsageInfo.getMostUsedByRemainingRatio().reversed();
+      comparator = DatanodeUsageInfo.getMostUtilized().reversed();
     } else {
-      comparator = DatanodeUsageInfo.getMostUsedByRemainingRatio();
+      comparator = DatanodeUsageInfo.getMostUtilized();
     }
 
     return datanodeDetailsList.stream()
