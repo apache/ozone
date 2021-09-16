@@ -545,11 +545,11 @@ public class BlockDataStreamOutput
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     ChecksumData checksumData = checksum.noChecksum(); //TODO: support checksum
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
-            .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
-            .setOffset(offset)
-            .setLen(effectiveChunkSize)
-            .setChecksumData(checksumData.getProtoBufMessage())
-            .build();
+        .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
+        .setOffset(offset)
+        .setLen(effectiveChunkSize)
+        .setChecksumData(checksumData.getProtoBufMessage())
+        .build();
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} length {} at offset {}",
@@ -557,23 +557,23 @@ public class BlockDataStreamOutput
     }
 
     CompletableFuture<DataStreamReply> future =
-            (needSync(offset + effectiveChunkSize) ?
-                    out.writeAsync(fpc, StandardWriteOption.SYNC) :
-                    out.writeAsync(fpc))
-                    .whenCompleteAsync((r, e) -> {
-                      if (e != null || !r.isSuccess()) {
-                        if (e == null) {
-                          e = new IOException("result is not success");
-                        }
-                        String msg =
-                                "Failed to write chunk " + chunkInfo.getChunkName() +
-                                        " " + "into block " + blockID;
-                        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-                        CompletionException ce = new CompletionException(msg, e);
-                        setIoException(ce);
-                        throw ce;
-                      }
-                    }, responseExecutor);
+        (needSync(offset + effectiveChunkSize) ?
+            out.writeAsync(fpc, StandardWriteOption.SYNC) :
+            out.writeAsync(fpc))
+            .whenCompleteAsync((r, e) -> {
+              if (e != null || !r.isSuccess()) {
+                if (e == null) {
+                  e = new IOException("result is not success");
+                }
+                String msg =
+                    "Failed to write chunk " + chunkInfo.getChunkName() +
+                    " " + "into block " + blockID;
+                LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+                CompletionException ce = new CompletionException(msg, e);
+                setIoException(ce);
+                throw ce;
+              }
+            }, responseExecutor);
 
     futures.add(future);
     containerBlockData.addChunks(chunkInfo);
