@@ -155,7 +155,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
         nodeVsIdx.put(nodeDetails,
             internalBlkStream.getPipeline().getReplicaIndex(nodeDetails));
       }
-
+      nodeStatus.sort((o1, o2) -> nodeVsIdx.get(o1) - nodeVsIdx.get(o2));
       final BlockOutputStreamEntry firstStreamInBlockGrp = blkGrpStreams.get(0);
       Pipeline blockGrpPipeline = Pipeline.newBuilder()
           .setId(firstStreamInBlockGrp.getPipeline().getId())

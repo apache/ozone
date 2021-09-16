@@ -228,6 +228,29 @@ public class TestOzoneECClient {
   }
 
   @Test
+  public void testCommitKeyInfo()
+      throws IOException {
+    final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(dataBlocks, parityBlocks)));
+
+    // create key without mentioning replication config. Since we set EC
+    // replication in bucket, key should be EC key.
+    try (OzoneOutputStream out = bucket.createKey("mykey", 2000)) {
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+    Assert.assertEquals(1,
+        transportStub.getKeys().get(volumeName).get(bucketName).get(keyName)
+            .getKeyLocationListCount());
+    Assert.assertEquals(inputChunks[0].length * 3,
+        transportStub.getKeys().get(volumeName).get(bucketName).get(keyName)
+            .getDataSize());
+  }
+
+  @Test
   public void testPartialStripeWithSingleChunkAndPadding() throws IOException {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
