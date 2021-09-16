@@ -222,7 +222,7 @@ public class TestS3GetSecretRequest {
   }
 
   @Test
-  public void testGetSecretOfAnotherUserAsNonAdmin() throws IOException {
+  public void testGetOwnSecretAsNonAdmin() throws IOException {
 
     // This effectively makes alice a regular user.
     when(ozoneManager.isAdmin(ugiAlice)).thenReturn(false);
@@ -297,7 +297,7 @@ public class TestS3GetSecretRequest {
   }
 
   @Test
-  public void testGetOwnSecretAsNonAdmin() throws IOException {
+  public void testGetSecretOfAnotherUserAsNonAdmin() throws IOException {
 
     // This effectively makes alice a regular user.
     when(ozoneManager.isAdmin(ugiAlice)).thenReturn(false);

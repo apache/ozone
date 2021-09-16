@@ -128,9 +128,10 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
     }
 
     // Won't check tenant existence in preExecute.
-    // Won't check Kerberos principal existence at all. TODO: Confirm this.
+    // Won't check Kerberos principal existence.
 
-    // Generate random S3 secret
+    // Generate secret. Used only when doesn't the kerberosID entry doesn't
+    //  exist in DB, discarded otherwise.
     final String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
 
     final UpdateGetS3SecretRequest updateGetS3SecretRequest =
