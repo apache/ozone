@@ -328,7 +328,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       List<String> userGroupIDs = new ArrayList<>();
       userGroupIDs.add(idGroupTenantAllUsers);
 
-      //String userID = authorizer.createUser(userPrincipal, userGroupIDs);
+      String userID = authorizer.createUser(userPrincipal, userGroupIDs);
 
       inMemoryUserNameToTenantNameMap.put(
           userPrincipal.getFullMultiTenantPrincipalID(), tenantName);
