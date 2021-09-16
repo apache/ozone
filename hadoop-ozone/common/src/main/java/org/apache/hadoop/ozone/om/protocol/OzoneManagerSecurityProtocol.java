@@ -55,7 +55,7 @@ public interface OzoneManagerSecurityProtocol {
    * @throws OMException
    */
   @Idempotent
-  default default long renewDelegationToken(Token<OzoneTokenIdentifier> token throws OMException {
+  default long renewDelegationToken(Token<OzoneTokenIdentifier> token) throws OMException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
