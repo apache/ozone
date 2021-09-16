@@ -127,7 +127,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
     RaftServerStatus raftServerStatus;
-    if (isRatisEnabled) {
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
         return submitReadRequestToOM(request);
@@ -143,9 +142,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         }
         return submitRequestToRatis(request);
       }
-    } else {
-      return submitRequestDirectlyToOM(request);
-    }
   }
 
   /**
