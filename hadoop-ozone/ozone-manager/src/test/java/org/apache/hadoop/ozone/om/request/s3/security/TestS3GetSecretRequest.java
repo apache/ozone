@@ -86,11 +86,11 @@ public class TestS3GetSecretRequest {
       ((response, transactionIndex) -> null);
 
   // Multi-tenant related vars
-  private final String userAlice = "alice@EXAMPLE.COM";
+  private static final String userAlice = "alice@EXAMPLE.COM";
   private UserGroupInformation ugiAlice;
-  private final String tenantName = "finance";
-  private final String userBob = "bob@EXAMPLE.COM";
-  private final String accessId =
+  private static final String tenantName = "finance";
+  private static final String userBob = "bob@EXAMPLE.COM";
+  private static final String accessId =
       tenantName + TENANT_NAME_USER_NAME_DELIMITER + userBob;
 
   private OMMultiTenantManager omMultiTenantManager;

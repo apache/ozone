@@ -91,6 +91,7 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
     if (s3SecretValue != null &&
         getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
       assert(accessId.equals(s3SecretValue.getKerberosID()));
+      // Add S3SecretTable entry
       omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
           accessId, s3SecretValue);
     }
