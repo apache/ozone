@@ -68,8 +68,8 @@ public class CreateBucketHandler extends BucketHandler {
 
   @Option(names = {"--replication", "-r"},
       description = "Replication value. Example: 3 (for Ratis type) or 1 ( for"
-          + " standalone type). Inthe case of EC type, the following valid"
-          + " values can be passed: 3-2, 6-3, 10-4")
+          + " standalone type). In the case of EC, pass DATA-PARITY, eg 3-2," +
+          " 6-3, 10-4")
   private String replication;
 
   @Option(names = {"--replicationtype", "-rt"},
