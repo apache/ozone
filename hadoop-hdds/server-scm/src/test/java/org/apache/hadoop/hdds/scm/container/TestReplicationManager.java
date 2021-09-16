@@ -827,6 +827,30 @@ public class TestReplicationManager {
         .onMessage(id, eventQueue);
   }
 
+  /**
+   * ReplicationManager should skip send close command to unhealthy replica.
+   */
+  @Test
+  public void testCloseUnhealthyReplica()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+    final ContainerID id = container.containerID();
+    final Set<ContainerReplica> replicas = getReplicas(id, State.UNHEALTHY,
+        randomDatanodeDetails());
+    replicas.addAll(getReplicas(id, State.OPEN, randomDatanodeDetails()));
+    replicas.addAll(getReplicas(id, State.OPEN, randomDatanodeDetails()));
+
+    containerStateManager.loadContainer(container);
+    for (ContainerReplica replica : replicas) {
+      containerStateManager.updateContainerReplica(id, replica);
+    }
+
+    replicationManager.processAll();
+    // Wait for EventQueue to call the event handler
+    eventQueue.processAll(1000);
+    Assert.assertEquals(2, datanodeCommandHandler.getInvocation());
+  }
+
   @Test
   public void testGeneratedConfig() {
     ReplicationManagerConfiguration rmc =
