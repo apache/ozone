@@ -139,16 +139,14 @@ public final class BlockDataStreamOutputEntry
 
   Collection<DatanodeDetails> getFailedServers() {
     if (blockDataStreamOutput != null) {
-      BlockDataStreamOutput out = this.blockDataStreamOutput;
-      return out.getFailedServers();
+      return this.blockDataStreamOutput.getFailedServers();
     }
     return Collections.emptyList();
   }
 
   long getWrittenDataLength() {
     if (blockDataStreamOutput != null) {
-      BlockDataStreamOutput out = this.blockDataStreamOutput;
-      return out.getWrittenDataLength();
+      return this.blockDataStreamOutput.getWrittenDataLength();
     } else {
       // For a pre allocated block for which no write has been initiated,
       // the ByteBufferStreamOutput will be null here.
@@ -159,15 +157,13 @@ public final class BlockDataStreamOutputEntry
 
   void cleanup(boolean invalidateClient) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = this.blockDataStreamOutput;
-    out.cleanup(invalidateClient);
+    this.blockDataStreamOutput.cleanup(invalidateClient);
 
   }
 
   void writeOnRetry(long len) throws IOException {
     checkStream();
-    BlockDataStreamOutput out = this.blockDataStreamOutput;
-    out.writeOnRetry(len);
+    this.blockDataStreamOutput.writeOnRetry(len);
     this.currentPosition += len;
 
   }
