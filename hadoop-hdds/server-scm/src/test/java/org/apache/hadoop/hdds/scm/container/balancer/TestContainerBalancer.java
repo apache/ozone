@@ -140,6 +140,19 @@ public class TestContainerBalancer {
         replicationManager, conf, SCMContext.emptyContext(), placementPolicy);
   }
 
+  @Test
+  public void testCalculationOfUtilization() {
+    Assert.assertEquals(nodesInCluster.size(), nodeUtilizations.size());
+    for (int i = 0; i < nodesInCluster.size(); i++) {
+      Assert.assertEquals(nodeUtilizations.get(i),
+          nodesInCluster.get(i).calculateUtilization(), 0.0001);
+    }
+
+    // should be equal to average utilization of the cluster
+    Assert.assertEquals(averageUtilization,
+        containerBalancer.calculateAvgUtilization(nodesInCluster), 0.0001);
+  }
+
   /**
    * Checks whether ContainerBalancer is correctly updating the list of
    * unBalanced nodes with varying values of Threshold.
