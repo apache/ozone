@@ -399,7 +399,11 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
-  StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
+  default StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Queries the current status of finalization.
@@ -517,7 +521,11 @@ public interface OzoneManagerProtocol
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue getS3Secret(String kerberosID) throws IOException;
+  default S3SecretValue getS3Secret(String kerberosID) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Revokes s3Secret of given kerberos user.

@@ -40,8 +40,12 @@ public interface OzoneManagerSecurityProtocol {
    * @throws OMException
    */
   @Idempotent
-  Token<OzoneTokenIdentifier> getDelegationToken(Text renewer)
-      throws OMException;
+  default Token<OzoneTokenIdentifier> getDelegationToken(Text renewer)
+    throws OMException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Renew an existing delegation token.
@@ -51,8 +55,11 @@ public interface OzoneManagerSecurityProtocol {
    * @throws OMException
    */
   @Idempotent
-  long renewDelegationToken(Token<OzoneTokenIdentifier> token)
-      throws OMException;
+  default default long renewDelegationToken(Token<OzoneTokenIdentifier> token throws OMException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
   /**
    * Cancel an existing delegation token.
@@ -61,7 +68,10 @@ public interface OzoneManagerSecurityProtocol {
    * @throws OMException
    */
   @Idempotent
-  void cancelDelegationToken(Token<OzoneTokenIdentifier> token)
-      throws OMException;
+  default void cancelDelegationToken(Token<OzoneTokenIdentifier> token) throws OMException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
 
 }
