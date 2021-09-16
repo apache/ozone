@@ -83,6 +83,7 @@ public class ContainerBalancer {
   private ContainerBalancerMetrics metrics;
   private long clusterCapacity;
   private long clusterUsed;
+  private long clusterRemaining;
   private double clusterAvgUtilisation;
   private volatile boolean balancerRunning;
   private Thread currentBalancingThread;
@@ -241,6 +242,7 @@ public class ContainerBalancer {
     this.totalNodesInCluster = datanodeUsageInfos.size();
     this.clusterCapacity = 0L;
     this.clusterUsed = 0L;
+    this.clusterRemaining = 0L;
     this.selectedContainers.clear();
     this.overUtilizedNodes.clear();
     this.underUtilizedNodes.clear();
@@ -273,7 +275,7 @@ public class ContainerBalancer {
 
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
-      double utilization = calculateUtilization(datanodeUsageInfo);
+      double utilization = datanodeUsageInfo.calculateUtilization();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} is {}",
             datanodeUsageInfo.getDatanodeDetails().getUuidString(),
@@ -433,6 +435,8 @@ public class ContainerBalancer {
                 moveSelection.getContainerID(), e);
           }
           metrics.incrementMovedContainersNum(1);
+          // TODO incrementing size balanced this way incorrectly counts the
+          //  size moved twice
           metrics.incrementDataSizeBalancedGB(sizeMovedPerIteration);
         }
       } catch (InterruptedException e) {
@@ -588,6 +592,8 @@ public class ContainerBalancer {
       Collection<DatanodeDetails> potentialTargets,
       Set<DatanodeDetails> selectedTargets,
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
+    // TODO: counting datanodes involved this way is incorrect when the same
+    //  datanode is involved in different moves
     countDatanodesInvolvedPerIteration += 2;
     incSizeSelectedForMoving(source, moveSelection);
     sourceToTargetMap.put(source, moveSelection);
@@ -596,7 +602,7 @@ public class ContainerBalancer {
     selectionCriteria.setSelectedContainers(selectedContainers);
 
     return potentialTargets.stream()
-        .filter(node -> sizeEnteringNode.get(node) <=
+        .filter(node -> sizeEnteringNode.get(node) <
             config.getMaxSizeEnteringTarget()).collect(Collectors.toList());
   }
 
@@ -613,12 +619,12 @@ public class ContainerBalancer {
 
   /**
    * Calculates the average utilization for the specified nodes.
-   * Utilization is used space divided by capacity.
+   * Utilization is (capacity - remaining) divided by capacity.
    *
    * @param nodes List of DatanodeUsageInfo to find the average utilization for
    * @return Average utilization value
    */
-  private double calculateAvgUtilization(List<DatanodeUsageInfo> nodes) {
+  double calculateAvgUtilization(List<DatanodeUsageInfo> nodes) {
     if (nodes.size() == 0) {
       LOG.warn("No nodes to calculate average utilization for in " +
           "ContainerBalancer.");
@@ -631,23 +637,9 @@ public class ContainerBalancer {
     }
     clusterCapacity = aggregatedStats.getCapacity().get();
     clusterUsed = aggregatedStats.getScmUsed().get();
+    clusterRemaining = aggregatedStats.getRemaining().get();
 
-    return clusterUsed / (double) clusterCapacity;
-  }
-
-  /**
-   * Calculates the utilization, that is used space divided by capacity, for
-   * the given datanodeUsageInfo.
-   *
-   * @param datanodeUsageInfo DatanodeUsageInfo to calculate utilization for
-   * @return Utilization value
-   */
-  public static double calculateUtilization(
-      DatanodeUsageInfo datanodeUsageInfo) {
-    SCMNodeStat stat = datanodeUsageInfo.getScmNodeStat();
-
-    return stat.getScmUsed().get().doubleValue() /
-        stat.getCapacity().get().doubleValue();
+    return (clusterCapacity - clusterRemaining) / (double) clusterCapacity;
   }
 
   /**
@@ -765,7 +757,7 @@ public class ContainerBalancer {
    *
    * @return List of DatanodeUsageInfo containing unBalanced nodes.
    */
-  public List<DatanodeUsageInfo> getUnBalancedNodes() {
+  List<DatanodeUsageInfo> getUnBalancedNodes() {
     return unBalancedNodes;
   }
 
