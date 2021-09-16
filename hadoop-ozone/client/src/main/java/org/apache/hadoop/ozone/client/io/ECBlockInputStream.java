@@ -47,8 +47,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       LoggerFactory.getLogger(ECBlockInputStream.class);
 
   private final ECReplicationConfig repConfig;
-  // TODO - HDDS-5741
-  private final int ecChunkSize = 1024;
+  // TODO - HDDS-5741 - remove hardcoded value
+  private static final int HARDCODED_CHUNK_SIZE = 1024;
+  private final int ecChunkSize;
   private final BlockInputStreamFactory streamFactory;
   private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
@@ -66,9 +67,20 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
       Pipeline> refreshFunction, BlockInputStreamFactory streamFactory) {
+
+    this(repConfig, HARDCODED_CHUNK_SIZE, blockInfo, verifyChecksum,
+        xceiverClientFactory, refreshFunction, streamFactory);
+  }
+
+  // TODO - HDDS-5741 - remove this constructor - ecChunkSize should not be
+  //        there
+  public ECBlockInputStream(ECReplicationConfig repConfig, int ecChunkSize,
+      OmKeyLocationInfo blockInfo, boolean verifyChecksum,
+      XceiverClientFactory xceiverClientFactory, Function<BlockID,
+      Pipeline> refreshFunction, BlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;
     // TODO - HDDS-5741
-    // this.ecChunkSize = ecChunkSize;
+    this.ecChunkSize = ecChunkSize;
     this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;
     this.streamFactory = streamFactory;

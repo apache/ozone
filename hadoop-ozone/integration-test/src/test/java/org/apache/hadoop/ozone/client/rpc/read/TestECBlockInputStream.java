@@ -66,15 +66,15 @@ public class TestECBlockInputStream {
   public void testSufficientLocations() {
     // EC-3-2, 5MB block, so all 3 data locations are needed
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 5 * ONEMB);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, new TestBlockInputStreamFactory())) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertTrue(ecb.hasSufficientLocations());
     }
 
     // EC-3-2, very large block, so all 3 data locations are needed
     keyInfo = createKeyInfo(repConfig, 5, 5000 * ONEMB);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, new TestBlockInputStreamFactory())) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertTrue(ecb.hasSufficientLocations());
     }
 
@@ -83,8 +83,8 @@ public class TestECBlockInputStream {
     // EC-3-2, 1 byte short of 1MB with 1 location
     dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
     keyInfo = createKeyInfo(repConfig, ONEMB - 1, dnMap);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, new TestBlockInputStreamFactory())) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertTrue(ecb.hasSufficientLocations());
     }
 
@@ -92,8 +92,8 @@ public class TestECBlockInputStream {
     dnMap.clear();
     dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 2);
     keyInfo = createKeyInfo(repConfig, ONEMB, dnMap);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, new TestBlockInputStreamFactory())) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertFalse(ecb.hasSufficientLocations());
     }
 
@@ -102,8 +102,8 @@ public class TestECBlockInputStream {
     dnMap.clear();
     dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
     keyInfo = createKeyInfo(repConfig, 5 * ONEMB, dnMap);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, new TestBlockInputStreamFactory())) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertFalse(ecb.hasSufficientLocations());
     }
 
@@ -114,8 +114,8 @@ public class TestECBlockInputStream {
     dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 4);
     dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
     keyInfo = createKeyInfo(repConfig, 5 * ONEMB, dnMap);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, new TestBlockInputStreamFactory())) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertFalse(ecb.hasSufficientLocations());
     }
   }
@@ -126,8 +126,8 @@ public class TestECBlockInputStream {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, ONEMB - 100);
 
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
       ecb.read(buf);
       // We expect only 1 block stream and it should have a length passed of
       // ONEMB - 100.
@@ -142,7 +142,7 @@ public class TestECBlockInputStream {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, ONEMB + 100);
 
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB, 
         keyInfo, true, null, null, streamFactory)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
@@ -157,8 +157,8 @@ public class TestECBlockInputStream {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 2 * ONEMB + 100);
 
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       Assert.assertEquals(ONEMB, streams.get(0).getLength());
@@ -173,8 +173,8 @@ public class TestECBlockInputStream {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 10 * ONEMB + 100);
 
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       Assert.assertEquals(4 * ONEMB, streams.get(0).getLength());
@@ -189,8 +189,8 @@ public class TestECBlockInputStream {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, ONEMB);
 
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       Assert.assertEquals(ONEMB, streams.get(0).getLength());
@@ -203,8 +203,8 @@ public class TestECBlockInputStream {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 9 * ONEMB);
 
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       Assert.assertEquals(3 * ONEMB, streams.get(0).getLength());
@@ -216,8 +216,8 @@ public class TestECBlockInputStream {
   @Test
   public void testSimpleRead() throws IOException {
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 5 * ONEMB);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
 
       ByteBuffer buf = ByteBuffer.allocate(100);
 
@@ -234,8 +234,8 @@ public class TestECBlockInputStream {
   @Test
   public void testReadPastEOF() throws IOException {
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 50);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
 
       ByteBuffer buf = ByteBuffer.allocate(100);
 
@@ -252,8 +252,8 @@ public class TestECBlockInputStream {
   public void testReadCrossingMultipleECChunkBounds() throws IOException {
     // EC-3-2, 5MB block, so all 3 data locations are needed
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 5 * ONEMB);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, keyInfo,
-        true, null, null, streamFactory)) {
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig, ONEMB,
+        keyInfo, true, null, null, streamFactory)) {
 
       // EC Chunk size is 100 and 3-2. Create a byte buffer to read 3.5 chunks,
       // so 350
