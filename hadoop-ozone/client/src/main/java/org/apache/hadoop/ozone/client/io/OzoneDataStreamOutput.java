@@ -64,12 +64,7 @@ public class OzoneDataStreamOutput
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    if (keyDataStreamOutput instanceof KeyDataStreamOutput) {
-      return ((KeyDataStreamOutput)
-              keyDataStreamOutput).getCommitUploadPartInfo();
-    }
-    // Otherwise return null.
-    return null;
+    return keyDataStreamOutput.getCommitUploadPartInfo();
   }
 
   public ByteBufferStreamOutput getByteBufStreamOutput() {
