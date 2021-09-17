@@ -111,6 +111,18 @@ public class TestKeyInputStream extends TestInputStreamBase {
   }
 
   @Test
+  /**
+   * This test runs the others as a single test, so to avoid creating a new
+   * mini-cluster for each test.
+   */
+  public void testNonReplicationReads() throws Exception {
+    testSeekRandomly();
+    testSeek();
+    testReadChunkWithByteArray();
+    testReadChunkWithByteBuffer();
+    testSkip();
+  }
+
   public void testSeekRandomly() throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
@@ -141,7 +153,6 @@ public class TestKeyInputStream extends TestInputStreamBase {
     keyInputStream.close();
   }
 
-  @Test
   public void testSeek() throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
@@ -187,7 +198,6 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  @Test
   public void testReadChunkWithByteArray() throws Exception {
     String keyName = getNewKeyName();
 
@@ -208,7 +218,6 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  @Test
   public void testReadChunkWithByteBuffer() throws Exception {
     String keyName = getNewKeyName();
 
@@ -229,7 +238,6 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  @Test
   public void testSkip() throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
