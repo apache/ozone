@@ -160,11 +160,11 @@ public interface OMMultiTenantManager {
       throws IOException;
 
   /**
-   * Given a user return Tenant.
-   * @param user
+   * Given an access ID return its corresponding tenant.
+   * @param accessID
    * @return Tenant
    */
-  Tenant getUserTenantInfo(OzoneMultiTenantPrincipal user) throws IOException;
+  Tenant getTenantInfoForAccessID(String accessID) throws IOException;
 
   /**
    * Given a user, make him an admin of the corresponding Tenant.

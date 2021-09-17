@@ -106,13 +106,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   // Mapping for user-access-id to TenantName
   // Typical usage: given a user-access-id find out which tenant
-  private Map<String, String> inMemoryUserNameToTenantNameMap;
+  private Map<String, String> inMemoryAccessIDToTenantNameMap;
 
   // Mapping from user-access-id to all the groups that they belong to.
   // Typical usage: Adding a user or modify user, provide a list of groups
   //          that they would belong to. Note that groupIDs are opaque to OM.
   //          This may make sense just to the authorizer-plugin.
-  private Map<String, List<String>> inMemoryUserNameToListOfGroupsMap;
+  private Map<String, List<String>> inMemoryAccessIDToListOfGroupsMap;
 
 
   OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
@@ -121,8 +121,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     inMemoryTenantNameToTenantInfoMap = new ConcurrentHashMap<>();
     inMemoryTenantToPolicyNameListMap = new ConcurrentHashMap<>();
     inMemoryTenantToTenantGroups = new ConcurrentHashMap<>();
-    inMemoryUserNameToTenantNameMap = new ConcurrentHashMap<>();
-    inMemoryUserNameToListOfGroupsMap = new ConcurrentHashMap<>();
+    inMemoryAccessIDToTenantNameMap = new ConcurrentHashMap<>();
+    inMemoryAccessIDToListOfGroupsMap = new ConcurrentHashMap<>();
 
     controlPathLock = new ReentrantReadWriteLock();
     omMetadataManager = mgr;
@@ -327,9 +327,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
       String userID = authorizer.createUser(userPrincipal, userGroupIDs);
 
-      inMemoryUserNameToTenantNameMap.put(
+      inMemoryAccessIDToTenantNameMap.put(
           userPrincipal.getFullMultiTenantPrincipalID(), tenantName);
-      inMemoryUserNameToListOfGroupsMap.put(
+      inMemoryAccessIDToListOfGroupsMap.put(
           userPrincipal.getFullMultiTenantPrincipalID(), userGroupIDs);
 
       return userID;
@@ -357,9 +357,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       final String userID = authorizer.getUserId(userPrincipal);
       authorizer.deleteUser(userID);
 
-      inMemoryUserNameToTenantNameMap.remove(
+      inMemoryAccessIDToTenantNameMap.remove(
           userPrincipal.getFullMultiTenantPrincipalID());
-      inMemoryUserNameToListOfGroupsMap.remove(
+      inMemoryAccessIDToListOfGroupsMap.remove(
           userPrincipal.getFullMultiTenantPrincipalID());
     } catch (Exception e) {
       LOG.error(e.getMessage());
@@ -394,9 +394,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public Tenant getUserTenantInfo(OzoneMultiTenantPrincipal user)
-      throws IOException {
-    return null;
+  public Tenant getTenantInfoForAccessID(String accessID) throws IOException {
+    String tenantName = inMemoryAccessIDToTenantNameMap.get(accessID);
+    return inMemoryTenantNameToTenantInfoMap.get(tenantName);
   }
 
   @Override

@@ -135,6 +135,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -3074,6 +3075,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // TODO: modify, delete
 
   @Override
+  public OmVolumeArgs getS3Volume() throws IOException {
+    String accessID = getRemoteUser().getUserName();
+    Tenant tenant = multiTenantManagr.getTenantInfoForAccessID(accessID);
+    // This call performs acl checks and checks volume existence.
+    return getVolumeInfo(tenant.getTenantId());
+  }
+
+  @Override
   /**
    * {@inheritDoc}
    */
@@ -4099,7 +4108,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException
    */
   private void addS3GVolumeToDB() throws IOException {
-    String s3VolumeName = HddsClientUtils.getS3VolumeName(configuration);
+    String s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(configuration);
     String dbVolumeKey = metadataManager.getVolumeKey(s3VolumeName);
 
     if (!s3VolumeName.equals(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)) {

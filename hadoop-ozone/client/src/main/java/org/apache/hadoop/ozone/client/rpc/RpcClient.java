@@ -376,6 +376,16 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     verifyVolumeName(volumeName);
     OmVolumeArgs volume = ozoneManagerClient.getVolumeInfo(volumeName);
+    return buildOzoneVolume(volume);
+  }
+
+  @Override
+  public OzoneVolume getS3VolumeDetails() throws IOException {
+    OmVolumeArgs volume = ozoneManagerClient.getS3Volume();
+    return buildOzoneVolume(volume);
+  }
+
+  private OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
     return new OzoneVolume(
         conf,
         this,

@@ -110,6 +110,8 @@ enum Type {
   AssignUserToTenant = 98;
   ModifyTenantUser = 99;
   DeleteTenantUser = 100;
+
+  GetS3Volume = 101;
 }
 
 message OMRequest {
@@ -193,13 +195,14 @@ message OMRequest {
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
-  optional CreateTenantRequest              CreateTenantRequest            = 95;
-  optional ModifyTenantRequest              ModifyTenantRequest            = 96;
-  optional DeleteTenantRequest              DeleteTenantRequest            = 97;
+  optional CreateTenantRequest              createTenantRequest            = 95;
+  optional ModifyTenantRequest              modifyTenantRequest            = 96;
+  optional DeleteTenantRequest              deleteTenantRequest            = 97;
 
-  optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 98;
-  optional ModifyTenantUserRequest          ModifyTenantUserRequest        = 99;
-  optional DeleteTenantUserRequest          DeleteTenantUserRequest        = 100;
+  optional AssignUserToTenantRequest        assignUserToTenantRequest      = 98;
+  optional ModifyTenantUserRequest          modifyTenantUserRequest        = 99;
+  optional DeleteTenantUserRequest          deleteTenantUserRequest        = 100;
+  optional GetS3VolumeRequest               getS3VolumeRequest             = 101;
 }
 
 message OMResponse {
@@ -278,15 +281,16 @@ message OMResponse {
   optional PurgePathsResponse                 purgePathsResponse           = 93;
 
   // Skipped 94 to align with OMRequest
-  optional CreateTenantResponse              CreateTenantResponse          = 95;
-  optional ModifyTenantResponse              ModifyTenantResponse          = 96;
-  optional DeleteTenantResponse              DeleteTenantResponse          = 97;
+  optional CreateTenantResponse              createTenantResponse          = 95;
+  optional ModifyTenantResponse              modifyTenantResponse          = 96;
+  optional DeleteTenantResponse              deleteTenantResponse          = 97;
 
-  optional AssignUserToTenantResponse        AssignUserToTenantResponse    = 98;
+  optional AssignUserToTenantResponse        assignUserToTenantResponse    = 98;
   // TODO: Remove ModifyTenantUserResponse since it won't be useful anymore?
-  optional ModifyTenantUserResponse          ModifyTenantUserResponse      = 99;
+  optional ModifyTenantUserResponse          modifyTenantUserResponse      = 99;
   // TODO: Rename this to UnassignUserFromTenant Response ?
-  optional DeleteTenantUserResponse          DeleteTenantUserResponse      = 100;
+  optional DeleteTenantUserResponse          deleteTenantUserResponse      = 100;
+  optional GetS3VolumeResponse               getS3VolumeResponse           = 101;
 }
 
 enum Status {
@@ -1395,6 +1399,10 @@ message DeleteTenantUserRequest {
     optional string tenantUsername = 1;
 }
 
+message GetS3VolumeRequest {
+
+}
+
 message CreateTenantResponse {
     optional bool success = 1;
 }
@@ -1418,6 +1426,10 @@ message ModifyTenantUserResponse {
 
 message DeleteTenantUserResponse {
     optional bool success = 1;
+}
+
+message GetS3VolumeResponse {
+  optional VolumeInfo volumeInfo = 1;
 }
 
 /**
