@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
  */
 public class ContainerBalancer {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
 
   private NodeManager nodeManager;

@@ -121,7 +121,7 @@ public final class ContainerBalancerConfiguration {
         "OzoneConfiguration should not be null.");
     this.ozoneConfiguration = config;
 
-    // sizeEnteringTargetMax and sizeLeavingSourceMax should by default be
+    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
