@@ -1829,6 +1829,109 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Get delegation token from OzoneManager.
+   *
+   * @param renewer Renewer information
+   * @return delegationToken DelegationToken signed by OzoneManager
+   * @throws IOException on error
+   */
+  @Override
+  public Token<OzoneTokenIdentifier> getDelegationToken(Text renewer)
+      throws OMException {
+    Token<OzoneTokenIdentifier> token;
+    try {
+      if (!isAllowedDelegationTokenOp()) {
+        throw new OMException("Delegation Token can be issued only with "
+            + "kerberos or web authentication",
+            INVALID_AUTH_METHOD);
+      }
+      if (delegationTokenMgr == null || !delegationTokenMgr.isRunning()) {
+        LOG.warn("trying to get DT with no secret manager running in OM.");
+        return null;
+      }
+
+      UserGroupInformation ugi = getRemoteUser();
+      String user = ugi.getUserName();
+      Text owner = new Text(user);
+      Text realUser = null;
+      if (ugi.getRealUser() != null) {
+        realUser = new Text(ugi.getRealUser().getUserName());
+      }
+
+      return delegationTokenMgr.createToken(owner, renewer, realUser);
+    } catch (OMException oex) {
+      throw oex;
+    } catch (IOException ex) {
+      LOG.error("Get Delegation token failed, cause: {}", ex.getMessage());
+      throw new OMException("Get Delegation token failed.", ex,
+          TOKEN_ERROR_OTHER);
+    }
+  }
+
+  /**
+   * Method to renew a delegationToken issued by OzoneManager.
+   *
+   * @param token token to renew
+   * @return new expiryTime of the token
+   * @throws InvalidToken if {@code token} is invalid
+   * @throws IOException  on other errors
+   */
+  @Override
+  public long renewDelegationToken(Token<OzoneTokenIdentifier> token)
+      throws OMException {
+    long expiryTime;
+
+    try {
+
+      if (!isAllowedDelegationTokenOp()) {
+        throw new OMException("Delegation Token can be renewed only with "
+            + "kerberos or web authentication",
+            INVALID_AUTH_METHOD);
+      }
+      String renewer = getRemoteUser().getShortUserName();
+      expiryTime = delegationTokenMgr.renewToken(token, renewer);
+
+    } catch (OMException oex) {
+      throw oex;
+    } catch (IOException ex) {
+      OzoneTokenIdentifier id = null;
+      try {
+        id = OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
+      } catch (IOException exe) {
+      }
+      LOG.error("Delegation token renewal failed for dt id: {}, cause: {}",
+          id, ex.getMessage());
+      throw new OMException("Delegation token renewal failed for dt: " + token,
+          ex, TOKEN_ERROR_OTHER);
+    }
+    return expiryTime;
+  }
+
+  /**
+   * Cancels a delegation token.
+   *
+   * @param token token to cancel
+   * @throws IOException on error
+   */
+  @Override
+  public void cancelDelegationToken(Token<OzoneTokenIdentifier> token)
+      throws OMException {
+    OzoneTokenIdentifier id = null;
+    try {
+      String canceller = getRemoteUser().getUserName();
+      id = delegationTokenMgr.cancelToken(token, canceller);
+      LOG.trace("Delegation token cancelled for dt: {}", id);
+    } catch (OMException oex) {
+      throw oex;
+    } catch (IOException ex) {
+      LOG.error("Delegation token cancellation failed for dt id: {}, cause: {}",
+          id, ex.getMessage());
+      throw new OMException("Delegation token renewal failed for dt: " + token,
+          ex, TOKEN_ERROR_OTHER);
+    }
+  }
+
+  /**
    * Checks if current caller has acl permissions.
    *
    * @param resType - Type of ozone resource. Ex volume, bucket.
@@ -2506,12 +2609,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public StatusAndMessages finalizeUpgrade(String upgradeClientID)
-      throws IOException {
-    return upgradeFinalizer.finalize(upgradeClientID, this);
-  }
-
-  @Override
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException {
@@ -2520,22 +2617,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           Collections.emptyList());
     }
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
-  }
-
-  @Override
-  /**
-   * {@inheritDoc}
-   */
-  public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
-
-    // Check whether user name passed is matching with the current user or not.
-    if (!user.getUserName().equals(kerberosID)) {
-      throw new OMException("User mismatch. Requested user name is " +
-          "mismatched " + kerberosID + ", with current user " +
-          user.getUserName(), OMException.ResultCodes.USER_MISMATCH);
-    }
-    return s3SecretManager.getS3Secret(kerberosID);
   }
 
   @Override
