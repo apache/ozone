@@ -207,43 +207,4 @@ public abstract class TestInputStreamBase {
               "position " + (offset + i), expectedData[i], readData[i]);
     }
   }
-
-  @Test
-  public void testInputStreams() throws Exception {
-    String keyName = getNewKeyName();
-    int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE) + 1;
-    writeRandomBytes(keyName, dataLength);
-
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
-
-    // Verify BlockStreams and ChunkStreams
-    int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
-        dataLength, BLOCK_SIZE);
-    List<BlockInputStream> blockStreams = keyInputStream.getBlockStreams();
-    Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
-
-    int readBlockLength = 0;
-    for (BlockInputStream blockStream : blockStreams) {
-      int blockStreamLength = Math.min(BLOCK_SIZE,
-          dataLength - readBlockLength);
-      Assert.assertEquals(blockStreamLength, blockStream.getLength());
-
-      int expectedNumChunkStreams =
-          BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
-      blockStream.initialize();
-      List<ChunkInputStream> chunkStreams = blockStream.getChunkStreams();
-      Assert.assertEquals(expectedNumChunkStreams, chunkStreams.size());
-
-      int readChunkLength = 0;
-      for (ChunkInputStream chunkStream : chunkStreams) {
-        int chunkStreamLength = Math.min(CHUNK_SIZE,
-            blockStreamLength - readChunkLength);
-        Assert.assertEquals(chunkStreamLength, chunkStream.getRemaining());
-
-        readChunkLength += chunkStreamLength;
-      }
-
-      readBlockLength += blockStreamLength;
-    }
-  }
 }
