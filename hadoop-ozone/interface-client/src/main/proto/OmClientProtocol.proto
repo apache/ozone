@@ -184,6 +184,10 @@ message OMRequest {
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
+
+  optional string                           stringToSign                   = 95;
+  optional string                           signature                      = 96;
+  optional string                           awsAccessId                    = 97;
 }
 
 message OMResponse {
