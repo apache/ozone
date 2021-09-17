@@ -284,6 +284,9 @@ public final class TestDelegationToken {
       // Start OM
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
+      while (!om.isLeaderReady()) {
+        Thread.sleep(1000);
+      }
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       String username = ugi.getUserName();
 
