@@ -469,8 +469,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
-    public Builder setIpAddress(String IpAddress) {
-      this.ipAddress = IpAddress;
+    public Builder setIpAddress(String ip) {
+      this.ipAddress = ip;
       return this;
     }
 
