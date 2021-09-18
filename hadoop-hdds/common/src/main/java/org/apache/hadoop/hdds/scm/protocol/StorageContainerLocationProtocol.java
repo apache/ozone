@@ -151,7 +151,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state, String ip, String uuid) throws IOException;
+      int count, HddsProtos.LifeCycleState state,
+      String ip, String uuid) throws IOException;
 
   /**
    * Deletes a container in SCM.

@@ -404,7 +404,8 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state, String ip, String uuid) throws IOException {
+      int count, HddsProtos.LifeCycleState state,
+      String ip, String uuid) throws IOException {
     return storageContainerLocationClient.listContainer(
         startContainerID, count, state, ip, uuid);
   }

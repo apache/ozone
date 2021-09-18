@@ -329,14 +329,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count, String ip, String uuid)
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, String ip, String uuid)
       throws IOException {
     return listContainer(startContainerID, count, null, ip, uuid);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
-      HddsProtos.LifeCycleState state, String ip, String uuid) throws IOException {
+      HddsProtos.LifeCycleState state,
+      String ip, String uuid) throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,

@@ -378,7 +378,8 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state, String ip, String uuid) throws IOException {
+      int count, HddsProtos.LifeCycleState state,
+      String ip, String uuid) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -386,25 +387,23 @@ public class SCMClientProtocolServer implements
     if (state != null) {
       auditMap.put("state", state.name());
     }
-    List<ContainerInfo> ContainerInfos;
     try {
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
       if(null != state) {
-        ContainerInfos = scm.getContainerManager().getContainers(state).stream()
+        return scm.getContainerManager().getContainers(state).stream()
             .filter(info -> info.containerID().getId() >= startContainerID)
             .sorted().limit(count).collect(Collectors.toList());
       } else if(!ip.equals("")) {
-        ContainerInfos = scm.getContainerManager().getContainersByIpAddress(ip).stream()
+        return scm.getContainerManager().getContainersByIpAddress(ip).stream()
             .filter(info -> info.containerID().getId() >= startContainerID)
             .sorted().limit(count).collect(Collectors.toList());
       } else if(!uuid.equals("")) {
-        ContainerInfos = scm.getContainerManager().getContainersByUuid(uuid).stream()
+        return scm.getContainerManager().getContainersByUuid(uuid).stream()
             .filter(info -> info.containerID().getId() >= startContainerID)
             .sorted().limit(count).collect(Collectors.toList());
       } else {
-        ContainerInfos = scm.getContainerManager().getContainers(containerId, count);
+        return scm.getContainerManager().getContainers(containerId, count);
       }
-      return ContainerInfos;
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(

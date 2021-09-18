@@ -119,7 +119,8 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state, String ip, String uuid) throws IOException;
+      int count, HddsProtos.LifeCycleState state,
+      String ip, String uuid) throws IOException;
 
   /**
    * Read meta data from an existing container.
