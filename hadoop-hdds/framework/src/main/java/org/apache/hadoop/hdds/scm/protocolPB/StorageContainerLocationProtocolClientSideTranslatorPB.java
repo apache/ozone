@@ -346,6 +346,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setStartContainerID(startContainerID);
     builder.setCount(count);
     builder.setTraceID(TracingUtil.exportCurrentSpan());
+    if (ip != null) {
+      builder.setIp(ip);
+    }
+    if (uuid != null) {
+      builder.setUuid(uuid);
+    }
     if (state != null) {
       builder.setState(state);
     }
