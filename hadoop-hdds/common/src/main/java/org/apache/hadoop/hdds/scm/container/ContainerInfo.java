@@ -469,13 +469,13 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
-    public Builder setIpAddress(String ipAddress) {
-      this.ipAddress = ipAddress;
+    public Builder setIpAddress(String IpAddress) {
+      this.ipAddress = IpAddress;
       return this;
     }
 
-    public Builder setUuid(String uuid) {
-      this.uuid = uuid;
+    public Builder setUuid(String uuID) {
+      this.uuid = uuID;
       return this;
     }
 
