@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -86,7 +86,7 @@ import org.junit.rules.TemporaryFolder;
  */
 public class TestBlockManager {
   private StorageContainerManager scm;
-  private ContainerManagerV2 mapping;
+  private ContainerManager mapping;
   private MockNodeManager nodeManager;
   private PipelineManagerImpl pipelineManager;
   private BlockManagerImpl blockManager;
@@ -150,7 +150,7 @@ public class TestBlockManager {
             pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    ContainerManagerV2 containerManager =
+    ContainerManager containerManager =
         new ContainerManagerImpl(conf,
             scmHAManager,
             sequenceIdGen,
