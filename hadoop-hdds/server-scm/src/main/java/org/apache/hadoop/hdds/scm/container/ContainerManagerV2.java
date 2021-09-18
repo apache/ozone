@@ -84,6 +84,20 @@ public interface ContainerManagerV2 extends Closeable {
   List<ContainerInfo> getContainers(LifeCycleState state);
 
   /**
+   * Returns all the containers which are in the ipAddress.
+   *
+   * @return List of ContainerInfo
+   */
+  List<ContainerInfo> getContainersByIpAddress(String ipAddress);
+
+  /**
+   * Returns all the containers which are in the ipAddress.
+   *
+   * @return List of ContainerInfo
+   */
+  List<ContainerInfo> getContainersByUuid(String uuid);
+
+  /**
    * Returns true if the container exist, false otherwise.
    * @param id Container ID
    * @return true if container exist, else false

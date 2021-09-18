@@ -397,16 +397,16 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
-      int count) throws IOException {
+      int count, String ip, String uuid) throws IOException {
     return storageContainerLocationClient.listContainer(
-        startContainerID, count);
+        startContainerID, count, ip, uuid);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state) throws IOException {
+      int count, HddsProtos.LifeCycleState state, String ip, String uuid) throws IOException {
     return storageContainerLocationClient.listContainer(
-        startContainerID, count, state);
+        startContainerID, count, state, ip, uuid);
   }
 
   /**

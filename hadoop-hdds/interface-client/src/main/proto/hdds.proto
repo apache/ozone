@@ -225,6 +225,8 @@ message ContainerInfoProto {
     optional int64 sequenceId = 9;
     required ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
+    optional string ipAddress = 12;
+    optional string uuid = 13;
 }
 
 message ContainerWithPipeline {

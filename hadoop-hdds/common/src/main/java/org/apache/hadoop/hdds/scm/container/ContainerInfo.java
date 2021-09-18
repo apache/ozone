@@ -66,6 +66,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
+  private String ipAddress;
+  private String uuid;
 
   /**
    * Allows you to maintain private data on ContainerInfo. This is not
@@ -85,7 +87,9 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       String owner,
       long deleteTransactionId,
       long sequenceId,
-      ReplicationConfig repConfig) {
+      ReplicationConfig repConfig,
+      String ipAddress,
+      String uuid) {
     this.containerID = containerID;
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
@@ -97,6 +101,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
     this.replicationConfig = repConfig;
+    this.ipAddress = ipAddress;
+    this.uuid = uuid;
   }
 
   /**
@@ -118,6 +124,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationConfig(config)
         .setSequenceId(info.getSequenceId())
+        .setIpAddress(info.getIpAddress())
+        .setUuid(info.getUuid())
         .build();
 
     if (info.hasPipelineID()) {
@@ -184,6 +192,14 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return sequenceId;
   }
 
+  public String getIpAddress() {
+    return ipAddress;
+  }
+
+  public String getUuid() {
+    return uuid;
+  }
+
   public void updateDeleteTransactionId(long transactionId) {
     deleteTransactionId = max(transactionId, deleteTransactionId);
   }
@@ -222,7 +238,9 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setOwner(getOwner())
-        .setSequenceId(getSequenceId());
+        .setSequenceId(getSequenceId())
+        .setIpAddress(getIpAddress())
+        .setUuid(getUuid());
 
     builder.setReplicationFactor(
         ReplicationConfig.getLegacyFactor(replicationConfig));
@@ -250,6 +268,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         + ", pipelineID=" + pipelineID
         + ", stateEnterTime=" + stateEnterTime
         + ", owner=" + owner
+        + ", ipAddress" + ipAddress
+        + ", uuid" + uuid
         + '}';
   }
 
@@ -395,6 +415,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private long sequenceId;
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
+    private String ipAddress;
+    private String uuid;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
@@ -447,10 +469,20 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
+    public Builder setIpAddress(String ipAddress) {
+      this.ipAddress = ipAddress;
+      return this;
+    }
+
+    public Builder setUuid(String uuid) {
+      this.uuid = uuid;
+      return this;
+    }
+
     public ContainerInfo build() {
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationConfig);
+          sequenceId, replicationConfig, ipAddress, uuid);
     }
   }
 

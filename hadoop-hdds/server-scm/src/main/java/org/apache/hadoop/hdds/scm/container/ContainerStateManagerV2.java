@@ -119,6 +119,16 @@ public interface ContainerStateManagerV2 {
   /**
    *
    */
+  Set<ContainerID> getContainerIDsByIpAddress(String ipAddress);
+
+  /**
+   *
+   */
+  Set<ContainerID> getContainerIDsByUuid(String uuid);
+
+  /**
+   *
+   */
   ContainerInfo getContainer(HddsProtos.ContainerID id);
 
   /**

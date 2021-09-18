@@ -482,6 +482,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
     long startContainerID = 0;
     int count = -1;
+    String ip = "";
+    String uuid = "";
 
     // Arguments check.
     if (request.hasStartContainerID()) {
@@ -493,8 +495,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     if (request.hasState()) {
       state = request.getState();
     }
+    if (request.hasIp()) {
+      ip = request.getIp();
+    }
+    if (request.hasUuid()) {
+      uuid = request.getUuid();
+    }
     List<ContainerInfo> containerList =
-        impl.listContainer(startContainerID, count, state);
+        impl.listContainer(startContainerID, count, state, ip, uuid);
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
     for (ContainerInfo container : containerList) {

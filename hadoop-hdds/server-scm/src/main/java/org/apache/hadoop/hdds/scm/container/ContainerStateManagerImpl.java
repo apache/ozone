@@ -277,6 +277,26 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
+  public Set<ContainerID> getContainerIDsByUuid(String uuid) {
+    lock.readLock().lock();
+    try {
+      return containers.getContainerIDsByUuid(uuid);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public Set<ContainerID> getContainerIDsByIpAddress(final String ipAddress) {
+    lock.readLock().lock();
+    try {
+      return containers.getContainerIDsByIpAddress(ipAddress);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
   public ContainerInfo getContainer(final HddsProtos.ContainerID id) {
     lock.readLock().lock();
     try {

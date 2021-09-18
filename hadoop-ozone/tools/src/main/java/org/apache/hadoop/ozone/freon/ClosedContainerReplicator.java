@@ -100,7 +100,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerOperationClient(conf);
 
     final List<ContainerInfo> containerInfos =
-        containerOperationClient.listContainer(0L, 1_000_000);
+        containerOperationClient.listContainer(0L, 1_000_000, "", "");
 
     replicationTasks = new ArrayList<>();
 

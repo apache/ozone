@@ -173,6 +173,22 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   @Override
+  public List<ContainerInfo> getContainersByIpAddress(String ipAddress) {
+    return containerStateManager.getContainerIDsByIpAddress(ipAddress).stream()
+        .map(ContainerID::getProtobuf)
+        .map(containerStateManager::getContainer)
+        .filter(Objects::nonNull).collect(Collectors.toList());
+  }
+
+  @Override
+  public List<ContainerInfo> getContainersByUuid(String uuid) {
+    return containerStateManager.getContainerIDsByUuid(uuid).stream()
+        .map(ContainerID::getProtobuf)
+        .map(containerStateManager::getContainer)
+        .filter(Objects::nonNull).collect(Collectors.toList());
+  }
+
+  @Override
   public ContainerInfo allocateContainer(
       final ReplicationConfig replicationConfig, final String owner)
       throws IOException {
@@ -256,6 +272,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
         .setReplicationFactor(
             ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
         .setReplicationType(pipeline.getType())
+        .setIpAddress(pipeline.getLeaderNode().getIpAddress())
+        .setUuid(pipeline.getClosestNode().getUuidString())
         .build();
     containerStateManager.addContainer(containerInfo);
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();

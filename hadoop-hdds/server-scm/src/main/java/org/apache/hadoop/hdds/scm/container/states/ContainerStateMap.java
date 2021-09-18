@@ -84,6 +84,8 @@ public class ContainerStateMap {
 
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
   private final ContainerAttribute<String> ownerMap;
+  private final ContainerAttribute<String> ipAddress;
+  private final ContainerAttribute<String> uuid;
   private final ContainerAttribute<ReplicationConfig> repConfigMap;
   private final ContainerAttribute<ReplicationType> typeMap;
   private final Map<ContainerID, ContainerInfo> containerMap;
@@ -95,6 +97,8 @@ public class ContainerStateMap {
    */
   public ContainerStateMap() {
     this.lifeCycleStateMap = new ContainerAttribute<>();
+    this.ipAddress = new ContainerAttribute<>();
+    this.uuid = new ContainerAttribute<>();
     this.ownerMap = new ContainerAttribute<>();
     this.repConfigMap = new ContainerAttribute<>();
     this.typeMap = new ContainerAttribute<>();
@@ -116,6 +120,8 @@ public class ContainerStateMap {
     if (!contains(id)) {
       containerMap.put(id, info);
       lifeCycleStateMap.insert(info.getState(), id);
+      ipAddress.insert(info.getIpAddress(), id);
+      uuid.insert(info.getUuid(), id);
       ownerMap.insert(info.getOwner(), id);
       repConfigMap.insert(info.getReplicationConfig(), id);
       typeMap.insert(info.getReplicationType(), id);
@@ -144,6 +150,8 @@ public class ContainerStateMap {
       // remove operation fails?
       final ContainerInfo info = containerMap.remove(id);
       lifeCycleStateMap.remove(info.getState(), id);
+      ipAddress.remove(info.getIpAddress(), id);
+      uuid.remove(info.getUuid(), id);
       ownerMap.remove(info.getOwner(), id);
       repConfigMap.remove(info.getReplicationConfig(), id);
       typeMap.remove(info.getReplicationType(), id);
@@ -339,6 +347,31 @@ public class ContainerStateMap {
     Preconditions.checkNotNull(state);
     return lifeCycleStateMap.getCollection(state);
   }
+
+  /**
+   * Returns Containers by Datanode ip.
+   *
+   * @param ip - ip
+   * @return List of containers by ipAddress.
+   */
+  public NavigableSet<ContainerID> getContainerIDsByIpAddress(
+      final String ip) {
+    Preconditions.checkNotNull(ip);
+    return ipAddress.getCollection(ip);
+  }
+
+  /**
+   * Returns Containers by Datanode uuid.
+   *
+   * @param datanodeUuid - datanodeUuid
+   * @return List of containers by Datanodeuuid.
+   */
+  public NavigableSet<ContainerID> getContainerIDsByUuid(
+      final String datanodeUuid) {
+    Preconditions.checkNotNull(datanodeUuid);
+    return uuid.getCollection(datanodeUuid);
+  }
+
 
   /**
    * Gets the containers that matches the  following filters.
