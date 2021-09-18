@@ -49,11 +49,6 @@ List containers with explicit host
     ${output} =         Execute          ozone admin container list --scm ${SCM}
                         Should contain   ${output}   OPEN
 
-List containers with container ip
-    ${ip} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{print \$3}' | awk -F "/" '{print \$3}'
-    ${output} =         Execute          ozone admin container list --ip ${ip}
-                        Should contain   ${output}   ${ip}
-
 List containers with container uuid
     ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
     ${output} =         Execute          ozone admin container list --uuid ${uuid}
