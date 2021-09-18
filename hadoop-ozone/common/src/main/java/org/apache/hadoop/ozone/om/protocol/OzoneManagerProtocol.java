@@ -399,11 +399,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
-  default StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
-  }
-
+  StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
 
   /**
    * Queries the current status of finalization.
