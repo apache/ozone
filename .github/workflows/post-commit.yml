@@ -194,6 +194,8 @@ jobs:
         suite:
           - secure
           - unsecure
+          - HA
+          - MR
           - misc
       fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:

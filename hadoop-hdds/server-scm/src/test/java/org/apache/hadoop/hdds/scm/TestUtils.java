@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -523,7 +523,7 @@ public final class TestUtils {
   }
 
   public static org.apache.hadoop.hdds.scm.container.ContainerInfo
-      allocateContainer(ContainerManagerV2 containerManager)
+      allocateContainer(ContainerManager containerManager)
       throws IOException {
     return containerManager
         .allocateContainer(new RatisReplicationConfig(ReplicationFactor.THREE),
@@ -531,8 +531,8 @@ public final class TestUtils {
 
   }
 
-  public static void closeContainer(ContainerManagerV2 containerManager,
-      ContainerID id) throws IOException, InvalidStateTransitionException {
+  public static void closeContainer(ContainerManager containerManager,
+        ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -546,8 +546,8 @@ public final class TestUtils {
    * @param id
    * @throws IOException
    */
-  public static void quasiCloseContainer(ContainerManagerV2 containerManager,
-      ContainerID id) throws IOException, InvalidStateTransitionException {
+  public static void quasiCloseContainer(ContainerManager containerManager,
+       ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
