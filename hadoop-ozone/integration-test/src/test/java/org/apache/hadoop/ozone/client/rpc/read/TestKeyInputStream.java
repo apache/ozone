@@ -113,11 +113,11 @@ public class TestKeyInputStream extends TestInputStreamBase {
     validateData(inputData, (int) seek, readData);
   }
 
-  @Test
   /**
    * This test runs the others as a single test, so to avoid creating a new
    * mini-cluster for each test.
    */
+  @Test
   public void testNonReplicationReads() throws Exception {
     testInputStreams();
     testSeekRandomly();
