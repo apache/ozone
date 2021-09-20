@@ -154,7 +154,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setToken(blockInfo.getToken())
           .setPartNumber(blockInfo.getPartNumber())
           .build();
-      stream = streamFactory.create(repConfig, blkInfo, pipeline,
+      stream = streamFactory.create(
+          new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
+          blkInfo, pipeline,
           blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
           refreshFunction);
       blockStreams[ind] = stream;
