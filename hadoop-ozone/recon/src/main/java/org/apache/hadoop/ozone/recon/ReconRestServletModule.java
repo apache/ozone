@@ -55,7 +55,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
  */
 public class ReconRestServletModule extends ServletModule {
 
-  public static final String BASE_API_PATH = UriBuilder.fromPath("api").path(
+  public static final String BASE_API_PATH = UriBuilder.fromPath("/api").path(
       "v1").build().toString();
   public static final String API_PACKAGE = "org.apache.hadoop.ozone.recon.api";
 
