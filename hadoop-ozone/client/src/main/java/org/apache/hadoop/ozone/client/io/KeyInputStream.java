@@ -165,18 +165,14 @@ public class KeyInputStream extends InputStream
           verifyChecksum, keyLocationInfo -> {
             OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
             BlockID blockID = keyLocationInfo.getBlockID();
-            List<OmKeyLocationInfo> collect =
-                newKeyInfo.getLatestVersionLocations()
+            return newKeyInfo.getLatestVersionLocations()
                 .getLocationLists()
                 .stream()
                 .flatMap(List::stream)
                 .filter(l -> l.getBlockID().equals(blockID))
-                .collect(Collectors.toList());
-            if (CollectionUtils.isNotEmpty(collect)) {
-              return collect.get(0).getPipeline();
-            } else {
-              return null;
-            }
+                .findFirst()
+                .map(OmKeyLocationInfo::getPipeline)
+                .orElse(null);
           });
 
       this.blockOffsets[i] = keyLength;

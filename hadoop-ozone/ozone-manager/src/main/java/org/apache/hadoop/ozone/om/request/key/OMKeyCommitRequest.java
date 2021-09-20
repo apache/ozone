@@ -184,8 +184,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
       // Update the block length for each block
-      List<OmKeyLocationInfo> allocatedLocationInfoList =
-          omKeyInfo.getLatestVersionLocations().getLocationList();
+      long allocatedLocationInfoListCount =
+          omKeyInfo.getLatestVersionLocations().getLocationLists().stream()
+              .flatMap(List::stream).count();
       omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
@@ -208,7 +209,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
-          allocatedLocationInfoList.size() * scmBlockSize * factor;
+          allocatedLocationInfoListCount * scmBlockSize * factor;
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
