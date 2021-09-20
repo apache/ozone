@@ -51,7 +51,7 @@ public class TestBlockInputStreamFactoryImpl {
         new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
 
     OmKeyLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
-        1024*1024*10);
+        1024 * 1024 * 10);
 
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),

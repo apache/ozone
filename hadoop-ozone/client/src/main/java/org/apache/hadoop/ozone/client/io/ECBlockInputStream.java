@@ -147,9 +147,16 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
-      stream = streamFactory.create(blockInfo.getBlockID(),
-          internalBlockLength(ind+1), pipeline, blockInfo.getToken(),
-          verifyChecksum, xceiverClientFactory, refreshFunction);
+      OmKeyLocationInfo blkInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(blockInfo.getBlockID())
+          .setLength(internalBlockLength(ind+1))
+          .setPipeline(blockInfo.getPipeline())
+          .setToken(blockInfo.getToken())
+          .setPartNumber(blockInfo.getPartNumber())
+          .build();
+      stream = streamFactory.create(repConfig, blkInfo, pipeline,
+          blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
+          refreshFunction);
       blockStreams[ind] = stream;
     }
     return stream;

@@ -328,23 +328,16 @@ public class TestECBlockInputStream {
       return blockStreams;
     }
 
-    @Override
-    public BlockExtendedInputStream create(BlockID blockId, long blockLen,
-        Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
-        boolean verifyChecksum, XceiverClientFactory xceiverFactory,
-        Function<BlockID, Pipeline> refreshFunction) {
-      TestBlockInputStream stream = new TestBlockInputStream(
-          blockId, blockLen, (byte)blockStreams.size());
-      blockStreams.add(stream);
-      return stream;
-    }
-
     public BlockExtendedInputStream create(ReplicationConfig repConfig,
         OmKeyLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
         XceiverClientFactory xceiverFactory,
         Function<BlockID, Pipeline> refreshFunction) {
-      return null;
+      TestBlockInputStream stream = new TestBlockInputStream(
+          blockInfo.getBlockID(), blockInfo.getLength(),
+          (byte)blockStreams.size());
+      blockStreams.add(stream);
+      return stream;
     }
   }
 

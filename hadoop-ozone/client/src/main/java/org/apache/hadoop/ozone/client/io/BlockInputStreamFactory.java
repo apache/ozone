@@ -34,22 +34,6 @@ import java.util.function.Function;
 public interface BlockInputStreamFactory {
 
   /**
-   * Create a new BlockInputStream from the given parameters.
-   * @param blockId The blockID
-   * @param blockLen The Block Length
-   * @param pipeline The pipeline used to read from the block
-   * @param token The block access token
-   * @param verifyChecksum Whether to verify checksums or not
-   * @param xceiverFactory Factor to create the xceiver in the client
-   * @param refreshFunction Function to refresh the pipeline if needed.
-   * @return A BlockInputStream instance
-   */
-  BlockExtendedInputStream create(BlockID blockId, long blockLen,
-      Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
-      boolean verifyChecksum, XceiverClientFactory xceiverFactory,
-      Function<BlockID, Pipeline> refreshFunction);
-
-  /**
    * Create a new BlockInputStream based on the replication Config. If the
    * replication Config indicates the block is EC, then it will create an
    * ECBlockInputStream, otherwise a BlockInputStream will be returned.
@@ -67,12 +51,5 @@ public interface BlockInputStreamFactory {
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
        XceiverClientFactory xceiverFactory,
        Function<BlockID, Pipeline> refreshFunction);
-
-/*
-        new BlockInputStream(blockInfo.getBlockID(),
-        blockInfo.getLength(), blockInfo.getPipeline(), blockInfo.getToken(),
-  verifyChecksum, xceiverClientFactory,
-  blockID -> refreshPipelineFunction.apply(blockInfo)));
- */
 
 }

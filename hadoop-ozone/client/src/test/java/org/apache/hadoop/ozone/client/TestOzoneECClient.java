@@ -184,7 +184,7 @@ public class TestOzoneECClient {
     Assert.assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[1024];
-      for (int i=0; i<3; i++) {
+      for (int i=0; i<dataBlocks; i++) {
         Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
         Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
       }
