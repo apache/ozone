@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -76,12 +77,20 @@ public class TestOmMetrics {
    */
   @Before
   public void setup() throws Exception {
+    OzoneConfiguration conf = createConf();
+    // These test do not use any features of SCM, so we can skip safemode
+    // which gets the cluster to come up much faster.
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(0).build();
+    cluster.waitForClusterToBeReady();
+    ozoneManager = cluster.getOzoneManager();
+  }
+
+  private OzoneConfiguration createConf() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL,
         1000, TimeUnit.MILLISECONDS);
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    ozoneManager = cluster.getOzoneManager();
+    return conf;
   }
 
   /**
@@ -367,6 +376,13 @@ public class TestOmMetrics {
 
   @Test
   public void testAclOperationsHA() throws Exception {
+    // This test needs a cluster with DNs and SCM to wait on safemode
+    cluster.shutdown();
+    OzoneConfiguration conf = createConf();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
+    cluster.waitForClusterToBeReady();
+    ozoneManager = cluster.getOzoneManager();
+
     ObjectStore objectStore = cluster.getClient().getObjectStore();
     // Create a volume.
     objectStore.createVolume("volumeacl");
