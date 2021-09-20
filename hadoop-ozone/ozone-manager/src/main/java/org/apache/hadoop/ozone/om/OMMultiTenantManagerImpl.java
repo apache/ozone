@@ -335,7 +335,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       inMemoryUserNameToListOfGroupsMap.put(
           userPrincipal.getFullMultiTenantPrincipalID(), userGroupIDs);
 
-      return null;
+      return userID;
     } catch (Exception e) {
       destroyUser(tenantName, userName);
       LOG.error(e.getMessage());
