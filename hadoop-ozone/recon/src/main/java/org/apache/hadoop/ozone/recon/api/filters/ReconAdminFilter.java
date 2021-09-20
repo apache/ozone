@@ -92,10 +92,8 @@ public class ReconAdminFilter implements Filter {
             userName, httpServletRequest.getRequestURL());
       }
     } else {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Rejecting request from non admin user {} to {}",
-            userName, httpServletRequest.getRequestURL());
-      }
+      LOG.warn("Rejecting request from non admin user {} to {}",
+          userName, httpServletRequest.getRequestURL());
       httpServletResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
     }
   }

@@ -40,7 +40,7 @@ import org.reflections.scanners.TypeAnnotationsScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.Path;
+import javax.ws.rs.core.UriBuilder;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,7 +55,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
  */
 public class ReconRestServletModule extends ServletModule {
 
-  public static final String BASE_API_PATH = "/api/v1";
+  public static final String BASE_API_PATH = UriBuilder.fromPath("api").path(
+      "v1").build().toString();
   public static final String API_PACKAGE = "org.apache.hadoop.ozone.recon.api";
 
   private static final Logger LOG =
@@ -89,7 +90,7 @@ public class ReconRestServletModule extends ServletModule {
       Set<Class<?>> adminEndpointClasses =
           reflections.getTypesAnnotatedWith(AdminOnly.class);
       adminEndpointClasses.stream()
-          .map(clss -> clss.getAnnotation(Path.class).value())
+          .map(clss -> UriBuilder.fromResource(clss).build().toString())
           .forEachOrdered(adminEndpoints::add);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Registered the following endpoint classes as admin only: {}",
@@ -104,25 +105,30 @@ public class ReconRestServletModule extends ServletModule {
     }
     bind(ServletContainer.class).in(Scopes.SINGLETON);
 
-    serve(baseApiPath + "/*").with(ServletContainer.class, params);
+    String allApiPath =
+        UriBuilder.fromPath(baseApiPath).path("*").build().toString();
+    serve(allApiPath).with(ServletContainer.class, params);
     addFilters(baseApiPath, adminEndpoints);
   }
 
-  private void addFilters(String basePath, Set<String> subPaths) {
+  private void addFilters(String basePath, Set<String> adminSubPaths) {
     if (OzoneSecurityUtil.isHttpSecurityEnabled(conf)) {
-      filter(basePath + "/*").through(ReconAuthFilter.class);
+      String authPath =
+          UriBuilder.fromPath(basePath).path("*").build().toString();
+      filter(authPath).through(ReconAuthFilter.class);
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Added authentication filter to all paths under {}",
-            basePath);
+        LOG.debug("Added authentication filter to path {}", authPath);
       }
 
       boolean aclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
           OZONE_ACL_ENABLED_DEFAULT);
       if (aclEnabled) {
-        for (String path: subPaths) {
-          filter(basePath + path).through(ReconAdminFilter.class);
+        for (String path: adminSubPaths) {
+          String adminPath =
+              UriBuilder.fromPath(basePath).path(path).build().toString();
+          filter(adminPath).through(ReconAdminFilter.class);
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Added admin filter to path {}", basePath + path);
+            LOG.debug("Added admin filter to path {}", adminPath);
           }
         }
       }
