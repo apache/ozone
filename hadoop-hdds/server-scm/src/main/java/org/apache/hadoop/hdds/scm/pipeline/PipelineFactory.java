@@ -40,7 +40,7 @@ public class PipelineFactory {
 
   private Map<ReplicationType, PipelineProvider> providers;
 
-  PipelineFactory(NodeManager nodeManager, StateManager stateManager,
+  PipelineFactory(NodeManager nodeManager, PipelineStateManager stateManager,
                   ConfigurationSource conf, EventPublisher eventPublisher,
                   SCMContext scmContext) {
     providers = new HashMap<>();
