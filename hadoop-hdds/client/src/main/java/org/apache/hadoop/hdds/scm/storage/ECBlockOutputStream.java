@@ -46,6 +46,8 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChu
 public class ECBlockOutputStream extends BlockOutputStream{
 
   private int chunkIndex;
+  private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      currentChunkRspFuture = null;
   /**
    * Creates a new ECBlockOutputStream.
    *  @param blockID              block ID
@@ -61,13 +63,9 @@ public class ECBlockOutputStream extends BlockOutputStream{
         pipeline, bufferPool, config, token);
   }
 
-  public CompletableFuture<ContainerProtos
-      .ContainerCommandResponseProto> writeDirect(
-      byte[] b, int off, int len) throws IOException {
-    final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-        containerCommandResponseProtoCompletableFuture =
+  public void write(byte[] b, int off, int len) throws IOException {
+    currentChunkRspFuture =
         writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
-    return containerCommandResponseProtoCompletableFuture;
   }
 
 
@@ -138,5 +136,10 @@ public class ECBlockOutputStream extends BlockOutputStream{
       handleInterruptedException(ex, false);
     }
     return null;
+  }
+
+  public CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> getCurrentChunkResponseFuture() {
+    return this.currentChunkRspFuture;
   }
 }

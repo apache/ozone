@@ -47,8 +47,6 @@ import java.util.concurrent.ExecutionException;
 public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
   private final List<BlockOutputStreamEntry> finishedStreamEntries;
   private final ECReplicationConfig ecReplicationConfig;
-  private CompletableFuture<ContainerProtos
-      .ContainerCommandResponseProto>[] chunkWriteResponseFutures;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public ECBlockOutputStreamEntryPool(OzoneClientConfig config,
@@ -68,9 +66,6 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     this.finishedStreamEntries = new ArrayList<>();
     assert replicationConfig instanceof ECReplicationConfig;
     this.ecReplicationConfig = (ECReplicationConfig) replicationConfig;
-    this.chunkWriteResponseFutures =
-        new CompletableFuture[this.ecReplicationConfig
-            .getData() + this.ecReplicationConfig.getParity()];
   }
 
   @Override
@@ -96,8 +91,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
               .setPipeline(pipeline).setConfig(getConfig())
               .setLength(subKeyInfo.getLength()).setBufferPool(getBufferPool())
               .setToken(subKeyInfo.getToken())
-              .setIsParityStreamEntry(i >= ecReplicationConfig.getData())
-              .setChunkWriteRspFutures(this.chunkWriteResponseFutures);
+              .setIsParityStreamEntry(i >= ecReplicationConfig.getData());
       getStreamEntries().add(builder.build());
     }
   }
@@ -178,13 +172,16 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     int countChunkWriteFailures = 0;
     final ECBlockOutputStreamEntry[] streams = getStreamEntries()
         .toArray(new ECBlockOutputStreamEntry[getStreamEntries().size()]);
-    for (int i = 0; i < chunkWriteResponseFutures.length; i++) {
-      final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-          chunkWriteResponseFuture = chunkWriteResponseFutures[i];
+    for (int i = 0; i < (ecReplicationConfig.getData() + ecReplicationConfig
+        .getParity()); i++) {
       ContainerProtos.ContainerCommandResponseProto
           containerCommandResponseProto = null;
       final ECBlockOutputStream outputStream =
           (ECBlockOutputStream) streams[i].getOutputStream();
+      final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          chunkWriteResponseFuture = outputStream != null ?
+          outputStream.getCurrentChunkResponseFuture() :
+          null;
       try {
         containerCommandResponseProto = chunkWriteResponseFuture != null ?
             chunkWriteResponseFuture.get() :

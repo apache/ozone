@@ -387,21 +387,6 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testrepeat() throws IOException {
-
-    for (int i=0; i< 1000; i++){
-      System.out.println(i);
-      tearDown();
-
-      init();
-
-      testWriteShouldFailIfMoreThanParityNodesFail();
-
-    }
-
-  }
-
-  @Test
   public void testWriteShouldFailIfMoreThanParityNodesFail()
       throws IOException {
     store.createVolume(volumeName);

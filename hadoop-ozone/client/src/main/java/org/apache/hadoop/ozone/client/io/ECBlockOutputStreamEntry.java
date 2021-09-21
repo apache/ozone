@@ -63,17 +63,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     return this.out;
   }
 
-  @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    checkStream();
-    final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-        containerCommandResponseProtoCompletableFuture =
-        this.out.writeDirect(b, off, len);
-    this.chunkWriteResponseFutures[this.currStreamIdx] =
-        containerCommandResponseProtoCompletableFuture;
-    setCurrentPosition(getCurrentPosition() + len);
-  }
-
   void executePutBlock() throws IOException {
     this.out.executePutBlockSync();
   }
