@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -97,9 +98,13 @@ public class TestOzoneManagerListVolumes {
 
     // Use native impl here, default impl doesn't do actual checks
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    // These test do not use any features of SCM, so we can skip safemode
+    // which gets the cluster to come up much faster.
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId).setScmId(scmId).setOmId(omId).build();
+        .setClusterId(clusterId).setScmId(scmId).setOmId(omId).
+        setNumDatanodes(0).build();
     cluster.waitForClusterToBeReady();
 
     // Create volumes with non-default owners and ACLs
