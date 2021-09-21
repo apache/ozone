@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -28,32 +27,23 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Helper for {@link ECBlockOutputStream}.
  */
 public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   private final boolean isParityStreamEntry;
-  private final CompletableFuture<ContainerProtos
-      .ContainerCommandResponseProto>[] chunkWriteResponseFutures;
   private boolean isFailed = false;
   private ECBlockOutputStream out;
-  private int currStreamIdx;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
       BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config, boolean isParityStream,
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>[]
-          chunkWriteResponseFutures) {
+      OzoneClientConfig config, boolean isParityStream) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
         token, config);
     this.isParityStreamEntry = isParityStream;
-    this.chunkWriteResponseFutures = chunkWriteResponseFutures;
-    this.currStreamIdx =
-        pipeline.getReplicaIndex(pipeline.getNodes().iterator().next()) - 1;
   }
 
   @Override
@@ -93,8 +83,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
     private boolean isParityStreamEntry;
-    private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>[]
-        chunkWriteResponseFutures;
 
     public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -145,17 +133,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       return this;
     }
 
-    public ECBlockOutputStreamEntry.Builder setChunkWriteRspFutures(
-        CompletableFuture<ContainerProtos.
-            ContainerCommandResponseProto>[] chunkWriteRspFutures) {
-      this.chunkWriteResponseFutures = chunkWriteRspFutures;
-      return this;
-    }
-
     public ECBlockOutputStreamEntry build() {
       return new ECBlockOutputStreamEntry(blockID, key, xceiverClientManager,
-          pipeline, length, bufferPool, token, config, isParityStreamEntry,
-          this.chunkWriteResponseFutures);
+          pipeline, length, bufferPool, token, config, isParityStreamEntry);
     }
   }
 }
