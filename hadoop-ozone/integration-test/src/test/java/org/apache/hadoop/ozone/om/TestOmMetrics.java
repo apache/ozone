@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -64,6 +65,8 @@ public class TestOmMetrics {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
   private MiniOzoneCluster cluster;
+  private MiniOzoneCluster.Builder clusterBuilder;
+  private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
 
   /**
@@ -76,10 +79,17 @@ public class TestOmMetrics {
    */
   @Before
   public void setup() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL,
         1000, TimeUnit.MILLISECONDS);
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
+    // Most tests in this class do not use any features of SCM, so we can skip
+    // safemode which gets the cluster to come up much faster.
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
+    clusterBuilder = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(0);
+  }
+
+  private void startCluster() throws Exception {
+    cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
   }
@@ -97,7 +107,8 @@ public class TestOmMetrics {
 
 
   @Test
-  public void testVolumeOps() throws IOException {
+  public void testVolumeOps() throws Exception {
+    startCluster();
     VolumeManager volumeManager =
         (VolumeManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "volumeManager");
@@ -174,7 +185,8 @@ public class TestOmMetrics {
   }
 
   @Test
-  public void testBucketOps() throws IOException {
+  public void testBucketOps() throws Exception {
+    startCluster();
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "bucketManager");
@@ -240,7 +252,8 @@ public class TestOmMetrics {
   }
 
   @Test
-  public void testKeyOps() throws IOException {
+  public void testKeyOps() throws Exception {
+    startCluster();
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
@@ -330,7 +343,8 @@ public class TestOmMetrics {
   }
 
   @Test
-  public void testAclOperations() throws IOException {
+  public void testAclOperations() throws Exception {
+    startCluster();
     try {
       // Create a volume.
       cluster.getClient().getObjectStore().createVolume("volumeacl");
@@ -367,6 +381,11 @@ public class TestOmMetrics {
 
   @Test
   public void testAclOperationsHA() throws Exception {
+    // This test needs a cluster with DNs and SCM to wait on safemode
+    clusterBuilder.setNumDatanodes(3);
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
+    startCluster();
+
     ObjectStore objectStore = cluster.getClient().getObjectStore();
     // Create a volume.
     objectStore.createVolume("volumeacl");
