@@ -152,7 +152,7 @@ public class UgiFilter implements Filter {
 
   private void validateAccessId(String awsAccessId) throws Exception {
     if (awsAccessId == null || awsAccessId.equals("")) {
-      LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
+      LOG.error("Malformed s3 header. awsAccessID: {}", awsAccessId);
       throw wrapOS3Exception(MALFORMED_HEADER);
     }
   }
