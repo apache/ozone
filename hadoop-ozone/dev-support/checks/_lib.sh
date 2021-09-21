@@ -73,7 +73,7 @@ install_k3s() {
 }
 
 _install_k3s() {
-  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.21.2+k3s1" sh -
+  curl -sfL https://get.k3s.io  | sed 's/    download_hash/#    download_hash/' | sed 's/    verify_binary/#   verify_binary/'  | INSTALL_K3S_VERSION="v1.21.2+k3s1" sh -
   sudo chmod a+r $KUBECONFIG
 }
 
