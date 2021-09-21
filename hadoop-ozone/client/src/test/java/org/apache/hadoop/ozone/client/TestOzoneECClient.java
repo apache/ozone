@@ -387,6 +387,21 @@ public class TestOzoneECClient {
   }
 
   @Test
+  public void testrepeat() throws IOException {
+
+    for (int i=0; i< 1000; i++){
+      System.out.println(i);
+      tearDown();
+
+      init();
+
+      testWriteShouldFailIfMoreThanParityNodesFail();
+
+    }
+
+  }
+
+  @Test
   public void testWriteShouldFailIfMoreThanParityNodesFail()
       throws IOException {
     store.createVolume(volumeName);
@@ -409,6 +424,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < parityBlocks + 1; i++) {
         failedDNs.add(dnDetails[i]);
       }
+
 
       // First let's set > parity storages as bad
       ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);

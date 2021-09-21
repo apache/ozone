@@ -21,9 +21,13 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -33,6 +37,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * This class manages the stream entries list and handles block allocation
@@ -41,6 +47,8 @@ import java.util.Map;
 public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
   private final List<BlockOutputStreamEntry> finishedStreamEntries;
   private final ECReplicationConfig ecReplicationConfig;
+  private CompletableFuture<ContainerProtos
+      .ContainerCommandResponseProto>[] chunkWriteResponseFutures;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public ECBlockOutputStreamEntryPool(OzoneClientConfig config,
@@ -60,6 +68,9 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     this.finishedStreamEntries = new ArrayList<>();
     assert replicationConfig instanceof ECReplicationConfig;
     this.ecReplicationConfig = (ECReplicationConfig) replicationConfig;
+    this.chunkWriteResponseFutures =
+        new CompletableFuture[this.ecReplicationConfig
+            .getData() + this.ecReplicationConfig.getParity()];
   }
 
   @Override
@@ -85,7 +96,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
               .setPipeline(pipeline).setConfig(getConfig())
               .setLength(subKeyInfo.getLength()).setBufferPool(getBufferPool())
               .setToken(subKeyInfo.getToken())
-              .setIsParityStreamEntry(i >= ecReplicationConfig.getData());
+              .setIsParityStreamEntry(i >= ecReplicationConfig.getData())
+              .setChunkWriteRspFutures(this.chunkWriteResponseFutures);
       getStreamEntries().add(builder.build());
     }
   }
@@ -127,8 +139,10 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     super.cleanup();
   }
 
-  void executePutBlockForAll() throws IOException {
+  void executePutBlockForAll()
+      throws IOException {
     List<BlockOutputStreamEntry> streamEntries = getStreamEntries();
+    checkStreamFailures();
     int failedStreams = 0;
     for (int i = 0; i < streamEntries.size(); i++) {
       ECBlockOutputStreamEntry ecBlockOutputStreamEntry =
@@ -157,6 +171,64 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
               + ") than the supported tolerance: "
               + ecReplicationConfig.getParity());
     }
+  }
+
+  private void checkStreamFailures()
+      throws IOException {
+    int countChunkWriteFailures = 0;
+    final ECBlockOutputStreamEntry[] streams = getStreamEntries()
+        .toArray(new ECBlockOutputStreamEntry[getStreamEntries().size()]);
+    for (int i = 0; i < chunkWriteResponseFutures.length; i++) {
+      final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          chunkWriteResponseFuture = chunkWriteResponseFutures[i];
+      ContainerProtos.ContainerCommandResponseProto
+          containerCommandResponseProto = null;
+      final ECBlockOutputStream outputStream =
+          (ECBlockOutputStream) streams[i].getOutputStream();
+      try {
+        containerCommandResponseProto = chunkWriteResponseFuture != null ?
+            chunkWriteResponseFuture.get() :
+            null;
+      } catch (InterruptedException e) {
+        outputStream.setIoException(e);
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
+        outputStream.setIoException(e);
+      }
+
+      if ((outputStream != null && containerCommandResponseProto != null)
+          && (outputStream.getIoException() != null || isStreamFailed(
+          containerCommandResponseProto, outputStream))) {
+        countChunkWriteFailures++;
+      }
+    }
+
+    if (countChunkWriteFailures > ecReplicationConfig.getParity()) {
+      // TODO: throw the multi IO exception
+      throw new IOException(
+          "There are more failures(" + countChunkWriteFailures
+              + ") than the supported tolerance: "
+              + ecReplicationConfig.getParity());
+    }
+
+  }
+
+  boolean isStreamFailed(
+      ContainerProtos.ContainerCommandResponseProto responseProto,
+      ECBlockOutputStream stream) {
+    try {
+      // if the ioException is already set, it means a prev request has failed
+      // just return true.
+      IOException exception = stream.getIoException();
+      if (exception != null) {
+        return true;
+      }
+      ContainerProtocolCalls.validateContainerResponse(responseProto);
+    } catch (StorageContainerException sce) {
+      stream.setIoException(sce);
+      return true;
+    }
+    return false;
   }
 
   void cleanupAll() {

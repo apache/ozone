@@ -17,16 +17,19 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,85 +37,106 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 
 /**
  * Handles the chunk EC writes for an EC internal block.
  */
 public class ECBlockOutputStream extends BlockOutputStream{
 
+  private int chunkIndex;
   /**
    * Creates a new ECBlockOutputStream.
-   *
-   * @param blockID              block ID
+   *  @param blockID              block ID
    * @param xceiverClientManager client manager that controls client
    * @param pipeline             pipeline where block will be written
    * @param bufferPool           pool of buffers
    */
-  public ECBlockOutputStream(
-      BlockID blockID,
-      XceiverClientFactory xceiverClientManager,
-      Pipeline pipeline,
-      BufferPool bufferPool,
-      OzoneClientConfig config,
-      Token<? extends TokenIdentifier> token
-  ) throws IOException {
+  public ECBlockOutputStream(BlockID blockID,
+      XceiverClientFactory xceiverClientManager, Pipeline pipeline,
+      BufferPool bufferPool, OzoneClientConfig config,
+      Token<? extends TokenIdentifier> token) throws IOException {
     super(blockID, xceiverClientManager,
         pipeline, bufferPool, config, token);
   }
 
-  @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
+  public CompletableFuture<ContainerProtos
+      .ContainerCommandResponseProto> writeDirect(
+      byte[] b, int off, int len) throws IOException {
+    final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+        containerCommandResponseProtoCompletableFuture =
+        writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
+    return containerCommandResponseProtoCompletableFuture;
+  }
+
+
+  public void executePutBlockSync() throws IOException {
+    checkOpen();
+    try {
+      ContainerProtos.BlockData blockData = getContainerBlockData().build();
+      putBlock(getXceiverClient(), blockData,
+          (Token<OzoneBlockTokenIdentifier>) getToken());
+    } catch (IOException e) {
+      throw new IOException(EXCEPTION_MSG + e.toString(), e);
+    }
   }
 
   /**
-   * @param close whether putBlock is happening as part of closing the stream
-   * @param force true if no data was written since most recent putBlock and
-   *            stream is being closed
+   * Writes buffered data as a new chunk to the container and saves chunk
+   * information to be used later in putKey call.
+   *
+   * @throws IOException if there is an I/O error while performing the call
+   * @throws OzoneChecksumException if there is an error while computing
+   * checksum
+   * @return ContainerCommandResponseProto
    */
-  public CompletableFuture<ContainerProtos.
-      ContainerCommandResponseProto> executePutBlock(boolean close,
-      boolean force) throws IOException {
-    checkOpen();
+  CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> writeChunkToContainer(
+      ChunkBuffer chunk) throws IOException {
+    int effectiveChunkSize = chunk.remaining();
+    final long offset = getChunkOffset().getAndAdd(effectiveChunkSize);
+    final ByteString data =
+        chunk.toByteString(getBufferPool().byteStringConversion());
+    ChecksumData checksumData = getCheckSum().computeChecksum(chunk);
+    ContainerProtos.ChunkInfo chunkInfo = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName(getBlockID().getLocalID() + "_chunk_" + ++chunkIndex)
+        .setOffset(offset).setLen(effectiveChunkSize)
+        .setChecksumData(checksumData.getProtoBufMessage()).build();
 
-    CompletableFuture<ContainerProtos.
-        ContainerCommandResponseProto> flushFuture = null;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Writing chunk {} length {} at offset {}",
+          chunkInfo.getChunkName(), effectiveChunkSize, offset);
+    }
     try {
-      ContainerProtos.BlockData blockData = getContainerBlockData().build();
       XceiverClientReply asyncReply =
-          putBlockAsync(getXceiverClient(), blockData, close, getToken());
+          writeChunkAsync(getXceiverClient(), chunkInfo, getBlockID(), data,
+              getToken(), 1);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
-      flushFuture = future.thenApplyAsync(e -> {
+      future.thenApplyAsync(e -> {
         try {
           validateResponse(e);
         } catch (IOException sce) {
-          throw new CompletionException(sce);
-        }
-        // if the ioException is not set, putBlock is successful
-        if (getIoException() == null) {
-          BlockID responseBlockID = BlockID.getFromProtobuf(
-              e.getPutBlock().getCommittedBlockLength().getBlockID());
-          Preconditions.checkState(getBlockID().getContainerBlockID()
-              .equals(responseBlockID.getContainerBlockID()));
+          future.completeExceptionally(sce);
         }
         return e;
       }, getResponseExecutor()).exceptionally(e -> {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("putBlock failed for blockID {} with exception {}",
-              getBlockID(), e.getLocalizedMessage());
-        }
-        CompletionException ce =  new CompletionException(e);
+        String msg = "Failed to write chunk " + chunkInfo
+            .getChunkName() + " " + "into block " + getBlockID();
+        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+        CompletionException ce = new CompletionException(msg, e);
         setIoException(ce);
         throw ce;
       });
+      getContainerBlockData().addChunks(chunkInfo);
+      return future;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    return flushFuture;
+    return null;
   }
 }

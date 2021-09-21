@@ -225,6 +225,14 @@ public class BlockOutputStream extends OutputStream {
     return this.token;
   }
 
+  public Checksum getCheckSum(){
+    return this.checksum;
+  }
+
+  public AtomicLong getChunkOffset(){
+    return this.chunkOffset;
+  }
+
   ExecutorService getResponseExecutor(){
     return this.responseExecutor;
   }
@@ -598,7 +606,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  void setIoException(Exception e) {
+  public void setIoException(Exception e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -654,8 +662,10 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException if there is an I/O error while performing the call
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
+   * @return
    */
-  void writeChunkToContainer(ChunkBuffer chunk) throws IOException {
+  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(
+      ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -693,6 +703,7 @@ public class BlockOutputStream extends OutputStream {
         setIoException(ce);
         throw ce;
       });
+
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
@@ -700,6 +711,8 @@ public class BlockOutputStream extends OutputStream {
       handleInterruptedException(ex, false);
     }
     containerBlockData.addChunks(chunkInfo);
+
+    return null;
   }
 
   @VisibleForTesting

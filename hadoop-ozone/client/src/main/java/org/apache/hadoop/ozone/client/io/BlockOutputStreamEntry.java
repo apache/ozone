@@ -94,7 +94,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    * done when data is written.
    * @throws IOException if xceiverClient initialization fails
    */
-  private void checkStream() throws IOException {
+  void checkStream() throws IOException {
     if (this.outputStream == null) {
       this.outputStream = createOutputStream();
     }

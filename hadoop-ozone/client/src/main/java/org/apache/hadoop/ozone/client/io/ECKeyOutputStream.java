@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -60,6 +62,8 @@ import org.slf4j.LoggerFactory;
 public class ECKeyOutputStream extends KeyOutputStream {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
+  private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>[]
+      stripeChunkFutures;
   private int ecChunkSize = 1024;
   private final int numDataBlks;
   private final int numParityBlks;
@@ -122,6 +126,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.numParityBlks = ((ECReplicationConfig) replicationConfig).getParity();
     ecChunkBufferCache =
         new ECChunkBuffers(ecChunkSize, numDataBlks, numParityBlks);
+    stripeChunkFutures = new CompletableFuture[numDataBlks + numParityBlks];
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new ECBlockOutputStreamEntryPool(config, omClient, requestId,
