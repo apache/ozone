@@ -81,9 +81,6 @@ public class TestOzoneManagerConfiguration {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
-    // These test do not use any features of SCM, so we can skip safemode
-    // which gets the cluster to come up much faster.
-    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
     // writes the version file properties
@@ -102,7 +99,7 @@ public class TestOzoneManagerConfiguration {
       .setClusterId(clusterId)
       .setScmId(scmId)
       .setOmId(omId)
-      .setNumDatanodes(0)
+      .withoutDatanodes()
       .build();
     cluster.waitForClusterToBeReady();
   }

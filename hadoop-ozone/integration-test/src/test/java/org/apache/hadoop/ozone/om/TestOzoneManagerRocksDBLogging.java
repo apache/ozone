@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
@@ -53,9 +52,8 @@ public class TestOzoneManagerRocksDBLogging {
     conf = new OzoneConfiguration();
     dbConf = conf.getObject(RocksDBConfiguration.class);
     enableRocksDbLogging(false);
-    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     cluster =  MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(0).build();
+        .withoutDatanodes().build();
     cluster.waitForClusterToBeReady();
   }
 

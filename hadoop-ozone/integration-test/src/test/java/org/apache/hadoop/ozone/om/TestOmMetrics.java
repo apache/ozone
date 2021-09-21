@@ -82,10 +82,7 @@ public class TestOmMetrics {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL,
         1000, TimeUnit.MILLISECONDS);
-    // Most tests in this class do not use any features of SCM, so we can skip
-    // safemode which gets the cluster to come up much faster.
-    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
-    clusterBuilder = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(0);
+    clusterBuilder = MiniOzoneCluster.newBuilder(conf).withoutDatanodes();
   }
 
   private void startCluster() throws Exception {
