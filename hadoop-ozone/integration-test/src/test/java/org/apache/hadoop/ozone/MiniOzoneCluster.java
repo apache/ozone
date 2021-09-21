@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -358,6 +359,17 @@ public interface MiniOzoneCluster {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
+      return this;
+    }
+
+    /**
+     * For tests that do not use any features of SCM, we can get by with
+     * 0 datanodes.  Also need to skip safemode in this case.
+     * This allows the cluster to come up much faster.
+     */
+    public Builder withoutDatanodes() {
+      setNumDatanodes(0);
+      conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
       return this;
     }
 
