@@ -51,7 +51,7 @@ public final class OzoneClientCache {
             ozoneConfiguration);
       }
     } catch (IOException e) {
-      LOG.warn("cannot create OzoneClient");
+      LOG.warn("cannot create OzoneClient", e);
       throw e;
     }
   }
