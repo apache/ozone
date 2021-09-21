@@ -43,8 +43,12 @@ _install_tool() {
   if [[ ! -d "${dir}" ]]; then
     mkdir -pv "${dir}"
     pushd "${dir}"
-    eval "${func}"
-    echo "Installed ${tool} in ${dir}"
+    if eval "${func}"; then
+      echo "Installed ${tool} in ${dir}"
+    else
+      echo "Failed to install ${tool}"
+      exit 1
+    fi
     popd
   fi
 
@@ -74,11 +78,6 @@ install_k3s() {
 
 _install_k3s() {
   curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.21.2+k3s1" sh -
-  if [ $? -ne 0 ]
-  then
-    echo k3s install failed
-    exit 1
-  fi
   sudo chmod a+r $KUBECONFIG
 }
 
