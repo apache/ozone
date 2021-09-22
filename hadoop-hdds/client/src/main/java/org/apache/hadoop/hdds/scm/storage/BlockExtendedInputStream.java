@@ -15,20 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.io;
+package org.apache.hadoop.hdds.scm.storage;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.security.token.Token;
 
 /**
- * Interface used to create BlockInputStreams.
+ * Abstract class used as an interface for input streams related to Ozone
+ * blocks.
  */
-public interface BlockInputStreamProvider {
+public abstract class BlockExtendedInputStream  extends ExtendedInputStream {
 
-  BlockInputStream provide(BlockID blockId, long blockLen, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum);
+  public abstract BlockID getBlockID();
+
+  public abstract long getRemaining();
+
+  public abstract long getLength();
 
 }
