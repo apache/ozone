@@ -28,16 +28,43 @@ import java.util.regex.Pattern;
  * Replication configuration for EC replication.
  */
 public class ECReplicationConfig implements ReplicationConfig {
-  
+
+  // TODO - should this enum be defined in the protobuf rather than here? Right
+  //        the proto will carry a string. It might be more flexible for the
+  //        constants to be defined in code rather than proto?
+
+  /**
+   * Enum defining the allowed list of ECCodecs.
+   */
+  public enum EcCodec {
+    RS, XOR
+  }
+
   private static final Pattern STRING_FORMAT = Pattern.compile("(\\d+)-(\\d+)");
-  
+
   private int data;
 
   private int parity;
 
+  // TODO - the default chunk size is 4MB - is EC defaulting to 1MB or 4MB
+  //        stripe width? Should we default this to the chunk size setting?
+  private int stripeSize = 1024 * 1024;
+
+  // TODO - should we have a config for the default, or does it matter if we
+  //        always force the client to send rs-3-2-1024k for example?
+  private EcCodec codec = EcCodec.RS;
+
   public ECReplicationConfig(int data, int parity) {
     this.data = data;
     this.parity = parity;
+  }
+
+  public ECReplicationConfig(int data, int parity, EcCodec codec,
+      int stripeSize) {
+    this.data = data;
+    this.parity = parity;
+    this.codec = codec;
+    this.stripeSize = stripeSize;
   }
 
   public ECReplicationConfig(String string) {
@@ -59,6 +86,8 @@ public class ECReplicationConfig implements ReplicationConfig {
       HddsProtos.ECReplicationConfig ecReplicationConfig) {
     this.data = ecReplicationConfig.getData();
     this.parity = ecReplicationConfig.getParity();
+    this.codec = EcCodec.valueOf(ecReplicationConfig.getCodec().toUpperCase());
+    this.stripeSize = ecReplicationConfig.getStripeSize();
   }
 
   @Override
@@ -75,6 +104,8 @@ public class ECReplicationConfig implements ReplicationConfig {
     return HddsProtos.ECReplicationConfig.newBuilder()
         .setData(data)
         .setParity(parity)
+        .setCodec(codec.toString())
+        .setStripeSize(stripeSize)
         .build();
   }
 
@@ -86,6 +117,14 @@ public class ECReplicationConfig implements ReplicationConfig {
     return parity;
   }
 
+  public int getStripeSize() {
+    return stripeSize;
+  }
+
+  public EcCodec getCodec() {
+    return codec;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -95,12 +134,13 @@ public class ECReplicationConfig implements ReplicationConfig {
       return false;
     }
     ECReplicationConfig that = (ECReplicationConfig) o;
-    return data == that.data && parity == that.parity;
+    return data == that.data && parity == that.parity
+        && codec == that.getCodec() && stripeSize == that.getStripeSize();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(data, parity);
+    return Objects.hash(data, parity, codec, stripeSize);
   }
 
 }

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.client;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -24,7 +25,6 @@ import org.junit.Test;
  * Unit test for ECReplicationConfig.
  */
 public class TestECReplicationConfig {
-
 
   @Test
   public void testStringParsing() {
@@ -45,5 +45,19 @@ public class TestECReplicationConfig {
     new ECReplicationConfig("3-0");
   }
 
+  @Test
+  public void testSerializeToProtoAndBack() {
+    ECReplicationConfig orig = new ECReplicationConfig(6, 3,
+        ECReplicationConfig.EcCodec.XOR, 1024);
+
+    HddsProtos.ECReplicationConfig proto = orig.toProto();
+
+    ECReplicationConfig recovered = new ECReplicationConfig(proto);
+    Assert.assertEquals(orig.getData(), recovered.getData());
+    Assert.assertEquals(orig.getParity(), recovered.getParity());
+    Assert.assertEquals(orig.getCodec(), recovered.getCodec());
+    Assert.assertEquals(orig.getStripeSize(), recovered.getStripeSize());
+    Assert.assertTrue(orig.equals(recovered));
+  }
 
 }
