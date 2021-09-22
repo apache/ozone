@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
@@ -95,7 +95,7 @@ public class TestDecommissionAndMaintenance {
   private OzoneBucket bucket;
   private MiniOzoneCluster cluster;
   private NodeManager nm;
-  private ContainerManagerV2 cm;
+  private ContainerManager cm;
   private PipelineManager pm;
   private StorageContainerManager scm;
 
@@ -129,7 +129,7 @@ public class TestDecommissionAndMaintenance {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfDatanodes);
 
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 11);
+    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 8);
   }
 
   @AfterClass
@@ -157,8 +157,9 @@ public class TestDecommissionAndMaintenance {
   @Test
   // Decommissioning a node with open pipelines should close the pipelines
   // and hence the open containers and then the containers should be replicated
-  // by the replication manager.
-  public void testNodeWithOpenPipelineCanBeDecommissioned()
+  // by the replication manager. After the node completes decommission, it can
+  // be recommissioned.
+  public void testNodeWithOpenPipelineCanBeDecommissionedAndRecommissioned()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
@@ -185,43 +186,26 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(container, 4);
 
     // Stop the decommissioned DN
+    int dnIndex = cluster.getHddsDatanodeIndex(toDecommission);
     cluster.shutdownHddsDatanode(toDecommission);
     waitForDnToReachHealthState(toDecommission, DEAD);
 
     // Now the decommissioned node is dead, we should have
     // 3 replicas for the tracked container.
     waitForContainerReplicas(container, 3);
-  }
 
-  @Test
-  // After a SCM restart, it will have forgotten all the Operational states.
-  // However the state will have been persisted on the DNs. Therefore on initial
-  // registration, the DN operationalState is the source of truth and SCM should
-  // be updated to reflect that.
-  public void testDecommissionedStateReinstatedAfterSCMRestart()
-      throws Exception {
-    // Decommission any node and wait for it to be DECOMMISSIONED
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
-    DatanodeDetails dn = nm.getAllNodes().get(0);
-    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
-    waitForDnToReachOpState(dn, DECOMMISSIONED);
-
-    cluster.restartStorageContainerManager(true);
-    setManagers();
-    DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
-
-    // On initial registration, the DN should report its operational state
-    // and if it is decommissioned, that should be updated in the NodeStatus
-    waitForDnToReachOpState(newDn, DECOMMISSIONED);
-    // Also confirm the datanodeDetails correctly reflect the operational
-    // state.
-    waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
+    cluster.restartHddsDatanode(dnIndex, true);
+    scmClient.recommissionNodes(Arrays.asList(
+        getDNHostAndPort(toDecommission)));
+    waitForDnToReachOpState(toDecommission, IN_SERVICE);
+    waitForDnToReachPersistedOpState(toDecommission, IN_SERVICE);
   }
 
   @Test
   // If a node has not yet completed decommission and SCM is restarted, then
   // when it re-registers it should re-enter the decommission workflow and
-  // complete decommissioning.
+  // complete decommissioning. If SCM is restarted after decommssion is complete
+  // then SCM should learn of the decommissioned DN when it registers.
   public void testDecommissioningNodesCompleteDecommissionOnSCMRestart()
       throws Exception {
     // First stop the replicationManager so nodes marked for decommission cannot
@@ -246,6 +230,18 @@ public class TestDecommissionAndMaintenance {
     // it should re-enter the decommission workflow and move to DECOMMISSIONED
     DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
     waitForDnToReachOpState(newDn, DECOMMISSIONED);
+    waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
+
+    // Now the node is decommissioned, so restart SCM again
+    cluster.restartStorageContainerManager(true);
+    setManagers();
+    newDn = nm.getNodeByUuid(dn.getUuid().toString());
+
+    // On initial registration, the DN should report its operational state
+    // and if it is decommissioned, that should be updated in the NodeStatus
+    waitForDnToReachOpState(newDn, DECOMMISSIONED);
+    // Also confirm the datanodeDetails correctly reflect the operational
+    // state.
     waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
   }
 
@@ -284,27 +280,12 @@ public class TestDecommissionAndMaintenance {
   }
 
   @Test
-  // A node which is decommissioning or decommissioned can be move back to
-  // IN_SERVICE.
-  public void testDecommissionedNodeCanBeRecommissioned() throws Exception {
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
-    DatanodeDetails dn = nm.getAllNodes().get(0);
-    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
-
-    GenericTestUtils.waitFor(
-        () -> !dn.getPersistedOpState()
-            .equals(IN_SERVICE),
-        200, 30000);
-
-    scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
-    waitForDnToReachOpState(dn, IN_SERVICE);
-    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
-  }
-
-  @Test
   // When putting a single node into maintenance, its pipelines should be closed
   // but no new replicas should be create and the node should transition into
-  // maintenance
+  // maintenance.
+  // After a restart, the DN should keep the maintenance state.
+  // If the DN is recommissioned while stopped, it should get the recommissioned
+  // state when it re-registers.
   public void testSingleNodeWithOpenPipelineCanGotoMaintenance()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
@@ -343,21 +324,8 @@ public class TestDecommissionAndMaintenance {
     DatanodeDetails newDN = nm.getNodeByUuid(dn.getUuid().toString());
     waitForDnToReachHealthState(newDN, HEALTHY);
     waitForDnToReachPersistedOpState(newDN, IN_MAINTENANCE);
-  }
 
-  @Test
-  // After a node enters maintenance and is stopped, it can be recommissioned in
-  // SCM. Then when it is restarted, it should go back to IN_SERVICE and have
-  // that persisted on the DN.
-  public void testStoppedMaintenanceNodeTakesScmStateOnRestart()
-      throws Exception {
-    // Put a node into maintenance and wait for it to complete
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
-    DatanodeDetails dn = nm.getAllNodes().get(0);
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0);
-    waitForDnToReachOpState(dn, IN_MAINTENANCE);
-    waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
-
+    // Stop the DN and wait for it to go dead.
     int dnIndex = cluster.getHddsDatanodeIndex(dn);
     cluster.shutdownHddsDatanode(dnIndex);
     waitForDnToReachHealthState(dn, DEAD);

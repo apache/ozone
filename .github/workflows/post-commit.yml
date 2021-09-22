@@ -116,7 +116,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-18.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
       matrix:
@@ -187,13 +187,15 @@ jobs:
       - build-info
       - compile
     runs-on: ubuntu-18.04
-    timeout-minutes: 120 # Todo HDDS-5270
+    timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
       matrix:
         suite:
           - secure
           - unsecure
+          - HA
+          - MR
           - misc
       fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:

@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
@@ -84,7 +84,7 @@ public class TestDeletedBlockLog {
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private Table<ContainerID, ContainerInfo> containerTable;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
@@ -102,7 +102,7 @@ public class TestDeletedBlockLog {
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     scm = TestUtils.getScm(conf);
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    containerManager = Mockito.mock(ContainerManager.class);
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
         new MockSCMHADBTransactionBuffer(scm.getScmMetadataStore().getStore());
