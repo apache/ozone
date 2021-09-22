@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -345,5 +347,21 @@ public class TestOzoneTokenIdentifier {
     }
     Assert.assertEquals("Deserialize Serialized Token should equal.",
         idWrite, idRead);
+  }
+
+  @Test
+  public void testGetUserFromAccessIdInToken() {
+    OzoneTokenIdentifier id = getIdentifierInst();
+    Assert.assertEquals("User1", id.getUser().getUserName());
+
+    id.setTokenType(S3AUTHINFO);
+    Assert.assertEquals("User1", id.getUser().getUserName());
+
+    id.setGetUserForAccessId(s -> "modified-" + s);
+    Assert.assertEquals("modified-User1", id.getUser().getUserName());
+
+    id.setGetUserForAccessId(s -> null);
+    Assert.assertEquals("User1", id.getUser().getUserName());
+
   }
 }
