@@ -295,6 +295,15 @@ public class ContainerStateManager {
             + "Do you have enough nodes?");
 
     final long containerID = containerCount.incrementAndGet();
+    String ipAddress = "";
+    String uuid = "";
+    try {
+      ipAddress = pipeline.getClosestNode().getIpAddress();
+      uuid = pipeline.getClosestNode().getUuidString();
+    }catch (IOException e){
+      ipAddress = "";
+      uuid = "";
+    }
     final ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setState(LifeCycleState.OPEN)
         .setPipelineID(pipeline.getId())
@@ -305,6 +314,8 @@ public class ContainerStateManager {
         .setContainerID(containerID)
         .setDeleteTransactionId(0)
         .setReplicationConfig(pipeline.getReplicationConfig())
+        .setIpAddress(ipAddress)
+        .setUuid(uuid)
         .build();
     addContainerInfo(containerID, containerInfo, pipelineManager, pipeline);
     if (LOG.isTraceEnabled()) {

@@ -168,6 +168,8 @@ public class TestDeletedBlockLog {
             .setState(HddsProtos.LifeCycleState.CLOSED)
             .setOwner("TestDeletedBlockLog")
             .setPipelineID(PipelineID.randomId())
+            .setIpAddress("127.0.0.1")
+            .setUuid(UUID.randomUUID().toString())
             .build();
     final Set<ContainerReplica> replicaSet = dnList.stream()
         .map(datanodeDetails -> ContainerReplica.newBuilder()
