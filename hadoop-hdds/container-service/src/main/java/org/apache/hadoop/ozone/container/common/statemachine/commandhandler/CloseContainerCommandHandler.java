@@ -129,7 +129,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
     } catch (NotLeaderException e) {
       LOG.debug("Follower cannot close container #{}.", containerId);
     } catch (IOException e) {
-      LOG.error("Can't close container #{}", containerId, e);
+      LOG.error("Can't close container #{}: {}", containerId, e);
     } finally {
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;
