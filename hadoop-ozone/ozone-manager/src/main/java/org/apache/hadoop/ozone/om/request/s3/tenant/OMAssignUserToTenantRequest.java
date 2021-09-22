@@ -80,7 +80,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
       - Value: <GENERATED_SECRET>
     - Release S3_SECRET_LOCK write lock
     - New entry in tenantAccessIdTable:
-      - Key: New accessId for the user in this tenant. e.g. finance$bob ?
+      - Key: New accessId for the user in this tenant.
+             Example of accessId: finance$bob@EXAMPLE.COM
       - Value: OmDBAccessIdInfo. Has tenantId, kerberosPrincipal, sharedSecret.
     - New entry or update existing entry in principalToAccessIdsTable:
       - Key: Kerberos principal of the user.
@@ -88,7 +89,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
     - tenantGroupTable: Add this new user to the default tenant group.
       - Key: finance$bob
       - Value: finance-users
-    - tenantRoleTable: TBD. No-op for prototype.
+    - tenantRoleTable: TBD. No-Op for now.
     - Release VOLUME_LOCK write lock
  */
 
@@ -128,9 +129,10 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
     }
 
     // Won't check tenant existence in preExecute.
-    // Won't check Kerberos principal existence at all. TODO: Confirm this.
+    // Won't check Kerberos principal existence.
 
-    // Generate random S3 secret
+    // Generate secret. Used only when doesn't the kerberosID entry doesn't
+    //  exist in DB, discarded otherwise.
     final String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
 
     final UpdateGetS3SecretRequest updateGetS3SecretRequest =
@@ -179,7 +181,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
     assert(accessId.equals(request.getAccessId()));
     final String volumeName = tenantName;  // TODO: Configurable
     IOException exception = null;
-    String userId = null;
+    String userId;
 
     try {
       // Check ACL: requires ozone admin or tenant admin permission
@@ -220,6 +222,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
 
       final S3SecretValue s3SecretValue =
           new S3SecretValue(accessId, awsSecret);
+      // Add S3SecretTable cache entry
       omMetadataManager.getS3SecretTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));
