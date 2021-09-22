@@ -70,7 +70,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               "If -1 dumps the entire table data")
   private static int limit = 100;
 
-  @CommandLine.Option(names = {"-out", "-o"},
+  @CommandLine.Option(names = {"--out", "-o"},
       description = "File to dump table scan data")
   private static String fileName;
 
