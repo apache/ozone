@@ -168,6 +168,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .setState(LifeCycleState.OPEN)
         .setOwner("test")
         .setPipelineID(pipeline.getId())
+        .setIpAddress("127.0.0.1")
+        .setUuid(UUID.randomUUID().toString())
         .build();
 
     ContainerWithPipeline containerWithPipeline =

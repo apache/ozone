@@ -472,6 +472,8 @@ public class TestContainerEndpoint {
         .setOwner("owner1")
         .setNumberOfKeys(keyCount)
         .setPipelineID(pipelineID)
+        .setIpAddress("127.0.0.1")
+        .setUuid(UUID.randomUUID().toString())
         .build();
   }
 

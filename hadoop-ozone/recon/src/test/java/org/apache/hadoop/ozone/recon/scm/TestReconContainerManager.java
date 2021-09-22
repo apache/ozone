@@ -191,6 +191,8 @@ public class TestReconContainerManager
         .setOwner("owner2")
         .setNumberOfKeys(99L)
         .setPipelineID(pipeline.getId())
+        .setIpAddress("127.0.0.1")
+        .setUuid(UUID.randomUUID().toString())
         .build();
   }
 

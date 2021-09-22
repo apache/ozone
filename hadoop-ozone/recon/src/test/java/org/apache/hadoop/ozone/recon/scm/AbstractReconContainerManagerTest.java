@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.scm;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -156,6 +157,8 @@ public class AbstractReconContainerManagerTest {
             .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOwner("test")
             .setState(OPEN)
+            .setIpAddress("127.0.0.1")
+            .setUuid(UUID.randomUUID().toString())
             .build();
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
@@ -177,6 +180,8 @@ public class AbstractReconContainerManagerTest {
               .setOwner("test")
               //add containers in all kinds of state
               .setState(stateTypes[i % stateTypeCount])
+              .setIpAddress("127.0.0.1")
+              .setUuid(UUID.randomUUID().toString())
               .build();
       verifiedContainerPipeline.add(
           new ContainerWithPipeline(cInfo, pipeline));
@@ -210,6 +215,8 @@ public class AbstractReconContainerManagerTest {
             .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOwner("test")
             .setState(state)
+            .setIpAddress("127.0.0.1")
+            .setUuid(UUID.randomUUID().toString())
             .build();
     return new ContainerWithPipeline(containerInfo, pipeline);
   }
@@ -228,6 +235,8 @@ public class AbstractReconContainerManagerTest {
             .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setOwner("test")
             .setState(state)
+            .setIpAddress("127.0.0.1")
+            .setUuid(UUID.randomUUID().toString())
             .build();
     return new ContainerWithPipeline(containerInfo, pipeline);
   }

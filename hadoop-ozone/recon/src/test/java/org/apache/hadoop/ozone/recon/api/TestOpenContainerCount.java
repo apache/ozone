@@ -144,6 +144,8 @@ public class TestOpenContainerCount {
               .setState(LifeCycleState.OPEN)
               .setOwner("test")
               .setPipelineID(pipeline.getId())
+              .setIpAddress("127.0.0.1")
+              .setUuid(UUID.randomUUID().toString())
               .build();
       ContainerWithPipeline containerWithPipeline =
               new ContainerWithPipeline(containerInfo, pipeline);
@@ -162,6 +164,8 @@ public class TestOpenContainerCount {
               .setState(LifeCycleState.OPEN)
               .setOwner("test")
               .setPipelineID(pipeline2.getId())
+              .setIpAddress("127.0.0.1")
+              .setUuid(UUID.randomUUID().toString())
               .build();
       ContainerWithPipeline containerWithPipeline =
               new ContainerWithPipeline(containerInfo, pipeline2);
