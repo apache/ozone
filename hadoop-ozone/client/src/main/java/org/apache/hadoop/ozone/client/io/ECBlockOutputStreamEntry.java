@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Helper for {@link ECBlockOutputStream}.
@@ -53,8 +55,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     return this.out;
   }
 
-  void executePutBlock() throws IOException {
-    this.out.executePutBlockSync();
+  CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> executePutBlock()
+      throws IOException {
+    return this.out.executePutBlock(false, false);
   }
 
   public boolean isParityStreamEntry() {

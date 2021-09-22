@@ -142,7 +142,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
       ECBlockOutputStreamEntry ecBlockOutputStreamEntry =
           (ECBlockOutputStreamEntry) streamEntries.get(i);
       if (!ecBlockOutputStreamEntry.isClosed()) {
-        if(!ecBlockOutputStreamEntry.isInitialized()){
+        if (!ecBlockOutputStreamEntry.isInitialized()) {
           // Stream not initialized. Means this stream was not used to write.
           continue;
         }
@@ -159,7 +159,13 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
         failedStreams++;
       }
     }
-    if(failedStreams > ecReplicationConfig.getParity()) {
+    checkFailures(failedStreams);
+    // Double check by validating future responses
+    checkStreamFailures();
+  }
+
+  private void checkFailures(int failedStreams) throws IOException {
+    if (failedStreams > ecReplicationConfig.getParity()) {
       throw new IOException(
           "There are more failures(" + failedStreams
               + ") than the supported tolerance: "
@@ -169,45 +175,45 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
 
   private void checkStreamFailures()
       throws IOException {
-    int countChunkWriteFailures = 0;
+    int countFailures = 0;
     final ECBlockOutputStreamEntry[] streams = getStreamEntries()
         .toArray(new ECBlockOutputStreamEntry[getStreamEntries().size()]);
     for (int i = 0; i < (ecReplicationConfig.getData() + ecReplicationConfig
         .getParity()); i++) {
-      ContainerProtos.ContainerCommandResponseProto
-          containerCommandResponseProto = null;
       final ECBlockOutputStream outputStream =
           (ECBlockOutputStream) streams[i].getOutputStream();
       final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           chunkWriteResponseFuture = outputStream != null ?
-          outputStream.getCurrentChunkResponseFuture() :
+          outputStream.getCurrentChunkResponseFuture() : null;
+      countFailures += validateFuture(outputStream, chunkWriteResponseFuture);
+    }
+    checkFailures(countFailures);
+  }
+
+  private int validateFuture(
+      ECBlockOutputStream outputStream,
+      CompletableFuture<ContainerProtos.
+          ContainerCommandResponseProto> chunkWriteResponseFuture) {
+    int countChunkWriteFailures = 0;
+    ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto
+        = null;
+    try {
+      containerCommandResponseProto = chunkWriteResponseFuture != null ?
+          chunkWriteResponseFuture.get() :
           null;
-      try {
-        containerCommandResponseProto = chunkWriteResponseFuture != null ?
-            chunkWriteResponseFuture.get() :
-            null;
-      } catch (InterruptedException e) {
-        outputStream.setIoException(e);
-        Thread.currentThread().interrupt();
-      } catch (ExecutionException e) {
-        outputStream.setIoException(e);
-      }
-
-      if ((outputStream != null && containerCommandResponseProto != null)
-          && (outputStream.getIoException() != null || isStreamFailed(
-          containerCommandResponseProto, outputStream))) {
-        countChunkWriteFailures++;
-      }
+    } catch (InterruptedException e) {
+      outputStream.setIoException(e);
+      Thread.currentThread().interrupt();
+    } catch (ExecutionException e) {
+      outputStream.setIoException(e);
     }
 
-    if (countChunkWriteFailures > ecReplicationConfig.getParity()) {
-      // TODO: throw the multi IO exception
-      throw new IOException(
-          "There are more failures(" + countChunkWriteFailures
-              + ") than the supported tolerance: "
-              + ecReplicationConfig.getParity());
+    if ((outputStream != null && containerCommandResponseProto != null)
+        && (outputStream.getIoException() != null || isStreamFailed(
+        containerCommandResponseProto, outputStream))) {
+      countChunkWriteFailures++;
     }
-
+    return countChunkWriteFailures;
   }
 
   boolean isStreamFailed(
