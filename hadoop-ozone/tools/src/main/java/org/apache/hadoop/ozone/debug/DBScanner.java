@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -63,8 +66,13 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private static boolean withKey;
 
   @CommandLine.Option(names = {"--length", "-l"},
-          description = "Maximum number of items to list")
+          description = "Maximum number of items to list. " +
+              "If -1 dumps the entire table data")
   private static int limit = 100;
+
+  @CommandLine.Option(names = {"-out", "-o"},
+      description = "File to dump table scan data")
+  private static String fileName;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -77,7 +85,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
     iterator.seekToFirst();
-    while (iterator.isValid() && limit > 0){
+
+
+    PrintWriter printWriter = null;
+    if (fileName != null) {
+      FileWriter fileWriter = new FileWriter(fileName);
+      printWriter = new PrintWriter(fileWriter);
+    }
+    while (iterator.isValid()){
       StringBuilder result = new StringBuilder();
       if (withKey) {
         Object key = dbColumnFamilyDefinition.getKeyCodec()
@@ -91,9 +106,19 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       outputs.add(o);
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
       result.append(gson.toJson(o));
-      System.out.println(result.toString());
+      if (fileName != null) {
+        printWriter.println(result);
+      } else {
+        System.out.println(result.toString());
+      }
       limit--;
       iterator.next();
+      if (limit == 0) {
+        break;
+      }
+    }
+    if (fileName != null) {
+      printWriter.close();
     }
     return outputs;
   }
@@ -166,9 +191,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
           RocksDB rocksDB, String dbPath) throws IOException {
-    if (limit < 1) {
+    if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
-              "List length should be a positive number");
+              "List length should be a positive number. Only allowed negative" +
+                  " number is -1 which is to dump entire table");
     }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     this.constructColumnFamilyMap(DBDefinitionFactory.
