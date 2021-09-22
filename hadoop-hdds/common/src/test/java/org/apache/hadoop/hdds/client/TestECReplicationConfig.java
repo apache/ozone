@@ -55,12 +55,12 @@ public class TestECReplicationConfig {
   @Test
   public void testUnsuccessfulStringParsing() {
     String[] invalid = {
-      "3-2-1024",
-      "rss-3-2-1024",
-      "rs-3-0-1024",
-      "rs-3-2-0k",
-      "rs-3-2",
-      "x3-2"
+        "3-2-1024",
+        "rss-3-2-1024",
+        "rs-3-0-1024",
+        "rs-3-2-0k",
+        "rs-3-2",
+        "x3-2"
     };
     for (String s : invalid) {
       try {

@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.logging.log4j.util.Strings;
 
 import java.util.EnumSet;
 import java.util.Objects;
