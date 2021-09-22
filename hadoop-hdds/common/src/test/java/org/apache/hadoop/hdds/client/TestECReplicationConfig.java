@@ -21,29 +21,57 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
+import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.XOR;
+import static org.junit.Assert.fail;
+
 /**
  * Unit test for ECReplicationConfig.
  */
 public class TestECReplicationConfig {
 
   @Test
-  public void testStringParsing() {
-    final ECReplicationConfig ec = new ECReplicationConfig("3-2");
-    Assert.assertEquals(ec.getData(), 3);
-    Assert.assertEquals(ec.getParity(), 2);
+  public void testSuccessfulStringParsing() {
+    Map<String, ECReplicationConfig> valid = new HashMap();
+    valid.put("rs-3-2-1024", new ECReplicationConfig(3, 2, RS, 1024));
+    valid.put("RS-3-2-1024", new ECReplicationConfig(3, 2, RS, 1024));
+    valid.put("rs-3-2-1024k", new ECReplicationConfig(3, 2, RS, 1024 * 1024));
+    valid.put("rs-3-2-1024K", new ECReplicationConfig(3, 2, RS, 1024 * 1024));
+    valid.put("xor-10-4-1", new ECReplicationConfig(10, 4, XOR, 1));
+    valid.put("XOR-6-3-12345", new ECReplicationConfig(6, 3, XOR, 12345));
+
+    for (Map.Entry<String, ECReplicationConfig> e : valid.entrySet()) {
+      ECReplicationConfig ec = new ECReplicationConfig(e.getKey());
+      Assert.assertEquals(e.getValue().getData(), ec.getData());
+      Assert.assertEquals(e.getValue().getParity(), ec.getParity());
+      Assert.assertEquals(e.getValue().getCodec(), ec.getCodec());
+      Assert.assertEquals(e.getValue().getStripeSize(), ec.getStripeSize());
+    }
   }
 
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testStringParsingWithString() {
-    new ECReplicationConfig("x3-2");
+  @Test
+  public void testUnsuccessfulStringParsing() {
+    String[] invalid = {
+      "3-2-1024",
+      "rss-3-2-1024",
+      "rs-3-0-1024",
+      "rs-3-2-0k",
+      "rs-3-2",
+      "x3-2"
+    };
+    for (String s : invalid) {
+      try {
+        new ECReplicationConfig(s);
+        fail(s + " should not parse correctly");
+      } catch (IllegalArgumentException e) {
+        // ignore, this expected
+      }
+    }
   }
 
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testStringParsingWithZero() {
-    new ECReplicationConfig("3-0");
-  }
 
   @Test
   public void testSerializeToProtoAndBack() {
