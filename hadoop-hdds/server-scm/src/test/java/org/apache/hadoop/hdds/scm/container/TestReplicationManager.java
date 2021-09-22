@@ -102,7 +102,7 @@ public class TestReplicationManager {
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private GenericTestUtils.LogCapturer scmLogs;
   private SCMServiceManager serviceManager;
   private TestClock clock;
@@ -117,9 +117,8 @@ public class TestReplicationManager {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
 
-    scmLogs = GenericTestUtils.LogCapturer
-      .captureLogs(ReplicationManager.LOG);
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    scmLogs = GenericTestUtils.LogCapturer.captureLogs(ReplicationManager.LOG);
+    containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
@@ -173,7 +172,7 @@ public class TestReplicationManager {
       throws InterruptedException, IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     testDir = GenericTestUtils
-      .getTestDir(TestSCMContainerManager.class.getSimpleName());
+      .getTestDir(TestContainerManagerImpl.class.getSimpleName());
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.getAbsolutePath());
     config.setTimeDuration(
@@ -825,6 +824,30 @@ public class TestReplicationManager {
     eventQueue.processAll(1000);
     Mockito.verify(closeContainerHandler, Mockito.times(1))
         .onMessage(id, eventQueue);
+  }
+
+  /**
+   * ReplicationManager should skip send close command to unhealthy replica.
+   */
+  @Test
+  public void testCloseUnhealthyReplica()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+    final ContainerID id = container.containerID();
+    final Set<ContainerReplica> replicas = getReplicas(id, State.UNHEALTHY,
+        randomDatanodeDetails());
+    replicas.addAll(getReplicas(id, State.OPEN, randomDatanodeDetails()));
+    replicas.addAll(getReplicas(id, State.OPEN, randomDatanodeDetails()));
+
+    containerStateManager.loadContainer(container);
+    for (ContainerReplica replica : replicas) {
+      containerStateManager.updateContainerReplica(id, replica);
+    }
+
+    replicationManager.processAll();
+    // Wait for EventQueue to call the event handler
+    eventQueue.processAll(1000);
+    Assert.assertEquals(2, datanodeCommandHandler.getInvocation());
   }
 
   @Test

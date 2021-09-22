@@ -59,6 +59,7 @@ public class DUResponse {
     this.duData = new ArrayList<>();
     // by default, the replication feature is disabled
     this.sizeWithReplica = -1L;
+    this.keySize = -1L;
   }
 
   public ResponseStatus getStatus() {
@@ -133,8 +134,13 @@ public class DUResponse {
     @JsonProperty("sizeWithReplica")
     private long sizeWithReplica;
 
+    /** Indicate if the path is a key for Web UI. */
+    @JsonProperty("isKey")
+    private boolean isKey;
+
     public DiskUsage() {
       this.sizeWithReplica = -1L;
+      this.isKey = false;
     }
 
     public long getSize() {
@@ -159,6 +165,14 @@ public class DUResponse {
 
     public void setSizeWithReplica(long sizeWithReplica) {
       this.sizeWithReplica = sizeWithReplica;
+    }
+
+    public void setKey(boolean key) {
+      isKey = key;
+    }
+
+    public boolean isKey() {
+      return isKey;
     }
   }
 }

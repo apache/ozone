@@ -896,5 +896,327 @@
       "fileSize": 131072,
       "count": 217
     }
-  ]
+  ],
+  "root": {
+    "status": "OK",
+    "path": "/",
+    "size": 100000,
+    "sizeWithReplica": 300000,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/vol1",
+        "size": 50000,
+        "sizeWithReplica": 150000
+      },
+      {
+        "path": "/vol2",
+        "size": 20000,
+        "sizeWithReplica": 60000
+      },
+      {
+        "path": "/vol3",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol4",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol5",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      }
+    ],
+    "sizeDirectKey": 0
+  },
+  "volume": {
+    "status": "OK",
+    "path": "/dummyVolume",
+    "size": 150000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/dummyVolume/bucket1",
+        "size": 100000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket2",
+        "size": 20000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket3",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket4",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket5",
+        "size": 10000,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 0
+  },
+  "bucket": {
+    "status": "OK",
+    "path": "/dummyVolume/dummyBucket",
+    "size": 200000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/dummyVolume/dummyBucket/dir1",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir2",
+        "size": 20000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir3",
+        "size": 30000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir4",
+        "size": 40000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir5",
+        "size": 50000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/key1",
+        "size": 25000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/key2",
+        "size": 25000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/empty",
+        "size": 0,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 50000
+  },
+  "dir": {
+    "status": "OK",
+    "path": "/dummyVolume/dummyBucket/dummyDir",
+    "size": 200000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key1",
+        "size": 100000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key2",
+        "size": 30000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key3",
+        "size": 30000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key4",
+        "size": 40000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      }
+    ],
+    "sizeDirectKey": 50000
+  },
+  "empty": {
+    "status": "OK",
+    "path": "/vol1/bucket1/empty",
+    "size": 0,
+    "sizeWithReplica": -1,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": 0
+  },
+  "key": {
+    "status": "OK",
+    "path": "/vol1/bucket1/dir1/key1",
+    "size": 3800,
+    "sizeWithReplica": 11400,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": 0
+  },
+  "metadata": {
+    "type": "DUMMY_TYPE",
+    "numVolume": 100,
+    "numBucket": 200,
+    "numDir": 400,
+    "numKey": 800,
+    "status": "OK"
+  },
+  "quota": {
+    "allowed": 1000000000,
+    "used": 5000000,
+    "status": "OK"
+  },
+  "clunky": {
+    "status": "OK",
+    "path": "/clunky",
+    "size": 250000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/nested/b1",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b2",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b3",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b4",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b5",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b6",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b7",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b8",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b9",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b10",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b11",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b12",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b13",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b14",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b15",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b16",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b17",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b18",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b19",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b20",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b21",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b22",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b23",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b24",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b25",
+        "size": 10000,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 0
+  }
 }

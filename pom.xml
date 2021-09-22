@@ -231,6 +231,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
     <snakeyaml.version>1.26</snakeyaml.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
+
+    <aspectj.version>1.9.7</aspectj.version>
+    <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
   </properties>
 
 
@@ -250,7 +253,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.4.0</version>
+        <version>4.6.1</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>

@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
 import java.io.IOException;
@@ -42,7 +41,6 @@ import java.util.Iterator;
  */
 public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
-  @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
@@ -125,6 +123,19 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
               keyName, id);
     } else {
       return omMetadataManager.getOpenFileName(1000, keyName, id);
+    }
+  }
+
+  @Override
+  protected String getOzoneKey() throws IOException {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+    if (omBucketInfo != null) {
+      return omMetadataManager.getOzonePathKey(omBucketInfo.getObjectID(),
+          keyName);
+    } else {
+      return omMetadataManager.getOzonePathKey(1000, keyName);
     }
   }
 

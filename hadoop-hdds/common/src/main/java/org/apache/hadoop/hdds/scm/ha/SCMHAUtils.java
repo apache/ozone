@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -73,6 +74,7 @@ public final class SCMHAUtils {
           .add(SCMException.class)
           .add(NonRetriableException.class)
           .add(PipelineNotFoundException.class)
+          .add(ContainerNotFoundException.class)
           .build();
 
   private SCMHAUtils() {

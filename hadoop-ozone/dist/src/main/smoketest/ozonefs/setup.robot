@@ -59,7 +59,7 @@ Sanity check for FS test
     ${result} =         Execute               ozone sh volume list
                         Should contain        ${result}               ${VOLUME}
                         Should contain        ${result}               ${VOL2}
-                        Should Match Regexp   ${result}               "admin" : "(hadoop|testuser\/scm[^@]*@EXAMPLE\.COM)"
+                        Should Match Regexp   ${result}               "admin" : "(hadoop|testuser)"
     ${result} =         Execute               ozone sh bucket list ${VOLUME}
                         Should contain        ${result}               ${BUCKET}
                         Should contain        ${result}               ${BUCKET2}
