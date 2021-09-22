@@ -43,11 +43,6 @@ public class RDBCheckpointManager {
       LoggerFactory.getLogger(RDBCheckpointManager.class);
   private String checkpointNamePrefix = "";
 
-  public RDBCheckpointManager(RocksDB rocksDB) {
-    this.db = rocksDB;
-    this.checkpoint = Checkpoint.create(rocksDB);
-  }
-
   /**
    * Create a checkpoint manager with a prefix to be added to the
    * snapshots created.
@@ -96,5 +91,9 @@ public class RDBCheckpointManager {
       LOG.error("Unable to create RocksDB Snapshot.", e);
     }
     return null;
+  }
+
+  public void close() {
+    this.checkpoint.close();
   }
 }

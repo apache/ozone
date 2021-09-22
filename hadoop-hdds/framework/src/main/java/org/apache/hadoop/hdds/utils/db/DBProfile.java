@@ -21,11 +21,9 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.BloomFilter;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
-import org.rocksdb.LRUCache;
 
 import java.math.BigDecimal;
 
@@ -63,10 +61,8 @@ public enum DBProfile {
           .setWriteBufferSize(writeBufferSize)
           .setTableFormatConfig(
               new BlockBasedTableConfig()
-                  .setBlockCache(new LRUCache(blockCacheSize))
                   .setBlockSize(blockSize)
-                  .setPinL0FilterAndIndexBlocksInCache(true)
-                  .setFilterPolicy(new BloomFilter()));
+                  .setPinL0FilterAndIndexBlocksInCache(true));
     }
 
     @Override

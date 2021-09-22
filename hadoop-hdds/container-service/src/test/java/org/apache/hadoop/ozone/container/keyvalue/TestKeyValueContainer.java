@@ -433,32 +433,6 @@ public class TestKeyValueContainer {
   }
 
   @Test
-  public void testContainersShareColumnFamilyOptions() throws Exception {
-    // Get a read only view (not a copy) of the options cache.
-    Map<ConfigurationSource, ColumnFamilyOptions> cachedOptions =
-        AbstractDatanodeStore.getColumnFamilyOptionsCache();
-
-    // Create Container 1
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    ColumnFamilyOptions options1 = cachedOptions.get(CONF);
-    Assert.assertNotNull(options1);
-
-    // Create Container 2
-    keyValueContainerData = new KeyValueContainerData(2L,
-        layout,
-        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-        datanodeId.toString());
-    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-
-    ColumnFamilyOptions options2 = cachedOptions.get(CONF);
-    Assert.assertNotNull(options2);
-
-    // Column family options object should be reused.
-    Assert.assertSame(options1, options2);
-  }
-
-  @Test
   public void testDBProfileAffectsDBOptions() throws Exception {
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);

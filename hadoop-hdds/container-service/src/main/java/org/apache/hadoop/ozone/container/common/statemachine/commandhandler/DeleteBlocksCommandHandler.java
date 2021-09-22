@@ -241,7 +241,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           containerDB.getStore().getBlockDataTable();
       Table<String, ChunkInfoList> deletedBlocksTable =
           containerDB.getStore().getDeletedBlocksTable();
-
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
         for (Long blkLong : delTX.getLocalIDList()) {

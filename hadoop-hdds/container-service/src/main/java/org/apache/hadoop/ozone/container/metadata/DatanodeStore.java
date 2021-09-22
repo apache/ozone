@@ -35,14 +35,6 @@ import java.io.IOException;
 public interface DatanodeStore {
 
   /**
-   * Start datanode manager.
-   *
-   * @param configuration - Configuration
-   * @throws IOException - Unable to start datanode store.
-   */
-  void start(ConfigurationSource configuration) throws IOException;
-
-  /**
    * Stop datanode manager.
    */
   void stop() throws Exception;

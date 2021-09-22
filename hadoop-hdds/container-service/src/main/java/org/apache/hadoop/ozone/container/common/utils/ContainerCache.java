@@ -177,9 +177,9 @@ public final class ContainerCache extends LRUMap {
           cleanupDb(db);
           return currentDB;
         } else {
-          this.put(containerDBPath, db);
           // increment the reference before returning the object
           db.incrementReference();
+          this.put(containerDBPath, db);
           return db;
         }
       } finally {

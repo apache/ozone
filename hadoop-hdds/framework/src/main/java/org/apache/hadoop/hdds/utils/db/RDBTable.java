@@ -19,25 +19,24 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Arrays;
-
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.StringUtils;
-
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteOptions;
 import org.rocksdb.RocksIterator;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
 
@@ -56,8 +55,7 @@ class RDBTable implements Table<byte[], byte[]> {
   private final RocksDB db;
   private final ColumnFamilyHandle handle;
   private final WriteOptions writeOptions;
-  private final RDBMetrics rdbMetrics;
-
+  private final ReadOptions readOptions = new ReadOptions();
   /**
    * Constructs a TableStore.
    *
@@ -70,7 +68,6 @@ class RDBTable implements Table<byte[], byte[]> {
     this.db = db;
     this.handle = handle;
     this.writeOptions = writeOptions;
-    this.rdbMetrics = rdbMetrics;
   }
 
   /**
@@ -119,7 +116,7 @@ class RDBTable implements Table<byte[], byte[]> {
       // RocksDB#keyMayExist
       // If the key definitely does not exist in the database, then this
       // method returns false, else true.
-      rdbMetrics.incNumDBKeyMayExistChecks();
+      //rdbMetrics.incNumDBKeyMayExistChecks();
       Holder<byte[]> outValue = new Holder<>();
       boolean keyMayExist = db.keyMayExist(handle, key, outValue);
       if (keyMayExist) {
@@ -127,7 +124,7 @@ class RDBTable implements Table<byte[], byte[]> {
             (outValue.getValue() != null && outValue.getValue().length > 0) ||
                 (db.get(handle, key) != null);
         if (!keyExists) {
-          rdbMetrics.incNumDBKeyMayExistMisses();
+          //rdbMetrics.incNumDBKeyMayExistMisses();
         }
         return keyExists;
       }
@@ -167,16 +164,16 @@ class RDBTable implements Table<byte[], byte[]> {
       // RocksDB#keyMayExist
       // If the key definitely does not exist in the database, then this
       // method returns false, else true.
-      rdbMetrics.incNumDBKeyGetIfExistChecks();
+      //rdbMetrics.incNumDBKeyGetIfExistChecks();
       boolean keyMayExist = db.keyMayExist(handle, key, null);
       if (keyMayExist) {
         // Not using out value from string builder, as that is causing
         // IllegalArgumentException during protobuf parsing.
-        rdbMetrics.incNumDBKeyGetIfExistGets();
+        //rdbMetrics.incNumDBKeyGetIfExistGets();
         byte[] val;
         val = db.get(handle, key);
         if (val == null) {
-          rdbMetrics.incNumDBKeyGetIfExistMisses();
+          //rdbMetrics.incNumDBKeyGetIfExistMisses();
         }
         return val;
       }
@@ -208,7 +205,6 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public TableIterator<byte[], ByteArrayKeyValue> iterator() {
-    ReadOptions readOptions = new ReadOptions();
     readOptions.setFillCache(false);
     return new RDBStoreIterator(db.newIterator(handle, readOptions), this);
   }
@@ -225,6 +221,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void close() throws Exception {
     // Nothing do for a Column Family.
+    this.readOptions.close();
   }
 
   @Override
