@@ -507,12 +507,12 @@ public final class OzoneManagerRatisUtils {
     return buckInfo;
   }
 
-  private static BucketLayout getBucketLayout(OmBucketInfo buckInfo) {
+  private static BucketLayout getBucketLayout(OmBucketInfo buckInfo,
+      String volName, String buckName) {
     if (buckInfo != null) {
       return buckInfo.getBucketLayout();
     } else {
-      LOG.error("Bucket not found: {}/{} ", buckInfo.getVolumeName(),
-          buckInfo.getBucketName());
+      LOG.error("Bucket not found: {}/{} ", volName, buckName);
       // TODO: Handle bucket validation
     }
     return BucketLayout.LEGACY;
@@ -523,7 +523,7 @@ public final class OzoneManagerRatisUtils {
     BucketLayout bucketLayout = null;
     OmBucketInfo buckInfo = null;
     buckInfo = getOmBucketInfo(ozoneManager, buckInfo, volName, buckName);
-    bucketLayout = getBucketLayout(buckInfo);
+    bucketLayout = getBucketLayout(buckInfo, volName, buckName);
     return BucketLayout.FILE_SYSTEM_OPTIMIZED.equals(bucketLayout);
   }
 
