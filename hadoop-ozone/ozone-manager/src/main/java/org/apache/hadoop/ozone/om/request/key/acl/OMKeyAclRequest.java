@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -152,7 +153,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    */
   abstract String getPath();
 
-  public OmBucketInfo getBucketInfo(OzoneManager ozoneManager) {
+  public BucketLayout getBucketLayout(OzoneManager ozoneManager) {
+    BucketLayout bucketLayout = BucketLayout.LEGACY;
     OmBucketInfo buckInfo = null;
     try {
       ObjectParser objectParser = new ObjectParser(getPath(),
@@ -167,13 +169,18 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       try {
         buckInfo =
             ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+        if (buckInfo == null) {
+          LOG.error("Bucket not found: {}/{} ", volume, bucket);
+          return BucketLayout.LEGACY;
+        }
+        bucketLayout = buckInfo.getBucketLayout();
       } catch (IOException e) {
         LOG.debug("Failed to get the value for the key: " + buckKey);
       }
     } catch (OMException ome) {
-        // Handle exception
+      // Handle exception
     }
-    return buckInfo;
+    return bucketLayout;
   }
 
   /**

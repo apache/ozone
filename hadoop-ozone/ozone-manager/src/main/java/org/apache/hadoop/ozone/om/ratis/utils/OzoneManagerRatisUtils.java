@@ -303,9 +303,9 @@ public final class OzoneManagerRatisUtils {
         return new OMBucketAddAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
         OMKeyAddAclRequest aclReq = new OMKeyAddAclRequest(omRequest);
-        OmBucketInfo buckInfo = aclReq.getBucketInfo(ozoneManager);
+        BucketLayout bucketLayout = aclReq.getBucketLayout(ozoneManager);
         if (BucketLayout.FILE_SYSTEM_OPTIMIZED
-            .equals(buckInfo.getBucketLayout())) {
+            .equals(bucketLayout)) {
           return new OMKeyAddAclRequestWithFSO(omRequest);
         }
         return aclReq;
@@ -320,9 +320,9 @@ public final class OzoneManagerRatisUtils {
         return new OMBucketRemoveAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
         OMKeyRemoveAclRequest aclReq = new OMKeyRemoveAclRequest(omRequest);
-        OmBucketInfo buckInfo = aclReq.getBucketInfo(ozoneManager);
+        BucketLayout bucketLayout = aclReq.getBucketLayout(ozoneManager);
         if (BucketLayout.FILE_SYSTEM_OPTIMIZED
-            .equals(buckInfo.getBucketLayout())) {
+            .equals(bucketLayout)) {
           return new OMKeyRemoveAclRequestWithFSO(omRequest);
         }
         return aclReq;
@@ -337,9 +337,9 @@ public final class OzoneManagerRatisUtils {
         return new OMBucketSetAclRequest(omRequest);
       } else if (ObjectType.KEY == type) {
         OMKeySetAclRequest aclReq = new OMKeySetAclRequest(omRequest);
-        OmBucketInfo buckInfo = aclReq.getBucketInfo(ozoneManager);
+        BucketLayout bucketLayout = aclReq.getBucketLayout(ozoneManager);
         if (BucketLayout.FILE_SYSTEM_OPTIMIZED
-            .equals(buckInfo.getBucketLayout())) {
+            .equals(bucketLayout)) {
           return new OMKeySetAclRequestWithFSO(omRequest);
         }
         return aclReq;
@@ -481,6 +481,19 @@ public final class OzoneManagerRatisUtils {
     return new ServiceException(leaderNotReadyException);
   }
 
+  /**
+   * All the client requests are executed through
+   * OzoneManagerStateMachine#runCommand function and ensures sequential
+   * execution path.
+   * Below is the call trace to perform OM client request operation:
+   * OzoneManagerStateMachine#applyTransaction ->
+   * OzoneManagerStateMachine#runCommand ->
+   * OzoneManagerRequestHandler#handleWriteRequest ->
+   * OzoneManagerRatisUtils#createClientRequest ->
+   * OzoneManagerRatisUtils#getOmBucketInfo ->
+   * omMetadataManager().getBucketTable().get(buckKey)
+   */
+
   private static OmBucketInfo getOmBucketInfo(OzoneManager ozoneManager,
       OmBucketInfo buckInfo, String volName, String buckName) {
     String buckKey =
@@ -498,10 +511,11 @@ public final class OzoneManagerRatisUtils {
     if (buckInfo != null) {
       return buckInfo.getBucketLayout();
     } else {
-      buckInfo = null;
+      LOG.error("Bucket not found: {}/{} ", buckInfo.getVolumeName(),
+          buckInfo.getBucketName());
       // TODO: Handle bucket validation
     }
-    return null;
+    return BucketLayout.LEGACY;
   }
 
   private static boolean isBucketFSOptimized(String volName, String buckName,
