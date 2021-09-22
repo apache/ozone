@@ -3078,8 +3078,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmVolumeArgs getS3Volume() throws IOException {
     String accessID = getRemoteUser().getUserName();
     Tenant tenant = multiTenantManagr.getTenantInfoForAccessID(accessID);
-    // This call performs acl checks and checks volume existence.
-    return getVolumeInfo(tenant.getTenantId());
+    if (tenant == null) {
+      // If the user is not associated with a tenant, they will use the
+      // default s3 volume.
+      String defaultS3volume =
+          HddsClientUtils.getDefaultS3VolumeName(configuration);
+      return getVolumeInfo(defaultS3volume);
+    } else {
+      // This call performs acl checks and checks volume existence.
+      return getVolumeInfo(tenant.getTenantId());
+    }
   }
 
   @Override

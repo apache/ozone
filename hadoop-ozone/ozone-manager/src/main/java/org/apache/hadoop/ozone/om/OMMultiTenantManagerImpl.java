@@ -38,8 +38,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
@@ -114,6 +116,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   //          This may make sense just to the authorizer-plugin.
   private Map<String, List<String>> inMemoryAccessIDToListOfGroupsMap;
 
+  // Used for testing (where there's no ranger instance) to inject a mock
+  // authorizer.
+  private static Supplier<MultiTenantAccessAuthorizer> authorizerSupplier =
+      MultiTenantAccessAuthorizerRangerPlugin::new;
+
 
   OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
       throws IOException {
@@ -129,9 +136,15 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     start(conf);
   }
 
+  @VisibleForTesting
+  public static void setAuthorizerSupplier(
+      Supplier<MultiTenantAccessAuthorizer> authSupplier) {
+    authorizerSupplier = authSupplier;
+  }
+
   @Override
   public void start(OzoneConfiguration configuration) throws IOException {
-    authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
+    authorizer = authorizerSupplier.get();
     authorizer.init(configuration);
   }
 
@@ -394,9 +407,14 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public Tenant getTenantInfoForAccessID(String accessID) throws IOException {
-    String tenantName = inMemoryAccessIDToTenantNameMap.get(accessID);
-    return inMemoryTenantNameToTenantInfoMap.get(tenantName);
+  public Tenant getTenantInfoForAccessID(String accessID) {
+    LOG.info("--- looking up tenant for access ID {}", accessID);
+//    if (inMemoryTenantNameToTenantInfoMap.containsKey(accessID)) {
+//      return inMemoryTenantNameToTenantInfoMap.get(accessID);
+//    } else {
+//      return null;
+//    }
+    return inMemoryTenantNameToTenantInfoMap.getOrDefault(accessID, null);
   }
 
   @Override
