@@ -27,11 +27,15 @@ share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-logging.jar
+share/ozone/lib/commons-math.jar
 share/ozone/lib/commons-math3.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
+share/ozone/lib/curator-client.jar
+share/ozone/lib/curator-framework.jar
+share/ozone/lib/curator-test.jar
 share/ozone/lib/derby.jar
 share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
@@ -130,6 +134,7 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
+share/ozone/lib/jline.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/joda-time.jar
 share/ozone/lib/jooq-codegen.jar
@@ -177,6 +182,7 @@ share/ozone/lib/netty-resolver.Final.jar
 share/ozone/lib/netty-transport.Final.jar
 share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
+share/ozone/lib/netty.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar
 share/ozone/lib/okio.jar
@@ -240,3 +246,4 @@ share/ozone/lib/token-provider.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/weld-servlet.Final.jar
 share/ozone/lib/woodstox-core.jar
+share/ozone/lib/zookeeper.jar
