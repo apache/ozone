@@ -324,7 +324,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final int SHUTDOWN_HOOK_PRIORITY = 30;
   private final Runnable shutdownHook;
   private final File omMetaDir;
-  private final boolean isAclEnabled;
+  private boolean isAclEnabled;
   private final boolean isSpnegoEnabled;
   private IAccessAuthorizer accessAuthorizer;
   private JvmPauseMonitor jvmPauseMonitor;
@@ -422,9 +422,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     loginOMUserIfSecurityEnabled(conf);
-
-    this.allowListAllVolumes = conf.getBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED,
-        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
+    setInstanceVariablesFromConf();
     this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
         OZONE_OM_USER_MAX_VOLUME_DEFAULT);
     Preconditions.checkArgument(this.maxUserVolumeCount > 0,
@@ -439,9 +437,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           ResultCodes.OM_NOT_INITIALIZED);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
-
-    this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
-        OZONE_ACL_ENABLED_DEFAULT);
+    
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
@@ -535,6 +531,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
+  }
+
+  /**
+   * This method is used to set selected instance variables in this class from
+   * the passed in config. This allows these variable to be reset when the OM
+   * instance is restarted (normally from a test mini-cluster). Note, not all
+   * variables are added here as variables are selectively added as tests
+   * require.
+   */
+  private void setInstanceVariablesFromConf() {
+    this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
+        OZONE_ACL_ENABLED_DEFAULT);
+    this.allowListAllVolumes = configuration.getBoolean(
+        OZONE_OM_VOLUME_LISTALL_ALLOWED,
+        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
 
   /**
@@ -803,6 +814,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setS3SecretManager(s3SecretManager)
         .setCertificateClient(certClient)
         .setOmServiceId(omNodeDetails.getServiceId())
+        .setOMMultiTenantManager(multiTenantManagr)
         .build();
   }
 
@@ -1363,6 +1375,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void restart() throws IOException {
     initFSOLayout();
+    setInstanceVariablesFromConf();
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));

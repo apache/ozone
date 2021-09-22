@@ -35,8 +35,8 @@ import picocli.CommandLine.Option;
 public class GetS3SecretHandler extends S3Handler {
 
   @Option(names = "-u",
-      description = "Specify the user name to perform the operation on "
-          + "(admins only)'")
+      description = "Specify the user to perform the operation on "
+          + "(Admins only)'")
   private String username;
 
   @Option(names = "-e",
@@ -58,8 +58,10 @@ public class GetS3SecretHandler extends S3Handler {
 
     final S3SecretValue secret = client.getObjectStore().getS3Secret(username);
     if (export) {
-      out().println("export AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
-      out().println("export AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
+      out().println("export AWS_ACCESS_KEY_ID='" +
+          secret.getAwsAccessKey() + "'");
+      out().println("export AWS_SECRET_ACCESS_KEY='" +
+          secret.getAwsSecret() + "'");
     } else {
       out().println(secret);
     }

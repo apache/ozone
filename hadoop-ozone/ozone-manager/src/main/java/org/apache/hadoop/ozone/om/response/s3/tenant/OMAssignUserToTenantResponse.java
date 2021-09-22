@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -90,6 +91,7 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
     if (s3SecretValue != null &&
         getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
       assert(accessId.equals(s3SecretValue.getKerberosID()));
+      // Add S3SecretTable entry
       omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
           accessId, s3SecretValue);
     }
@@ -102,5 +104,10 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
         batchOperation, principal, groupName);
     omMetadataManager.getTenantRoleTable().putWithBatch(
         batchOperation, principal, roleName);
+  }
+
+  @VisibleForTesting
+  public OmDBAccessIdInfo getOmDBAccessIdInfo() {
+    return omDBAccessIdInfo;
   }
 }

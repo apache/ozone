@@ -36,6 +36,16 @@ public final class ReconConfigKeys {
       "ozone.recon.datanode.address";
   public static final String OZONE_RECON_ADDRESS_KEY =
       "ozone.recon.address";
+  public static final String OZONE_RECON_ADDRESS_DEFAULT =
+      "0.0.0.0:9891";
+  public static final String OZONE_RECON_HTTP_ADDRESS_KEY =
+      "ozone.recon.http-address";
+  public static final String OZONE_RECON_HTTP_ADDRESS_DEFAULT =
+      "0.0.0.0:9888";
+  public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
+      "ozone.recon.https-address";
+  public static final String OZONE_RECON_HTTPS_ADDRESS_DEFAULT =
+      "0.0.0.0:9889";
   public static final String OZONE_RECON_DATANODE_BIND_HOST_KEY =
       "ozone.recon.datanode.bind.host";
   public static final String OZONE_RECON_DATANODE_BIND_HOST_DEFAULT =
@@ -45,4 +55,14 @@ public final class ReconConfigKeys {
   // ex: http://localhost:9090
   public static final String OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT =
       "ozone.recon.prometheus.http.endpoint";
+  /**
+   * Recon administrator users delimited by a comma.
+   * This is the list of users who can access admin only information from recon.
+   * Users defined in
+   * {@link org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS}
+   * will always be able to access all recon information regardless of this
+   * setting.
+   */
+  public static final String OZONE_RECON_ADMINISTRATORS =
+      "ozone.recon.administrators";
 }

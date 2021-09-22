@@ -69,6 +69,7 @@ import static org.junit.Assert.fail;
 public abstract class TestOzoneManagerHA {
 
   private MiniOzoneOMHAClusterImpl cluster = null;
+  private MiniOzoneCluster.Builder clusterBuilder = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -99,6 +100,10 @@ public abstract class TestOzoneManagerHA {
 
   public OzoneConfiguration getConf() {
     return conf;
+  }
+
+  public MiniOzoneCluster.Builder getClusterBuilder() {
+    return clusterBuilder;
   }
 
   public String getOmServiceId() {
@@ -166,16 +171,34 @@ public abstract class TestOzoneManagerHA {
      */
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
-    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    additionalConfiguration();
+
+    clusterBuilder = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setOmId(omId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .build();
+        .setNumOfOzoneManagers(numOfOMs);
+    additionalClusterSettings();
+
+    cluster = (MiniOzoneOMHAClusterImpl)clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
         .getObjectStore();
+  }
+
+  /**
+   * Override this method in sub-classes to additional test specific
+   * configuration. Add settings to the conf instance variable.
+   */
+  protected void additionalConfiguration() {
+  }
+
+  /**
+   * Override this method in sub-classes to additional test specific
+   * mini-cluster settings. Add settings the clusterBuilder instance variable.
+   */
+  protected void additionalClusterSettings() {
   }
 
   /**

@@ -129,6 +129,12 @@ public interface OMMultiTenantManager {
    */
   void destroyUser(String tenantName, String userName);
 
+
+  /**
+   * Given an accessId, return kerberos user name for the tenant user.
+   */
+  String getUserNameGivenAccessId(String accessId);
+
   /**
    * Given a user, return their S3-Secret Key.
    * @param user

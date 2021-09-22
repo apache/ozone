@@ -145,15 +145,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.upgrade.layout.inline</name>
-    <value>true</value>
-    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>Determines whether to upgrade the DN layout on restart
-      automatically. If set of false, the tool verifies that the current
-      disk format is correct.
-    </description>
-  </property>
-  <property>
     <name>hdds.datanode.dir.du.reserved</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -2400,6 +2391,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.administrators</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      Recon administrator users delimited by a comma.
+      This is the list of users who can access admin only information from recon.
+      Users defined in ozone.administrators will always be able to access all
+      recon information regardless of this setting.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
     <tag>DATANODE, SECURITY, KERBEROS</tag>
@@ -2853,6 +2855,13 @@
     <description>Byte limit for Raft's Log Worker queue.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Number of operation pending with Raft's Log Worker.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ha.ratis.log.purge.enabled</name>
     <value>false</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
@@ -2946,5 +2955,23 @@
     <tag>OZONE, SECURITY, KERBEROS, S3GATEWAY</tag>
     <description>The S3Gateway service principal.
       Ex: s3g/_HOST@REALM.COM</description>
+  </property>
+
+  <property>
+    <name>hdds.container.checksum.verification.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description> To enable/disable checksum verification of the
+      containers.
+    </description>
+  </property>
+
+  <property>
+    <name>hadoop.http.idle_timeout.ms</name>
+    <value>60000</value>
+    <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
+    <description>
+      OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+    </description>
   </property>
 </configuration>
