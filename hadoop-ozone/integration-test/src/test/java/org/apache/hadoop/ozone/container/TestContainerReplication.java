@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -34,17 +33,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
-import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
-import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -135,48 +130,6 @@ public class TestContainerReplication {
     cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
 
     waitForReplicaCount(containerID, 3, cluster);
-  }
-
-  @Test
-  public void testSkipDecommissionAndMaintenanceNode() throws Exception {
-    List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
-    assertFalse(keyLocations.isEmpty());
-
-    OmKeyLocationInfo keyLocation = keyLocations.get(0);
-    long containerID = keyLocation.getContainerID();
-    waitForContainerClose(cluster, containerID);
-
-    // Mark other two DN Decommission and Maintenance
-    NodeDecommissionManager decommissionManager =
-        cluster.getStorageContainerManager().getScmDecommissionManager();
-    boolean deCommission = true;
-    for (HddsDatanodeService d1 : cluster.getHddsDatanodes()) {
-      boolean match = false;
-      for (DatanodeDetails d2 : keyLocations.get(0).getPipeline().getNodes()) {
-        if (d1.getDatanodeDetails().equals(d2)) {
-          match = true;
-          break;
-        }
-      }
-      if (!match) {
-        if (deCommission) {
-          decommissionManager.startDecommission(d1.getDatanodeDetails());
-          deCommission = false;
-        } else {
-          decommissionManager.startMaintenance(d1.getDatanodeDetails(), 1);
-        }
-      }
-    }
-
-    cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
-
-    waitForReplicaCount(containerID, 2, cluster);
-    try {
-      waitForReplicaCount(containerID, 3, cluster);
-      fail("Replication should not succeed without extra IN_SERVICE nodes");
-    } catch (TimeoutException e) {
-      Assert.assertTrue(TestHelper.countReplicas(containerID, cluster) == 2);
-    }
   }
 
   private static OzoneConfiguration createConfiguration() {

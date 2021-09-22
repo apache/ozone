@@ -39,9 +39,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ratis.util.LifeCycle;
 import org.hamcrest.core.StringContains;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,13 +70,13 @@ public class TestOzoneFsHAURLs {
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
-  private MiniOzoneCluster cluster;
-  private String omId;
-  private String omServiceId;
-  private String clusterId;
-  private String scmId;
-  private OzoneManager om;
-  private int numOfOMs;
+  private static MiniOzoneCluster cluster;
+  private static String omId;
+  private static String omServiceId;
+  private static String clusterId;
+  private static String scmId;
+  private static OzoneManager om;
+  private static int numOfOMs;
 
   private String volumeName;
   private String bucketName;
@@ -86,9 +87,9 @@ public class TestOzoneFsHAURLs {
   private final String o3fsImplValue =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
 
-  @Before
-  public void init() throws Exception {
-    conf = new OzoneConfiguration();
+  @BeforeClass
+  public static void initClass() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     omId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     numOfOMs = 3;
@@ -117,6 +118,14 @@ public class TestOzoneFsHAURLs {
     cluster.waitForClusterToBeReady();
 
     om = cluster.getOzoneManager();
+  }
+
+  @Before
+  public void init() throws Exception {
+    // Duplicate the conf for each test, so the client can change it, and each
+    // test will still get the same base conf used to start the cluster.
+    conf = new OzoneConfiguration(cluster.getConf());
+
     Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     volumeName = "volume" + RandomStringUtils.randomNumeric(5);
@@ -142,8 +151,8 @@ public class TestOzoneFsHAURLs {
     fs.mkdirs(dir2);
   }
 
-  @After
-  public void shutdown() {
+  @AfterClass
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }

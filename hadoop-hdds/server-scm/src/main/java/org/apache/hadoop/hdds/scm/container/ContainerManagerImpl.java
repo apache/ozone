@@ -57,7 +57,7 @@ import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
 /**
  * TODO: Add javadoc.
  */
-public class ContainerManagerImpl implements ContainerManagerV2 {
+public class ContainerManagerImpl implements ContainerManager {
 
   /*
    * TODO: Introduce container level locks.
@@ -176,33 +176,64 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public ContainerInfo allocateContainer(
       final ReplicationConfig replicationConfig, final String owner)
       throws IOException {
+    // Acquire pipeline manager lock, to avoid any updates to pipeline
+    // while allocate container happens. This is to avoid scenario like
+    // mentioned in HDDS-5655.
+    pipelineManager.acquireReadLock();
     lock.lock();
+    List<Pipeline> pipelines;
+    Pipeline pipeline;
+    ContainerInfo containerInfo = null;
     try {
-      final List<Pipeline> pipelines = pipelineManager
+      pipelines = pipelineManager
           .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
-
-      final Pipeline pipeline;
-      if (pipelines.isEmpty()) {
-        try {
-          pipeline = pipelineManager.createPipeline(replicationConfig);
-          pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-        } catch (IOException e) {
-          scmContainerManagerMetrics.incNumFailureCreateContainers();
-          throw new IOException("Could not allocate container. Cannot get any" +
-              " matching pipeline for replicationConfig: " + replicationConfig
-              + ", State:PipelineState.OPEN", e);
-        }
-      } else {
+      if (!pipelines.isEmpty()) {
         pipeline = pipelines.get(random.nextInt(pipelines.size()));
+        containerInfo = createContainer(pipeline, owner);
       }
-      final ContainerInfo containerInfo = allocateContainer(pipeline, owner);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("New container allocated: {}", containerInfo);
-      }
-      return containerInfo;
     } finally {
       lock.unlock();
+      pipelineManager.releaseReadLock();
     }
+
+    if (pipelines.isEmpty()) {
+      try {
+        pipeline = pipelineManager.createPipeline(replicationConfig);
+        pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+      } catch (IOException e) {
+        scmContainerManagerMetrics.incNumFailureCreateContainers();
+        throw new IOException("Could not allocate container. Cannot get any" +
+            " matching pipeline for replicationConfig: " + replicationConfig
+            + ", State:PipelineState.OPEN", e);
+      }
+      pipelineManager.acquireReadLock();
+      lock.lock();
+      try {
+        pipelines = pipelineManager
+            .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+        if (!pipelines.isEmpty()) {
+          pipeline = pipelines.get(random.nextInt(pipelines.size()));
+          containerInfo = createContainer(pipeline, owner);
+        } else {
+          throw new IOException("Could not allocate container. Cannot get any" +
+              " matching pipeline for replicationConfig: " + replicationConfig
+              + ", State:PipelineState.OPEN");
+        }
+      } finally {
+        lock.unlock();
+        pipelineManager.releaseReadLock();
+      }
+    }
+    return containerInfo;
+  }
+
+  private ContainerInfo createContainer(Pipeline pipeline, String owner)
+      throws IOException {
+    final ContainerInfo containerInfo = allocateContainer(pipeline, owner);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("New container allocated: {}", containerInfo);
+    }
+    return containerInfo;
   }
 
   private ContainerInfo allocateContainer(final Pipeline pipeline,
@@ -411,8 +442,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   // Remove this after fixing Recon
-  @Deprecated
-  protected ContainerStateManagerV2 getContainerStateManager() {
+  @VisibleForTesting
+  public ContainerStateManagerV2 getContainerStateManager() {
     return containerStateManager;
   }
 

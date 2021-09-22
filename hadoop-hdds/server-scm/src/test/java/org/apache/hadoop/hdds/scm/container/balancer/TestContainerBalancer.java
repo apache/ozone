@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
@@ -69,7 +69,7 @@ public class TestContainerBalancer {
       LoggerFactory.getLogger(TestContainerBalancer.class);
 
   private ReplicationManager replicationManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private ContainerBalancer containerBalancer;
   private MockNodeManager mockNodeManager;
   private OzoneConfiguration conf;
@@ -92,7 +92,7 @@ public class TestContainerBalancer {
   @Before
   public void setup() throws SCMException, NodeNotFoundException {
     conf = new OzoneConfiguration();
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
 
     balancerConfiguration = new ContainerBalancerConfiguration(conf);
@@ -138,6 +138,19 @@ public class TestContainerBalancer {
 
     containerBalancer = new ContainerBalancer(mockNodeManager, containerManager,
         replicationManager, conf, SCMContext.emptyContext(), placementPolicy);
+  }
+
+  @Test
+  public void testCalculationOfUtilization() {
+    Assert.assertEquals(nodesInCluster.size(), nodeUtilizations.size());
+    for (int i = 0; i < nodesInCluster.size(); i++) {
+      Assert.assertEquals(nodeUtilizations.get(i),
+          nodesInCluster.get(i).calculateUtilization(), 0.0001);
+    }
+
+    // should be equal to average utilization of the cluster
+    Assert.assertEquals(averageUtilization,
+        containerBalancer.calculateAvgUtilization(nodesInCluster), 0.0001);
   }
 
   /**

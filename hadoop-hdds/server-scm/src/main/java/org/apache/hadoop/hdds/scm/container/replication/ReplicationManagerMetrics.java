@@ -17,30 +17,38 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Class contains metrics related to ReplicationManager.
  */
 @Metrics(about = "Replication Manager Metrics", context = OzoneConsts.OZONE)
-public final class ReplicationManagerMetrics {
+public final class ReplicationManagerMetrics implements MetricsSource {
 
   public static final String METRICS_SOURCE_NAME =
       ReplicationManagerMetrics.class.getSimpleName();
 
-  @Metric("Tracked inflight container replication requests.")
-  private MutableGaugeLong inflightReplication;
+  private static final MetricsInfo INFLIGHT_REPLICATION = Interns.info(
+      "InflightReplication",
+      "Tracked inflight container replication requests.");
 
-  @Metric("Tracked inflight container deletion requests.")
-  private MutableGaugeLong inflightDeletion;
+  private static final MetricsInfo INFLIGHT_DELETION = Interns.info(
+      "InflightDeletion",
+      "Tracked inflight container deletion requests.");
 
-  @Metric("Tracked inflight container move requests.")
-  private MutableGaugeLong inflightMove;
+  private static final MetricsInfo INFLIGHT_MOVE = Interns.info(
+      "InflightMove",
+      "Tracked inflight container move requests.");
 
   @Metric("Number of replication commands sent.")
   private MutableCounterLong numReplicationCmdsSent;
@@ -66,9 +74,12 @@ public final class ReplicationManagerMetrics {
   @Metric("Number of replication bytes completed.")
   private MutableCounterLong numReplicationBytesCompleted;
 
+  private MetricsRegistry registry;
+
   private ReplicationManager replicationManager;
 
   public ReplicationManagerMetrics(ReplicationManager manager) {
+    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
   }
 
@@ -77,6 +88,23 @@ public final class ReplicationManagerMetrics {
         "SCM Replication manager (closed container replication) related "
             + "metrics",
         new ReplicationManagerMetrics(manager));
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME)
+        .addGauge(INFLIGHT_REPLICATION, getInflightReplication())
+        .addGauge(INFLIGHT_DELETION, getInflightDeletion())
+        .addGauge(INFLIGHT_MOVE, getInflightMove());
+
+    numReplicationCmdsSent.snapshot(builder, all);
+    numReplicationCmdsCompleted.snapshot(builder, all);
+    numReplicationCmdsTimeout.snapshot(builder, all);
+    numDeletionCmdsSent.snapshot(builder, all);
+    numDeletionCmdsCompleted.snapshot(builder, all);
+    numDeletionCmdsTimeout.snapshot(builder, all);
+    numReplicationBytesTotal.snapshot(builder, all);
+    numReplicationBytesCompleted.snapshot(builder, all);
   }
 
   public void unRegister() {

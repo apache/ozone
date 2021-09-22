@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -53,12 +53,12 @@ public class ContainerSafeModeRule extends
   private double maxContainer;
 
   private AtomicLong containerWithMinReplicas = new AtomicLong(0);
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
-      ConfigurationSource conf,
-      List<ContainerInfo> containers,
-      ContainerManagerV2 containerManager, SCMSafeModeManager manager) {
+             ConfigurationSource conf,
+             List<ContainerInfo> containers,
+             ContainerManager containerManager, SCMSafeModeManager manager) {
     super(manager, ruleName, eventQueue);
     this.containerManager = containerManager;
     safeModeCutoff = conf.getDouble(
