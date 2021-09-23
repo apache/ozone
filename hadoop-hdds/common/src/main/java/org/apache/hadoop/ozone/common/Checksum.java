@@ -139,6 +139,11 @@ public class Checksum {
    */
   public ChecksumData computeChecksum(ByteBuffer data)
       throws OzoneChecksumException {
+    // If type is set to NONE, we do not need to compute the checksums. We also
+    // need to avoid unnecessary conversions.
+    if (checksumType == ChecksumType.NONE) {
+      return new ChecksumData(checksumType, bytesPerChecksum);
+    }
     if (!data.isReadOnly()) {
       data = data.asReadOnlyBuffer();
     }
