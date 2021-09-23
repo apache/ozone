@@ -62,7 +62,7 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   // TODO - the default chunk size is 4MB - is EC defaulting to 1MB or 4MB
   //        stripe width? Should we default this to the chunk size setting?
-  private int stripeSize = 1024 * 1024;
+  private int ecChunkSize = 1024 * 1024;
 
   // TODO - should we have a config for the default, or does it matter if we
   //        always force the client to send rs-3-2-1024k for example?
@@ -74,11 +74,11 @@ public class ECReplicationConfig implements ReplicationConfig {
   }
 
   public ECReplicationConfig(int data, int parity, EcCodec codec,
-      int stripeSize) {
+      int ecChunkSize) {
     this.data = data;
     this.parity = parity;
     this.codec = codec;
-    this.stripeSize = stripeSize;
+    this.ecChunkSize = ecChunkSize;
   }
 
   /**
@@ -113,16 +113,16 @@ public class ECReplicationConfig implements ReplicationConfig {
           "replication config supposed to be positive numbers");
     }
 
-    int stripe = Integer.parseInt((matcher.group(4)));
-    if (stripe <= 0) {
-      throw new IllegalArgumentException("The stripeSize (" + stripe + ") be " +
-          "greater than zero");
+    int chunkSize = Integer.parseInt((matcher.group(4)));
+    if (chunkSize <= 0) {
+      throw new IllegalArgumentException("The ecChunkSize (" + chunkSize +
+          ") be greater than zero");
     }
     if (matcher.group(5) != null) {
       // The "k" modifier is present, so multiple by 1024
-      stripe = stripe * 1024;
+      chunkSize = chunkSize * 1024;
     }
-    stripeSize = stripe;
+    ecChunkSize = chunkSize;
   }
 
   public ECReplicationConfig(
@@ -130,7 +130,7 @@ public class ECReplicationConfig implements ReplicationConfig {
     this.data = ecReplicationConfig.getData();
     this.parity = ecReplicationConfig.getParity();
     this.codec = EcCodec.valueOf(ecReplicationConfig.getCodec().toUpperCase());
-    this.stripeSize = ecReplicationConfig.getStripeSize();
+    this.ecChunkSize = ecReplicationConfig.getEcChunkSize();
   }
 
   @Override
@@ -148,7 +148,7 @@ public class ECReplicationConfig implements ReplicationConfig {
         .setData(data)
         .setParity(parity)
         .setCodec(codec.toString())
-        .setStripeSize(stripeSize)
+        .setEcChunkSize(ecChunkSize)
         .build();
   }
 
@@ -160,8 +160,8 @@ public class ECReplicationConfig implements ReplicationConfig {
     return parity;
   }
 
-  public int getStripeSize() {
-    return stripeSize;
+  public int getEcChunkSize() {
+    return ecChunkSize;
   }
 
   public EcCodec getCodec() {
@@ -178,12 +178,12 @@ public class ECReplicationConfig implements ReplicationConfig {
     }
     ECReplicationConfig that = (ECReplicationConfig) o;
     return data == that.data && parity == that.parity
-        && codec == that.getCodec() && stripeSize == that.getStripeSize();
+        && codec == that.getCodec() && ecChunkSize == that.getEcChunkSize();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(data, parity, codec, stripeSize);
+    return Objects.hash(data, parity, codec, ecChunkSize);
   }
 
 }

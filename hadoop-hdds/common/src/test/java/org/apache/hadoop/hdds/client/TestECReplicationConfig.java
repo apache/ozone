@@ -48,7 +48,7 @@ public class TestECReplicationConfig {
       Assert.assertEquals(e.getValue().getData(), ec.getData());
       Assert.assertEquals(e.getValue().getParity(), ec.getParity());
       Assert.assertEquals(e.getValue().getCodec(), ec.getCodec());
-      Assert.assertEquals(e.getValue().getStripeSize(), ec.getStripeSize());
+      Assert.assertEquals(e.getValue().getEcChunkSize(), ec.getEcChunkSize());
     }
   }
 
@@ -84,7 +84,7 @@ public class TestECReplicationConfig {
     Assert.assertEquals(orig.getData(), recovered.getData());
     Assert.assertEquals(orig.getParity(), recovered.getParity());
     Assert.assertEquals(orig.getCodec(), recovered.getCodec());
-    Assert.assertEquals(orig.getStripeSize(), recovered.getStripeSize());
+    Assert.assertEquals(orig.getEcChunkSize(), recovered.getEcChunkSize());
     Assert.assertTrue(orig.equals(recovered));
   }
 
