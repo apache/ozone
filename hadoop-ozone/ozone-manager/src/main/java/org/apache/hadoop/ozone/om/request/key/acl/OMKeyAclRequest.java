@@ -175,9 +175,10 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         }
         bucketLayout = buckInfo.getBucketLayout();
       } catch (IOException e) {
-        LOG.debug("Failed to get the value for the key: " + buckKey);
+        LOG.error("Failed to get bucket for the key: {}", buckKey);
       }
     } catch (OMException ome) {
+      LOG.error("Invalid Path: " + getPath());
       // Handle exception
     }
     return bucketLayout;

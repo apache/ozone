@@ -143,7 +143,7 @@ public final class OzoneManagerRatisUtils {
    * @throws IOException
    */
   public static OMClientRequest createClientRequest(OMRequest omRequest,
-      OzoneManager ozoneManager) throws IOException {
+      OzoneManager ozoneManager) {
 
     // Handling of exception by createClientRequest(OMRequest, OzoneManger):
     // Either the code will take FSO or non FSO path, both classes has a

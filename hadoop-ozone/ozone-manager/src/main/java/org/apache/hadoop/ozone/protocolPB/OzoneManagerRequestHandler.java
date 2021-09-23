@@ -242,15 +242,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       long transactionLogIndex) {
     OMClientRequest omClientRequest = null;
     OMClientResponse omClientResponse = null;
-    try {
-      omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-      omClientResponse = omClientRequest
-          .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
-              ozoneManagerDoubleBuffer::add);
-    } catch (IOException e) {
-      LOG.debug("Exception: " + e);
-    }
+    omClientRequest =
+        OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
+    omClientResponse = omClientRequest
+        .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
+            ozoneManagerDoubleBuffer::add);
     return omClientResponse;
   }
 
