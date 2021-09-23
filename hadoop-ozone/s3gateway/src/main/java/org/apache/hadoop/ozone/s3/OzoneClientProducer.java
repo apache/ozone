@@ -17,29 +17,17 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-//import javax.annotation.PreDestroy;
-//import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.RequestScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.Context;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.security.UserGroupInformation;
 
-import com.google.common.annotations.VisibleForTesting;
-import static org.apache.hadoop.ozone.s3.exception
-    .S3ErrorTable.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.s3.exception
-    .S3ErrorTable.MALFORMED_HEADER;
-import org.jetbrains.annotations.NotNull;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,19 +42,11 @@ public class OzoneClientProducer {
 
   private OzoneClient client;
 
-  private UserGroupInformation remoteUser = null;
-
   @Inject
   private OzoneConfiguration ozoneConfiguration;
 
   @Inject
-  private Text omService;
-
-  @Inject
   private String omServiceID;
-
-  @Context
-  private ContainerRequestContext context;
 
   @Produces
   public OzoneClient createClient() throws WebApplicationException,
@@ -79,40 +59,18 @@ public class OzoneClientProducer {
       throws WebApplicationException {
     OzoneClient ozoneClient = null;
     try {
-
-      this.remoteUser = UserGroupInformation.getCurrentUser();
       ozoneClient =
           OzoneClientCache.getOzoneClientInstance(omServiceID,
               ozoneConfiguration);
-    } catch (Throwable t) {
+    } catch (Exception e) {
       // For any other critical errors during object creation throw Internal
       // error.
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", t);
+        LOG.debug("Error during Client Creation: ", e);
       }
       throw wrapOS3Exception(INTERNAL_ERROR);
     }
     return ozoneClient;
-  }
-
-  @NotNull
-  @VisibleForTesting
-  OzoneClient createOzoneClient() throws IOException {
-    if (omServiceID == null) {
-      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
-    } else {
-      // As in HA case, we need to pass om service ID.
-      return OzoneClientFactory.getRpcClient(omServiceID,
-          ozoneConfiguration);
-    }
-  }
-
-  // ONLY validate aws access id when needed.
-  private void validateAccessId(String awsAccessId) throws Exception {
-    if (awsAccessId == null || awsAccessId.equals("")) {
-      LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
-      throw wrapOS3Exception(MALFORMED_HEADER);
-    }
   }
 
   public void setOzoneConfiguration(OzoneConfiguration config) {

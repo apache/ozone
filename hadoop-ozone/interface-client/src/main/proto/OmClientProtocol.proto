@@ -185,9 +185,7 @@ message OMRequest {
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
-  optional string                           stringToSign                   = 95;
-  optional string                           signature                      = 96;
-  optional string                           awsAccessId                    = 97;
+  optional S3Authentication                 s3Authentication               = 95;
 }
 
 message OMResponse {
@@ -1345,6 +1343,15 @@ message RevokeS3SecretRequest {
 message UpdateGetS3SecretRequest {
     required string kerberosID = 1;
     required string awsSecret = 2;
+}
+
+/**
+  This will be used by OM to authenicate S3 gateway requests on a per request basis.
+*/
+message S3Authentication {
+    required string stringToSign = 1;
+    required string signature = 2;
+    required string accessId = 3;
 }
 
 /**

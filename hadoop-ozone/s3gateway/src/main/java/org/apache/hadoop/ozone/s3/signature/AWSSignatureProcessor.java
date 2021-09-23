@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.Context;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,8 +43,6 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private static final Logger LOG =
       LoggerFactory.getLogger(AWSSignatureProcessor.class);
 
-  @Context
-  private ContainerRequestContext context;
   private Map<String, String> headerMap;
   private Map<String, String[]> parameterMap;
 
