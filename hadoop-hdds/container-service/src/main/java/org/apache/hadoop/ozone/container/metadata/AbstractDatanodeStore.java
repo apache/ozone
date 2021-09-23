@@ -67,7 +67,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
   private final long containerID;
-  private final ColumnFamilyOptions cfOptions;
   private final DBProfile dbProfile;
   private final boolean openReadOnly;
 
@@ -84,7 +83,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     dbProfile = config.getEnum(HDDS_DB_PROFILE,
         HDDS_DEFAULT_DB_PROFILE);
 
-    cfOptions = buildColumnFamilyOptions(config);
 
     this.dbDef = dbDef;
     this.containerID = containerID;
@@ -94,36 +92,43 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private void start(ConfigurationSource config)
       throws IOException {
-    // Needs to be closed at the end.
+    ColumnFamilyOptions cfOptions = buildColumnFamilyOptions(config);
     DBOptions options = dbProfile.getDBOptions();
-    options.setCreateIfMissing(true);
-    options.setCreateMissingColumnFamilies(true);
-    this.store = DBStoreBuilder.newBuilder(config, dbDef)
-        .setDBOptions(options)
-        .setDefaultCFOptions(cfOptions)
-        .setOpenReadOnly(openReadOnly)
-        .build();
+    try {
+      // Needs to be closed at the end.
+      options.setCreateIfMissing(true);
+      options.setCreateMissingColumnFamilies(true);
+      this.store = DBStoreBuilder.newBuilder(config, dbDef)
+          .setDBOptions(options)
+          .setDefaultCFOptions(cfOptions)
+          .setOpenReadOnly(openReadOnly)
+          .build();
 
-    // Use the DatanodeTable wrapper to disable the table iterator on
-    // existing Table implementations retrieved from the DBDefinition.
-    // See the DatanodeTable's Javadoc for an explanation of why this is
-    // necessary.
-    metadataTable = new DatanodeTable<>(
-        dbDef.getMetadataColumnFamily().getTable(this.store));
-    checkTableStatus(metadataTable, metadataTable.getName());
+      // Use the DatanodeTable wrapper to disable the table iterator on
+      // existing Table implementations retrieved from the DBDefinition.
+      // See the DatanodeTable's Javadoc for an explanation of why this is
+      // necessary.
+      metadataTable = new DatanodeTable<>(
+          dbDef.getMetadataColumnFamily().getTable(this.store));
+      checkTableStatus(metadataTable, metadataTable.getName());
 
-    // The block iterator this class returns will need to use the table
-    // iterator internally, so construct a block data table instance
-    // that does not have the iterator disabled by DatanodeTable.
-    blockDataTableWithIterator =
-        dbDef.getBlockDataColumnFamily().getTable(this.store);
+      // The block iterator this class returns will need to use the table
+      // iterator internally, so construct a block data table instance
+      // that does not have the iterator disabled by DatanodeTable.
+      blockDataTableWithIterator =
+          dbDef.getBlockDataColumnFamily().getTable(this.store);
 
-    blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
-    checkTableStatus(blockDataTable, blockDataTable.getName());
+      blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
+      checkTableStatus(blockDataTable, blockDataTable.getName());
 
-    deletedBlocksTable = new DatanodeTable<>(
-        dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
-    checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
+      deletedBlocksTable = new DatanodeTable<>(
+          dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
+      checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
+    } catch  (Exception ex) {
+      options.close();
+      cfOptions.close();
+      throw ex;
+    }
   }
 
   @Override

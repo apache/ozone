@@ -18,23 +18,21 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import java.io.IOException;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * container cache is a LRUMap that maintains the DB handles.
@@ -45,7 +43,6 @@ public final class ContainerCache extends LRUMap {
   private final Lock lock = new ReentrantLock();
   private static ContainerCache cache;
   private static final float LOAD_FACTOR = 0.75f;
-  private final Striped<Lock> rocksDBLock;
   private static ContainerCacheMetrics metrics;
   /**
    * Constructs a cache that holds DBHandle references.
@@ -53,7 +50,6 @@ public final class ContainerCache extends LRUMap {
   private ContainerCache(int maxSize, int stripes, float loadFactor, boolean
       scanUntilRemovable) {
     super(maxSize, loadFactor, scanUntilRemovable);
-    rocksDBLock = Striped.lazyWeakLock(stripes);
   }
 
   @VisibleForTesting
@@ -136,57 +132,58 @@ public final class ContainerCache extends LRUMap {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");
     ReferenceCountedDB db;
-    Lock containerLock = rocksDBLock.get(containerDBPath);
-    containerLock.lock();
     metrics.incNumDbGetOps();
+    lock.lock();
     try {
+      db = (ReferenceCountedDB) this.get(containerDBPath);
+      if (db != null) {
+        metrics.incNumCacheHits();
+        db.incrementReference();
+        return db;
+      } else {
+        metrics.incNumCacheMisses();
+      }
+    } finally {
+      lock.unlock();
+    }
+
+    try {
+      long start = Time.monotonicNow();
+      DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerID,
+          containerDBPath, schemaVersion, conf, false);
+      db = new ReferenceCountedDB(store, containerDBPath);
+      metrics.incDbOpenLatency(Time.monotonicNow() - start);
       lock.lock();
       try {
-        db = (ReferenceCountedDB) this.get(containerDBPath);
-        if (db != null) {
-          metrics.incNumCacheHits();
-          db.incrementReference();
-          return db;
-        } else {
-          metrics.incNumCacheMisses();
+        // increment the reference before returning the object
+        db.incrementReference();
+        ReferenceCountedDB existingDb =
+            (ReferenceCountedDB) this.putIfAbsent(containerDBPath, db);
+        if (existingDb != null) {
+          db.decrementReference();
+          cleanupDb(db);
+          existingDb.incrementReference();
+          return existingDb;
         }
+        return db;
       } finally {
         lock.unlock();
       }
-
-      try {
-        long start = Time.monotonicNow();
-        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerID,
-            containerDBPath, schemaVersion, conf, false);
-        db = new ReferenceCountedDB(store, containerDBPath);
-        metrics.incDbOpenLatency(Time.monotonicNow() - start);
-      } catch (Exception e) {
-        LOG.error("Error opening DB. Container:{} ContainerPath:{}",
-            containerID, containerDBPath, e);
-        throw e;
-      }
-
+    } catch (Exception e) {
+      LOG.warn("Error opening DB. Container:{} ContainerPath:{}",
+          containerID, containerDBPath, e);
       lock.lock();
       try {
         ReferenceCountedDB currentDB =
             (ReferenceCountedDB) this.get(containerDBPath);
         if (currentDB != null) {
-          // increment the reference before returning the object
           currentDB.incrementReference();
-          // clean the db created in previous step
-          cleanupDb(db);
           return currentDB;
-        } else {
-          // increment the reference before returning the object
-          db.incrementReference();
-          this.put(containerDBPath, db);
-          return db;
         }
       } finally {
         lock.unlock();
       }
-    } finally {
-      containerLock.unlock();
+      throw e;
     }
   }
 
