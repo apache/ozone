@@ -431,14 +431,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public Tenant getTenantInfoForAccessID(String accessID) {
+  public String getTenantForAccessID(String accessID) {
     LOG.info("--- looking up tenant for access ID {}", accessID);
-//    if (inMemoryTenantNameToTenantInfoMap.containsKey(accessID)) {
-//      return inMemoryTenantNameToTenantInfoMap.get(accessID);
-//    } else {
-//      return null;
-//    }
-    return inMemoryTenantNameToTenantInfoMap.getOrDefault(accessID, null);
+    return inMemoryAccessIDToTenantNameMap.getOrDefault(accessID, null);
   }
 
   @Override

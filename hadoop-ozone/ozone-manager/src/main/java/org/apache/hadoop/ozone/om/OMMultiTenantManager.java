@@ -168,9 +168,9 @@ public interface OMMultiTenantManager {
   /**
    * Given an access ID return its corresponding tenant.
    * @param accessID
-   * @return Tenant
+   * @return String tenant name
    */
-  Tenant getTenantInfoForAccessID(String accessID) throws IOException;
+  String getTenantForAccessID(String accessID) throws IOException;
 
   /**
    * Given a user, make him an admin of the corresponding Tenant.
