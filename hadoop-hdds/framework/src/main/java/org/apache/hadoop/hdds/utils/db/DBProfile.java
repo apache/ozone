@@ -19,10 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.conf.StorageUnit;
-import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
 
 import java.math.BigDecimal;
@@ -46,39 +43,14 @@ public enum DBProfile {
 
     @Override
     public ColumnFamilyOptions getColumnFamilyOptions() {
-
-      // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
-      final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
-
-      // Set the Default block size to 16KB
-      final long blockSize = toLong(StorageUnit.KB.toBytes(16));
-
-      // Write Buffer Size -- set to 128 MB
-      final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
-
-      return new ColumnFamilyOptions()
-          .setLevelCompactionDynamicLevelBytes(true)
-          .setWriteBufferSize(writeBufferSize)
-          .setTableFormatConfig(
-              new BlockBasedTableConfig()
-                  .setBlockSize(blockSize)
-                  .setPinL0FilterAndIndexBlocksInCache(true));
+      return new ColumnFamilyOptions();
     }
 
     @Override
     public DBOptions getDBOptions() {
-      final int maxBackgroundCompactions = 4;
-      final int maxBackgroundFlushes = 2;
-      final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
-      final boolean createIfMissing = true;
-      final boolean createMissingColumnFamilies = true;
       return new DBOptions()
-          .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
-          .setMaxBackgroundCompactions(maxBackgroundCompactions)
-          .setMaxBackgroundFlushes(maxBackgroundFlushes)
-          .setBytesPerSync(bytesPerSync)
-          .setCreateIfMissing(createIfMissing)
-          .setCreateMissingColumnFamilies(createMissingColumnFamilies);
+          .setCreateIfMissing(true)
+          .setCreateMissingColumnFamilies(true);
     }
 
 
@@ -91,14 +63,12 @@ public enum DBProfile {
 
     @Override
     public DBOptions getDBOptions() {
-      final long readAheadSize = toLong(StorageUnit.MB.toBytes(4.00));
-      return SSD.getDBOptions().setCompactionReadaheadSize(readAheadSize);
+      return SSD.getDBOptions();
     }
 
     @Override
     public ColumnFamilyOptions getColumnFamilyOptions() {
       ColumnFamilyOptions columnFamilyOptions = SSD.getColumnFamilyOptions();
-      columnFamilyOptions.setCompactionStyle(CompactionStyle.LEVEL);
       return columnFamilyOptions;
     }
 

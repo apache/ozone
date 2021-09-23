@@ -170,7 +170,7 @@ public final class ContainerCache extends LRUMap {
         lock.unlock();
       }
     } catch (Exception e) {
-      LOG.warn("Error opening DB. Container:{} ContainerPath:{}",
+      LOG.warn("Hit exception while opening DB {} {} {}",
           containerID, containerDBPath, e);
       lock.lock();
       try {

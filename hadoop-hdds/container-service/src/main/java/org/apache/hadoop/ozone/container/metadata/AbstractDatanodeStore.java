@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
@@ -33,7 +32,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
 import org.slf4j.Logger;
@@ -45,8 +43,6 @@ import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -218,17 +214,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private synchronized ColumnFamilyOptions buildColumnFamilyOptions(
       ConfigurationSource config) {
-    long cacheSize = (long) config.getStorageSize(
-        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
-        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-
-    BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-    tableConfig
-        .setPinL0FilterAndIndexBlocksInCache(true);
-
-    return dbProfile.getColumnFamilyOptions()
-        .setTableFormatConfig(tableConfig);
+    return dbProfile.getColumnFamilyOptions();
   }
 
   /**

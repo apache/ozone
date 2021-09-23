@@ -18,8 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
-import java.io.IOException;
-
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -30,21 +29,22 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+import java.io.IOException;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.*;
 
 /**
  * Utils functions to help block functions.
  */
 public final class BlockUtils {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerCache.class);
   /** Never constructed. **/
   private BlockUtils() {
 
@@ -117,9 +117,13 @@ public final class BlockUtils {
     Preconditions.checkNotNull(cache);
     Preconditions.checkNotNull(containerData.getDbFile());
     try {
-      return cache.getDB(containerData.getContainerID(), containerData
-          .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
-              containerData.getSchemaVersion(), conf);
+      ReferenceCountedDB db = cache.getDB(containerData.getContainerID(), containerData
+              .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
+          containerData.getSchemaVersion(), conf);
+      if (db == null) {
+        LOG.warn("Got a null DB {}", containerData.getDbFile());
+      }
+      return db;
     } catch (IOException ex) {
       String message = String.format("Error opening DB. Container:%s " +
           "ContainerPath:%s", containerData.getContainerID(), containerData

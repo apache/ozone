@@ -155,7 +155,9 @@ public class RDBStore implements DBStore {
 
   @Override
   public void close() throws IOException {
-
+    for (final ColumnFamilyHandle handle : handleTable.values()) {
+      handle.close();
+    }
     if (this.checkPointManager != null) {
       this.checkPointManager.close();
     }
