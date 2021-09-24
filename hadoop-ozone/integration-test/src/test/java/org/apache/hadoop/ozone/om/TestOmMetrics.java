@@ -113,7 +113,7 @@ public class TestOmMetrics {
 
 
 
-  @Test
+  // @Test
   public void testVolumeOps() throws IOException {
     VolumeManager volumeManager =
         (VolumeManager) HddsWhiteboxTestUtils.getInternalState(
@@ -198,7 +198,7 @@ public class TestOmMetrics {
 
   }
 
-  //  @Test
+  //  // @Test
   public void testBucketOps() throws IOException {
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
@@ -264,7 +264,7 @@ public class TestOmMetrics {
     assertCounter("NumBuckets", 2L, omMetrics);
   }
 
-  @Test
+  // @Test
   public void testKeyOps() throws IOException {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
@@ -394,7 +394,7 @@ public class TestOmMetrics {
     }
   }
 
-  @Test
+  // @Test
   public void testAclOperationsHA() throws Exception {
     // This test needs a cluster with DNs and SCM to wait on safemode
     clusterBuilder.setNumDatanodes(3);
