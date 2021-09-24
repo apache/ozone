@@ -17,12 +17,13 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
-import java.io.IOException;
-import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
  * Handler of scm status command.
@@ -40,9 +41,14 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
 
   @Override
   protected void execute(ScmClient scmClient) throws IOException {
-    List<String> roles = scmClient.getScmRatisRoles();
-    for (String role: roles) {
-      System.out.println(role);
+    try {
+      List<String> roles = scmClient.getScmRatisRoles();
+      for (String role: roles) {
+        System.out.println(role);
+      }
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      throw ex;
     }
   }
 }

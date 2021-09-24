@@ -18,27 +18,12 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import javax.annotation.Nonnull;
-import javax.crypto.Cipher;
-import javax.crypto.CipherInputStream;
-import javax.crypto.CipherOutputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.security.InvalidKeyException;
-import java.security.PrivilegedExceptionAction;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -50,6 +35,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.QuorumInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -117,24 +103,42 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.logging.log4j.util.Strings;
+import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
+import javax.annotation.Nonnull;
+import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.security.InvalidKeyException;
+import java.security.PrivilegedExceptionAction;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
-
-import org.apache.logging.log4j.util.Strings;
-import org.apache.ratis.protocol.ClientId;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone RPC Client Implementation, it connects to OM, SCM and DataNode
@@ -286,6 +290,37 @@ public class RpcClient implements ClientProtocol {
       }
     }
     return roleInfos;
+  }
+
+  //This is the only place to get the OM side quorum info. This call must be
+  // called after check OM HA to ensure HA enabled.
+  @Override
+  public QuorumInfo getQuorumInfo() throws IOException {
+    List<ServiceInfo> serviceList = ozoneManagerClient.getServiceList();
+    for (ServiceInfo serviceInfo: serviceList) {
+      if (serviceInfo.getNodeType().equals(HddsProtos.NodeType.OM) &&
+          serviceInfo.getOmRoleInfo().getServerRole().equalsIgnoreCase(
+          RaftProtos.RaftPeerRole.LEADER.name())) {
+        OMRoleInfo leaderOmRoleInfo = serviceInfo.getOmRoleInfo();
+        Objects.requireNonNull(leaderOmRoleInfo.getGroupId(),
+            "RaftGroupId is null, OM HA cluster not satisfied");
+        Objects.requireNonNull(leaderOmRoleInfo.getPeersList(),
+            "RaftPeers is null, OM HA cluster not satisfied");
+        return new QuorumInfo.Builder().
+            setPeers(leaderOmRoleInfo.getPeersList().stream().
+                map(raftPeerProto -> RaftPeer.newBuilder()
+                    .setId(RaftPeerId.valueOf(raftPeerProto.getId()))
+                    .setAddress(raftPeerProto.getAddress())
+                    .setPriority(raftPeerProto.getPriority())
+                    .build()).collect(Collectors.toList()))
+            .setRaftGroupId(RaftGroupId.valueOf(
+                UUID.fromString(leaderOmRoleInfo.getGroupId())))
+            .setLeaderRaftId(serviceInfo.getOmRoleInfo().getNodeId())
+            .build();
+      }
+    }
+    // this should never happen
+    return null;
   }
 
   @Override

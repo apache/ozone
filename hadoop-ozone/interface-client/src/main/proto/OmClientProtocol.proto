@@ -1179,6 +1179,17 @@ message ServicePort {
 message OMRoleInfo {
     required string nodeId = 1;
     required string serverRole = 2;
+    optional string groupId = 3;
+    repeated RaftPeerProto peers = 4;
+}
+
+message RaftPeerProto {
+  required string id = 1;      // id of the peer
+  required string address = 2; // e.g. address of the RPC server
+  optional uint32 priority = 3; // priority of the peer
+  optional string dataStreamAddress = 4; // address of the data stream server
+  optional string clientAddress = 5; // address of the client RPC server
+  optional string adminAddress = 6; // address of the admin RPC server
 }
 
 message ServiceInfo {

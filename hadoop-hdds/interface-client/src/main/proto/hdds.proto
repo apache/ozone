@@ -240,6 +240,8 @@ message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
     repeated string peerRoles = 3;
+    optional string groupId = 4;
+    repeated RaftPeerProto peers = 5;
 }
 
 message AddScmRequestProto {
@@ -251,6 +253,15 @@ message AddScmRequestProto {
 message AddScmResponseProto {
     required bool success = 1;
     optional string scmId = 2;
+}
+
+message RaftPeerProto {
+    required string id = 1;      // id of the peer
+    required string address = 2; // e.g. address of the RPC server
+    optional uint32 priority = 3; // priority of the peer
+    optional string dataStreamAddress = 4; // address of the data stream server
+    optional string clientAddress = 5; // address of the client RPC server
+    optional string adminAddress = 6; // address of the admin RPC server
 }
 
 enum ReplicationType {

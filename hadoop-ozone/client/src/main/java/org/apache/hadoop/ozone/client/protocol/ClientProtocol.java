@@ -18,16 +18,12 @@
 
 package org.apache.hadoop.ozone.client.protocol;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.ratis.QuorumInfo;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -54,6 +50,11 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+
 /**
  * An implementer of this interface is capable of connecting to Ozone Cluster
  * and perform client operations. The protocol used for communication is
@@ -70,6 +71,13 @@ public interface ClientProtocol {
    * @throws IOException
    */
   List<OMRoleInfo> getOmRoleInfos() throws IOException;
+
+  /**
+   * Gets quorum info, includes RaftGroupId and RaftPeers.
+   * @return the quorum info
+   * @throws IOException the io exception
+   */
+  QuorumInfo getQuorumInfo() throws IOException;
 
   /**
    * Creates a new Volume.

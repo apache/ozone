@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -26,9 +30,11 @@ import java.util.List;
  * contains clusterId and the SCM Id.
  */
 public final class ScmInfo {
-  private String clusterId;
-  private String scmId;
-  private List<String> peerRoles;
+  private final String clusterId;
+  private final String scmId;
+  private final List<String> peerRoles;
+  private final RaftGroupId raftGroupId;
+  private final Collection<RaftPeer> peers;
 
   /**
    * Builder for ScmInfo.
@@ -37,6 +43,8 @@ public final class ScmInfo {
     private String clusterId;
     private String scmId;
     private List<String> peerRoles;
+    private RaftGroupId raftGroupId;
+    private Collection<RaftPeer> peers;
 
     public Builder() {
       peerRoles = new ArrayList<>();
@@ -72,15 +80,28 @@ public final class ScmInfo {
       return this;
     }
 
+    public Builder setRaftGroupId(RaftGroupId gid) {
+      this.raftGroupId = gid;
+      return this;
+    }
+
+    public Builder setPeers(Collection<RaftPeer> raftPeers) {
+      this.peers = raftPeers;
+      return this;
+    }
+
     public ScmInfo build() {
-      return new ScmInfo(clusterId, scmId, peerRoles);
+      return new ScmInfo(clusterId, scmId, peerRoles, raftGroupId, peers);
     }
   }
 
-  private ScmInfo(String clusterId, String scmId, List<String> peerRoles) {
+  private ScmInfo(String clusterId, String scmId, List<String> peerRoles,
+                  RaftGroupId raftGroupId, Collection<RaftPeer> peers) {
     this.clusterId = clusterId;
     this.scmId = scmId;
     this.peerRoles = peerRoles;
+    this.raftGroupId = raftGroupId;
+    this.peers = peers;
   }
 
   /**
@@ -105,5 +126,21 @@ public final class ScmInfo {
    */
   public List<String> getRatisPeerRoles() {
     return peerRoles;
+  }
+
+  /**
+   * Gets raft group id.
+   * @return the raft group id
+   */
+  public RaftGroupId getRaftGroupId() {
+    return raftGroupId;
+  }
+
+  /**
+   * Gets Raft peers.
+   * @return the peers
+   */
+  public Collection<RaftPeer> getPeers() {
+    return peers;
   }
 }

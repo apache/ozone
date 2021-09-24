@@ -80,7 +80,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -591,15 +590,23 @@ public class SCMClientProtocolServer implements
               .setClusterId(scm.getScmStorageConfig().getClusterID())
               .setScmId(scm.getScmStorageConfig().getScmId());
       if (scm.getScmHAManager().getRatisServer() != null) {
+        Preconditions.checkNotNull(scm.getScmHAManager().getRatisServer()
+            .getDivision());
+        Preconditions.checkNotNull(scm.getScmHAManager().getRatisServer()
+            .getDivision().getGroup());
         builder.setRatisPeerRoles(
             scm.getScmHAManager().getRatisServer().getRatisRoles());
+        builder.setRaftGroupId(scm.getScmHAManager().getRatisServer()
+            .getDivision().getGroup().getGroupId());
+        builder.setPeers(scm.getScmHAManager().getRatisServer()
+            .getDivision().getGroup().getPeers());
       } else {
         // In case, there is no ratis, there is no ratis role.
         // This will just print the hostname with ratis port as the default
         // behaviour.
         String adddress = scm.getSCMHANodeDetails().getLocalNodeDetails()
             .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(adddress));
+        builder.setRatisPeerRoles(Collections.singletonList(adddress));
       }
       return builder.build();
     } catch (Exception ex) {

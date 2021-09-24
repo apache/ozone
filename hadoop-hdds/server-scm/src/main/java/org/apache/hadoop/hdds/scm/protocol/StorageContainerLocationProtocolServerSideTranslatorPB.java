@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.ratis.QuorumInfo;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -110,6 +111,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
@@ -601,11 +603,19 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       HddsProtos.GetScmInfoRequestProto req)
       throws IOException {
     ScmInfo scmInfo = impl.getScmInfo();
-    return HddsProtos.GetScmInfoResponseProto.newBuilder()
-        .setClusterId(scmInfo.getClusterId())
+    HddsProtos.GetScmInfoResponseProto.Builder builder =
+        HddsProtos.GetScmInfoResponseProto.newBuilder();
+    builder.setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
-        .addAllPeerRoles(scmInfo.getRatisPeerRoles())
-        .build();
+        .addAllPeerRoles(scmInfo.getRatisPeerRoles());
+    if (scmInfo.getRaftGroupId() != null) {
+      builder.setGroupId(scmInfo.getRaftGroupId().getUuid().toString());
+    }
+    if (scmInfo.getPeers() != null) {
+      builder.addAllPeers(scmInfo.getPeers().stream()
+          .map(QuorumInfo::getProtobuf).collect(Collectors.toList()));
+    }
+    return builder.build();
   }
 
   public InSafeModeResponseProto inSafeMode(

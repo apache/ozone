@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.client;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.ratis.QuorumInfo;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -333,6 +334,11 @@ public interface ScmClient extends Closeable {
    * returns the list of ratis peer roles. Currently only include peer address.
    */
   List<String> getScmRatisRoles() throws IOException;
+
+  /**
+   *  return the ratis quorum info of scm.
+   */
+  QuorumInfo getQuorumInfo() throws IOException;
 
   /**
    * Get usage information of datanode by ipaddress or uuid.
