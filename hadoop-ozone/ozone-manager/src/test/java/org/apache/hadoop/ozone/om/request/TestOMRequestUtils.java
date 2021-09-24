@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -96,9 +97,17 @@ public final class TestOMRequestUtils {
   public static void addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager) throws Exception {
 
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
+  }
+
+  public static void addVolumeAndBucketToDB(String volumeName,
+      String bucketName, OMMetadataManager omMetadataManager,
+      BucketLayout bucketLayout) throws Exception {
+
     addVolumeToDB(volumeName, omMetadataManager);
 
-    addBucketToDB(volumeName, bucketName, omMetadataManager);
+    addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
   }
 
   @SuppressWarnings("parameterNumber")
@@ -429,9 +438,18 @@ public final class TestOMRequestUtils {
   public static void addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager) throws Exception {
 
+    addBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
+  }
+
+  public static void addBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
+      throws Exception {
+
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now()).build();
+            .setBucketName(bucketName).setCreationTime(Time.now())
+            .setBucketLayout(bucketLayout).build();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
