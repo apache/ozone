@@ -359,7 +359,8 @@ public class TestOmMetrics {
   }
 
   @Test
-  public void testAclOperations() throws IOException {
+  public void testAclOperations() throws Exception {
+    startCluster();
     try {
       // Create a volume.
       cluster.getClient().getObjectStore().createVolume("volumeacl");
