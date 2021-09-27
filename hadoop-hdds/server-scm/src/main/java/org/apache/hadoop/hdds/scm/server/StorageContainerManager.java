@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -205,7 +205,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private NodeManager scmNodeManager;
   private PipelineManager pipelineManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private BlockManager scmBlockManager;
   private final SCMStorageConfig scmStorageConfig;
   private NodeDecommissionManager scmDecommissionManager;
@@ -526,7 +526,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       clusterMap = new NetworkTopologyImpl(conf);
     }
-
+    // This needs to be done before initializing Ratis.
+    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -913,6 +914,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.info("Skipping clusterId validation during bootstrap command.  "
               + "ClusterId id {}, SCM id {}", persistedClusterId,
           scmStorageConfig.getScmId());
+
+      // Initialize security if security is enabled later.
+      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+
       return true;
     }
 
@@ -934,6 +939,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 + "is {}", persistedClusterId, fetchedId);
         return false;
       }
+
+      // Initialize security if security is enabled later.
+      initializeSecurityIfNeeded(conf, scmhaNodeDetails, scmStorageConfig);
+
     } else {
       try {
         scmStorageConfig.setClusterId(fetchedId);
@@ -961,6 +970,29 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     }
     return true;
+  }
+
+  /**
+   * Initialize security If Ozone security is enabled and
+   * ScmStorageConfig does not have certificate serial id.
+   * @param conf
+   * @param scmhaNodeDetails
+   * @param scmStorageConfig
+   * @throws IOException
+   */
+  private static void initializeSecurityIfNeeded(OzoneConfiguration conf,
+      SCMHANodeDetails scmhaNodeDetails, SCMStorageConfig scmStorageConfig)
+      throws IOException {
+    // Initialize security if security is enabled later.
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)
+        && scmStorageConfig.getScmCertSerialId() == null) {
+      HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
+          getScmAddress(scmhaNodeDetails, conf), true);
+      scmStorageConfig.forceInitialize();
+      LOG.info("SCM unsecure cluster is converted to secure cluster. " +
+              "Persisted SCM Certificate SerialID {}",
+          scmStorageConfig.getScmCertSerialId());
+    }
   }
 
   /**
@@ -1044,15 +1076,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
 
       // Initialize security if security is enabled later.
-      if (OzoneSecurityUtil.isSecurityEnabled(conf)
-          && scmStorageConfig.getScmCertSerialId() == null) {
-        HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
-            getScmAddress(haDetails, conf), true);
-        scmStorageConfig.forceInitialize();
-        LOG.info("SCM unsecure cluster is converted to secure cluster. " +
-                "Persisted SCM Certificate SerialID {}",
-            scmStorageConfig.getScmCertSerialId());
-      }
+      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig);
 
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
@@ -1262,8 +1286,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
-
-    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap);
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
@@ -1528,7 +1550,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @VisibleForTesting
   @Override
-  public ContainerManagerV2 getContainerManager() {
+  public ContainerManager getContainerManager() {
     return containerManager;
   }
 

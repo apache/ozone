@@ -48,7 +48,7 @@ public class IncrementalContainerReportHandler extends
 
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
-      final ContainerManagerV2 containerManager,
+      final ContainerManager containerManager,
       final SCMContext scmContext) {
     super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;

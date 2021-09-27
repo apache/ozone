@@ -92,6 +92,8 @@ public class KeyValueContainerCheck {
       valid = true;
 
     } catch (IOException e) {
+      LOG.info("Marking Container {} UNHEALTHY as it failed metadata check",
+              containerID);
       handleCorruption(e);
     }
 

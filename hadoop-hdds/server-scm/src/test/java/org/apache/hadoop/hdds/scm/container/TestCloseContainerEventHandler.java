@@ -64,7 +64,7 @@ public class TestCloseContainerEventHandler {
   private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
   private static PipelineManagerImpl pipelineManager;
-  private static ContainerManagerV2 containerManager;
+  private static ContainerManager containerManager;
   private static long size;
   private static File testDir;
   private static EventQueue eventQueue;

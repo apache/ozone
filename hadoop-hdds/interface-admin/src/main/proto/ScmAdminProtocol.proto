@@ -481,6 +481,8 @@ message StartContainerBalancerRequestProto {
   optional int32 idleiterations = 3;
   optional double maxDatanodesRatioToInvolvePerIteration = 4;
   optional int64 maxSizeToMovePerIterationInGB = 5;
+  optional int64 maxSizeEnteringTargetInGB = 6;
+  optional int64 maxSizeLeavingSourceInGB = 7;
 }
 
 message StartContainerBalancerResponseProto {

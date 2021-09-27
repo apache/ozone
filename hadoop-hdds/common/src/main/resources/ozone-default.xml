@@ -145,15 +145,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.upgrade.layout.inline</name>
-    <value>true</value>
-    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>Determines whether to upgrade the DN layout on restart
-      automatically. If set of false, the tool verifies that the current
-      disk format is correct.
-    </description>
-  </property>
-  <property>
     <name>hdds.datanode.dir.du.reserved</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -2397,6 +2388,17 @@
     <description>The server principal used by Ozone Recon server. This is
       typically set to HTTP/_HOST@REALM.TLD The SPNEGO server principal
       begins with the prefix HTTP/ by convention.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.administrators</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      Recon administrator users delimited by a comma.
+      This is the list of users who can access admin only information from recon.
+      Users defined in ozone.administrators will always be able to access all
+      recon information regardless of this setting.
     </description>
   </property>
   <property>
