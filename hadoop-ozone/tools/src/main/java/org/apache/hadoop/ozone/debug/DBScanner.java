@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -85,39 +87,46 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     List<Object> outputs = new ArrayList<>();
     iterator.seekToFirst();
 
-
+    Writer fileWriter = null;
     PrintWriter printWriter = null;
-    if (fileName != null) {
-      FileWriter fileWriter = new FileWriter(fileName);
-      printWriter = new PrintWriter(fileWriter);
-    }
-    while (iterator.isValid()){
-      StringBuilder result = new StringBuilder();
-      if (withKey) {
-        Object key = dbColumnFamilyDefinition.getKeyCodec()
-            .fromPersistedFormat(iterator.key());
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        result.append(gson.toJson(key));
-        result.append(" -> ");
-      }
-      Object o = dbColumnFamilyDefinition.getValueCodec()
-              .fromPersistedFormat(iterator.value());
-      outputs.add(o);
-      Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      result.append(gson.toJson(o));
+    try {
       if (fileName != null) {
-        printWriter.println(result);
-      } else {
-        System.out.println(result.toString());
+        fileWriter = new OutputStreamWriter(
+            new FileOutputStream(fileName), StandardCharsets.UTF_8);
+        printWriter = new PrintWriter(fileWriter);
       }
-      limit--;
-      iterator.next();
-      if (limit == 0) {
-        break;
+      while (iterator.isValid()) {
+        StringBuilder result = new StringBuilder();
+        if (withKey) {
+          Object key = dbColumnFamilyDefinition.getKeyCodec()
+              .fromPersistedFormat(iterator.key());
+          Gson gson = new GsonBuilder().setPrettyPrinting().create();
+          result.append(gson.toJson(key));
+          result.append(" -> ");
+        }
+        Object o = dbColumnFamilyDefinition.getValueCodec()
+            .fromPersistedFormat(iterator.value());
+        outputs.add(o);
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        result.append(gson.toJson(o));
+        if (fileName != null) {
+          printWriter.println(result);
+        } else {
+          System.out.println(result.toString());
+        }
+        limit--;
+        iterator.next();
+        if (limit == 0) {
+          break;
+        }
       }
-    }
-    if (fileName != null) {
-      printWriter.close();
+    } finally {
+      if (printWriter != null) {
+        printWriter.close();
+      }
+      if (fileWriter != null) {
+        fileWriter.close();
+      }
     }
     return outputs;
   }
@@ -140,6 +149,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   public List<Object> getScannedObjects() {
     return scannedObjects;
+  }
+
+  public static void setFileName(String name) {
+    DBScanner.fileName = name;
   }
 
   private static ColumnFamilyHandle getColumnFamilyHandle(
