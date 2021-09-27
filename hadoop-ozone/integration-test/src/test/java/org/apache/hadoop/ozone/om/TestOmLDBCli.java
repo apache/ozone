@@ -38,7 +38,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -120,7 +120,8 @@ public class TestOmLDBCli {
     Assert.assertEquals(5, getKeyNames(dbScanner).size());
 
     // Test dump to file.
-    String outFile = "/tmp/keyTable" + LocalDate.now();
+    String outFile = System.getProperty("java.io.tmpdir") + "keyTable"
+        + LocalDateTime.now();
     BufferedReader bufferedReader = null;
     try {
       DBScanner.setLimit(-1);
