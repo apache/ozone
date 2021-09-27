@@ -126,6 +126,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -165,8 +166,7 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.*;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -293,7 +293,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @SuppressWarnings("checkstyle:methodlength")
   private StorageContainerManager(OzoneConfiguration conf,
                                   SCMConfigurator configurator)
-      throws IOException, AuthenticationException  {
+      throws IOException, AuthenticationException, CertificateException  {
     super(HddsVersionInfo.HDDS_VERSION_INFO);
 
     Objects.requireNonNull(configurator, "configurator cannot not be null");
@@ -637,7 +637,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @throws AuthenticationException - on Failure
    */
   private void initializeCAnSecurityProtocol(OzoneConfiguration conf,
-      SCMConfigurator configurator) throws IOException {
+      SCMConfigurator configurator) throws IOException, CertificateException {
 
     // TODO: Support Certificate Server loading via Class Name loader.
     // So it is easy to use different Certificate Servers if needed.
@@ -751,12 +751,24 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private ContainerTokenSecretManager createContainerTokenSecretManager(
-      OzoneConfiguration conf) {
+      OzoneConfiguration conf) throws IOException, CertificateException {
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
+
+    // Means this is an upgraded cluster and it has no sub-ca,
+    // so SCM Certificate client is not initialized. To make Tokens
+    // work lets ise root CA cert and create SCM Certificate client with
+    // root CA cert.
+    if (scmCertificateClient == null) {
+      Preconditions.checkState(
+          !scmStorageConfig.checkPrimarySCMIdInitialized());
+      scmCertificateClient = new SCMCertificateClient(securityConfig,
+          getScmCertificateServer().getCACertificate()
+              .getSerialNumber().toString(), SCM_ROOT_CA_COMPONENT_NAME);
+    }
     String certId = scmCertificateClient.getCertificate().getSerialNumber()
         .toString();
     return new ContainerTokenSecretManager(securityConfig,
