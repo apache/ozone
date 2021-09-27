@@ -252,6 +252,7 @@ public class TestContainerBalancer {
         });
 
     NodeManager nodeManager = scm.getScmNodeManager();
+    Thread.sleep(500);
     nodeManager.getAllNodes().forEach(datanodeDetails -> {
       try {
         Assert.assertEquals(2,

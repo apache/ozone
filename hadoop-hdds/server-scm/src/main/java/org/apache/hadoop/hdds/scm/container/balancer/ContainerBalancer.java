@@ -185,7 +185,9 @@ public class ContainerBalancer {
     for (int i = 0; i < idleIteration && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
-        stop();
+        if (!isBalancerRunning()) {
+          stop();
+        }
         return;
       }
       doIteration();
@@ -204,13 +206,17 @@ public class ContainerBalancer {
           } catch (InterruptedException e) {
             LOG.info("Container Balancer was interrupted while waiting for" +
                 " next iteration.");
-            stop();
+            if (!isBalancerRunning()) {
+              stop();
+            }
             return;
           }
         }
       }
     }
-    stop();
+    if (!isBalancerRunning()) {
+      stop();
+    }
   }
 
   /**
@@ -276,6 +282,9 @@ public class ContainerBalancer {
 
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
+      if (!isBalancerRunning() || Thread.currentThread().isInterrupted()) {
+        return false;
+      }
       double utilization = datanodeUsageInfo.calculateUtilization();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} with capacity {}, used {}, and " +
@@ -359,13 +368,19 @@ public class ContainerBalancer {
     Set<DatanodeDetails> selectedTargets =
         new HashSet<>(potentialTargets.size());
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
+    IterationResult result;
 
     // match each overUtilized node with a target
     for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
+      if (!balancerRunning || Thread.currentThread().isInterrupted()) {
+        checkIterationResults(selectedTargets);
+        return IterationResult.ITERATION_INTERRUPTED;
+      }
       DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
-      IterationResult result = checkConditionsForBalancing();
+      result = checkConditionsForBalancing();
       if (result != null) {
         LOG.info("Exiting current iteration: {}", result);
+        checkIterationResults(selectedTargets);
         return result;
       }
 
@@ -392,10 +407,15 @@ public class ContainerBalancer {
       Collections.reverse(withinThresholdUtilizedNodes);
 
       for (DatanodeUsageInfo datanodeUsageInfo : withinThresholdUtilizedNodes) {
+        if (!balancerRunning || Thread.currentThread().isInterrupted()) {
+          checkIterationResults(selectedTargets);
+          return IterationResult.ITERATION_INTERRUPTED;
+        }
         DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
-        IterationResult result = checkConditionsForBalancing();
+        result = checkConditionsForBalancing();
         if (result != null) {
           LOG.info("Exiting current iteration: {}", result);
+          checkIterationResults(selectedTargets);
           return result;
         }
 
@@ -419,11 +439,16 @@ public class ContainerBalancer {
     }
 
     // check move results
+    checkIterationResults(selectedTargets);
+    return IterationResult.ITERATION_COMPLETED;
+  }
+
+  private void checkIterationResults(Set<DatanodeDetails> selectedTargets) {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     for (Map.Entry<ContainerMoveSelection,
-            CompletableFuture<ReplicationManager.MoveResult>>
-        futureEntry : moveSelectionToFutureMap.entrySet()) {
+         CompletableFuture<ReplicationManager.MoveResult>>
+         futureEntry : moveSelectionToFutureMap.entrySet()) {
       ContainerMoveSelection moveSelection = futureEntry.getKey();
       CompletableFuture<ReplicationManager.MoveResult> future =
           futureEntry.getValue();
@@ -435,7 +460,6 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-//            this.countDatanodesInvolvedPerIteration += 2;
             metrics.incrementMovedContainersNum(1);
             LOG.info("Move completed for container {} to target {}",
                 container.containerID(),
@@ -447,8 +471,9 @@ public class ContainerBalancer {
           }
         }
       } catch (InterruptedException e) {
-        LOG.warn("Container move for container {} was interrupted.",
-            moveSelection.getContainerID(), e);
+        LOG.warn("Current balancing thread was interrupted while checking " +
+                "move result for container {} to target datanode {}",
+            moveSelection.getContainerID(), moveSelection.getTargetNode(), e);
         Thread.currentThread().interrupt();
       } catch (ExecutionException e) {
         LOG.warn("Container move for container {} completed exceptionally.",
@@ -465,7 +490,6 @@ public class ContainerBalancer {
         countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
     metrics.incrementDataSizeBalancedGB(
         sizeMovedPerIteration / (double) OzoneConsts.GB);
-    return IterationResult.ITERATION_COMPLETED;
   }
 
   /**
@@ -739,7 +763,7 @@ public class ContainerBalancer {
       balancerRunning = false;
       if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
         currentBalancingThread.interrupt();
-        currentBalancingThread.join(100);
+        currentBalancingThread.join(0);
       }
       // allow garbage collector to collect balancing thread
       currentBalancingThread = null;
@@ -849,6 +873,7 @@ public class ContainerBalancer {
   enum IterationResult {
     ITERATION_COMPLETED,
     MAX_DATANODES_TO_INVOLVE_REACHED,
-    MAX_SIZE_TO_MOVE_REACHED
+    MAX_SIZE_TO_MOVE_REACHED,
+    ITERATION_INTERRUPTED
   }
 }
