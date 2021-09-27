@@ -312,13 +312,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @return Table.
    */
-  //Table<String, OmKeyInfo> getOpenKeyTable();
-
-  /**
-   * Returns the OpenFileTable.
-   *
-   * @return FileTable.
-   */
   Table<String, OmKeyInfo> getOpenKeyTable(BucketLayout buckLayout);
 
   /**

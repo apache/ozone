@@ -464,8 +464,8 @@ public final class OMFileRequest {
       keyInfoOptional = Optional.of(omFileInfo);
     }
 
-    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            new CacheKey<>(dbOpenFileName),
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .addCacheEntry(new CacheKey<>(dbOpenFileName),
             new CacheValue<>(keyInfoOptional, trxnLogIndex));
   }
 
@@ -512,7 +512,7 @@ public final class OMFileRequest {
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             openKeySessionID);
 
-    omMetadataMgr.getOpenKeyTable(getBucketLayout())
+    omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
         .putWithBatch(batchOp, dbOpenFileKey, omFileInfo);
   }
 
@@ -534,7 +534,7 @@ public final class OMFileRequest {
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             uploadID);
 
-    omMetadataMgr.getOpenKeyTable(getBucketLayout())
+    omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
         .putWithBatch(batchOp, multipartFileKey, omFileInfo);
 
     return multipartFileKey;
@@ -581,7 +581,8 @@ public final class OMFileRequest {
     OmKeyInfo dbOmKeyInfo;
     if (openFileTable) {
       dbOmKeyInfo =
-          omMetadataMgr.getOpenKeyTable(getBucketLayout()).get(dbOpenFileKey);
+          omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+              .get(dbOpenFileKey);
     } else {
       dbOmKeyInfo = omMetadataMgr.getKeyTable().get(dbOpenFileKey);
     }
@@ -973,6 +974,6 @@ public final class OMFileRequest {
   }
 
   public static BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

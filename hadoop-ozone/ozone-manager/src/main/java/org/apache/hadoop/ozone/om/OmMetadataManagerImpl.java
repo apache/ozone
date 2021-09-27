@@ -305,10 +305,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table getOpenKeyTable(BucketLayout bucketLayout) {
-    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-      return openKeyTable;
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      return openFileTable;
     }
-    return openFileTable;
+    return openKeyTable;
   }
 
   @Override

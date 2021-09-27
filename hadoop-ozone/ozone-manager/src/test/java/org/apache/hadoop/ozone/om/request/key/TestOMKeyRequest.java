@@ -222,7 +222,7 @@ public class TestOMKeyRequest {
     return omKeyInfo;
   }
 
-  protected BucketLayout getBucketLayout() {
+  public BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
 

@@ -1495,6 +1495,6 @@ public class TestKeyManagerImpl {
   }
 
   public BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+    return BucketLayout.LEGACY;
   }
 }

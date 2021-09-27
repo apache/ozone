@@ -269,7 +269,7 @@ public class TestS3MultipartRequest {
     return new S3MultipartUploadAbortRequest(omRequest);
   }
 
-  protected BucketLayout getBucketLayout() {
+  public BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
 
