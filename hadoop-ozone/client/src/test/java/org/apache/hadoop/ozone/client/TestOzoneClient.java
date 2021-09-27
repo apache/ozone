@@ -193,15 +193,18 @@ public class TestOzoneClient {
     ConfigurationSource config = new InMemoryConfiguration();
     int data = 3;
     int parity = 2;
+    int chunkSize = 1024;
     createNewClient(config, new MultiNodePipelineBlockAllocator(data + parity));
-    String value = new String(new byte[1024], UTF_8);
+    String value = new String(new byte[chunkSize], UTF_8);
     OzoneBucket bucket = getOzoneBucket();
 
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
       try (OzoneOutputStream out = bucket
           .createKey(keyName, value.getBytes(UTF_8).length,
-              new ECReplicationConfig(data, parity), new HashMap<>())) {
+              new ECReplicationConfig(data, parity,
+                  ECReplicationConfig.EcCodec.RS, chunkSize),
+              new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
         out.write(value.getBytes(UTF_8));
       }

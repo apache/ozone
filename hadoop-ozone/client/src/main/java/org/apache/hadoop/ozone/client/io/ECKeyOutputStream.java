@@ -26,7 +26,6 @@ import java.util.List;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -60,7 +59,7 @@ import org.slf4j.LoggerFactory;
 public class ECKeyOutputStream extends KeyOutputStream {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
-  private int ecChunkSize = 1024;
+  private int ecChunkSize;
   private final int numDataBlks;
   private final int numParityBlks;
   private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
@@ -109,17 +108,17 @@ public class ECKeyOutputStream extends KeyOutputStream {
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public ECKeyOutputStream(OzoneClientConfig config, OpenKeySession handler,
       XceiverClientFactory xceiverClientManager, OzoneManagerProtocol omClient,
-      int chunkSize, String requestId, ReplicationConfig replicationConfig,
+      int chunkSize, String requestId, ECReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion) {
     this.config = config;
     // For EC, cell/chunk size and buffer size can be same for now.
+    ecChunkSize = replicationConfig.getEcChunkSize();
     this.config.setStreamBufferMaxSize(ecChunkSize);
     this.config.setStreamBufferFlushSize(ecChunkSize);
     this.config.setStreamBufferSize(ecChunkSize);
-    assert replicationConfig instanceof ECReplicationConfig;
-    this.numDataBlks = ((ECReplicationConfig) replicationConfig).getData();
-    this.numParityBlks = ((ECReplicationConfig) replicationConfig).getParity();
+    this.numDataBlks = replicationConfig.getData();
+    this.numParityBlks = replicationConfig.getParity();
     ecChunkBufferCache =
         new ECChunkBuffers(ecChunkSize, numDataBlks, numParityBlks);
     OmKeyInfo info = handler.getKeyInfo();
@@ -576,7 +575,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     private boolean isMultipartKey;
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
-    private ReplicationConfig replicationConfig;
+    private ECReplicationConfig replicationConfig;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -629,7 +628,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     public ECKeyOutputStream.Builder setReplicationConfig(
-        ReplicationConfig replConfig) {
+        ECReplicationConfig replConfig) {
       this.replicationConfig = replConfig;
       return this;
     }
