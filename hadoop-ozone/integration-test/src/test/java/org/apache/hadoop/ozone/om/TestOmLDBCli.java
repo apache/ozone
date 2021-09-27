@@ -120,7 +120,8 @@ public class TestOmLDBCli {
     Assert.assertEquals(5, getKeyNames(dbScanner).size());
 
     // Test dump to file.
-    String outFile = System.getProperty("java.io.tmpdir") + "keyTable"
+    File tempFile = folder.newFolder();
+    String outFile = tempFile.getAbsolutePath() + "keyTable"
         + LocalDateTime.now();
     BufferedReader bufferedReader = null;
     try {
