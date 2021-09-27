@@ -267,11 +267,14 @@ public class RDBStore implements DBStore {
 
   @Override
   public void flushDB() throws IOException {
-    try (FlushOptions flushOptions = new FlushOptions()) {
+    FlushOptions flushOptions = new FlushOptions();
+    try  {
       flushOptions.setWaitForFlush(true);
       db.flush(flushOptions);
     } catch (RocksDBException e) {
       throw toIOException("Unable to Flush RocksDB data", e);
+    } finally {
+      flushOptions.close();
     }
   }
 
@@ -293,7 +296,7 @@ public class RDBStore implements DBStore {
     if (flush) {
       this.flushDB();
     }
-    return checkPointManager.createCheckpoint(checkpointsParentDir);
+    return null;
   }
 
   @Override
@@ -328,10 +331,10 @@ public class RDBStore implements DBStore {
       throws SequenceNumberNotFoundException {
 
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
-    try {
-      TransactionLogIterator transactionLogIterator =
+    TransactionLogIterator transactionLogIterator = null;
+    try{
+      transactionLogIterator =
           db.getUpdatesSince(sequenceNumber);
-
       // Only the first record needs to be checked if its seq number <
       // ( 1 + passed_in_sequence_number). For example, if seqNumber passed
       // in is 100, then we can read from the WAL ONLY if the first sequence
@@ -364,6 +367,10 @@ public class RDBStore implements DBStore {
     } catch (RocksDBException e) {
       LOG.error("Unable to get delta updates since sequenceNumber {} ",
           sequenceNumber, e);
+    } finally {
+      if (transactionLogIterator != null) {
+        transactionLogIterator.close();
+      }
     }
     return dbUpdatesWrapper;
   }

@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -33,19 +30,19 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-
-import com.google.common.base.Preconditions;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.*;
 
 /**
  * This class is for performing block related operations on the KeyValue
@@ -119,8 +116,9 @@ public class BlockManagerImpl implements BlockManager {
         "cannot be negative");
     // We are not locking the key manager since LevelDb serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
-    try(ReferenceCountedDB db = BlockUtils.
-        getDB(container.getContainerData(), config)) {
+    ReferenceCountedDB db = BlockUtils.
+        getDB(container.getContainerData(), config);
+    try {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -144,8 +142,9 @@ public class BlockManagerImpl implements BlockManager {
         return data.getSize();
       }
       // update the blockData as well as BlockCommitSequenceId here
-      try (BatchOperation batch = db.getStore().getBatchHandler()
-          .initBatchOperation()) {
+      BatchOperation batch = db.getStore().getBatchHandler()
+          .initBatchOperation();
+      try {
         db.getStore().getBlockDataTable().putWithBatch(
             batch, Long.toString(data.getLocalID()), data);
         if (bcsId != 0) {
@@ -171,6 +170,8 @@ public class BlockManagerImpl implements BlockManager {
         }
 
         db.getStore().getBatchHandler().commitBatchOperation(batch);
+      } finally {
+        batch.close();
       }
 
       if (bcsId != 0) {
@@ -186,6 +187,8 @@ public class BlockManagerImpl implements BlockManager {
                 + bcsId + " chunk size " + data.getChunks().size());
       }
       return data.getSize();
+    } finally {
+      db.close();
     }
   }
 
@@ -215,8 +218,8 @@ public class BlockManagerImpl implements BlockManager {
               + container.getContainerData().getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
     }
-
-    try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    ReferenceCountedDB db = BlockUtils.getDB(containerData, config);
+    try {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -228,6 +231,8 @@ public class BlockManagerImpl implements BlockManager {
                 + id + " for block " + blockID + ".", BCSID_MISMATCH);
       }
       return blockData;
+    } finally {
+      db.close();
     }
   }
 
@@ -244,12 +249,15 @@ public class BlockManagerImpl implements BlockManager {
       throws IOException {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    ReferenceCountedDB db = BlockUtils.getDB(containerData, config);
+    try {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
       BlockData blockData = getBlockByID(db, blockID);
       return blockData.getSize();
+    } finally {
+      db.close();
     }
   }
 
@@ -276,7 +284,8 @@ public class BlockManagerImpl implements BlockManager {
 
     KeyValueContainerData cData = (KeyValueContainerData) container
         .getContainerData();
-    try(ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
+    ReferenceCountedDB db = BlockUtils.getDB(cData, config);
+    try {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -304,6 +313,8 @@ public class BlockManagerImpl implements BlockManager {
 
       // Decrement block count here
       container.getContainerData().decrKeyCount();
+    } finally {
+      db.close();
     }
   }
 
@@ -343,14 +354,6 @@ public class BlockManagerImpl implements BlockManager {
     } finally {
       container.readUnlock();
     }
-  }
-
-  /**
-   * Shutdown KeyValueContainerManager.
-   */
-  @Override
-  public void shutdown() {
-    BlockUtils.shutdownCache(ContainerCache.getInstance(config));
   }
 
   private BlockData getBlockByID(ReferenceCountedDB db, BlockID blockID)

@@ -91,9 +91,4 @@ public interface BlockManager {
       throws IOException;
 
   long getDefaultReadBufferCapacity();
-
-  /**
-   * Shutdown ContainerManager.
-   */
-  void shutdown();
 }

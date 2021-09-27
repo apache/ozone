@@ -32,20 +32,19 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
@@ -229,10 +228,10 @@ public class KeyValueContainerCheck {
     onDiskContainerData.setDbFile(dbFile);
 
     ChunkLayOutVersion layout = onDiskContainerData.getLayOutVersion();
-
-    try(ReferenceCountedDB db =
-            BlockUtils.getDB(onDiskContainerData, checkConfig);
-        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
+    ReferenceCountedDB db =
+        BlockUtils.getDB(onDiskContainerData, checkConfig);
+    BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator();
+    try {
 
       while(kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
@@ -258,6 +257,8 @@ public class KeyValueContainerCheck {
           }
         }
       }
+    } finally {
+      db.close();
     }
   }
 

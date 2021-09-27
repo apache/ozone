@@ -146,15 +146,6 @@ public final class BlockUtils {
   }
 
   /**
-   * Shutdown all DB Handles.
-   *
-   * @param cache - Cache for DB Handles.
-   */
-  public static void shutdownCache(ContainerCache cache)  {
-    cache.shutdownCache();
-  }
-
-  /**
    * Add a DB handler into cache.
    *
    * @param db - DB handler.

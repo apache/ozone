@@ -18,12 +18,6 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -32,8 +26,14 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
-import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
@@ -98,8 +98,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>();
       //fill cache
-      try(TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
-              iterator()) {
+      TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
+          iterator();
+      try {
 
         while (tableIterator.hasNext()) {
           KeyValue< KEY, VALUE > kv = tableIterator.next();
@@ -110,6 +111,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           cache.loadInitial(new CacheKey<>(kv.getKey()),
               new CacheValue<>(Optional.of(kv.getValue()), EPOCH_DEFAULT));
         }
+      } finally {
+        tableIterator.close();
       }
     } else {
       cache = new PartialTableCache<>();

@@ -17,6 +17,19 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.compress.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -27,30 +40,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.utils.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-
-import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar.gz)
@@ -106,99 +100,8 @@ public class DBCheckpointServlet extends HttpServlet {
    */
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) {
-
-    LOG.info("Received request to obtain DB checkpoint snapshot");
-    if (dbStore == null) {
-      LOG.error(
-          "Unable to process metadata snapshot request. DB Store is null");
-      response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-      return;
-    }
-
-    // Check ACL for dbCheckpoint only when global Ozone ACL is enable
-    if (aclEnabled) {
-      final java.security.Principal userPrincipal = request.getUserPrincipal();
-      if (userPrincipal == null) {
-        final String remoteUser = request.getRemoteUser();
-        LOG.error("Permission denied: Unauthorized access to /dbCheckpoint,"
-                + " no user principal found. Current login user is {}.",
-            remoteUser != null ? "'" + remoteUser + "'" : "UNKNOWN");
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        return;
-      } else {
-        final String userPrincipalName = userPrincipal.getName();
-        UserGroupInformation ugi =
-            UserGroupInformation.createRemoteUser(userPrincipalName);
-        if (!hasPermission(ugi)) {
-          LOG.error("Permission denied: User principal '{}' does not have"
-                  + " access to /dbCheckpoint.\nThis can happen when Ozone"
-                  + " Manager is started with a different user.\n"
-                  + " Please append '{}' to OM 'ozone.administrators'"
-                  + " config and restart OM to grant current"
-                  + " user access to this endpoint.",
-              userPrincipalName, userPrincipalName);
-          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-          return;
-        }
-        LOG.debug("Granted user principal '{}' access to /dbCheckpoint.",
-            userPrincipalName);
-      }
-    }
-
-    DBCheckpoint checkpoint = null;
-    try {
-
-      boolean flush = false;
-      String flushParam =
-          request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
-      if (StringUtils.isNotEmpty(flushParam)) {
-        flush = Boolean.valueOf(flushParam);
-      }
-
-      checkpoint = dbStore.getCheckpoint(flush);
-      if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
-        LOG.error("Unable to process metadata snapshot request. " +
-            "Checkpoint request returned null.");
-        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-        return;
-      }
-      dbMetrics.setLastCheckpointCreationTimeTaken(
-          checkpoint.checkpointCreationTimeTaken());
-
-      Path file = checkpoint.getCheckpointLocation().getFileName();
-      if (file == null) {
-        return;
-      }
-      response.setContentType("application/x-tgz");
-      response.setHeader("Content-Disposition",
-          "attachment; filename=\"" +
-               file.toString() + ".tgz\"");
-
-      Instant start = Instant.now();
-      writeDBCheckpointToStream(checkpoint,
-          response.getOutputStream());
-      Instant end = Instant.now();
-
-      long duration = Duration.between(start, end).toMillis();
-      LOG.info("Time taken to write the checkpoint to response output " +
-          "stream: {} milliseconds", duration);
-      dbMetrics.setLastCheckpointStreamingTimeTaken(duration);
-      dbMetrics.incNumCheckpoints();
-    } catch (Exception e) {
-      LOG.error(
-          "Unable to process metadata snapshot request. ", e);
-      response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-      dbMetrics.incNumCheckpointFails();
-    } finally {
-      if (checkpoint != null) {
-        try {
-          checkpoint.cleanupCheckpoint();
-        } catch (IOException e) {
-          LOG.error("Error trying to clean checkpoint at {} .",
-              checkpoint.getCheckpointLocation().toString());
-        }
-      }
-    }
+    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+    return;
   }
 
   /**

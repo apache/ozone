@@ -18,28 +18,19 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.UUID;
-import java.util.LinkedList;
-import java.util.Objects;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
+import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -48,6 +39,7 @@ import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletio
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -56,18 +48,23 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-
-import com.google.common.collect.Lists;
-
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
-
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 
 /**
  * A per-datanode container block deleting service takes in charge
@@ -348,8 +345,9 @@ public class BlockDeletingService extends BackgroundService {
         }
 
         // Once blocks are deleted... remove the blockID from blockDataTable.
-        try(BatchOperation batch = meta.getStore().getBatchHandler()
-            .initBatchOperation()) {
+        BatchOperation batch = meta.getStore().getBatchHandler()
+            .initBatchOperation();
+        try {
           for (String entry : succeedBlocks) {
             blockDataTable.deleteWithBatch(batch, entry);
           }
@@ -360,6 +358,8 @@ public class BlockDeletingService extends BackgroundService {
           // in-memory container status.
           containerData.decrPendingDeletionBlocks(deleteBlockCount);
           containerData.decrKeyCount(deleteBlockCount);
+        } finally {
+          batch.close();
         }
 
         if (!succeedBlocks.isEmpty()) {
@@ -423,8 +423,9 @@ public class BlockDeletingService extends BackgroundService {
 
         // Once blocks are deleted... remove the blockID from blockDataTable
         // and also remove the transactions from txnTable.
-        try(BatchOperation batch = meta.getStore().getBatchHandler()
-            .initBatchOperation()) {
+        BatchOperation batch = meta.getStore().getBatchHandler()
+            .initBatchOperation();
+        try {
           for (DeletedBlocksTransaction delTx : delBlocks) {
             deleteTxns.deleteWithBatch(batch, delTx.getTxID());
             for (Long blk : delTx.getLocalIDList()) {
@@ -439,6 +440,8 @@ public class BlockDeletingService extends BackgroundService {
           // in-memory container status.
           containerData.decrPendingDeletionBlocks(totalBlocks);
           containerData.decrKeyCount(totalBlocks);
+        } finally {
+          batch.close();
         }
 
         LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",
