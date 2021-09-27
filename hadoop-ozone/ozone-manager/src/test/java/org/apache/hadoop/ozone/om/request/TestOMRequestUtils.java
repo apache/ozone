@@ -962,11 +962,11 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenFileName(
               omKeyInfo.getParentObjectID(), fileName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable(getBucketLayout())
+        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
             .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable(getBucketLayout())
+      omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
           .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzonePathKey(

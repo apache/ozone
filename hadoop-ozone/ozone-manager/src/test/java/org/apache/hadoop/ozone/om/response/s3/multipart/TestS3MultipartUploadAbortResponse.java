@@ -72,7 +72,8 @@ public class TestS3MultipartUploadAbortResponse
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     Assert.assertNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
+        omMetadataManager.getOpenKeyTable(getBucketLayout())
+            .get(multipartOpenKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
