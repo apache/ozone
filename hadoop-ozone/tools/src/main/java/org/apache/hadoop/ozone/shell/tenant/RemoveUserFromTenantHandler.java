@@ -15,25 +15,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
+package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.ozone.shell.Handler;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.volume.VolumeUri;
 import picocli.CommandLine;
 
 /**
- * Base class for tenant command handlers.
+ * ozone s3 user delete.
  */
-// TODO: VolumeHandler
-public abstract class TenantHandler extends Handler {
-
-  @CommandLine.Mixin
-  private VolumeUri address;
+@CommandLine.Command(name = "delete",
+    description = "Delete a tenant user")
+public class TenantUserDeleteHandler extends TenantHandler {
 
   @Override
-  protected OzoneAddress getAddress() {
-    return address.getValue();
+  protected void execute(OzoneClient client, OzoneAddress address) {
+    out().println("Not Implemented.");
   }
-
 }

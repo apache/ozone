@@ -859,21 +859,4 @@ public class TestOzoneShellHA {
     objectStore.deleteVolume("vol4");
   }
 
-  /**
-   * Test ozone tenant commands.
-   */
-  @Test
-  public void testOzoneTenant() {
-    // TODO: tenant subcommand will be moved from s3 to admin later.
-
-    // Test create tenant
-    execute(s3Shell, new String[] {
-        "tenant", "create", "finance",
-        "--om-service-id=" + omServiceId});
-
-    // Test assign user
-    execute(s3Shell, new String[] {
-        "user", "assign", "bob@EXAMPLE.COM", "--tenant=finance",
-        "--om-service-id=" + omServiceId});
-  }
 }

@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
+package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -27,11 +27,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ozone s3 tenant create.
+ * ozone tenant create.
  */
 @CommandLine.Command(name = "create",
     description = "Create one or more tenants")
-public class TenantCreateHandler extends S3Handler {
+public class TenantCreateHandler extends TenantHandler {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;

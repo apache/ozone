@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
+package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -33,11 +33,11 @@ import java.util.List;
 import static org.apache.hadoop.ozone.OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
 
 /**
- * ozone s3 user assign.
+ * ozone tenant user assign.
  */
 @CommandLine.Command(name = "assign",
     description = "Assign user to tenant")
-public class AssignUserToTenantHandler extends S3Handler {
+public class AssignUserToTenantHandler extends TenantHandler {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;

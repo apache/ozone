@@ -15,21 +15,40 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
+package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
+import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
+import java.io.IOException;
+
 /**
- * ozone s3 user delete.
+ * Base class for tenant command handlers.
  */
-@CommandLine.Command(name = "delete",
-    description = "Delete a tenant user")
-public class TenantUserDeleteHandler extends S3Handler {
+public abstract class TenantHandler extends Handler {
+
+  @CommandLine.Option(names = {"--om-service-id"},
+      required = false,
+      description = "Service ID is required when OM is running in HA" +
+          " cluster")
+  private String omServiceID;
+
+  public String getOmServiceID() {
+    return omServiceID;
+  }
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    out().println("Not Implemented.");
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress();
   }
+
+  @Override
+  protected OzoneClient createClient(OzoneAddress address)
+      throws IOException, OzoneClientException {
+    return address.createClientForS3Commands(getConf(), omServiceID);
+  }
+
 }
