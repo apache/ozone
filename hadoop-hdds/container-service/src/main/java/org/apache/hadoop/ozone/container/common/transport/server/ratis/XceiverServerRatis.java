@@ -265,7 +265,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // Disable the pre vote feature in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        conf.getObject(DatanodeRatisServerConfig.class).isPreVoteEnabled());
 
     // Set the ratis storage directory
     Collection<String> storageDirPaths =

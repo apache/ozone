@@ -139,4 +139,20 @@ public class DatanodeRatisServerConfig {
   public void setLeaderNumPendingRequests(boolean delete) {
     this.shouldDeleteRatisLogDirectory = delete;
   }
+
+  @Config(key = "leaderelection.pre-vote",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {OZONE, DATANODE, RATIS},
+      description = "Flag to enable/disable ratis election pre-vote."
+  )
+  private boolean preVoteEnabled;
+
+  public boolean isPreVoteEnabled() {
+    return preVoteEnabled;
+  }
+
+  public void setPreVote(boolean preVote) {
+    this.preVoteEnabled = preVote;
+  }
 }
