@@ -76,6 +76,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
  */
 @Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class ContainerEndpoint {
 
   @Inject

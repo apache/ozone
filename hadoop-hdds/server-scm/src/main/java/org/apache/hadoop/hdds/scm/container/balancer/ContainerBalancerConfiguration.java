@@ -107,13 +107,17 @@ public final class ContainerBalancerConfiguration {
 
   /**
    * Create configuration with default values.
+   *
+   * @param ozoneConfiguration Ozone configuration
    */
-  public ContainerBalancerConfiguration(OzoneConfiguration ozoneConfiguration) {
+  public ContainerBalancerConfiguration(
+      OzoneConfiguration ozoneConfiguration) {
     Preconditions.checkNotNull(ozoneConfiguration,
         "OzoneConfiguration should not be null.");
     this.ozoneConfiguration = ozoneConfiguration;
+
     // balancing interval should be greater than DUFactory refresh period
-    duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
+    duConf = this.ozoneConfiguration.getObject(DUFactory.Conf.class);
     balancingInterval = duConf.getRefreshPeriod().toMillis() +
         Duration.ofMinutes(10).toMillis();
   }
@@ -275,12 +279,12 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the {@link OzoneConfiguration} with which this
-   * {@link ContainerBalancerConfiguration} was created.
-   * @return {@link OzoneConfiguration} configuration
+   * Gets the {@link OzoneConfiguration} using which this configuration was
+   * constructed.
+   * @return the {@link OzoneConfiguration} being used by this configuration
    */
   public OzoneConfiguration getOzoneConfiguration() {
-    return ozoneConfiguration;
+    return this.ozoneConfiguration;
   }
 
   @Override

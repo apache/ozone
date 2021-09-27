@@ -370,8 +370,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               createKeyRequest.getKeyArgs().getKeyName());
       break;
     case FAILURE:
-      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +
-          "Exception:{}", createKeyRequest.getKeyArgs().getVolumeName(),
+      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key:{}. ",
+              createKeyRequest.getKeyArgs().getVolumeName(),
               createKeyRequest.getKeyArgs().getBucketName(),
               createKeyRequest.getKeyArgs().getKeyName(), exception);
       break;

@@ -127,6 +127,9 @@ public class ContainerSet {
       if (c.getContainerData().getVolume().isFailed()) {
         try {
           c.markContainerUnhealthy();
+          LOG.info("Marking Container {} UNHEALTHY as the Volume {} " +
+              "has failed", c.getContainerData().getContainerID(),
+              c.getContainerData().getVolume());
         } catch (StorageContainerException e) {
           LOG.error("Failed to move container {} to UNHEALTHY state in "
                   + "volume {}", c.getContainerData().getContainerID(),

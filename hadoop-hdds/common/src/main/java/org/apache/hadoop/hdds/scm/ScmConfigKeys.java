@@ -454,11 +454,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
 
-  public static final String HDDS_DATANODE_UPGRADE_LAYOUT_INLINE =
-      "hdds.datanode.upgrade.layout.inline";
-  public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
-      true;
-
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";
   public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =

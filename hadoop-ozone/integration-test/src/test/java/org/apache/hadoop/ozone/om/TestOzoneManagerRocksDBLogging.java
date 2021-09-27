@@ -53,7 +53,7 @@ public class TestOzoneManagerRocksDBLogging {
     dbConf = conf.getObject(RocksDBConfiguration.class);
     enableRocksDbLogging(false);
     cluster =  MiniOzoneCluster.newBuilder(conf)
-        .build();
+        .withoutDatanodes().build();
     cluster.waitForClusterToBeReady();
   }
 

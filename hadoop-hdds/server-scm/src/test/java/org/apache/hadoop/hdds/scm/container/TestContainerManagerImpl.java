@@ -50,7 +50,7 @@ public class TestContainerManagerImpl {
 
   private File testDir;
   private DBStore dbStore;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private SCMHAManager scmhaManager;
   private SequenceIdGenerator sequenceIdGen;
 

@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.slf4j.Logger;
@@ -47,11 +47,11 @@ public class WritableRatisContainerProvider
   private final ConfigurationSource conf;
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
 
   public WritableRatisContainerProvider(ConfigurationSource conf,
       PipelineManager pipelineManager,
-      ContainerManagerV2 containerManager,
+      ContainerManager containerManager,
       PipelineChoosePolicy pipelineChoosePolicy) {
     this.conf = conf;
     this.pipelineManager = pipelineManager;
