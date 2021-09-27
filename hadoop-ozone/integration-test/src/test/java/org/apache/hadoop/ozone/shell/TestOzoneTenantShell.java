@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.shell;
 import com.google.common.base.Strings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;

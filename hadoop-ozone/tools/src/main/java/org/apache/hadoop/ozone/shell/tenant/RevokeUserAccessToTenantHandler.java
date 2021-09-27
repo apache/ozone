@@ -22,11 +22,11 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 /**
- * ozone s3 user delete.
+ * ozone tenant user revoke.
  */
-@CommandLine.Command(name = "delete",
-    description = "Delete a tenant user")
-public class TenantUserDeleteHandler extends TenantHandler {
+@CommandLine.Command(name = "revoke",
+    description = "Revoke user access to tenant")
+public class RevokeUserAccessToTenantHandler extends TenantHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {

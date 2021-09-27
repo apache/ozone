@@ -35,15 +35,15 @@ import java.util.concurrent.Callable;
 @CommandLine.Command(name = "user",
     description = "Tenant user management",
     subcommands = {
+        GetUserInfoHandler.class,
         AssignUserToTenantHandler.class,
-        TenantUserModifyHandler.class,
-        TenantUserDeleteHandler.class
+        RevokeUserAccessToTenantHandler.class
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 @MetaInfServices(SubcommandWithParent.class)
-public class TenantUserCommands implements GenericParentCommand, Callable<Void>,
-    SubcommandWithParent{
+public class TenantUserCommands implements
+    GenericParentCommand, Callable<Void>, SubcommandWithParent {
 
   @CommandLine.ParentCommand
   private Shell shell;

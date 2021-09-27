@@ -59,11 +59,6 @@ public class AssignUserToTenantHandler extends TenantHandler {
   //  `s3 getsecret` and leak the secret if an admin isn't careful.
   private String accessId;
 
-  // TODO: support dry-run?
-//  @CommandLine.Option(names = {"--dry-run"},
-//      description = "Dry-run")
-//  private boolean dryRun;
-
   private boolean isEmptyList(List<String> list) {
     return list == null || list.size() == 0;
   }
