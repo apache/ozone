@@ -31,10 +31,6 @@ import java.util.stream.Collectors;
  */
 public class ECReplicationConfig implements ReplicationConfig {
 
-  // TODO - should this enum be defined in the protobuf rather than here? Right
-  //        the proto will carry a string. It might be more flexible for the
-  //        constants to be defined in code rather than proto?
-
   /**
    * Enum defining the allowed list of ECCodecs.
    */
@@ -60,12 +56,8 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   private int parity;
 
-  // TODO - the default chunk size is 4MB - is EC defaulting to 1MB or 4MB
-  //        stripe width? Should we default this to the chunk size setting?
   private int ecChunkSize = 1024 * 1024;
 
-  // TODO - should we have a config for the default, or does it matter if we
-  //        always force the client to send rs-3-2-1024k for example?
   private EcCodec codec = EcCodec.RS;
 
   public ECReplicationConfig(int data, int parity) {
