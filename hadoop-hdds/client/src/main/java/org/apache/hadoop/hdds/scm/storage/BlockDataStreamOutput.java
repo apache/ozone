@@ -41,6 +41,8 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RoutingTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,7 +146,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     this.xceiverClient =
         (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
     // Alternatively, stream setup can be delayed till the first chunk write.
-    this.out = setupStream();
+    this.out = setupStream(pipeline);
     this.token = token;
 
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
@@ -166,7 +168,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         config.getBytesPerChecksum());
   }
 
-  private DataStreamOutput setupStream() throws IOException {
+  private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
     // Execute a dummy WriteChunk request to get the path of the target file,
     // but does NOT write any data to it.
     ContainerProtos.WriteChunkRequestProto.Builder writeChunkRequest =
@@ -184,7 +186,48 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         ContainerCommandRequestMessage.toMessage(builder.build(), null);
 
     return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
-        .stream(message.getContent().asReadOnlyByteBuffer());
+    .stream(message.getContent().asReadOnlyByteBuffer(),
+        getRoutingTable(pipeline));
+  }
+
+  public RoutingTable getRoutingTable(Pipeline pipeline) {
+    RaftPeer primary = null;
+    List<RaftPeer> raftPeers = new ArrayList();
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      RaftPeer.Builder raftPeerBuilder = RaftPeer.newBuilder();
+      raftPeerBuilder.setId(dn.getUuidString()).setAddress(dn.getIpAddress()
+          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS_SERVER)
+          .getValue());
+      raftPeerBuilder.setDataStreamAddress(dn.getIpAddress()
+          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)
+          .getValue());
+      raftPeerBuilder.setAdminAddress(dn.getIpAddress()
+          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS_ADMIN).getValue());
+      raftPeerBuilder.setClientAddress(dn.getIpAddress()
+          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+      try {
+        if (dn == pipeline.getFirstNode()) {
+          primary = raftPeerBuilder.build();
+
+        }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      raftPeers.add(raftPeerBuilder.build());
+    }
+
+    RoutingTable.Builder builder = RoutingTable.newBuilder();
+    RaftPeer previous = primary;
+    for (RaftPeer peer : raftPeers) {
+      if (peer.equals(primary)) {
+        continue;
+      }
+      builder.addSuccessor(previous.getId(), peer.getId());
+      previous = peer;
+    }
+
+    return builder.build();
   }
 
   public BlockID getBlockID() {
