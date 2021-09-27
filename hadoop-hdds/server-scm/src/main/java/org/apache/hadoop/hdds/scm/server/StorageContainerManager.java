@@ -165,7 +165,9 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConsts.*;
+import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -292,7 +294,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @SuppressWarnings("checkstyle:methodlength")
   private StorageContainerManager(OzoneConfiguration conf,
                                   SCMConfigurator configurator)
-      throws IOException, AuthenticationException, CertificateException  {
+      throws IOException, AuthenticationException  {
     super(HddsVersionInfo.HDDS_VERSION_INFO);
 
     Objects.requireNonNull(configurator, "configurator cannot not be null");
@@ -636,7 +638,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @throws AuthenticationException - on Failure
    */
   private void initializeCAnSecurityProtocol(OzoneConfiguration conf,
-      SCMConfigurator configurator) throws IOException, CertificateException {
+      SCMConfigurator configurator) throws IOException {
 
     // TODO: Support Certificate Server loading via Class Name loader.
     // So it is easy to use different Certificate Servers if needed.
@@ -750,7 +752,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private ContainerTokenSecretManager createContainerTokenSecretManager(
-      OzoneConfiguration conf) throws IOException, CertificateException {
+      OzoneConfiguration conf) throws IOException {
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
@@ -764,9 +766,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (scmCertificateClient == null) {
       Preconditions.checkState(
           !scmStorageConfig.checkPrimarySCMIdInitialized());
+
+      String certSerialNumber;
+      try {
+        certSerialNumber = getScmCertificateServer().getCACertificate()
+            .getSerialNumber().toString();
+      } catch (IOException | CertificateException ex) {
+        LOG.error("Get CA Certificate failed", ex);
+        throw new IOException(ex);
+      }
       scmCertificateClient = new SCMCertificateClient(securityConfig,
-          getScmCertificateServer().getCACertificate()
-              .getSerialNumber().toString(), SCM_ROOT_CA_COMPONENT_NAME);
+          certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
     }
     String certId = scmCertificateClient.getCertificate().getSerialNumber()
         .toString();
