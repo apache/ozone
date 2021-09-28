@@ -183,7 +183,7 @@ public class TestMiniOzoneCluster {
   @Test
   public void testDatanodeEmptyIdFile() throws Exception {
     // empty datanode id file
-    File file = new File("test.id");
+    File file = new File(WRITE_TMP,"test.id");
     file.createNewFile();
     ContainerUtils.readDatanodeDetailsFrom(file);
     file.delete();

@@ -32,11 +32,9 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.UUID;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -179,11 +177,8 @@ public final class ContainerUtils {
         return DatanodeDetails.getFromProtoBuf(
             HddsProtos.DatanodeDetailsProto.parseFrom(in));
       } catch (IOException io) {
-        DatanodeDetails details = DatanodeDetails.newBuilder()
-            .setUuid(UUID.randomUUID()).build();
-        details.setInitialVersion(DatanodeVersions.CURRENT_VERSION);
-        details.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
-        return details;
+        throw new IOException("Failed to parse DatanodeDetails from "
+            + path.getAbsolutePath(), io);
       }
     }
   }
