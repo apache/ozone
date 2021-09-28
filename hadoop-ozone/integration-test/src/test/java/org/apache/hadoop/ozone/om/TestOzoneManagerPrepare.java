@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,13 +81,22 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   /**
+   * Make sure OM is out of Prepare state before executing individual tests.
+   * @throws Exception
+   */
+  @Before
+  public void initOM() throws Exception {
+    setup();
+    submitCancelPrepareRequest();
+    assertClusterNotPrepared();
+  }
+
+  /**
    * Writes data to the cluster via the leader OM, and then prepares it.
    * Checks that every OM is prepared successfully.
    */
   @Test
   public void testPrepareWithTransactions() throws Exception {
-    setup();
-
     long prepareIndex = submitPrepareRequest();
     assertClusterPrepared(prepareIndex);
     assertRatisLogsCleared();
@@ -120,7 +130,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    */
   @Test
   public void testPrepareDownedOM() throws Exception {
-    setup();
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
     List<OzoneManager> runningOms = cluster.getOzoneManagersList();
@@ -175,7 +184,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   @Test
   public void testPrepareWithRestart() throws Exception {
-    setup();
     String volumeName = VOLUME + UUID.randomUUID().toString();
     writeKeysAndWaitForLogs(volumeName, 10);
 
@@ -194,9 +202,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       "be able to do anything with 2 OMs down.")
   @Test
   public void testPrepareFailsWhenTwoOmsAreDown() throws Exception {
-
-    setup();
-
     // Shut down 2 OMs.
     for (int i : Arrays.asList(1, 2)) {
       cluster.stopOzoneManager(i);
@@ -216,11 +221,11 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * the requests will execute, so this test checks that the cluster ends in
    * a prepared state, and that create volume requests either succeed, or fail
    * indicating the cluster was prepared before they were encountered.
+   *
    * @throws Exception
    */
   @Test
   public void testPrepareWithMultipleThreads() throws Exception {
-    setup();
     final int numThreads = 10;
     final int prepareTaskIndex = 5;
 
@@ -276,7 +281,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   @Test
   public void testCancelPrepare() throws Exception {
-    setup();
     String volumeName = VOLUME + UUID.randomUUID().toString();
     Set<String> writtenKeys = writeKeysAndWaitForLogs(volumeName, 10);
     long prepareIndex = submitPrepareRequest();
@@ -348,7 +352,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
-    for (OzoneManager om: ozoneManagers) {
+    for (OzoneManager om : ozoneManagers) {
       LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000,
           () -> logFilesPresentInRatisPeer(om));
     }
