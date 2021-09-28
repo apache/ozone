@@ -110,7 +110,7 @@ public class TestMultipartUploadWithCopy {
     // Make sure DELAY_MS has passed, otherwise
     //  afterSourceKeyModificationTimeStr will be in the future
     //  and thus invalid
-    long currentTime = new Date().getTime();
+    long currentTime = System.currentTimeMillis();
     long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
     if (sleepMs > 0) {
       Thread.sleep(sleepMs);
