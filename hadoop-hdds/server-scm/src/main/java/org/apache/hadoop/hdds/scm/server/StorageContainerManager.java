@@ -761,7 +761,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // Means this is an upgraded cluster and it has no sub-ca,
     // so SCM Certificate client is not initialized. To make Tokens
-    // work lets ise root CA cert and create SCM Certificate client with
+    // work let's use root CA cert and create SCM Certificate client with
     // root CA cert.
     if (scmCertificateClient == null) {
       Preconditions.checkState(
