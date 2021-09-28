@@ -869,7 +869,7 @@ public class TestOzoneShellHA {
     getVolume(volumeName);
     String[] args =
         new String[] {"bucket", "create", "/volume100/bucket0", "-rt", "EC",
-            "-r", "3-2"};
+            "-r", "rs-3-2-1024k"};
     execute(ozoneShell, args);
 
     OzoneVolume volume =

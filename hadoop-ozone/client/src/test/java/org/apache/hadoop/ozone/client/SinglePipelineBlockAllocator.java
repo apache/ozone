@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -48,7 +49,7 @@ public class SinglePipelineBlockAllocator
       KeyArgs keyArgs) {
 
     if (pipeline == null) {
-      pipeline = Pipeline.newBuilder()
+      Pipeline.Builder bldr = Pipeline.newBuilder()
           .setFactor(keyArgs.getFactor())
           .setType(keyArgs.getType())
           .setId(PipelineID.newBuilder()
@@ -68,8 +69,11 @@ public class SinglePipelineBlockAllocator
                   .setName("RATIS")
                   .setValue(1234)
                   .build())
-              .build())
-          .build();
+              .build());
+      if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
+        bldr.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+      }
+      pipeline = bldr.build();
     }
 
     List<KeyLocation> results = new ArrayList<>();

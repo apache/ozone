@@ -273,6 +273,8 @@ enum ReplicationFactor {
 message ECReplicationConfig {
     required int32 data = 1;
     required int32 parity = 2;
+    required string codec = 3;
+    required int32 ecChunkSize = 4;
 }
 
 message DefaultReplicationConfig {
