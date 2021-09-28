@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -33,7 +34,11 @@ import org.junit.Test;
 import org.junit.Assert;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -98,14 +103,71 @@ public class TestOmLDBCli {
     Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
     Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
     Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
+
     DBScanner.setLimit(1);
     Assert.assertEquals(1, getKeyNames(dbScanner).size());
-    DBScanner.setLimit(-1);
+
+    DBScanner.setLimit(0);
     try {
       getKeyNames(dbScanner);
       Assert.fail("IllegalArgumentException is expected");
     }catch (IllegalArgumentException e){
       //ignore
+    }
+
+    // If set with -1, check if it dumps entire table data.
+    DBScanner.setLimit(-1);
+    Assert.assertEquals(5, getKeyNames(dbScanner).size());
+
+    // Test dump to file.
+    File tempFile = folder.newFolder();
+    String outFile = tempFile.getAbsolutePath() + "keyTable"
+        + LocalDateTime.now();
+    BufferedReader bufferedReader = null;
+    try {
+      DBScanner.setLimit(-1);
+      DBScanner.setFileName(outFile);
+      keyNames = getKeyNames(dbScanner);
+      Assert.assertEquals(5, keyNames.size());
+      Assert.assertTrue(new File(outFile).exists());
+
+      bufferedReader = new BufferedReader(
+          new InputStreamReader(new FileInputStream(outFile), UTF_8));
+
+      String readLine;
+      int count = 0;
+
+      while ((readLine = bufferedReader.readLine()) != null) {
+        for (String keyName : keyNames) {
+          if (readLine.contains(keyName)) {
+            count++;
+            break;
+          }
+        }
+      }
+
+      // As keyName will be in the file twice for each key.
+      // Once in keyName and second time in fileName.
+
+      // Sample key data.
+      // {
+      // ..
+      // ..
+      // "keyName": "key5",
+      // "fileName": "key5",
+      // ..
+      // ..
+      // }
+
+      Assert.assertEquals("File does not have all keys",
+          keyNames.size() * 2, count);
+    } finally {
+      if (bufferedReader != null) {
+        bufferedReader.close();
+      }
+      if (new File(outFile).exists()) {
+        FileUtils.deleteQuietly(new File(outFile));
+      }
     }
   }
 
