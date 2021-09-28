@@ -161,6 +161,21 @@ public class TestBlockOutputStreamWithFailures {
   }
 
   @Test
+  public void testThreeNode() throws Exception {
+    testWatchForCommitWithCloseContainerException();
+    testWatchForCommitDatanodeFailure();
+    test2DatanodesFailure();
+    testFailureWithPrimeSizedData();
+    testExceptionDuringClose();
+  }
+
+  @Test
+  public void testOneNode() throws Exception {
+    testDatanodeFailureWithSingleNodeRatis();
+    testWatchForCommitWithSingleNodeRatis();
+    testDatanodeFailureWithPreAllocation();
+  }
+
   public void testWatchForCommitWithCloseContainerException()
       throws Exception {
     String keyName = getKeyName();
@@ -250,7 +265,6 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  @Test
   public void testWatchForCommitDatanodeFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -336,7 +350,6 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
   
-  @Test
   public void test2DatanodesFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -441,7 +454,6 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, data1);
   }
 
-  @Test
   public void testFailureWithPrimeSizedData() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -505,7 +517,6 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  @Test
   public void testExceptionDuringClose() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -576,7 +587,6 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  @Test
   public void testWatchForCommitWithSingleNodeRatis() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
@@ -667,7 +677,6 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  @Test
   public void testDatanodeFailureWithSingleNodeRatis() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
@@ -760,7 +769,6 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  @Test
   public void testDatanodeFailureWithPreAllocation() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
