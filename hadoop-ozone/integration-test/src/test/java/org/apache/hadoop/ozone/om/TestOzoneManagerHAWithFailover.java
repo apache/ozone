@@ -25,8 +25,9 @@ import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIME
 
 /**
  * Test Ozone Manager operation in distributed handler scenario with failover.
- * NOTE: Do not add new tests to this class since testIncrementalWaitTimeWithSameNodeFailover
- * does not leave the cluster in a reusable state.
+ * NOTE: Do not add new tests to this class since
+ * testIncrementalWaitTimeWithSameNodeFailove does not leave the cluster in a
+ * reusable state.
  */
 public class TestOzoneManagerHAWithFailover extends TestOzoneManagerHA {
   /**
