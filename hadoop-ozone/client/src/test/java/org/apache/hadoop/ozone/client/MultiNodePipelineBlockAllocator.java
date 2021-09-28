@@ -55,6 +55,9 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
                 HddsProtos.Port.newBuilder().setName("RATIS").setValue(1234 + i)
                     .build()).build());
       }
+      if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
+        builder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+      }
       pipeline = builder.build();
     }
 
