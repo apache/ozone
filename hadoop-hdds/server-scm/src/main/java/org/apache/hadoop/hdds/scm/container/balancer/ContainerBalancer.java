@@ -191,6 +191,8 @@ public class ContainerBalancer {
         return;
       }
 
+      //if no new move option is generated, it means the cluster can
+      //not be balanced any more , so just stop
       if (doIteration() == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
         stop();
         return;
@@ -674,8 +676,15 @@ public class ContainerBalancer {
       SCMNodeStat scmNodeStat = scmNM.get();
       double capacity = scmNodeStat.getCapacity().get();
       Preconditions.checkArgument(capacity > 0);
+
+      //size can be moved into target datanode only when the following
+      //two condition are met.
+      //1 sizeEnteringAfterMove does not succeed the configured
+      // MaxSizeEnteringTarget
+      //2 current usage of target datanode plus sizeEnteringAfterMove
+      // is smaller than or equal to upperLimit
       double usedAfterMove =
-          capacity - scmNodeStat.getRemaining().get() + size;
+          capacity - scmNodeStat.getRemaining().get() + sizeEnteringAfterMove;
 
       return sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
           usedAfterMove/capacity <= upperLimit;
