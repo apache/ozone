@@ -42,7 +42,8 @@ public class TestNSSummaryAdmin {
     conf.setBoolean("ozone.om.enable.filesystem.paths", true);
     conf.set("ozone.om.metadata.layout", "PREFIX");
     conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
-    cluster = MiniOzoneCluster.newBuilder(conf).includeRecon(true).build();
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .withoutDatanodes().includeRecon(true).build();
     cluster.waitForClusterToBeReady();
     // Client uses server conf for this test
     ozoneAdmin = new OzoneAdmin(conf);
