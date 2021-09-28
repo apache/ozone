@@ -29,9 +29,12 @@ Create Random file
     [arguments]             ${size_in_megabytes}
     Execute                 dd if=/dev/urandom of=/tmp/part1 bs=1048576 count=${size_in_megabytes}
 
-Wait For AfterCreate
-    [arguments]             ${sleepTime}
-    Sleep                   ${sleepTime}
+Wait Til Date Past
+    [arguments]         ${date}
+    ${latestDate} =     Get Current Date         UTC
+    ${sleepSeconds} =   Subtract Date From Date  ${date}  ${latestDate}
+    Run Keyword If      ${sleepSeconds} > 0      Sleep  ${sleepSeconds}
+
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
@@ -298,9 +301,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Should contain           ${result}    ${LastModified}
     ${lmDate} =         Convert Date 	 	 ${lastModified}  date_format=%a, %d %b %Y %H:%M:%S %Z
     ${afterCreate} =    Add Time To Date         ${lmDate}  3 seconds
-    ${latestDate} =     Get Current Date         UTC
-    ${sleepSeconds} =   Subtract Date From Date  ${afterCreate}  ${latestDate}
-    Run Keyword If      ${sleepSeconds} > 0      Wait For AfterCreate  ${sleepSeconds}
+    Wait Til Date Past  ${afterCreate}
 
     ${result} =         Execute AWSS3APICli and checkrc     upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757 --copy-source-if-modified-since '${afterCreate}'    255
                         Should contain           ${result}    PreconditionFailed
