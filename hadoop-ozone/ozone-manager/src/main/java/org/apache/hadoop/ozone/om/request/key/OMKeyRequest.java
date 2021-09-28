@@ -127,9 +127,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationType,
-              replicationFactor, omID, excludeList);
+      allocatedBlocks = scmClient.getBlockClient().allocateBlock(scmBlockSize,
+          numBlocks, ReplicationConfig.fromTypeAndFactor(replicationType,
+              replicationFactor),
+          omID, excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {

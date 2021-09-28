@@ -23,7 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -45,7 +45,7 @@ public class ReconIncrementalContainerReportHandler
       ReconIncrementalContainerReportHandler.class);
 
   public ReconIncrementalContainerReportHandler(NodeManager nodeManager,
-      ContainerManagerV2 containerManager, SCMContext scmContext) {
+             ContainerManager containerManager, SCMContext scmContext) {
     super(nodeManager, containerManager, scmContext);
   }
 
