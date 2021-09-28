@@ -876,7 +876,7 @@ public class ObjectEndpoint extends EndpointBase {
       return OptionalLong.empty();
     }
 
-    long currentDate = new Date().getTime();
+    long currentDate = System.currentTimeMillis();
     if  (ozoneDateInMs <= currentDate){
       return OptionalLong.of(ozoneDateInMs);
     } else {
