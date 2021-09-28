@@ -25,8 +25,8 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -64,7 +64,7 @@ public class ContainerBalancer {
       LoggerFactory.getLogger(ContainerBalancer.class);
 
   private NodeManager nodeManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private ReplicationManager replicationManager;
   private OzoneConfiguration ozoneConfiguration;
   private final SCMContext scmContext;
@@ -110,7 +110,7 @@ public class ContainerBalancer {
    */
   public ContainerBalancer(
       NodeManager nodeManager,
-      ContainerManagerV2 containerManager,
+      ContainerManager containerManager,
       ReplicationManager replicationManager,
       OzoneConfiguration ozoneConfiguration,
       final SCMContext scmContext,
@@ -737,7 +737,7 @@ public class ContainerBalancer {
   }
 
   public void setContainerManager(
-      ContainerManagerV2 containerManager) {
+      ContainerManager containerManager) {
     this.containerManager = containerManager;
   }
 

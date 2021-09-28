@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
@@ -71,7 +71,7 @@ public class TestContainerBalancer {
       LoggerFactory.getLogger(TestContainerBalancer.class);
 
   private ReplicationManager replicationManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private ContainerBalancer containerBalancer;
   private MockNodeManager mockNodeManager;
   private OzoneConfiguration conf;
@@ -94,7 +94,7 @@ public class TestContainerBalancer {
   @Before
   public void setup() throws SCMException, NodeNotFoundException {
     conf = new OzoneConfiguration();
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
 
     balancerConfiguration = new ContainerBalancerConfiguration(conf);

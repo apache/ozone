@@ -102,7 +102,7 @@ public class TestReplicationManager {
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private GenericTestUtils.LogCapturer scmLogs;
   private SCMServiceManager serviceManager;
   private TestClock clock;
@@ -117,9 +117,8 @@ public class TestReplicationManager {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
 
-    scmLogs = GenericTestUtils.LogCapturer
-      .captureLogs(ReplicationManager.LOG);
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    scmLogs = GenericTestUtils.LogCapturer.captureLogs(ReplicationManager.LOG);
+    containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
@@ -173,7 +172,7 @@ public class TestReplicationManager {
       throws InterruptedException, IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     testDir = GenericTestUtils
-      .getTestDir(TestSCMContainerManager.class.getSimpleName());
+      .getTestDir(TestContainerManagerImpl.class.getSimpleName());
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.getAbsolutePath());
     config.setTimeDuration(

@@ -283,6 +283,21 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @Test
+  public void testSingleNodeRack() throws SCMException {
+    // make sure there is a single node rack
+    assumeTrue(datanodeCount % NODE_PER_RACK == 1);
+    List<DatanodeDetails> excludeNodes = new ArrayList<>();
+    excludeNodes.add(datanodes.get(datanodeCount - 1));
+    excludeNodes.add(datanodes.get(0));
+    List<DatanodeDetails> chooseDatanodes =
+        policy.chooseDatanodes(excludeNodes, null, 1, 0, 0);
+    Assert.assertTrue(chooseDatanodes.size() == 1);
+    // the selected node should be on the same rack as the second exclude node
+    Assert.assertTrue(chooseDatanodes.get(0).toString(),
+        cluster.isSameParent(chooseDatanodes.get(0), excludeNodes.get(1)));
+  }
+
+  @Test
   public void testFallback() throws SCMException {
     // 5 replicas. there are only 3 racks. policy with fallback should
     // allocate the 5th datanode though it will break the rack rule(first

@@ -99,7 +99,9 @@ public class TestOzoneManagerListVolumes {
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId).setScmId(scmId).setOmId(omId).build();
+        .withoutDatanodes()
+        .setClusterId(clusterId).setScmId(scmId).setOmId(omId)
+        .build();
     cluster.waitForClusterToBeReady();
 
     // Create volumes with non-default owners and ACLs
