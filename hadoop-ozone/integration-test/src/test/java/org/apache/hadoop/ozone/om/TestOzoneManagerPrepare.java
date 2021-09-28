@@ -184,6 +184,11 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   @Test
   public void testPrepareWithRestart() throws Exception {
+    // Create fresh cluster for this test to prevent timeout from restarting
+    // modified cluster.
+    init();
+    setup();
+
     String volumeName = VOLUME + UUID.randomUUID().toString();
     writeKeysAndWaitForLogs(volumeName, 10);
 
