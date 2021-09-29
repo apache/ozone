@@ -1430,6 +1430,14 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(uploadID);
     boolean isTruncated = false;
     int nextPartNumberMarker = 0;
+    BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    if (ozoneManager != null) {
+      String buckKey = ozoneManager.getMetadataManager()
+          .getBucketKey(volumeName, bucketName);
+      OmBucketInfo buckInfo =
+          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+      bucketLayout = buckInfo.getBucketLayout();
+    }
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -1486,7 +1494,7 @@ public class KeyManagerImpl implements KeyManager {
                     uploadID);
           }
           OmKeyInfo omKeyInfo =
-              metadataManager.getOpenKeyTable(getBucketLayout())
+              metadataManager.getOpenKeyTable(bucketLayout)
                   .get(multipartKey);
 
           if (omKeyInfo == null) {
@@ -1761,6 +1769,20 @@ public class KeyManagerImpl implements KeyManager {
         .setKeyName(keyName)
         .build();
 
+    BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    if (ozoneManager != null) {
+      String buckKey = ozoneManager.getMetadataManager()
+          .getBucketKey(volume, bucket);
+      OmBucketInfo buckInfo = null;
+      try {
+        buckInfo =
+            ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      bucketLayout = buckInfo.getBucketLayout();
+    }
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
@@ -1770,7 +1792,7 @@ public class KeyManagerImpl implements KeyManager {
       // OpenKeyTable since appends to existing keys are not supported.
       if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
         keyInfo =
-            metadataManager.getOpenKeyTable(getBucketLayout()).get(objectKey);
+            metadataManager.getOpenKeyTable(bucketLayout).get(objectKey);
       } else {
         // Recursive check is done only for ACL_TYPE DELETE
         // Rename and delete operations will send ACL_TYPE DELETE
