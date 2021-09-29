@@ -399,6 +399,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   @Test
   public void testOMRestart() throws Exception {
+    // start fresh cluster
+    shutdown();
+    init();
+
     ObjectStore objectStore = getObjectStore();
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
