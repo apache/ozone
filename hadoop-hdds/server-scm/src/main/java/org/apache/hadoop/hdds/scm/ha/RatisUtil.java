@@ -151,9 +151,12 @@ public final class RatisUtil {
    *
    */
   private static void setRaftLeadElectionProperties(
-      final RaftProperties properties) {
-    // Disable the pre vote feature (related to leader election) in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+      final RaftProperties properties, final ConfigurationSource ozoneConf) {
+    //Disable/Enable the pre vote feature (related to leader election) in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        ozoneConf.getBoolean(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE,
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT));
   }
 
   /**
