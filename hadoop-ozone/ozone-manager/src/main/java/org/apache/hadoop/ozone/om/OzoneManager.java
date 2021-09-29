@@ -2091,43 +2091,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Checks if the specified user can access this volume.
-   *
-   * @param volume  - volume
-   * @param userAcl - user acls which needs to be checked for access
-   * @return true if the user has required access for the volume, false
-   * otherwise
-   * @throws IOException
-   */
-  @Override
-  public boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
-      throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE,
-          ACLType.READ, volume, null, null);
-    }
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.USER_ACL,
-        (userAcl == null) ? null : userAcl.getName());
-    try {
-      metrics.incNumVolumeCheckAccesses();
-      return volumeManager.checkVolumeAccess(volume, userAcl);
-    } catch (Exception ex) {
-      metrics.incNumVolumeCheckAccessFails();
-      auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          OMAction.CHECK_VOLUME_ACCESS, auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            OMAction.CHECK_VOLUME_ACCESS, auditMap));
-      }
-    }
-  }
-
-  /**
    * Gets the volume information.
    *
    * @param volume - Volume name.

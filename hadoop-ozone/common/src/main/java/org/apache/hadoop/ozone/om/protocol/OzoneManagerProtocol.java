@@ -120,8 +120,11 @@ public interface OzoneManagerProtocol
    *         false otherwise
    * @throws IOException
    */
-  boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
-      throws IOException;
+  default boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
+      throws IOException {
+    throw new UnsupportedOperationException("deprecated");
+  }
+
 
   /**
    * Gets the volume information.
