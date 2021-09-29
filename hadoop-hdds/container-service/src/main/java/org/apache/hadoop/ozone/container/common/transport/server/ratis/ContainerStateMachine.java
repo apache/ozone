@@ -32,10 +32,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -52,8 +55,6 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.Cache;
-import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -174,9 +175,14 @@ public class ContainerStateMachine extends BaseStateMachine {
         StorageUnit.BYTES);
     int pendingRequestsMegaBytesLimit =
         HddsUtils.roundupMb(pendingRequestsBytesLimit);
-    stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-        (index, data) -> new int[] {1, HddsUtils.roundupMb(data.size())},
-        numPendingRequests, pendingRequestsMegaBytesLimit);
+    int pendingExpire = (int) conf.getTimeDuration(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_EXPIRE,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_EXPIRE_DEFAULT,
+        TimeUnit.MINUTES);
+    stateMachineDataCache = CacheBuilder.newBuilder()
+        .expireAfterAccess(pendingExpire, TimeUnit.MINUTES)
+        .maximumSize(numPendingRequests)
+        .build();
 
     this.chunkExecutors = chunkExecutors;
 
@@ -421,9 +427,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (server.getDivision(gid).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
-    } catch (InterruptedException ioe) {
-      Thread.currentThread().interrupt();
-      return completeExceptionally(ioe);
     } catch (IOException ioe) {
       return completeExceptionally(ioe);
     }
@@ -647,13 +650,14 @@ public class ContainerStateMachine extends BaseStateMachine {
       Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
       if (requestProto.getCmdType() == Type.WriteChunk) {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
-        ByteString data = stateMachineDataCache.get(entry.getIndex());
+        ByteString data = stateMachineDataCache.getIfPresent(entry.getIndex());
         if (data != null) {
           Preconditions.checkArgument(!data.isEmpty());
           future.complete(data);
           return future;
         }
 
+        metrics.incNumDataCacheMiss();
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
@@ -737,7 +741,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     long index = trx.getLogEntry().getIndex();
     // Since leader and one of the followers has written the data, it can
     // be removed from the stateMachineDataMap.
-    stateMachineDataCache.remove(index);
+    // While from the perf point of view, just keep the element until it is
+    // expired or the cache is full.
 
     DispatcherContext.Builder builder =
         new DispatcherContext.Builder()
@@ -857,13 +862,14 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public CompletableFuture<Void> truncate(long index) {
-    stateMachineDataCache.removeIf(k -> k >= index);
+    stateMachineDataCache.invalidate(index);
     return CompletableFuture.completedFuture(null);
   }
 
   @VisibleForTesting
   public void evictStateMachineCache() {
-    stateMachineDataCache.clear();
+    stateMachineDataCache.invalidateAll();
+    stateMachineDataCache.cleanUp();
   }
 
   @Override

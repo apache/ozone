@@ -39,29 +39,49 @@ public class CSMMetrics {
       CSMMetrics.class.getSimpleName();
 
   // ratis op metrics metrics
-  private @Metric MutableCounterLong numWriteStateMachineOps;
-  private @Metric MutableCounterLong numQueryStateMachineOps;
-  private @Metric MutableCounterLong numApplyTransactionOps;
-  private @Metric MutableCounterLong numReadStateMachineOps;
-  private @Metric MutableCounterLong numBytesWrittenCount;
-  private @Metric MutableCounterLong numBytesCommittedCount;
+  private @Metric
+  MutableCounterLong numWriteStateMachineOps;
+  private @Metric
+  MutableCounterLong numQueryStateMachineOps;
+  private @Metric
+  MutableCounterLong numApplyTransactionOps;
+  private @Metric
+  MutableCounterLong numReadStateMachineOps;
+  private @Metric
+  MutableCounterLong numBytesWrittenCount;
+  private @Metric
+  MutableCounterLong numBytesCommittedCount;
 
-  private @Metric MutableRate transactionLatency;
+  private @Metric
+  MutableRate transactionLatency;
   private MutableRate[] opsLatency;
   private MetricsRegistry registry = null;
 
   // Failure Metrics
-  private @Metric MutableCounterLong numWriteStateMachineFails;
-  private @Metric MutableCounterLong numWriteDataFails;
-  private @Metric MutableCounterLong numQueryStateMachineFails;
-  private @Metric MutableCounterLong numApplyTransactionFails;
-  private @Metric MutableCounterLong numReadStateMachineFails;
-  private @Metric MutableCounterLong numReadStateMachineMissCount;
-  private @Metric MutableCounterLong numStartTransactionVerifyFailures;
-  private @Metric MutableCounterLong numContainerNotOpenVerifyFailures;
+  private @Metric
+  MutableCounterLong numWriteStateMachineFails;
+  private @Metric
+  MutableCounterLong numWriteDataFails;
+  private @Metric
+  MutableCounterLong numQueryStateMachineFails;
+  private @Metric
+  MutableCounterLong numApplyTransactionFails;
+  private @Metric
+  MutableCounterLong numReadStateMachineFails;
+  private @Metric
+  MutableCounterLong numReadStateMachineMissCount;
+  private @Metric
+  MutableCounterLong numStartTransactionVerifyFailures;
+  private @Metric
+  MutableCounterLong numContainerNotOpenVerifyFailures;
 
-  private @Metric MutableRate applyTransaction;
-  private @Metric MutableRate writeStateMachineData;
+  private @Metric
+  MutableCounterLong numDataCacheMiss;
+
+  private @Metric
+  MutableRate applyTransaction;
+  private @Metric
+  MutableRate writeStateMachineData;
 
   public CSMMetrics() {
     int numCmdTypes = ContainerProtos.Type.values().length;
@@ -194,7 +214,7 @@ public class CSMMetrics {
   }
 
   public void incPipelineLatency(ContainerProtos.Type type,
-      long latencyMillis) {
+                                 long latencyMillis) {
     opsLatency[type.ordinal()].add(latencyMillis);
     transactionLatency.add(latencyMillis);
   }
@@ -218,5 +238,9 @@ public class CSMMetrics {
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
+  }
+
+  public void incNumDataCacheMiss() {
+    numDataCacheMiss.incr();
   }
 }
