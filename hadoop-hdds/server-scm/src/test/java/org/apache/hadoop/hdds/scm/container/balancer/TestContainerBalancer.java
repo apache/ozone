@@ -145,7 +145,7 @@ public class TestContainerBalancer {
     Assert.assertEquals(nodesInCluster.size(), nodeUtilizations.size());
     for (int i = 0; i < nodesInCluster.size(); i++) {
       Assert.assertEquals(nodeUtilizations.get(i),
-          nodesInCluster.get(i).calculateUtilization(), 0.0001);
+          nodesInCluster.get(i).calculateUtilization(0), 0.0001);
     }
 
     // should be equal to average utilization of the cluster

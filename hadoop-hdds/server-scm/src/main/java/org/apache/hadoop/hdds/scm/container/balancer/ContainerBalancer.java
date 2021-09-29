@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -30,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -193,7 +191,8 @@ public class ContainerBalancer {
 
       //if no new move option is generated, it means the cluster can
       //not be balanced any more , so just stop
-      if (doIteration() == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
+      IterationResult iR = doIteration();
+      if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
         stop();
         return;
       }
@@ -284,7 +283,7 @@ public class ContainerBalancer {
 
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
-      double utilization = datanodeUsageInfo.calculateUtilization();
+      double utilization = datanodeUsageInfo.calculateUtilization(0);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} is {}",
             datanodeUsageInfo.getDatanodeDetails().getUuidString(),
@@ -671,23 +670,15 @@ public class ContainerBalancer {
   boolean canSizeEnterTarget(DatanodeDetails target, long size) {
     if (sizeEnteringNode.containsKey(target)) {
       long sizeEnteringAfterMove = sizeEnteringNode.get(target) + size;
-      SCMNodeMetric scmNM = nodeManager.getNodeStat(target);
-      Preconditions.checkNotNull(scmNM);
-      SCMNodeStat scmNodeStat = scmNM.get();
-      double capacity = scmNodeStat.getCapacity().get();
-      Preconditions.checkArgument(capacity > 0);
-
       //size can be moved into target datanode only when the following
       //two condition are met.
       //1 sizeEnteringAfterMove does not succeed the configured
       // MaxSizeEnteringTarget
       //2 current usage of target datanode plus sizeEnteringAfterMove
       // is smaller than or equal to upperLimit
-      double usedAfterMove =
-          capacity - scmNodeStat.getRemaining().get() + sizeEnteringAfterMove;
-
       return sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
-          usedAfterMove/capacity <= upperLimit;
+           nodeManager.getUsageInfo(target)
+               .calculateUtilization(sizeEnteringAfterMove) <= upperLimit;
     }
     return false;
   }
