@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CephCompatibleTenantImpl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
 import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
@@ -69,6 +70,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMMultiTenantManagerImpl.class);
+
+  // TODO: Remove when proper testing infra is deployed.
+  // Internal dev flag to skip Ranger communication.
+  public static final String OZONE_OM_TENANT_DEV_SKIP_RANGER =
+      "ozone.om.tenant.dev.skip.ranger";
+  private final boolean devSkipRanger;
 
   private MultiTenantAccessAuthorizer authorizer;
   private OMMetadataManager omMetadataManager;
@@ -129,12 +136,18 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     controlPathLock = new ReentrantReadWriteLock();
     omMetadataManager = mgr;
+
+    devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
     start(conf);
   }
 
   @Override
   public void start(OzoneConfiguration configuration) throws IOException {
-    authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
+    if (devSkipRanger) {
+      authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
+    } else {
+      authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
+    }
     authorizer.init(configuration);
   }
 
