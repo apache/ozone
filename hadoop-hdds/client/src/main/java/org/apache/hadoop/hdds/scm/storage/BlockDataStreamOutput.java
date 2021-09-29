@@ -41,7 +41,6 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
-import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RoutingTable;
 import org.slf4j.Logger;
@@ -192,40 +191,31 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   public RoutingTable getRoutingTable(Pipeline pipeline) {
-    RaftPeerId primary = null;
-    List<RaftPeerId> raftPeers = new ArrayList();
+    RaftPeerId primaryId = null;
+    List<RaftPeerId> raftPeers = new ArrayList<>();
 
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      RaftPeer.Builder raftPeerBuilder = RaftPeer.newBuilder();
-      raftPeerBuilder.setId(dn.getUuidString()).setAddress(dn.getIpAddress()
-          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS_SERVER)
-          .getValue());
-      raftPeerBuilder.setDataStreamAddress(dn.getIpAddress()
-          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)
-          .getValue());
-      raftPeerBuilder.setAdminAddress(dn.getIpAddress()
-          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS_ADMIN).getValue());
-      raftPeerBuilder.setClientAddress(dn.getIpAddress()
-          + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+      final RaftPeerId raftPeerId = RaftPeerId.valueOf(dn.getUuidString());
       try {
         if (dn == pipeline.getFirstNode()) {
-          primary = raftPeerBuilder.build().getId();
-
+          primaryId = raftPeerId;
         }
       } catch (IOException e) {
-        e.printStackTrace();
+        LOG.error("Can not get FirstNode from the pipeline: {} with " +
+            "exception: {}", pipeline.toString(), e.getLocalizedMessage());
+        return null;
       }
-      raftPeers.add(raftPeerBuilder.build().getId());
+      raftPeers.add(raftPeerId);
     }
 
     RoutingTable.Builder builder = RoutingTable.newBuilder();
-    RaftPeerId previous = primary;
-    for (RaftPeerId peer : raftPeers) {
-      if (peer.equals(primary)) {
+    RaftPeerId previousId = primaryId;
+    for (RaftPeerId peerId : raftPeers) {
+      if (peerId.equals(primaryId)) {
         continue;
       }
-      builder.addSuccessor(previous, peer);
-      previous = peer;
+      builder.addSuccessor(previousId, peerId);
+      previousId = peerId;
     }
 
     return builder.build();
