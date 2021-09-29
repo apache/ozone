@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -142,11 +143,19 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
-    ozoneManager.getMultiTenantManager().createTenant(tenantName);
+    final Tenant tenant =
+        ozoneManager.getMultiTenantManager().createTenant(tenantName);
+
+    // Pass this to followers as well
+    final String tenantDefaultPolicies = tenant.getTenantAccessPolicies()
+        .stream().map(AccessPolicy::getPolicyID)
+        .collect(Collectors.joining(","));
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setCreateTenantRequest(
-            CreateTenantRequest.newBuilder().setTenantName(tenantName))
+            CreateTenantRequest.newBuilder()
+                .setTenantDefaultPolicyName(tenantDefaultPolicies)
+                .setTenantName(tenantName))
         .setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         .setUserInfo(getUserInfo())
@@ -199,7 +208,13 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String volumeName = volumeInfo.getVolume();
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
     IOException exception = null;
-    LOG.info("tenant: {} create Request", tenantName);
+
+    final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
+    assert(tenantDefaultPolicies != null);
+
+    LOG.info("Processing tenant '{}' create request. "
+        + "tenantDefaultPolicies = {}", tenantName, tenantDefaultPolicies);
+
     try {
       // Check ACL: requires volume create permission. TODO: tenant create perm?
       if (ozoneManager.getAclsEnabled()) {
@@ -237,12 +252,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheKey<>(tenantName),
           new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
 
-
-      tenant = ozoneManager.getMultiTenantManager()
-          .getTenantInfo(tenantName);
-      final String tenantDefaultPolicies = tenant.getTenantAccessPolicies()
-          .stream().map(e->e.getPolicyID())
-          .collect(Collectors.joining(","));
+      tenant = ozoneManager.getMultiTenantManager().getTenantInfo(tenantName);
 
       // Add to tenantPolicyTable
       omMetadataManager.getTenantPolicyTable().addCacheEntry(

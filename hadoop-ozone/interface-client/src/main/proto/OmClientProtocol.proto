@@ -1388,6 +1388,7 @@ message RevokeS3SecretRequest {
 
 message CreateTenantRequest {
     optional string tenantName = 1;
+    optional string tenantDefaultPolicyName = 2;
 }
 
 message ModifyTenantRequest {
