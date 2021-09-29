@@ -455,27 +455,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private AllocateBlockResponse allocateBlock(AllocateBlockRequest request,
-      int clientVersion) throws IOException {
-    AllocateBlockResponse.Builder resp =
-        AllocateBlockResponse.newBuilder();
-
-    KeyArgs keyArgs = request.getKeyArgs();
-    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(keyArgs.getKeyName())
-        .build();
-
-    OmKeyLocationInfo newLocation = impl.allocateBlock(omKeyArgs,
-        request.getClientID(), ExcludeList.getFromProtoBuf(
-            request.getExcludeList()));
-
-    resp.setKeyLocation(newLocation.getProtobuf(clientVersion));
-
-    return resp.build();
-  }
-
   private ServiceListResponse getServiceList(ServiceListRequest request)
       throws IOException {
     ServiceListResponse.Builder resp = ServiceListResponse.newBuilder();

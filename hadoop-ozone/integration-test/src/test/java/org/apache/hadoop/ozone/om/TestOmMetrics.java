@@ -199,7 +199,7 @@ public class TestOmMetrics {
 
   }
 
-  // @Test
+  @Test
   public void testBucketOps() throws Exception {
     startCluster();
     BucketManager bucketManager =
@@ -207,7 +207,8 @@ public class TestOmMetrics {
             ozoneManager, "bucketManager");
     BucketManager mockBm = Mockito.spy(bucketManager);
 
-    doBucketOps();
+    OmBucketInfo bucketInfo = createBucketInfo();
+    doBucketOps(bucketInfo);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
     assertCounter("NumBucketOps", 5L, omMetrics);
@@ -216,26 +217,40 @@ public class TestOmMetrics {
     assertCounter("NumBucketInfos", 1L, omMetrics);
     assertCounter("NumBucketDeletes", 1L, omMetrics);
     assertCounter("NumBucketLists", 1L, omMetrics);
-    assertCounter("NumBuckets", 0L, omMetrics);
+    assertCounter("NumBuckets", 1L, omMetrics);
 
-    ozoneManager.createBucket(null);
-    ozoneManager.createBucket(null);
-    ozoneManager.createBucket(null);
-    ozoneManager.deleteBucket(null, null);
+    bucketInfo = createBucketInfo();
+    writeClient.createBucket(bucketInfo);
+    bucketInfo = createBucketInfo();
+    writeClient.createBucket(bucketInfo);
+    bucketInfo = createBucketInfo();
+    writeClient.createBucket(bucketInfo);
+    writeClient.deleteBucket(bucketInfo.getVolumeName(), bucketInfo.getBucketName());
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBuckets", 2L, omMetrics);
+    assertCounter("NumBuckets", 3L, omMetrics);
 
-    // inject exception to test for Failure Metrics
-    Mockito.doThrow(exception).when(mockBm).createBucket(null);
-    Mockito.doThrow(exception).when(mockBm).deleteBucket(null, null);
+    // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockBm).getBucketInfo(null, null);
-    Mockito.doThrow(exception).when(mockBm).setBucketProperty(null);
     Mockito.doThrow(exception).when(mockBm).listBuckets(null, null, null, 0);
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
-    doBucketOps();
+
+    // inject exception to test for Failure Metrics on the write path
+    OMMetadataManager metadataManager = (OMMetadataManager)
+        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
+    OMMetadataManager mockMm = Mockito.spy(metadataManager);
+    @SuppressWarnings("unchecked")
+    Table<String, OmBucketInfo> bucketTable = (Table<String, OmBucketInfo>)
+        HddsWhiteboxTestUtils.getInternalState(metadataManager, "bucketTable");
+    Table<String, OmBucketInfo> mockBTable = Mockito.spy(bucketTable);
+    Mockito.doThrow(exception).when(mockBTable).isExist(any());
+    Mockito.doReturn(mockBTable).when(mockMm).getBucketTable();
+    HddsWhiteboxTestUtils.setInternalState(
+        ozoneManager, "metadataManager", mockMm);
+    
+    doBucketOps(bucketInfo);
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumBucketOps", 14L, omMetrics);
@@ -248,13 +263,13 @@ public class TestOmMetrics {
     assertCounter("NumBucketCreateFails", 1L, omMetrics);
     assertCounter("NumBucketUpdateFails", 1L, omMetrics);
     assertCounter("NumBucketInfoFails", 1L, omMetrics);
-    assertCounter("NumBucketDeleteFails", 1L, omMetrics);
-    assertCounter("NumBucketListFails", 1L, omMetrics);
+    assertCounter("NumBucketDeleteFails", 2L, omMetrics);
+    assertCounter("NumBucketListFails", 0L, omMetrics);
 
-    assertCounter("NumBuckets", 2L, omMetrics);
+    assertCounter("NumBuckets", 3L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumBuckets", 2L, omMetrics);
+    assertCounter("NumBuckets", 3L, omMetrics);
   }
 
   @Test
@@ -498,29 +513,30 @@ public class TestOmMetrics {
   /**
    * Test bucket operations with ignoring thrown exception.
    */
-  private void doBucketOps() {
+  private void doBucketOps(OmBucketInfo info) throws IOException{
+    OmBucketInfo deleteInfo = createBucketInfo();
     try {
-      ozoneManager.createBucket(null);
+      writeClient.createBucket(info);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.deleteBucket(null, null);
+      writeClient.deleteBucket(deleteInfo.getVolumeName(), deleteInfo.getBucketName());
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.getBucketInfo(null, null);
+      ozoneManager.getBucketInfo(info.getVolumeName(), info.getBucketName());
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.setBucketProperty(null);
+      writeClient.setBucketProperty(getBucketArgs(info));
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listBuckets(null, null, null, 0);
+      ozoneManager.listBuckets(info.getVolumeName(), null, null, 0);
     } catch (IOException ignored) {
     }
   }
@@ -592,6 +608,21 @@ public class TestOmMetrics {
         .setVolume(volumeName)
         .setOwnerName("dummy")
         .setAdminName("dummyAdmin")
+        .build();
+  }
+  private OmBucketArgs getBucketArgs(OmBucketInfo info) {
+    return new OmBucketArgs.Builder()
+        .setVolumeName(info.getVolumeName())
+        .setBucketName(info.getBucketName())
+        .build();
+  }
+  private OmBucketInfo createBucketInfo() throws IOException {
+    OmVolumeArgs volumeArgs = createVolumeArgs();
+    writeClient.createVolume(volumeArgs);
+    String bucketName = UUID.randomUUID().toString();
+    return new OmBucketInfo.Builder()
+        .setVolumeName(volumeArgs.getVolume())
+        .setBucketName(bucketName)
         .build();
   }
 }
