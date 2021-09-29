@@ -107,9 +107,9 @@ enum Type {
   ModifyTenant = 96;
   DeleteTenant = 97;
 
-  AssignUserToTenant = 98;
-  ModifyTenantUser = 99;
-  DeleteTenantUser = 100;
+  TenantGetUserInfo = 98;
+  AssignUserToTenant = 99;
+  RevokeUserAccessToTenant = 100;
 }
 
 message OMRequest {
@@ -197,9 +197,9 @@ message OMRequest {
   optional ModifyTenantRequest              ModifyTenantRequest            = 96;
   optional DeleteTenantRequest              DeleteTenantRequest            = 97;
 
-  optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 98;
-  optional ModifyTenantUserRequest          ModifyTenantUserRequest        = 99;
-  optional DeleteTenantUserRequest          DeleteTenantUserRequest        = 100;
+  optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 98;
+  optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 99;
+  optional RevokeUserAccessToTenantRequest  RevokeUserAccessToTenantRequest = 100;
 }
 
 message OMResponse {
@@ -282,11 +282,9 @@ message OMResponse {
   optional ModifyTenantResponse              ModifyTenantResponse          = 96;
   optional DeleteTenantResponse              DeleteTenantResponse          = 97;
 
-  optional AssignUserToTenantResponse        AssignUserToTenantResponse    = 98;
-  // TODO: Remove ModifyTenantUserResponse since it won't be useful anymore?
-  optional ModifyTenantUserResponse          ModifyTenantUserResponse      = 99;
-  // TODO: Rename this to UnassignUserFromTenant Response ?
-  optional DeleteTenantUserResponse          DeleteTenantUserResponse      = 100;
+  optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 98;
+  optional AssignUserToTenantResponse        AssignUserToTenantResponse    = 99;
+  optional RevokeUserAccessToTenantResponse  RevokeUserAccessToTenantResponse = 100;
 }
 
 enum Status {
@@ -1361,6 +1359,25 @@ message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
 }
 
+message TenantUserInfo {
+  optional string userPrincipal = 1;
+  repeated TenantAccessIdInfo accessIdInfo = 2;
+}
+
+message TenantAccessIdInfo {
+  optional string accessId = 1;
+  optional string tenantName = 2;
+}
+
+message TenantGetUserInfoRequest {
+  optional string userPrincipal = 1;
+}
+
+message TenantGetUserInfoResponse {
+  optional bool success = 1;
+  optional TenantUserInfo tenantUserInfo = 2;
+}
+
 message LayoutVersion {
   required uint64 version = 1;
 }
@@ -1387,12 +1404,9 @@ message AssignUserToTenantRequest {
     optional string accessId = 3;
 }
 
-message ModifyTenantUserRequest {
-    optional string tenantUsername = 1;
-}
-
-message DeleteTenantUserRequest {
-    optional string tenantUsername = 1;
+message RevokeUserAccessToTenantRequest {
+    optional string accessId = 1;
+    optional string tenantName = 2;
 }
 
 message CreateTenantResponse {
@@ -1412,11 +1426,7 @@ message AssignUserToTenantResponse {
     optional S3Secret s3Secret = 2;
 }
 
-message ModifyTenantUserResponse {
-    optional bool success = 1;
-}
-
-message DeleteTenantUserResponse {
+message RevokeUserAccessToTenantResponse {
     optional bool success = 1;
 }
 

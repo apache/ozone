@@ -30,6 +30,7 @@ import java.util.Set;
  * principal, but can be extended to store more fields later.
  */
 public final class OmDBKerberosPrincipalInfo {
+
   /**
    * A set of accessIds.
    */
@@ -46,6 +47,10 @@ public final class OmDBKerberosPrincipalInfo {
   private OmDBKerberosPrincipalInfo(String serialized) {
     accessIds = new HashSet<>(
         Arrays.asList(serialized.split(SERIALIZATION_SPLIT_KEY)));
+  }
+
+  public Set<String> getAccessIds() {
+    return accessIds;
   }
 
   public boolean addAccessId(String accessId) {

@@ -17,9 +17,17 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * ozone tenant user info.
@@ -28,8 +36,48 @@ import picocli.CommandLine;
     description = "Get tenant related information of a user")
 public class GetUserInfoHandler extends TenantHandler {
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
+  @CommandLine.Parameters(description = "List of user principal(s)")
+  private List<String> userPrincipals = new ArrayList<>();
+
+  private boolean isEmptyList(List<String> list) {
+    return list == null || list.size() == 0;
+  }
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    out().println("Not Implemented.");
+    final ObjectStore objStore = client.getObjectStore();
+
+    if (isEmptyList(userPrincipals)) {
+      GenericCli.missingSubcommand(spec);
+      return;
+    }
+
+    for (final String userPrincipal : userPrincipals) {
+      try {
+        final TenantUserInfoValue tenantUserInfo =
+            objStore.tenantGetUserInfo(userPrincipal);
+        List<TenantAccessIdInfo> accessIdInfoList =
+            tenantUserInfo.getAccessIdInfoList();
+        if (accessIdInfoList.size() == 0) {
+          out().println("User '" + userPrincipal +
+              "' is not assigned to any tenant.");
+          continue;
+        }
+        out().println("User '" + userPrincipal + "' is assigned to:");
+
+        for (TenantAccessIdInfo accessIdInfo : accessIdInfoList) {
+          out().println("- Tenant '" + accessIdInfo.getTenantName() +
+              "' under accessId '" + accessIdInfo.getAccessId() + "'");
+        }
+
+        out().println();
+      } catch (IOException e) {
+        err().println("Failed to GetUserInfo of user '" + userPrincipal
+            + "': " + e.getMessage());
+      }
+    }
   }
 }

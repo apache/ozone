@@ -29,9 +29,9 @@ import java.io.IOException;
 /**
  * Handles OMTenantUserModify request.
  */
-public class OMTenantUserModifyRequest extends OMVolumeRequest {
+public class OMRevokeUserAccessToTenantRequest extends OMVolumeRequest {
 
-  public OMTenantUserModifyRequest(OMRequest omRequest) {
+  public OMRevokeUserAccessToTenantRequest(OMRequest omRequest) {
     super(omRequest);
   }
 

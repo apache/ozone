@@ -265,6 +265,7 @@ public final class OmUtils {
     case ListMultipartUploads:
     case FinalizeUpgradeProgress:
     case PrepareStatus:
+    case TenantGetUserInfo:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -304,8 +305,7 @@ public final class OmUtils {
     case ModifyTenant:
     case DeleteTenant:
     case AssignUserToTenant:
-    case ModifyTenantUser:
-    case DeleteTenantUser:
+    case RevokeUserAccessToTenant:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

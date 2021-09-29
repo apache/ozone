@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
@@ -96,6 +97,9 @@ public class TestOzoneTenantShell {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
 
+    conf.setBoolean(
+        OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
+
     String path = GenericTestUtils.getTempPath(
         TestOzoneTenantShell.class.getSimpleName());
     baseDir = new File(path);
@@ -107,7 +111,7 @@ public class TestOzoneTenantShell {
 
     tenantShell = new TenantShell();
 
-    // Init HA cluster
+    // Init cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
     clusterId = UUID.randomUUID().toString();
@@ -119,6 +123,7 @@ public class TestOzoneTenantShell {
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
+//    MiniOzoneHAClusterImpl impl = (MiniOzoneOMHAClusterImpl) cluster;
   }
 
   /**
@@ -176,6 +181,16 @@ public class TestOzoneTenantShell {
     String[] argsWithHAConf = getHASetConfStrings(args);
 
     cmd.parseWithHandlers(new RunLast(), exceptionHandler, argsWithHAConf);
+  }
+
+  /**
+   * Helper that appends HA service id to args.
+   */
+  private void executeHA(GenericCli shell, String[] args) {
+    final String[] newArgs = new String[args.length + 1];
+    System.arraycopy(args, 0, newArgs, 0, args.length);
+    newArgs[args.length] = "--om-service-id=" + omServiceId;
+    execute(shell, newArgs);
   }
 
   /**
@@ -261,9 +276,8 @@ public class TestOzoneTenantShell {
 
     int indexCopyStart = res.length - existingArgs.length;
     // Then copy the existing args to the returned String array
-    for (int i = 0; i < existingArgs.length; i++) {
-      res[indexCopyStart + i] = existingArgs[i];
-    }
+    System.arraycopy(existingArgs, 0, res, indexCopyStart,
+        existingArgs.length);
     return res;
   }
 
@@ -273,15 +287,25 @@ public class TestOzoneTenantShell {
   @Test
   public void testOzoneTenantCreateAssignUser() {
 
-    // Test create tenant
-    execute(tenantShell, new String[] {
-        "create", "finance",
-        "--om-service-id=" + omServiceId});
+    // Create tenants
+    // Equivalent to `ozone tenant create finance`
+    executeHA(tenantShell, new String[] {"create", "finance"});
+    executeHA(tenantShell, new String[] {"create", "research"});
+    executeHA(tenantShell, new String[] {"create", "dev"});
 
-    // Test assign user
-    execute(tenantShell, new String[] {
-        "user", "assign", "bob@EXAMPLE.COM", "--tenant=finance",
-        "--om-service-id=" + omServiceId});
+    // Assign user
+    // Equivalent to `ozone tenant user assign bob@EXAMPLE.COM --tenant=finance`
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob@EXAMPLE.COM", "--tenant=finance"});
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob@EXAMPLE.COM", "--tenant=research"});
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob@EXAMPLE.COM", "--tenant=dev"});
+
+    // Get user info
+    // Equivalent to `ozone tenant user info bob@EXAMPLE.COM`
+    executeHA(tenantShell, new String[] {
+        "user", "info", "bob@EXAMPLE.COM"});
   }
 
 }

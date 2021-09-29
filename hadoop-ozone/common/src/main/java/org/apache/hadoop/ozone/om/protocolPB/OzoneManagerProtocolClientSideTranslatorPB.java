@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
@@ -920,8 +921,25 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return S3SecretValue.fromProtobuf(resp.getS3Secret());
   }
-  // TODO: Add a variant that uses OmTenantUserArgs
-  // TODO: modify, delete
+  // TODO: Add a variant that uses OmTenantUserArgs?
+
+  @Override
+  public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException {
+
+    final TenantGetUserInfoRequest request =
+        TenantGetUserInfoRequest.newBuilder()
+            .setUserPrincipal(userPrincipal)
+            .build();
+    final OMRequest omRequest = createOMRequest(Type.TenantGetUserInfo)
+        .setTenantGetUserInfoRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final TenantGetUserInfoResponse resp = handleError(omResponse)
+        .getTenantGetUserInfoResponse();
+
+    return TenantUserInfoValue.fromProtobuf(resp.getTenantUserInfo());
+  }
 
   /**
    * Return the proxy object underlying this protocol translator.

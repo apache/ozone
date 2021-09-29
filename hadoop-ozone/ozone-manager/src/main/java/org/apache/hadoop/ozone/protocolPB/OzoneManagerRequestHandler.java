@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -80,6 +81,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
@@ -221,6 +224,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
+      case TenantGetUserInfo:
+        TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
+            request.getTenantGetUserInfoRequest());
+        responseBuilder.setTenantGetUserInfoResponse(getUserInfoResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -341,6 +349,23 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     OmVolumeArgs ret = impl.getVolumeInfo(volume);
     resp.setVolumeInfo(ret.getProtobuf());
+
+    return resp.build();
+  }
+
+  private TenantGetUserInfoResponse tenantGetUserInfo(
+      TenantGetUserInfoRequest request) throws IOException {
+    final TenantGetUserInfoResponse.Builder resp =
+        TenantGetUserInfoResponse.newBuilder();
+    final String userPrincipal = request.getUserPrincipal();
+
+    TenantUserInfoValue ret = impl.tenantGetUserInfo(userPrincipal);
+    if (ret != null) {
+      resp.setSuccess(true);
+      resp.setTenantUserInfo(ret.getProtobuf());
+    } else {
+      resp.setSuccess(false);
+    }
 
     return resp.build();
   }
