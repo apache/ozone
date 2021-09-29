@@ -260,6 +260,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public Tenant getTenantInfo(String tenantID) throws IOException {
+    // TODO：Should read from DB. Ditch the in-memory maps.
     if (!inMemoryTenantNameToTenantInfoMap.containsKey(tenantID)) {
       return null;
     }
@@ -279,6 +280,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public void destroyTenant(Tenant tenant) throws Exception {
+    // TODO: Make sure this is idempotent. This can be called by ALL 3 OMs
+    //  in the case of a createTenant checkAcl failure for instance.
     try {
       controlPathLock.writeLock().lock();
       for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
