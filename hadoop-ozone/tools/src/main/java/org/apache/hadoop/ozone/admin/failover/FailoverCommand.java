@@ -94,7 +94,7 @@ public class FailoverCommand extends GenericCli
   private String omServiceId;
 
   @CommandLine.Option(
-          names = {"--raftHostPortList"},
+          names = {"--hostPortList"},
           description = "if need to test on given nodes, " +
                   "pattern like this 'host:port,host:port,host:port'"
   )
@@ -125,7 +125,6 @@ public class FailoverCommand extends GenericCli
   public Class<?> getParentType() {
     return OzoneAdmin.class;
   }
-
 
   /**
    * Create ratis client raft client.

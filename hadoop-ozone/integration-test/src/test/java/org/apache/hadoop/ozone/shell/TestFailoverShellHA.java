@@ -81,7 +81,6 @@ public class TestFailoverShellHA {
     if (cluster != null) {
       cluster.shutdown();
     }
-    System.setOut(null);
   }
 
 
