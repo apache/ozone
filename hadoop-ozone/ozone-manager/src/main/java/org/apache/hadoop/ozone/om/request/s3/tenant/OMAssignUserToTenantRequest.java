@@ -33,10 +33,9 @@ import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMAssignUserToTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantResponse;
@@ -96,7 +95,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 /**
  * Handles OMAssignUserToTenantRequest.
  */
-public class OMAssignUserToTenantRequest extends OMVolumeRequest {
+public class OMAssignUserToTenantRequest extends OMClientRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMAssignUserToTenantRequest.class);
 
@@ -291,7 +290,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
       // Set response success flag to false
       omResponse.setAssignUserToTenantResponse(
           AssignUserToTenantResponse.newBuilder().setSuccess(false).build());
-      omClientResponse = new OMTenantCreateResponse(
+      omClientResponse = new OMAssignUserToTenantResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
       if (omClientResponse != null) {
