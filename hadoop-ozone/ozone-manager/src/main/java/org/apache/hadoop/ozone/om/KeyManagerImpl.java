@@ -1771,16 +1771,16 @@ public class KeyManagerImpl implements KeyManager {
 
     BucketLayout bucketLayout = BucketLayout.DEFAULT;
     if (ozoneManager != null) {
-      String buckKey = ozoneManager.getMetadataManager()
-          .getBucketKey(volume, bucket);
+      String buckKey =
+          ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
       OmBucketInfo buckInfo = null;
       try {
         buckInfo =
             ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+        bucketLayout = buckInfo.getBucketLayout();
       } catch (IOException e) {
-        e.printStackTrace();
+        LOG.error("Failed to get bucket for the key: " + buckKey, e);
       }
-      bucketLayout = buckInfo.getBucketLayout();
     }
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
