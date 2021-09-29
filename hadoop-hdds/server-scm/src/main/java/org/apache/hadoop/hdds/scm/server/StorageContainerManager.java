@@ -167,6 +167,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -751,12 +752,35 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private ContainerTokenSecretManager createContainerTokenSecretManager(
-      OzoneConfiguration conf) {
+      OzoneConfiguration conf) throws IOException {
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
+
+    // Means this is an upgraded cluster and it has no sub-ca,
+    // so SCM Certificate client is not initialized. To make Tokens
+    // work let's use root CA cert and create SCM Certificate client with
+    // root CA cert.
+    if (scmCertificateClient == null) {
+      Preconditions.checkState(
+          !scmStorageConfig.checkPrimarySCMIdInitialized());
+
+      String certSerialNumber;
+      try {
+        certSerialNumber = getScmCertificateServer().getCACertificate()
+            .getSerialNumber().toString();
+      } catch (CertificateException ex) {
+        LOG.error("Get CA Certificate failed", ex);
+        throw new IOException(ex);
+      } catch (IOException ex) {
+        LOG.error("Get CA Certificate failed", ex);
+        throw ex;
+      }
+      scmCertificateClient = new SCMCertificateClient(securityConfig,
+          certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
+    }
     String certId = scmCertificateClient.getCertificate().getSerialNumber()
         .toString();
     return new ContainerTokenSecretManager(securityConfig,
