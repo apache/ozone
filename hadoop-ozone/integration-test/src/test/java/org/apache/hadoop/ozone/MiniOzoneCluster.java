@@ -501,14 +501,15 @@ public interface MiniOzoneCluster {
 
     /**
      * Sets the reserved space
-     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys#HDDS_DATANODE_DIR_DU_RESERVED}
+     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
+     * HDDS_DATANODE_DIR_DU_RESERVED
      * for each volume in each datanode.
      * @param reservedSpace String that contains the numeric size value and
      *                      ends with a
      *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
-     *                      suffix. For example, "50GB". See
-     *                      {@link org.apache.hadoop.ozone.container.common.volume.VolumeInfo}
-     *                      for more details.
+     *                      suffix. For example, "50GB".
+     * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
+     *
      * @return {@link MiniOzoneCluster} Builder
      */
     public Builder setDatanodeReservedSpace(String reservedSpace) {
