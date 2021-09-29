@@ -162,22 +162,14 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
   }
 
   @Test
-  public void testThreeNode() throws Exception {
+  public void testContainerClose() throws Exception {
     testWatchForCommitWithCloseContainerException();
-    testWatchForCommitDatanodeFailure();
-    test2DatanodesFailure();
+    testWatchForCommitWithSingleNodeRatis();
     testFailureWithPrimeSizedData();
     testExceptionDuringClose();
   }
 
-  @Test
-  public void testOneNode() throws Exception {
-    testDatanodeFailureWithSingleNodeRatis();
-    testWatchForCommitWithSingleNodeRatis();
-    testDatanodeFailureWithPreAllocation();
-  }
-
-  public void testWatchForCommitWithCloseContainerException()
+  private void testWatchForCommitWithCloseContainerException()
       throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -266,6 +258,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
+  @Test
   public void testWatchForCommitDatanodeFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -352,6 +345,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
+  @Test
   public void test2DatanodesFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -456,7 +450,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     validateData(keyName, data1);
   }
 
-  public void testFailureWithPrimeSizedData() throws Exception {
+  private void testFailureWithPrimeSizedData() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     int dataLength = maxFlushSize + chunkSize;
@@ -519,7 +513,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  public void testExceptionDuringClose() throws Exception {
+  private void testExceptionDuringClose() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     int dataLength = 167;
@@ -589,7 +583,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  public void testWatchForCommitWithSingleNodeRatis() throws Exception {
+  private void testWatchForCommitWithSingleNodeRatis() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 0, ReplicationFactor.ONE);
@@ -679,6 +673,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
+  @Test
   public void testDatanodeFailureWithSingleNodeRatis() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
@@ -771,6 +766,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
+  @Test
   public void testDatanodeFailureWithPreAllocation() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
