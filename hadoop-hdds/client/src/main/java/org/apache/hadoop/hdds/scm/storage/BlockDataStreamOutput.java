@@ -42,6 +42,7 @@ import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RoutingTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,8 +192,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   public RoutingTable getRoutingTable(Pipeline pipeline) {
-    RaftPeer primary = null;
-    List<RaftPeer> raftPeers = new ArrayList();
+    RaftPeerId primary = null;
+    List<RaftPeerId> raftPeers = new ArrayList();
 
     for (DatanodeDetails dn : pipeline.getNodes()) {
       RaftPeer.Builder raftPeerBuilder = RaftPeer.newBuilder();
@@ -208,22 +209,22 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           + ":" + dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
       try {
         if (dn == pipeline.getFirstNode()) {
-          primary = raftPeerBuilder.build();
+          primary = raftPeerBuilder.build().getId();
 
         }
       } catch (IOException e) {
         e.printStackTrace();
       }
-      raftPeers.add(raftPeerBuilder.build());
+      raftPeers.add(raftPeerBuilder.build().getId());
     }
 
     RoutingTable.Builder builder = RoutingTable.newBuilder();
-    RaftPeer previous = primary;
-    for (RaftPeer peer : raftPeers) {
+    RaftPeerId previous = primary;
+    for (RaftPeerId peer : raftPeers) {
       if (peer.equals(primary)) {
         continue;
       }
-      builder.addSuccessor(previous.getId(), peer.getId());
+      builder.addSuccessor(previous, peer);
       previous = peer;
     }
 
