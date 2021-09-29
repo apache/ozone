@@ -17,13 +17,6 @@
  */
 package org.apache.hadoop.ozone;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,6 +30,13 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -315,6 +315,7 @@ public interface MiniOzoneCluster {
     protected Optional<String> omId = Optional.empty();
     
     protected Boolean randomContainerPort = true;
+    protected Optional<String> datanodeReservedSpace = Optional.of("0B");
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
@@ -495,6 +496,23 @@ public interface MiniOzoneCluster {
      */
     public Builder setTrace(Boolean trace) {
       enableTrace = Optional.of(trace);
+      return this;
+    }
+
+    /**
+     * Sets the reserved space
+     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys#HDDS_DATANODE_DIR_DU_RESERVED}
+     * for each volume in each datanode.
+     * @param reservedSpace String that contains the numeric size value and
+     *                      ends with a
+     *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
+     *                      suffix. For example, "50GB". See
+     *                      {@link org.apache.hadoop.ozone.container.common.volume.VolumeInfo}
+     *                      for more details.
+     * @return {@link MiniOzoneCluster} Builder
+     */
+    public Builder setDatanodeReservedSpace(String reservedSpace) {
+      datanodeReservedSpace = Optional.of(reservedSpace);
       return this;
     }
 

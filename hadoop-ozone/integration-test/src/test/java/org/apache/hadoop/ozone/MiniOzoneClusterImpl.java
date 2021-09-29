@@ -17,23 +17,7 @@
  */
 package org.apache.hadoop.ozone;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.UUID;
-import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -71,8 +55,29 @@ import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
+import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
-import org.apache.commons.io.FileUtils;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_ADMIN;
@@ -93,11 +98,6 @@ import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
-import org.junit.rules.TemporaryFolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -818,6 +818,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           Path dir = Paths.get(datanodeBaseDir, "data-" + j, "containers");
           Files.createDirectories(dir);
           dataDirs.add(dir.toString());
+          datanodeReservedSpace.ifPresent(
+              s -> dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
+                  dir + ":" + s));
         }
         String listOfDirs = String.join(",", dataDirs);
         Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
@@ -828,6 +831,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         Files.createDirectories(workDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
         dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
+        dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, listOfDirs);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
