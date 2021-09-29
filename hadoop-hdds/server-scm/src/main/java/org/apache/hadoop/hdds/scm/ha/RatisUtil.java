@@ -73,7 +73,7 @@ public final class RatisUtil {
     setRaftLogProperties(properties, conf);
     setRaftRetryCacheProperties(properties, conf);
     setRaftSnapshotProperties(properties, conf);
-    setRaftLeadElectionProperties(properties);
+    setRaftLeadElectionProperties(properties, conf);
     return properties;
   }
 
