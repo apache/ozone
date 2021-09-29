@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -146,7 +145,8 @@ public class TestOmMetrics {
 
     // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockVm).getVolumeInfo(any());
-    Mockito.doThrow(exception).when(mockVm).listVolumes(any(), any(), any(), anyInt());
+    Mockito.doThrow(exception).when(mockVm).listVolumes(any(), any(),
+        any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
         "volumeManager", mockVm);
@@ -216,14 +216,16 @@ public class TestOmMetrics {
     writeClient.createBucket(bucketInfo);
     bucketInfo = createBucketInfo();
     writeClient.createBucket(bucketInfo);
-    writeClient.deleteBucket(bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+    writeClient.deleteBucket(bucketInfo.getVolumeName(),
+        bucketInfo.getBucketName());
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumBuckets", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockBm).getBucketInfo(any(), any());
-    Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(), any(), anyInt());
+    Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(),
+        any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
@@ -466,7 +468,7 @@ public class TestOmMetrics {
   /**
    * Test volume operations with ignoring thrown exception.
    */
-  private void doVolumeOps(OmVolumeArgs volumeArgs ) {
+  private void doVolumeOps(OmVolumeArgs volumeArgs) {
     try {
       writeClient.createVolume(volumeArgs);
     } catch (IOException ignored) {
