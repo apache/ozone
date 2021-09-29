@@ -119,23 +119,13 @@ public class TestOmMetrics {
             ozoneManager, "volumeManager");
     VolumeManager mockVm = Mockito.spy(volumeManager);
 
-
-
     OmVolumeArgs volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumeCreateFails", 0L, omMetrics);
-    assertCounter("NumVolumeUpdateFails", 0L, omMetrics);
-    assertCounter("NumVolumeInfoFails", 0L, omMetrics);
-    assertCounter("NumVolumeCheckAccessFails", 1L, omMetrics);
-    assertCounter("NumVolumeDeleteFails", 0L, omMetrics);
-    assertCounter("NumVolumeListFails", 0L, omMetrics);
-
-    assertCounter("NumVolumeOps", 6L, omMetrics);
+    assertCounter("NumVolumeOps", 5L, omMetrics);
     assertCounter("NumVolumeCreates", 1L, omMetrics);
     assertCounter("NumVolumeUpdates", 1L, omMetrics);
     assertCounter("NumVolumeInfos", 1L, omMetrics);
-    assertCounter("NumVolumeCheckAccesses", 1L, omMetrics);
     assertCounter("NumVolumeDeletes", 1L, omMetrics);
     assertCounter("NumVolumeLists", 1L, omMetrics);
     assertCounter("NumVolumes", 1L, omMetrics);
@@ -155,9 +145,8 @@ public class TestOmMetrics {
 
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockVm).getVolumeInfo(null);
-    Mockito.doThrow(exception).when(mockVm).checkVolumeAccess(null, null);
-    Mockito.doThrow(exception).when(mockVm).listVolumes(null, null, null, 0);
+    Mockito.doThrow(exception).when(mockVm).getVolumeInfo(any());
+    Mockito.doThrow(exception).when(mockVm).listVolumes(any(), any(), any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
         "volumeManager", mockVm);
@@ -174,26 +163,22 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);
 
-
-
     volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumeOps", 16L, omMetrics);
+    assertCounter("NumVolumeOps", 14L, omMetrics);
     assertCounter("NumVolumeCreates", 5L, omMetrics);
     assertCounter("NumVolumeUpdates", 2L, omMetrics);
     assertCounter("NumVolumeInfos", 2L, omMetrics);
-    assertCounter("NumVolumeCheckAccesses", 2L, omMetrics);
     assertCounter("NumVolumeDeletes", 3L, omMetrics);
     assertCounter("NumVolumeLists", 2L, omMetrics);
 
     assertCounter("NumVolumeCreateFails", 1L, omMetrics);
     assertCounter("NumVolumeUpdateFails", 1L, omMetrics);
     assertCounter("NumVolumeInfoFails", 1L, omMetrics);
-    assertCounter("NumVolumeCheckAccessFails", 2L, omMetrics);
     assertCounter("NumVolumeDeleteFails", 1L, omMetrics);
-    assertCounter("NumVolumeListFails", 0L, omMetrics);
+    assertCounter("NumVolumeListFails", 1L, omMetrics);
 
     // As last call for volumesOps does not increment numVolumes as those are
     // failed.
@@ -223,7 +208,7 @@ public class TestOmMetrics {
     assertCounter("NumBucketInfos", 1L, omMetrics);
     assertCounter("NumBucketDeletes", 1L, omMetrics);
     assertCounter("NumBucketLists", 1L, omMetrics);
-    assertCounter("NumBuckets", 1L, omMetrics);
+    assertCounter("NumBuckets", 0L, omMetrics);
 
     bucketInfo = createBucketInfo();
     writeClient.createBucket(bucketInfo);
@@ -234,11 +219,11 @@ public class TestOmMetrics {
     writeClient.deleteBucket(bucketInfo.getVolumeName(), bucketInfo.getBucketName());
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBuckets", 3L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockBm).getBucketInfo(null, null);
-    Mockito.doThrow(exception).when(mockBm).listBuckets(null, null, null, 0);
+    Mockito.doThrow(exception).when(mockBm).getBucketInfo(any(), any());
+    Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(), any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
@@ -269,13 +254,13 @@ public class TestOmMetrics {
     assertCounter("NumBucketCreateFails", 1L, omMetrics);
     assertCounter("NumBucketUpdateFails", 1L, omMetrics);
     assertCounter("NumBucketInfoFails", 1L, omMetrics);
-    assertCounter("NumBucketDeleteFails", 2L, omMetrics);
-    assertCounter("NumBucketListFails", 0L, omMetrics);
+    assertCounter("NumBucketDeleteFails", 1L, omMetrics);
+    assertCounter("NumBucketListFails", 1L, omMetrics);
 
-    assertCounter("NumBuckets", 3L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumBuckets", 3L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
   }
 
   @Test
@@ -499,14 +484,13 @@ public class TestOmMetrics {
     } catch (IOException ignored) {
     }
 
+    /* This appears to have been removed from the VolumeManagerImpl:
+       HDDS-4901.  Should I remove it from the OM?
     try {
-      OzoneManagerProtocolProtos.OzoneAclInfo aclInfo = OzoneAcl.toProtobuf(
-          new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
-        IAccessAuthorizer.ACLType.ALL, ACCESS));
-      ozoneManager.checkVolumeAccess(volumeArgs.getVolume(),
-        aclInfo);
+      ozoneManager.checkVolumeAccess(null, null);
     } catch (IOException ignored) {
     }
+    */
 
     try {
       writeClient.setOwner(volumeArgs.getVolume(), "dummy");
@@ -532,11 +516,12 @@ public class TestOmMetrics {
     } catch (IOException ignored) {
     }
 
+    /*  Commenting this out for now since it seems wrong.
     try {
-      OmBucketInfo deleteInfo = createBucketInfo();
-      writeClient.deleteBucket(deleteInfo.getVolumeName(), deleteInfo.getBucketName());
+      ozoneManager.deleteBucket(null, null);
     } catch (IOException ignored) {
     }
+    */
 
     try {
       ozoneManager.getBucketInfo(info.getVolumeName(), info.getBucketName());
@@ -550,6 +535,11 @@ public class TestOmMetrics {
 
     try {
       ozoneManager.listBuckets(info.getVolumeName(), null, null, 0);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.deleteBucket(info.getVolumeName(), info.getBucketName());
     } catch (IOException ignored) {
     }
   }
