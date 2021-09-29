@@ -186,6 +186,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   public void testPrepareWithRestart() throws Exception {
     // Create fresh cluster for this test to prevent timeout from restarting
     // modified cluster.
+    shutdown();
     init();
     setup();
 

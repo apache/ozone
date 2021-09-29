@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.BeforeClass;
-import org.junit.Before;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Rule;
@@ -187,28 +186,6 @@ public abstract class TestOzoneManagerHA {
         .getObjectStore();
   }
 
-  /**
-   * Apply additional configuration between tests.
-   */
-  @Before
-  public void setupTest() {
-    additionalConfiguration();
-    additionalClusterSettings();
-  }
-
-  /**
-   * Override this method in sub-classes to additional test specific
-   * configuration. Add settings to the conf instance variable.
-   */
-  protected void additionalConfiguration() {
-  }
-
-  /**
-   * Override this method in sub-classes to additional test specific
-   * mini-cluster settings. Add settings the clusterBuilder instance variable.
-   */
-  protected void additionalClusterSettings() {
-  }
 
   /**
    * Reset cluster between tests.
