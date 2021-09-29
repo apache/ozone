@@ -74,8 +74,6 @@ public class TestOmMetrics {
   private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
   private OzoneManagerProtocol writeClient;
-  private final String volumeName = UUID.randomUUID().toString();
-  private final String bucketName = UUID.randomUUID().toString();
   /**
    * The exception used for testing failure metrics.
    */
@@ -278,11 +276,13 @@ public class TestOmMetrics {
     clusterBuilder.setNumDatanodes(3);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
     startCluster();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
     TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
-    OmKeyArgs keyArgs = createKeyArgs();
+    OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName);
     doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
@@ -306,13 +306,13 @@ public class TestOmMetrics {
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
     
 
-    keyArgs = createKeyArgs();
+    keyArgs = createKeyArgs(volumeName, bucketName);
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = createKeyArgs();
+    keyArgs = createKeyArgs(volumeName, bucketName);
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = createKeyArgs();
+    keyArgs = createKeyArgs(volumeName, bucketName);
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
@@ -343,7 +343,7 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);
 
-    keyArgs = createKeyArgs();
+    keyArgs = createKeyArgs(volumeName, bucketName);
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
@@ -474,16 +474,13 @@ public class TestOmMetrics {
    * Test volume operations with ignoring thrown exception.
    */
   private void doVolumeOps(OmVolumeArgs volumeArgs ) {
-    OzoneManagerProtocolProtos.OzoneAclInfo aclInfo = OzoneAcl.toProtobuf(
-      new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
-        IAccessAuthorizer.ACLType.ALL, ACCESS));
-    OmVolumeArgs deleteArgs = createVolumeArgs();
     try {
       writeClient.createVolume(volumeArgs);
     } catch (IOException ignored) {
     }
 
     try {
+      OmVolumeArgs deleteArgs = createVolumeArgs();
       writeClient.deleteVolume(deleteArgs.getVolume());
     } catch (IOException ignored) {
     }
@@ -493,6 +490,9 @@ public class TestOmMetrics {
     }
 
     try {
+      OzoneManagerProtocolProtos.OzoneAclInfo aclInfo = OzoneAcl.toProtobuf(
+          new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
+        IAccessAuthorizer.ACLType.ALL, ACCESS));
       ozoneManager.checkVolumeAccess(volumeArgs.getVolume(),
         aclInfo);
     } catch (IOException ignored) {
@@ -507,20 +507,19 @@ public class TestOmMetrics {
       ozoneManager.listAllVolumes(volumeArgs.getVolume(), null, 0);
     } catch (IOException ignored) {
     }
-
   }
 
   /**
    * Test bucket operations with ignoring thrown exception.
    */
   private void doBucketOps(OmBucketInfo info) throws IOException{
-    OmBucketInfo deleteInfo = createBucketInfo();
     try {
       writeClient.createBucket(info);
     } catch (IOException ignored) {
     }
 
     try {
+      OmBucketInfo deleteInfo = createBucketInfo();
       writeClient.deleteBucket(deleteInfo.getVolumeName(), deleteInfo.getBucketName());
     } catch (IOException ignored) {
     }
@@ -586,7 +585,8 @@ public class TestOmMetrics {
 
   }
 
-  private OmKeyArgs createKeyArgs() throws IOException {
+  private OmKeyArgs createKeyArgs(String volumeName, String bucketName)
+      throws IOException {
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
         .setPipeline(MockPipeline.createSingleNodePipeline())
