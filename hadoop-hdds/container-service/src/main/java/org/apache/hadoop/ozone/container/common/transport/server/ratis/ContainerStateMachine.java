@@ -169,12 +169,6 @@ public class ContainerStateMachine extends BaseStateMachine {
     int numPendingRequests = conf
         .getObject(DatanodeRatisServerConfig.class)
         .getLeaderNumPendingRequests();
-    long pendingRequestsBytesLimit = (long)conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
-        StorageUnit.BYTES);
-    int pendingRequestsMegaBytesLimit =
-        HddsUtils.roundupMb(pendingRequestsBytesLimit);
     int pendingExpire = (int) conf.getTimeDuration(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_EXPIRE,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_EXPIRE_DEFAULT,
