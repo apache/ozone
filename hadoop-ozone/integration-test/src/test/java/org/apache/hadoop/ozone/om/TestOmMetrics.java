@@ -259,6 +259,9 @@ public class TestOmMetrics {
 
   @Test
   public void testKeyOps() throws Exception {
+    // This test needs a cluster with DNs and SCM to wait on safemode
+    clusterBuilder.setNumDatanodes(3);
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
     startCluster();
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
@@ -271,12 +274,12 @@ public class TestOmMetrics {
 
     // Check for failures
     //  The delete and lookup in doKeyOps() always fail
-    // assertCounter("NumKeyAllocateFails", 0L, omMetrics);
-    // assertCounter("NumKeyLookupFails", 1L, omMetrics);
-    // assertCounter("NumKeyDeleteFails", 1L, omMetrics);
-    // assertCounter("NumKeyListFails", 0L, omMetrics);
-    // assertCounter("NumTrashKeyListFails", 0L, omMetrics);
-    // assertCounter("NumInitiateMultipartUploadFails", 0L, omMetrics);
+    assertCounter("NumKeyAllocateFails", 0L, omMetrics);
+    assertCounter("NumKeyLookupFails", 1L, omMetrics);
+    assertCounter("NumKeyDeleteFails", 1L, omMetrics);
+    assertCounter("NumKeyListFails", 0L, omMetrics);
+    assertCounter("NumTrashKeyListFails", 0L, omMetrics);
+    assertCounter("NumInitiateMultipartUploadFails", 0L, omMetrics);
 
     assertCounter("NumKeyOps", 7L, omMetrics);
     assertCounter("NumKeyAllocate", 1L, omMetrics);
@@ -531,39 +534,39 @@ public class TestOmMetrics {
     } catch (IOException ignored) {
     }
 
-    // try {
-    //   // Always fails because key is not committed
-    //   writeClient.deleteKey(keyArgs);
-    // } catch (IOException ignored) {
-    // }
+    try {
+      // Always fails because key is not committed
+      writeClient.deleteKey(keyArgs);
+    } catch (IOException ignored) {
+    }
 
-    // try {
-    //   // Always fails because key is not committed
-    //   ozoneManager.lookupKey(keyArgs);
-    // } catch (IOException ignored) {
-    // }
+    try {
+      // Always fails because key is not committed
+      ozoneManager.lookupKey(keyArgs);
+    } catch (IOException ignored) {
+    }
 
-    // try {
-    //   ozoneManager.listKeys(keyArgs.getVolumeName(),
-    //                         keyArgs.getBucketName(), null, null, 0);
-    // } catch (IOException ignored) {
-    // }
+    try {
+      ozoneManager.listKeys(keyArgs.getVolumeName(),
+                            keyArgs.getBucketName(), null, null, 0);
+    } catch (IOException ignored) {
+    }
 
-    // try {
-    //   ozoneManager.listTrash(keyArgs.getVolumeName(),
-    //                          keyArgs.getBucketName(), null, null, 0);
-    // } catch (IOException ignored) {
-    // }
+    try {
+      ozoneManager.listTrash(keyArgs.getVolumeName(),
+                             keyArgs.getBucketName(), null, null, 0);
+    } catch (IOException ignored) {
+    }
 
-    // try {
-    //   writeClient.commitKey(keyArgs, 0);
-    // } catch (IOException ignored) {
-    // }
+    try {
+      writeClient.commitKey(keyArgs, 0);
+    } catch (IOException ignored) {
+    }
 
-    // try {
-    //   writeClient.initiateMultipartUpload(keyArgs);
-    // } catch (IOException ignored) {
-    // }
+    try {
+      writeClient.initiateMultipartUpload(keyArgs);
+    } catch (IOException ignored) {
+    }
 
   }
 
