@@ -119,10 +119,18 @@ public class TestOmMetrics {
             ozoneManager, "volumeManager");
     VolumeManager mockVm = Mockito.spy(volumeManager);
 
+
+
     OmVolumeArgs volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
-
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumVolumeCreateFails", 0L, omMetrics);
+    assertCounter("NumVolumeUpdateFails", 0L, omMetrics);
+    assertCounter("NumVolumeInfoFails", 0L, omMetrics);
+    assertCounter("NumVolumeCheckAccessFails", 1L, omMetrics);
+    assertCounter("NumVolumeDeleteFails", 0L, omMetrics);
+    assertCounter("NumVolumeListFails", 0L, omMetrics);
+
     assertCounter("NumVolumeOps", 6L, omMetrics);
     assertCounter("NumVolumeCreates", 1L, omMetrics);
     assertCounter("NumVolumeUpdates", 1L, omMetrics);
@@ -130,7 +138,7 @@ public class TestOmMetrics {
     assertCounter("NumVolumeCheckAccesses", 1L, omMetrics);
     assertCounter("NumVolumeDeletes", 1L, omMetrics);
     assertCounter("NumVolumeLists", 1L, omMetrics);
-    assertCounter("NumVolumes", 2L, omMetrics);
+    assertCounter("NumVolumes", 1L, omMetrics);
 
     volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);
@@ -143,7 +151,7 @@ public class TestOmMetrics {
     omMetrics = getMetrics("OMMetrics");
 
     // Accounting 's3v' volume which is created by default.
-    assertCounter("NumVolumes", 4L, omMetrics);
+    assertCounter("NumVolumes", 3L, omMetrics);
 
 
     // inject exception to test for Failure Metrics on the read path
@@ -184,15 +192,15 @@ public class TestOmMetrics {
     assertCounter("NumVolumeUpdateFails", 1L, omMetrics);
     assertCounter("NumVolumeInfoFails", 1L, omMetrics);
     assertCounter("NumVolumeCheckAccessFails", 2L, omMetrics);
-    assertCounter("NumVolumeDeleteFails", 2L, omMetrics);
+    assertCounter("NumVolumeDeleteFails", 1L, omMetrics);
     assertCounter("NumVolumeListFails", 0L, omMetrics);
 
     // As last call for volumesOps does not increment numVolumes as those are
     // failed.
-    assertCounter("NumVolumes", 4L, omMetrics);
+    assertCounter("NumVolumes", 3L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumVolumes", 4L, omMetrics);
+    assertCounter("NumVolumes", 3L, omMetrics);
 
 
   }
@@ -479,11 +487,13 @@ public class TestOmMetrics {
     } catch (IOException ignored) {
     }
 
+    /*  Commenting this out for now since it seems wrong.
     try {
-      OmVolumeArgs deleteArgs = createVolumeArgs();
-      writeClient.deleteVolume(deleteArgs.getVolume());
+      writeClient.deleteVolume("nonExistentVolume");
     } catch (IOException ignored) {
     }
+    */
+
     try {
       ozoneManager.getVolumeInfo(volumeArgs.getVolume());
     } catch (IOException ignored) {
@@ -504,7 +514,11 @@ public class TestOmMetrics {
     }
 
     try {
-      ozoneManager.listAllVolumes(volumeArgs.getVolume(), null, 0);
+      ozoneManager.listAllVolumes("", null, 0);
+    } catch (IOException ignored) {
+    }
+    try {
+      writeClient.deleteVolume(volumeArgs.getVolume());
     } catch (IOException ignored) {
     }
   }
