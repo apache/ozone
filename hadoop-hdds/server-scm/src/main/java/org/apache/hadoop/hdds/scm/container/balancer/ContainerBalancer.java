@@ -184,7 +184,7 @@ public class ContainerBalancer {
     for (int i = 0; i < idleIteration && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
-        if (!isBalancerRunning()) {
+        if (isBalancerRunning()) {
           stop();
         }
         return;
@@ -205,15 +205,12 @@ public class ContainerBalancer {
           } catch (InterruptedException e) {
             LOG.info("Container Balancer was interrupted while waiting for" +
                 " next iteration.");
-            if (!isBalancerRunning()) {
-              stop();
-            }
             return;
           }
         }
       }
     }
-    if (!isBalancerRunning()) {
+    if (isBalancerRunning()) {
       stop();
     }
   }
@@ -281,7 +278,7 @@ public class ContainerBalancer {
 
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
-      if (!isBalancerRunning() || Thread.currentThread().isInterrupted()) {
+      if (!isBalancerRunning()) {
         return false;
       }
       double utilization = datanodeUsageInfo.calculateUtilization();
@@ -370,7 +367,7 @@ public class ContainerBalancer {
 
     // match each overUtilized node with a target
     for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
-      if (!balancerRunning || Thread.currentThread().isInterrupted()) {
+      if (!balancerRunning) {
         checkIterationMoveResults();
         return IterationResult.ITERATION_INTERRUPTED;
       }
@@ -405,7 +402,7 @@ public class ContainerBalancer {
       Collections.reverse(withinThresholdUtilizedNodes);
 
       for (DatanodeUsageInfo datanodeUsageInfo : withinThresholdUtilizedNodes) {
-        if (!balancerRunning || Thread.currentThread().isInterrupted()) {
+        if (!balancerRunning) {
           checkIterationMoveResults();
           return IterationResult.ITERATION_INTERRUPTED;
         }
@@ -749,7 +746,7 @@ public class ContainerBalancer {
       balancerRunning = false;
       if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
         currentBalancingThread.interrupt();
-        currentBalancingThread.join(0);
+        currentBalancingThread.join();
       }
 
       // allow garbage collector to collect balancing thread
