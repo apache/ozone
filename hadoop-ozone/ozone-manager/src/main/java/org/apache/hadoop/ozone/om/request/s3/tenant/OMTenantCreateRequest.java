@@ -54,6 +54,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -116,7 +118,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .isExist(tenantName)) {
       LOG.debug("tenant: {} already exists", tenantName);
       throw new OMException("Tenant already exists",
-          OMException.ResultCodes.TENANT_ALREADY_EXISTS);
+          TENANT_ALREADY_EXISTS);
     }
 
     // getUserName returns:
@@ -188,6 +190,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
@@ -202,7 +205,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantName = request.getTenantName();
-    Tenant tenant = null;
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
@@ -228,14 +230,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Check volume existence
       if (omMetadataManager.getVolumeTable().isExist(volumeName)) {
         LOG.debug("volume: {} already exists", volumeName);
-        throw new OMException("Volume already exists",
-            OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+        throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
       }
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantName)) {
         LOG.debug("tenant: {} already exists", tenantName);
-        throw new OMException("Tenant already exists",
-            OMException.ResultCodes.TENANT_ALREADY_EXISTS);
+        throw new OMException("Tenant already exists", TENANT_ALREADY_EXISTS);
       }
 
       // Add to tenantStateTable. Redundant assignment for clarity
@@ -251,8 +251,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantName),
           new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
-
-      tenant = ozoneManager.getMultiTenantManager().getTenantInfo(tenantName);
 
       // Add to tenantPolicyTable
       omMetadataManager.getTenantPolicyTable().addCacheEntry(
@@ -294,21 +292,32 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           omResponse.build(),
           omVolumeArgs, volumeList,
           omDBTenantInfo, tenantDefaultPolicies, bucketPolicyId);
+
     } catch (IOException ex) {
-      exception = ex;
-      if (tenant != null) {
-        try {
-          ozoneManager.getMultiTenantManager().destroyTenant(tenant);
-        } catch (Exception e) {
-          // TODO: Ignore for now. Multi-Tenant Manager is responsible for
-          //  cleaning up stale state eventually.
+      if (ex instanceof OMException) {
+        final OMException omEx = (OMException) ex;
+        if (omEx.getResult().equals(VOLUME_ALREADY_EXISTS) ||
+            omEx.getResult().equals(TENANT_ALREADY_EXISTS)) {
+          // Do NOT perform any clean-up if the exception is a result of
+          //  volume name or tenant name already existing.
+          //  Otherwise in a race condition a late-comer could wipe the
+          omResponse.setSuccess(true);
+        } else {
+          omResponse.setSuccess(false);
+          // All OMs should proactively call the clean-up handler in other cases
+          handleRequestFailure(ozoneManager);
         }
+      } else {
+        omResponse.setSuccess(false);
+        // All OMs should proactively call the clean-up handler in other cases
+        handleRequestFailure(ozoneManager);
       }
-      // Set response success flag to false
+      // Prepare omClientResponse
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder().setSuccess(false).build());
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
+      exception = ex;
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper

@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * TenantUserInfo retrieved from OM.
+ * Utility class to handle protobuf message TenantUserInfo conversion.
  */
 public class TenantUserInfoValue {
 
@@ -64,7 +64,7 @@ public class TenantUserInfoValue {
   @Override
   public String toString() {
     return "userPrincipal=" + userPrincipal +
-        "\naccessIdInfoList=" + accessIdInfoList;
+        "\naccessIdInfoList=[" + accessIdInfoList + "]";
     // TODO: Check. List might print hashCode.
   }
 

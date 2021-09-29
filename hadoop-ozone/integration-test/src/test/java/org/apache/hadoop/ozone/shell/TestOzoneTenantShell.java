@@ -57,8 +57,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.fail;
 
 /**
- * This class tests Ozone tenant shell command.
- * Inspired by TestS3Shell
+ * Integration test for Ozone tenant shell command.
  */
 public class TestOzoneTenantShell {
 
