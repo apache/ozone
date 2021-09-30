@@ -28,10 +28,10 @@ import java.util.Objects;
  */
 public class TenantUserInfoValue {
 
-  // Usually the Kerberos principal of a user.
+  // Usually this is the Kerberos principal of a user.
   private final String userPrincipal;
 
-  // A map from accessId to tenant name.
+  // A list of TenantAccessIdInfo from protobuf.
   private final List<TenantAccessIdInfo> accessIdInfoList;
 
   public String getUserPrincipal() {
@@ -64,8 +64,7 @@ public class TenantUserInfoValue {
   @Override
   public String toString() {
     return "userPrincipal=" + userPrincipal +
-        "\naccessIdInfoList=[" + accessIdInfoList + "]";
-    // TODO: Check. List might print hashCode.
+        "\naccessIdInfoList=" + accessIdInfoList;
   }
 
   @Override
@@ -78,11 +77,11 @@ public class TenantUserInfoValue {
     }
     TenantUserInfoValue that = (TenantUserInfoValue) o;
     return userPrincipal.equals(that.userPrincipal) &&
-        accessIdInfoList.equals(that.accessIdInfoList);  // TODO: Questionable
+        accessIdInfoList.equals(that.accessIdInfoList);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(userPrincipal, accessIdInfoList);  // TODO: Questionable
+    return Objects.hash(userPrincipal, accessIdInfoList);
   }
 }
