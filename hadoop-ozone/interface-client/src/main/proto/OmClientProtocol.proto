@@ -110,7 +110,6 @@ enum Type {
   AssignUserToTenant = 98;
   ModifyTenantUser = 99;
   DeleteTenantUser = 100;
-
   GetS3Volume = 101;
 }
 

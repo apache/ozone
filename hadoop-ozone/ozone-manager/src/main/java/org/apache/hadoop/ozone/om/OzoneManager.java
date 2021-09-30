@@ -3095,8 +3095,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String defaultS3volume =
           HddsClientUtils.getDefaultS3VolumeName(configuration);
 
-      LOG.info("No tenant found for access ID {}. Directing " +
-          "requests to default s3 volume {}.", accessID, defaultS3volume);
       if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
                 "requests to default s3 volume {}.", accessID, defaultS3volume);

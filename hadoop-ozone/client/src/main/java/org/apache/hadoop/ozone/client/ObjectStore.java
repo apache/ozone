@@ -113,12 +113,12 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    OzoneVolume volume = getS3Volume(defaultS3Volume);
+    OzoneVolume volume = getVolume(defaultS3Volume);
     volume.createBucket(bucketName);
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
-    return getS3Volume(defaultS3Volume).getBucket(bucketName);
+    return getVolume(defaultS3Volume).getBucket(bucketName);
   }
 
   /**
@@ -128,7 +128,7 @@ public class ObjectStore {
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
     try {
-      OzoneVolume volume = getS3Volume(defaultS3Volume);
+      OzoneVolume volume = getVolume(defaultS3Volume);
       volume.deleteBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {

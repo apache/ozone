@@ -326,22 +326,21 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         LOG.error("Tenant doesn't exist");
         return null;
       }
-      final BasicUserPrincipal userPrincipal = new BasicUserPrincipal(accessID);
-
       final OzoneTenantGroupPrincipal groupTenantAllUsers =
           new OzoneTenantUserGroupPrincipal(tenantName);
       String idGroupTenantAllUsers = authorizer.getGroupId(groupTenantAllUsers);
       List<String> userGroupIDs = new ArrayList<>();
       userGroupIDs.add(idGroupTenantAllUsers);
 
-      String userID = authorizer.createUser(userPrincipal, userGroupIDs);
+      // TODO: Get principal for access ID, or create it if needed.
+//      BasicUserPrincipal
+//      String userID = authorizer.createUser(userPrincipal, userGroupIDs);
 
-      inMemoryAccessIDToTenantNameMap.put(
-          userPrincipal.getName(), tenantName);
-      inMemoryAccessIDToListOfGroupsMap.put(
-          userPrincipal.getName(), userGroupIDs);
+      inMemoryAccessIDToTenantNameMap.put(accessID, tenantName);
+      inMemoryAccessIDToListOfGroupsMap.put(accessID, userGroupIDs);
 
-      return userID;
+//      return userID;
+      return null;
     } catch (Exception e) {
       destroyUser(accessID);
       LOG.error(e.getMessage());

@@ -129,36 +129,4 @@ public class TestMultiTenantVolume {
       }
     }
   }
-
-//  private void assertS3BucketNotFound(OzoneVolume volume, String bucketName)
-//      throws Exception {
-//    try {
-//      volume.getBucket(bucketName);
-//    } catch(OMException ex) {
-//      if (ex.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND) {
-//        throw ex;
-//      }
-//    }
-//  }
-
-//  private ObjectStore getStoreForAccessID(String accessID) throws Exception {
-////    OzoneTokenIdentifier identifier = OzoneTokenIdentifier.newInstance();
-////    identifier.setOmCertSerialId("foo");
-////    identifier.setGetUserForAccessId(accID -> accessID);
-//
-//    UserGroupInformation remoteUser =
-//        UserGroupInformation.createRemoteUser(accessID);
-//
-////    Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
-////        identifier.getSignature().getBytes(StandardCharsets.UTF_8),
-////        identifier.getKind(), null);
-////    remoteUser.addToken(token);
-//
-//    OzoneClient client =
-//        remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)
-//        () -> OzoneClientFactory.getRpcClient(conf));
-//    openClients.add(client);
-//    client.
-//    return client.getObjectStore();
-//  }
 }

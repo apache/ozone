@@ -118,10 +118,11 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * @param accessID
    * @return The {@link OzoneVolume} that should be used to for this S3
    * request based on its access ID.
    * @throws IOException
-   * @param accessID*/
+   */
   OzoneVolume getS3VolumeDetails(String accessID) throws IOException;
 
   /**
