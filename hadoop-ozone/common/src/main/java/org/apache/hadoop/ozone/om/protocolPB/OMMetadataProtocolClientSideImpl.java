@@ -96,8 +96,8 @@ public class OMMetadataProtocolClientSideImpl implements
   @Override
   public OMConfiguration getOMConfiguration() throws IOException {
     try {
-      OMConfigurationResponse getConfigResponse = rpcProxy.getOMConfiguration
-          (NULL_RPC_CONTROLLER, OMConfigurationRequest.newBuilder().build());
+      OMConfigurationResponse getConfigResponse = rpcProxy.getOMConfiguration(
+          NULL_RPC_CONTROLLER, OMConfigurationRequest.newBuilder().build());
 
       OMConfiguration.Builder omMedatataBuilder = new OMConfiguration.Builder();
       if (getConfigResponse.getSuccess()) {
