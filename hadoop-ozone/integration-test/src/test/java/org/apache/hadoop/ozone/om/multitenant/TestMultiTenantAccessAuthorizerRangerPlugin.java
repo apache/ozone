@@ -254,7 +254,8 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     OzoneTenantGroupPrincipal principal =
         new OzoneTenantUserGroupPrincipal(tenant);
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        principal.getName() + "AllowBucketKeyAccess" + vol + bucketName + "Policy");
+        principal.getName() + "AllowBucketKeyAccess" + vol + bucketName +
+            "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(KEY).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName(bucketName).setKeyName("*").build();

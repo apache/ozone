@@ -104,7 +104,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.http.HttpStatus;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 
@@ -267,7 +266,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testDefaultS3GVolumeExists() throws Exception {
-    String s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(cluster.getConf());
+    String s3VolumeName =
+        HddsClientUtils.getDefaultS3VolumeName(cluster.getConf());
     OzoneVolume ozoneVolume = store.getVolume(s3VolumeName);
     Assert.assertEquals(ozoneVolume.getName(), s3VolumeName);
     OMMetadataManager omMetadataManager =
@@ -3587,7 +3587,8 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testSetS3VolumeAcl() throws Exception {
     OzoneObj s3vVolume = new OzoneObjInfo.Builder()
-        .setVolumeName(HddsClientUtils.getDefaultS3VolumeName(cluster.getConf()))
+        .setVolumeName(
+            HddsClientUtils.getDefaultS3VolumeName(cluster.getConf()))
         .setResType(OzoneObj.ResourceType.VOLUME)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();

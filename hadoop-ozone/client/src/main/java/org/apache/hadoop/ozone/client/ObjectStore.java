@@ -59,7 +59,7 @@ public class ObjectStore {
    * Cache size to be used for listVolume calls.
    */
   private int listCacheSize;
-  private final String DEFAULT_S3_VOLUME;
+  private final String defaultS3Volume;
 
   /**
    * Creates an instance of ObjectStore.
@@ -69,7 +69,7 @@ public class ObjectStore {
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    DEFAULT_S3_VOLUME = HddsClientUtils.getDefaultS3VolumeName(conf);
+    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @VisibleForTesting
@@ -77,7 +77,7 @@ public class ObjectStore {
     // For the unit test
     OzoneConfiguration conf = new OzoneConfiguration();
     proxy = null;
-    DEFAULT_S3_VOLUME = HddsClientUtils.getDefaultS3VolumeName(conf);
+    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @VisibleForTesting
@@ -113,12 +113,12 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    OzoneVolume volume = getS3Volume(DEFAULT_S3_VOLUME);
+    OzoneVolume volume = getS3Volume(defaultS3Volume);
     volume.createBucket(bucketName);
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
-    return getS3Volume(DEFAULT_S3_VOLUME).getBucket(bucketName);
+    return getS3Volume(defaultS3Volume).getBucket(bucketName);
   }
 
   /**
@@ -128,7 +128,7 @@ public class ObjectStore {
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
     try {
-      OzoneVolume volume = getS3Volume(DEFAULT_S3_VOLUME);
+      OzoneVolume volume = getS3Volume(defaultS3Volume);
       volume.deleteBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {

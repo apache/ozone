@@ -135,7 +135,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;

@@ -22,7 +22,8 @@ import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
 /**
  * Implements OzoneMultiTenantPrincipal.
  */
-public class OzoneTenantUserGroupPrincipal implements OzoneTenantGroupPrincipal {
+public class OzoneTenantUserGroupPrincipal implements
+    OzoneTenantGroupPrincipal {
   private final String tenantID;
   private static final String DEFAULT_TENANT_GROUP_ALL_USERS =
       "GroupTenantAllUsers";

@@ -224,10 +224,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       case GetS3Volume:
-          GetS3VolumeResponse s3VolumeResponse =
-              getS3Volume(request.getGetS3VolumeRequest());
-          responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
-          break;
+        GetS3VolumeResponse s3VolumeResponse =
+        getS3Volume(request.getGetS3VolumeRequest());
+        responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -662,7 +662,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
-  private GetS3VolumeResponse getS3Volume(GetS3VolumeRequest request) throws IOException {
+  private GetS3VolumeResponse getS3Volume(GetS3VolumeRequest request)
+      throws IOException {
     OmVolumeArgs s3VolArgs = impl.getS3Volume(request.getAccessID());
     return GetS3VolumeResponse.newBuilder()
         .setVolumeInfo(s3VolArgs.getProtobuf())

@@ -70,9 +70,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       LoggerFactory.getLogger(OMMultiTenantManagerImpl.class);
 
   private MultiTenantAccessAuthorizer authorizer;
-  final private OMMetadataManager omMetadataManager;
-  final private OzoneConfiguration conf;
-  final private ReentrantReadWriteLock controlPathLock;
+  private final OMMetadataManager omMetadataManager;
+  private final OzoneConfiguration conf;
+  private final ReentrantReadWriteLock controlPathLock;
 
   // The following Mappings maintain all of the multi-tenancy states.
   // These mappings needs to have their persistent counterpart in OM tables.
@@ -81,13 +81,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   // module a clean separation from the rest of the OM.
 
   // key : tenantName, value : TenantInfo
-  final private Map<String, Tenant> inMemoryTenantNameToTenantInfoMap;
+  private final Map<String, Tenant> inMemoryTenantNameToTenantInfoMap;
 
   // This Mapping maintains all policies for all tenants
   //   key = tenantName
   //   value = list of all PolicyNames for this tenant in authorizor-plugin
   // Typical Usage : find out all the bucket/user policies for a tenant.
-  final private Map<String, List<String>> inMemoryTenantToPolicyNameListMap;
+  private final Map<String, List<String>> inMemoryTenantToPolicyNameListMap;
 
   // This Mapping maintains all groups for all tenants
   //   key = tenantName
@@ -204,11 +204,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // TODO : Make it an idempotent operation. If any ranger state creation
       //  fails because it already exists, Ignore it.
 
-      OzoneTenantUserGroupPrincipal allTenantUsers = new OzoneTenantUserGroupPrincipal(tenantID);
+      OzoneTenantUserGroupPrincipal allTenantUsers =
+          new OzoneTenantUserGroupPrincipal(tenantID);
       String allTenantUsersGroupID = authorizer.createGroup(allTenantUsers);
       tenant.addTenantAccessGroup(allTenantUsersGroupID);
 
-      OzoneTenantAdminGroupPrincipal allTenantAdmins = new OzoneTenantAdminGroupPrincipal(tenantID);
+      OzoneTenantAdminGroupPrincipal allTenantAdmins =
+          new OzoneTenantAdminGroupPrincipal(tenantID);
       String allTenantAdminsGroupID = authorizer.createGroup(allTenantAdmins);
       tenant.addTenantAccessGroup(allTenantAdminsGroupID);
 
