@@ -973,7 +973,4 @@ public final class OMFileRequest {
     }
   }
 
-  public static BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }
