@@ -42,6 +42,10 @@ public class EndpointBase {
   @Inject
   private OzoneClient client;
 
+  // TODO: Handle this.
+  @Inject
+  private String accessID;
+
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
     OzoneBucket bucket;
@@ -61,7 +65,7 @@ public class EndpointBase {
       throws OS3Exception, IOException {
     OzoneBucket bucket;
     try {
-      bucket = client.getObjectStore().getS3Bucket(bucketName);
+      bucket = getVolume().getBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
@@ -76,7 +80,7 @@ public class EndpointBase {
   }
 
   protected OzoneVolume getVolume() throws IOException {
-    return client.getObjectStore().getS3Volume();
+    return client.getObjectStore().getS3Volume(accessID);
   }
 
   /**
@@ -89,7 +93,7 @@ public class EndpointBase {
   protected String createS3Bucket(String bucketName) throws
       IOException, OS3Exception {
     try {
-      client.getObjectStore().createS3Bucket(bucketName);
+      getVolume().createBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
@@ -110,7 +114,7 @@ public class EndpointBase {
   protected void deleteS3Bucket(String s3BucketName)
       throws IOException, OS3Exception {
     try {
-      client.getObjectStore().deleteS3Bucket(s3BucketName);
+      getVolume().deleteBucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,

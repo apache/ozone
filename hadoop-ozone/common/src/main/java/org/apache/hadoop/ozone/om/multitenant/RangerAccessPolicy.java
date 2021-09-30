@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import com.google.gson.JsonObject;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -29,7 +30,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessPolicyType.RANGER_POLICY;
-import static org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal.OzonePrincipalType.GROUP_PRINCIPAL;
 
 /**
  * This is used for Ozone tenant access policy control.
@@ -81,7 +81,7 @@ public class RangerAccessPolicy implements AccessPolicy {
 
   @Override
   public void addAccessPolicyElem(OzoneObj object,
-                                  OzoneMultiTenantPrincipal principal,
+                                  Principal principal,
                                   ACLType acl, AccessGrantType grant)
       throws IOException {
     if (accessObject == null) {
@@ -91,17 +91,17 @@ public class RangerAccessPolicy implements AccessPolicy {
           "RangerAccessPolicy supports only one object per" + " policy");
     }
     AccessPolicyElem elem = new AccessPolicyElem(object, principal, acl, grant);
-    if (!policyMap.containsKey(principal.toString())) {
+    if (!policyMap.containsKey(principal.getName())) {
       List<AccessPolicyElem> elemList = new ArrayList<>();
       elemList.add(elem);
-      policyMap.put(principal.toString(), elemList);
+      policyMap.put(principal.getName(), elemList);
       return;
     }
-    List<AccessPolicyElem> elemList = policyMap.get(principal.toString());
+    List<AccessPolicyElem> elemList = policyMap.get(principal.getName());
     for (AccessPolicyElem e : elemList) {
       if (e.getAclType() == acl) {
         throw new IOException(
-            "RangerAccessPolicy: Principal " + principal.toString()
+            "RangerAccessPolicy: Principal " + principal.getName()
                 + " already exists with access " + acl);
       }
     }
@@ -118,8 +118,10 @@ public class RangerAccessPolicy implements AccessPolicy {
     return list;
   }
 
-  @Override public void removeAccessPolicyElem(OzoneObj object,
-      OzoneMultiTenantPrincipal principal, ACLType acl, AccessGrantType grant)
+  @Override
+  public void removeAccessPolicyElem(OzoneObj object,
+                                     Principal principal, ACLType acl,
+                                     AccessGrantType grant)
       throws IOException {
     if (accessObject == null) {
       throw new IOException("removeAccessPolicyElem: Invalid Arguments.");
@@ -127,11 +129,11 @@ public class RangerAccessPolicy implements AccessPolicy {
       throw new IOException(
           "removeAccessPolicyElem:  Object not found." + object.toString());
     }
-    if (!policyMap.containsKey(principal.toString())) {
+    if (!policyMap.containsKey(principal.getName())) {
       throw new IOException(
           "removeAccessPolicyElem:  Principal not found." + object.toString());
     }
-    List<AccessPolicyElem> elemList = policyMap.get(principal.toString());
+    List<AccessPolicyElem> elemList = policyMap.get(principal.getName());
     for (AccessPolicyElem e : elemList) {
       if (e.getAclType() == acl) {
         elemList.remove(e);
@@ -190,8 +192,7 @@ public class RangerAccessPolicy implements AccessPolicy {
         continue;
       }
       policyItems.append("{");
-      if (list.get(0).getPrincipal().getUserPrincipalType()
-          == GROUP_PRINCIPAL) {
+      if (list.get(0).getPrincipal() instanceof OzoneTenantGroupPrincipal) {
         policyItems.append("\"groups\":[\"" + mapElem.getKey() + "\"],");
       } else {
         policyItems.append("\"users\":[\"" + mapElem.getKey() + "\"],");

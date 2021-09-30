@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -223,7 +224,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       case GetS3Volume:
-          GetS3VolumeResponse s3VolumeResponse = getS3Volume();
+          GetS3VolumeResponse s3VolumeResponse =
+              getS3Volume(request.getGetS3VolumeRequest());
           responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
           break;
       default:
@@ -660,8 +662,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
-  private GetS3VolumeResponse getS3Volume() throws IOException {
-    OmVolumeArgs s3VolArgs = impl.getS3Volume();
+  private GetS3VolumeResponse getS3Volume(GetS3VolumeRequest request) throws IOException {
+    OmVolumeArgs s3VolArgs = impl.getS3Volume(request.getAccessID());
     return GetS3VolumeResponse.newBuilder()
         .setVolumeInfo(s3VolArgs.getProtobuf())
         .build();

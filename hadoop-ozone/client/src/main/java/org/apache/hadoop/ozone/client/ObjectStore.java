@@ -59,6 +59,7 @@ public class ObjectStore {
    * Cache size to be used for listVolume calls.
    */
   private int listCacheSize;
+  private final String DEFAULT_S3_VOLUME;
 
   /**
    * Creates an instance of ObjectStore.
@@ -68,6 +69,7 @@ public class ObjectStore {
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
+    DEFAULT_S3_VOLUME = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @VisibleForTesting
@@ -75,6 +77,7 @@ public class ObjectStore {
     // For the unit test
     OzoneConfiguration conf = new OzoneConfiguration();
     proxy = null;
+    DEFAULT_S3_VOLUME = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @VisibleForTesting
@@ -110,12 +113,12 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    OzoneVolume volume = getS3Volume();
+    OzoneVolume volume = getS3Volume(DEFAULT_S3_VOLUME);
     volume.createBucket(bucketName);
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
-    return getS3Volume().getBucket(bucketName);
+    return getS3Volume(DEFAULT_S3_VOLUME).getBucket(bucketName);
   }
 
   /**
@@ -125,7 +128,7 @@ public class ObjectStore {
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
     try {
-      OzoneVolume volume = getS3Volume();
+      OzoneVolume volume = getS3Volume(DEFAULT_S3_VOLUME);
       volume.deleteBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {
@@ -146,8 +149,8 @@ public class ObjectStore {
     return proxy.getVolumeDetails(volumeName);
   }
 
-  public OzoneVolume getS3Volume() throws IOException {
-    return proxy.getS3VolumeDetails();
+  public OzoneVolume getS3Volume(String accessID) throws IOException {
+    return proxy.getS3VolumeDetails(accessID);
   }
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {

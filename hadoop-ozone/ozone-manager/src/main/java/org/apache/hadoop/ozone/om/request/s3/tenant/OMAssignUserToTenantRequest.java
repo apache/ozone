@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
@@ -170,7 +169,6 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
 
     boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
-    OzoneMultiTenantPrincipal tenantPrincipal = null;
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -285,8 +283,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
           s3SecretValue, principal, defaultGroupName, roleName,
           accessId, omDBAccessIdInfo, omDBKerberosPrincipalInfo);
     } catch (IOException ex) {
-      ozoneManager.getMultiTenantManager().destroyUser(
-          tenantName, accessId);
+      ozoneManager.getMultiTenantManager().destroyUser(accessId);
       exception = ex;
       // Set response success flag to false
       omResponse.setAssignUserToTenantResponse(
