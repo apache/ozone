@@ -151,18 +151,7 @@ public class TestOmMetrics {
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
         "volumeManager", mockVm);
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = (OMMetadataManager)
-        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
-    OMMetadataManager mockMm = Mockito.spy(metadataManager);
-    @SuppressWarnings("unchecked")
-    Table<String, OmVolumeArgs> volumeTable = (Table<String, OmVolumeArgs>)
-        HddsWhiteboxTestUtils.getInternalState(metadataManager, "volumeTable");
-    Table<String, OmVolumeArgs> mockVTable = Mockito.spy(volumeTable);
-    Mockito.doThrow(exception).when(mockVTable).isExist(any());
-    Mockito.doReturn(mockVTable).when(mockMm).getVolumeTable();
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "metadataManager", mockMm);
-
+    mockWritePathExceptions(OmVolumeArgs.class);
     volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
 
@@ -231,18 +220,7 @@ public class TestOmMetrics {
         ozoneManager, "bucketManager", mockBm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = (OMMetadataManager)
-        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
-    OMMetadataManager mockMm = Mockito.spy(metadataManager);
-    @SuppressWarnings("unchecked")
-    Table<String, OmBucketInfo> bucketTable = (Table<String, OmBucketInfo>)
-        HddsWhiteboxTestUtils.getInternalState(metadataManager, "bucketTable");
-    Table<String, OmBucketInfo> mockBTable = Mockito.spy(bucketTable);
-    Mockito.doThrow(exception).when(mockBTable).isExist(any());
-    Mockito.doReturn(mockBTable).when(mockMm).getBucketTable();
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "metadataManager", mockMm);
-    
+    mockWritePathExceptions(OmBucketInfo.class);
     doBucketOps(bucketInfo);
 
     omMetrics = getMetrics("OMMetrics");
@@ -299,7 +277,6 @@ public class TestOmMetrics {
     assertCounter("NumTrashKeyLists", 1L, omMetrics);
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
-    
 
     keyArgs = createKeyArgs(volumeName, bucketName);
     OpenKeySession keySession = writeClient.openKey(keyArgs);
@@ -326,18 +303,7 @@ public class TestOmMetrics {
         ozoneManager, "keyManager", mockKm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = (OMMetadataManager)
-        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
-    OMMetadataManager mockMm = Mockito.spy(metadataManager);
-    @SuppressWarnings("unchecked")
-    Table<String, OmBucketInfo> bucketTable = (Table<String, OmBucketInfo>)
-        HddsWhiteboxTestUtils.getInternalState(metadataManager, "bucketTable");
-    Table<String, OmBucketInfo> mockBTable = Mockito.spy(bucketTable);
-    Mockito.doThrow(exception).when(mockBTable).isExist(any());
-    Mockito.doReturn(mockBTable).when(mockMm).getBucketTable();
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "metadataManager", mockMm);
-
+    mockWritePathExceptions(OmBucketInfo.class);
     keyArgs = createKeyArgs(volumeName, bucketName);
     doKeyOps(keyArgs);
 
@@ -363,6 +329,30 @@ public class TestOmMetrics {
     cluster.restartOzoneManager();
     assertCounter("NumKeys", 2L, omMetrics);
 
+  }
+
+  private <T> void mockWritePathExceptions(Class<T>klass) throws Exception {
+    String tableName;
+    if (klass == OmBucketInfo.class) {
+      tableName = "bucketTable";
+    } else {
+      tableName = "volumeTable";
+    }
+    OMMetadataManager metadataManager = (OMMetadataManager)
+        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
+    OMMetadataManager mockMm = Mockito.spy(metadataManager);
+    @SuppressWarnings("unchecked")
+    Table<String, T> table = (Table<String, T>)
+        HddsWhiteboxTestUtils.getInternalState(metadataManager, tableName);
+    Table<String, T> mockTable = Mockito.spy(table);
+    Mockito.doThrow(exception).when(mockTable).isExist(any());
+    if (klass == OmBucketInfo.class) {
+      Mockito.doReturn(mockTable).when(mockMm).getBucketTable();
+    } else {
+      Mockito.doReturn(mockTable).when(mockMm).getVolumeTable();
+    }
+    HddsWhiteboxTestUtils.setInternalState(
+        ozoneManager, "metadataManager", mockMm);
   }
 
   @Test
