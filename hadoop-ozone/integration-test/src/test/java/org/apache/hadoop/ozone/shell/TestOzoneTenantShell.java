@@ -63,6 +63,8 @@ public class TestOzoneTenantShell {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneTenantShell.class);
 
+  private static final String DEFAULT_ENCODING = UTF_8.name();
+
   /**
    * Set the timeout for every test.
    */
@@ -277,10 +279,11 @@ public class TestOzoneTenantShell {
   private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
       boolean exactMatch) throws IOException {
     stream.flush();
+    final String str = stream.toString(DEFAULT_ENCODING);
     if (exactMatch) {
-      Assert.assertEquals(stringToMatch, stream.toString(UTF_8.name()));
+      Assert.assertEquals(stringToMatch, str);
     } else {
-      Assert.assertTrue(stream.toString().contains(stringToMatch));
+      Assert.assertTrue(str.contains(stringToMatch));
     }
     stream.reset();
   }
@@ -306,7 +309,8 @@ public class TestOzoneTenantShell {
     // Creating the tenant with the same name again should result in failure
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to create tenant 'finance': Tenant already exists\n", true);
+    checkOutput(err, "Failed to create tenant 'finance':"
+        + " Tenant already exists\n", true);
 
     executeHA(tenantShell, new String[] {"create", "research"});
     checkOutput(out, "Created tenant 'research'.\n", true);
