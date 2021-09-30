@@ -259,16 +259,6 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-
-    // Check for failures
-    //  The delete and lookup in doKeyOps() always fail
-    assertCounter("NumKeyAllocateFails", 0L, omMetrics);
-    assertCounter("NumKeyLookupFails", 1L, omMetrics);
-    assertCounter("NumKeyDeleteFails", 1L, omMetrics);
-    assertCounter("NumKeyListFails", 0L, omMetrics);
-    assertCounter("NumTrashKeyListFails", 0L, omMetrics);
-    assertCounter("NumInitiateMultipartUploadFails", 0L, omMetrics);
-
     assertCounter("NumKeyOps", 7L, omMetrics);
     assertCounter("NumKeyAllocate", 1L, omMetrics);
     assertCounter("NumKeyLookup", 1L, omMetrics);
@@ -317,8 +307,8 @@ public class TestOmMetrics {
     assertCounter("NumInitiateMultipartUploads", 2L, omMetrics);
 
     assertCounter("NumKeyAllocateFails", 1L, omMetrics);
-    assertCounter("NumKeyLookupFails", 2L, omMetrics);
-    assertCounter("NumKeyDeleteFails", 2L, omMetrics);
+    assertCounter("NumKeyLookupFails", 1L, omMetrics);
+    assertCounter("NumKeyDeleteFails", 1L, omMetrics);
     assertCounter("NumKeyListFails", 1L, omMetrics);
     assertCounter("NumTrashKeyListFails", 1L, omMetrics);
     assertCounter("NumInitiateMultipartUploadFails", 1L, omMetrics);
@@ -540,19 +530,19 @@ public class TestOmMetrics {
    * Test key operations with ignoring thrown exception.
    */
   private void doKeyOps(OmKeyArgs keyArgs) {
+    OpenKeySession keySession = null;
     try {
-      writeClient.openKey(keyArgs);
+      keySession = writeClient.openKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      // Always fails because key is not committed
-      writeClient.deleteKey(keyArgs);
+      long id = (keySession != null)?keySession.getId():0;
+      writeClient.commitKey(keyArgs, id);
     } catch (IOException ignored) {
     }
 
     try {
-      // Always fails because key is not committed
       ozoneManager.lookupKey(keyArgs);
     } catch (IOException ignored) {
     }
@@ -570,7 +560,7 @@ public class TestOmMetrics {
     }
 
     try {
-      writeClient.commitKey(keyArgs, 0);
+      writeClient.deleteKey(keyArgs);
     } catch (IOException ignored) {
     }
 
@@ -578,7 +568,6 @@ public class TestOmMetrics {
       writeClient.initiateMultipartUpload(keyArgs);
     } catch (IOException ignored) {
     }
-
   }
 
   private OmKeyArgs createKeyArgs(String volumeName, String bucketName)
