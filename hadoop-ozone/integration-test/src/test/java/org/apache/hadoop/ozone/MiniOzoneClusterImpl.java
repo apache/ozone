@@ -814,14 +814,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
         List<String> dataDirs = new ArrayList<>();
+        List<String> reservedSpaceList = new ArrayList<>();
         for (int j = 0; j < numDataVolumes; j++) {
           Path dir = Paths.get(datanodeBaseDir, "data-" + j, "containers");
           Files.createDirectories(dir);
           dataDirs.add(dir.toString());
           datanodeReservedSpace.ifPresent(
-              s -> dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-                  dir + ":" + s));
+              s -> reservedSpaceList.add(dir + ":" + s));
         }
+        String reservedSpaceString = String.join(",", reservedSpaceList);
+        dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
+            reservedSpaceString);
         String listOfDirs = String.join(",", dataDirs);
         Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
         Path workDir = Paths.get(datanodeBaseDir, "data", "replication",

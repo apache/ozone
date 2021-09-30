@@ -57,6 +57,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
+/**
+ * An integration test for {@link ContainerBalancer}. Simulates an unbalanced
+ * cluster by creating a constant number of containers in a certain number of
+ * datanodes, and then adding more datanodes.
+ */
 public class TestContainerBalancer {
 
   // timeout for each test
@@ -118,49 +123,6 @@ public class TestContainerBalancer {
   @Test
   public void shouldBalanceSixNodeClusterWithThreeEmptyNodes()
       throws Exception {
-//    StringBuilder reservedSpaceStrings = new StringBuilder();
-//
-//    // determine reserved space for each datanode and shut it down
-//    List<HddsDatanodeService> hddsDatanodes = cluster.getHddsDatanodes();
-//    for (int i = 0; i < NUM_DATANODES; i++) {
-//      VolumeInfo volumeInfo =
-//          hddsDatanodes.get(i).getDatanodeStateMachine().getContainer()
-//              .getVolumeSet()
-//              .getVolumesList().get(0).getVolumeInfo();
-//      String rootDir = volumeInfo.getRootDir();
-//      VolumeUsage usage = volumeInfo.getUsageForTesting();
-//      long volumeCapacity = usage.getCapacity(), volumeAvailable =
-//          usage.getAvailable(), volumeUsed = usage.getUsedSpace();
-//      long reservedSpace =
-//          volumeCapacity - volumeAvailable - volumeUsed + OzoneConsts.GB;
-//      Assert.assertTrue(volumeCapacity > reservedSpace);
-//
-//      reservedSpaceStrings.append(rootDir).append(":").append(reservedSpace)
-//          .append("bytes")
-//          .append(",");
-////      cluster.shutdownHddsDatanode(i);
-//    }
-//    ozoneConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-//        reservedSpaceStrings.toString());
-//    cluster.setConf(ozoneConf);
-//
-//    // set reserved space for each datanode and restart
-//    for (int i = 0; i < NUM_DATANODES; i++) {
-//      HddsDatanodeService hddsDatanode = hddsDatanodes.get(i);
-////      OzoneConfiguration dnConf = hddsDatanode.getConf();
-////      dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-////          reservedSpaceStrings.toString());
-////      hddsDatanode.setConfiguration(dnConf);
-//
-//      try {
-//        cluster.restartHddsDatanode(hddsDatanode.getDatanodeDetails(), true);
-//      } catch (InterruptedException | TimeoutException | IOException e) {
-//        LOG.debug("Failed to restart datanode {} after setting reserved " +
-//            "space", hddsDatanode.getDatanodeDetails().getUuidString());
-//        Assert.fail();
-//      }
-//    }
-
     long containerSize = 640 * OzoneConsts.KB;
     ozoneConf.setStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         containerSize, StorageUnit.BYTES);
