@@ -1,77 +1,63 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
-import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
 import org.mockito.Mockito;
 
-import java.nio.charset.StandardCharsets;
-import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-
 public class TestMultiTenantVolume {
+  private static MiniOzoneClusterProvider clusterProvider;
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
-  private Collection<OzoneClient> openClients;
+  private static String s3VolumeName;
+
+  @BeforeClass
+  public static void initClusterProvider() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
+        .withoutDatanodes();
+    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 2);
+    s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
+  }
 
   @Before
   public void setup() throws Exception {
     OMMultiTenantManagerImpl.setAuthorizerSupplier(() ->
         Mockito.mock(MultiTenantAccessAuthorizer.class)
     );
-
-    openClients = new ArrayList<>();
-
-    // TODO: Use cluster provider for tests or reuse cluster instance.
-    conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .withoutDatanodes()
-        .build();
-    cluster.waitForClusterToBeReady();
+    cluster = clusterProvider.provide();
   }
 
   @After
   public void teardown() throws Exception {
-    for (OzoneClient client: openClients) {
-      client.close();
-    }
-    cluster.shutdown();
+    clusterProvider.destroy(cluster);
+  }
+
+  @AfterAll
+  public static void shutdownClusterProvider() throws Exception {
+    clusterProvider.shutdown();
   }
 
   @Test
   public void testS3BucketDefault() throws Exception {
     final String bucketName = "bucket";
     final String accessID = UUID.randomUUID().toString();
-    final String s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
 
     // Get Volume.
-    ObjectStore store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    ObjectStore store = cluster.getClient().getObjectStore();
     OzoneVolume s3Volume = store.getS3Volume(accessID);
     Assert.assertEquals(s3VolumeName, s3Volume.getName());
 
@@ -91,7 +77,7 @@ public class TestMultiTenantVolume {
     final String username = "user";
     final String bucketName = "bucket";
     final String accessID = UUID.randomUUID().toString();
-    ObjectStore store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    ObjectStore store = cluster.getClient().getObjectStore();
 
     store.createTenant(tenant);
     store.assignUserToTenant(username, tenant, accessID);
