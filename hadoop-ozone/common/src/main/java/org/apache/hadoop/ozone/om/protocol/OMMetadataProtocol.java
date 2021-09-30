@@ -30,7 +30,7 @@ import org.apache.hadoop.security.KerberosInfo;
 public interface OMMetadataProtocol extends Closeable {
 
   /**
-   * Get the OM metadata information.
+   * Get the OM configuration.
    */
-  OMMetadata getOMMetadata() throws IOException;
+  OMConfiguration getOMConfiguration() throws IOException;
 }

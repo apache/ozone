@@ -18,30 +18,33 @@ package org.apache.hadoop.ozone.om.protocol;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.NodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 
 /**
- * Class storing the OM metadata such as the node details in memory and node
- * details when config is reloaded from disk.
- * Note that this class is used as a structure to transfer the OM node
+ * Class storing the OM configuration information such as the node details in
+ * memory and node details when config is reloaded from disk.
+ * Note that this class is used as a structure to transfer the OM configuration
  * information through the {@link OMMetadataProtocol} and not for storing the
- * metadata information in OzoneManager itself.
+ * configuration information in OzoneManager itself.
  */
-public final class OMMetadata {
+public final class OMConfiguration {
 
   // OM nodes present in OM's memory
   private List<OMNodeDetails> omNodesInMemory = new ArrayList<>();
   // OM nodes reloaded from new config on disk
   private List<OMNodeDetails> omNodesInNewConf = new ArrayList<>();
 
-  private OMMetadata(List<OMNodeDetails> inMemoryNodeList,
+  private OMConfiguration(List<OMNodeDetails> inMemoryNodeList,
       List<OMNodeDetails> onDiskNodeList) {
     this.omNodesInMemory.addAll(inMemoryNodeList);
     this.omNodesInNewConf.addAll(onDiskNodeList);
   }
 
   /**
-   * OMMetadata Builder class.
+   * OMConfiguration Builder class.
    */
   public static class Builder {
     private List<OMNodeDetails> omNodesInMemory;
@@ -62,12 +65,20 @@ public final class OMMetadata {
       return this;
     }
 
-    public OMMetadata build() {
-      return new OMMetadata(omNodesInMemory, omNodesInNewConf);
+    public OMConfiguration build() {
+      return new OMConfiguration(omNodesInMemory, omNodesInNewConf);
     }
   }
 
-  public List<OMNodeDetails> getOmNodesInNewConf() {
-    return omNodesInNewConf;
+  public List<String> getCurrentPeerList() {
+    return omNodesInMemory.stream().map(NodeDetails::getNodeId)
+        .collect(Collectors.toList());
+  }
+
+  public Map<String, OMNodeDetails> getOmNodesInNewConf() {
+    return omNodesInNewConf.stream().collect(Collectors.toMap(
+        NodeDetails::getNodeId,
+        omNodeDetails -> omNodeDetails,
+        (nodeId, omNodeDetails) -> omNodeDetails));
   }
 }

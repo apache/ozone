@@ -34,10 +34,10 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.om.protocol.OMMetadata;
+import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocol.OMMetadataProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMMetadataInfoRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMMetadataInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMNodeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -94,23 +94,23 @@ public class OMMetadataProtocolClientSideImpl implements
   }
 
   @Override
-  public OMMetadata getOMMetadata() throws IOException {
+  public OMConfiguration getOMConfiguration() throws IOException {
     try {
-      OMMetadataInfoResponse metadataInfoResponse = rpcProxy.getOMMetadataInfo(
-          NULL_RPC_CONTROLLER, OMMetadataInfoRequest.newBuilder().build());
+      OMConfigurationResponse getConfigResponse = rpcProxy.getOMConfiguration
+          (NULL_RPC_CONTROLLER, OMConfigurationRequest.newBuilder().build());
 
-      OMMetadata.Builder omMedatataBuilder = new OMMetadata.Builder();
-      if (metadataInfoResponse.getSuccess()) {
-        if (metadataInfoResponse.getNodesInMemoryCount() > 0) {
+      OMConfiguration.Builder omMedatataBuilder = new OMConfiguration.Builder();
+      if (getConfigResponse.getSuccess()) {
+        if (getConfigResponse.getNodesInMemoryCount() > 0) {
           for (OMNodeInfo omNodeInfo :
-              metadataInfoResponse.getNodesInMemoryList()) {
+              getConfigResponse.getNodesInMemoryList()) {
             omMedatataBuilder.addToNodesInMemory(
                 OMNodeDetails.getFromProtobuf(omNodeInfo));
           }
         }
-        if (metadataInfoResponse.getNodesInNewConfCount() > 0) {
+        if (getConfigResponse.getNodesInNewConfCount() > 0) {
           for (OMNodeInfo omNodeInfo :
-              metadataInfoResponse.getNodesInNewConfList()) {
+              getConfigResponse.getNodesInNewConfList()) {
             omMedatataBuilder.addToNodesInNewConf(
                 OMNodeDetails.getFromProtobuf(omNodeInfo));
           }
@@ -118,8 +118,7 @@ public class OMMetadataProtocolClientSideImpl implements
       }
       return omMedatataBuilder.build();
     } catch (ServiceException e) {
-      LOG.error("Failed to retrieve metadata information of OM {}", omNodeID,
-          e);
+      LOG.error("Failed to retrieve configuration of OM {}", omNodeID, e);
     }
     return null;
   }

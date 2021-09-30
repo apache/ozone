@@ -23,13 +23,13 @@ import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMMetadataProtocolPB;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMMetadataInfoRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMMetadataInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMNodeInfo;
 
 /**
  * This class is the server-side translator that forwards requests received on
- * {@link OMMetadataProtocolPB} to the OMMetadata server implementation.
+ * {@link OMMetadataProtocolPB} to the OMConfiguration server implementation.
  */
 public class OMMetadataProtocolServerSideImpl implements OMMetadataProtocolPB {
 
@@ -40,8 +40,8 @@ public class OMMetadataProtocolServerSideImpl implements OMMetadataProtocolPB {
   }
 
   @Override
-  public OMMetadataInfoResponse getOMMetadataInfo(RpcController controller,
-      OMMetadataInfoRequest request) throws ServiceException {
+  public OMConfigurationResponse getOMConfiguration(RpcController controller,
+      OMConfigurationRequest request) throws ServiceException {
 
     List<OMNodeDetails> oldOMNodesList = ozoneManager.getAllOMNodesInMemory();
     List<OMNodeDetails> newOMNodesList = ozoneManager.getAllOMNodesInNewConf();
@@ -57,7 +57,7 @@ public class OMMetadataProtocolServerSideImpl implements OMMetadataProtocolPB {
       omNodesInNewConf.add(omNodeDetails.getProtobuf());
     }
 
-    return OMMetadataInfoResponse.newBuilder()
+    return OMConfigurationResponse.newBuilder()
         .setSuccess(true)
         .addAllNodesInMemory(omNodesInMemory)
         .addAllNodesInNewConf(omNodesInNewConf)

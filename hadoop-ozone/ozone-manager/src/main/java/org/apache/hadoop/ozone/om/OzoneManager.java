@@ -98,7 +98,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -126,7 +125,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
-import org.apache.hadoop.ozone.om.protocol.OMMetadata;
+import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
@@ -752,14 +751,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     stop();
   }
 
-  public void shutdown(Exception ex) throws IOException {
+  public void shutdown(Exception ex) {
     if (omState != State.STOPPED) {
       stop();
       exitManager.exitSystem(1, ex.getLocalizedMessage(), ex, LOG);
     }
   }
 
-  public void shutdown(String errorMsg) throws IOException {
+  public void shutdown(String errorMsg) {
     if (omState != State.STOPPED) {
       stop();
       exitManager.exitSystem(1, errorMsg, LOG);
@@ -1471,18 +1470,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                    getRemoteUser(), remoteNodeId,
                    remoteNodeDetails.getRpcAddress())) {
 
-        OMMetadata remoteOMMetadata = omMetadataProtocolClient.getOMMetadata();
-        boolean exists = checkOMexistsInRemoteOMConfig(remoteOMMetadata);
-        if (!exists) {
-          LOG.error("Remote OM " + remoteNodeId + ":" +
-              remoteNodeDetails.getHostAddress() + " does not have the " +
-              "bootstrapping OM(" + getOMNodeId() + ") information on " +
-              "reloading configs.");
-          omsWihtoutNewConfig.add(remoteNodeDetails);
-        }
+        OMConfiguration remoteOMConfiguration =
+            omMetadataProtocolClient.getOMConfiguration();
+        checkRemoteOMConfig(remoteNodeId, remoteOMConfiguration);
       } catch (IOException ioe) {
-        LOG.error("Remote OM config check before bootstrap failed on OM {}",
-            remoteNodeId, ioe);
+        LOG.error("Remote OM config check failed on OM {}", remoteNodeId, ioe);
         omsWihtoutNewConfig.add(remoteNodeDetails);
       }
     }
@@ -1494,29 +1486,45 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         errorMsgBuilder.append(",")
             .append(omsWihtoutNewConfig.get(i).getOMPrintInfo());
       }
-      errorMsgBuilder.append("] do not have the bootstrapping OM information." +
-          " Update their ozone-site.xml with new node details before " +
+      errorMsgBuilder.append("] do not have or have incorrect information " +
+          "of the bootstrapping OM. Update their ozone-site.xml before " +
           "proceeding.");
       shutdown(errorMsgBuilder.toString());
     }
   }
 
   /**
-   * Check whether current OM information exists in the remote OM's reloaded
-   * configs.
+   * Verify that the remote OM configuration is updated for the bootstrapping
+   * OM.
    */
-  private boolean checkOMexistsInRemoteOMConfig(OMMetadata remoteOMMetadata) {
-    List<OMNodeDetails> omNodesInNewConf = remoteOMMetadata
-        .getOmNodesInNewConf();
-    for (OMNodeDetails omNodeInRemoteOM : omNodesInNewConf) {
-      if (omNodeInRemoteOM.getNodeId().equals(getOMNodeId())) {
-        // Verify that the rpc address of current nodeID in remote OM config
-        // is correct.
-        return omNodeInRemoteOM.getRpcAddress().equals(
-            omNodeDetails.getRpcAddress());
-      }
+  private void checkRemoteOMConfig(String remoteNodeId,
+      OMConfiguration remoteOMConfig) throws IOException {
+    if (remoteOMConfig == null) {
+      throw new IOException("Remote OM " + remoteNodeId + " configuration " +
+          "returned null");
     }
-    return false;
+
+    if (remoteOMConfig.getCurrentPeerList().contains(this.getOMNodeId())) {
+      throw new IOException("Remote OM " + remoteNodeId + " already contains " +
+          "bootstrapping OM(" + getOMNodeId() + ") in it's in memory peer " +
+          "list");
+    }
+
+    OMNodeDetails omNodeDetailsInRemoteConfig = remoteOMConfig
+        .getOmNodesInNewConf().get(getOMNodeId());
+    if (omNodeDetailsInRemoteConfig == null) {
+      throw new IOException("Remote OM " + remoteNodeId + " does not have the" +
+          " bootstrapping OM(" + getOMNodeId() + ") information on reloading " +
+          "configs or it could not resolve the address.");
+    }
+
+    if (!omNodeDetailsInRemoteConfig.getRpcAddress().equals(
+        this.omNodeDetails.getRpcAddress())) {
+      throw new IOException("Remote OM " + remoteNodeId + " configuration has" +
+          " bootstrapping OM(" + getOMNodeId() + ") address as " +
+          omNodeDetailsInRemoteConfig.getRpcAddress() + " where the " +
+          "bootstrapping OM address is " + omNodeDetails.getRpcAddress());
+    }
   }
 
   @Override
@@ -1584,20 +1592,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Ratis server.
    */
   public void addOMNodeToPeers(String newOMNodeId) {
-    OMNodeDetails newOMNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
-        getConfiguration(), getOMServiceId(), newOMNodeId);
-    if (newOMNodeDetails == null) {
-      // Load new configuration object to read in new peer information
-      setConfiguration(new OzoneConfiguration());
+    OMNodeDetails newOMNodeDetails = null;
+    try {
       newOMNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
           getConfiguration(), getOMServiceId(), newOMNodeId);
-
       if (newOMNodeDetails == null) {
-        // If new node information is not present in the newly loaded
-        // configuration also, throw an exception
-        throw new OzoneIllegalArgumentException("There is no OM configuration "
-            + "for node ID " + newOMNodeId + " in ozone-site.xml.");
+        // Load new configuration object to read in new peer information
+        setConfiguration(new OzoneConfiguration());
+        newOMNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
+            getConfiguration(), getOMServiceId(), newOMNodeId);
+
+        if (newOMNodeDetails == null) {
+          // If new node information is not present in the newly loaded
+          // configuration also, throw an exception
+          throw new IOException("There is no OM configuration for node ID "
+              + newOMNodeId + " in ozone-site.xml.");
+        }
       }
+    } catch (IOException e) {
+      LOG.error("Couldn't add OM {} to peer list.", newOMNodeId);
+      shutdown(e);
     }
 
     if (omSnapshotProvider == null) {

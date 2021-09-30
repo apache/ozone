@@ -34,10 +34,10 @@ This file contains the metadata protocol for Ozone Manager(s). This involves
 getting the meta information about an individual OM.
 */
 
-message OMMetadataInfoRequest {
+message OMConfigurationRequest {
 }
 
-message OMMetadataInfoResponse {
+message OMConfigurationResponse {
     required bool success = 1;
     optional string errorMsg = 2;
     // OM nodes present in OM's memory
@@ -58,8 +58,8 @@ message OMNodeInfo {
  The service for getting OM metadata.
 */
 service OzoneManagerMetaService {
-    // RPC request to OM to return its in memory OM nodes list and also the
-    // anticipated nodes list from the config files (upon reloading).
-    rpc getOMMetadataInfo(OMMetadataInfoRequest)
-    returns(OMMetadataInfoResponse);
+    // RPC request to OM to return its confugration -  in memory OM nodes list
+    // and the anticipated nodes list from the config files (upon reloading).
+    rpc getOMConfiguration(OMConfigurationRequest)
+    returns(OMConfigurationResponse);
 }

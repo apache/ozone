@@ -740,9 +740,17 @@ public final class OmUtils {
     }
 
     for (String nodeId : omNodeIds) {
-      OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
-          conf, omServiceId, nodeId, false);
-      omNodesList.add(omNodeDetails);
+      try {
+        OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
+            conf, omServiceId, nodeId);
+        omNodesList.add(omNodeDetails);
+      } catch (IOException e) {
+        String omRpcAddressStr = OMNodeDetails.getOMNodeAddressFromConf(conf,
+            omServiceId, nodeId);
+        LOG.error("OM {} is present in config file but it's address {} could " +
+            "not be resolved. Hence, OM {} is not added to list of peer nodes.",
+            nodeId, omRpcAddressStr, nodeId);
+      }
     }
 
     return omNodesList;
