@@ -461,16 +461,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
         OmKeyInfo omKeyInfo =
             omMetadataManager.getOpenKeyTable(getBucketLayout()).get(
-                omMetadataManager.getMultipartKey(volumeName, bucketName,
-                    keyArgs.getKeyName(), keyArgs.getMultipartUploadID()));
+                omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
+                    resolvedBucket.realBucket(), keyArgs.getKeyName(),
+                    keyArgs.getMultipartUploadID()));
         if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
         }
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock().releaseReadLock(
-              BUCKET_LOCK, volumeName, bucketName);
+          omMetadataManager.getLock()
+              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
         }
       }
     }
