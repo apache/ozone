@@ -541,7 +541,6 @@ public final class TestSecureOzoneCluster {
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
 
-
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
       // Get first OM client which will authenticate via Kerberos
