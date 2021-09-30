@@ -73,7 +73,7 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
       defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
-      "maximum size in Gigabytes that can enter a target datanode in each " +
+      "maximum size that can enter a target datanode in each " +
       "iteration while balancing. This is the sum of data from multiple " +
       "sources. The default value is greater than the configured" +
       " (or default) ozone.scm.container.size by 1GB.")
@@ -81,7 +81,7 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
       defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
-      "maximum size in Gigabytes that can leave a source datanode in each " +
+      "maximum size that can leave a source datanode in each " +
       "iteration while balancing. This is the sum of data moving to multiple " +
       "targets. The default value is greater than the configured" +
       " (or default) ozone.scm.container.size by 1GB.")
