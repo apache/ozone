@@ -109,10 +109,6 @@
     <Bug pattern="UWF_NULL_FIELD" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestOmMetrics"/>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
-  </Match>
-  <Match>
     <Class name="org.apache.hadoop.ozone.scm.TestContainerSmallFile"/>
     <Bug pattern="DLS_DEAD_LOCAL_STORE" />
   </Match>

@@ -22,8 +22,8 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -492,7 +492,7 @@ public class TestOmMetrics {
   /**
    * Test bucket operations with ignoring thrown exception.
    */
-  private void doBucketOps(OmBucketInfo info) throws IOException{
+  private void doBucketOps(OmBucketInfo info) {
     try {
       writeClient.createBucket(info);
     } catch (IOException ignored) {
