@@ -305,6 +305,11 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Created tenant 'finance'.\n", true);
     checkOutput(err, "", true);
 
+    // Creating the tenant with the same name again should result in failure
+    executeHA(tenantShell, new String[] {"create", "finance"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Failed to create tenant 'finance': Tenant already exists\n", true);
+
     executeHA(tenantShell, new String[] {"create", "research"});
     checkOutput(out, "Created tenant 'research'.\n", true);
     checkOutput(err, "", true);

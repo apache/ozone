@@ -30,6 +30,6 @@ public class TenantDeleteHandler extends TenantHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    out().println("Not Implemented.");
+    err().println("Not Implemented.");
   }
 }

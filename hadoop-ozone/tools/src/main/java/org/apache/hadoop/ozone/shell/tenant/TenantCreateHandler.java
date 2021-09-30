@@ -47,7 +47,7 @@ public class TenantCreateHandler extends TenantHandler {
           client.getObjectStore().createTenant(tenantName);
           out().println("Created tenant '" + tenantName + "'.");
         } catch (IOException e) {
-          out().println("Failed to create tenant '" + tenantName + "': " +
+          err().println("Failed to create tenant '" + tenantName + "': " +
               e.getMessage());
         }
       }

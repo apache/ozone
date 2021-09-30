@@ -62,7 +62,7 @@ public class GetUserInfoHandler extends TenantHandler {
         List<TenantAccessIdInfo> accessIdInfoList =
             tenantUserInfo.getAccessIdInfoList();
         if (accessIdInfoList.size() == 0) {
-          out().println("User '" + userPrincipal +
+          err().println("User '" + userPrincipal +
               "' is not assigned to any tenant.");
           continue;
         }
