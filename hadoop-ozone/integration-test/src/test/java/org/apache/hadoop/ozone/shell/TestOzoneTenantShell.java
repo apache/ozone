@@ -63,8 +63,6 @@ public class TestOzoneTenantShell {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneTenantShell.class);
 
-  private static final String DEFAULT_ENCODING = UTF_8.name();
-
   /**
    * Set the timeout for every test.
    */
@@ -280,7 +278,7 @@ public class TestOzoneTenantShell {
       boolean exactMatch) throws IOException {
     stream.flush();
     if (exactMatch) {
-      Assert.assertEquals(stringToMatch, stream.toString(DEFAULT_ENCODING));
+      Assert.assertEquals(stringToMatch, stream.toString(UTF_8.name()));
     } else {
       Assert.assertTrue(stream.toString().contains(stringToMatch));
     }
