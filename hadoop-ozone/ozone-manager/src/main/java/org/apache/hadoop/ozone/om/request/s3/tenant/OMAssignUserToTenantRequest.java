@@ -232,6 +232,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       // Inform MultiTenantManager of user assignment so it could
       //  initialize some policies in Ranger.
       // TODO: Is userId from MultiTenantManager still useful?
+      // TODO: Move this to preExecute as well.
       userId = ozoneManager.getMultiTenantManager()
           .assignUserToTenant(tenantName, accessId);
       LOG.debug("userId = {}", userId);
