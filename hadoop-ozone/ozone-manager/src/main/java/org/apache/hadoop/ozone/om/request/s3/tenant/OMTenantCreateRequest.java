@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,7 +131,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // - User's login name when security is not enabled
     // - AWS_ACCESS_KEY_ID if the original request comes from S3 Gateway.
     //    Not Applicable to TenantCreateRequest.
-    final String owner = getOmRequest().getUserInfo().getUserName();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    // getShortUserName here follows RpcClient#createVolume
+    // A caveat is that this assumes OM's auth_to_local is the same as
+    //  the client's. Maybe move this logic to the client and pass VolumeArgs?
+    final String owner = ugi.getShortUserName();
     final String volumeName = tenantName;  // TODO: Configurable
     final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
         .setVolume(volumeName)
