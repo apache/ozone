@@ -37,6 +37,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -332,15 +333,15 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       List<String> userGroupIDs = new ArrayList<>();
       userGroupIDs.add(idGroupTenantAllUsers);
 
-      // TODO: Get principal for access ID, or create it if needed.
-//      BasicUserPrincipal
-//      String userID = authorizer.createUser(userPrincipal, userGroupIDs);
+      String username = getUserNameGivenAccessId(accessID);
+      BasicUserPrincipal userPrincipal =
+          new BasicUserPrincipal(username);
+      String userID = authorizer.createUser(userPrincipal, userGroupIDs);
 
       inMemoryAccessIDToTenantNameMap.put(accessID, tenantName);
       inMemoryAccessIDToListOfGroupsMap.put(accessID, userGroupIDs);
 
-//      return userID;
-      return null;
+      return userID;
     } catch (Exception e) {
       destroyUser(accessID);
       LOG.error(e.getMessage());
