@@ -454,25 +454,10 @@ public class TestOmMetrics {
     } catch (IOException ignored) {
     }
 
-    /*  Commenting this out for now since it seems wrong.
-    try {
-      writeClient.deleteVolume("nonExistentVolume");
-    } catch (IOException ignored) {
-    }
-    */
-
     try {
       ozoneManager.getVolumeInfo(volumeArgs.getVolume());
     } catch (IOException ignored) {
     }
-
-    /* This appears to have been removed from the VolumeManagerImpl:
-       HDDS-4901.  Should I remove it from the OM?
-    try {
-      ozoneManager.checkVolumeAccess(null, null);
-    } catch (IOException ignored) {
-    }
-    */
 
     try {
       writeClient.setOwner(volumeArgs.getVolume(), "dummy");
@@ -483,6 +468,7 @@ public class TestOmMetrics {
       ozoneManager.listAllVolumes("", null, 0);
     } catch (IOException ignored) {
     }
+
     try {
       writeClient.deleteVolume(volumeArgs.getVolume());
     } catch (IOException ignored) {
@@ -497,13 +483,6 @@ public class TestOmMetrics {
       writeClient.createBucket(info);
     } catch (IOException ignored) {
     }
-
-    /*  Commenting this out for now since it seems wrong.
-    try {
-      ozoneManager.deleteBucket(null, null);
-    } catch (IOException ignored) {
-    }
-    */
 
     try {
       ozoneManager.getBucketInfo(info.getVolumeName(), info.getBucketName());
