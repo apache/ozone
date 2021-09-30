@@ -97,7 +97,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
  *  involves volume creation.
  */
 public class OMTenantCreateRequest extends OMVolumeRequest {
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OMTenantCreateRequest.class);
 
   public OMTenantCreateRequest(OMRequest omRequest) {
@@ -219,8 +219,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
     assert(tenantDefaultPolicies != null);
 
-    LOG.info("Processing tenant '{}' create request. "
-        + "tenantDefaultPolicies = {}", tenantName, tenantDefaultPolicies);
+    LOG.debug("Processing tenant '{}' create request", tenantName);
+    LOG.debug("tenantDefaultPolicies = {}", tenantDefaultPolicies);
 
     try {
       // Check ACL: requires volume create permission. TODO: tenant create perm?

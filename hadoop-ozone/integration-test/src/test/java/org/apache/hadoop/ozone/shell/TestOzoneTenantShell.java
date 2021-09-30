@@ -21,11 +21,14 @@ import com.google.common.base.Strings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
@@ -38,19 +41,16 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 import picocli.CommandLine;
-import picocli.CommandLine.ExecutionException;
-import picocli.CommandLine.IExceptionHandler2;
-import picocli.CommandLine.ParameterException;
-import picocli.CommandLine.ParseResult;
-import picocli.CommandLine.RunLast;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -157,29 +157,30 @@ public class TestOzoneTenantShell {
   }
 
   private void execute(GenericCli shell, String[] args) {
-    LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
+    LOG.info("Executing shell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
-    IExceptionHandler2<List<Object>> exceptionHandler =
-        new IExceptionHandler2<List<Object>>() {
-          @Override
-          public List<Object> handleParseException(ParameterException ex,
-              String[] args) {
-            throw ex;
-          }
-
-          @Override
-          public List<Object> handleExecutionException(ExecutionException ex,
-              ParseResult parseRes) {
-            throw ex;
-          }
+    CommandLine.IExecutionExceptionHandler exceptionHandler =
+        (ex, commandLine, parseResult) -> {
+          commandLine.getErr().println(ex.getMessage());
+          return commandLine.getCommandSpec().exitCodeOnExecutionException();
         };
 
     // Since there is no elegant way to pass Ozone config to the shell,
     // the idea is to use 'set' to place those OM HA configs.
     String[] argsWithHAConf = getHASetConfStrings(args);
 
-    cmd.parseWithHandlers(new RunLast(), exceptionHandler, argsWithHAConf);
+    cmd.setExecutionExceptionHandler(exceptionHandler);
+
+    StringWriter outWriter = new StringWriter();
+    StringWriter errWriter = new StringWriter();
+    cmd.setOut(new PrintWriter(outWriter));
+    cmd.setErr(new PrintWriter(errWriter));
+
+    cmd.execute(argsWithHAConf);
+
+    LOG.info(outWriter.toString());
+    LOG.error(errWriter.toString());
   }
 
   /**
@@ -281,10 +282,16 @@ public class TestOzoneTenantShell {
   }
 
   /**
-   * Test ozone tenant create and user assign.
+   * Test tenant create, assign user and get user info.
    */
   @Test
-  public void testOzoneTenantCreateAssignUser() {
+  public void testOzoneTenantCreateAssignInfo() {
+
+    // Suppress OMNotLeaderException
+    GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
+
+    GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMAssignUserToTenantRequest.LOG, Level.DEBUG);
 
     // Create tenants
     // Equivalent to `ozone tenant create finance`

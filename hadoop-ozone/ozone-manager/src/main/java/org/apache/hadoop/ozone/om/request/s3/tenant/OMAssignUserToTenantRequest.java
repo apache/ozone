@@ -96,7 +96,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
  * Handles OMAssignUserToTenantRequest.
  */
 public class OMAssignUserToTenantRequest extends OMClientRequest {
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OMAssignUserToTenantRequest.class);
 
   public OMAssignUserToTenantRequest(OMRequest omRequest) {
@@ -234,7 +234,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       // TODO: Is userId from MultiTenantManager still useful?
       userId = ozoneManager.getMultiTenantManager()
           .assignUserToTenant(tenantName, accessId);
-      LOG.info("userId = {}", userId);
+      LOG.debug("userId = {}", userId);
 
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
