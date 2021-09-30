@@ -302,21 +302,15 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Error handling. Clean up Ranger policies when necessary.
       if (ex instanceof OMException) {
         final OMException omEx = (OMException) ex;
-        if (omEx.getResult().equals(VOLUME_ALREADY_EXISTS) ||
-            omEx.getResult().equals(TENANT_ALREADY_EXISTS)) {
-          // Do NOT perform any clean-up if the exception is a result of
-          //  volume name or tenant name already existing.
-          //  Otherwise in a race condition a late-comer could wipe the
-          //  policies of an existing tenant from Ranger.
-          // TODO: Remove this line if it is not useful.
-          omResponse.setSuccess(true);
-        } else {
-          omResponse.setSuccess(false);
-          // ALL OMs should proactively call the clean-up handler in other cases
+        if (!omEx.getResult().equals(VOLUME_ALREADY_EXISTS) &&
+            !omEx.getResult().equals(TENANT_ALREADY_EXISTS)) {
           handleRequestFailure(ozoneManager);
         }
+        // Do NOT perform any clean-up if the exception is a result of
+        //  volume name or tenant name already existing.
+        //  Otherwise in a race condition a late-comer could wipe the
+        //  policies of an existing tenant from Ranger.
       } else {
-        omResponse.setSuccess(false);
         // ALL OMs should proactively call the clean-up handler in other cases
         handleRequestFailure(ozoneManager);
       }
