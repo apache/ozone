@@ -47,8 +47,6 @@ import picocli.CommandLine;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.UUID;
@@ -171,16 +169,7 @@ public class TestOzoneTenantShell {
     String[] argsWithHAConf = getHASetConfStrings(args);
 
     cmd.setExecutionExceptionHandler(exceptionHandler);
-
-    StringWriter outWriter = new StringWriter();
-    StringWriter errWriter = new StringWriter();
-    cmd.setOut(new PrintWriter(outWriter));
-    cmd.setErr(new PrintWriter(errWriter));
-
     cmd.execute(argsWithHAConf);
-
-    LOG.info(outWriter.toString());
-    LOG.error(errWriter.toString());
   }
 
   /**
