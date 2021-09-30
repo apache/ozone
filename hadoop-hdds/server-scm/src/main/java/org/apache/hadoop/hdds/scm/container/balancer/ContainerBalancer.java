@@ -283,7 +283,7 @@ public class ContainerBalancer {
 
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
-      double utilization = datanodeUsageInfo.calculateUtilization(0);
+      double utilization = datanodeUsageInfo.calculateUtilization();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} is {}",
             datanodeUsageInfo.getDatanodeDetails().getUuidString(),
