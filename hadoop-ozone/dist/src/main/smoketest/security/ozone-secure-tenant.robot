@@ -42,7 +42,7 @@ Secure Tenant Assign User Success
 
 Secure Tenant GetUserInfo Success
     ${output} =         Execute          ozone tenant user info bob@EXAMPLE.COM
-                        Should contain   ${output}         Tenant 'finance' under accessId 'finance$bob@EXAMPLE.COM'
+                        Should contain   ${output}         Tenant 'finance' with accessId 'finance$bob@EXAMPLE.COM'
 
 Secure Tenant Assign User Failure
     ${rc}  ${result} =  Run And Return Rc And Output  ozone tenant user assign bob@EXAMPLE.COM --tenant=nonexistenttenant

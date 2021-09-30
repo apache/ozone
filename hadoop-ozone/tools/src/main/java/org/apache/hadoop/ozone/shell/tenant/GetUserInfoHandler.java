@@ -70,7 +70,7 @@ public class GetUserInfoHandler extends TenantHandler {
 
         for (TenantAccessIdInfo accessIdInfo : accessIdInfoList) {
           out().println("- Tenant '" + accessIdInfo.getTenantName() +
-              "' under accessId '" + accessIdInfo.getAccessId() + "'");
+              "' with accessId '" + accessIdInfo.getAccessId() + "'");
         }
 
         out().println();

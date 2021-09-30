@@ -312,11 +312,11 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
             getOmRequest().getUserInfo()));
 
     if (exception == null) {
-      LOG.info("Assigned user '{}' to tenant '{}' under accessId '{}'",
+      LOG.info("Assigned user '{}' to tenant '{}' with accessId '{}'",
           principal, tenantName, accessId);
       // TODO: omMetrics.incNumTenantUsers()
     } else {
-      LOG.error("Failed to assign '{}' to tenant '{}' under accessId '{}': {}",
+      LOG.error("Failed to assign '{}' to tenant '{}' with accessId '{}': {}",
           principal, tenantName, accessId, exception.getMessage());
       // TODO: Check if the exception message is sufficient.
       // TODO: omMetrics.incNumTenantUserCreateFails()
