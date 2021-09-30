@@ -1400,7 +1400,7 @@ message DeleteTenantUserRequest {
 }
 
 message GetS3VolumeRequest {
-
+  optional string accessID = 1;
 }
 
 message CreateTenantResponse {

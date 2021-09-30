@@ -3088,8 +3088,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // TODO: modify, delete
 
   @Override
-  public OmVolumeArgs getS3Volume() throws IOException {
-    String accessID = getRemoteUser().getUserName();
+  public OmVolumeArgs getS3Volume(String accessID) throws IOException {
     String tenantName = multiTenantManagr.getTenantForAccessID(accessID);
     if (tenantName == null) {
       // If the user is not associated with a tenant, they will use the
@@ -3097,6 +3096,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String defaultS3volume =
           HddsClientUtils.getDefaultS3VolumeName(configuration);
 
+      LOG.info("No tenant found for access ID {}. Directing " +
+          "requests to default s3 volume {}.", accessID, defaultS3volume);
       if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
                 "requests to default s3 volume {}.", accessID, defaultS3volume);

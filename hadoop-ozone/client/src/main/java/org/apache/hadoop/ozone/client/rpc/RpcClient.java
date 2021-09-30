@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -380,8 +381,8 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public OzoneVolume getS3VolumeDetails() throws IOException {
-    OmVolumeArgs volume = ozoneManagerClient.getS3Volume();
+  public OzoneVolume getS3VolumeDetails(String accessID) throws IOException {
+    OmVolumeArgs volume = ozoneManagerClient.getS3Volume(accessID);
     return buildOzoneVolume(volume);
   }
 

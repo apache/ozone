@@ -15,47 +15,34 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.om.multitenant;
+package org.apache.hadoop.ozone.om.multitenantImpl;
 
-import java.security.Principal;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
 
 /**
- * OzoneMultiTenantPrincipal interface.
+ * Implements OzoneMultiTenantPrincipal.
  */
-public interface OzoneMultiTenantPrincipal {
+public class OzoneTenantUserGroupPrincipal implements OzoneTenantGroupPrincipal {
+  private final String tenantID;
+  private static final String DEFAULT_TENANT_GROUP_ALL_USERS =
+      "GroupTenantAllUsers";
 
-  /**
-   * Two types of Ozone principal.
-   */
-  enum OzonePrincipalType{USER_PRINCIPAL, GROUP_PRINCIPAL};
-
-  /**
-   * @return Principal(access-id) representing the multiTenantUser including
-   * any Tenant AccountNameSpace qualification.
-   */
-  Principal getPrincipal();
-
-  /**
-   * @return full String ID of the MultiTenantPrincipal
-   */
-  String getFullMultiTenantPrincipalID();
-
-  /**
-   * @return plain TenantID part
-   */
-  String getTenantID();
-
-  /**
-   * @return plain userID part
-   */
-  String getUserID();
-
-  /**
-   *
-   * @return Whether this principal represents a User or a group.
-   */
-  OzonePrincipalType getUserPrincipalType();
+  public OzoneTenantUserGroupPrincipal(String tenantID) {
+    this.tenantID = tenantID;
+  }
 
   @Override
-  String toString();
+  public String getTenantID() {
+    return tenantID;
+  }
+
+  @Override
+  public String toString() {
+    return getName();
+  }
+
+  @Override
+  public String getName() {
+    return tenantID + TENANT_ID_SEPARATOR + DEFAULT_TENANT_GROUP_ALL_USERS;
+  }
 }

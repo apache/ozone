@@ -4,6 +4,7 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -15,17 +16,24 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.UUID;
+
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 public class TestMultiTenantVolume {
   private MiniOzoneCluster cluster;
@@ -63,20 +71,18 @@ public class TestMultiTenantVolume {
     final String s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
 
     // Get Volume.
-    ObjectStore store = getStoreForAccessID(accessID);
-    OzoneVolume s3Volume = store.getS3Volume();
+    ObjectStore store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    OzoneVolume s3Volume = store.getS3Volume(accessID);
     Assert.assertEquals(s3VolumeName, s3Volume.getName());
 
     // Create bucket.
-    store.createS3Bucket(bucketName);
-    OzoneBucket bucket = store.getS3Bucket(bucketName);
+    s3Volume.createBucket(bucketName);
+    OzoneBucket bucket = s3Volume.getBucket(bucketName);
     Assert.assertEquals(s3VolumeName, bucket.getVolumeName());
-    // Should get the same bucket accessing from the volume directly.
-    Assert.assertEquals(bucketName, s3Volume.getBucket(bucketName).getName());
 
     // Delete bucket.
-    store.deleteS3Bucket(bucketName);
-    Assert.assertNull(s3Volume.getBucket(bucketName));
+    s3Volume.deleteBucket(bucketName);
+    assertBucketNotFound(s3Volume, bucketName);
   }
 
   @Test
@@ -85,41 +91,71 @@ public class TestMultiTenantVolume {
     final String username = "user";
     final String bucketName = "bucket";
     final String accessID = UUID.randomUUID().toString();
-    ObjectStore store = getStoreForAccessID(accessID);
+    ObjectStore store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
 
     store.createTenant(tenant);
     store.assignUserToTenant(username, tenant, accessID);
 
     // Get Volume.
-    OzoneVolume tenantVolume = store.getS3Volume();
+    OzoneVolume tenantVolume = store.getS3Volume(accessID);
     Assert.assertEquals(tenant, tenantVolume.getName());
 
     // Create bucket.
-    store.createS3Bucket(bucketName);
+    tenantVolume.createBucket(bucketName);
     // The tenant's bucket should have been created in a tenant volume.
-    OzoneBucket bucket = store.getS3Bucket(bucketName);
+    OzoneBucket bucket = tenantVolume.getBucket(bucketName);
     Assert.assertEquals(tenant, bucket.getVolumeName());
-    // Should get the same bucket accessing from the volume directly.
-    Assert.assertEquals(bucketName,
-        tenantVolume.getBucket(bucketName).getName());
 
     // A different user should not see bucket, since they will be directed to
     // the s3 volume.
-    ObjectStore store2 = getStoreForAccessID(UUID.randomUUID().toString());
-    Assert.assertNull(store2.getS3Bucket(bucketName));
+    String accessID2 = UUID.randomUUID().toString();
+    assertBucketNotFound(store.getS3Volume(accessID2), bucketName);
 
     // Delete bucket.
-    store.deleteS3Bucket(bucketName);
-    Assert.assertNull(tenantVolume.getBucket(bucketName));
+    tenantVolume.deleteBucket(bucketName);
+    assertBucketNotFound(tenantVolume, bucketName);
   }
 
-  private ObjectStore getStoreForAccessID(String accessID) throws Exception {
-    UserGroupInformation remoteUser =
-        UserGroupInformation.createRemoteUser(accessID);
-    OzoneClient client =
-        remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)
-        () -> OzoneClientFactory.getRpcClient(conf));
-    openClients.add(client);
-    return client.getObjectStore();
+  private void assertBucketNotFound(OzoneVolume volume, String bucketName)
+      throws Exception {
+    try {
+      volume.getBucket(bucketName);
+    } catch(OMException ex) {
+      if (ex.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND) {
+        throw ex;
+      }
+    }
   }
+
+//  private void assertS3BucketNotFound(OzoneVolume volume, String bucketName)
+//      throws Exception {
+//    try {
+//      volume.getBucket(bucketName);
+//    } catch(OMException ex) {
+//      if (ex.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND) {
+//        throw ex;
+//      }
+//    }
+//  }
+
+//  private ObjectStore getStoreForAccessID(String accessID) throws Exception {
+////    OzoneTokenIdentifier identifier = OzoneTokenIdentifier.newInstance();
+////    identifier.setOmCertSerialId("foo");
+////    identifier.setGetUserForAccessId(accID -> accessID);
+//
+//    UserGroupInformation remoteUser =
+//        UserGroupInformation.createRemoteUser(accessID);
+//
+////    Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
+////        identifier.getSignature().getBytes(StandardCharsets.UTF_8),
+////        identifier.getKind(), null);
+////    remoteUser.addToken(token);
+//
+//    OzoneClient client =
+//        remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)
+//        () -> OzoneClientFactory.getRpcClient(conf));
+//    openClients.add(client);
+//    client.
+//    return client.getObjectStore();
+//  }
 }

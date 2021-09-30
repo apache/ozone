@@ -474,7 +474,7 @@ public interface OzoneManagerProtocol
   S3SecretValue assignUserToTenant(String username, String tenantName,
       String accessId) throws IOException;
 
-  OmVolumeArgs getS3Volume() throws IOException;
+  OmVolumeArgs getS3Volume(String accessID) throws IOException;
 
   // TODO: modify, delete
 
