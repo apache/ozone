@@ -552,11 +552,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-    OmKeyLocationInfoGroup keyLocationGroup =
-        omKeyInfo.getLatestVersionLocations();
 
-    for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()) {
-      bytesUsed += locationInfo.getLength() * keyFactor;
+    for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
+        bytesUsed += locationInfo.getLength() * keyFactor;
+      }
     }
 
     return bytesUsed;
