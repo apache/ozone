@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -78,7 +77,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     cluster = getCluster();
     store = getObjectStore();
     clientProtocol = store.getClientProxy();
-    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null, 500, 30000);
   }
 
   /**

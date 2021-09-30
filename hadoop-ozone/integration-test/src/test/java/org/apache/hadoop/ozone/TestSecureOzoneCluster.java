@@ -540,9 +540,6 @@ public final class TestSecureOzoneCluster {
     try {
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
-      while (!om.isLeaderReady()) {
-        Thread.sleep(1000);
-      }
 
 
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
