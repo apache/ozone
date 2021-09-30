@@ -46,6 +46,7 @@ import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
@@ -55,7 +56,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.fail;
 
 /**
- * Integration test for Ozone tenant shell command.
+ * Integration test for Ozone tenant shell command. HA enabled.
  */
 public class TestOzoneTenantShell {
 
@@ -271,12 +272,26 @@ public class TestOzoneTenantShell {
   }
 
   /**
+   * Helper function that checks command output AND clears it.
+   */
+  private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
+      boolean exactMatch) throws IOException {
+    stream.flush();
+    if (exactMatch) {
+      Assert.assertEquals(stringToMatch, stream.toString());
+    } else {
+      Assert.assertTrue(stream.toString().contains(stringToMatch));
+    }
+    stream.reset();
+  }
+
+  /**
    * Test tenant create, assign user and get user info.
    */
   @Test
-  public void testOzoneTenantCreateAssignInfo() {
+  public void testOzoneTenantCreateAssignInfo() throws IOException {
 
-    // Suppress OMNotLeaderException
+    // Suppress OMNotLeaderException in the log
     GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
 
     GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
@@ -285,22 +300,49 @@ public class TestOzoneTenantShell {
     // Create tenants
     // Equivalent to `ozone tenant create finance`
     executeHA(tenantShell, new String[] {"create", "finance"});
+    checkOutput(out, "Created tenant 'finance'.\n", true);
+    checkOutput(err, "", true);
+
     executeHA(tenantShell, new String[] {"create", "research"});
+    checkOutput(out, "Created tenant 'research'.\n", true);
+    checkOutput(err, "", true);
+
     executeHA(tenantShell, new String[] {"create", "dev"});
+    checkOutput(out, "Created tenant 'dev'.\n", true);
+    checkOutput(err, "", true);
 
     // Assign user
     // Equivalent to `ozone tenant user assign bob@EXAMPLE.COM --tenant=finance`
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob@EXAMPLE.COM", "--tenant=finance"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob@EXAMPLE.COM'\n"
+        + "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'bob@EXAMPLE.COM' to 'finance' with accessId"
+        + " 'finance$bob@EXAMPLE.COM'.\n", true);
+
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob@EXAMPLE.COM", "--tenant=research"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='research$bob@EXAMPLE.COM'\n"
+        + "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'bob@EXAMPLE.COM' to 'research' with accessId"
+        + " 'research$bob@EXAMPLE.COM'.\n", true);
+
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob@EXAMPLE.COM", "--tenant=dev"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='dev$bob@EXAMPLE.COM'\n"
+        + "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'bob@EXAMPLE.COM' to 'dev' with accessId"
+        + " 'dev$bob@EXAMPLE.COM'.\n", true);
 
     // Get user info
     // Equivalent to `ozone tenant user info bob@EXAMPLE.COM`
     executeHA(tenantShell, new String[] {
         "user", "info", "bob@EXAMPLE.COM"});
+    checkOutput(out, "User 'bob@EXAMPLE.COM' is assigned to:\n"
+        + "- Tenant 'finance' with accessId 'finance$bob@EXAMPLE.COM'\n"
+        + "- Tenant 'research' with accessId 'research$bob@EXAMPLE.COM'\n"
+        + "- Tenant 'dev' with accessId 'dev$bob@EXAMPLE.COM'\n\n", true);
+    checkOutput(err, "", true);
   }
 
 }
