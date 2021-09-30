@@ -81,7 +81,7 @@ public class TestOzoneTenantShell {
 
   private static File baseDir;
   private static File testFile;
-  private static final File auditLogFile = new File("audit.log");
+  private static final File AUDIT_LOG_FILE = new File("audit.log");
 
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
@@ -106,8 +106,8 @@ public class TestOzoneTenantShell {
   @BeforeClass
   public static void init() throws Exception {
     // Remove audit log output if it exists
-    if (auditLogFile.exists()) {
-      auditLogFile.delete();
+    if (AUDIT_LOG_FILE.exists()) {
+      AUDIT_LOG_FILE.delete();
     }
 
     conf = new OzoneConfiguration();
@@ -320,7 +320,7 @@ public class TestOzoneTenantShell {
     GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(OMAssignUserToTenantRequest.LOG, Level.DEBUG);
 
-    List<String> lines = FileUtils.readLines(auditLogFile, (String)null);
+    List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
     Assert.assertEquals(0, lines.size());
 
     // Create tenants
@@ -329,7 +329,7 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Created tenant 'finance'.\n", true);
     checkOutput(err, "", true);
 
-    lines = FileUtils.readLines(auditLogFile, (String)null);
+    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
     checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Creating the tenant with the same name again should result in failure
