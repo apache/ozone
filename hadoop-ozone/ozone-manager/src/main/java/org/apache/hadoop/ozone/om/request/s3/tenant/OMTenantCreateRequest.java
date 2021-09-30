@@ -92,6 +92,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 
 /**
  * Handles OMTenantCreate request.
+ *
+ * Extends OMVolumeRequest but not OMClientRequest since tenant creation
+ *  involves volume creation.
  */
 public class OMTenantCreateRequest extends OMVolumeRequest {
   private static final Logger LOG =
@@ -136,6 +139,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // Verify volume name
     OmUtils.validateVolumeName(volumeInfo.getVolume());
 
+    // TODO: Shall we check volume existence here as well?
+
     // Generate volume modification time
     long initialTime = Time.now();
     final VolumeInfo updatedVolumeInfo = volumeInfo.toBuilder()
@@ -148,7 +153,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final Tenant tenant =
         ozoneManager.getMultiTenantManager().createTenant(tenantName);
 
-    // Pass this to followers as well
+    // Get the tenant default policy, pass this along
     final String tenantDefaultPolicies = tenant.getTenantAccessPolicies()
         .stream().map(AccessPolicy::getPolicyID)
         .collect(Collectors.joining(","));
@@ -176,7 +181,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
 
     try {
-      Tenant tenant = ozoneManager.getMultiTenantManager()
+      final Tenant tenant = ozoneManager.getMultiTenantManager()
           .getTenantInfo(request.getTenantName());
       // Cleanup any state maintained by OMMultiTenantManager
       if (tenant != null) {
@@ -294,6 +299,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           omDBTenantInfo, tenantDefaultPolicies, bucketPolicyId);
 
     } catch (IOException ex) {
+      // Error handling. Clean up Ranger policies when necessary.
       if (ex instanceof OMException) {
         final OMException omEx = (OMException) ex;
         if (omEx.getResult().equals(VOLUME_ALREADY_EXISTS) ||
@@ -301,15 +307,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           // Do NOT perform any clean-up if the exception is a result of
           //  volume name or tenant name already existing.
           //  Otherwise in a race condition a late-comer could wipe the
+          //  policies of an existing tenant from Ranger.
+          // TODO: Remove this line if it is not useful.
           omResponse.setSuccess(true);
         } else {
           omResponse.setSuccess(false);
-          // All OMs should proactively call the clean-up handler in other cases
+          // ALL OMs should proactively call the clean-up handler in other cases
           handleRequestFailure(ozoneManager);
         }
       } else {
         omResponse.setSuccess(false);
-        // All OMs should proactively call the clean-up handler in other cases
+        // ALL OMs should proactively call the clean-up handler in other cases
         handleRequestFailure(ozoneManager);
       }
       // Prepare omClientResponse
@@ -339,10 +347,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             getOmRequest().getUserInfo()));
 
     if (exception == null) {
-      LOG.info("Created tenant: {}, and volume: {}", tenantName, volumeName);
+      LOG.info("Created tenant '{}' and volume '{}'", tenantName, volumeName);
       // TODO: omMetrics.incNumTenants()
     } else {
-      LOG.error("Failed to create tenant: {}", tenantName, exception);
+      LOG.error("Failed to create tenant '{}'", tenantName, exception);
       // TODO: omMetrics.incNumTenantCreateFails()
     }
     return omClientResponse;
