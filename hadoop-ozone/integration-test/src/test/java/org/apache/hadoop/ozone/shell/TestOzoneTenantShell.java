@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell;
 
 import com.google.common.base.Strings;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,6 +51,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -63,6 +65,12 @@ public class TestOzoneTenantShell {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneTenantShell.class);
 
+  static {
+    System.setProperty("log4j.configurationFile", "auditlog.properties");
+    System.setProperty("log4j2.contextSelector",
+        "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
+  }
+
   private static final String DEFAULT_ENCODING = UTF_8.name();
 
   /**
@@ -73,6 +81,8 @@ public class TestOzoneTenantShell {
 
   private static File baseDir;
   private static File testFile;
+  private static final File auditLogFile = new File("audit.log");
+
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private static TenantShell tenantShell = null;
@@ -95,6 +105,11 @@ public class TestOzoneTenantShell {
    */
   @BeforeClass
   public static void init() throws Exception {
+    // Remove audit log output if it exists
+    if (auditLogFile.exists()) {
+      auditLogFile.delete();
+    }
+
     conf = new OzoneConfiguration();
 
     conf.setBoolean(
@@ -280,12 +295,17 @@ public class TestOzoneTenantShell {
       boolean exactMatch) throws IOException {
     stream.flush();
     final String str = stream.toString(DEFAULT_ENCODING);
+    checkOutput(str, stringToMatch, exactMatch);
+    stream.reset();
+  }
+
+  private void checkOutput(String str, String stringToMatch,
+      boolean exactMatch) {
     if (exactMatch) {
       Assert.assertEquals(stringToMatch, str);
     } else {
       Assert.assertTrue(str.contains(stringToMatch));
     }
-    stream.reset();
   }
 
   /**
@@ -300,11 +320,17 @@ public class TestOzoneTenantShell {
     GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(OMAssignUserToTenantRequest.LOG, Level.DEBUG);
 
+    List<String> lines = FileUtils.readLines(auditLogFile, (String)null);
+    Assert.assertEquals(0, lines.size());
+
     // Create tenants
     // Equivalent to `ozone tenant create finance`
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "Created tenant 'finance'.\n", true);
     checkOutput(err, "", true);
+
+    lines = FileUtils.readLines(auditLogFile, (String)null);
+    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Creating the tenant with the same name again should result in failure
     executeHA(tenantShell, new String[] {"create", "finance"});

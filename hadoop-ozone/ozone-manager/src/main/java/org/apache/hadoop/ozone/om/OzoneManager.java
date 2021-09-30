@@ -3108,22 +3108,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     final Set<String> accessIds = kerberosPrincipalInfo.getAccessIds();
 
+    final Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.TENANT, userPrincipal);
+
     accessIds.forEach(accessId -> {
       try {
+        // Use get() intentionally, which throws if entry doesn't exist in table
         final OmDBAccessIdInfo accessIdInfo =
             metadataManager.getTenantAccessIdTable().get(accessId);
         // Sanity check
         assert(accessIdInfo.getKerberosPrincipal().equals(userPrincipal));
+        // Build TenantAccessIdInfo instances from accessId and tenantName
         final String tenantName = accessIdInfo.getTenantId();
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
             .setTenantName(tenantName)
             .build());
       } catch (IOException e) {
-        LOG.error("Found potential DB consistency issue. "
+        LOG.error("Found potential DB consistency issue! "
             + "accessId '" + "' is supposed to exist in TenantAccessIdTable.");
+        AUDIT.logWriteFailure(buildAuditMessageForFailure(
+            OMAction.TENANT_GET_USER_INFO, auditMap, e));
       }
     });
+
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        OMAction.TENANT_GET_USER_INFO, auditMap));
 
     return new TenantUserInfoValue(userPrincipal, accessIdInfoList);
   }
