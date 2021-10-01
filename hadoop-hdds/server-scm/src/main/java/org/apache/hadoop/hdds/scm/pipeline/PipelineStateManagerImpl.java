@@ -46,10 +46,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * state. All the read and write operations in PipelineStateMap are protected
  * by a read write lock.
  */
-public class PipelineStateManagerV2Impl implements StateManager {
+public class PipelineStateManagerImpl implements PipelineStateManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(PipelineStateManager.class);
+      LoggerFactory.getLogger(PipelineStateManagerImpl.class);
 
   private PipelineStateMap pipelineStateMap;
   private final NodeManager nodeManager;
@@ -60,7 +60,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
   // See https://issues.apache.org/jira/browse/HDDS-4560
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-  public PipelineStateManagerV2Impl(
+  public PipelineStateManagerImpl(
       Table<PipelineID, Pipeline> pipelineStore, NodeManager nodeManager,
       DBTransactionBuffer buffer) throws IOException {
     this.pipelineStateMap = new PipelineStateMap();
@@ -286,46 +286,6 @@ public class PipelineStateManagerV2Impl implements StateManager {
     }
   }
 
-  // TODO Remove legacy
-  @Override
-  public void addPipeline(Pipeline pipeline) throws IOException {
-    throw new IOException("Not supported.");
-  }
-
-  @Override
-  public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
-    throw new IOException("Not supported.");
-  }
-
-  @Override
-  public void updatePipelineState(PipelineID id,
-                                  Pipeline.PipelineState newState)
-      throws IOException {
-    throw new IOException("Not supported.");
-  }
-
-  @Override
-  public Pipeline finalizePipeline(PipelineID pipelineId)
-      throws IOException {
-    throw new IOException("Not supported.");
-  }
-
-
-  @Override
-  public Pipeline openPipeline(PipelineID pipelineId) throws IOException {
-    throw new IOException("Not supported.");
-  }
-
-  @Override
-  public void activatePipeline(PipelineID pipelineID) throws IOException {
-    throw new IOException("Not supported.");
-  }
-
-  @Override
-  public void deactivatePipeline(PipelineID pipelineID) throws IOException {
-    throw new IOException("Not supported.");
-  }
-
   @Override
   public void reinitialize(Table<PipelineID, Pipeline> store)
       throws IOException {
@@ -349,7 +309,7 @@ public class PipelineStateManagerV2Impl implements StateManager {
   }
 
   /**
-   * Builder for PipelineStateManager.
+   * Builder for PipelineStateManagerImpl.
    */
   public static class Builder {
     private Table<PipelineID, Pipeline> pipelineStore;
@@ -378,20 +338,20 @@ public class PipelineStateManagerV2Impl implements StateManager {
       return this;
     }
 
-    public StateManager build() throws IOException {
+    public PipelineStateManager build() throws IOException {
       Preconditions.checkNotNull(pipelineStore);
 
-      final StateManager pipelineStateManager =
-          new PipelineStateManagerV2Impl(
+      final PipelineStateManager pipelineStateManager =
+          new PipelineStateManagerImpl(
               pipelineStore, nodeManager, transactionBuffer);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.PIPELINE,
               pipelineStateManager, scmRatisServer);
 
-      return (StateManager) Proxy.newProxyInstance(
+      return (PipelineStateManager) Proxy.newProxyInstance(
           SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{StateManager.class}, invocationHandler);
+          new Class<?>[]{PipelineStateManager.class}, invocationHandler);
     }
   }
 }
