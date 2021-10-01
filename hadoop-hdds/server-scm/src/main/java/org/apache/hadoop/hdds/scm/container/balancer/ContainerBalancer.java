@@ -775,9 +775,7 @@ public class ContainerBalancer {
 
       // allow garbage collector to collect balancing thread
       currentBalancingThread = null;
-    } catch (InterruptedException e) {
-      LOG.warn("Interrupted while waiting for balancing thread to join.");
-      Thread.currentThread().interrupt();
+    } catch (InterruptedException ignored) {
     } finally {
       lock.unlock();
     }
