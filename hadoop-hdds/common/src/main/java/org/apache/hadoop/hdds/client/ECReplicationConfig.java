@@ -37,6 +37,11 @@ public class ECReplicationConfig implements ReplicationConfig {
   public enum EcCodec {
     RS, XOR;
 
+    @Override
+    public String toString() {
+      return name().toLowerCase();
+    }
+
     public static String allValuesAsString() {
       return EnumSet.allOf(EcCodec.class)
           .stream()

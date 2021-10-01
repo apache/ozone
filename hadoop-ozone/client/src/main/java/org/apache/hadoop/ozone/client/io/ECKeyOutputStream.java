@@ -64,9 +64,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private final int numParityBlks;
   private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
   private final RawErasureEncoder encoder;
-  // TODO: EC: Currently using the below EC Schema. This has to be modified and
-  //  created dynamically once OM return the configured scheme details.
-  private static final String DEFAULT_CODEC_NAME = "rs";
+  private final ECReplicationConfig.EcCodec ecCodec;
 
   private long currentBlockGroupLen = 0;
   /**
@@ -114,6 +112,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.config = config;
     // For EC, cell/chunk size and buffer size can be same for now.
     ecChunkSize = replicationConfig.getEcChunkSize();
+    this.ecCodec = replicationConfig.getCodec();
     this.config.setStreamBufferMaxSize(ecChunkSize);
     this.config.setStreamBufferFlushSize(ecChunkSize);
     this.config.setStreamBufferSize(ecChunkSize);
@@ -134,7 +133,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.writeOffset = 0;
     OzoneConfiguration conf = new OzoneConfiguration();
     ECSchema schema =
-        new ECSchema(DEFAULT_CODEC_NAME, numDataBlks, numParityBlks);
+        new ECSchema(ecCodec.toString(), numDataBlks, numParityBlks);
     ErasureCodecOptions options = new ErasureCodecOptions(schema);
     RSErasureCodec codec = new RSErasureCodec(conf, options);
     this.encoder = CodecUtil.createRawEncoder(conf,
