@@ -71,7 +71,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private final ReentrantReadWriteLock lock;
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
-  private BackgroundPipelineCreatorV2 backgroundPipelineCreator;
+  private BackgroundPipelineCreator backgroundPipelineCreator;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -136,8 +136,8 @@ public class PipelineManagerImpl implements PipelineManager {
         eventPublisher, scmContext);
 
     // Create background thread.
-    BackgroundPipelineCreatorV2 backgroundPipelineCreator =
-        new BackgroundPipelineCreatorV2(
+    BackgroundPipelineCreator backgroundPipelineCreator =
+        new BackgroundPipelineCreator(
             pipelineManager, conf, serviceManager, scmContext);
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
@@ -579,12 +579,12 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private void setBackgroundPipelineCreator(
-      BackgroundPipelineCreatorV2 backgroundPipelineCreator) {
+      BackgroundPipelineCreator backgroundPipelineCreator) {
     this.backgroundPipelineCreator = backgroundPipelineCreator;
   }
 
   @VisibleForTesting
-  public BackgroundPipelineCreatorV2 getBackgroundPipelineCreator() {
+  public BackgroundPipelineCreator getBackgroundPipelineCreator() {
     return this.backgroundPipelineCreator;
   }
 
