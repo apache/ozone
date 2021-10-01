@@ -18,7 +18,7 @@
 
 /**
  * Unit Tests for
- * {@link org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer}
+ * {@link org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer}.
  *
  */
 package org.apache.hadoop.hdds.scm.container.balancer;
