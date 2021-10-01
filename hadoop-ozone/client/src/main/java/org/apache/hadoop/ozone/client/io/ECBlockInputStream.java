@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -34,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.function.Function;
@@ -48,6 +48,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   private final ECReplicationConfig repConfig;
   private final int ecChunkSize;
+  private final long stripeSize;
   private final BlockInputStreamFactory streamFactory;
   private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
@@ -60,6 +61,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   private long position = 0;
   private boolean closed = false;
+  private boolean seeked = false;
 
   public ECBlockInputStream(ECReplicationConfig repConfig,
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
@@ -77,6 +79,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     this.parityLocations = new DatanodeDetails[repConfig.getParity()];
     this.blockStreams = new BlockExtendedInputStream[repConfig.getData()];
 
+    stripeSize = ecChunkSize * repConfig.getData();
     setBlockLocations(this.blockInfo.getPipeline());
   }
 
@@ -158,8 +161,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * @return
    */
   private long internalBlockLength(int index) {
-    long lastStripe = blockInfo.getLength()
-        % ((long)ecChunkSize * repConfig.getData());
+    long lastStripe = blockInfo.getLength() % stripeSize;
     long blockSize = (blockInfo.getLength() - lastStripe) / repConfig.getData();
     long lastCell = lastStripe / ecChunkSize + 1;
     long lastCellLength = lastStripe % ecChunkSize;
@@ -255,8 +257,23 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private int readFromStream(BlockExtendedInputStream stream,
       ByteReaderStrategy strategy)
       throws IOException {
-    // Number of bytes left to read from this streams EC cell.
-    long ecLimit = ecChunkSize - (position % ecChunkSize);
+    long partialPosition = position % ecChunkSize;
+    if (seeked) {
+      // Seek on the underlying streams is performed lazily, as there is a
+      // possibility a read after a seek may only read a small amount of data.
+      // Once this block stream has been seeked, we always check the position,
+      // but in the usual case, where there are no seeks at all, we don't need
+      // to do this extra work.
+      long basePosition = (position / stripeSize) * (long)ecChunkSize;
+      long streamPosition = basePosition + partialPosition;
+      if (streamPosition != stream.getPos()) {
+        // This ECBlockInputStream has been seeked, so the underlying
+        // block stream is no longer at the correct position. Therefore we need
+        // to seek it too.
+        stream.seek(streamPosition);
+      }
+    }
+    long ecLimit = ecChunkSize - partialPosition;
     // Free space in the buffer to read into
     long bufLimit = strategy.getTargetLength();
     // How much we can read, the lower of the EC Cell, buffer and overall block
@@ -309,8 +326,20 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
-  public synchronized void seek(long l) throws IOException {
-    throw new NotImplementedException("Seek is not implements for EC");
+  public synchronized void seek(long pos) throws IOException {
+    checkOpen();
+    if (pos < 0 || pos >= getLength()) {
+      if (pos == 0) {
+        // It is possible for length and pos to be zero in which case
+        // seek should return instead of throwing exception
+        return;
+      }
+      throw new EOFException(
+          "EOF encountered at pos: " + pos + " for block: "
+              + blockInfo.getBlockID());
+    }
+    position = pos;
+    seeked = true;
   }
 
   @Override
