@@ -16,9 +16,9 @@
 
 CORE-SITE.XML_fs.defaultFS=ofs://om
 CORE-SITE.XML_fs.trash.interval=1
-# For HttpFS service it is required to enable proxying users.
-CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts=*
-CORE-SITE.XML_hadoop.proxyuser.hadoop.groups=*
+# For HttpFS it is required to enable impersonating users as root, because the httpfs is mapped to root as a result of the auth_to_local rules.
+CORE-SITE.XML_hadoop.proxyuser.root.hosts=*
+CORE-SITE.XML_hadoop.proxyuser.root.groups=*
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
@@ -124,13 +124,12 @@ HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 
-HTTPFS-SITE.XML.hadoop.http.authentication.type=kerberos
-HTTPFS-SITE.XML.hadoop.http.authentication.kerberos.principal=HTTP/httpfs@EXAMPLE.COM
-HTTPFS-SITE.XML.hadoop.http.authentication.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
-HTTPFS-SITE.XML.httpfs.hadoop.authentication.type=kerberos
-HTTPFS-SITE.XML.httpfs.hadoop.authentication.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
-HTTPFS-SITE.XML.httpfs.hadoop.authentication.kerberos.principal=hdfs/httpfs@EXAMPLE.COM
-
+HTTPFS-SITE.XML_hadoop.http.authentication.type=kerberos
+HTTPFS-SITE.XML_hadoop.http.authentication.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
+HTTPFS-SITE.XML_hadoop.http.authentication.kerberos.principal=HTTP/httpfs@EXAMPLE.COM
+HTTPFS-SITE.XML_httpfs.hadoop.authentication.type=kerberos
+HTTPFS-SITE.XML_httpfs.hadoop.authentication.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
+HTTPFS-SITE.XML_httpfs.hadoop.authentication.kerberos.principal=httpfs/httpfs@EXAMPLE.COM
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
