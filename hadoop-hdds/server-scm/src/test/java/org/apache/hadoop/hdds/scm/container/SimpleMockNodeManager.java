@@ -234,6 +234,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
+    return null;
+  }
+
+  @Override
   public SCMNodeMetric getNodeStat(DatanodeDetails datanodeDetails) {
     return null;
   }

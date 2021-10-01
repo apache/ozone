@@ -85,6 +85,7 @@ public class ContainerBalancer {
   private long clusterUsed;
   private long clusterRemaining;
   private double clusterAvgUtilisation;
+  private double upperLimit;
   private volatile boolean balancerRunning;
   private Thread currentBalancingThread;
   private Lock lock;
@@ -187,7 +188,14 @@ public class ContainerBalancer {
         stop();
         return;
       }
-      doIteration();
+
+      //if no new move option is generated, it means the cluster can
+      //not be balanced any more , so just stop
+      IterationResult iR = doIteration();
+      if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
+        stop();
+        return;
+      }
 
       // return if balancing has been stopped
       if (!isBalancerRunning()) {
@@ -263,7 +271,7 @@ public class ContainerBalancer {
 
     // over utilized nodes have utilization(that is, used / capacity) greater
     // than upper limit
-    double upperLimit = clusterAvgUtilisation + threshold;
+    this.upperLimit = clusterAvgUtilisation + threshold;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Lower limit for utilization is {} and Upper limit for " +
@@ -352,6 +360,7 @@ public class ContainerBalancer {
     Set<DatanodeDetails> selectedTargets =
         new HashSet<>(potentialTargets.size());
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
+    boolean isMoveGenerated = false;
 
     // match each overUtilized node with a target
     for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
@@ -365,6 +374,7 @@ public class ContainerBalancer {
       ContainerMoveSelection moveSelection =
           matchSourceWithTarget(source, potentialTargets);
       if (moveSelection != null) {
+        isMoveGenerated = true;
         LOG.info("ContainerBalancer is trying to move container {} from " +
                 "source datanode {} to target datanode {}",
             moveSelection.getContainerID().toString(), source.getUuidString(),
@@ -395,6 +405,7 @@ public class ContainerBalancer {
         ContainerMoveSelection moveSelection =
             matchSourceWithTarget(source, potentialTargets);
         if (moveSelection != null) {
+          isMoveGenerated = true;
           LOG.info("ContainerBalancer is trying to move container {} from " +
                   "source datanode {} to target datanode {}",
               moveSelection.getContainerID().toString(),
@@ -409,6 +420,12 @@ public class ContainerBalancer {
           }
         }
       }
+    }
+
+    if (!isMoveGenerated) {
+      //no move option is generated, so the cluster can not be
+      //balanced any more, just stop iteration and exit
+      return IterationResult.CAN_NOT_BALANCE_ANY_MORE;
     }
 
     // check move results
@@ -652,8 +669,16 @@ public class ContainerBalancer {
    */
   boolean canSizeEnterTarget(DatanodeDetails target, long size) {
     if (sizeEnteringNode.containsKey(target)) {
-      return sizeEnteringNode.get(target) + size <=
-          config.getMaxSizeEnteringTarget();
+      long sizeEnteringAfterMove = sizeEnteringNode.get(target) + size;
+      //size can be moved into target datanode only when the following
+      //two condition are met.
+      //1 sizeEnteringAfterMove does not succeed the configured
+      // MaxSizeEnteringTarget
+      //2 current usage of target datanode plus sizeEnteringAfterMove
+      // is smaller than or equal to upperLimit
+      return sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
+           nodeManager.getUsageInfo(target)
+               .calculateUtilization(sizeEnteringAfterMove) <= upperLimit;
     }
     return false;
   }
@@ -825,6 +850,7 @@ public class ContainerBalancer {
   enum IterationResult {
     ITERATION_COMPLETED,
     MAX_DATANODES_TO_INVOLVE_REACHED,
-    MAX_SIZE_TO_MOVE_REACHED
+    MAX_SIZE_TO_MOVE_REACHED,
+    CAN_NOT_BALANCE_ANY_MORE
   }
 }
