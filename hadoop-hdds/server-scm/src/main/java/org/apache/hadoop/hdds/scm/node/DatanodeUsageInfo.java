@@ -47,7 +47,8 @@ public class DatanodeUsageInfo {
 
   /**
    * Compares two DatanodeUsageInfo on the basis of their utilization values,
-   * calculated using {@link DatanodeUsageInfo#calculateUtilization()}.
+   * calculated using
+   * {@link DatanodeUsageInfo#calculateUtilization(long plusSize)}.
    *
    * @param first DatanodeUsageInfo
    * @param second DatanodeUsageInfo
@@ -65,20 +66,35 @@ public class DatanodeUsageInfo {
   }
 
   /**
-   * Calculates utilization of a datanode. Utilization of a datanode is defined
-   * as its used space divided by its capacity. Here, we prefer calculating
+   * Calculates utilization of a datanode after adding a specified size.
+   * Utilization of a datanode is defined as its used space divided
+   * by its capacity. Here, we prefer calculating
+   * used space as (capacity - remaining), instead of using
+   * {@link SCMNodeStat#getScmUsed()} (see HDDS-5728).
+   *
+   * @param plusSize the increased size
+   * @return (capacity - remaining) / capacity of this datanode
+   */
+  public double calculateUtilization(long plusSize) {
+    long capacity = scmNodeStat.getCapacity().get();
+    if (capacity == 0) {
+      return 0;
+    }
+    long numerator = capacity - scmNodeStat.getRemaining().get() + plusSize;
+    return numerator / (double) capacity;
+  }
+
+  /**
+   * Calculates current utilization of a datanode .
+   * Utilization of a datanode is defined as its used space divided
+   * by its capacity. Here, we prefer calculating
    * used space as (capacity - remaining), instead of using
    * {@link SCMNodeStat#getScmUsed()} (see HDDS-5728).
    *
    * @return (capacity - remaining) / capacity of this datanode
    */
   public double calculateUtilization() {
-    double capacity = scmNodeStat.getCapacity().get();
-    if (capacity == 0) {
-      return 0;
-    }
-    double numerator = capacity - scmNodeStat.getRemaining().get();
-    return numerator / capacity;
+    return calculateUtilization(0);
   }
 
   /**
