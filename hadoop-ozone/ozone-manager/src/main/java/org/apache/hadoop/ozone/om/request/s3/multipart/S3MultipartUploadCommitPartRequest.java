@@ -213,7 +213,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(multipartKeyInfo),
               trxnLogIndex));
 
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
@@ -282,7 +282,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
       String openKey, String keyName) throws IOException {
 
-    return omMetadataManager.getOpenKeyTable().get(openKey);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
   }
 
   protected String getOpenKey(String volumeName, String bucketName,

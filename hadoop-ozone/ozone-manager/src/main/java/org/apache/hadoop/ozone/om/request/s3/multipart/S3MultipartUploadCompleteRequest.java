@@ -383,7 +383,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   protected OmKeyInfo getOmKeyInfoFromOpenKeyTable(String dbMultipartKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
-    return omMetadataManager.getOpenKeyTable().get(dbMultipartKey);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartKey);
   }
 
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
@@ -496,7 +497,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
         transactionLogIndex);
 
-    omMetadataManager.getOpenKeyTable().addCacheEntry(
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
         new CacheKey<>(dbMultipartOpenKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(

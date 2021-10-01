@@ -228,11 +228,12 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-            new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+        omMetadataManager.getOpenKeyTable(getBucketLayout())
+            .addCacheEntry(new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
@@ -961,11 +962,12 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenFileName(
               omKeyInfo.getParentObjectID(), fileName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-                new CacheKey<>(ozoneKey),
+        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzonePathKey(
               omKeyInfo.getParentObjectID(), fileName);
@@ -1034,5 +1036,9 @@ public final class TestOMRequestUtils {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
+  }
+
+  public static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

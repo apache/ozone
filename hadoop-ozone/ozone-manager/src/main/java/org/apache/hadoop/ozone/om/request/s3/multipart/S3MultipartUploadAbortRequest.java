@@ -138,8 +138,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      OmKeyInfo omKeyInfo =
-          omMetadataManager.getOpenKeyTable().get(multipartOpenKey);
+      OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .get(multipartOpenKey);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // If there is no entry in openKeyTable, then there is no multipart
@@ -171,12 +171,12 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries
       // in delete table are not used by any read/write operations.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(multipartOpenKey),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
-      omMetadataManager.getMultipartInfoTable().addCacheEntry(
-          new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+      omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .addCacheEntry(new CacheKey<>(multipartOpenKey),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
+      omMetadataManager.getMultipartInfoTable()
+          .addCacheEntry(new CacheKey<>(multipartKey),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
           multipartKey, multipartOpenKey, omResponse, omBucketInfo);

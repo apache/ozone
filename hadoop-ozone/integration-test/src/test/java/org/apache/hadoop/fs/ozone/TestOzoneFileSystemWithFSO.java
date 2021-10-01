@@ -439,7 +439,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     // wait for DB updates
     GenericTestUtils.waitFor(() -> {
       try {
-        return omMgr.getOpenKeyTable().isEmpty();
+        return omMgr.getOpenKeyTable(getBucketLayout()).isEmpty();
       } catch (IOException e) {
         LOG.error("DB failure!", e);
         Assert.fail("DB failure!");
@@ -476,5 +476,10 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertEquals("Wrong representation!",
         dbKey + ":" + dirInfo.getObjectID(), dirInfo.toString());
     return dirInfo.getObjectID();
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
