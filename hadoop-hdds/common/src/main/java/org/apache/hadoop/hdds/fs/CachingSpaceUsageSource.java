@@ -114,7 +114,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   public void refreshNow() {
     //refresh immediately
-    executor.schedule(this::refresh, 0 , MILLISECONDS);
+    executor.schedule(this::refresh, 0, MILLISECONDS);
   }
 
   private void loadInitialValue() {
