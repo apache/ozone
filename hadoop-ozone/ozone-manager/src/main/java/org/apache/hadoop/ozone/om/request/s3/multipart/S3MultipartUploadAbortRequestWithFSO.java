@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -85,5 +86,10 @@ public class S3MultipartUploadAbortRequestWithFSO
         fileName, multipartUploadID);
 
     return multipartKey;
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

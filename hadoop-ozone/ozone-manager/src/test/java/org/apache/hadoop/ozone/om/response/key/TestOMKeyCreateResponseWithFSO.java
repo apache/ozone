@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -72,5 +73,10 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
     return new OMKeyCreateResponseWithFSO(response, keyInfo, new ArrayList<>(),
         clientID, bucketInfo);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

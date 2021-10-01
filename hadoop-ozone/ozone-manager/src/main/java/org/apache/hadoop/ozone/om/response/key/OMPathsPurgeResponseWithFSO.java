@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
@@ -122,4 +123,8 @@ public class OMPathsPurgeResponseWithFSO extends OMClientResponse {
     }
   }
 
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
 }

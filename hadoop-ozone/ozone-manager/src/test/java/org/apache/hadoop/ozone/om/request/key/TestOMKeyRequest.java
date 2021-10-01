@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -213,11 +214,16 @@ public class TestOMKeyRequest {
           throws Exception {
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
             key, id);
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (doAssert) {
       Assert.assertNotNull("Failed to find key in OpenKeyTable", omKeyInfo);
     }
     return omKeyInfo;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   @After

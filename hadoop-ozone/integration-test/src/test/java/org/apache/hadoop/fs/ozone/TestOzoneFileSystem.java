@@ -227,6 +227,10 @@ public class TestOzoneFileSystem {
     return volumeName;
   }
 
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
   @Test
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
       throws Exception {
