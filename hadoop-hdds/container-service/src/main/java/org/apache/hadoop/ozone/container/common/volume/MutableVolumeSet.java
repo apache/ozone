@@ -289,6 +289,10 @@ public class MutableVolumeSet implements VolumeSet {
         });
   }
 
+  public void refreshAllVolumeUsage() {
+    volumeMap.forEach((k, v)-> v.refreshVolumeInfo());
+  }
+
   /**
    * Acquire Volume Set Read lock.
    */

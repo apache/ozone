@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -57,7 +56,6 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     this(params, createExecutor(params));
   }
 
-  @VisibleForTesting
   CachingSpaceUsageSource(SpaceUsageCheckParams params,
       ScheduledExecutorService executor) {
     Preconditions.checkArgument(params != null, "params == null");
@@ -112,6 +110,11 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
       executor.shutdown();
     }
+  }
+
+  public void refreshNow() {
+    //refresh immediately
+    executor.schedule(this::refresh, 0 , MILLISECONDS);
   }
 
   private void loadInitialValue() {
