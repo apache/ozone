@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -79,6 +80,7 @@ public class TestECKeyOutputStream {
   private static String keyString;
   private static int dataBlocks = 3;
   private static int parityBlocks = 2;
+  private static int inputSize = dataBlocks * chunkSize;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
   /**
@@ -132,7 +134,7 @@ public class TestECKeyOutputStream {
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     try (OzoneOutputStream key = TestHelper
         .createKey(keyString, new ECReplicationConfig(3, 2,
-            ECReplicationConfig.EcCodec.RS, chunkSize), 2000, objectStore,
+        ECReplicationConfig.EcCodec.RS, chunkSize), inputSize, objectStore,
             volumeName, bucketName)) {
       Assert.assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
     }
@@ -142,7 +144,7 @@ public class TestECKeyOutputStream {
   public void testCreateKeyWithOutBucketDefaults() throws Exception {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
+    try (OzoneOutputStream out = bucket.createKey("myKey", inputSize)) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);
@@ -152,8 +154,18 @@ public class TestECKeyOutputStream {
 
   @Test
   public void testCreateKeyWithBucketDefaults() throws Exception {
-    OzoneBucket bucket = getOzoneBucket();
-    try (OzoneOutputStream out = bucket.createKey(keyString, 2000)) {
+    String myBucket = UUID.randomUUID().toString();
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
+    bucketArgs.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+                chunkSize)));
+
+    volume.createBucket(myBucket, bucketArgs.build());
+    OzoneBucket bucket = volume.getBucket(myBucket);
+
+    try (OzoneOutputStream out = bucket.createKey(keyString, inputSize)) {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);
@@ -247,17 +259,20 @@ public class TestECKeyOutputStream {
 
 
   @Test
+  // Ignoring this test, as the single block pipelines are not exposed anymore.
+  // TODO: remove this before committing HDDS-5755
+  @Ignore
   public void testECKeyXceiverClientShouldNotUseCachedKeysForDifferentStreams()
       throws Exception {
     int data = 3;
     int parity = 2;
     try (OzoneOutputStream key = TestHelper
         .createKey(keyString, new ECReplicationConfig(data, parity,
-            ECReplicationConfig.EcCodec.RS, chunkSize), 1024,
+        ECReplicationConfig.EcCodec.RS, chunkSize), 4096,
             objectStore, volumeName, bucketName)) {
       final List<BlockOutputStreamEntry> streamEntries =
           ((ECKeyOutputStream) key.getOutputStream()).getStreamEntries();
-      Assert.assertEquals(data + parity, streamEntries.size());
+      Assert.assertEquals(1, streamEntries.size());
       final Cache<String, XceiverClientSpi> clientCache =
           ((XceiverClientManager) ((ECKeyOutputStream) key.getOutputStream())
               .getXceiverClientFactory()).getClientCache();

@@ -276,15 +276,20 @@ public class BlockOutputStreamEntry extends OutputStream {
    * here.
    * @param id the last know ID of the block.
    */
-  void updateBlockID(BlockID id) {
+  @VisibleForTesting
+  protected void updateBlockID(BlockID id) {
     this.blockID = id;
   }
 
-  OzoneClientConfig getConf(){
+  public String getKey() {
+    return this.key;
+  }
+
+  public OzoneClientConfig getConf(){
     return this.config;
   }
 
-  XceiverClientFactory getXceiverClientManager() {
+  public XceiverClientFactory getXceiverClientManager() {
     return this.xceiverClientManager;
   }
 
@@ -309,11 +314,11 @@ public class BlockOutputStreamEntry extends OutputStream {
     return getPipeline();
   }
 
-  long getCurrentPosition() {
+  public long getCurrentPosition() {
     return this.currentPosition;
   }
 
-  BufferPool getBufferPool() {
+  public BufferPool getBufferPool() {
     return this.bufferPool;
   }
 

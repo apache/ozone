@@ -17,56 +17,235 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.util.Preconditions;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Helper for {@link ECBlockOutputStream}.
  */
 public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
-  private final boolean isParityStreamEntry;
-  private ECBlockOutputStream out;
+  private ECBlockOutputStream[] blockOutputStreams;
+  private final ECReplicationConfig replicationConfig;
+  private Map<DatanodeDetails, Integer> replicaIndicies = new HashMap<>();
+
+  private int currentStreamIdx = 0;
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
       BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config, boolean isParityStream) {
+      OzoneClientConfig config) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
         token, config);
-    this.isParityStreamEntry = isParityStream;
+    Preconditions.assertInstanceOf(
+        pipeline.getReplicationConfig(), ECReplicationConfig.class);
+    this.replicationConfig =
+        (ECReplicationConfig) pipeline.getReplicationConfig();
   }
 
   @Override
   void createOutputStream() throws IOException {
-    this.out = new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
-        getPipeline(), getBufferPool(), getConf(), getToken());
-  }
-
-  public ECBlockOutputStream getOutputStream() {
-    return out;
+    Pipeline ecPipeline = getPipeline();
+    List<DatanodeDetails> nodes = getPipeline().getNodes();
+    blockOutputStreams =
+        new ECBlockOutputStream[nodes.size()];
+    for (int i = 0; i< getPipeline().getNodes().size(); i++) {
+      blockOutputStreams[i] = new ECBlockOutputStream(
+          getBlockID(),
+          getXceiverClientManager(),
+          createSingleECBlockPipeline(ecPipeline, nodes.get(i), i+1),
+          getBufferPool(),
+          getConf(),
+          getToken());
+    }
   }
 
   void executePutBlock() throws IOException {
-    this.out.executePutBlock(false, true);
+    if (!isInitialized()) {
+      return;
+    }
+    int failedStreams = 0;
+    for (ECBlockOutputStream stream : blockOutputStreams) {
+      if (!stream.isClosed()) {
+        stream.executePutBlock(false, true);
+      } else {
+        failedStreams++;
+      }
+      if(failedStreams > replicationConfig.getParity()) {
+        throw new IOException(
+            "There are " + failedStreams + " failures than supported tolerance: "
+                + replicationConfig.getParity());
+      }
+    }
   }
 
-  public boolean isParityStreamEntry() {
-    return this.isParityStreamEntry;
+  @Override
+  public OutputStream getOutputStream() {
+    if (!isInitialized()) {
+      return null;
+    }
+    return blockOutputStreams[currentStreamIdx];
+  }
+
+  @Override
+  boolean isInitialized() {
+    return blockOutputStreams != null;
+  }
+
+  public void useNextBlock() {
+    currentStreamIdx++;
+  }
+
+  public void forceToFirstParityBlock(){
+    currentStreamIdx = replicationConfig.getData();
+  }
+
+  public int getCurrentStreamIdx() {
+    return currentStreamIdx;
+  }
+
+  @Override
+  void incCurrentPosition() {
+    if (isWritingParity()) {
+      return;
+    }
+    super.incCurrentPosition();
+  }
+
+  @Override
+  void incCurrentPosition(long len) {
+    if (isWritingParity()){
+      return;
+    }
+    super.incCurrentPosition(len);
+  }
+
+  private boolean isWritingParity() {
+    return currentStreamIdx >= replicationConfig.getData();
+  }
+
+  @Override
+  public void flush() throws IOException {
+    if (!isInitialized()) {
+      return;
+    }
+    for(int i=0; i<=currentStreamIdx && i<blockOutputStreams.length; i++) {
+      blockOutputStreams[i].flush();
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (!isInitialized()) {
+      return;
+    }
+    for (ECBlockOutputStream stream : blockOutputStreams) {
+      stream.close();
+    }
+    updateBlockID(underlyingBlockID());
+  }
+
+  @Override
+  boolean isClosed() {
+    if (!isInitialized()) {
+      return false;
+    }
+    return blockStreams().allMatch(BlockOutputStream::isClosed);
+  }
+
+  @Override
+  long getTotalAckDataLength() {
+    if (!isInitialized()) {
+      return 0;
+    }
+    // blockID is the same for EC blocks inside one block group managed by
+    // this entry.
+    updateBlockID(underlyingBlockID());
+    return blockStreams()
+        .mapToLong(BlockOutputStream::getTotalAckDataLength)
+        .sum();
+  }
+
+  @Override
+  long getWrittenDataLength() {
+    if (!isInitialized()) {
+      return 0;
+    }
+    return blockStreams()
+        .mapToLong(BlockOutputStream::getWrittenDataLength)
+        .sum();
+  }
+
+  @Override
+  Collection<DatanodeDetails> getFailedServers() {
+    if (!isInitialized()) {
+      return Collections.emptyList();
+    }
+
+    return blockStreams()
+        .flatMap(outputStream -> outputStream.getFailedServers().stream())
+        .collect(Collectors.toList());
+  }
+
+  private BlockID underlyingBlockID() {
+    return blockOutputStreams[0].getBlockID();
+  }
+
+  private Stream<ECBlockOutputStream> blockStreams() {
+    return Arrays.stream(blockOutputStreams);
+  }
+
+  private Pipeline createSingleECBlockPipeline(Pipeline ecPipeline,
+      DatanodeDetails node, int replicaIndex) {
+    Map<DatanodeDetails, Integer> indiciesForSinglePipeline = new HashMap<>();
+    indiciesForSinglePipeline.put(node, replicaIndex);
+    replicaIndicies.put(node, replicaIndex);
+    return Pipeline.newBuilder()
+        .setId(ecPipeline.getId())
+        .setReplicationConfig(ecPipeline.getReplicationConfig())
+        .setState(ecPipeline.getPipelineState())
+        .setNodes(ImmutableList.of(node))
+        .setReplicaIndexes(indiciesForSinglePipeline)
+        .build();
+  }
+
+  @Override
+  Pipeline getPipelineForOMLocationReport() {
+    Pipeline original = getPipeline();
+    return Pipeline.newBuilder()
+        .setId(original.getId())
+        .setReplicationConfig(original.getReplicationConfig())
+        .setState(original.getPipelineState())
+        .setNodes(original.getNodes())
+        .setReplicaIndexes(replicaIndicies)
+        .build();
   }
 
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
   public static class Builder {
-
     private BlockID blockID;
     private String key;
     private XceiverClientFactory xceiverClientManager;
@@ -75,7 +254,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
-    private boolean isParityStreamEntry;
 
     public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -123,12 +301,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       return this;
     }
 
-    public ECBlockOutputStreamEntry.Builder setIsParityStreamEntry(
-        boolean isParity) {
-      this.isParityStreamEntry = isParity;
-      return this;
-    }
-
     public ECBlockOutputStreamEntry build() {
       return new ECBlockOutputStreamEntry(blockID,
           key,
@@ -136,7 +308,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
           pipeline,
           length,
           bufferPool,
-          token, config, isParityStreamEntry);
+          token, config);
     }
   }
 }

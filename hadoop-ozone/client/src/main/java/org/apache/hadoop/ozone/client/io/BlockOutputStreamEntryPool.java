@@ -345,18 +345,6 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
-  public int getCurrIdx(){
-    return currentStreamIndex;
-  }
-
-  public void setCurrIdx(int currIdx) {
-    this.currentStreamIndex = currIdx;
-  }
-
-  public void updateToNextStream(int rotation) {
-    currentStreamIndex = (currentStreamIndex + 1) % rotation;
-  }
-
   /**
    * Allocates a new block with OM if the current stream is closed, and new
    * writes are to be handled.
