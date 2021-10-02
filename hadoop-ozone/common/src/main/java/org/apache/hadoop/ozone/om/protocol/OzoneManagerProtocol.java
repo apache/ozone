@@ -80,7 +80,7 @@ public interface OzoneManagerProtocol
    */
   default void createVolume(OmVolumeArgs args) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -94,7 +94,7 @@ public interface OzoneManagerProtocol
    */
   default boolean setOwner(String volume, String owner) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -108,7 +108,7 @@ public interface OzoneManagerProtocol
   default void setQuota(String volume, long quotaInNamespace, long quotaInBytes)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -122,7 +122,7 @@ public interface OzoneManagerProtocol
    */
   default boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
       throws IOException {
-    throw new UnsupportedOperationException("deprecated");
+    throw new UnsupportedOperationException("This operation is not supported.");
   }
 
 
@@ -141,7 +141,7 @@ public interface OzoneManagerProtocol
    */
   default void deleteVolume(String volume) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -175,7 +175,7 @@ public interface OzoneManagerProtocol
    */
   default void createBucket(OmBucketInfo bucketInfo) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -196,7 +196,7 @@ public interface OzoneManagerProtocol
    */
   default void setBucketProperty(OmBucketArgs args) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -209,7 +209,7 @@ public interface OzoneManagerProtocol
    */
   default OpenKeySession openKey(OmKeyArgs args) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
   /**
@@ -223,7 +223,7 @@ public interface OzoneManagerProtocol
   default void commitKey(OmKeyArgs args, long clientID)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -241,7 +241,7 @@ public interface OzoneManagerProtocol
   default OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientID,
       ExcludeList excludeList) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
   /**
@@ -261,7 +261,7 @@ public interface OzoneManagerProtocol
    */
   default void renameKey(OmKeyArgs args, String toKeyName) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -273,7 +273,7 @@ public interface OzoneManagerProtocol
    */
   default void renameKeys(OmRenameKeys omRenameKeys) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -285,7 +285,7 @@ public interface OzoneManagerProtocol
    */
   default void deleteKey(OmKeyArgs args) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -299,7 +299,7 @@ public interface OzoneManagerProtocol
    */
   default void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -311,7 +311,7 @@ public interface OzoneManagerProtocol
    */
   default void deleteBucket(String volume, String bucket) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -449,7 +449,7 @@ public interface OzoneManagerProtocol
   default OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -464,7 +464,7 @@ public interface OzoneManagerProtocol
   default OmMultipartCommitUploadPartInfo commitMultipartUploadPart(
       OmKeyArgs omKeyArgs, long clientID) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -479,7 +479,7 @@ public interface OzoneManagerProtocol
       OmKeyArgs omKeyArgs, OmMultipartUploadCompleteList multipartUploadList)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -490,7 +490,7 @@ public interface OzoneManagerProtocol
    */
   default void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -522,7 +522,7 @@ public interface OzoneManagerProtocol
    */
   default S3SecretValue getS3Secret(String kerberosID) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -533,7 +533,7 @@ public interface OzoneManagerProtocol
    */
   default void revokeS3Secret(String kerberosID) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -560,7 +560,7 @@ public interface OzoneManagerProtocol
    */
   default void createDirectory(OmKeyArgs args) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -581,7 +581,7 @@ public interface OzoneManagerProtocol
   default OpenKeySession createFile(OmKeyArgs keyArgs, boolean overWrite,
       boolean recursive) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -620,7 +620,7 @@ public interface OzoneManagerProtocol
    * */
   default boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -634,7 +634,7 @@ public interface OzoneManagerProtocol
    * */
   default boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
@@ -648,7 +648,7 @@ public interface OzoneManagerProtocol
    * */
   default boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
+        "this to be implemented, as write requests use a new approach.");
   }
 
 
