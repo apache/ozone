@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -59,6 +60,7 @@ public class BlockDataStreamOutputEntryPool {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private List<ByteBuffer> bufferPool;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockDataStreamOutputEntryPool(
@@ -83,6 +85,7 @@ public class BlockDataStreamOutputEntryPool {
     this.requestID = requestId;
     this.openID = openID;
     this.excludeList = new ExcludeList();
+    this.bufferPool = new ArrayList<>();
   }
 
   /**
@@ -142,7 +145,8 @@ public class BlockDataStreamOutputEntryPool {
             .setPipeline(subKeyInfo.getPipeline())
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
-            .setToken(subKeyInfo.getToken());
+            .setToken(subKeyInfo.getToken())
+            .setBufferPool(bufferPool);
     streamEntries.add(builder.build());
   }
 
@@ -300,5 +304,13 @@ public class BlockDataStreamOutputEntryPool {
 
   boolean isEmpty() {
     return streamEntries.isEmpty();
+  }
+
+  long computeBufferData() {
+    long totalDataLen =0;
+    for (ByteBuffer b:bufferPool){
+      totalDataLen+=(b.limit()-b.position());
+    }
+    return totalDataLen;
   }
 }

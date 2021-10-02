@@ -24,6 +24,7 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -31,13 +32,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Set;
+import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -48,7 +53,13 @@ public class StreamCommitWatcher {
   private static final Logger LOG =
       LoggerFactory.getLogger(StreamCommitWatcher.class);
 
-  private Set<Long> commitIndexSet;
+  private Map<Long, List<ByteBuffer>> commitIndexSet;
+
+  private List<ByteBuffer> bufferPool;
+
+  // total data which has been successfully flushed and acknowledged
+  // by all servers
+  private long totalAckDataLength;
 
   // future Map to hold up all putBlock futures
   private ConcurrentHashMap<Long,
@@ -57,14 +68,18 @@ public class StreamCommitWatcher {
 
   private XceiverClientSpi xceiverClient;
 
-  public StreamCommitWatcher(XceiverClientSpi xceiverClient) {
+  public StreamCommitWatcher(XceiverClientSpi xceiverClient,
+      List<ByteBuffer> bufferPool) {
     this.xceiverClient = xceiverClient;
-    commitIndexSet = new ConcurrentSkipListSet();
+    commitIndexSet = new ConcurrentSkipListMap<>();
     futureMap = new ConcurrentHashMap<>();
+    this.bufferPool = bufferPool;
+    totalAckDataLength = 0;
   }
 
-  public void updateCommitInfoSet(long index) {
-    commitIndexSet.add(index);
+  public void updateCommitInfoSet(long index, List<ByteBuffer> buffers) {
+    commitIndexSet.computeIfAbsent(index, k -> new LinkedList<>())
+        .addAll(buffers);
   }
 
   int getCommitInfoSetSize() {
@@ -83,7 +98,7 @@ public class StreamCommitWatcher {
       // to get committed to all or majority of nodes in case timeout
       // happens.
       long index =
-          commitIndexSet.stream().mapToLong(v -> v).min()
+          commitIndexSet.keySet().stream().mapToLong(v -> v).min()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
         LOG.debug("waiting for first index {} to catch up", index);
@@ -107,7 +122,7 @@ public class StreamCommitWatcher {
       // to get committed to all or majority of nodes in case timeout
       // happens.
       long index =
-          commitIndexSet.stream().mapToLong(v -> v).max()
+          commitIndexSet.keySet().stream().mapToLong(v -> v).max()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
         LOG.debug("waiting for last flush Index {} to catch up", index);
@@ -127,9 +142,16 @@ public class StreamCommitWatcher {
    */
   public XceiverClientReply streamWatchForCommit(long commitIndex)
       throws IOException {
+    long index;
     try {
       XceiverClientReply reply =
           xceiverClient.watchForCommit(commitIndex);
+      if (reply == null) {
+        index = 0;
+      } else {
+        index = reply.getLogIndex();
+      }
+      adjustBuffers(index);
       return reply;
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
@@ -140,11 +162,55 @@ public class StreamCommitWatcher {
     }
   }
 
+  void releaseBuffersOnException() {
+    adjustBuffers(xceiverClient.getReplicatedMinCommitIndex());
+  }
+
+  private void adjustBuffers(long commitIndex) {
+    List<Long> keyList = commitIndexSet.keySet().stream()
+        .filter(p -> p <= commitIndex).collect(Collectors.toList());
+    if (!keyList.isEmpty()) {
+      releaseBuffers(keyList);
+    }
+  }
+
+  private long releaseBuffers(List<Long> indexes) {
+    Preconditions.checkArgument(!commitIndexSet.isEmpty());
+    for (long index : indexes) {
+      Preconditions.checkState(commitIndexSet.containsKey(index));
+      final List<ByteBuffer> buffers
+          = commitIndexSet.remove(index);
+      long length =
+          buffers.stream().mapToLong(buf -> (buf.limit() - buf.position()))
+              .sum();
+      totalAckDataLength += length;
+      // clear the future object from the future Map
+      final CompletableFuture<ContainerCommandResponseProto> remove =
+          futureMap.remove(totalAckDataLength);
+      if (remove == null) {
+        LOG.error("Couldn't find required future for " + totalAckDataLength);
+        for (Long key : futureMap.keySet()) {
+          LOG.error("Existing acknowledged data: " + key);
+        }
+      }
+      Preconditions.checkNotNull(remove);
+      for (ByteBuffer byteBuffer : buffers) {
+        bufferPool.remove(byteBuffer);
+      }
+    }
+    return totalAckDataLength;
+  }
+
+  public long getTotalAckDataLength() {
+    return totalAckDataLength;
+  }
+
   private IOException getIOExceptionForWatchForCommit(long commitIndex,
                                                        Exception e) {
     LOG.warn("watchForCommit failed for index {}", commitIndex, e);
     IOException ioException = new IOException(
         "Unexpected Storage Container Exception: " + e.toString(), e);
+    releaseBuffersOnException();
     return ioException;
   }
 
