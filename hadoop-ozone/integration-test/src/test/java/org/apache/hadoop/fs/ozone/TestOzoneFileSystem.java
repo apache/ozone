@@ -585,7 +585,18 @@ public class TestOzoneFileSystem {
     Path parent = new Path("/");
     FileStatus[] fileStatuses = fs.listStatus(parent);
 
-    // Wait until the filestatuses are updated
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(()-> {
+        try {
+          return fs.listStatus(parent).length!=0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
     while (fileStatuses.length == 0) {
       Thread.sleep(1000);
       fileStatuses = fs.listStatus(parent);
