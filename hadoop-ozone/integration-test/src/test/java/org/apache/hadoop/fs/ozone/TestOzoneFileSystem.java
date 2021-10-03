@@ -597,10 +597,6 @@ public class TestOzoneFileSystem {
         }
       }, 1000, 120000);
     }
-    while (fileStatuses.length == 0) {
-      Thread.sleep(1000);
-      fileStatuses = fs.listStatus(parent);
-    }
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
     writeClient.deleteKey(keyArgs);
