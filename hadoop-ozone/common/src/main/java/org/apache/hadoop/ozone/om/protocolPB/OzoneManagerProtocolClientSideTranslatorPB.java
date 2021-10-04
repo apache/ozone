@@ -1481,9 +1481,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .addAllAcls(args.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(
-              ReplicationConfig
-                      .getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgsBuilder.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgsBuilder.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
     CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
