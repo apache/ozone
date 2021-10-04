@@ -750,7 +750,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     try {
       if (ratisServer.getServer().getDivision(gid).getInfo().isLeader()
           && Arrays.stream(ratisServer.getServer().getDivision(gid).getInfo()
-          .getFollowerNextIndices()).allMatch(i -> i >= index) ) {
+          .getFollowerNextIndices()).allMatch(i -> i >= index)) {
         stateMachineDataCache.remove(index);
       }
       DispatcherContext.Builder builder =
