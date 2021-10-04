@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -80,7 +81,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     String fileName = keyPathFileName.toString();
     String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
             omRequest.getCreateKeyRequest().getClientID());
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     Assert.assertNotNull(omKeyInfo);
   }
 
@@ -142,5 +144,10 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   @Override
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
     return new OMKeyCreateRequestWithFSO(omRequest);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

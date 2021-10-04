@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerV2Impl;
-import org.apache.hadoop.hdds.scm.pipeline.StateManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersions;
@@ -55,7 +55,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
   private ReconPipelineManager(ConfigurationSource conf,
                                SCMHAManager scmhaManager,
                                NodeManager nodeManager,
-                               StateManager pipelineStateManager,
+                               PipelineStateManager pipelineStateManager,
                                PipelineFactory pipelineFactory,
                                EventPublisher eventPublisher,
                                SCMContext scmContext) {
@@ -71,8 +71,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       SCMHAManager scmhaManager,
       SCMContext scmContext) throws IOException {
 
-    // Create PipelineStateManager
-    StateManager stateManager = PipelineStateManagerV2Impl
+    // Create PipelineStateManagerImpl
+    PipelineStateManager stateManager = PipelineStateManagerImpl
         .newBuilder()
         .setPipelineStore(pipelineStore)
         .setNodeManager(nodeManager)

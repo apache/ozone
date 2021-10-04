@@ -676,6 +676,7 @@ public class SCMNodeManager implements NodeManager {
    * @param mostUsed true if most used, false if least used
    * @return List of DatanodeUsageInfo
    */
+  @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
     List<DatanodeDetails> healthyNodes =
@@ -700,6 +701,18 @@ public class SCMNodeManager implements NodeManager {
           DatanodeUsageInfo.getMostUtilized());
     }
     return datanodeUsageInfoList;
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
+    SCMNodeStat stat = getNodeStatInternal(dn);
+    return new DatanodeUsageInfo(dn, stat);
   }
 
   /**
