@@ -198,7 +198,8 @@ public class TestOzoneECClient {
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
         new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(dataBlocks, parityBlocks)));
+            new ECReplicationConfig(dataBlocks, parityBlocks,
+                ECReplicationConfig.EcCodec.RS, chunkSize)));
 
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
@@ -215,7 +216,8 @@ public class TestOzoneECClient {
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
         new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(dataBlocks, parityBlocks)));
+            new ECReplicationConfig(dataBlocks, parityBlocks,
+                ECReplicationConfig.EcCodec.RS, chunkSize)));
 
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
@@ -241,7 +243,8 @@ public class TestOzoneECClient {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, 2000,
-        new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
+        new ECReplicationConfig(dataBlocks, parityBlocks,
+            ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
       for (int i = 0; i < inputChunks[0].length; i++) {
         out.write(inputChunks[0][i]);
       }
@@ -266,7 +269,8 @@ public class TestOzoneECClient {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, 2000,
-        new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
+        new ECReplicationConfig(dataBlocks, parityBlocks,
+            ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
       for (int i = 0; i < inputChunks[0].length-1; i++) {
         out.write(inputChunks[0][i]);
       }
@@ -297,7 +301,8 @@ public class TestOzoneECClient {
             inputChunks[inputChunks.length - 1].length - 1);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, 2000,
-        new ECReplicationConfig(dataBlocks, parityBlocks), new HashMap<>())) {
+        new ECReplicationConfig(dataBlocks, parityBlocks,
+            ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
       for (int i = 0; i < inputChunks.length - 1; i++) {
         out.write(inputChunks[i]);
       }
@@ -335,7 +340,8 @@ public class TestOzoneECClient {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(key, 2000,
-        new ECReplicationConfig(3, 2), new HashMap<>())) {
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
       for (int i = 0; i < chunks.length; i++) {
         out.write(chunks[i]);
       }

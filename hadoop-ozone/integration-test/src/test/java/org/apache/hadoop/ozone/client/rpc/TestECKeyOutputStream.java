@@ -129,7 +129,8 @@ public class TestECKeyOutputStream {
   @Test
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     try (OzoneOutputStream key = TestHelper
-        .createKey(keyString, new ECReplicationConfig(3, 2), 2000, objectStore,
+        .createKey(keyString, new ECReplicationConfig(3, 2,
+            ECReplicationConfig.EcCodec.RS, chunkSize), 2000, objectStore,
             volumeName, bucketName)) {
       Assert.assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
     }
@@ -154,7 +155,8 @@ public class TestECKeyOutputStream {
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
         new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(3, 2)));
+            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+                chunkSize)));
 
     volume.createBucket(myBucket, bucketArgs.build());
     OzoneBucket bucket = volume.getBucket(myBucket);
@@ -182,7 +184,8 @@ public class TestECKeyOutputStream {
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
         new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(3, 2)));
+            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+                chunkSize)));
 
     volume.createBucket(myBucket, bucketArgs.build());
     OzoneBucket bucket = volume.getBucket(myBucket);
@@ -204,7 +207,8 @@ public class TestECKeyOutputStream {
     int data = 3;
     int parity = 2;
     try (OzoneOutputStream key = TestHelper
-        .createKey(keyString, new ECReplicationConfig(data, parity), 1024,
+        .createKey(keyString, new ECReplicationConfig(data, parity,
+            ECReplicationConfig.EcCodec.RS, chunkSize), 1024,
             objectStore, volumeName, bucketName)) {
       final List<BlockOutputStreamEntry> streamEntries =
           ((ECKeyOutputStream) key.getOutputStream()).getStreamEntries();
