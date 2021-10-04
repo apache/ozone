@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -207,7 +208,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
         .collect(Collectors.toList());
   }
 
-  private Pipeline createSingleECBlockPipeline(Pipeline ecPipeline,
+  @VisibleForTesting
+  Pipeline createSingleECBlockPipeline(Pipeline ecPipeline,
       DatanodeDetails node, int replicaIndex) {
     Map<DatanodeDetails, Integer> indiciesForSinglePipeline = new HashMap<>();
     indiciesForSinglePipeline.put(node, replicaIndex);
