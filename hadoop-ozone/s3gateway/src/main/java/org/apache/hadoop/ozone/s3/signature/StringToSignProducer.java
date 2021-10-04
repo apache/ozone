@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.MultivaluedMap;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -76,19 +74,6 @@ public final class StringToSignProducer {
   private StringToSignProducer() {
   }
 
-  public static String createSignatureBase(
-      SignatureInfo signatureInfo,
-      ContainerRequestContext context
-  ) throws Exception {
-    return createSignatureBase(signatureInfo,
-        context.getUriInfo().getRequestUri().getScheme(),
-        context.getMethod(),
-        context.getUriInfo().getRequestUri().getPath(),
-        LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders()),
-        fromMultiValueToSingleValueMap(
-            context.getUriInfo().getQueryParameters()));
-  }
-
   @VisibleForTesting
   public static String createSignatureBase(
       SignatureInfo signatureInfo,
@@ -137,11 +122,11 @@ public final class StringToSignProducer {
   }
 
   public static Map<String, String> fromMultiValueToSingleValueMap(
-      MultivaluedMap<String, String> queryParameters
+      Map<String, String[]> queryParameters
   ) {
     Map<String, String> result = new HashMap<>();
-    for (String key : queryParameters.keySet()) {
-      result.put(key, queryParameters.getFirst(key));
+    for (Map.Entry<String, String[]> entry : queryParameters.entrySet()) {
+      result.put(entry.getKey(), entry.getValue()[0]);
     }
     return result;
   }
