@@ -83,8 +83,7 @@ import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantDeleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantModifyRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserDeleteRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantUserModifyRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMRevokeUserAccessToTenantRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
@@ -266,10 +265,8 @@ public final class OzoneManagerRatisUtils {
       return new OMTenantDeleteRequest(omRequest);
     case AssignUserToTenant:
       return new OMAssignUserToTenantRequest(omRequest);
-    case ModifyTenantUser:
-      return new OMTenantUserModifyRequest(omRequest);
-    case DeleteTenantUser:
-      return new OMTenantUserDeleteRequest(omRequest);
+    case RevokeUserAccessToTenant:
+      return new OMRevokeUserAccessToTenantRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);

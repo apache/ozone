@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CephCompatibleTenantImpl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
+import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
 import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
@@ -69,6 +70,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMMultiTenantManagerImpl.class);
+
+  // TODO: Remove when proper testing infra is deployed.
+  // Internal dev flag to skip Ranger communication.
+  public static final String OZONE_OM_TENANT_DEV_SKIP_RANGER =
+      "ozone.om.tenant.dev.skip.ranger";
+  private final boolean devSkipRanger;
 
   private MultiTenantAccessAuthorizer authorizer;
   private OMMetadataManager omMetadataManager;
@@ -129,12 +136,18 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     controlPathLock = new ReentrantReadWriteLock();
     omMetadataManager = mgr;
+
+    devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
     start(conf);
   }
 
   @Override
   public void start(OzoneConfiguration configuration) throws IOException {
-    authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
+    if (devSkipRanger) {
+      authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
+    } else {
+      authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
+    }
     authorizer.init(configuration);
   }
 
@@ -247,6 +260,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public Tenant getTenantInfo(String tenantID) throws IOException {
+    // TODO：Should read from DB. Ditch the in-memory maps.
     if (!inMemoryTenantNameToTenantInfoMap.containsKey(tenantID)) {
       return null;
     }
@@ -266,6 +280,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public void destroyTenant(Tenant tenant) throws Exception {
+    // TODO: Make sure this is idempotent. This can be called by ALL 3 OMs
+    //  in the case of a createTenant checkAcl failure for instance.
     try {
       controlPathLock.writeLock().lock();
       for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {

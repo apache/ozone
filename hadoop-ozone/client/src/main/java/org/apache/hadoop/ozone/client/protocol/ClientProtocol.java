@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -582,7 +583,14 @@ public interface ClientProtocol {
   S3SecretValue assignUserToTenant(String username, String tenantName,
       String accessId) throws IOException;
 
-  // TODO: modify, delete
+  /**
+   * Get tenant info for a user.
+   * @param userPrincipal Kerberos principal of a user.
+   * @return TenantUserInfo
+   * @throws IOException
+   */
+  TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException;
 
   /**
    * Get KMS client provider.

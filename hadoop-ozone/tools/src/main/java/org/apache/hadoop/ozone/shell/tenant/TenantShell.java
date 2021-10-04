@@ -15,30 +15,31 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
-
-import java.util.function.Supplier;
+package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
-
 import picocli.CommandLine.Command;
 
+import java.util.function.Supplier;
+
 /**
- * Shell for s3 related operations.
+ * Shell for multi-tenant related operations.
  */
-@Command(name = "ozone s3",
-    description = "Shell for S3 specific operations",
+@Command(name = "ozone tenant",
+    description = "Shell for multi-tenant specific operations",
     subcommands = {
-        GetS3SecretHandler.class,
-        RevokeS3SecretHandler.class
+        TenantCreateHandler.class,
+        TenantModifyHandler.class,
+        TenantDeleteHandler.class,
+        TenantUserCommands.class
     })
-public class S3Shell extends Shell {
+public class TenantShell extends Shell {
 
   @Override
   public void execute(String[] argv) {
-    TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    TracingUtil.executeInNewSpan("s3shell",
+    TracingUtil.initTracing("tenant-shell", createOzoneConfiguration());
+    TracingUtil.executeInNewSpan("tenant-shell",
         (Supplier<Void>) () -> {
           super.execute(argv);
           return null;
@@ -46,11 +47,11 @@ public class S3Shell extends Shell {
   }
 
   /**
-   * Main for the S3Shell Command handling.
+   * Main for the TenantShell Command handling.
    *
    * @param argv - System Args Strings[]
    */
   public static void main(String[] argv) {
-    new S3Shell().run(argv);
+    new TenantShell().run(argv);
   }
 }
