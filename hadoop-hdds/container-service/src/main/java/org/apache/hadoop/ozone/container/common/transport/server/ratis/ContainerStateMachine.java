@@ -425,7 +425,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       }
     } catch (InterruptedException ioe) {
       Thread.currentThread().interrupt();
-      return completeExceptionally(ioe);a
+      return completeExceptionally(ioe);
     } catch (IOException ioe) {
       return completeExceptionally(ioe);
     }
