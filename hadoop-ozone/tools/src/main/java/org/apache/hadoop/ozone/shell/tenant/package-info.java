@@ -15,21 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
-
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.shell.OzoneAddress;
-import picocli.CommandLine;
-
 /**
- * ozone s3 tenant delete.
+ * Tenant commands for Ozone.
  */
-@CommandLine.Command(name = "delete",
-    description = "Delete a tenant")
-public class TenantDeleteHandler extends S3Handler {
-
-  @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    out().println("Not Implemented.");
-  }
-}
+package org.apache.hadoop.ozone.shell.tenant;

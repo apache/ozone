@@ -33,10 +33,9 @@ import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMAssignUserToTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantResponse;
@@ -96,8 +95,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 /**
  * Handles OMAssignUserToTenantRequest.
  */
-public class OMAssignUserToTenantRequest extends OMVolumeRequest {
-  private static final Logger LOG =
+public class OMAssignUserToTenantRequest extends OMClientRequest {
+  public static final Logger LOG =
       LoggerFactory.getLogger(OMAssignUserToTenantRequest.class);
 
   public OMAssignUserToTenantRequest(OMRequest omRequest) {
@@ -233,9 +232,10 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
       // Inform MultiTenantManager of user assignment so it could
       //  initialize some policies in Ranger.
       // TODO: Is userId from MultiTenantManager still useful?
+      // TODO: Move this to preExecute as well.
       userId = ozoneManager.getMultiTenantManager()
           .assignUserToTenant(tenantName, accessId);
-      LOG.info("userId = {}", userId);
+      LOG.debug("userId = {}", userId);
 
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
@@ -291,7 +291,7 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
       // Set response success flag to false
       omResponse.setAssignUserToTenantResponse(
           AssignUserToTenantResponse.newBuilder().setSuccess(false).build());
-      omClientResponse = new OMTenantCreateResponse(
+      omClientResponse = new OMAssignUserToTenantResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
       if (omClientResponse != null) {
@@ -313,11 +313,11 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
             getOmRequest().getUserInfo()));
 
     if (exception == null) {
-      LOG.info("Assigned user '{}' to tenant '{}' under accessId '{}'",
+      LOG.info("Assigned user '{}' to tenant '{}' with accessId '{}'",
           principal, tenantName, accessId);
       // TODO: omMetrics.incNumTenantUsers()
     } else {
-      LOG.error("Failed to assign '{}' to tenant '{}' under accessId '{}': {}",
+      LOG.error("Failed to assign '{}' to tenant '{}' with accessId '{}': {}",
           principal, tenantName, accessId, exception.getMessage());
       // TODO: Check if the exception message is sufficient.
       // TODO: omMetrics.incNumTenantUserCreateFails()

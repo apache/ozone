@@ -141,7 +141,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | principalToAccessIdsTable | Principal -> OmDBKerberosPrincipalInfo   |
    * |----------------------------------------------------------------------|
-   * | tenantStateTable          | accessId -> OmDBTenantInfo               |
+   * | tenantStateTable          | tenant name -> OmDBTenantInfo            |
    * |----------------------------------------------------------------------|
    * | tenantGroupTable          | accessId -> [tenant group A, B, ...]     |
    * |----------------------------------------------------------------------|
@@ -563,16 +563,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     checkTableStatus(metaTable, META_TABLE);
 
     // tenant user name -> tenant name string
+    // TODO: Unused. Remove.
     tenantUserTable = this.store.getTable(TENANT_USER_TABLE,
         String.class, String.class);
     checkTableStatus(tenantUserTable, TENANT_USER_TABLE);
 
-    // tenantId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
+    // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
     tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
         String.class, OmDBAccessIdInfo.class);
     checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE);
 
-    // Kerberos principal -> OmDBKerberosPrincipalInfo (A list of accessIds)
+    // User principal -> OmDBKerberosPrincipalInfo (A list of accessIds)
     principalToAccessIdsTable = this.store.getTable(
         PRINCIPAL_TO_ACCESS_IDS_TABLE,
         String.class, OmDBKerberosPrincipalInfo.class);
@@ -583,13 +584,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         String.class, OmDBTenantInfo.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
 
-    // tenant user name -> list of tenant groups the user belongs to
+    // accessId -> list of tenant groups the user belongs to
     tenantGroupTable = this.store.getTable(TENANT_GROUP_TABLE,
         String.class, String.class /* TODO: Use custom list */);
     checkTableStatus(tenantGroupTable, TENANT_GROUP_TABLE);
 
-    // tenant user name -> list of roles in a tenant. e.g. admin for "finance"
-    // TODO: Placeholder. Unused in the prototype.
+    // accessId -> list of roles in a tenant. e.g. admin for "finance"
     tenantRoleTable = this.store.getTable(TENANT_ROLE_TABLE,
         String.class, String.class /* TODO: Use custom list */);
     checkTableStatus(tenantRoleTable, TENANT_ROLE_TABLE);
