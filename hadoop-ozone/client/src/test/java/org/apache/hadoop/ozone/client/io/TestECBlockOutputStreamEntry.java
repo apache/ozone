@@ -35,11 +35,14 @@ import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 
+/**
+ * {@link ECBlockOutputStreamEntry} tests.
+ */
 public class TestECBlockOutputStreamEntry {
 
   @Test
   public void
-  testAcquireDifferentClientForECBlocksOnTheSameHostButDifferentPort()
+      testAcquireDifferentClientForECBlocksOnTheSameHostButDifferentPort()
       throws IOException {
     PipelineID randomId = PipelineID.randomId();
     ReplicationConfig ecReplicationConfig =
@@ -76,7 +79,7 @@ public class TestECBlockOutputStreamEntry {
 
   @Test
   public void
-  testAcquireDifferentClientForECBlocksOnTheSameHostWithSomeOnSamePortAlso()
+      testAcquireDifferentClientForECBlocksOnTheSameHostWithSomeOnSamePortAlso()
       throws IOException {
     PipelineID randomId = PipelineID.randomId();
     ReplicationConfig ecReplicationConfig =
