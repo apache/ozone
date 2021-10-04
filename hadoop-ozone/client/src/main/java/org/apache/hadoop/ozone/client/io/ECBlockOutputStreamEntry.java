@@ -94,8 +94,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       }
       if(failedStreams > replicationConfig.getParity()) {
         throw new IOException(
-            "There are " + failedStreams + " failures than supported tolerance: "
-                + replicationConfig.getParity());
+            "There are " + failedStreams + " block write failures,"
+                + " supported tolerance: " + replicationConfig.getParity());
       }
     }
   }

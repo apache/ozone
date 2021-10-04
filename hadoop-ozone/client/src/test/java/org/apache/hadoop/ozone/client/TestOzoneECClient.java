@@ -393,8 +393,8 @@ public class TestOzoneECClient {
         Arrays.copyOf(inputChunks[inputChunks.length - 1],
             inputChunks[inputChunks.length - 1].length - 1);
 
-    int inputSize = chunkSize * (inputChunks.length - 1) + lastChunk.length;
-    try (OzoneOutputStream out = bucket.createKey(keyName, inputSize,
+    int inSize = chunkSize * (inputChunks.length - 1) + lastChunk.length;
+    try (OzoneOutputStream out = bucket.createKey(keyName, inSize,
         new ECReplicationConfig(dataBlocks, parityBlocks,
             ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
       for (int i = 0; i < inputChunks.length - 1; i++) {

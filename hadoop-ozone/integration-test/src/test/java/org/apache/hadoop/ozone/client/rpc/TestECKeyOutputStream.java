@@ -134,8 +134,8 @@ public class TestECKeyOutputStream {
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     try (OzoneOutputStream key = TestHelper
         .createKey(keyString, new ECReplicationConfig(3, 2,
-        ECReplicationConfig.EcCodec.RS, chunkSize), inputSize, objectStore,
-            volumeName, bucketName)) {
+              ECReplicationConfig.EcCodec.RS, chunkSize), inputSize,
+            objectStore, volumeName, bucketName)) {
       Assert.assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
     }
   }

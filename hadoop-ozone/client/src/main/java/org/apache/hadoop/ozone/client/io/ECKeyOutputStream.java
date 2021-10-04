@@ -182,17 +182,17 @@ public class ECKeyOutputStream extends KeyOutputStream {
       return;
     }
 
+    int currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
+        .getCurrentStreamIdx();
     int currentChunkBufferRemainingLength =
-        ecChunkBufferCache.
-            dataBuffers[blockOutputStreamEntryPool.getCurrentStreamEntry().getCurrentStreamIdx()]
-            .remaining();
+        ecChunkBufferCache.dataBuffers[currentStreamIdx].remaining();
     int currentChunkBufferLen =
-        ecChunkBufferCache.dataBuffers[blockOutputStreamEntryPool.getCurrentStreamEntry().getCurrentStreamIdx()]
+        ecChunkBufferCache.dataBuffers[currentStreamIdx]
             .position();
     int maxLenToCurrChunkBuffer = Math.min(len, ecChunkSize);
     int currentWriterChunkLenToWrite =
         Math.min(currentChunkBufferRemainingLength, maxLenToCurrChunkBuffer);
-    int pos = handleDataWrite(blockOutputStreamEntryPool.getCurrentStreamEntry().getCurrentStreamIdx(), b, off,
+    int pos = handleDataWrite(currentStreamIdx, b, off,
         currentWriterChunkLenToWrite,
         currentChunkBufferLen + currentWriterChunkLenToWrite == ecChunkSize);
     checkAndWriteParityCells(pos);
@@ -202,7 +202,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     off += currentWriterChunkLenToWrite;
 
     while (iters > 0) {
-      pos = handleDataWrite(blockOutputStreamEntryPool.getCurrentStreamEntry().getCurrentStreamIdx(), b, off,
+      pos = handleDataWrite(currentStreamIdx, b, off,
           ecChunkSize, true);
       off += ecChunkSize;
       iters--;
@@ -210,7 +210,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     if (lastCellSize > 0) {
-      pos = handleDataWrite(blockOutputStreamEntryPool.getCurrentStreamEntry().getCurrentStreamIdx(), b, off,
+      pos = handleDataWrite(currentStreamIdx, b, off,
           lastCellSize, false);
       checkAndWriteParityCells(pos);
     }
@@ -221,8 +221,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
       throws IOException {
     //check data blocks finished
     //If index is > datanum blks
-    if (blockOutputStreamEntryPool
-        .getCurrentStreamEntry().getCurrentStreamIdx() == numDataBlks && lastDataBuffPos == ecChunkSize) {
+    int currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
+        .getCurrentStreamIdx();
+    if (currentStreamIdx == numDataBlks && lastDataBuffPos == ecChunkSize) {
       //Lets encode and write
       handleParityWrites(ecChunkSize);
     }
