@@ -293,7 +293,7 @@ public class ContainerBalancer {
 
         metrics.setMaxDatanodeUtilizedPercentage(Math.max(
             metrics.getMaxDatanodeUtilizedPercentage(),
-            (int) utilization * 100));
+            ratioToPercent(utilization)));
 
         // amount of bytes greater than upper limit in this node
         overUtilizedBytes += ratioToBytes(
@@ -845,6 +845,14 @@ public class ContainerBalancer {
 
   long getSizeMovedPerIteration() {
     return sizeMovedPerIteration;
+  }
+
+  public ContainerBalancerMetrics getMetrics() {
+    return metrics;
+  }
+
+  public static int ratioToPercent(double ratio) {
+    return (int) (ratio * 100);
   }
 
   @Override
