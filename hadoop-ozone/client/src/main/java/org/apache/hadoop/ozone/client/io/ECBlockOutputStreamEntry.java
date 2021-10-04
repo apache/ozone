@@ -81,25 +81,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     }
   }
 
-  void executePutBlock() throws IOException {
-    if (!isInitialized()) {
-      return;
-    }
-    int failedStreams = 0;
-    for (ECBlockOutputStream stream : blockOutputStreams) {
-      if (!stream.isClosed()) {
-        stream.executePutBlock(false, true);
-      } else {
-        failedStreams++;
-      }
-      if(failedStreams > replicationConfig.getParity()) {
-        throw new IOException(
-            "There are " + failedStreams + " block write failures,"
-                + " supported tolerance: " + replicationConfig.getParity());
-      }
-    }
-  }
-
   @Override
   public OutputStream getOutputStream() {
     if (!isInitialized()) {
@@ -113,16 +94,16 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     return blockOutputStreams != null;
   }
 
-  public void useNextBlock() {
+  public int getCurrentStreamIdx() {
+    return currentStreamIdx;
+  }
+
+  public void useNextBlockStream() {
     currentStreamIdx++;
   }
 
   public void forceToFirstParityBlock(){
     currentStreamIdx = replicationConfig.getData();
-  }
-
-  public int getCurrentStreamIdx() {
-    return currentStreamIdx;
   }
 
   @Override
@@ -141,10 +122,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     super.incCurrentPosition(len);
   }
 
-  private boolean isWritingParity() {
-    return currentStreamIdx >= replicationConfig.getData();
-  }
-
   @Override
   public void flush() throws IOException {
     if (!isInitialized()) {
@@ -156,6 +133,14 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   @Override
+  boolean isClosed() {
+    if (!isInitialized()) {
+      return false;
+    }
+    return blockStreams().allMatch(BlockOutputStream::isClosed);
+  }
+
+  @Override
   public void close() throws IOException {
     if (!isInitialized()) {
       return;
@@ -164,14 +149,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       stream.close();
     }
     updateBlockID(underlyingBlockID());
-  }
-
-  @Override
-  boolean isClosed() {
-    if (!isInitialized()) {
-      return false;
-    }
-    return blockStreams().allMatch(BlockOutputStream::isClosed);
   }
 
   @Override
@@ -208,14 +185,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
         .collect(Collectors.toList());
   }
 
-  private BlockID underlyingBlockID() {
-    return blockOutputStreams[0].getBlockID();
-  }
-
-  private Stream<ECBlockOutputStream> blockStreams() {
-    return Arrays.stream(blockOutputStreams);
-  }
-
   private Pipeline createSingleECBlockPipeline(Pipeline ecPipeline,
       DatanodeDetails node, int replicaIndex) {
     Map<DatanodeDetails, Integer> indiciesForSinglePipeline = new HashMap<>();
@@ -240,6 +209,37 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
         .setNodes(original.getNodes())
         .setReplicaIndexes(replicaIndicies)
         .build();
+  }
+
+  void executePutBlock() throws IOException {
+    if (!isInitialized()) {
+      return;
+    }
+    int failedStreams = 0;
+    for (ECBlockOutputStream stream : blockOutputStreams) {
+      if (!stream.isClosed()) {
+        stream.executePutBlock(false, true);
+      } else {
+        failedStreams++;
+      }
+      if(failedStreams > replicationConfig.getParity()) {
+        throw new IOException(
+            "There are " + failedStreams + " block write failures,"
+                + " supported tolerance: " + replicationConfig.getParity());
+      }
+    }
+  }
+
+  private BlockID underlyingBlockID() {
+    return blockOutputStreams[0].getBlockID();
+  }
+
+  private boolean isWritingParity() {
+    return currentStreamIdx >= replicationConfig.getData();
+  }
+
+  private Stream<ECBlockOutputStream> blockStreams() {
+    return Arrays.stream(blockOutputStreams);
   }
 
   /**

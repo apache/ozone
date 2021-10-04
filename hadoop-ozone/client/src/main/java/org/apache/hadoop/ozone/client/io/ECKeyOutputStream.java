@@ -266,7 +266,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     handleOutputStreamWrite(currIdx, b, off, len, isFullCell, false);
 
     if(pos == ecChunkSize){
-      blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlock();
+      blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
     return pos;
   }
@@ -274,7 +274,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private void handleParityWrite(int currIdx, byte[] b, int off, long len,
       boolean isFullCell) throws IOException {
     handleOutputStreamWrite(currIdx, b, off, len, isFullCell, true);
-    blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlock();
+    blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
   }
 
   private void handleOutputStreamWrite(int currIdx, byte[] b, int off, long len,
