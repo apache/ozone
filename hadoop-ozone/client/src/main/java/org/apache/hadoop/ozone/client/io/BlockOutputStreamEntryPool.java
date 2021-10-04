@@ -184,7 +184,7 @@ public class BlockOutputStreamEntryPool {
             .build();
   }
 
-  void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
+  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
     streamEntries.add(createStreamEntry(subKeyInfo));
   }
@@ -203,7 +203,7 @@ public class BlockOutputStreamEntryPool {
     return locationInfoList;
   }
 
-  List<OmKeyLocationInfo> getOmKeyLocationInfos(
+  private List<OmKeyLocationInfo> getOmKeyLocationInfos(
       List<BlockOutputStreamEntry> streams) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     for (BlockOutputStreamEntry streamEntry : streams) {

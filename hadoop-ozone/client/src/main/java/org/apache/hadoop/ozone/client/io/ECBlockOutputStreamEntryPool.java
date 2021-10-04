@@ -25,16 +25,19 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * This class manages the stream entries list and handles block allocation
- * from OzoneManager for EC writes.
+ * {@link BlockOutputStreamEntryPool} is responsible to manage OM communication
+ * regarding writing a block to Ozone in a non-EC write case.
+ * The basic operations are fine for us but we need a specific
+ * {@link ECBlockOutputStreamEntry} implementation to handle writing EC block
+ * groups, this class implements the logic that handles the specific EC entries'
+ * instantiation and retrieval from the pool.
+ *
+ * @see ECKeyOutputStream
+ * @see BlockOutputStreamEntryPool
+ * @see ECBlockOutputStreamEntry
  */
 public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
-  private final List<BlockOutputStreamEntry> finishedStreamEntries;
-  private final ECReplicationConfig ecReplicationConfig;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public ECBlockOutputStreamEntryPool(OzoneClientConfig config,
@@ -51,9 +54,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
     super(config, omClient, requestId, replicationConfig, uploadID, partNumber,
         isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
         openID);
-    this.finishedStreamEntries = new ArrayList<>();
     assert replicationConfig instanceof ECReplicationConfig;
-    this.ecReplicationConfig = (ECReplicationConfig) replicationConfig;
   }
 
   @Override

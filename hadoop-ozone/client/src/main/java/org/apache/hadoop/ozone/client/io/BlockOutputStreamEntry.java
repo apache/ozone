@@ -42,7 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
  *
  * The base implementation is handling Ratis-3 writes, with a single stream,
  * but there can be other implementations that are using a different way.
- * */
+ */
 public class BlockOutputStreamEntry extends OutputStream {
 
   private final OzoneClientConfig config;
@@ -281,15 +281,11 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.blockID = id;
   }
 
-  public String getKey() {
-    return this.key;
-  }
-
-  public OzoneClientConfig getConf(){
+  OzoneClientConfig getConf(){
     return this.config;
   }
 
-  public XceiverClientFactory getXceiverClientManager() {
+  XceiverClientFactory getXceiverClientManager() {
     return this.xceiverClientManager;
   }
 
@@ -314,11 +310,11 @@ public class BlockOutputStreamEntry extends OutputStream {
     return getPipeline();
   }
 
-  public long getCurrentPosition() {
+  long getCurrentPosition() {
     return this.currentPosition;
   }
 
-  public BufferPool getBufferPool() {
+  BufferPool getBufferPool() {
     return this.bufferPool;
   }
 

@@ -159,17 +159,39 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     // blockID is the same for EC blocks inside one block group managed by
     // this entry.
     updateBlockID(underlyingBlockID());
-    return blockStreams()
-        .mapToLong(BlockOutputStream::getTotalAckDataLength)
-        .sum();
+    //TODO: A future implementation might require something like this, but
+    // currently as ECBlockOutputStream is inheriting from BlockOutputStream
+    // this method returns 0 all the time from the unrelying streams.
+    // After we have a confirmed ack mechanism, like there is in
+    // RatisBlockOutputStream, we should revisit this part, and decide if we
+    // want to filter out parity here for example.
+//    return blockStreams()
+//        .mapToLong(BlockOutputStream::getTotalAckDataLength)
+//        .sum();
+    return 0;
   }
 
+  /**
+   * Returns the amount of bytes that were attempted to be sent through towards
+   * the DataNodes, and the write call succeeded without an exception.
+   * In EC entries the parity writes does not count into this, as the written
+   * data length represents the attempts of the classes using the entry, and
+   * not the attempts of the entry itself.
+   * @return 0 if the stream is not initialized, the amount of data bytes that
+   *    were attempted to be written to the entry.
+   */
+  //TODO: this might become problematic, and should be tested during the
+  //      implementation of retries and error handling, as if there is a retry,
+  //      then some data might have to be written twice.
+  //      This current implementation is an assumption here.
+  //      We might need to account the parity bytes written here, or elsewhere.
   @Override
   long getWrittenDataLength() {
     if (!isInitialized()) {
       return 0;
     }
     return blockStreams()
+        .limit(replicationConfig.getData())
         .mapToLong(BlockOutputStream::getWrittenDataLength)
         .sum();
   }

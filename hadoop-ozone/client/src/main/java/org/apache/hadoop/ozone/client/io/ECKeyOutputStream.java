@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.List;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -78,7 +77,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       LoggerFactory.getLogger(KeyOutputStream.class);
 
   private boolean closed;
-  private FileEncryptionInfo feInfo;
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
@@ -126,9 +124,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
             replicationConfig, uploadID, partNumber, isMultipart, info,
             unsafeByteBufferConversion, xceiverClientManager, handler.getId());
 
-    // Retrieve the file encryption key info, null if file is not in
-    // encrypted bucket.
-    this.feInfo = info.getFileEncryptionInfo();
     this.isException = false;
     this.writeOffset = 0;
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -542,10 +537,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
-  }
-
-  public FileEncryptionInfo getFileEncryptionInfo() {
-    return feInfo;
   }
 
   @VisibleForTesting
