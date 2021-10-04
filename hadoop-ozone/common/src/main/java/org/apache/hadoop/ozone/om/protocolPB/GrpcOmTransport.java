@@ -76,6 +76,8 @@ public class GrpcOmTransport implements OmTransport {
 
     maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
         OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
+
+    start();
   }
 
   public void start() {
