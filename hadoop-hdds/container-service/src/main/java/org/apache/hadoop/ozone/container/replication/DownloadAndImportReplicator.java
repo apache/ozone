@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -125,9 +126,10 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         importContainer(containerID, path);
         LOG.info("Container {} is replicated successfully", containerID);
         task.setStatus(Status.DONE);
-      } catch (Exception e) {
+      } catch (InterruptedException | IOException | ExecutionException e) {
         LOG.error("Container {} replication was unsuccessful.", containerID, e);
         task.setStatus(Status.FAILED);
+        Thread.currentThread().interrupt();
       }
     }
   }

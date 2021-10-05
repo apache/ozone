@@ -116,6 +116,7 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
       emitFinishedMsg("Ozone Manager");
     } catch (CancellationException|InterruptedException e) {
       emitCancellationMsg("Ozone Manager");
+      Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
       emitGeneralErrorMsg();
       throw e;

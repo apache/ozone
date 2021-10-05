@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 
@@ -281,7 +282,8 @@ public final class OzoneManagerRatisServer {
     try {
       return server.submitClientRequestAsync(raftClientRequest)
           .get();
-    } catch (Exception ex) {
+    } catch (InterruptedException | IOException | ExecutionException ex) {
+      Thread.currentThread().interrupt();
       throw new ServiceException(ex.getMessage(), ex);
     }
   }

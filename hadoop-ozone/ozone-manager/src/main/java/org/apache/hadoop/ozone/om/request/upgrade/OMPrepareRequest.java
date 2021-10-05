@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * OM Request used to flush all transactions to disk, take a DB snapshot, and
@@ -132,6 +133,7 @@ public class OMPrepareRequest extends OMClientRequest {
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, new OMException(e,
               OMException.ResultCodes.PREPARE_FAILED)));
+      Thread.currentThread().interrupt();
 
       // Disable prepare gate and attempt to delete prepare marker file.
       // Whether marker file delete fails or succeeds, we will return the
@@ -248,9 +250,10 @@ public class OMPrepareRequest extends OMClientRequest {
           "than prepare index %d. Some required logs may not have" +
             " been removed.", actualPurgeIndex, prepareIndex));
       }
-    } catch (Exception e) {
+    } catch (InterruptedException | ExecutionException e) {
       // Ozone manager error handler does not respect exception chaining and
       // only displays the message of the top level exception.
+      Thread.currentThread().interrupt();
       throw new IOException("Unable to purge logs: " + e.getMessage());
     }
   }

@@ -33,11 +33,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.HddsUtils;
@@ -583,7 +585,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       try {
         reply = server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
-      } catch (Exception e) {
+      } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        Thread.currentThread().interrupt();
         throw new IOException(e.getMessage(), e);
       }
       processReply(reply);
