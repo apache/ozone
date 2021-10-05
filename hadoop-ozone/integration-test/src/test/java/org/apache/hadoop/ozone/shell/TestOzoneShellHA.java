@@ -22,10 +22,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -854,5 +858,36 @@ public class TestOzoneShellHA {
     objectStore.deleteVolume("vol3");
     objectStore.getVolume("vol4").deleteBucket("buck4");
     objectStore.deleteVolume("vol4");
+  }
+
+  @Test
+  public void testListVolumeShouldOutputValidJson() {
+
+    final List<String> volumesForThisTest =
+        Arrays.asList("random-vol1", "random-vol2", "random-vol3");
+
+    // Create test volumes
+    volumesForThisTest.forEach(vol ->
+        execute(ozoneShell, new String[] {"volume", "create", vol}));
+    out.reset();
+
+    execute(ozoneShell, new String[] {"volume", "list"});
+
+    // Expect proper JSON output
+    final ArrayList<LinkedTreeMap<String, String>> outArray =
+        new Gson().fromJson(out.toString(), ArrayList.class);
+    // Might have s3v and volumes from other test cases that aren't clean up.
+    Assert.assertTrue(outArray.size() >= 3);
+    final HashSet<String> volumesSet = new HashSet<>(volumesForThisTest);
+    outArray.forEach(treeMap -> volumesSet.remove(treeMap.get("name")));
+
+    // Should have found all 3 volumes we created for this test
+    Assert.assertEquals(0, volumesSet.size());
+
+    // Clean up
+    volumesForThisTest.forEach(vol ->
+        execute(ozoneShell, new String[] {"volume", "delete", vol}));
+    out.reset();
+    err.reset();
   }
 }

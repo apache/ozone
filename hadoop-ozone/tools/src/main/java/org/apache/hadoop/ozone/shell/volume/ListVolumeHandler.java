@@ -85,10 +85,17 @@ public class ListVolumeHandler extends Handler {
     }
 
     int counter = 0;
+    final StringBuilder res = new StringBuilder("[ ");  // Mark JSON array start
     while (listOptions.getLimit() > counter && volumeIterator.hasNext()) {
-      printObjectAsJson(volumeIterator.next());
+      if (counter > 0) {
+        res.append(", ");
+      }
+      res.append(objectToJsonString(volumeIterator.next()));
       counter++;
     }
+
+    res.append(" ]");  // Mark JSON array end
+    out().println(res);
 
     if (isVerbose()) {
       out().printf("Found : %d volumes for user : %s ", counter,

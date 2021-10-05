@@ -118,6 +118,10 @@ public abstract class Handler implements Callable<Void> {
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(o));
   }
 
+  protected String objectToJsonString(Object o) throws IOException {
+    return JsonUtils.toJsonStringWithDefaultPrettyPrinter(o);
+  }
+
   protected void printMsg(String msg) {
     out().println(msg);
   }
