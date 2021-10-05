@@ -87,6 +87,8 @@ public class TestOzoneShellHA {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneShellHA.class);
 
+  private static final String DEFAULT_ENCODING = UTF_8.name();
+
   /**
    * Set the timeout for every test.
    */
@@ -861,7 +863,8 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testListVolumeShouldOutputValidJson() {
+  public void testListVolumeShouldPrintValidJson()
+      throws UnsupportedEncodingException {
 
     final List<String> volumesForThisTest =
         Arrays.asList("random-vol1", "random-vol2", "random-vol3");
@@ -875,7 +878,7 @@ public class TestOzoneShellHA {
 
     // Expect proper JSON output
     final ArrayList<LinkedTreeMap<String, String>> outArray =
-        new Gson().fromJson(out.toString(), ArrayList.class);
+        new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
     // Might have s3v and volumes from other test cases that aren't clean up.
     Assert.assertTrue(outArray.size() >= 3);
     final HashSet<String> volumesSet = new HashSet<>(volumesForThisTest);
