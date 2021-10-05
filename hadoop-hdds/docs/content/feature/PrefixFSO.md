@@ -83,6 +83,6 @@ By default, the buckets will default to OBS behaviour.
 ```XML
 <property>
    <name>ozone.default.bucket.layout</name>
-   <value>OBS</value>
+   <value>OBJECT_STORE</value>
 </property>
 ```
