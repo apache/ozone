@@ -2108,7 +2108,7 @@
       not be renewed.
     </description>
   </property>
-  
+
   <property>
     <name>ozone.fs.iterate.batch-size</name>
     <value>100</value>
@@ -2813,7 +2813,7 @@
     <tag>OZONE, SCM</tag>
     <description>Thread pool size configured to process container reports.
     </description>
-  </property>  
+  </property>
 
   <property>
     <name>ozone.scm.datanode.ratis.volume.free-space.min</name>
@@ -2991,10 +2991,11 @@
 
   <property>
     <name>ozone.default.bucket.layout</name>
-    <value>OBS</value>
+    <value>OBJECT_STORE</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
-      Default bucket layout used during bucket creation when OM does not pass the bucket type argument.
+      Default bucket layout used by Ozone Manager during bucket creation when a client does not specify the
+      bucket layout option.
     </description>
   </property>
 </configuration>

@@ -59,4 +59,10 @@ public enum BucketLayout {
           "Error: BucketLayout not found, type=" + this);
     }
   }
+
+  public static BucketLayout fromString(String value) {
+    // Todo: need to discuss about throwing a validation error
+    //  during OM startup or bucket creation time.
+    return BucketLayout.valueOf(value);
+  }
 }

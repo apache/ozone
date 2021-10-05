@@ -270,12 +270,14 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
 
-  // Defines the default bucket behaviour when OM does not pass the
-  // bucket layout argument during bucket creation.
+  // Default bucket layout used by Ozone Manager during bucket creation
+  // when a client does not specify the bucket layout option.
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
       "ozone.default.bucket.layout";
-  public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT = "OBS";
-  public static final String OZONE_DEFAULT_BUCKET_LAYOUT_FSO = "FSO";
+  public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
+      "OBJECT_STORE";
+  public static final String OZONE_DEFAULT_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
+      "FILE_SYSTEM_OPTIMIZED";
 
   /**
    * Configuration properties for Directory Deleting Service.
