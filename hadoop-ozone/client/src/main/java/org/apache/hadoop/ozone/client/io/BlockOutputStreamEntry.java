@@ -41,9 +41,7 @@ import com.google.common.annotations.VisibleForTesting;
  * and in the meantime accounts the length of data successfully written.
  *
  * The base implementation is handling Ratis-3 writes, with a single stream,
- * but there can be other implementations that are using a different way, like
- * EC writes where an entry manages the write into a block group via multiple
- * data and parity data related streams.
+ * but there can be other implementations that are using a different way.
  * */
 public class BlockOutputStreamEntry extends OutputStream {
 
