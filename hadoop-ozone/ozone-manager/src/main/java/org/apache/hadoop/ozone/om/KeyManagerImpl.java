@@ -2585,7 +2585,8 @@ public class KeyManagerImpl implements KeyManager {
             bucketName);
       }
       countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet, iterator);
+          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet,
+          iterator);
 
     } else {
       /*
@@ -2652,8 +2653,8 @@ public class KeyManagerImpl implements KeyManager {
           // begins from the first sub-dir under the parent dir
           seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-          // First under lock obtain both entries from dir/file cache and generate
-          // entries marked for delete.
+          // First under lock obtain both entries from dir/file cache and
+          // generate entries marked for delete.
           metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
               bucketName);
           try {
@@ -2812,11 +2813,13 @@ public class KeyManagerImpl implements KeyManager {
     return countEntries;
   }
 
+  @SuppressWarnings("parameternumber")
   private int getFilesFromDirectory(
       TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
       int countEntries, long numEntries, Set<String> deletedKeySet,
-      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator)
+      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+          iterator)
       throws IOException {
     iterator.seek(seekKeyInDB);
     while (iterator.hasNext() && numEntries - countEntries > 0) {
