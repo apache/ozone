@@ -145,12 +145,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OmBucketInfo omBucketInfo = null;
     if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
         .equals(BucketLayoutProto.LEGACY)) {
-      BucketLayout defaultType = BucketLayout.LEGACY;
-      if (StringUtils
-          .equalsIgnoreCase(OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX,
-              omLayout)) {
-        defaultType = BucketLayout.FILE_SYSTEM_OPTIMIZED;
-      }
+      BucketLayout defaultType = OMConfigKeys.OZONE_BUCKET_LAYOUT_DEFAULT;
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
