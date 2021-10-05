@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.After;
@@ -36,6 +37,11 @@ import org.mockito.Mockito;
 
 import java.util.UUID;
 
+/**
+ * Tests that S3 requests for a tenant are directed to that tenant's volume,
+ * and that users not belonging to a tenant are directed to the default S3
+ * volume.
+ */
 public class TestMultiTenantVolume {
   private static MiniOzoneClusterProvider clusterProvider;
   private MiniOzoneCluster cluster;
@@ -52,6 +58,7 @@ public class TestMultiTenantVolume {
 
   @Before
   public void setup() throws Exception {
+    // No Ranger auth plugin needed for these tests.
     OMMultiTenantManagerImpl.setAuthorizerSupplier(() ->
         Mockito.mock(MultiTenantAccessAuthorizer.class)
     );
@@ -69,64 +76,85 @@ public class TestMultiTenantVolume {
   }
 
   @Test
-  public void testS3BucketDefault() throws Exception {
+  public void testDefaultS3Volume() throws Exception {
     final String bucketName = "bucket";
-    final String accessID = UUID.randomUUID().toString();
 
-    // Get Volume.
+    // Default client not belonging to a tenant should end up in the S3 volume.
     ObjectStore store = cluster.getClient().getObjectStore();
-    OzoneVolume s3Volume = store.getS3Volume(accessID);
-    Assert.assertEquals(s3VolumeName, s3Volume.getName());
+    Assert.assertEquals(s3VolumeName, store.getS3Volume().getName());
 
     // Create bucket.
-    s3Volume.createBucket(bucketName);
-    OzoneBucket bucket = s3Volume.getBucket(bucketName);
-    Assert.assertEquals(s3VolumeName, bucket.getVolumeName());
+    store.createS3Bucket(bucketName);
+    Assert.assertEquals(s3VolumeName,
+        store.getS3Bucket(bucketName).getVolumeName());
 
     // Delete bucket.
-    s3Volume.deleteBucket(bucketName);
-    assertBucketNotFound(s3Volume, bucketName);
+    store.deleteS3Bucket(bucketName);
+    assertS3BucketNotFound(store, bucketName);
   }
 
   @Test
-  public void testS3BucketTenant() throws Exception {
+  public void testS3TenantVolume() throws Exception {
     final String tenant = "tenant";
-    final String username = "user";
+    final String principal = "username";
     final String bucketName = "bucket";
     final String accessID = UUID.randomUUID().toString();
-    ObjectStore store = cluster.getClient().getObjectStore();
 
+    ObjectStore store = getStoreForAccessID(accessID);
     store.createTenant(tenant);
-    store.assignUserToTenant(username, tenant, accessID);
+    store.assignUserToTenant(principal, tenant, accessID);
 
-    // Get Volume.
-    OzoneVolume tenantVolume = store.getS3Volume(accessID);
-    Assert.assertEquals(tenant, tenantVolume.getName());
+    // S3 volume pointed to by the store should be for the tenant.
+    Assert.assertEquals(tenant, store.getS3Volume().getName());
 
-    // Create bucket.
-    tenantVolume.createBucket(bucketName);
-    // The tenant's bucket should have been created in a tenant volume.
-    OzoneBucket bucket = tenantVolume.getBucket(bucketName);
+    // Create bucket in the tenant volume.
+    store.createS3Bucket(bucketName);
+    OzoneBucket bucket = store.getS3Bucket(bucketName);
     Assert.assertEquals(tenant, bucket.getVolumeName());
 
     // A different user should not see bucket, since they will be directed to
     // the s3 volume.
-    String accessID2 = UUID.randomUUID().toString();
-    assertBucketNotFound(store.getS3Volume(accessID2), bucketName);
+    ObjectStore store2 = getStoreForAccessID(UUID.randomUUID().toString());
+    assertS3BucketNotFound(store2, bucketName);
 
     // Delete bucket.
-    tenantVolume.deleteBucket(bucketName);
-    assertBucketNotFound(tenantVolume, bucketName);
+    store.deleteS3Bucket(bucketName);
+    assertS3BucketNotFound(store, bucketName);
   }
 
-  private void assertBucketNotFound(OzoneVolume volume, String bucketName)
+  /**
+   * Checks that the bucket is not found using
+   * {@link ObjectStore#getS3Bucket} and the designated S3 volume pointed to
+   * by the ObjectStore.
+   */
+  private void assertS3BucketNotFound(ObjectStore store, String bucketName)
       throws Exception {
     try {
+      store.getS3Bucket(bucketName);
+    } catch(OMException ex) {
+      if (ex.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND) {
+        throw ex;
+      }
+    }
+
+    try {
+      OzoneVolume volume = store.getS3Volume();
       volume.getBucket(bucketName);
     } catch(OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw ex;
       }
     }
+  }
+
+  private ObjectStore getStoreForAccessID(String accessID) throws Exception {
+    // Cluster provider will modify our provided configuration. We must use
+    // this version to build the client.
+    OzoneConfiguration conf = cluster.getOzoneManager().getConfiguration();
+    // Manually construct an object store instead of using the cluster
+    // provided one so we can specify the access ID.
+    // TODO: Update after HDDS-4440 is merged and this is not necessary.
+    return new ObjectStore(conf, new RpcClient(conf, null),
+        accessID);
   }
 }

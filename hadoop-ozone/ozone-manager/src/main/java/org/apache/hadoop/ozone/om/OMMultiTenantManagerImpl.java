@@ -37,7 +37,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -314,17 +313,20 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    *      We can do all of this as part of holding a coarse lock and synchronize
    *      these control path operations.
    *
+   * @param principal
    * @param tenantName
    * @param accessID
    * @return Tenant, or null on error
    */
   @Override
-  public String assignUserToTenant(String tenantName, String accessID) {
+  public String assignUserToTenant(BasicUserPrincipal principal,
+      String tenantName, String accessID) {
     try {
       controlPathLock.writeLock().lock();
       Tenant tenant = getTenantInfo(tenantName);
       if (tenant == null) {
-        LOG.error("Tenant doesn't exist");
+        LOG.error("Cannot assign user to tenant {} that doesn't exist",
+            tenantName);
         return null;
       }
       final OzoneTenantGroupPrincipal groupTenantAllUsers =
@@ -333,10 +335,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       List<String> userGroupIDs = new ArrayList<>();
       userGroupIDs.add(idGroupTenantAllUsers);
 
-      String username = getUserNameGivenAccessId(accessID);
-      BasicUserPrincipal userPrincipal =
-          new BasicUserPrincipal(username);
-      String userID = authorizer.createUser(userPrincipal, userGroupIDs);
+      String userID = authorizer.createUser(principal, userGroupIDs);
 
       inMemoryAccessIDToTenantNameMap.put(accessID, tenantName);
       inMemoryAccessIDToListOfGroupsMap.put(accessID, userGroupIDs);

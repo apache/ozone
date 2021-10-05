@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
+import org.apache.http.auth.BasicUserPrincipal;
 
 /**
  * OM MultiTenant manager interface.
@@ -110,13 +111,14 @@ public interface OMMultiTenantManager {
 
   /**
    * Creates a new user that exists for S3 API access to Ozone.
-   * TODO: FIX the description.
    * @param tenantName
-   * @param userName
+   * @param principal
+   * @param accessID
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  String assignUserToTenant(String tenantName, String userName);
+  String assignUserToTenant(BasicUserPrincipal principal, String tenantName,
+                            String accessID);
 
   /**
    * Given a user, destroys all state associated with that user.

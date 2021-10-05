@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
+import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -232,7 +233,8 @@ public class OMAssignUserToTenantRequest extends OMVolumeRequest {
       //  initialize some policies in Ranger.
       // TODO: Is userId from MultiTenantManager still useful?
       userId = ozoneManager.getMultiTenantManager()
-          .assignUserToTenant(tenantName, accessId);
+          .assignUserToTenant(new BasicUserPrincipal(principal), tenantName,
+              accessId);
       LOG.info("userId = {}", userId);
 
       // Add to tenantAccessIdTable
