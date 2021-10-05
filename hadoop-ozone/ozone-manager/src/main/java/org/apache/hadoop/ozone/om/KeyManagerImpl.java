@@ -2533,6 +2533,9 @@ public class KeyManagerImpl implements KeyManager {
     Set<String> deletedKeySet = new TreeSet<>();
     TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
 
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator;
+
     if (Strings.isNullOrEmpty(startKey)) {
       OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
       if (fileStatus.isFile()) {
@@ -2565,14 +2568,24 @@ public class KeyManagerImpl implements KeyManager {
       // (1)Seek files in fileTable
       // (2)Seek dirs in dirTable
 
-      // Get files, dirs and marked for delete entries from cache.
-      countEntries = getFilesAndDirsFromCacheWithBucketLock(volumeName,
-          bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
-          prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
-          countEntries, numEntries);
 
+      // First under lock obtain both entries from dir/file cache and generate
+      // entries marked for delete.
+      metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
+          bucketName);
+      try {
+        iterator = metadataManager.getKeyTable().iterator();
+        countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
+            bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
+            prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
+            countEntries, numEntries);
+
+      } finally {
+        metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+            bucketName);
+      }
       countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet);
+          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet, iterator);
 
     } else {
       /*
@@ -2639,16 +2652,25 @@ public class KeyManagerImpl implements KeyManager {
           // begins from the first sub-dir under the parent dir
           seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-          // Get files, dirs and marked for delete entries from cache.
-          countEntries = getFilesAndDirsFromCacheWithBucketLock(volumeName,
-              bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
-              prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
-              countEntries, numEntries);
+          // First under lock obtain both entries from dir/file cache and generate
+          // entries marked for delete.
+          metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
+              bucketName);
+          try {
+            iterator = metadataManager.getKeyTable().iterator();
+            countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
+                bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
+                prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
+                countEntries, numEntries);
+          } finally {
+            metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+                bucketName);
+          }
 
           // 1. Seek the given key in key table.
           countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
               prefixPath, prefixKeyInDB, countEntries, numEntries,
-              deletedKeySet);
+              deletedKeySet, iterator);
         }
       } else {
         // TODO: HDDS-4364: startKey can be a non-existed key
@@ -2723,32 +2745,26 @@ public class KeyManagerImpl implements KeyManager {
    * cache.
    */
   @SuppressWarnings("parameternumber")
-  private int getFilesAndDirsFromCacheWithBucketLock(String volumeName,
+  private int getFilesAndDirsFromCacheWithBucket(String volumeName,
       String bucketName, Map<String, OzoneFileStatus> cacheFileMap,
       Map<String, OzoneFileStatus> tempCacheDirMap,
       Set<String> deletedKeySet, long prefixKeyInDB,
       String seekFileInDB,  String seekDirInDB, String prefixPath,
       String startKey, int countEntries, long numEntries) {
-    metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-        bucketName);
+
 
     // First under lock obtain both entries from dir/file cache and generate
     // entries marked for delete.
-    try {
-      countEntries = listStatusFindFilesInTableCache(cacheFileMap,
-          metadataManager.getKeyTable(), prefixKeyInDB, seekFileInDB,
-          prefixPath, startKey, countEntries, numEntries, deletedKeySet);
+    countEntries = listStatusFindFilesInTableCache(cacheFileMap,
+        metadataManager.getKeyTable(), prefixKeyInDB, seekFileInDB,
+        prefixPath, startKey, countEntries, numEntries, deletedKeySet);
 
-      // Don't count entries from dir cache, as first we need to return all
-      // files and then directories.
-      listStatusFindDirsInTableCache(tempCacheDirMap,
-          metadataManager.getDirectoryTable(),
-          prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-          bucketName, countEntries, numEntries, deletedKeySet);
-    } finally {
-      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
-    }
+    // Don't count entries from dir cache, as first we need to return all
+    // files and then directories.
+    listStatusFindDirsInTableCache(tempCacheDirMap,
+        metadataManager.getDirectoryTable(),
+        prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
+        bucketName, countEntries, numEntries, deletedKeySet);
 
     return countEntries;
   }
@@ -2799,13 +2815,9 @@ public class KeyManagerImpl implements KeyManager {
   private int getFilesFromDirectory(
       TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
-      int countEntries, long numEntries, Set<String> deletedKeySet)
+      int countEntries, long numEntries, Set<String> deletedKeySet,
+      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator)
       throws IOException {
-
-    Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable();
-
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator();
     iterator.seek(seekKeyInDB);
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       OmKeyInfo keyInfo = iterator.value().getValue();
