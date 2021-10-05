@@ -30,6 +30,8 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
+execute_robot_test ${SCM} -v SECURITY_ENABLED:${SECURITY_ENABLED} -v USERNAME:httpfs httpfs
+
 execute_robot_test ${SCM} basic/ozone-shell-single.robot
 execute_robot_test ${SCM} basic/links.robot
 execute_robot_test ${SCM} s3
