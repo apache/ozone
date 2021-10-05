@@ -44,21 +44,37 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class manages the stream entries list and handles block allocation
- * from OzoneManager.
+ * A BlockOutputStreamEntryPool manages the communication with OM during writing
+ * a Key to Ozone with {@link KeyOutputStream}.
+ * Block allocation, handling of pre-allocated blocks, and managing stream
+ * entries that represent a writing channel towards DataNodes are the main
+ * responsibility of this class.
  */
 public class BlockOutputStreamEntryPool {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
 
+  /**
+   * List of stream entries that are used to write a block of data.
+   */
   private final List<BlockOutputStreamEntry> streamEntries;
   private final OzoneClientConfig config;
+  /**
+   * The actual stream entry we are writing into. Note that a stream entry is
+   * allowed to manage more streams, as for example in the EC write case, where
+   * an entry represents an EC block group.
+   */
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
   private final OmKeyArgs keyArgs;
   private final XceiverClientFactory xceiverClientFactory;
   private final String requestID;
+  /**
+   * A {@link BufferPool} shared between all
+   * {@link org.apache.hadoop.hdds.scm.storage.BlockOutputStream}s managed by
+   * the entries in the pool.
+   */
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
@@ -145,9 +161,17 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
-  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
-    Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    BlockOutputStreamEntry.Builder builder =
+  /**
+   * Method to create a stream entry instance based on the
+   * {@link OmKeyLocationInfo}.
+   * If implementations require additional data to create the entry, they need
+   * to get that data before starting to create entries.
+   * @param subKeyInfo the {@link OmKeyLocationInfo} object that describes the
+   *                   key to be written.
+   * @return a BlockOutputStreamEntry instance that handles how data is written.
+   */
+  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
+    return
         new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
             .setKey(keyArgs.getKeyName())
@@ -156,22 +180,45 @@ public class BlockOutputStreamEntryPool {
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
-            .setToken(subKeyInfo.getToken());
-    streamEntries.add(builder.build());
+            .setToken(subKeyInfo.getToken())
+            .build();
   }
 
-  public List<OmKeyLocationInfo> getLocationInfoList()  {
+  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
+    Preconditions.checkNotNull(subKeyInfo.getPipeline());
+    streamEntries.add(createStreamEntry(subKeyInfo));
+  }
+
+  /**
+   * Returns the list of {@link OmKeyLocationInfo} object that describes to OM
+   * where the blocks of the key have been written.
+   * @return the location info list of written blocks.
+   */
+  @VisibleForTesting
+  public List<OmKeyLocationInfo> getLocationInfoList() {
+    List<OmKeyLocationInfo> locationInfoList;
+    List<OmKeyLocationInfo> currBlocksLocationInfoList =
+        getOmKeyLocationInfos(streamEntries);
+    locationInfoList = currBlocksLocationInfoList;
+    return locationInfoList;
+  }
+
+  private List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      List<BlockOutputStreamEntry> streams) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    for (BlockOutputStreamEntry streamEntry : streamEntries) {
+    for (BlockOutputStreamEntry streamEntry : streams) {
       long length = streamEntry.getCurrentPosition();
 
       // Commit only those blocks to OzoneManager which are not empty
       if (length != 0) {
         OmKeyLocationInfo info =
-            new OmKeyLocationInfo.Builder().setBlockID(streamEntry.getBlockID())
-                .setLength(streamEntry.getCurrentPosition()).setOffset(0)
+            new OmKeyLocationInfo.Builder()
+                .setBlockID(streamEntry.getBlockID())
+                .setLength(streamEntry.getCurrentPosition())
+                .setOffset(0)
                 .setToken(streamEntry.getToken())
-                .setPipeline(streamEntry.getPipeline()).build();
+                .setPipeline(streamEntry.getPipelineForOMLocationReport())
+                .build();
         locationInfoList.add(info);
       }
       if (LOG.isDebugEnabled()) {
@@ -182,6 +229,19 @@ public class BlockOutputStreamEntryPool {
       }
     }
     return locationInfoList;
+  }
+
+  /**
+   * Retrieves the {@link BufferPool} instance shared between managed block
+   * output stream entries.
+   * @return the shared buffer pool.
+   */
+  public BufferPool getBufferPool() {
+    return this.bufferPool;
+  }
+
+  OzoneClientConfig getConfig() {
+    return config;
   }
 
   /**
@@ -211,10 +271,12 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
+  @VisibleForTesting
   List<BlockOutputStreamEntry> getStreamEntries() {
     return streamEntries;
   }
 
+  @VisibleForTesting
   XceiverClientFactory getXceiverClientFactory() {
     return xceiverClientFactory;
   }
@@ -224,8 +286,8 @@ public class BlockOutputStreamEntryPool {
   }
 
   long getKeyLength() {
-    return streamEntries.stream().mapToLong(
-        BlockOutputStreamEntry::getCurrentPosition).sum();
+    return streamEntries.stream()
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
   }
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
@@ -244,7 +306,16 @@ public class BlockOutputStreamEntryPool {
     addKeyLocationInfo(subKeyInfo);
   }
 
-
+  /**
+   * Commits the keys with Ozone Manager(s).
+   * At the end of the write committing the key from client side lets the OM
+   * know that the data has been written and to where. With this info OM can
+   * register the metadata stored in OM and SCM about the key that was written.
+   * @param offset the offset on which the key writer stands at the time of
+   *               finishing data writes. (Has to be equal and checked against
+   *               the actual length written by the stream entries.)
+   * @throws IOException in case there is an I/O problem during communication.
+   */
   void commitKey(long offset) throws IOException {
     if (keyArgs != null) {
       // in test, this could be null
@@ -266,7 +337,7 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
-  public BlockOutputStreamEntry getCurrentStreamEntry() {
+  BlockOutputStreamEntry getCurrentStreamEntry() {
     if (streamEntries.isEmpty() || streamEntries.size() <= currentStreamIndex) {
       return null;
     } else {
@@ -274,6 +345,12 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
+  /**
+   * Allocates a new block with OM if the current stream is closed, and new
+   * writes are to be handled.
+   * @return the new current open stream to write to
+   * @throws IOException if the block allocation failed.
+   */
   BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
     BlockOutputStreamEntry streamEntry = getCurrentStreamEntry();
     if (streamEntry != null && streamEntry.isClosed()) {
