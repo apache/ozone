@@ -19,24 +19,27 @@ Library             BuiltIn
 Library             String
 
 *** Variables ***
-${URL}          http://httpfs:14000/webhdfs/v1/
-${USERNAME}     hdfs
+${URL}                  http://httpfs:14000/webhdfs/v1/
 
 *** Keywords ***
 Execute curl command
     [Arguments]       ${path}           ${operation}    ${extra_commands}
-    ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=  ${operation}    &user.name=   ${USERNAME}
-    ${output}         Run process       curl ${extra_commands} "${final_url}"    shell=True
+    ${user.name} =    Set Variable If   '${SECURITY_ENABLED}'=='false'   &user.name=${USERNAME}      ${EMPTY}
+    ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=  ${operation}     ${user.name}
+    ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}==true'       --negotiate -u :    ${EMPTY}
+    ${output}         Run process       curl ${extra_commands} ${curl_extra_commands} "${final_url}"    shell=True
     Should Be Equal As Integers         ${output.rc}    0
     [return]          ${output}
 
 Execute create file command
     [Arguments]       ${path}           ${file_name}
-    ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=CREATE&user.name=  ${USERNAME}
-    ${output}         Run process       curl -X PUT "${final_url}"   shell=True
+    ${user.name} =    Set Variable If   '${SECURITY_ENABLED}'=='false'   &user.name=${USERNAME}      ${EMPTY}
+    ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}==true'       --negotiate -u :    ${EMPTY}
+    ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=CREATE     ${user.name}
+    ${output}         Run process       curl -X PUT ${curl_extra_commands} "${final_url}"   shell=True
     Should Be Equal As Integers         ${output.rc}    0
-    ${final_url2} =   Catenate          SEPARATOR=      ${URL}  ${path}  ?op=CREATE&data=true&user.name=  ${USERNAME}
-    ${output2}        Run process       curl -X PUT -T ${file_name} "${final_url2}" -H"Content-Type: application/octet-stream"   shell=True
+    ${final_url2} =   Catenate          SEPARATOR=      ${URL}  ${path}  ?op=CREATE&data=true       ${user.name}
+    ${output2}        Run process       curl -X PUT -T ${file_name} ${curl_extra_commands} "${final_url2}" -H"Content-Type: application/octet-stream"   shell=True
     Should Be Equal As Integers         ${output2.rc}    0
     [return]          ${output2}
 

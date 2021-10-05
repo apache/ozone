@@ -19,10 +19,12 @@ Library             Process
 Library             String
 Library             BuiltIn
 Resource            operations.robot
+Resource            ../kinit.robot
+Resource            ../lib/os.robot
+Resource            ../commonlib.robot
+Suite Setup         Generate volume
 
 *** Variables ***
-${URL}                         http://httpfs:14000/webhdfs/v1/
-${USERNAME}                    hdfs
 ${volume}                      generated
 
 *** Keywords ***
@@ -30,10 +32,42 @@ Generate volume
    ${random} =         Generate Random String  5  [LOWER]
    Set Suite Variable  ${volume}  ${random}
 
+Kinit admin
+    Wait Until Keyword Succeeds      2min       10sec      Execute      kinit -k httpfs/httpfs@EXAMPLE.COM -t /etc/security/keytabs/httpfs.keytab
+
+
 *** Test Cases ***
+Kinit admin user
+    Run Keyword If      '${SECURITY_ENABLED}'=='true'       Kinit admin
+
 Create volume
-    ${volume} =     Execute curl command    ${volume}    MKDIRS      -X PUT
-    Should contain  ${volume.stdout}   true
+    ${vol} =     Execute curl command    ${volume}    MKDIRS      -X PUT
+    Should contain  ${vol.stdout}   true
+
+# Check owner before
+    # ${status_after} =     Execute curl command    ${volume}          GETFILESTATUS      ${EMPTY}
+    # ${json_after} =       Evaluate                json.loads('''${status_after.stdout}''')    json
+    # ${owner_after} =      Set Variable     ${json_after["FileStatus"]["owner"]}
+    # Should be equal       httpfs   ${owner_after}
+
+# Set owner of volume
+    # ${rc} =                             Run And Return Rc       ozone sh volume update --user=testuser /${volume}
+    # Should Be Equal As Integers         ${rc}       0
+
+# Kinit
+   # Kinit test user     testuser     testuser.keytab
+
+# Check owner
+    # ${status_after} =     Execute curl command    ${volume}          GETFILESTATUS      ${EMPTY}
+    # ${json_after} =       Evaluate                json.loads('''${status_after.stdout}''')    json
+    # ${owner_after} =      Set Variable     ${json_after["FileStatus"]["owner"]}
+    # Should be equal       testuser   ${owner_after}
+
+# Check permission
+    # ${status_after} =       Execute curl command    ${volume}          GETFILESTATUS      ${EMPTY}
+    # ${json_after} =       evaluate                json.loads('''${status_after.stdout}''')    json
+    # ${permission_after} =   Set Variable     ${json_after["FileStatus"]["permission"]}
+    # Should be equal As Integers     777   ${permission_after}
 
 Create first bucket
     ${bucket} =     Execute curl command    ${volume}/buck1          MKDIRS      -X PUT
@@ -90,11 +124,13 @@ Get quota usage of directory
 
 Get home directory
     ${home} =       Execute curl command    ${EMPTY}          GETHOMEDIRECTORY      ${EMPTY}
-    Should contain  ${home.stdout}     "Path":"\\/user\\/hdfs"
+    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   root    ${USERNAME}
+    Should contain  ${home.stdout}     "Path":"\\/user\\/${user}"
 
 Get trash root
     ${trash} =      Execute curl command    ${volume}/buck1/testfile          GETTRASHROOT      ${EMPTY}
-    Should contain  ${trash.stdout}    "Path":"\\/${volume}\\/buck1\\/.Trash\\/hdfs"
+    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   root    ${USERNAME}
+    Should contain  ${trash.stdout}    "Path":"\\/${volume}\\/buck1\\/.Trash\\/${user}"
 
 # Missing functionality, not working yet.
 # Set permission of bucket
