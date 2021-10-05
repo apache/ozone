@@ -154,7 +154,6 @@ public class BlockOutputStreamEntry extends OutputStream {
     checkStream();
     BlockOutputStream out = (BlockOutputStream) getOutputStream();
     out.cleanup(invalidateClient);
-
   }
 
   /**
