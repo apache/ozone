@@ -73,3 +73,16 @@ By default the feature is disabled. It can be enabled with the following
    <value>PREFIX</value>
 </property>
 ```
+
+In reference to efforts towards supporting protocol aware buckets within a
+single OM the following configurations can be used to define the default value
+for bucket layout during bucket creation if the client (S3 or o3fs) is not
+passing the bucket layout argument.
+
+By default, the buckets will default to OBS behaviour.
+```XML
+<property>
+   <name>ozone.default.bucket.layout</name>
+   <value>OBS</value>
+</property>
+```

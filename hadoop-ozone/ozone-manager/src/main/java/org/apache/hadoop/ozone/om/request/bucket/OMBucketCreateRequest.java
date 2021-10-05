@@ -145,7 +145,16 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OmBucketInfo omBucketInfo = null;
     if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
         .equals(BucketLayoutProto.LEGACY)) {
-      BucketLayout defaultType = OMConfigKeys.OZONE_BUCKET_LAYOUT_DEFAULT;
+      // Bucket Layout argument was not passed during bucket creation.
+      BucketLayout defaultType;
+      String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
+      if (StringUtils.equalsIgnoreCase(
+          OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT,
+          omDefaultBucketLayout)) {
+        defaultType = BucketLayout.OBJECT_STORE;
+      } else {
+        defaultType = BucketLayout.FILE_SYSTEM_OPTIMIZED;
+      }
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);

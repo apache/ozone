@@ -2988,4 +2988,13 @@
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
     </description>
   </property>
+
+  <property>
+    <name>ozone.default.bucket.layout</name>
+    <value>OBS</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default bucket layout used during bucket creation when OM does not pass the bucket type argument.
+    </description>
+  </property>
 </configuration>
