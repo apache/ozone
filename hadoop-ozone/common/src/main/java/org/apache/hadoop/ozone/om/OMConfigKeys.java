@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
 /**
