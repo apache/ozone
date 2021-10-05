@@ -117,6 +117,8 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -135,6 +137,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -155,6 +158,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
@@ -3084,7 +3088,55 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "non-Ratis assignUserToTenant() is not implemented");
   }
 
-  // TODO: modify, delete
+  /**
+   * Tenant get user info.
+   */
+  public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException {
+
+    if (StringUtils.isEmpty(userPrincipal)) {
+      return null;
+    }
+
+    final List<TenantAccessIdInfo> accessIdInfoList = new ArrayList<>();
+
+    // Retrieve a list of accessIds associates to this user principal
+    final OmDBKerberosPrincipalInfo kerberosPrincipalInfo =
+        metadataManager.getPrincipalToAccessIdsTable().get(userPrincipal);
+    if (kerberosPrincipalInfo == null) {
+      return null;
+    }
+    final Set<String> accessIds = kerberosPrincipalInfo.getAccessIds();
+
+    final Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.TENANT, userPrincipal);
+
+    accessIds.forEach(accessId -> {
+      try {
+        // Use get() intentionally, which throws if entry doesn't exist in table
+        final OmDBAccessIdInfo accessIdInfo =
+            metadataManager.getTenantAccessIdTable().get(accessId);
+        // Sanity check
+        assert(accessIdInfo.getKerberosPrincipal().equals(userPrincipal));
+        // Build TenantAccessIdInfo instances from accessId and tenantName
+        final String tenantName = accessIdInfo.getTenantId();
+        accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
+            .setAccessId(accessId)
+            .setTenantName(tenantName)
+            .build());
+      } catch (IOException e) {
+        LOG.error("Found potential DB consistency issue! "
+            + "accessId '" + "' is supposed to exist in TenantAccessIdTable.");
+        AUDIT.logWriteFailure(buildAuditMessageForFailure(
+            OMAction.TENANT_GET_USER_INFO, auditMap, e));
+      }
+    });
+
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        OMAction.TENANT_GET_USER_INFO, auditMap));
+
+    return new TenantUserInfoValue(userPrincipal, accessIdInfoList);
+  }
 
   @Override
   public OmVolumeArgs getS3Volume(String accessID) throws IOException {

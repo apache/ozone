@@ -33,7 +33,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.jupiter.api.AfterAll;
-import org.mockito.Mockito;
 
 import java.util.UUID;
 
@@ -50,6 +49,8 @@ public class TestMultiTenantVolume {
   @BeforeClass
   public static void initClusterProvider() {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(
+        OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes();
     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 2);
@@ -58,10 +59,6 @@ public class TestMultiTenantVolume {
 
   @Before
   public void setup() throws Exception {
-    // No Ranger auth plugin needed for these tests.
-    OMMultiTenantManagerImpl.setAuthorizerSupplier(() ->
-        Mockito.mock(MultiTenantAccessAuthorizer.class)
-    );
     cluster = clusterProvider.provide();
   }
 

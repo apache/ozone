@@ -58,6 +58,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
@@ -134,6 +135,9 @@ public class TestS3GetSecretRequest {
     tenant = mock(Tenant.class);
     when(omMultiTenantManager.getTenantInfo(TENANT_NAME)).thenReturn(tenant);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
+
+    when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
+    when(omMultiTenantManager.createTenant(TENANT_NAME)).thenReturn(tenant);
   }
 
   @After

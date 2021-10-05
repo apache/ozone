@@ -15,18 +15,18 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
+package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 /**
- * ozone s3 user delete.
+ * ozone s3 tenant modify.
  */
-@CommandLine.Command(name = "delete",
-    description = "Delete a tenant user")
-public class TenantUserDeleteHandler extends S3Handler {
+@CommandLine.Command(name = "modify",
+    description = "Modify a tenant")
+public class TenantModifyHandler extends TenantHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {

@@ -53,6 +53,7 @@ function ozone_usage
   ozone_add_subcommand "recon" daemon "run the Recon service"
   ozone_add_subcommand "sh" client "command line interface for object store operations"
   ozone_add_subcommand "s3" client "command line interface for s3 related operations"
+  ozone_add_subcommand "tenant" client "command line interface for multi-tenant related operations"
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
@@ -185,6 +186,10 @@ function ozonecmd_case
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
       OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
+    ;;
+    tenant)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.tenant.TenantShell
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     csi)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"

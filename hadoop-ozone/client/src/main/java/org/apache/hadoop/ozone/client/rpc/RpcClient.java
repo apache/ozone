@@ -104,6 +104,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
@@ -665,7 +666,19 @@ public class RpcClient implements ClientProtocol {
         username, tenantName, accessId);
   }
 
-  // TODO: modify, delete
+  /**
+   * Get tenant info for a user.
+   * @param userPrincipal Kerberos principal of a user.
+   * @return TenantUserInfo
+   * @throws IOException
+   */
+  @Override
+  public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(userPrincipal),
+        "userPrincipal can't be null or empty.");
+    return ozoneManagerClient.tenantGetUserInfo(userPrincipal);
+  }
 
   @Override
   public void setBucketVersioning(

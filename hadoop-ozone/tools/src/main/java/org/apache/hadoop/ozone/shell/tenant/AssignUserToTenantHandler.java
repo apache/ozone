@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.shell.s3;
+package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -33,11 +33,11 @@ import java.util.List;
 import static org.apache.hadoop.ozone.OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
 
 /**
- * ozone s3 user assign.
+ * ozone tenant user assign.
  */
 @CommandLine.Command(name = "assign",
     description = "Assign user to tenant")
-public class AssignUserToTenantHandler extends S3Handler {
+public class AssignUserToTenantHandler extends TenantHandler {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -58,11 +58,6 @@ public class AssignUserToTenantHandler extends S3Handler {
   //  restricted in any way so far and this could cause some conflict with
   //  `s3 getsecret` and leak the secret if an admin isn't careful.
   private String accessId;
-
-  // TODO: support dry-run?
-//  @CommandLine.Option(names = {"--dry-run"},
-//      description = "Dry-run")
-//  private boolean dryRun;
 
   private boolean isEmptyList(List<String> list) {
     return list == null || list.size() == 0;
@@ -104,7 +99,7 @@ public class AssignUserToTenantHandler extends S3Handler {
         final S3SecretValue resp =
             objStore.assignUserToTenant(principal, tenantName, accessId);
         err().println("Assigned '" + principal + "' to '" + tenantName +
-            "' under accessId '" + accessId + "'.");
+            "' with accessId '" + accessId + "'.");
         out().println("export AWS_ACCESS_KEY_ID='" +
             resp.getAwsAccessKey() + "'");
         out().println("export AWS_SECRET_ACCESS_KEY='" +
