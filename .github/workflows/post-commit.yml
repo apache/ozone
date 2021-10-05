@@ -24,7 +24,7 @@ concurrency:
 jobs:
   basic:
     runs-on: ubuntu-18.04
-    timeout-minutes: 240
+    timeout-minutes: 300
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -47,7 +47,7 @@ jobs:
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh -Dtest=TestBlockDeletion
         env:
-          ITERATIONS: 200
+          ITERATIONS: 100
       - name: Summary of failures
         run: cat target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
