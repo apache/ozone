@@ -230,6 +230,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         GetS3VolumeResponse s3VolumeResponse =
             getS3Volume(request.getGetS3VolumeRequest());
         responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
+        break;
       case TenantGetUserInfo:
         TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
             request.getTenantGetUserInfoRequest());
