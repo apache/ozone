@@ -39,7 +39,6 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -62,6 +61,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
@@ -97,6 +97,7 @@ public class TestOzoneShellHA {
 
   private static File baseDir;
   private static File testFile;
+  private static String testFilePathString;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneShell ozoneShell = null;
@@ -127,7 +128,8 @@ public class TestOzoneShellHA {
     baseDir = new File(path);
     baseDir.mkdirs();
 
-    testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
+    testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
+    testFile = new File(testFilePathString);
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
 
@@ -318,7 +320,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     String keyName = volumeName + bucketName +
-        OzoneConsts.OZONE_URI_DELIMITER + "key";
+        OZONE_URI_DELIMITER + "key";
     for (int i = 0; i < 100; i++) {
       args = new String[] {
           "key", "put", "o3://" + omServiceId + keyName + i,
@@ -343,7 +345,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     String bucketName =
-        volumeName + OzoneConsts.OZONE_URI_DELIMITER + "testbucket";
+        volumeName + OZONE_URI_DELIMITER + "testbucket";
     for (int i = 0; i < numOfBuckets; i++) {
       args = new String[] {
           "bucket", "create", "o3://" + omServiceId + bucketName + i};
@@ -862,32 +864,73 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testListVolumeShouldPrintValidJson()
+  public void testListVolumeBucketKeyShouldPrintValidJson()
       throws UnsupportedEncodingException {
 
     final List<String> volumesForThisTest =
-        Arrays.asList("random-vol1", "random-vol2", "random-vol3");
+        Arrays.asList("jsontest-vol1", "jsontest-vol2", "jsontest-vol3");
+    final String firstVolumePrefix =
+        volumesForThisTest.get(0) + OZONE_URI_DELIMITER;
+    final List<String> bucketsForThisTest =
+        Arrays.asList("v1-bucket1", "v1-bucket2", "v1-bucket3");
+    final String keyPathPrefix = firstVolumePrefix +
+        bucketsForThisTest.get(0) + OZONE_URI_DELIMITER;
+    final List<String> keysForThisTest = Arrays.asList("key1", "key2", "key3");
 
-    // Create test volumes
-    volumesForThisTest.forEach(vol ->
-        execute(ozoneShell, new String[] {"volume", "create", vol}));
+    // Create volumes, buckets, keys
+    volumesForThisTest.forEach(vol -> execute(ozoneShell, new String[] {
+        "volume", "create", vol}));
+    bucketsForThisTest.forEach(bucket -> execute(ozoneShell, new String[] {
+        "bucket", "create", firstVolumePrefix + bucket}));
+    keysForThisTest.forEach(key -> execute(ozoneShell, new String[] {
+        "key", "put", keyPathPrefix + key, testFilePathString}));
+
+    // ozone sh volume list
     out.reset();
-
     execute(ozoneShell, new String[] {"volume", "list"});
 
-    // Expect proper JSON output
-    final ArrayList<LinkedTreeMap<String, String>> outArray =
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> volumeListOut =
         new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
-    // Might have s3v and volumes from other test cases that aren't clean up.
-    Assert.assertTrue(outArray.size() >= 3);
-    final HashSet<String> volumesSet = new HashSet<>(volumesForThisTest);
-    outArray.forEach(treeMap -> volumesSet.remove(treeMap.get("name")));
-
+    // Might include s3v and volumes from other test cases that aren't clean up.
+    Assert.assertTrue(volumeListOut.size() >= volumesForThisTest.size());
+    final HashSet<String> volumeSet = new HashSet<>(volumesForThisTest);
+    volumeListOut.forEach(map -> volumeSet.remove(map.get("name")));
     // Should have found all 3 volumes we created for this test
-    Assert.assertEquals(0, volumesSet.size());
+    Assert.assertEquals(0, volumeSet.size());
+
+    // ozone sh bucket list
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", firstVolumePrefix});
+
+    // Expect valid JSON array as well
+    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+        new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+    Assert.assertEquals(bucketsForThisTest.size(), bucketListOut.size());
+    final HashSet<String> bucketSet = new HashSet<>(bucketsForThisTest);
+    bucketListOut.forEach(map -> bucketSet.remove(map.get("name")));
+    // Should have found all buckets we created
+    Assert.assertEquals(0, bucketSet.size());
+
+    // ozone sh key list
+    out.reset();
+    execute(ozoneShell, new String[] {"key", "list", keyPathPrefix});
+
+    // Expect valid JSON array as well
+    final ArrayList<LinkedTreeMap<String, String>> keyListOut =
+        new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+    Assert.assertEquals(keysForThisTest.size(), keyListOut.size());
+    final HashSet<String> keySet = new HashSet<>(keysForThisTest);
+    keyListOut.forEach(map -> keySet.remove(map.get("name")));
+    // Should have found all keys we put
+    Assert.assertEquals(0, keySet.size());
 
     // Clean up
-    volumesForThisTest.forEach(vol ->
-        execute(ozoneShell, new String[] {"volume", "delete", vol}));
+    keysForThisTest.forEach(key -> execute(ozoneShell, new String[] {
+        "key", "delete", keyPathPrefix + key}));
+    bucketsForThisTest.forEach(bucket -> execute(ozoneShell, new String[] {
+        "bucket", "delete", firstVolumePrefix + bucket}));
+    volumesForThisTest.forEach(vol -> execute(ozoneShell, new String[] {
+        "volume", "delete", vol}));
   }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Iterator;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
@@ -120,6 +121,25 @@ public abstract class Handler implements Callable<Void> {
 
   protected String objectToJsonString(Object o) throws IOException {
     return JsonUtils.toJsonStringWithDefaultPrettyPrinter(o);
+  }
+
+  /**
+   * Print the results in the iterator as a valid JSON array to out().
+   * @return Number of entries actually printed.
+   */
+  protected int printAsJsonArray(Iterator<?> iterator, int limit)
+      throws IOException {
+    int counter = 0;
+    out().print("[ ");
+    while (limit > counter && iterator.hasNext()) {
+      if (counter > 0) {
+        out().print(", ");
+      }
+      out().print(objectToJsonString(iterator.next()));
+      counter++;
+    }
+    out().println(" ]");
+    return counter;
   }
 
   protected void printMsg(String msg) {

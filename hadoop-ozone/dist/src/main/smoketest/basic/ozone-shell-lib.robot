@@ -56,7 +56,7 @@ Test ozone shell
                     Should Be Equal     ${result}       1099511627776
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
                     Should Be Equal     ${result}       1000
-    ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '. | select(.name=="bb1") | .volumeName'
+    ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '.[] | select(.name=="bb1") | .volumeName'
                     Should Be Equal     ${result}       ${volume}
                     Run Keyword         Test key handling       ${protocol}       ${server}       ${volume}
                     Execute             ozone sh volume clrquota --space-quota ${protocol}${server}/${volume}
@@ -146,10 +146,10 @@ Test key handling
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
-    ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="key1") | .name'
+    ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '.[] | select(.name=="key1") | .name'
                     Should Be Equal     ${result}       key1
                     Execute             ozone sh key rename ${protocol}${server}/${volume}/bb1 key1 key2
-    ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '.name'
+    ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '.[].name'
                     Should Be Equal     ${result}       key2
                     Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key2
 
