@@ -36,9 +36,7 @@ public class TestObjectStore {
   private static String clusterId;
   private static String scmId;
   private static String omId;
-  private static String volumeName;
-  private static String bucketName;
-  private static FileSystem fs;
+
   @Rule
   public Timeout timeout = new Timeout(1200000);
 
