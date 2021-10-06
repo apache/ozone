@@ -299,8 +299,7 @@ public class KeyOutputStream extends OutputStream {
     Pipeline pipeline = streamEntry.getPipeline();
     PipelineID pipelineId = pipeline.getId();
     long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
-    //set the correct length for the current stream
-    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
+    streamEntry.resetToAckedPosition();
     long bufferedDataLen = blockOutputStreamEntryPool.computeBufferData();
     if (containerExclusionException) {
       LOG.debug(
