@@ -282,10 +282,12 @@ public final class OzoneManagerRatisServer {
     try {
       return server.submitClientRequestAsync(raftClientRequest)
           .get();
-    } catch (InterruptedException | IOException | ExecutionException ex) {
-      Thread.currentThread().interrupt();
+    } catch (IOException ex) {
       throw new ServiceException(ex.getMessage(), ex);
+    } catch (ExecutionException | InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
+    return null;
   }
 
   /**

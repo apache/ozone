@@ -75,8 +75,9 @@ public class NodeService extends NodeImplBase {
           .build());
       responseObserver.onCompleted();
 
-    } catch (InterruptedException | IOException e) {
+    } catch (IOException e) {
       responseObserver.onError(e);
+    } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
 
@@ -111,8 +112,9 @@ public class NodeService extends NodeImplBase {
           .build());
       responseObserver.onCompleted();
 
-    } catch (InterruptedException | IOException e) {
+    } catch (IOException e) {
       responseObserver.onError(e);
+    } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
 

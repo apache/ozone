@@ -89,13 +89,14 @@ public class SimpleContainerDownloader implements ContainerDownloader {
             LOG.error("Error on replicating container: " + containerId, t);
             try {
               return downloadContainer(containerId, datanode).get();
-            } catch (InterruptedException | IOException
-                    | ExecutionException e) {
+            } catch (IOException e) {
               LOG.error("Error on replicating container: " + containerId,
                   e);
-              Thread.currentThread().interrupt();
               return null;
+            } catch (ExecutionException | InterruptedException e) {
+              Thread.currentThread().interrupt();
             }
+            return null;
           });
         }
       } catch (Exception ex) {
