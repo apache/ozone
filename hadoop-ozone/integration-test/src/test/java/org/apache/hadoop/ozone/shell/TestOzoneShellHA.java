@@ -361,6 +361,14 @@ public class TestOzoneShellHA {
     return out.toString(DEFAULT_ENCODING).split(bucketPrefix).length - 1;
   }
 
+  /**
+   * Parse output into ArrayList with Gson.
+   * @return ArrayList
+   */
+  private ArrayList<LinkedTreeMap<String, String>> parseOutputIntoArrayList()
+      throws UnsupportedEncodingException {
+    return new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+  }
 
   /**
    * Tests ozone sh command URI parsing with volume and bucket create commands.
@@ -441,7 +449,8 @@ public class TestOzoneShellHA {
     args = new String[] {"key", "list", startKey, destinationBucket};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(0, out.size());
+    // Expect empty JSON array
+    Assert.assertEquals(0, parseOutputIntoArrayList().size());
     Assert.assertEquals(0, getNumOfKeys());
 
     // Part of listing buckets test.
@@ -463,7 +472,8 @@ public class TestOzoneShellHA {
     out.reset();
     args = new String[] {"bucket", "list", startBucket, destinationVolume};
     execute(ozoneShell, args);
-    Assert.assertEquals(0, out.size());
+    // Expect empty JSON array
+    Assert.assertEquals(0, parseOutputIntoArrayList().size());
     Assert.assertEquals(0, getNumOfBuckets("testbucket"));
   }
 
@@ -864,7 +874,7 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testListVolumeBucketKeyShouldPrintValidJson()
+  public void testListVolumeBucketKeyShouldPrintValidJsonArray()
       throws UnsupportedEncodingException {
 
     final List<String> volumesForThisTest =
@@ -891,7 +901,7 @@ public class TestOzoneShellHA {
 
     // Expect valid JSON array
     final ArrayList<LinkedTreeMap<String, String>> volumeListOut =
-        new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+        parseOutputIntoArrayList();
     // Might include s3v and volumes from other test cases that aren't clean up.
     Assert.assertTrue(volumeListOut.size() >= volumesForThisTest.size());
     final HashSet<String> volumeSet = new HashSet<>(volumesForThisTest);
@@ -905,7 +915,7 @@ public class TestOzoneShellHA {
 
     // Expect valid JSON array as well
     final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
-        new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+        parseOutputIntoArrayList();
     Assert.assertEquals(bucketsForThisTest.size(), bucketListOut.size());
     final HashSet<String> bucketSet = new HashSet<>(bucketsForThisTest);
     bucketListOut.forEach(map -> bucketSet.remove(map.get("name")));
@@ -918,7 +928,7 @@ public class TestOzoneShellHA {
 
     // Expect valid JSON array as well
     final ArrayList<LinkedTreeMap<String, String>> keyListOut =
-        new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+        parseOutputIntoArrayList();
     Assert.assertEquals(keysForThisTest.size(), keyListOut.size());
     final HashSet<String> keySet = new HashSet<>(keysForThisTest);
     keyListOut.forEach(map -> keySet.remove(map.get("name")));

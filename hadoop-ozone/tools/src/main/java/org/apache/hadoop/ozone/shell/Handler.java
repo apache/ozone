@@ -23,6 +23,7 @@ import java.io.PrintStream;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -119,26 +120,18 @@ public abstract class Handler implements Callable<Void> {
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(o));
   }
 
-  protected String objectToJsonString(Object o) throws IOException {
-    return JsonUtils.toJsonStringWithDefaultPrettyPrinter(o);
-  }
-
   /**
-   * Print the results in the iterator as a valid JSON array to out().
+   * Pretty print the result as a valid JSON array to out().
    * @return Number of entries actually printed.
    */
-  protected int printAsJsonArray(Iterator<?> iterator, int limit)
-      throws IOException {
+  protected int printAsJsonArray(Iterator<?> iterator, int limit) {
     int counter = 0;
-    out().print("[ ");
+    final ArrayNode arrayNode = JsonUtils.createArrayNode();
     while (limit > counter && iterator.hasNext()) {
-      if (counter > 0) {
-        out().print(", ");
-      }
-      out().print(objectToJsonString(iterator.next()));
+      arrayNode.add(JsonUtils.createObjectNode(iterator.next()));
       counter++;
     }
-    out().println(" ]");
+    out().println(arrayNode.toPrettyString());
     return counter;
   }
 
