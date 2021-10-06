@@ -97,7 +97,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -181,7 +181,6 @@ public class KeyManagerImpl implements KeyManager {
   private final boolean enableFileSystemPaths;
   private BackgroundService dirDeletingService;
 
-
   @VisibleForTesting
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
@@ -256,8 +255,7 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     // Start directory deletion service for FSO buckets.
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()
-        && dirDeletingService == null) {
+    if (dirDeletingService == null) {
       long dirDeleteInterval = configuration.getTimeDuration(
           OZONE_DIR_DELETING_SERVICE_INTERVAL,
           OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT,
@@ -267,7 +265,7 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
       dirDeletingService = new DirectoryDeletingService(dirDeleteInterval,
-          TimeUnit.SECONDS, serviceTimeout, ozoneManager);
+          TimeUnit.SECONDS, serviceTimeout, ozoneManager, configuration);
       dirDeletingService.start();
     }
   }
@@ -328,7 +326,8 @@ public class KeyManagerImpl implements KeyManager {
     String openKey = metadataManager.getOpenKey(
         volumeName, bucketName, keyName, clientID);
 
-    OmKeyInfo keyInfo = metadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo keyInfo =
+        metadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (keyInfo == null) {
       LOG.error("Allocate block for a key not in open status in meta store" +
           " /{}/{}/{} with ID {}", volumeName, bucketName, keyName, clientID);
@@ -343,7 +342,7 @@ public class KeyManagerImpl implements KeyManager {
 
     keyInfo.appendNewBlocks(locationInfos, true);
     keyInfo.updateModifcationTime();
-    metadataManager.getOpenKeyTable().put(openKey, keyInfo);
+    metadataManager.getOpenKeyTable(getBucketLayout()).put(openKey, keyInfo);
 
     return locationInfos.get(0);
 
@@ -502,7 +501,7 @@ public class KeyManagerImpl implements KeyManager {
       keyInfo.appendNewBlocks(locationInfos, true);
     }
 
-    metadataManager.getOpenKeyTable().put(openKey, keyInfo);
+    metadataManager.getOpenKeyTable(getBucketLayout()).put(openKey, keyInfo);
 
   }
 
@@ -542,8 +541,8 @@ public class KeyManagerImpl implements KeyManager {
     String multipartKey = metadataManager
         .getMultipartKey(args.getVolumeName(), args.getBucketName(),
             args.getKeyName(), uploadID);
-    OmKeyInfo partKeyInfo = metadataManager.getOpenKeyTable().get(
-        multipartKey);
+    OmKeyInfo partKeyInfo =
+        metadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey);
     if (partKeyInfo == null) {
       throw new OMException("No such Multipart upload is with specified " +
           "uploadId " + uploadID,
@@ -608,7 +607,8 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
       OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
-      OmKeyInfo keyInfo = metadataManager.getOpenKeyTable().get(openKey);
+      OmKeyInfo keyInfo =
+          metadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
       if (keyInfo == null) {
         throw new OMException("Failed to commit key, as " + openKey + "entry " +
             "is not found in the openKey table", KEY_NOT_FOUND);
@@ -622,7 +622,7 @@ public class KeyManagerImpl implements KeyManager {
           openKey,
           objectKey,
           keyInfo,
-          metadataManager.getOpenKeyTable(),
+          metadataManager.getOpenKeyTable(getBucketLayout()),
           metadataManager.getKeyTable());
     } catch (OMException e) {
       throw e;
@@ -649,7 +649,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     OmKeyInfo value = null;
     try {
-      if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      if (isBucketFSOptimized(volumeName, bucketName)) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
@@ -1085,7 +1085,7 @@ public class KeyManagerImpl implements KeyManager {
         // this key.
         metadataManager.getMultipartInfoTable().putWithBatch(batch,
             multipartKey, multipartKeyInfo);
-        metadataManager.getOpenKeyTable().putWithBatch(batch,
+        metadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(batch,
             multipartKey, omKeyInfo);
         store.commitBatchOperation(batch);
         return new OmMultipartInfo(volumeName, bucketName, keyName,
@@ -1163,8 +1163,8 @@ public class KeyManagerImpl implements KeyManager {
 
       String openKey = metadataManager.getOpenKey(
           volumeName, bucketName, keyName, clientID);
-      OmKeyInfo keyInfo = metadataManager.getOpenKeyTable().get(
-          openKey);
+      OmKeyInfo keyInfo =
+          metadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
       // set the data size and location info list
       keyInfo.setDataSize(omKeyArgs.getDataSize());
@@ -1199,7 +1199,8 @@ public class KeyManagerImpl implements KeyManager {
           // This is the first time part is being added.
           DBStore store = metadataManager.getStore();
           try (BatchOperation batch = store.initBatchOperation()) {
-            metadataManager.getOpenKeyTable().deleteWithBatch(batch, openKey);
+            metadataManager.getOpenKeyTable(getBucketLayout())
+                .deleteWithBatch(batch, openKey);
             metadataManager.getMultipartInfoTable().putWithBatch(batch,
                 multipartKey, multipartKeyInfo);
             store.commitBatchOperation(batch);
@@ -1226,7 +1227,8 @@ public class KeyManagerImpl implements KeyManager {
             metadataManager.getDeletedTable().putWithBatch(batch,
                 oldPartKeyInfo.getPartName(),
                 repeatedOmKeyInfo);
-            metadataManager.getOpenKeyTable().deleteWithBatch(batch, openKey);
+            metadataManager.getOpenKeyTable(getBucketLayout())
+                .deleteWithBatch(batch, openKey);
             metadataManager.getMultipartInfoTable().putWithBatch(batch,
                 multipartKey, multipartKeyInfo);
             store.commitBatchOperation(batch);
@@ -1311,8 +1313,8 @@ public class KeyManagerImpl implements KeyManager {
           bucketName, keyName, uploadID);
       OmMultipartKeyInfo multipartKeyInfo = metadataManager
           .getMultipartInfoTable().get(multipartKey);
-      OmKeyInfo openKeyInfo = metadataManager.getOpenKeyTable().get(
-          multipartKey);
+      OmKeyInfo openKeyInfo =
+          metadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey);
 
       // If there is no entry in openKeyTable, then there is no multipart
       // upload initiated for this key.
@@ -1349,8 +1351,8 @@ public class KeyManagerImpl implements KeyManager {
           // key table
           metadataManager.getMultipartInfoTable().deleteWithBatch(batch,
               multipartKey);
-          metadataManager.getOpenKeyTable().deleteWithBatch(batch,
-              multipartKey);
+          metadataManager.getOpenKeyTable(getBucketLayout())
+              .deleteWithBatch(batch, multipartKey);
           store.commitBatchOperation(batch);
         }
       }
@@ -1428,6 +1430,14 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(uploadID);
     boolean isTruncated = false;
     int nextPartNumberMarker = 0;
+    BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    if (ozoneManager != null) {
+      String buckKey = ozoneManager.getMetadataManager()
+          .getBucketKey(volumeName, bucketName);
+      OmBucketInfo buckInfo =
+          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+      bucketLayout = buckInfo.getBucketLayout();
+    }
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -1478,13 +1488,14 @@ public class KeyManagerImpl implements KeyManager {
 
         if (replicationConfig == null) {
           //if there are no parts, use the replicationType from the open key.
-          if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+          if (isBucketFSOptimized(volumeName, bucketName)) {
             multipartKey =
                 getMultipartOpenKeyFSO(volumeName, bucketName, keyName,
                     uploadID);
           }
           OmKeyInfo omKeyInfo =
-              metadataManager.getOpenKeyTable().get(multipartKey);
+              metadataManager.getOpenKeyTable(bucketLayout)
+                  .get(multipartKey);
 
           if (omKeyInfo == null) {
             throw new IllegalStateException(
@@ -1526,11 +1537,12 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private String getPartName(PartKeyInfo partKeyInfo, String volName,
-                             String buckName, String keyName) {
+                             String buckName, String keyName)
+      throws IOException {
 
     String partName = partKeyInfo.getPartName();
 
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volName, buckName)) {
       String parentDir = OzoneFSUtils.getParentDir(keyName);
       String partFileName = OzoneFSUtils.getFileName(partKeyInfo.getPartName());
 
@@ -1712,7 +1724,7 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
-      if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      if (isBucketFSOptimized(volume, bucket)) {
         keyInfo = getOmKeyInfoFSO(volume, bucket, keyName);
       } else {
         keyInfo = getOmKeyInfo(volume, bucket, keyName);
@@ -1757,6 +1769,20 @@ public class KeyManagerImpl implements KeyManager {
         .setKeyName(keyName)
         .build();
 
+    BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    if (ozoneManager != null) {
+      String buckKey =
+          ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
+      OmBucketInfo buckInfo = null;
+      try {
+        buckInfo =
+            ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+        bucketLayout = buckInfo.getBucketLayout();
+      } catch (IOException e) {
+        LOG.error("Failed to get bucket for the key: " + buckKey, e);
+      }
+    }
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
@@ -1765,7 +1791,8 @@ public class KeyManagerImpl implements KeyManager {
       // For Acl Type "WRITE", the key can only be found in
       // OpenKeyTable since appends to existing keys are not supported.
       if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
-        keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
+        keyInfo =
+            metadataManager.getOpenKeyTable(bucketLayout).get(objectKey);
       } else {
         // Recursive check is done only for ACL_TYPE DELETE
         // Rename and delete operations will send ACL_TYPE DELETE
@@ -1783,8 +1810,9 @@ public class KeyManagerImpl implements KeyManager {
           if (context.getAclRights() == IAccessAuthorizer.ACLType.READ) {
             return true;
           } else {
-            throw new OMException("Key not found, checkAccess failed. Key:" +
-                objectKey, KEY_NOT_FOUND);
+            throw new OMException(
+                "Key not found, checkAccess failed. Key:" + objectKey,
+                KEY_NOT_FOUND);
           }
         }
       }
@@ -1925,7 +1953,7 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volumeName, bucketName)) {
       return getOzoneFileStatusFSO(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress,
               args.getLatestVersionLocation(), false);
@@ -2202,7 +2230,7 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus;
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volumeName, bucketName)) {
       fileStatus = getOzoneFileStatusFSO(volumeName, bucketName, keyName,
               args.getSortDatanodes(), clientAddress,
               args.getLatestVersionLocation(), false);
@@ -2305,13 +2333,13 @@ public class KeyManagerImpl implements KeyManager {
       String startKey, long numEntries, String clientAddress)
           throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
-
+    String volName = args.getVolumeName();
+    String buckName = args.getBucketName();
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
     if (numEntries <= 0) {
       return fileStatusList;
     }
-
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+    if (isBucketFSOptimized(volName, buckName)) {
       return listStatusFSO(args, recursive, startKey, numEntries,
           clientAddress);
     }
@@ -3092,5 +3120,27 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     return files;
+  }
+
+  public boolean isBucketFSOptimized(String volName, String buckName)
+      throws IOException {
+    // This will never be null in reality but can be null in unit test cases.
+    // Added safer check for unit testcases.
+    if (ozoneManager == null) {
+      return false;
+    }
+    String buckKey =
+        ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
+    OmBucketInfo buckInfo =
+        ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+    if (buckInfo != null) {
+      return buckInfo.getBucketLayout()
+          .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    }
+    return false;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

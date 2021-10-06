@@ -251,10 +251,12 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.OzoneManagerInterService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -319,7 +321,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final int SHUTDOWN_HOOK_PRIORITY = 30;
   private final Runnable shutdownHook;
   private final File omMetaDir;
-  private final boolean isAclEnabled;
+  private boolean isAclEnabled;
   private final boolean isSpnegoEnabled;
   private IAccessAuthorizer accessAuthorizer;
   private JvmPauseMonitor jvmPauseMonitor;
@@ -417,9 +419,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     loginOMUserIfSecurityEnabled(conf);
-
-    this.allowListAllVolumes = conf.getBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED,
-        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
+    setInstanceVariablesFromConf();
     this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
         OZONE_OM_USER_MAX_VOLUME_DEFAULT);
     Preconditions.checkArgument(this.maxUserVolumeCount > 0,
@@ -434,9 +434,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           ResultCodes.OM_NOT_INITIALIZED);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
-
-    this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
-        OZONE_ACL_ENABLED_DEFAULT);
+    
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
@@ -530,6 +528,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
+  }
+
+  /**
+   * This method is used to set selected instance variables in this class from
+   * the passed in config. This allows these variable to be reset when the OM
+   * instance is restarted (normally from a test mini-cluster). Note, not all
+   * variables are added here as variables are selectively added as tests
+   * require.
+   */
+  private void setInstanceVariablesFromConf() {
+    this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
+        OZONE_ACL_ENABLED_DEFAULT);
+    this.allowListAllVolumes = configuration.getBoolean(
+        OZONE_OM_VOLUME_LISTALL_ALLOWED,
+        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
 
   /**
@@ -1142,6 +1155,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             omRatisSnapshotDir.toPath());
       }
 
+      File omRatisDir = new File(omRatisDirectory);
+      String groupIDfromServiceID = RaftGroupId.valueOf(
+          getRaftGroupIdFromOmServiceId(getOMServiceId())).getUuid().toString();
+
+      // If a directory exists in ratis storage dir
+      // Check the Ratis group Dir is same as the one generated from
+      // om service id.
+
+      // This will help to catch if some one has changed service id later on.
+      File[] ratisDirFiles = omRatisDir.listFiles();
+      if (ratisDirFiles != null) {
+        for (File ratisGroupDir : ratisDirFiles) {
+          if (ratisGroupDir.isDirectory()) {
+            if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
+              throw new IOException("Ratis group Dir on disk "
+                  + ratisGroupDir.getName() + " does not match with RaftGroupID"
+                  + groupIDfromServiceID + " generated from service id "
+                  + getOMServiceId() + ". Looks like there is a change to " +
+                  OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY + " value after the " +
+                  "cluster is setup. Currently change to this value is not " +
+                  "supported.");
+            }
+          } else {
+            LOG.warn("Unknown file {} exists in ratis storage dir {}",
+                ratisGroupDir, omRatisDir);
+          }
+        }
+      }
+
       if (peerNodesMap != null && !peerNodesMap.isEmpty()) {
         this.omSnapshotProvider = new OzoneManagerSnapshotProvider(
             configuration, omRatisSnapshotDir, peerNodesMap);
@@ -1318,6 +1360,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void restart() throws IOException {
     initFSOLayout();
+    setInstanceVariablesFromConf();
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));

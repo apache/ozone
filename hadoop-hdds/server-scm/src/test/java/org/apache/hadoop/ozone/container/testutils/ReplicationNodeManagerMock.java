@@ -177,6 +177,17 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn){
+    return null;
+  }
+
+  /**
    * Return the node stat of the specified datanode.
    *
    * @param dd - datanode details.

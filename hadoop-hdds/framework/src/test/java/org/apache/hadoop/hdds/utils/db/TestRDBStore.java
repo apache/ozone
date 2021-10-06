@@ -165,7 +165,7 @@ public class TestRDBStore {
         Assert.assertNotNull(newvalue);
         //and it is not same as what we wrote to the FirstTable, and equals
         // the new value.
-        Assert.assertArrayEquals(nextValue, nextValue);
+        Assert.assertArrayEquals(nextValue, newvalue);
       }
     }
 

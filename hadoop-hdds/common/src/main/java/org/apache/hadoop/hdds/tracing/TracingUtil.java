@@ -54,7 +54,7 @@ public final class TracingUtil {
           .registerExtractor(StringCodec.FORMAT, new StringCodec())
           .registerInjector(StringCodec.FORMAT, new StringCodec())
           .build();
-      GlobalTracer.register(tracer);
+      GlobalTracer.registerIfAbsent(tracer);
     }
   }
 
@@ -155,7 +155,7 @@ public final class TracingUtil {
       Supplier<R> supplier) {
     Span span = GlobalTracer.get()
         .buildSpan(spanName).start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
     } catch (Exception ex) {
       span.setTag("failed", true);
@@ -170,7 +170,7 @@ public final class TracingUtil {
    */
   private static <R> R executeInSpan(Span span,
       SupplierWithIOException<R> supplier) throws IOException {
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
     } catch (Exception ex) {
       span.setTag("failed", true);

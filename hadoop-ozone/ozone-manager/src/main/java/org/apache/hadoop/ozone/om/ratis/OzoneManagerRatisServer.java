@@ -549,11 +549,13 @@ public final class OzoneManagerRatisServer {
     // Set Ratis storage directory
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(ratisStorageDir)));
-    // Disable the pre vote feature in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+    // Disable/enable the pre vote feature in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        conf.getBoolean(OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE,
+            OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT));
 
     // Set RAFT segment size
-    final int raftSegmentSize = (int) conf.getStorageSize(
+    final long raftSegmentSize = (long) conf.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_DEFAULT,
         StorageUnit.BYTES);
@@ -562,7 +564,7 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties, true);
 
     // Set RAFT segment pre-allocated size
-    final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(
+    final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
@@ -755,7 +757,7 @@ public final class OzoneManagerRatisServer {
     return this.raftPeerId;
   }
 
-  private UUID getRaftGroupIdFromOmServiceId(String omServiceId) {
+  public static UUID getRaftGroupIdFromOmServiceId(String omServiceId) {
     return UUID.nameUUIDFromBytes(omServiceId.getBytes(StandardCharsets.UTF_8));
   }
 

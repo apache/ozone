@@ -55,7 +55,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     addKeyToOpenKeyTable();
 
     String openKey = getOpenKeyName();
-    Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertTrue(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
     String ozoneKey = getOzoneKey();
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
@@ -67,7 +68,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // When key commit key is deleted from openKey table and added to keyTable.
-    Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertFalse(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
   }
 
@@ -97,7 +99,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     // Adding it here.
     addKeyToOpenKeyTable();
 
-    Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertTrue(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
     omKeyCommitResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -107,7 +110,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     // As omResponse is error it is a no-op. So, entry should still be in
     // openKey table.
-    Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertTrue(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
   }
 

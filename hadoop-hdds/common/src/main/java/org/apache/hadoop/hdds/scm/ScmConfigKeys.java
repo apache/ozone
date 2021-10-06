@@ -356,6 +356,11 @@ public final class ScmConfigKeys {
           "ozone.scm.datanode.pipeline.limit";
   public static final int OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT = 2;
 
+  public static final String OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS =
+      "ozone.scm.datanode.disallow.same.peers";
+  public static final boolean OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT =
+      false;
+
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.
   // Only for test purpose now.
@@ -449,11 +454,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
 
-  public static final String HDDS_DATANODE_UPGRADE_LAYOUT_INLINE =
-      "hdds.datanode.upgrade.layout.inline";
-  public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
-      true;
-
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";
   public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
@@ -469,6 +469,90 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_EVENT_CONTAINER_REPORT_THREAD_POOL_SIZE =
       OZONE_SCM_EVENT_PREFIX + "ContainerReport.thread.pool.size";
   public static final int OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT = 10;
+
+  public static final String OZONE_SCM_HA_RATIS_RPC_TYPE =
+          "ozone.scm.ha.ratis.rpc.type";
+  public static final String OZONE_SCM_HA_RATIS_RPC_TYPE_DEFAULT =
+          "GRPC";
+
+  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE =
+          "ozone.scm.ha.ratis.segment.size";
+  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "16KB";
+
+  public static final String OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE =
+          "ozone.scm.ha.ratis.segment.preallocated.size";
+  public static final String
+          OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT = "16KB";
+
+  public static final String OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM =
+      "ozone.scm.ha.ratis.log.appender.queue.num-elements";
+  public static final int
+      OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM_DEFAULT = 1024;
+
+  public static final String OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT =
+          "ozone.scm.ha.ratis.log.appender.queue.byte-limit";
+  public static final String
+          OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT = "32MB";
+
+  public static final String OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL =
+          "ozone.scm.ha.grpc.deadline.interval";
+  public static final long
+          OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL_DEFAULT = 30 * 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT =
+          "ozone.scm.ha.ratis.server.failure.timeout.duration";
+  public static final long
+          OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT_DEFAULT = 120 * 1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL =
+          "ozone.scm.ha.ratis.leader.ready.check.interval";
+  public static final long
+          OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT = 2 * 1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT =
+          "ozone.scm.ha.ratis.leader.ready.wait.timeout";
+  public static final long
+          OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT = 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_RETRY_CACHE_TIMEOUT =
+          "ozone.scm.ha.ratis.server.retry.cache.timeout";
+  public static final long
+          OZONE_SCM_HA_RATIS_RETRY_CACHE_TIMEOUT_DEFAULT = 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_STORAGE_DIR =
+          "ozone.scm.ha.ratis.storage.dir";
+
+  public static final String OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED =
+          "ozone.scm.ha.ratis.log.purge.enabled";
+  public static final boolean OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED_DEFAULT =
+          false;
+
+  public static final String OZONE_SCM_HA_RAFT_LOG_PURGE_GAP =
+          "ozone.scm.ha.ratis.log.purge.gap";
+  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT =1000000;
+
+  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD =
+          "ozone.scm.ha.ratis.snapshot.threshold";
+  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
+          1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
+          "ozone.scm.ha.ratis.snapshot.dir";
+
+  public static final String OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT =
+          "ozone.scm.ha.ratis.leader.election.timeout";
+  public static final long
+          OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT_DEFAULT = 5 * 1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT =
+          "ozone.scm.ha.ratis.request.timeout";
+  public static final long
+          OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT = 30 * 1000L;
+
+  public static final String OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE =
+      "ozone.scm.ha.ratis.server.leaderelection.pre-vote";
+  public static final boolean
+      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
 
   /**
    * Never constructed.

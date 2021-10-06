@@ -19,12 +19,19 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
@@ -36,8 +43,11 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -48,7 +58,6 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -61,18 +70,26 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
  */
 @Path("/namespace")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class NSSummaryEndpoint {
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+      NSSummaryEndpoint.class);
   @Inject
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
+  private ContainerManager containerManager;
+
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
-                           ReconOMMetadataManager omMetadataManager) {
+                           ReconOMMetadataManager omMetadataManager,
+                           OzoneStorageContainerManager reconSCM) {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
+    this.containerManager = reconSCM.getContainerManager();
   }
 
   /**
@@ -84,10 +101,18 @@ public class NSSummaryEndpoint {
   @GET
   @Path("/summary")
   public Response getBasicInfo(
-          @QueryParam("path") String path) throws IOException {
+      @QueryParam("path") String path) throws IOException {
 
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
+    NamespaceSummaryResponse namespaceSummaryResponse = null;
+    if (!isInitializationComplete()) {
+      namespaceSummaryResponse =
+          new NamespaceSummaryResponse(EntityType.UNKNOWN);
+      namespaceSummaryResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(namespaceSummaryResponse).build();
     }
 
     String normalizedPath = normalizePath(path);
@@ -95,7 +120,6 @@ public class NSSummaryEndpoint {
 
     EntityType type = getEntityType(normalizedPath, names);
 
-    NamespaceSummaryResponse namespaceSummaryResponse = null;
     switch (type) {
     case ROOT:
       namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.ROOT);
@@ -104,7 +128,7 @@ public class NSSummaryEndpoint {
       List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
       namespaceSummaryResponse.setNumBucket(allBuckets.size());
       int totalNumDir = 0;
-      int totalNumKey = 0;
+      long totalNumKey = 0L;
       for (OmBucketInfo bucket : allBuckets) {
         long bucketObjectId = bucket.getObjectID();
         totalNumDir += getTotalDirCount(bucketObjectId);
@@ -115,11 +139,11 @@ public class NSSummaryEndpoint {
       break;
     case VOLUME:
       namespaceSummaryResponse =
-              new NamespaceSummaryResponse(EntityType.VOLUME);
+          new NamespaceSummaryResponse(EntityType.VOLUME);
       List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
       namespaceSummaryResponse.setNumBucket(buckets.size());
       int totalDir = 0;
-      int totalKey = 0;
+      long totalKey = 0L;
 
       // iterate all buckets to collect the total object count.
       for (OmBucketInfo bucket : buckets) {
@@ -132,7 +156,7 @@ public class NSSummaryEndpoint {
       break;
     case BUCKET:
       namespaceSummaryResponse =
-              new NamespaceSummaryResponse(EntityType.BUCKET);
+          new NamespaceSummaryResponse(EntityType.BUCKET);
       assert (names.length == 2);
       long bucketObjectId = getBucketObjectId(names);
       namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(bucketObjectId));
@@ -142,7 +166,7 @@ public class NSSummaryEndpoint {
       // path should exist so we don't need any extra verification/null check
       long dirObjectId = getDirObjectId(names);
       namespaceSummaryResponse =
-              new NamespaceSummaryResponse(EntityType.DIRECTORY);
+          new NamespaceSummaryResponse(EntityType.DIRECTORY);
       namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(dirObjectId));
       namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
       break;
@@ -151,7 +175,7 @@ public class NSSummaryEndpoint {
       break;
     case UNKNOWN:
       namespaceSummaryResponse =
-              new NamespaceSummaryResponse(EntityType.UNKNOWN);
+          new NamespaceSummaryResponse(EntityType.UNKNOWN);
       namespaceSummaryResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
       break;
     default:
@@ -163,28 +187,43 @@ public class NSSummaryEndpoint {
   /**
    * DU endpoint to return datasize for subdirectory (bucket for volume).
    * @param path request path
+   * @param listFile show subpath/disk usage for each key
+   * @param withReplica count actual DU with replication
    * @return DU response
    * @throws IOException
    */
   @GET
   @Path("/du")
-  public Response getDiskUsage(@QueryParam("path") String path)
-          throws IOException {
+  @SuppressWarnings("methodlength")
+  public Response getDiskUsage(@QueryParam("path") String path,
+                               @DefaultValue("false")
+                               @QueryParam("files") boolean listFile,
+                               @DefaultValue("false")
+                               @QueryParam("replica") boolean withReplica)
+      throws IOException {
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
+    DUResponse duResponse = new DUResponse();
+    if (!isInitializationComplete()) {
+      duResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(duResponse).build();
     }
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
-    DUResponse duResponse = new DUResponse();
+    duResponse.setPath(normalizedPath);
     switch (type) {
     case ROOT:
       List<OmVolumeArgs> volumes = listVolumes();
       duResponse.setCount(volumes.size());
 
       List<DUResponse.DiskUsage> volumeDuData = new ArrayList<>();
+      long totalDataSize = 0L;
+      long totalDataSizeWithReplica = 0L;
       for (OmVolumeArgs volume: volumes) {
         String volumeName = volume.getVolume();
         String subpath = omMetadataManager.getVolumeKey(volumeName);
@@ -196,9 +235,22 @@ public class NSSummaryEndpoint {
           long bucketObjectID = bucket.getObjectID();
           dataSize += getTotalSize(bucketObjectID);
         }
+        totalDataSize += dataSize;
+
+        // count replicas
+        // TODO: to be dropped or optimized in the future
+        if (withReplica) {
+          long volumeDU = calculateDUForVolume(volumeName);
+          totalDataSizeWithReplica += volumeDU;
+          diskUsage.setSizeWithReplica(volumeDU);
+        }
         diskUsage.setSize(dataSize);
         volumeDuData.add(diskUsage);
       }
+      if (withReplica) {
+        duResponse.setSizeWithReplica(totalDataSizeWithReplica);
+      }
+      duResponse.setSize(totalDataSize);
       duResponse.setDuData(volumeDuData);
       break;
     case VOLUME:
@@ -208,31 +260,51 @@ public class NSSummaryEndpoint {
 
       // List of DiskUsage data for all buckets
       List<DUResponse.DiskUsage> bucketDuData = new ArrayList<>();
-      for (OmBucketInfo bucket : buckets) {
+      long volDataSize = 0L;
+      long volDataSizeWithReplica = 0L;
+      for (OmBucketInfo bucket: buckets) {
         String bucketName = bucket.getBucketName();
         long bucketObjectID = bucket.getObjectID();
         String subpath = omMetadataManager.getBucketKey(volName, bucketName);
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
         diskUsage.setSubpath(subpath);
         long dataSize = getTotalSize(bucketObjectID);
+        volDataSize += dataSize;
+        if (withReplica) {
+          long bucketDU = calculateDUUnderObject(bucketObjectID);
+          diskUsage.setSizeWithReplica(bucketDU);
+          volDataSizeWithReplica += bucketDU;
+        }
         diskUsage.setSize(dataSize);
         bucketDuData.add(diskUsage);
       }
+      if (withReplica) {
+        duResponse.setSizeWithReplica(volDataSizeWithReplica);
+      }
+      duResponse.setSize(volDataSize);
       duResponse.setDuData(bucketDuData);
       break;
     case BUCKET:
       long bucketObjectId = getBucketObjectId(names);
       NSSummary bucketNSSummary =
               reconNamespaceSummaryManager.getNSSummary(bucketObjectId);
+      // empty bucket, because it's not a parent of any directory or key
+      if (bucketNSSummary == null) {
+        if (withReplica) {
+          duResponse.setSizeWithReplica(0L);
+        }
+        break;
+      }
 
       // get object IDs for all its subdirectories
       Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
-      duResponse.setCount(bucketSubdirs.size());
       duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
       List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
+      long bucketDataSize = duResponse.getKeySize();
+      long bucketDataSizeWithReplica = 0L;
       for (long subdirObjectId: bucketSubdirs) {
         NSSummary subdirNSSummary = reconNamespaceSummaryManager
-                .getNSSummary(subdirObjectId);
+            .getNSSummary(subdirObjectId);
 
         // get directory's name and generate the next-level subpath.
         String dirName = subdirNSSummary.getDirName();
@@ -242,24 +314,50 @@ public class NSSummaryEndpoint {
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
         diskUsage.setSubpath(subpath);
         long dataSize = getTotalSize(subdirObjectId);
+        bucketDataSize += dataSize;
+
+        if (withReplica) {
+          long dirDU = calculateDUUnderObject(subdirObjectId);
+          diskUsage.setSizeWithReplica(dirDU);
+          bucketDataSizeWithReplica += dirDU;
+        }
         diskUsage.setSize(dataSize);
         dirDUData.add(diskUsage);
       }
+      // Either listFile or withReplica is enabled, we need the directKeys info
+      if (listFile || withReplica) {
+        bucketDataSizeWithReplica += handleDirectKeys(bucketObjectId,
+            withReplica, listFile, dirDUData, normalizedPath);
+      }
+      if (withReplica) {
+        duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
+      }
+      duResponse.setCount(dirDUData.size());
+      duResponse.setSize(bucketDataSize);
       duResponse.setDuData(dirDUData);
       break;
     case DIRECTORY:
       long dirObjectId = getDirObjectId(names);
       NSSummary dirNSSummary =
               reconNamespaceSummaryManager.getNSSummary(dirObjectId);
+      // Empty directory
+      if (dirNSSummary == null) {
+        if (withReplica) {
+          duResponse.setSizeWithReplica(0L);
+        }
+        break;
+      }
+
       Set<Long> subdirs = dirNSSummary.getChildDir();
 
-      duResponse.setCount(subdirs.size());
       duResponse.setKeySize(dirNSSummary.getSizeOfFiles());
+      long dirDataSize = duResponse.getKeySize();
+      long dirDataSizeWithReplica = 0L;
       List<DUResponse.DiskUsage> subdirDUData = new ArrayList<>();
       // iterate all subdirectories to get disk usage data
       for (long subdirObjectId: subdirs) {
         NSSummary subdirNSSummary =
-                reconNamespaceSummaryManager.getNSSummary(subdirObjectId);
+            reconNamespaceSummaryManager.getNSSummary(subdirObjectId);
         String subdirName = subdirNSSummary.getDirName();
         // build the path for subdirectory
         String subpath = buildSubpath(normalizedPath, subdirName);
@@ -267,26 +365,46 @@ public class NSSummaryEndpoint {
         // reformat the response
         diskUsage.setSubpath(subpath);
         long dataSize = getTotalSize(subdirObjectId);
+        dirDataSize += dataSize;
+
+        if (withReplica) {
+          long subdirDU = calculateDUUnderObject(subdirObjectId);
+          diskUsage.setSizeWithReplica(subdirDU);
+          dirDataSizeWithReplica += subdirDU;
+        }
+
         diskUsage.setSize(dataSize);
         subdirDUData.add(diskUsage);
       }
+
+      // handle direct keys under directory
+      if (listFile || withReplica) {
+        dirDataSizeWithReplica += handleDirectKeys(dirObjectId, withReplica,
+            listFile, subdirDUData, normalizedPath);
+      }
+
+      if (withReplica) {
+        duResponse.setSizeWithReplica(dirDataSizeWithReplica);
+      }
+      duResponse.setCount(subdirDUData.size());
+      duResponse.setSize(dirDataSize);
       duResponse.setDuData(subdirDUData);
       break;
     case KEY:
-      // DU for key is the data size
-      duResponse.setCount(1);
-      DUResponse.DiskUsage keyDU = new DUResponse.DiskUsage();
+      // DU for key doesn't have subpaths
+      duResponse.setCount(0);
       // The object ID for the directory that the key is directly in
       long parentObjectId = getDirObjectId(names, names.length - 1);
       String fileName = names[names.length - 1];
       String ozoneKey =
-              omMetadataManager.getOzonePathKey(parentObjectId, fileName);
+          omMetadataManager.getOzonePathKey(parentObjectId, fileName);
       OmKeyInfo keyInfo =
-              omMetadataManager.getFileTable().getSkipCache(ozoneKey);
-      String subpath = buildSubpath(normalizedPath, null);
-      keyDU.setSubpath(subpath);
-      keyDU.setSize(keyInfo.getDataSize());
-      duResponse.setDuData(Collections.singletonList(keyDU));
+          omMetadataManager.getFileTable().getSkipCache(ozoneKey);
+      duResponse.setSize(keyInfo.getDataSize());
+      if (withReplica) {
+        long keySizeWithReplica = getKeySizeWithReplication(keyInfo);
+        duResponse.setSizeWithReplica(keySizeWithReplica);
+      }
       break;
     case UNKNOWN:
       duResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
@@ -307,17 +425,22 @@ public class NSSummaryEndpoint {
   @GET
   @Path("/quota")
   public Response getQuotaUsage(@QueryParam("path") String path)
-          throws IOException {
+      throws IOException {
 
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
+    QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
+    if (!isInitializationComplete()) {
+      quotaUsageResponse.setResponseCode(ResponseStatus.INITIALIZING);
+      return Response.ok(quotaUsageResponse).build();
     }
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
-    QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     if (type == EntityType.ROOT) {
       List<OmVolumeArgs> volumes = listVolumes();
       List<OmBucketInfo> buckets = listBucketsUnderVolume(null);
@@ -345,7 +468,7 @@ public class NSSummaryEndpoint {
       List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
       String volKey = omMetadataManager.getVolumeKey(names[0]);
       OmVolumeArgs volumeArgs =
-              omMetadataManager.getVolumeTable().getSkipCache(volKey);
+          omMetadataManager.getVolumeTable().getSkipCache(volKey);
       long quotaInBytes = volumeArgs.getQuotaInBytes();
       long quotaUsedInBytes = 0L;
 
@@ -359,7 +482,7 @@ public class NSSummaryEndpoint {
     } else if (type == EntityType.BUCKET) {
       String bucketKey = omMetadataManager.getBucketKey(names[0], names[1]);
       OmBucketInfo bucketInfo = omMetadataManager
-              .getBucketTable().getSkipCache(bucketKey);
+          .getBucketTable().getSkipCache(bucketKey);
       long bucketObjectId = bucketInfo.getObjectID();
       long quotaInBytes = bucketInfo.getQuotaInBytes();
       long quotaUsedInBytes = getTotalSize(bucketObjectId);
@@ -369,7 +492,7 @@ public class NSSummaryEndpoint {
       quotaUsageResponse.setResponseCode(ResponseStatus.PATH_NOT_FOUND);
     } else { // directory and key are not applicable for this request
       quotaUsageResponse.setResponseCode(
-              ResponseStatus.TYPE_NOT_APPLICABLE);
+          ResponseStatus.TYPE_NOT_APPLICABLE);
     }
     return Response.ok(quotaUsageResponse).build();
   }
@@ -383,18 +506,23 @@ public class NSSummaryEndpoint {
   @GET
   @Path("/dist")
   public Response getFileSizeDistribution(@QueryParam("path") String path)
-          throws IOException {
+      throws IOException {
 
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
+    FileSizeDistributionResponse distResponse =
+        new FileSizeDistributionResponse();
+    if (!isInitializationComplete()) {
+      distResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(distResponse).build();
     }
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
     EntityType type = getEntityType(normalizedPath, names);
 
-    FileSizeDistributionResponse distResponse =
-            new FileSizeDistributionResponse();
     switch (type) {
     case ROOT:
       List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
@@ -458,7 +586,7 @@ public class NSSummaryEndpoint {
    */
   @VisibleForTesting
   public EntityType getEntityType(String path, String[] names)
-          throws IOException {
+      throws IOException {
     if (path.equals(OM_KEY_PREFIX)) {
       return EntityType.ROOT;
     }
@@ -484,7 +612,7 @@ public class NSSummaryEndpoint {
       String keyName = getKeyName(names);
       // check if either volume or bucket doesn't exist
       if (!volumeExists(volName)
-              || !bucketExists(volName, bucketName)) {
+          || !bucketExists(volName, bucketName)) {
         return EntityType.UNKNOWN;
       }
       long bucketObjectId = getBucketObjectId(names);
@@ -501,7 +629,7 @@ public class NSSummaryEndpoint {
   private long getBucketObjectId(String[] names) throws IOException {
     String bucketKey = omMetadataManager.getBucketKey(names[0], names[1]);
     OmBucketInfo bucketInfo = omMetadataManager
-            .getBucketTable().getSkipCache(bucketKey);
+        .getBucketTable().getSkipCache(bucketKey);
     return bucketInfo.getObjectID();
   }
 
@@ -530,7 +658,7 @@ public class NSSummaryEndpoint {
     for (int i = 2; i < cutoff; ++i) {
       dirKey = omMetadataManager.getOzonePathKey(dirObjectId, names[i]);
       OmDirectoryInfo dirInfo =
-              omMetadataManager.getDirectoryTable().getSkipCache(dirKey);
+          omMetadataManager.getDirectoryTable().getSkipCache(dirKey);
       dirObjectId = dirInfo.getObjectID();
     }
     return dirObjectId;
@@ -578,7 +706,7 @@ public class NSSummaryEndpoint {
   }
 
   private boolean bucketExists(String volName, String bucketName)
-          throws IOException {
+      throws IOException {
     String bucketDBKey = omMetadataManager.getBucketKey(volName, bucketName);
     // Check if bucket exists
     return omMetadataManager.getBucketTable().getSkipCache(bucketDBKey) != null;
@@ -590,12 +718,12 @@ public class NSSummaryEndpoint {
    * @return count of keys
    * @throws IOException ioEx
    */
-  private int getTotalKeyCount(long objectId) throws IOException {
+  private long getTotalKeyCount(long objectId) throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary == null) {
-      return 0;
+      return 0L;
     }
-    int totalCnt = nsSummary.getNumOfFiles();
+    long totalCnt = nsSummary.getNumOfFiles();
     for (long childId: nsSummary.getChildDir()) {
       totalCnt += getTotalKeyCount(childId);
     }
@@ -670,7 +798,7 @@ public class NSSummaryEndpoint {
     List<OmVolumeArgs> result = new ArrayList<>();
     Table volumeTable = omMetadataManager.getVolumeTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-            iterator = volumeTable.iterator();
+        iterator = volumeTable.iterator();
 
     while (iterator.hasNext()) {
       Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
@@ -691,7 +819,7 @@ public class NSSummaryEndpoint {
    * @throws IOException IOE
    */
   private List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
-          throws IOException {
+      throws IOException {
     List<OmBucketInfo> result = new ArrayList<>();
     // if volume name is null, seek prefix is an empty string
     String seekPrefix = "";
@@ -699,7 +827,7 @@ public class NSSummaryEndpoint {
     Table bucketTable = omMetadataManager.getBucketTable();
 
     TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-            iterator = bucketTable.iterator();
+        iterator = bucketTable.iterator();
 
     if (volumeName != null) {
       if (!volumeExists(volumeName)) {
@@ -724,6 +852,144 @@ public class NSSummaryEndpoint {
     return result;
   }
 
+  private long calculateDUForVolume(String volumeName)
+      throws IOException {
+    long result = 0L;
+
+    Table keyTable = omMetadataManager.getFileTable();
+
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator();
+
+    while (iterator.hasNext()) {
+      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+      OmKeyInfo keyInfo = kv.getValue();
+
+      if (keyInfo != null) {
+        if (volumeName.equals(keyInfo.getVolumeName())) {
+          result += getKeySizeWithReplication(keyInfo);
+        }
+      }
+    }
+    return result;
+  }
+
+  // FileTable's key is in the format of "parentId/fileName"
+  // Make use of RocksDB's order to seek to the prefix and avoid full iteration
+  private long calculateDUUnderObject(long parentId) throws IOException {
+    Table keyTable = omMetadataManager.getFileTable();
+
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator();
+
+    String seekPrefix = parentId + OM_KEY_PREFIX;
+    iterator.seek(seekPrefix);
+    long totalDU = 0L;
+    // handle direct keys
+    while (iterator.hasNext()) {
+      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+      String dbKey = kv.getKey();
+      // since the RocksDB is ordered, seek until the prefix isn't matched
+      if (!dbKey.startsWith(seekPrefix)) {
+        break;
+      }
+      OmKeyInfo keyInfo = kv.getValue();
+      if (keyInfo != null) {
+        totalDU += getKeySizeWithReplication(keyInfo);
+      }
+    }
+
+    // handle nested keys (DFS)
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+    // empty bucket
+    if (nsSummary == null) {
+      return 0;
+    }
+
+    Set<Long> subDirIds = nsSummary.getChildDir();
+    for (long subDirId: subDirIds) {
+      totalDU += calculateDUUnderObject(subDirId);
+    }
+    return totalDU;
+  }
+
+  /**
+   * This method handles disk usage of direct keys.
+   * @param parentId parent directory/bucket
+   * @param withReplica if withReplica is enabled, set sizeWithReplica
+   * for each direct key's DU
+   * @param listFile if listFile is enabled, append key DU as a subpath
+   * @param duData the current DU data
+   * @param normalizedPath the normalized path request
+   * @return the total DU of all direct keys
+   * @throws IOException IOE
+   */
+  private long handleDirectKeys(long parentId, boolean withReplica,
+                                boolean listFile,
+                                List<DUResponse.DiskUsage> duData,
+                                String normalizedPath) throws IOException {
+
+    Table keyTable = omMetadataManager.getFileTable();
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator();
+
+    String seekPrefix = parentId + OM_KEY_PREFIX;
+    iterator.seek(seekPrefix);
+
+    long keyDataSizeWithReplica = 0L;
+
+    while (iterator.hasNext()) {
+      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+      String dbKey = kv.getKey();
+
+      if (!dbKey.startsWith(seekPrefix)) {
+        break;
+      }
+      OmKeyInfo keyInfo = kv.getValue();
+      if (keyInfo != null) {
+        DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+        String subpath = buildSubpath(normalizedPath,
+            keyInfo.getFileName());
+        diskUsage.setSubpath(subpath);
+        diskUsage.setKey(true);
+        diskUsage.setSize(keyInfo.getDataSize());
+
+        if (withReplica) {
+          long keyDU = getKeySizeWithReplication(keyInfo);
+          keyDataSizeWithReplica += keyDU;
+          diskUsage.setSizeWithReplica(keyDU);
+        }
+        // list the key as a subpath
+        if (listFile) {
+          duData.add(diskUsage);
+        }
+      }
+    }
+
+    return keyDataSizeWithReplica;
+  }
+
+  private long getKeySizeWithReplication(OmKeyInfo keyInfo) {
+    OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
+    List<OmKeyLocationInfo> keyLocations =
+        locationGroup.getBlocksLatestVersionOnly();
+    long du = 0L;
+    // a key could be too large to fit in one single container
+    for (OmKeyLocationInfo location: keyLocations) {
+      BlockID block = location.getBlockID();
+      ContainerID containerId = new ContainerID(block.getContainerID());
+      try {
+        int replicationFactor =
+            containerManager.getContainerReplicas(containerId).size();
+        long blockSize = location.getLength() * replicationFactor;
+        du += blockSize;
+      } catch (ContainerNotFoundException cnfe) {
+        LOG.warn("Cannot find container {}", block.getContainerID(), cnfe);
+      }
+    }
+    return du;
+  }
+
   /**
    * Helper function to check if a path is a directory, key, or invalid.
    * @param keyName key name
@@ -731,7 +997,7 @@ public class NSSummaryEndpoint {
    * @throws IOException
    */
   private EntityType determineKeyPath(String keyName, long bucketObjectId)
-          throws IOException {
+      throws IOException {
 
     java.nio.file.Path keyPath = Paths.get(keyName);
     Iterator<java.nio.file.Path> elements = keyPath.iterator();
@@ -747,16 +1013,16 @@ public class NSSummaryEndpoint {
       // 2. If there is no dir exists for the leaf node component 'file1.txt'
       // then do look it on fileTable.
       String dbNodeName = omMetadataManager.getOzonePathKey(
-              lastKnownParentId, fileName);
+          lastKnownParentId, fileName);
       omDirInfo = omMetadataManager.getDirectoryTable()
-              .getSkipCache(dbNodeName);
+          .getSkipCache(dbNodeName);
 
       if (omDirInfo != null) {
         lastKnownParentId = omDirInfo.getObjectID();
       } else if (!elements.hasNext()) {
         // reached last path component. Check file exists for the given path.
         OmKeyInfo omKeyInfo = omMetadataManager.getFileTable()
-                .getSkipCache(dbNodeName);
+            .getSkipCache(dbNodeName);
         // The path exists as a file
         if (omKeyInfo != null) {
           omKeyInfo.setKeyName(keyName);
@@ -773,6 +1039,20 @@ public class NSSummaryEndpoint {
       return EntityType.DIRECTORY;
     }
     return EntityType.UNKNOWN;
+  }
+
+  /**
+   * Return if all OMDB tables that will be used are initialized.
+   * @return
+   */
+  private boolean isInitializationComplete() {
+    if (omMetadataManager == null) {
+      return false;
+    }
+    return omMetadataManager.getVolumeTable() != null
+        && omMetadataManager.getBucketTable() != null
+        && omMetadataManager.getDirectoryTable() != null
+        && omMetadataManager.getFileTable() != null;
   }
 
   private static String normalizePath(String path) {

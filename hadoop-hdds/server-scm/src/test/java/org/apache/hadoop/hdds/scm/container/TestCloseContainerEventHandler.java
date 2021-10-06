@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -63,8 +63,8 @@ public class TestCloseContainerEventHandler {
 
   private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
-  private static PipelineManagerV2Impl pipelineManager;
-  private static ContainerManagerV2 containerManager;
+  private static PipelineManagerImpl pipelineManager;
+  private static ContainerManager containerManager;
   private static long size;
   private static File testDir;
   private static EventQueue eventQueue;
@@ -94,7 +94,7 @@ public class TestCloseContainerEventHandler {
     SCMServiceManager serviceManager = new SCMServiceManager();
 
     pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+        PipelineManagerImpl.newPipelineManager(
             configuration,
             scmhaManager,
             nodeManager,

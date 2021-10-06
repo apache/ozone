@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
@@ -194,7 +195,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // attribute in response object.
       int clientVersion = getOmRequest().getVersion();
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-              .setKeyInfo(omFileInfo.getProtobuf(keyName, clientVersion))
+              .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
+                  keyArgs.getLatestVersionLocation()))
               .setID(clientID)
               .setOpenVersion(openVersion).build())
               .setCmdType(Type.CreateKey);
@@ -228,5 +230,10 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             numKeysCreated);
 
     return omClientResponse;
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

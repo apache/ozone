@@ -150,7 +150,7 @@ public class TestOMRatisSnapshots {
     TermIndex leaderOMTermIndex =
         TermIndex.valueOf(transactionInfo.getTerm(),
             transactionInfo.getTransactionIndex());
-    long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
     DBCheckpoint leaderDbCheckpoint =
@@ -160,10 +160,17 @@ public class TestOMRatisSnapshots {
     cluster.startInactiveOM(followerNodeId);
 
     // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+          >= leaderOMSnapshotIndex - 1;
+    }, 100, 3000);
+    
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     assertTrue(
-        followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
+        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);    
 
     // Install leader OM's db checkpoint on the lagging OM.
     followerOM.installCheckpoint(leaderOMNodeId, leaderDbCheckpoint);
@@ -173,7 +180,7 @@ public class TestOMRatisSnapshots {
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnaphsotIndex);
+    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
     assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
         .getTerm() >= leaderOMSnapshotTermIndex);
 

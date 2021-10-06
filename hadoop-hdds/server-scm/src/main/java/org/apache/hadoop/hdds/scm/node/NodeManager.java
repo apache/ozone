@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collection;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -150,6 +151,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return List of DatanodeUsageInfo
    */
   List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed);
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
 
   /**
    * Return the node stat of the specified datanode.
@@ -306,6 +315,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   int pipelineLimit(DatanodeDetails dn);
 
   int minPipelineLimit(List<DatanodeDetails> dn);
+
+  /**
+   * Gets the peers in all the pipelines for the particular datnode.
+   * @param dn datanode
+   */
+  default Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
+    return null;
+  }
 
   default HDDSLayoutVersionManager getLayoutVersionManager(){
     return null;
