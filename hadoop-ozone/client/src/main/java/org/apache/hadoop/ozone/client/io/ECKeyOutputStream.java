@@ -199,6 +199,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
     int remLen = len - currentWriterChunkLenToWrite;
     int iters = remLen / ecChunkSize;
     int lastCellSize = remLen % ecChunkSize;
+    off += currentWriterChunkLenToWrite;
+
     while (iters > 0) {
       pos = handleDataWrite(blockOutputStreamEntryPool.getCurrIdx(), b, off,
           ecChunkSize, true);
