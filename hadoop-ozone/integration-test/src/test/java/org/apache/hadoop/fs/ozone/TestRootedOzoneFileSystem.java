@@ -1557,7 +1557,7 @@ public class TestRootedOzoneFileSystem {
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(3, 2)));
+            new ECReplicationConfig("RS-3-2-1024")));
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
