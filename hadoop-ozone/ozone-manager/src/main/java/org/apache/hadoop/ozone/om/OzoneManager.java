@@ -141,6 +141,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -3139,6 +3140,30 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMAction.TENANT_GET_USER_INFO, auditMap));
 
     return new TenantUserInfoValue(userPrincipal, accessIdInfoList);
+  }
+
+  @Override
+  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+      throws IOException {
+
+    if (StringUtils.isEmpty(tenantName)) {
+      return null;
+    }
+
+    final Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.USER_PREFIX, prefix);
+    try {
+      final TenantUserList userList =
+          multiTenantManagr.listUsersInTenant(tenantName, prefix);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          OMAction.TENANT_LIST_USER, auditMap));
+      return userList;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          OMAction.TENANT_LIST_USER, auditMap, ex));
+      throw ex;
+    }
   }
 
   @Override

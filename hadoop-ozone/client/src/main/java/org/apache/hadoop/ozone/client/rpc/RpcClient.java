@@ -105,6 +105,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
@@ -678,6 +679,12 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(Strings.isNotBlank(userPrincipal),
         "userPrincipal can't be null or empty.");
     return ozoneManagerClient.tenantGetUserInfo(userPrincipal);
+  }
+
+  @Override
+  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+      throws IOException {
+    return ozoneManagerClient.listUsersInTenant(tenantName, prefix);
   }
 
   @Override

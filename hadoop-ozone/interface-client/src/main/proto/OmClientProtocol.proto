@@ -111,6 +111,7 @@ enum Type {
   AssignUserToTenant = 99;
   RevokeUserAccessToTenant = 100;
   GetS3Volume = 101;
+  TenantListUser = 102;
 }
 
 message OMRequest {
@@ -202,6 +203,7 @@ message OMRequest {
   optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 99;
   optional RevokeUserAccessToTenantRequest  RevokeUserAccessToTenantRequest = 100;
   optional GetS3VolumeRequest               getS3VolumeRequest             = 101;
+  optional TenantListUserRequest         TenantListUserRequest             = 102;
 }
 
 message OMResponse {
@@ -288,6 +290,7 @@ message OMResponse {
   optional AssignUserToTenantResponse        AssignUserToTenantResponse    = 99;
   optional RevokeUserAccessToTenantResponse  RevokeUserAccessToTenantResponse = 100;
   optional GetS3VolumeResponse               getS3VolumeResponse           = 101;
+  optional TenantListUserResponse         TenantListUserResponse           = 102;
 }
 
 enum Status {
@@ -1367,6 +1370,16 @@ message TenantUserInfo {
   repeated TenantAccessIdInfo accessIdInfo = 2;
 }
 
+message TenantUserList {
+    optional string tenantName = 1;
+    repeated TenantUserAccessId userAccessIdInfo = 2;
+}
+
+message TenantUserAccessId {
+    optional string user = 1;
+    optional string accessId = 2;
+}
+
 message TenantAccessIdInfo {
   optional string accessId = 1;
   optional string tenantName = 2;
@@ -1376,9 +1389,19 @@ message TenantGetUserInfoRequest {
   optional string userPrincipal = 1;
 }
 
+message TenantListUserRequest {
+    optional string tenantName = 1;
+    optional string prefix = 2;
+}
+
 message TenantGetUserInfoResponse {
   optional bool success = 1;
   optional TenantUserInfo tenantUserInfo = 2;
+}
+
+message TenantListUserResponse {
+    optional bool success = 1;
+    optional TenantUserList tenantUserList = 2;
 }
 
 message LayoutVersion {

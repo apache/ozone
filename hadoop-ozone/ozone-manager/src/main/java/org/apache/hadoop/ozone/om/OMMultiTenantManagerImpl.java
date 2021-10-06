@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.COMPLETED;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.FAILED;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.NOT_STARTED;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.RUNNING;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TENANT_ACCESSID;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
@@ -34,16 +40,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
+import org.apache.hadoop.ozone.om.multitenant.CachedTenantInfo;
 import org.apache.hadoop.ozone.om.multitenant.CephCompatibleTenantImpl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
@@ -53,10 +64,10 @@ import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantAdminGroupPrincipal;
 import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantUserGroupPrincipal;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,91 +85,35 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   // Internal dev flag to skip Ranger communication.
   public static final String OZONE_OM_TENANT_DEV_SKIP_RANGER =
       "ozone.om.tenant.dev.skip.ranger";
-  private final boolean devSkipRanger;
 
   private MultiTenantAccessAuthorizer authorizer;
   private final OMMetadataManager omMetadataManager;
   private final OzoneConfiguration conf;
   private final ReentrantReadWriteLock controlPathLock;
+  private final Map<String, CachedTenantInfo> tenantCache;
+  private final TenantUserListLoader tenantUserListLoader;
 
-  // The following Mappings maintain all of the multi-tenancy states.
-  // These mappings needs to have their persistent counterpart in OM tables.
-  // Long term, we can bring those tables here as part of multi-tenant-Manager
-  // and not mixing up things with the rest of the OM. And thus giving this
-  // module a clean separation from the rest of the OM.
-
-  // key : tenantName, value : TenantInfo
-  private final Map<String, Tenant> inMemoryTenantNameToTenantInfoMap;
-
-  // This Mapping maintains all policies for all tenants
-  //   key = tenantName
-  //   value = list of all PolicyNames for this tenant in authorizor-plugin
-  // Typical Usage : find out all the bucket/user policies for a tenant.
-  private final Map<String, List<String>> inMemoryTenantToPolicyNameListMap;
-
-  // This Mapping maintains all groups for all tenants
-  //   key = tenantName
-  //   value = list of all GroupNames that belong to this tenant
-  // There are at least two default groups created for every tenant.
-  //    Tenant_XYZ$GroupTenantAllUsers
-  //    Tenant_XYZ$GroupTenantAdmins
-  // There are also predefined global groups like (TODO)
-  //    - AllAuthenticateUsers (TODO)
-  //    - AllUsers (TODO)
-  // Typical usage : Put together all the users that have access to some
-  // resource in the same group. E.g.
-  //      1) users in Tenant_XYZ$GroupTenantAllUsers would be able to
-  //      access the volume created for Tenant_XYZ.
-  //      2) If user creates an access policy for a bucket, all the users
-  //      that would have same access to the bucket can go in the same group.
-  private final Map<String, List<String>> inMemoryTenantToTenantGroups;
-
-  // Mapping for user-access-id to TenantName
-  // Typical usage: given a user-access-id find out which tenant
-  private final Map<String, String> inMemoryAccessIDToTenantNameMap;
-
-  // Mapping from user-access-id to all the groups that they belong to.
-  // Typical usage: Adding a user or modify user, provide a list of groups
-  //          that they would belong to. Note that groupIDs are opaque to OM.
-  //          This may make sense just to the authorizer-plugin.
-  private final Map<String, List<String>> inMemoryAccessIDToListOfGroupsMap;
-
-  // Used for testing (where there's no ranger instance) to inject a mock
-  // authorizer. Use the normal Ranger plugin by default.
-  private static Supplier<MultiTenantAccessAuthorizer> authorizerSupplier =
-      MultiTenantAccessAuthorizerRangerPlugin::new;
-
-
-  OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
-      throws IOException {
+  OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf) {
     this.conf = conf;
-    inMemoryTenantNameToTenantInfoMap = new ConcurrentHashMap<>();
-    inMemoryTenantToPolicyNameListMap = new ConcurrentHashMap<>();
-    inMemoryTenantToTenantGroups = new ConcurrentHashMap<>();
-    inMemoryAccessIDToTenantNameMap = new ConcurrentHashMap<>();
-    inMemoryAccessIDToListOfGroupsMap = new ConcurrentHashMap<>();
-
     controlPathLock = new ReentrantReadWriteLock();
     omMetadataManager = mgr;
-
-    devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
-    start(conf);
-  }
-
-  @VisibleForTesting
-  public static void setAuthorizerSupplier(
-      Supplier<MultiTenantAccessAuthorizer> authSupplier) {
-    authorizerSupplier = authSupplier;
+    tenantCache = new ConcurrentHashMap<>();
+    tenantUserListLoader = new TenantUserListLoader(omMetadataManager,
+        tenantCache);
   }
 
   @Override
   public void start(OzoneConfiguration configuration) throws IOException {
+    boolean devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER,
+        false);
     if (devSkipRanger) {
       authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
     } else {
       authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
     }
     authorizer.init(configuration);
+    Thread t = new Thread(tenantUserListLoader);
+    t.start();
   }
 
   @Override
@@ -171,6 +126,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return omMetadataManager;
   }
 
+  // TODO: Cleanup up this Java doc.
   /**
    *  Algorithm
    *  OM State :
@@ -204,18 +160,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * @throws IOException
    */
   @Override
-  public Tenant createTenant(String tenantID) throws IOException {
+  public Tenant createTenantAccessInAuthorizer(String tenantID)
+      throws IOException {
 
     Tenant tenant = new CephCompatibleTenantImpl(tenantID);
     try {
       controlPathLock.writeLock().lock();
-      inMemoryTenantNameToTenantInfoMap.put(tenantID, tenant);
-
-      // TODO : for now just create state in the Ranger. OM state is already
-      //  created in ValidateAndUpdateCache for the ratis transaction.
-
-      // TODO : Make it an idempotent operation. If any ranger state creation
-      //  fails because it already exists, Ignore it.
 
       OzoneTenantUserGroupPrincipal allTenantUsers =
           new OzoneTenantUserGroupPrincipal(tenantID);
@@ -226,11 +176,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
           new OzoneTenantAdminGroupPrincipal(tenantID);
       String allTenantAdminsGroupID = authorizer.createGroup(allTenantAdmins);
       tenant.addTenantAccessGroup(allTenantAdminsGroupID);
-
-      List<String> allTenantGroups = new ArrayList<>();
-      allTenantGroups.add(allTenantUsers.toString());
-      allTenantGroups.add(allTenantAdmins.toString());
-      inMemoryTenantToTenantGroups.put(tenantID, allTenantGroups);
 
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
       for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
@@ -250,35 +195,17 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
       }
 
-      inMemoryTenantToPolicyNameListMap.put(tenantID,
-          tenant.getTenantAccessPolicies().stream().map(e->e.getPolicyName())
-              .collect(Collectors.toList()));
     } catch (Exception e) {
       try {
-        destroyTenant(tenant);
+        removeTenantAccessFromAuthorizer(tenant);
       } catch (Exception exception) {
         // Best effort cleanup.
       }
-      controlPathLock.writeLock().unlock();
       throw new IOException(e.getMessage());
+    } finally {
+      controlPathLock.writeLock().unlock();
     }
-    controlPathLock.writeLock().unlock();
     return tenant;
-  }
-
-  @Override
-  public Tenant getTenantInfo(String tenantID) throws IOException {
-    // TODO：Should read from DB. Ditch the in-memory maps.
-    if (!inMemoryTenantNameToTenantInfoMap.containsKey(tenantID)) {
-      return null;
-    }
-    for (Map.Entry<String, Tenant> entry :
-        inMemoryTenantNameToTenantInfoMap.entrySet()) {
-      if (entry.getKey().equals(tenantID)) {
-        return entry.getValue();
-      }
-    }
-    throw new IOException("All Tenants Map is corrupt");
   }
 
   @Override
@@ -287,9 +214,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void destroyTenant(Tenant tenant) throws Exception {
-    // TODO: Make sure this is idempotent. This can be called by ALL 3 OMs
-    //  in the case of a createTenant checkAcl failure for instance.
+  public void removeTenantAccessFromAuthorizer(Tenant tenant) throws Exception {
     try {
       controlPathLock.writeLock().lock();
       for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
@@ -298,29 +223,17 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       for (String groupID : tenant.getTenantGroups()) {
         authorizer.deleteGroup(groupID);
       }
-
-      inMemoryTenantNameToTenantInfoMap.remove(tenant.getTenantId());
-      inMemoryTenantToPolicyNameListMap.remove(tenant.getTenantId());
-      inMemoryTenantToTenantGroups.remove(tenant.getTenantId());
-    } catch (Exception e) {
+    }  finally {
       controlPathLock.writeLock().unlock();
-      throw e;
     }
-    controlPathLock.writeLock().unlock();
   }
 
   /**
    *  Algorithm
-   *  OM State :
-   *    - Validation (Part of Ratis Request)
-   *    - create user in OMDB {Part of RATIS request}
-   *    - Persistence to OM DB {Part of RATIS request}
    *  Authorizer-plugin(Ranger) State :
    *    - create User in Ranger DB
    *    - For every user created
    *        Add them to # GroupTenantAllUsers
-   *  Finally :
-   *    - Update all Maps maintained by Multi-Tenant-Manager
    *  In case of failure :
    *    - Undo all Ranger State
    *    - remove updates to the Map
@@ -335,39 +248,26 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * @return Tenant, or null on error
    */
   @Override
-  public String assignUserToTenant(BasicUserPrincipal principal,
-      String tenantName, String accessID) {
+  public void assignUserToTenant(String tenantName, String user,
+                                 String accessID) throws OMException {
     try {
       controlPathLock.writeLock().lock();
-      Tenant tenant = getTenantInfo(tenantName);
-      if (tenant == null) {
-        LOG.error("Cannot assign user to tenant {} that doesn't exist",
-            tenantName);
-        return null;
-      }
-      final OzoneTenantGroupPrincipal groupTenantAllUsers =
-          new OzoneTenantUserGroupPrincipal(tenantName);
-      String idGroupTenantAllUsers = authorizer.getGroupId(groupTenantAllUsers);
-      List<String> userGroupIDs = new ArrayList<>();
-      userGroupIDs.add(idGroupTenantAllUsers);
-
-      String userID = authorizer.createUser(principal, userGroupIDs);
-
-      inMemoryAccessIDToTenantNameMap.put(accessID, tenantName);
-      inMemoryAccessIDToListOfGroupsMap.put(accessID, userGroupIDs);
-
-      return userID;
+      //TODO : Add user to group in Authorizer.
+      CachedTenantInfo cachedTenantInfo =
+          tenantCache.getOrDefault(tenantName,
+              new CachedTenantInfo(tenantName));
+      cachedTenantInfo.getTenantUsers().add(new ImmutablePair<>(user,
+          accessID));
+      LOG.info("Adding user '{}' to tenant '{}' in-memory state.");
     } catch (Exception e) {
-      destroyUser(accessID);
-      LOG.error(e.getMessage());
-      return null;
+      throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
     } finally {
       controlPathLock.writeLock().unlock();
     }
   }
 
   @Override
-  public void destroyUser(String accessID) {
+  public void destroyUser(String user, String accessID) {
     try {
       controlPathLock.writeLock().lock();
       String tenantName = getTenantForAccessID(accessID);
@@ -375,12 +275,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         LOG.error("Tenant doesn't exist");
         return;
       }
-      // TODO: Determine how to replace this code.
-//      final String userID = authorizer.getUserId(userPrincipal);
-//      authorizer.deleteUser(userID);
-
-      inMemoryAccessIDToTenantNameMap.remove(accessID);
-      inMemoryAccessIDToListOfGroupsMap.remove(accessID);
+      tenantCache.get(tenantName).getTenantUsers()
+          .remove(new ImmutablePair<>(user, accessID));
     } catch (Exception e) {
       LOG.error(e.getMessage());
     } finally {
@@ -429,14 +325,39 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public List<String> listAllAccessIDs(String tenantID)
+  public TenantUserList listUsersInTenant(String tenantID, String prefix)
       throws IOException {
-    return null;
+    if (!tenantUserListLoader.isDone()) {
+      throw new IOException("Loading user list from DB not done, state = " +
+          tenantUserListLoader.state());
+    }
+
+    if (!omMetadataManager.getTenantStateTable().isExist(tenantID)) {
+      throw new IOException("Tenant '" + tenantID + "' not found!");
+    }
+
+    List<TenantUserAccessId> userAccessIds = new ArrayList<>();
+    CachedTenantInfo cachedTenantInfo = tenantCache.get(tenantID);
+    cachedTenantInfo.getTenantUsers().stream()
+        .filter(
+            k -> StringUtils.isEmpty(prefix) || k.getKey().startsWith(prefix))
+        .forEach(
+            k -> userAccessIds.add(
+                TenantUserAccessId.newBuilder()
+                    .setUser(k.getKey())
+                    .setAccessId(k.getValue())
+                    .build()));
+    return new TenantUserList(tenantID, userAccessIds);
   }
 
   @Override
-  public String getTenantForAccessID(String accessID) {
-    return inMemoryAccessIDToTenantNameMap.getOrDefault(accessID, null);
+  public String getTenantForAccessID(String accessID) throws IOException {
+    OmDBAccessIdInfo omDBAccessIdInfo =
+        omMetadataManager.getTenantAccessIdTable().get(accessID);
+    if (omDBAccessIdInfo == null) {
+      throw new OMException(INVALID_TENANT_ACCESSID);
+    }
+    return omDBAccessIdInfo.getTenantId();
   }
 
   @Override
@@ -572,5 +493,68 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   public OzoneConfiguration getConf() {
     return conf;
+  }
+
+  static class TenantUserListLoader implements Runnable {
+
+    enum UserListLoadState {
+      NOT_STARTED,
+      RUNNING,
+      COMPLETED,
+      FAILED
+    }
+
+    private OMMetadataManager omMetadataManager;
+    private Map<String, CachedTenantInfo> tenantCacheMap;
+    private UserListLoadState loadState;
+
+    TenantUserListLoader(OMMetadataManager omMetadataManager,
+                         Map<String, CachedTenantInfo> tenantCache) {
+      this.omMetadataManager = omMetadataManager;
+      this.tenantCacheMap = tenantCache; // Same reference
+      this.loadState = NOT_STARTED;
+    }
+
+    @Override
+    public void run() {
+      Table<String, OmDBAccessIdInfo> tenantAccessIdTable =
+          omMetadataManager.getTenantAccessIdTable();
+      TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
+          iterator = tenantAccessIdTable.iterator();
+      int userCount = 0;
+      this.loadState = RUNNING;
+
+      try {
+        while (iterator.hasNext()) {
+
+          KeyValue<String, OmDBAccessIdInfo> next = iterator.next();
+          String accessId = next.getKey();
+          OmDBAccessIdInfo value = next.getValue();
+          String tenantId = value.getTenantId();
+          String user = value.getKerberosPrincipal();
+
+          CachedTenantInfo cachedTenantInfo =
+              tenantCacheMap.getOrDefault(tenantId,
+              new CachedTenantInfo(tenantId));
+          cachedTenantInfo.getTenantUsers().add(new ImmutablePair<>(user,
+                  accessId));
+          userCount++;
+        }
+        LOG.info("Loaded {} tenants and {} tenant-users from the database.",
+            tenantCacheMap.size(), userCount);
+        loadState = COMPLETED;
+      } catch (Exception ex) {
+       LOG.error("Error while loading user list. ", ex);
+       loadState = FAILED;
+      }
+    }
+
+    UserListLoadState state() {
+      return loadState;
+    }
+
+    boolean isDone() {
+      return loadState == COMPLETED;
+    }
   }
 }

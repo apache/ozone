@@ -79,7 +79,8 @@ public enum OMAction implements AuditAction {
 
   TENANT_GET_USER_INFO,
   ASSIGN_USER_TO_TENANT,
-  REVOKE_USER_ACCESS_TO_TENANT;
+  REVOKE_USER_ACCESS_TO_TENANT,
+  TENANT_LIST_USER;
 
   @Override
   public String getAction() {

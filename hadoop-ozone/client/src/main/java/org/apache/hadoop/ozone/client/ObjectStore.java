@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -208,6 +209,11 @@ public class ObjectStore {
   public S3SecretValue assignUserToTenant(
       String username, String tenantName, String accessId) throws IOException {
     return proxy.assignUserToTenant(username, tenantName, accessId);
+  }
+
+  public TenantUserList listUsersInTenant(String tenantName, String userPrefix)
+      throws IOException {
+    return proxy.listUsersInTenant(tenantName, userPrefix);
   }
 
   /**

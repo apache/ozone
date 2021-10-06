@@ -102,6 +102,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   public static final Logger LOG =
       LoggerFactory.getLogger(OMTenantCreateRequest.class);
 
+  private transient Tenant tenantInContext;
+
   public OMTenantCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -156,11 +158,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
-    final Tenant tenant =
-        ozoneManager.getMultiTenantManager().createTenant(tenantName);
+    tenantInContext = ozoneManager.getMultiTenantManager()
+        .createTenantAccessInAuthorizer(tenantName);
 
     // Get the tenant default policy, pass this along
-    final String tenantDefaultPolicies = tenant.getTenantAccessPolicies()
+    final String tenantDefaultPolicies = tenantInContext
+        .getTenantAccessPolicies()
         .stream().map(AccessPolicy::getPolicyID)
         .collect(Collectors.joining(","));
 
@@ -184,14 +187,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
   @Override
   public void handleRequestFailure(OzoneManager ozoneManager) {
-    CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
-
     try {
-      final Tenant tenant = ozoneManager.getMultiTenantManager()
-          .getTenantInfo(request.getTenantName());
       // Cleanup any state maintained by OMMultiTenantManager
-      if (tenant != null) {
-        ozoneManager.getMultiTenantManager().destroyTenant(tenant);
+      if (tenantInContext != null) {
+        ozoneManager.getMultiTenantManager()
+            .removeTenantAccessFromAuthorizer(tenantInContext);
       }
     } catch (Exception e) {
       // TODO: Ignore for now. Multi-Tenant Manager is responsible for
