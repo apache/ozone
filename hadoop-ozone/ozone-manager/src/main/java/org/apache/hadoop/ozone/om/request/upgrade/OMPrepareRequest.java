@@ -250,11 +250,12 @@ public class OMPrepareRequest extends OMClientRequest {
           "than prepare index %d. Some required logs may not have" +
             " been removed.", actualPurgeIndex, prepareIndex));
       }
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (ExecutionException e) {
       // Ozone manager error handler does not respect exception chaining and
       // only displays the message of the top level exception.
-      Thread.currentThread().interrupt();
       throw new IOException("Unable to purge logs: " + e.getMessage());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 }
