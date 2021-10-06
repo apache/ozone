@@ -316,7 +316,7 @@ public class ContainerBalancer {
       }
     }
     metrics.setDataSizeToBalanceGB(
-        Math.max(overUtilizedBytes, underUtilizedBytes));
+        Math.max(overUtilizedBytes, underUtilizedBytes) / OzoneConsts.GB);
     Collections.reverse(underUtilizedNodes);
 
     unBalancedNodes = new ArrayList<>(
