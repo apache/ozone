@@ -503,12 +503,15 @@ public final class TestOMRequestUtils {
           String bucketName, String volumeName, boolean isVersionEnabled,
           OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
     OzoneManagerProtocolProtos.BucketInfo bucketInfo =
-            OzoneManagerProtocolProtos.BucketInfo.newBuilder()
-                    .setBucketName(bucketName)
-                    .setVolumeName(volumeName)
-                    .setIsVersionEnabled(isVersionEnabled)
-                    .setStorageType(storageTypeProto)
-                    .addAllMetadata(getMetadataListFSO()).build();
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setBucketName(bucketName)
+            .setVolumeName(volumeName)
+            .setIsVersionEnabled(isVersionEnabled)
+            .setStorageType(storageTypeProto)
+            .addAllMetadata(getMetadataListFSO()).setBucketLayout(
+                OzoneManagerProtocolProtos.BucketLayoutProto.
+                    FILE_SYSTEM_OPTIMIZED)
+            .build();
     OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
             OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
     req.setBucketInfo(bucketInfo);

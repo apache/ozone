@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -61,8 +62,8 @@ public enum BucketLayout {
   }
 
   public static BucketLayout fromString(String value) {
-    // Todo: need to discuss about throwing a validation error
+    // Todo: should we throw error if user configured unsupported value
     //  during OM startup or bucket creation time.
-    return BucketLayout.valueOf(value);
+    return StringUtils.isBlank(value) ? LEGACY : BucketLayout.valueOf(value);
   }
 }
