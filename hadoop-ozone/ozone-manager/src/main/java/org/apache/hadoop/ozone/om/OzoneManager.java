@@ -107,7 +107,6 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -3146,10 +3145,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String tenantName = multiTenantManagr.getTenantForAccessID(accessID);
 
     if (tenantName == null) {
-    // If the user is not associated with a tenant, they will use the
-    // default s3 volume.
-    String defaultS3volume =
-        HddsClientUtils.getDefaultS3VolumeName(configuration);
+      // If the user is not associated with a tenant, they will use the
+      // default s3 volume.
+      String defaultS3volume =
+          HddsClientUtils.getDefaultS3VolumeName(configuration);
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
@@ -3160,9 +3159,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       Tenant tenant = multiTenantManagr.getTenantInfo(tenantName);
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
-      List<OzoneObj> nameSpaceObjs = bucketNameSpace.getBucketNameSpaceObjects();
-      Preconditions.checkArgument(nameSpaceObjs.size() == 1, "Each S3 tenant " +
-          "currently only supports a single volume in its bucket namespace.");
+      List<OzoneObj> nameSpaceObjs =
+          bucketNameSpace.getBucketNameSpaceObjects();
+      Preconditions.checkArgument(nameSpaceObjs.size() == 1,
+          "Each S3 tenant currently only supports a single volume in its" +
+              "bucket namespace.");
       String volumeName = nameSpaceObjs.get(0).getVolumeName();
 
       // This call performs acl checks and checks volume existence.
