@@ -110,6 +110,7 @@ enum Type {
   TenantGetUserInfo = 98;
   AssignUserToTenant = 99;
   RevokeUserAccessToTenant = 100;
+  GetS3Volume = 101;
 }
 
 message OMRequest {
@@ -193,13 +194,14 @@ message OMRequest {
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
-  optional CreateTenantRequest              CreateTenantRequest            = 95;
-  optional ModifyTenantRequest              ModifyTenantRequest            = 96;
-  optional DeleteTenantRequest              DeleteTenantRequest            = 97;
+  optional CreateTenantRequest              createTenantRequest            = 95;
+  optional ModifyTenantRequest              modifyTenantRequest            = 96;
+  optional DeleteTenantRequest              deleteTenantRequest            = 97;
 
   optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 98;
   optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 99;
   optional RevokeUserAccessToTenantRequest  RevokeUserAccessToTenantRequest = 100;
+  optional GetS3VolumeRequest               getS3VolumeRequest             = 101;
 }
 
 message OMResponse {
@@ -278,13 +280,14 @@ message OMResponse {
   optional PurgePathsResponse                 purgePathsResponse           = 93;
 
   // Skipped 94 to align with OMRequest
-  optional CreateTenantResponse              CreateTenantResponse          = 95;
-  optional ModifyTenantResponse              ModifyTenantResponse          = 96;
-  optional DeleteTenantResponse              DeleteTenantResponse          = 97;
+  optional CreateTenantResponse              createTenantResponse          = 95;
+  optional ModifyTenantResponse              modifyTenantResponse          = 96;
+  optional DeleteTenantResponse              deleteTenantResponse          = 97;
 
   optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 98;
   optional AssignUserToTenantResponse        AssignUserToTenantResponse    = 99;
   optional RevokeUserAccessToTenantResponse  RevokeUserAccessToTenantResponse = 100;
+  optional GetS3VolumeResponse               getS3VolumeResponse           = 101;
 }
 
 enum Status {
@@ -1410,6 +1413,10 @@ message RevokeUserAccessToTenantRequest {
     optional string tenantName = 2;
 }
 
+message GetS3VolumeRequest {
+  optional string accessID = 1;
+}
+
 message CreateTenantResponse {
     optional bool success = 1;
 }
@@ -1429,6 +1436,10 @@ message AssignUserToTenantResponse {
 
 message RevokeUserAccessToTenantResponse {
     optional bool success = 1;
+}
+
+message GetS3VolumeResponse {
+  optional VolumeInfo volumeInfo = 1;
 }
 
 /**

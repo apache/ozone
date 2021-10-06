@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.http.auth.BasicUserPrincipal;
 
 
 /**
@@ -59,7 +60,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String createUser(OzoneMultiTenantPrincipal principal,
+  String createUser(BasicUserPrincipal principal,
                     List<String> groupIDs) throws Exception;
 
   /**
@@ -67,14 +68,14 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return Unique userID maintained by the authorizer plugin.
    * @throws Exception
    */
-  String getUserId(OzoneMultiTenantPrincipal principal) throws Exception;
+  String getUserId(BasicUserPrincipal principal) throws Exception;
 
   /**
    * @param principal
    * @return Unique groupID maintained by the authorizer plugin.
    * @throws Exception
    */
-  String getGroupId(OzoneMultiTenantPrincipal principal)
+  String getGroupId(OzoneTenantGroupPrincipal principal)
       throws Exception;
 
   /**
@@ -92,7 +93,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * MultiTenantGateKeeper plugin Implementation e.g. corresponding ID on the
    * Ranger end for a ranger based implementation .
    */
-  String createGroup(OzoneMultiTenantPrincipal group) throws Exception;
+  String createGroup(OzoneTenantGroupPrincipal group) throws Exception;
 
   /**
    * Delete the group groupID in MultiTenantGateKeeper plugin.
@@ -137,7 +138,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param aclType
    */
   void grantAccess(BucketNameSpace bucketNameSpace,
-                   OzoneMultiTenantPrincipal user, ACLType aclType);
+                   BasicUserPrincipal user, ACLType aclType);
 
   /**
    * Revoke from user aclType access from bucketNameSpace.
@@ -146,7 +147,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param aclType
    */
   void revokeAccess(BucketNameSpace bucketNameSpace,
-                    OzoneMultiTenantPrincipal user, ACLType aclType);
+                    BasicUserPrincipal user, ACLType aclType);
 
   /**
    * Grant user aclType access to accountNameSpace.
@@ -155,7 +156,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param aclType
    */
   void grantAccess(AccountNameSpace accountNameSpace,
-                   OzoneMultiTenantPrincipal user,
+                   BasicUserPrincipal user,
                    ACLType aclType);
 
   /**
@@ -165,7 +166,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param aclType
    */
   void revokeAccess(AccountNameSpace accountNameSpace,
-                    OzoneMultiTenantPrincipal user, ACLType aclType);
+                    BasicUserPrincipal user, ACLType aclType);
 
   /**
    * Return all bucketnamespace accesses granted to user.
@@ -173,7 +174,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return list of access
    */
   List<Pair<BucketNameSpace, ACLType>> getAllBucketNameSpaceAccesses(
-      OzoneMultiTenantPrincipal user);
+      BasicUserPrincipal user);
 
   /**
    * Checks if the user has access to bucketNameSpace.
@@ -182,7 +183,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return true if access is granted, false otherwise.
    */
   boolean checkAccess(BucketNameSpace bucketNameSpace,
-                      OzoneMultiTenantPrincipal user);
+                      BasicUserPrincipal user);
 
   /**
    * Checks if the user has access to accountNameSpace.
@@ -191,7 +192,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return true if access is granted, false otherwise.
    */
   boolean checkAccess(AccountNameSpace accountNameSpace,
-                      OzoneMultiTenantPrincipal user);
+                      BasicUserPrincipal user);
 
   /**
    * Check access for given ozoneObject. Access for the object would be

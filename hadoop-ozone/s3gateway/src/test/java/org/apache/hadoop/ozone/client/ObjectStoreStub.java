@@ -124,7 +124,7 @@ public class ObjectStoreStub extends ObjectStore {
   public void createS3Bucket(String s3BucketName) throws
       IOException {
     if (!bucketEmptyStatus.containsKey(s3BucketName)) {
-      String volumeName = HddsClientUtils.getS3VolumeName(conf);
+      String volumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
       bucketEmptyStatus.put(s3BucketName, true);
       if (!volumes.containsKey(volumeName)) {
         createVolume(volumeName);

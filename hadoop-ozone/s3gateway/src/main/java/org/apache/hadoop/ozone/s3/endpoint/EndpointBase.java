@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.function.Function;
 
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -76,9 +75,7 @@ public class EndpointBase {
   }
 
   protected OzoneVolume getVolume() throws IOException {
-    String s3VolumeName = HddsClientUtils.getS3VolumeName(
-        client.getConfiguration());
-    return client.getObjectStore().getVolume(s3VolumeName);
+    return client.getObjectStore().getS3Volume();
   }
 
   /**
@@ -109,7 +106,7 @@ public class EndpointBase {
    * @param s3BucketName - S3 Bucket Name.
    * @throws  IOException in case the bucket cannot be deleted.
    */
-  public void deleteS3Bucket(String s3BucketName)
+  protected void deleteS3Bucket(String s3BucketName)
       throws IOException, OS3Exception {
     try {
       client.getObjectStore().deleteS3Bucket(s3BucketName);
@@ -130,7 +127,7 @@ public class EndpointBase {
    * @param prefix Bucket prefix to match
    * @return {@code Iterator<OzoneBucket>}
    */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
       throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix));
   }
@@ -145,7 +142,7 @@ public class EndpointBase {
    * @param previousBucket Buckets are listed after this bucket
    * @return {@code Iterator<OzoneBucket>}
    */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
       String previousBucket) throws IOException, OS3Exception {
     return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket));
   }

@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
-import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
+import org.apache.http.auth.BasicUserPrincipal;
 
 /**
  * OM MultiTenant manager interface.
@@ -111,23 +111,23 @@ public interface OMMultiTenantManager {
 
   /**
    * Creates a new user that exists for S3 API access to Ozone.
-   * TODO: FIX the description.
    * @param tenantName
-   * @param userName
+   * @param principal
+   * @param accessID
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  String assignUserToTenant(String tenantName, String userName);
+  String assignUserToTenant(BasicUserPrincipal principal, String tenantName,
+                            String accessID);
 
   /**
    * Given a user, destroys all state associated with that user.
    * This is different from deactivateUser().
-   * @param tenantName
-   @ @param userName
+   * @param accessID
    * @return
    * @throws IOException
    */
-  void destroyUser(String tenantName, String userName);
+  void destroyUser(String accessID);
 
 
   /**
@@ -137,99 +137,101 @@ public interface OMMultiTenantManager {
 
   /**
    * Given a user, return their S3-Secret Key.
-   * @param user
+   * @param accessID
    * @return S3 secret Key
    */
-  String getUserSecret(OzoneMultiTenantPrincipal user) throws IOException;
+  String getUserSecret(String accessID) throws IOException;
 
   /**
-   * Generates a new S3 secret key for the user. They can obtain the newly
-   * generated secret with getUserSecret();
-   * @param user
+   * Modify the groups that a user belongs to.
+   * @param accessID
+   * @param groupsAdded
+   * @param groupsRemoved
+   * @throws IOException
    */
-  void modifyUser(OzoneMultiTenantPrincipal user, List<String> groupsAdded,
+  void modifyUser(String accessID, List<String> groupsAdded,
                   List<String> groupsRemoved) throws IOException;
 
   /**
    * Given a user, deactivate them. We will need a recon command/job to cleanup
    * any data owned by this user (ReconMultiTenantManager).
-   * @param user
+   * @param accessID
    */
-  void deactivateUser(OzoneMultiTenantPrincipal user) throws IOException;
+  void deactivateUser(String accessID) throws IOException;
 
   /**
-   * List all the users that belong to this Tenant.
+   * List all the access IDs of all users that belong to this Tenant.
    * @param tenantID
    * @return List of users
    */
-  List<OzoneMultiTenantPrincipal> listAllUsers(String tenantID)
+  List<String> listAllAccessIDs(String tenantID)
       throws IOException;
 
   /**
-   * Given a user return Tenant.
-   * @param user
-   * @return Tenant
+   * Given an access ID return its corresponding tenant.
+   * @param accessID
+   * @return String tenant name
    */
-  Tenant getUserTenantInfo(OzoneMultiTenantPrincipal user) throws IOException;
+  String getTenantForAccessID(String accessID) throws IOException;
 
   /**
    * Given a user, make him an admin of the corresponding Tenant.
-   * @param user
+   * @param accessID
    */
-  void assignTenantAdminRole(OzoneMultiTenantPrincipal user) throws IOException;
+  void assignTenantAdminRole(String accessID) throws IOException;
 
   /**
-   * Given a user, make him an admin of the corresponding Tenant.
+   * Given a user, remove him as admin of the corresponding Tenant.
    */
-  void revokeTenantAdmin(OzoneMultiTenantPrincipal user) throws IOException;
+  void revokeTenantAdmin(String accessID) throws IOException;
 
   /**
    * List all the Admin users that belong to this Tenant.
    * @param tenantID
    * @return List of users
    */
-  List<OzoneMultiTenantPrincipal> listAllTenantAdmin(String tenantID)
+  List<String> listAllTenantAdmin(String tenantID)
       throws IOException;
 
   /**
    * grant given user access to the given BucketNameSpace.
-   * @param user
+   * @param accessID
    * @param bucketNameSpace
    */
-  void grantAccess(OzoneMultiTenantPrincipal user,
+  void grantAccess(String accessID,
                    BucketNameSpace bucketNameSpace) throws IOException;
 
   /**
-   * grant given user access to the given BucketNameSpace.
-   * @param user
+   * grant given user access to the given Bucket.
+   * @param accessID
    * @param bucketNameSpace
    */
-  void grantBucketAccess(OzoneMultiTenantPrincipal user,
+  void grantBucketAccess(String accessID,
                    BucketNameSpace bucketNameSpace, String bucketName)
       throws IOException;
 
   /**
    * revoke user access from the given BucketNameSpace.
-   * @param user
+   * @param accessID
    * @param bucketNameSpace
    */
-  void revokeAccess(OzoneMultiTenantPrincipal user,
+  void revokeAccess(String accessID,
                     BucketNameSpace bucketNameSpace) throws IOException;
 
   /**
    * grant given user access to the given AccountNameSpace.
-   * @param user
+   * @param accessID
    * @param accountNameSpace
    */
-  void grantAccess(OzoneMultiTenantPrincipal user,
+  void grantAccess(String accessID,
                    AccountNameSpace accountNameSpace) throws IOException;
 
   /**
    * revoke user access from the given AccountNameSpace.
-   * @param user
+   * @param accessID
    * @param accountNameSpace
    */
-  void revokeAccess(OzoneMultiTenantPrincipal user,
+  void revokeAccess(String accessID,
                     AccountNameSpace accountNameSpace) throws IOException;
 
   /**

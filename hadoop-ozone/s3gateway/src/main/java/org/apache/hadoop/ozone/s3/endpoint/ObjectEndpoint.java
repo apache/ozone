@@ -51,6 +51,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -176,14 +177,15 @@ public class ObjectEndpoint extends EndpointBase {
         s3StorageType = toS3StorageType(storageType);
         storageTypeDefault = false;
       }
-      ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      ReplicationConfig replicationConfig =
+          ReplicationConfig.fromTypeAndFactor(s3StorageType.getType(),
+              s3StorageType.getFactor());
 
       if (copyHeader != null) {
         //Copy object, as copy source available.
         CopyObjectResponse copyObjectResponse = copyObject(
-            copyHeader, bucketName, keyPath, replicationType,
-            replicationFactor, storageTypeDefault);
+            copyHeader, bucketName, keyPath, replicationConfig,
+            storageTypeDefault);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
@@ -191,8 +193,8 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       OzoneBucket bucket = getBucket(bucketName);
 
-      output = bucket.createKey(keyPath, length, replicationType,
-          replicationFactor, new HashMap<>());
+      output = bucket.createKey(keyPath, length, replicationConfig,
+          new HashMap<>());
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
@@ -730,8 +732,7 @@ public class ObjectEndpoint extends EndpointBase {
   private CopyObjectResponse copyObject(String copyHeader,
                                         String destBucket,
                                         String destkey,
-                                        ReplicationType replicationType,
-                                        ReplicationFactor replicationFactor,
+                                        ReplicationConfig replicationConfig,
                                         boolean storageTypeDefault)
       throws OS3Exception, IOException {
 
@@ -780,7 +781,7 @@ public class ObjectEndpoint extends EndpointBase {
       sourceInputStream = sourceOzoneBucket.readKey(sourceKey);
 
       destOutputStream = destOzoneBucket.createKey(destkey, sourceKeyLen,
-          replicationType, replicationFactor, new HashMap<>());
+          replicationConfig, new HashMap<>());
 
       IOUtils.copy(sourceInputStream, destOutputStream);
 

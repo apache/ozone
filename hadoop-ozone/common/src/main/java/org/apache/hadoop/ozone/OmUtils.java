@@ -265,6 +265,7 @@ public final class OmUtils {
     case ListMultipartUploads:
     case FinalizeUpgradeProgress:
     case PrepareStatus:
+    case GetS3Volume:
     case TenantGetUserInfo:
       return true;
     case CreateVolume:

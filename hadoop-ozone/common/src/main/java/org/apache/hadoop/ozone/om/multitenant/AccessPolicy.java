@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.List;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -54,11 +55,11 @@ public interface AccessPolicy {
    */
   class AccessPolicyElem {
     private OzoneObj object;
-    private OzoneMultiTenantPrincipal principal;
+    private Principal principal;
     private ACLType aclType;
     private AccessGrantType grantType;
 
-    public AccessPolicyElem(OzoneObj obj, OzoneMultiTenantPrincipal id,
+    public AccessPolicyElem(OzoneObj obj, Principal id,
                      ACLType acl, AccessGrantType grant) {
       object = obj;
       principal = id;
@@ -70,7 +71,7 @@ public interface AccessPolicy {
       return object;
     }
 
-    public OzoneMultiTenantPrincipal getPrincipal() {
+    public Principal getPrincipal() {
       return principal;
     }
 
@@ -122,11 +123,11 @@ public interface AccessPolicy {
   AccessPolicyType getAccessPolicyType();
 
   void addAccessPolicyElem(OzoneObj object,
-                           OzoneMultiTenantPrincipal principal, ACLType acl,
+                           Principal principal, ACLType acl,
                            AccessGrantType grant) throws IOException;
 
   void removeAccessPolicyElem(OzoneObj object,
-                              OzoneMultiTenantPrincipal principal,
+                              Principal principal,
                               ACLType acl, AccessGrantType grant)
       throws IOException;
 
