@@ -26,7 +26,7 @@ Execute curl command
     [Arguments]       ${path}           ${operation}    ${extra_commands}
     ${user.name} =    Set Variable If   '${SECURITY_ENABLED}'=='false'   &user.name=${USERNAME}      ${EMPTY}
     ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=  ${operation}     ${user.name}
-    ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}==true'       --negotiate -u :    ${EMPTY}
+    ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}'=='true'       --negotiate -u :    ${EMPTY}
     ${output}         Run process       curl ${extra_commands} ${curl_extra_commands} "${final_url}"    shell=True
     Should Be Equal As Integers         ${output.rc}    0
     [return]          ${output}
@@ -34,7 +34,7 @@ Execute curl command
 Execute create file command
     [Arguments]       ${path}           ${file_name}
     ${user.name} =    Set Variable If   '${SECURITY_ENABLED}'=='false'   &user.name=${USERNAME}      ${EMPTY}
-    ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}==true'       --negotiate -u :    ${EMPTY}
+    ${curl_extra_commands} =            Set Variable If     '${SECURITY_ENABLED}'=='true'       --negotiate -u :    ${EMPTY}
     ${final_url} =    Catenate          SEPARATOR=      ${URL}  ${path}  ?op=CREATE     ${user.name}
     ${output}         Run process       curl -X PUT ${curl_extra_commands} "${final_url}"   shell=True
     Should Be Equal As Integers         ${output.rc}    0
