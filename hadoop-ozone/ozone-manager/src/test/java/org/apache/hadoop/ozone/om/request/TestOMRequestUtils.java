@@ -1039,6 +1039,11 @@ public final class TestOMRequestUtils {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
+    if (StringUtils.equalsIgnoreCase(
+        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX, version)) {
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+    }
   }
 
   public static BucketLayout getBucketLayout() {

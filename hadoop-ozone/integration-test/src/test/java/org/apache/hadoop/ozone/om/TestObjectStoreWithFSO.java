@@ -649,13 +649,14 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(sampleBucketName, bucket.getName());
     Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
 
-    // Case 3: Bucket layout: Empty and OM default bucket layout: OBJECT_STORE
+    // Case 3: Bucket layout: Empty and
+    // OM default bucket layout: FILE_SYSTEM_OPTIMIZED
     builder = BucketArgs.newBuilder();
     sampleBucketName = UUID.randomUUID().toString();
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.OBJECT_STORE,
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
     // Case 4: Bucket layout: DEFAULT
@@ -664,7 +665,7 @@ public class TestObjectStoreWithFSO {
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.OBJECT_STORE,
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
     // Case 5: Bucket layout: LEGACY

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
 /**
@@ -275,9 +276,9 @@ public final class OMConfigKeys {
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
       "ozone.default.bucket.layout";
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
-      "OBJECT_STORE";
+      BucketLayout.OBJECT_STORE.name();
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
-      "FILE_SYSTEM_OPTIMIZED";
+      BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
 
   /**
    * Configuration properties for Directory Deleting Service.
