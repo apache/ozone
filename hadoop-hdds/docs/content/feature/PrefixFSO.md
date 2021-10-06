@@ -74,12 +74,12 @@ By default the feature is disabled. It can be enabled with the following
 </property>
 ```
 
-In reference to efforts towards supporting protocol aware buckets within a
-single OM, the following configurations can be used to define the default value
-for bucket layout during bucket creation if the client is not
-passing the bucket layout argument.
+In reference to efforts towards supporting protocol aware buckets within an
+Ozone cluster, the following configuration can be used to define the default
+value for bucket layout during bucket creation if the client has not specified
+the bucket layout argument.
 
-By default, the buckets will default to OBS behaviour.
+By default, the buckets will default to OBJECT_STORE behaviour.
 ```XML
 <property>
    <name>ozone.default.bucket.layout</name>

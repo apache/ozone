@@ -360,6 +360,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
+  private final String defaultBucketLayout;
 
   private boolean isNativeAuthorizerEnabled;
 
@@ -454,6 +455,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     isRatisEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    this.defaultBucketLayout =
+        configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
+            OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
@@ -4075,8 +4079,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public String getOMDefaultBucketLayout() {
-    return configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
-        OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
+    return this.defaultBucketLayout;
   }
 
   /**
