@@ -28,8 +28,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -53,6 +51,8 @@ import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 
 import com.google.common.base.Strings;
+import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
@@ -164,8 +164,8 @@ public class TestOzoneShellHA {
 
   @Before
   public void setup() throws UnsupportedEncodingException {
-    System.setOut(new PrintStream(out, false, UTF_8.name()));
-    System.setErr(new PrintStream(err, false, UTF_8.name()));
+    System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
   @After
@@ -331,7 +331,7 @@ public class TestOzoneShellHA {
    * Helper function to get nums of keys from info of listing command.
    */
   private int getNumOfKeys() throws UnsupportedEncodingException {
-    return out.toString(UTF_8.name()).split("key").length - 1;
+    return out.toString(DEFAULT_ENCODING).split("key").length - 1;
   }
 
   /**
@@ -356,8 +356,7 @@ public class TestOzoneShellHA {
    */
   private int getNumOfBuckets(String bucketPrefix)
       throws UnsupportedEncodingException {
-    return out.toString(UTF_8.name())
-        .split(bucketPrefix).length - 1;
+    return out.toString(DEFAULT_ENCODING).split(bucketPrefix).length - 1;
   }
 
 
@@ -890,7 +889,5 @@ public class TestOzoneShellHA {
     // Clean up
     volumesForThisTest.forEach(vol ->
         execute(ozoneShell, new String[] {"volume", "delete", vol}));
-    out.reset();
-    err.reset();
   }
 }
