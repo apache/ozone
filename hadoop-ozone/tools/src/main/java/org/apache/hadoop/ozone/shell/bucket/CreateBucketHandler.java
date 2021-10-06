@@ -53,7 +53,7 @@ public class CreateBucketHandler extends BucketHandler {
 
   // TODO: LEGACY should be removed and should not be exposed to the end user
   // we will revisit during the client side defaulting behaviour
-  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
 
   @Option(names = { "--type", "-t" },
       description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
