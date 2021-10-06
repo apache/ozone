@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.*;
