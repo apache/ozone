@@ -253,7 +253,7 @@ public class TestOzoneECClient {
     for (int i = 0; i < numChunks; i++) {
       int start = (i * chunkSize);
       Arrays.fill(inputData, start, start + chunkSize - 1,
-          String.valueOf(i % 9).getBytes()[0]);
+          String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     final OzoneBucket bucket = writeIntoECKey(inputData, keyName,
         new DefaultReplicationConfig(ReplicationType.EC,
