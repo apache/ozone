@@ -535,9 +535,8 @@ public class TestEndPoint {
     heartbeatTaskHelper(invalidAddress, 1000);
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
-    // 6s is introduced by DeleteBlocksCommandHandler#stop
     Assert.assertThat(end - start,
-        lessThanOrEqualTo(rpcTimeout + tolerance + 6000));
+        lessThanOrEqualTo(rpcTimeout + tolerance));
   }
 
   private StateContext getContext(DatanodeDetails datanodeDetails) {
