@@ -126,10 +126,10 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         importContainer(containerID, path);
         LOG.info("Container {} is replicated successfully", containerID);
         task.setStatus(Status.DONE);
-      } catch (IOException e) {
+      } catch (ExecutionException | IOException e) {
         LOG.error("Container {} replication was unsuccessful.", containerID, e);
         task.setStatus(Status.FAILED);
-      } catch (ExecutionException | InterruptedException e) {
+      } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }
     }
