@@ -212,6 +212,69 @@ public class TestOzoneECClient {
   }
 
   @Test
+  public void test4ChunksInSingleWriteOp() throws IOException {
+    testMultipleChunksInSingleWriteOp(4);
+  }
+
+  // Test random number of chunks in single write op.
+  @Test
+  public void test5ChunksInSingleWriteOp() throws IOException {
+    testMultipleChunksInSingleWriteOp(5);
+  }
+
+  @Test
+  public void test6ChunksInSingleWriteOp() throws IOException {
+    testMultipleChunksInSingleWriteOp(6);
+  }
+
+  @Test
+  public void test7ChunksInSingleWriteOp() throws IOException {
+    testMultipleChunksInSingleWriteOp(7);
+  }
+
+  @Test
+  public void test9ChunksInSingleWriteOp() throws IOException {
+    testMultipleChunksInSingleWriteOp(9);
+  }
+
+  @Test
+  public void test10ChunksInSingleWriteOp() throws IOException {
+    testMultipleChunksInSingleWriteOp(10);
+  }
+
+  @Test
+  public void test12ChunksInSingleWriteOp() throws IOException {
+    testMultipleChunksInSingleWriteOp(12);
+  }
+
+  public void testMultipleChunksInSingleWriteOp(int numChunks)
+      throws IOException {
+    byte[] inputData = new byte[numChunks * chunkSize];
+    for (int i = 0; i < numChunks; i++) {
+      int start = (i * chunkSize);
+      Arrays.fill(inputData, start, start + chunkSize - 1,
+          String.valueOf(i % 9).getBytes(UTF_8)[0]);
+    }
+    final OzoneBucket bucket = writeIntoECKey(inputData, keyName,
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(dataBlocks, parityBlocks,
+                ECReplicationConfig.EcCodec.RS, chunkSize)));
+    OzoneKey key = bucket.getKey(keyName);
+    validateContent(inputData, bucket, key);
+  }
+
+  private void validateContent(byte[] inputData, OzoneBucket bucket,
+      OzoneKey key) throws IOException {
+    Assert.assertEquals(keyName, key.getName());
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[inputData.length];
+      Assert.assertEquals(inputData.length, is.read(fileContent));
+      Assert.assertEquals(new String(inputData, UTF_8),
+          new String(fileContent, UTF_8));
+    }
+  }
+
+  @Test
   public void testCommitKeyInfo()
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
@@ -249,15 +312,8 @@ public class TestOzoneECClient {
         out.write(inputChunks[0][i]);
       }
     }
-
     OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1024];
-      Assert.assertEquals(inputChunks[0].length, is.read(fileContent));
-      Assert.assertEquals(new String(inputChunks[0], UTF_8),
-          new String(fileContent, UTF_8));
-    }
+    validateContent(inputChunks[0], bucket, key);
   }
 
   @Test
@@ -275,16 +331,9 @@ public class TestOzoneECClient {
         out.write(inputChunks[0][i]);
       }
     }
-
     OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[1023];
-      Assert.assertEquals(inputChunks[0].length - 1, is.read(fileContent));
-      Assert.assertEquals(
-          new String(Arrays.copyOf(inputChunks[0], inputChunks[0].length - 1),
-              UTF_8), new String(fileContent, UTF_8));
-    }
+    validateContent(Arrays.copyOf(inputChunks[0], inputChunks[0].length - 1),
+        bucket, key);
   }
 
   @Test
@@ -326,6 +375,11 @@ public class TestOzoneECClient {
     }
   }
 
+  private OzoneBucket writeIntoECKey(byte[] data, String key,
+      DefaultReplicationConfig defaultReplicationConfig) throws IOException {
+    return writeIntoECKey(new byte[][] {data}, key, defaultReplicationConfig);
+  }
+
   private OzoneBucket writeIntoECKey(byte[][] chunks, String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     store.createVolume(volumeName);
@@ -339,7 +393,7 @@ public class TestOzoneECClient {
     }
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    try (OzoneOutputStream out = bucket.createKey(key, 2000,
+    try (OzoneOutputStream out = bucket.createKey(key, 4096,
         new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
       for (int i = 0; i < chunks.length; i++) {
