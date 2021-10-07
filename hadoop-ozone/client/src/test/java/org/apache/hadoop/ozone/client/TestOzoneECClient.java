@@ -275,6 +275,29 @@ public class TestOzoneECClient {
   }
 
   @Test
+  public void testMultipleChunksWithPartialChunkInSigleWripeOp()
+      throws IOException {
+    final int partialChunkLen = 10;
+    final int numFullChunks = 9;
+    final int inputBuffLen = (numFullChunks * chunkSize) + partialChunkLen;
+    byte[] inputData = new byte[inputBuffLen];
+    for (int i = 0; i < numFullChunks; i++) {
+      int start = (i * chunkSize);
+      Arrays.fill(inputData, start, start + chunkSize - 1,
+          String.valueOf(i).getBytes(UTF_8)[0]);
+    }
+    //fill the last partial chunk as well.
+    Arrays.fill(inputData, (numFullChunks * chunkSize),
+        ((numFullChunks * chunkSize)) + partialChunkLen - 1, (byte) 1);
+    final OzoneBucket bucket = writeIntoECKey(inputData, keyName,
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(dataBlocks, parityBlocks,
+                ECReplicationConfig.EcCodec.RS, chunkSize)));
+    OzoneKey key = bucket.getKey(keyName);
+    validateContent(inputData, bucket, key);
+  }
+
+  @Test
   public void testCommitKeyInfo()
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
