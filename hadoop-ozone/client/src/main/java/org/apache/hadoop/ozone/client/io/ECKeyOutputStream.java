@@ -195,7 +195,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
         currentWriterChunkLenToWrite,
         currentChunkBufferLen + currentWriterChunkLenToWrite == ecChunkSize);
     checkAndWriteParityCells(pos);
-
     int remLen = len - currentWriterChunkLenToWrite;
     int iters = remLen / ecChunkSize;
     int lastCellSize = remLen % ecChunkSize;

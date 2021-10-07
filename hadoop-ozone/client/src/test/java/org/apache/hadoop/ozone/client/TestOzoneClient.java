@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -71,8 +73,8 @@ public class TestOzoneClient {
 
   @Before
   public void init() throws IOException {
-    ConfigurationSource config = new InMemoryConfiguration();
-    createNewClient(config, new SinglePipelineBlockAllocator());
+    OzoneConfiguration config = new OzoneConfiguration();
+    createNewClient(config, new SinglePipelineBlockAllocator(config));
   }
 
   private void createNewClient(ConfigurationSource config,
@@ -190,11 +192,14 @@ public class TestOzoneClient {
   @Test
   public void testPutKeyWithECReplicationConfig() throws IOException {
     close();
-    ConfigurationSource config = new InMemoryConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
+        StorageUnit.KB);
     int data = 3;
     int parity = 2;
     int chunkSize = 1024;
-    createNewClient(config, new MultiNodePipelineBlockAllocator(data + parity));
+    createNewClient(config, new MultiNodePipelineBlockAllocator(
+        config, data + parity));
     String value = new String(new byte[chunkSize], UTF_8);
     OzoneBucket bucket = getOzoneBucket();
 
