@@ -66,7 +66,7 @@ public class RatisPipelineProvider
 
   @VisibleForTesting
   public RatisPipelineProvider(NodeManager nodeManager,
-                               StateManager stateManager,
+                               PipelineStateManager stateManager,
                                ConfigurationSource conf,
                                EventPublisher eventPublisher,
                                SCMContext scmContext) {

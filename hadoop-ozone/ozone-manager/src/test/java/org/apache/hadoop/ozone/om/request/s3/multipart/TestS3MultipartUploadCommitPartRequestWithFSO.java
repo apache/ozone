@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -114,5 +115,10 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
     // Create parent dirs for the path
     parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
             dirName, omMetadataManager);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

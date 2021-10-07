@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -186,5 +187,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             exception, omKeyInfo, result);
 
     return omClientResponse;
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

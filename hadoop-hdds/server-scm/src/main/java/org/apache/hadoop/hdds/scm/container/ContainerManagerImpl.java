@@ -58,7 +58,7 @@ import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
 /**
  * TODO: Add javadoc.
  */
-public class ContainerManagerImpl implements ContainerManagerV2 {
+public class ContainerManagerImpl implements ContainerManager {
 
   /*
    * TODO: Introduce container level locks.
@@ -450,8 +450,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   // Remove this after fixing Recon
-  @Deprecated
-  protected ContainerStateManagerV2 getContainerStateManager() {
+  @VisibleForTesting
+  public ContainerStateManagerV2 getContainerStateManager() {
     return containerStateManager;
   }
 

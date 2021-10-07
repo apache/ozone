@@ -159,14 +159,15 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
         // If an open key is no longer present in the table, it was committed
         // and should not be deleted.
         OmKeyInfo omKeyInfo =
-            omMetadataManager.getOpenKeyTable().get(fullKeyName);
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
+                .get(fullKeyName);
         if (omKeyInfo != null) {
           // Set the UpdateID to current transactionLogIndex
           omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
           deletedKeys.put(fullKeyName, omKeyInfo);
 
           // Update table cache.
-          omMetadataManager.getOpenKeyTable().addCacheEntry(
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
                   new CacheKey<>(fullKeyName),
                   new CacheValue<>(Optional.absent(), trxnLogIndex));
 

@@ -1071,7 +1071,7 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream.addPreallocateBlocks(
         openKey.getKeyInfo().getLatestVersionLocations(),
         openKey.getOpenVersion());
-    FileEncryptionInfo feInfo = keyOutputStream.getFileEncryptionInfo();
+    FileEncryptionInfo feInfo = openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
       KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoOutputStream cryptoOut =
@@ -1425,7 +1425,8 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
-    final FileEncryptionInfo feInfo = keyOutputStream.getFileEncryptionInfo();
+    final FileEncryptionInfo feInfo =
+        openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
       KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoOutputStream cryptoOut =

@@ -48,7 +48,7 @@ import java.util.function.Supplier;
  */
 public class AbstractContainerReportHandler {
 
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final SCMContext scmContext;
   private final Logger logger;
 
@@ -59,7 +59,7 @@ public class AbstractContainerReportHandler {
    * @param containerManager ContainerManager
    * @param logger Logger to be used for logging
    */
-  AbstractContainerReportHandler(final ContainerManagerV2 containerManager,
+  AbstractContainerReportHandler(final ContainerManager containerManager,
                                  final SCMContext scmContext,
                                  final Logger logger) {
     Preconditions.checkNotNull(containerManager);
@@ -319,7 +319,7 @@ public class AbstractContainerReportHandler {
    * Return ContainerManager.
    * @return {@link ContainerManager}
    */
-  protected ContainerManagerV2 getContainerManager() {
+  protected ContainerManager getContainerManager() {
     return containerManager;
   }
 

@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -96,9 +97,17 @@ public final class TestOMRequestUtils {
   public static void addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager) throws Exception {
 
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
+  }
+
+  public static void addVolumeAndBucketToDB(String volumeName,
+      String bucketName, OMMetadataManager omMetadataManager,
+      BucketLayout bucketLayout) throws Exception {
+
     addVolumeToDB(volumeName, omMetadataManager);
 
-    addBucketToDB(volumeName, bucketName, omMetadataManager);
+    addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
   }
 
   @SuppressWarnings("parameterNumber")
@@ -219,11 +228,12 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-            new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+        omMetadataManager.getOpenKeyTable(getBucketLayout())
+            .addCacheEntry(new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
@@ -429,9 +439,18 @@ public final class TestOMRequestUtils {
   public static void addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager) throws Exception {
 
+    addBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
+  }
+
+  public static void addBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
+      throws Exception {
+
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now()).build();
+            .setBucketName(bucketName).setCreationTime(Time.now())
+            .setBucketLayout(bucketLayout).build();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
@@ -943,11 +962,12 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenFileName(
               omKeyInfo.getParentObjectID(), fileName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-                new CacheKey<>(ozoneKey),
+        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzonePathKey(
               omKeyInfo.getParentObjectID(), fileName);
@@ -1016,5 +1036,9 @@ public final class TestOMRequestUtils {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
+  }
+
+  public static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

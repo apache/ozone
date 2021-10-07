@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.junit.After;
 import org.junit.Assert;
@@ -274,6 +275,10 @@ public class TestS3MultipartRequest {
   protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(
       OMRequest omRequest) {
     return new S3MultipartUploadAbortRequest(omRequest);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
 }

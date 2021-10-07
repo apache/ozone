@@ -553,11 +553,14 @@ public class ContainerOperationClient implements ScmClient {
   public boolean startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> idleiterations,
       Optional<Double> maxDatanodesRatioToInvolvePerIteration,
-      Optional<Long> maxSizeToMovePerIterationInGB)
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTargetInGB,
+      Optional<Long> maxSizeLeavingSourceInGB)
       throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
         idleiterations, maxDatanodesRatioToInvolvePerIteration,
-        maxSizeToMovePerIterationInGB);
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB);
   }
 
   @Override

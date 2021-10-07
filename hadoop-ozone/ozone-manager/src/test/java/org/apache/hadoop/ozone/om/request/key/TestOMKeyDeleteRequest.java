@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -39,6 +40,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
  */
 public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
   @Test
   public void testPreExecute() throws Exception {
     doPreExecute(createDeleteKeyRequest());
@@ -48,7 +51,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   public void testValidateAndUpdateCache() throws Exception {
     // Add volume, bucket and key entries to OM DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, bucketLayout);
 
     String ozoneKey = addKeyToTable();
 
@@ -108,7 +111,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse =
         omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+            100L, ozoneManagerDoubleBufferHelper, bucketLayout);
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -126,7 +129,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse =
         omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+            100L, ozoneManagerDoubleBufferHelper, bucketLayout);
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());
@@ -179,5 +182,9 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
       OMRequest modifiedOmRequest) {
     return new OMKeyDeleteRequest(modifiedOmRequest);
+  }
+
+  protected void setBucketlayout(BucketLayout buckLayout) {
+    this.bucketLayout = buckLayout;
   }
 }

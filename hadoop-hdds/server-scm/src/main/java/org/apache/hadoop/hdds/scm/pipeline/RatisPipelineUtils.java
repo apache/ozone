@@ -103,30 +103,12 @@ public final class RatisPipelineUtils {
    * Return the list of pipelines who share the same set of datanodes
    * with the input pipeline.
    *
-   * @param stateManager PipelineStateManager
+   * @param stateManager PipelineStateManagerImpl
    * @param pipeline input pipeline
    * @return list of matched pipeline
    */
   static List<Pipeline> checkPipelineContainSameDatanodes(
       PipelineStateManager stateManager, Pipeline pipeline) {
-    return stateManager.getPipelines(new RatisReplicationConfig(
-        ReplicationFactor.THREE))
-        .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
-            (p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
-                p.sameDatanodes(pipeline)))
-        .collect(Collectors.toList());
-  }
-
-  /**
-   * Return the list of pipelines who share the same set of datanodes
-   * with the input pipeline.
-   *
-   * @param stateManager PipelineStateManager
-   * @param pipeline input pipeline
-   * @return list of matched pipeline
-   */
-  static List<Pipeline> checkPipelineContainSameDatanodes(
-      StateManager stateManager, Pipeline pipeline) {
     return stateManager
         .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
         .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&

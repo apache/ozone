@@ -25,7 +25,6 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -140,7 +139,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final ConfigurationSource conf;
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
-  private final Set<RaftGroupId> raftGids = new HashSet<>();
+  private final Set<RaftGroupId> raftGids = ConcurrentHashMap.newKeySet();
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
   private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
@@ -266,7 +265,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // Disable the pre vote feature in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        conf.getObject(DatanodeRatisServerConfig.class).isPreVoteEnabled());
 
     // Set the ratis storage directory
     Collection<String> storageDirPaths =

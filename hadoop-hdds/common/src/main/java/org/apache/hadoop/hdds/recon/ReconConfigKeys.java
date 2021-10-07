@@ -55,4 +55,14 @@ public final class ReconConfigKeys {
   // ex: http://localhost:9090
   public static final String OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT =
       "ozone.recon.prometheus.http.endpoint";
+  /**
+   * Recon administrator users delimited by a comma.
+   * This is the list of users who can access admin only information from recon.
+   * Users defined in
+   * {@link org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS}
+   * will always be able to access all recon information regardless of this
+   * setting.
+   */
+  public static final String OZONE_RECON_ADMINISTRATORS =
+      "ozone.recon.administrators";
 }

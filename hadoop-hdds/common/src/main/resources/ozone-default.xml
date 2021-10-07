@@ -1761,6 +1761,14 @@
   </property>
 
   <property>
+    <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
+    <value>false</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description>Enable/disable OM HA leader election pre-vote phase.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.server.failure.timeout.duration</name>
     <value>120s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
@@ -2407,6 +2415,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.administrators</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      Recon administrator users delimited by a comma.
+      This is the list of users who can access admin only information from recon.
+      Users defined in ozone.administrators will always be able to access all
+      recon information regardless of this setting.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
     <tag>DATANODE, SECURITY, KERBEROS</tag>
@@ -2906,6 +2925,12 @@
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM ratis leader
       election. Default is 1s.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
+    <value>false</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Enable/disable SCM HA leader election pre-vote phase.</description>
   </property>
   <property>
     <name>ozone.scm.ha.ratis.leader.ready.wait.timeout</name>

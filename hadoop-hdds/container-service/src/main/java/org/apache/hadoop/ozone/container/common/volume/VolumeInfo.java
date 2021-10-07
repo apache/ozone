@@ -233,4 +233,9 @@ public final class VolumeInfo {
   public VolumeUsage getUsageForTesting() {
     return usage;
   }
+
+  @VisibleForTesting
+  public long getReservedInBytes() {
+    return reservedInBytes;
+  }
 }

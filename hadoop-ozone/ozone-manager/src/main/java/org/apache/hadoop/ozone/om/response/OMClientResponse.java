@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -39,6 +40,10 @@ public abstract class OMClientResponse {
   public OMClientResponse(OMResponse omResponse) {
     Preconditions.checkNotNull(omResponse);
     this.omResponse = omResponse;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   /**
