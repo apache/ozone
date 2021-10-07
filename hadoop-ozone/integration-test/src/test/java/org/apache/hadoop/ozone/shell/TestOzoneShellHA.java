@@ -22,7 +22,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,7 +39,6 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -49,6 +50,8 @@ import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 
 import com.google.common.base.Strings;
+import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
@@ -58,6 +61,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
@@ -83,6 +87,8 @@ public class TestOzoneShellHA {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneShellHA.class);
 
+  private static final String DEFAULT_ENCODING = UTF_8.name();
+
   /**
    * Set the timeout for every test.
    */
@@ -91,6 +97,7 @@ public class TestOzoneShellHA {
 
   private static File baseDir;
   private static File testFile;
+  private static String testFilePathString;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneShell ozoneShell = null;
@@ -121,7 +128,8 @@ public class TestOzoneShellHA {
     baseDir = new File(path);
     baseDir.mkdirs();
 
-    testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
+    testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
+    testFile = new File(testFilePathString);
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
 
@@ -158,8 +166,8 @@ public class TestOzoneShellHA {
 
   @Before
   public void setup() throws UnsupportedEncodingException {
-    System.setOut(new PrintStream(out, false, UTF_8.name()));
-    System.setErr(new PrintStream(err, false, UTF_8.name()));
+    System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
   @After
@@ -311,8 +319,7 @@ public class TestOzoneShellHA {
         "bucket", "create", "o3://" + omServiceId + volumeName + bucketName};
     execute(ozoneShell, args);
 
-    String keyName = volumeName + bucketName +
-        OzoneConsts.OZONE_URI_DELIMITER + "key";
+    String keyName = volumeName + bucketName + OZONE_URI_DELIMITER + "key";
     for (int i = 0; i < 100; i++) {
       args = new String[] {
           "key", "put", "o3://" + omServiceId + keyName + i,
@@ -325,7 +332,7 @@ public class TestOzoneShellHA {
    * Helper function to get nums of keys from info of listing command.
    */
   private int getNumOfKeys() throws UnsupportedEncodingException {
-    return out.toString(UTF_8.name()).split("key").length - 1;
+    return out.toString(DEFAULT_ENCODING).split("key").length - 1;
   }
 
   /**
@@ -337,7 +344,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     String bucketName =
-        volumeName + OzoneConsts.OZONE_URI_DELIMITER + "testbucket";
+        volumeName + OZONE_URI_DELIMITER + "testbucket";
     for (int i = 0; i < numOfBuckets; i++) {
       args = new String[] {
           "bucket", "create", "o3://" + omServiceId + bucketName + i};
@@ -350,10 +357,17 @@ public class TestOzoneShellHA {
    */
   private int getNumOfBuckets(String bucketPrefix)
       throws UnsupportedEncodingException {
-    return out.toString(UTF_8.name())
-        .split(bucketPrefix).length - 1;
+    return out.toString(DEFAULT_ENCODING).split(bucketPrefix).length - 1;
   }
 
+  /**
+   * Parse output into ArrayList with Gson.
+   * @return ArrayList
+   */
+  private ArrayList<LinkedTreeMap<String, String>> parseOutputIntoArrayList()
+      throws UnsupportedEncodingException {
+    return new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+  }
 
   /**
    * Tests ozone sh command URI parsing with volume and bucket create commands.
@@ -434,7 +448,8 @@ public class TestOzoneShellHA {
     args = new String[] {"key", "list", startKey, destinationBucket};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(0, out.size());
+    // Expect empty JSON array
+    Assert.assertEquals(0, parseOutputIntoArrayList().size());
     Assert.assertEquals(0, getNumOfKeys());
 
     // Part of listing buckets test.
@@ -456,7 +471,8 @@ public class TestOzoneShellHA {
     out.reset();
     args = new String[] {"bucket", "list", startBucket, destinationVolume};
     execute(ozoneShell, args);
-    Assert.assertEquals(0, out.size());
+    // Expect empty JSON array
+    Assert.assertEquals(0, parseOutputIntoArrayList().size());
     Assert.assertEquals(0, getNumOfBuckets("testbucket"));
   }
 
@@ -854,5 +870,77 @@ public class TestOzoneShellHA {
     objectStore.deleteVolume("vol3");
     objectStore.getVolume("vol4").deleteBucket("buck4");
     objectStore.deleteVolume("vol4");
+  }
+
+  @Test
+  public void testListVolumeBucketKeyShouldPrintValidJsonArray()
+      throws UnsupportedEncodingException {
+
+    final List<String> testVolumes =
+        Arrays.asList("jsontest-vol1", "jsontest-vol2", "jsontest-vol3");
+    final List<String> testBuckets =
+        Arrays.asList("v1-bucket1", "v1-bucket2", "v1-bucket3");
+    final List<String> testKeys = Arrays.asList("key1", "key2", "key3");
+
+    final String firstVolumePrefix = testVolumes.get(0) + OZONE_URI_DELIMITER;
+    final String keyPathPrefix = firstVolumePrefix +
+        testBuckets.get(0) + OZONE_URI_DELIMITER;
+
+    // Create test volumes, buckets and keys
+    testVolumes.forEach(vol -> execute(ozoneShell, new String[] {
+        "volume", "create", vol}));
+    testBuckets.forEach(bucket -> execute(ozoneShell, new String[] {
+        "bucket", "create", firstVolumePrefix + bucket}));
+    testKeys.forEach(key -> execute(ozoneShell, new String[] {
+        "key", "put", keyPathPrefix + key, testFilePathString}));
+
+    // ozone sh volume list
+    out.reset();
+    execute(ozoneShell, new String[] {"volume", "list"});
+
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> volumeListOut =
+        parseOutputIntoArrayList();
+    // Can include s3v and volumes from other test cases that aren't cleaned up,
+    //  hence >= instead of equals.
+    Assert.assertTrue(volumeListOut.size() >= testVolumes.size());
+    final HashSet<String> volumeSet = new HashSet<>(testVolumes);
+    volumeListOut.forEach(map -> volumeSet.remove(map.get("name")));
+    // Should have found all the volumes created for this test
+    Assert.assertEquals(0, volumeSet.size());
+
+    // ozone sh bucket list jsontest-vol1
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", firstVolumePrefix});
+
+    // Expect valid JSON array as well
+    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+        parseOutputIntoArrayList();
+    Assert.assertEquals(testBuckets.size(), bucketListOut.size());
+    final HashSet<String> bucketSet = new HashSet<>(testBuckets);
+    bucketListOut.forEach(map -> bucketSet.remove(map.get("name")));
+    // Should have found all the buckets created for this test
+    Assert.assertEquals(0, bucketSet.size());
+
+    // ozone sh key list jsontest-vol1/v1-bucket1
+    out.reset();
+    execute(ozoneShell, new String[] {"key", "list", keyPathPrefix});
+
+    // Expect valid JSON array as well
+    final ArrayList<LinkedTreeMap<String, String>> keyListOut =
+        parseOutputIntoArrayList();
+    Assert.assertEquals(testKeys.size(), keyListOut.size());
+    final HashSet<String> keySet = new HashSet<>(testKeys);
+    keyListOut.forEach(map -> keySet.remove(map.get("name")));
+    // Should have found all the keys put for this test
+    Assert.assertEquals(0, keySet.size());
+
+    // Clean up
+    testKeys.forEach(key -> execute(ozoneShell, new String[] {
+        "key", "delete", keyPathPrefix + key}));
+    testBuckets.forEach(bucket -> execute(ozoneShell, new String[] {
+        "bucket", "delete", firstVolumePrefix + bucket}));
+    testVolumes.forEach(vol -> execute(ozoneShell, new String[] {
+        "volume", "delete", vol}));
   }
 }
