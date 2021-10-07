@@ -635,8 +635,6 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.createTenant(tenantName);
   }
 
-  // TODO: modify, delete
-
   /**
    * Assign user to tenant.
    * @param username user name to be assigned.
@@ -654,6 +652,22 @@ public class RpcClient implements ClientProtocol {
         "accessId can't be null or empty.");
     return ozoneManagerClient.assignUserToTenant(
         username, tenantName, accessId);
+  }
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  @Override
+  public void assignAdminToAccessId(String accessId, String tenantName)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
+        "tenantName can't be null or empty.");
+    ozoneManagerClient.assignAdminToAccessId(accessId, tenantName);
   }
 
   /**

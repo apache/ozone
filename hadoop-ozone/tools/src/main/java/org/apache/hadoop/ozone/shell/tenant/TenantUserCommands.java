@@ -37,7 +37,9 @@ import java.util.concurrent.Callable;
     subcommands = {
         GetUserInfoHandler.class,
         AssignUserToTenantHandler.class,
-        RevokeUserAccessToTenantHandler.class
+        RevokeUserAccessToTenantHandler.class,
+        TenantUserAssignAdminHandler.class,
+        TenantUserRevokeAdminHandler.class
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

@@ -3077,8 +3077,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "non-Ratis createTenant() is not implemented");
   }
 
-  // TODO: modify, delete
-
   /**
    * Assign user to tenant.
    */
@@ -3086,6 +3084,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String username, String tenantName, String accessId) throws IOException {
     throw new NotImplementedException(
         "non-Ratis assignUserToTenant() is not implemented");
+  }
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   */
+  public void assignAdminToAccessId(String accessId, String tenantName)
+      throws IOException {
+    throw new NotImplementedException(
+        "non-Ratis assignAdminToAccessId() is not implemented");
   }
 
   /**

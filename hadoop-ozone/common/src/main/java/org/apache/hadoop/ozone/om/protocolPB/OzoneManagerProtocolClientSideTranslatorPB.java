@@ -883,6 +883,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   /**
    * {@inheritDoc}
+   *
+   * TODO: Add a variant that uses OmTenantArgs?
    */
   @Override
   public void createTenant(String tenantArgs)
@@ -896,11 +898,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
   }
-  // TODO: Add a variant that uses OmTenantArgs
-  // TODO: modify, delete
 
   /**
    * {@inheritDoc}
+   *
+   * TODO: Add a variant that uses OmTenantUserArgs?
    */
   @Override
   public S3SecretValue assignUserToTenant(
@@ -921,8 +923,29 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return S3SecretValue.fromProtobuf(resp.getS3Secret());
   }
-  // TODO: Add a variant that uses OmTenantUserArgs?
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void assignAdminToAccessId(String accessId, String tenantName)
+      throws IOException {
+
+    final AssignAdminToAccessIdRequest request =
+        AssignAdminToAccessIdRequest.newBuilder()
+        .setAccessId(accessId)
+        .setTenantName(tenantName)
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.AssignAdminToAccessId)
+        .setAssignAdminToAccessIdRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException {

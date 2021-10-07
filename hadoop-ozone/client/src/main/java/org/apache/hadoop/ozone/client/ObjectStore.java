@@ -186,8 +186,6 @@ public class ObjectStore {
 //    proxy.createTenant(tenantName, tenantArgs);
 //  }
 
-  // TODO: modify, delete
-
   /**
    * Assign user to tenant.
    * @param username user name to be assigned.
@@ -198,6 +196,17 @@ public class ObjectStore {
   public S3SecretValue assignUserToTenant(
       String username, String tenantName, String accessId) throws IOException {
     return proxy.assignUserToTenant(username, tenantName, accessId);
+  }
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  public void assignAdminToAccessId(String accessId, String tenantName)
+      throws IOException {
+    proxy.assignAdminToAccessId(accessId, tenantName);
   }
 
   /**

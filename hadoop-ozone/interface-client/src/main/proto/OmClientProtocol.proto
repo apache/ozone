@@ -110,6 +110,9 @@ enum Type {
   TenantGetUserInfo = 98;
   AssignUserToTenant = 99;
   RevokeUserAccessToTenant = 100;
+
+  AssignAdminToAccessId = 101;
+  RevokeAdminFromAccessId = 102;
 }
 
 message OMRequest {
@@ -200,6 +203,9 @@ message OMRequest {
   optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 98;
   optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 99;
   optional RevokeUserAccessToTenantRequest  RevokeUserAccessToTenantRequest = 100;
+
+  optional AssignAdminToAccessIdRequest     AssignAdminToAccessIdRequest = 101;
+  optional RevokeAdminFromAccessIdRequest   RevokeAdminFromAccessIdRequest = 102;
 }
 
 message OMResponse {
@@ -1410,6 +1416,16 @@ message RevokeUserAccessToTenantRequest {
     optional string tenantName = 2;
 }
 
+message AssignAdminToAccessIdRequest {
+    optional string accessId = 1;
+    optional string tenantName = 2;
+}
+
+message RevokeAdminFromAccessIdRequest {
+    optional string accessId = 1;
+    optional string tenantName = 2;
+}
+
 message CreateTenantResponse {
     optional bool success = 1;
 }
@@ -1428,6 +1444,14 @@ message AssignUserToTenantResponse {
 }
 
 message RevokeUserAccessToTenantResponse {
+    optional bool success = 1;
+}
+
+message AssignAdminToAccessIdResponse {
+    optional bool success = 1;
+}
+
+message RevokeAdminFromAccessIdResponse {
     optional bool success = 1;
 }
 

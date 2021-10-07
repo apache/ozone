@@ -584,6 +584,15 @@ public interface ClientProtocol {
       String accessId) throws IOException;
 
   /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  void assignAdminToAccessId(String accessId, String tenantName)
+      throws IOException;
+
+  /**
    * Get tenant info for a user.
    * @param userPrincipal Kerberos principal of a user.
    * @return TenantUserInfo

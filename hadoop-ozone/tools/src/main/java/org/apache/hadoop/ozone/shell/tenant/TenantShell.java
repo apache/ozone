@@ -32,6 +32,7 @@ import java.util.function.Supplier;
         TenantCreateHandler.class,
         TenantModifyHandler.class,
         TenantDeleteHandler.class,
+        TenantListHandler.class,
         TenantUserCommands.class
     })
 public class TenantShell extends Shell {
