@@ -18,11 +18,10 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -33,6 +32,7 @@ import org.apache.hadoop.io.erasurecode.ECSchema;
 import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
 import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
 import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -74,8 +74,7 @@ public class TestOzoneECClient {
   private byte[][] inputChunks = new byte[dataBlocks][chunkSize];
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
-  private final MockOmTransport transportStub = new MockOmTransport(
-      new MultiNodePipelineBlockAllocator(dataBlocks + parityBlocks));
+  private MockOmTransport transportStub = null;
   private ECSchema schema = new ECSchema("rs", dataBlocks, parityBlocks);
   private ErasureCodecOptions options = new ErasureCodecOptions(schema);
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -86,8 +85,12 @@ public class TestOzoneECClient {
 
   @Before
   public void init() throws IOException {
-    ConfigurationSource config = new InMemoryConfiguration();
-    client = new OzoneClient(config, new RpcClient(config, null) {
+    conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
+        StorageUnit.KB);
+    transportStub = new MockOmTransport(
+        new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks));
+
+    client = new OzoneClient(conf, new RpcClient(conf, null) {
 
       @Override
       protected OmTransport createOmTransport(String omServiceId)
@@ -307,17 +310,34 @@ public class TestOzoneECClient {
 
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
-    try (OzoneOutputStream out = bucket.createKey("mykey", 2000)) {
+    try (OzoneOutputStream out = bucket.createKey("mykey", 1024)) {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
+      // Block Size is 2kb, so to create 3 blocks we need 6 iterations here
+      for (int j = 0; j < 6; j++) {
+        for (int i = 0; i < inputChunks.length; i++) {
+          out.write(inputChunks[i]);
+        }
       }
     }
+    OzoneManagerProtocolProtos.KeyLocationList blockList =
+        transportStub.getKeys().get(volumeName).get(bucketName).get("mykey")
+            .getKeyLocationListList().get(0);
+
+    Assert.assertEquals(3, blockList.getKeyLocationsCount());
+    // As the mock allocator allocates block with id's increasing sequentially
+    // from 1. Therefore the block should be in the order with id starting 1, 2
+    // and then 3.
+    for (int i = 0; i < 3; i++) {
+      long localId = blockList.getKeyLocationsList().get(i).getBlockID()
+          .getContainerBlockID().getLocalID();
+      Assert.assertEquals(i + 1, localId);
+    }
+
     Assert.assertEquals(1,
-        transportStub.getKeys().get(volumeName).get(bucketName).get(keyName)
+        transportStub.getKeys().get(volumeName).get(bucketName).get("mykey")
             .getKeyLocationListCount());
-    Assert.assertEquals(inputChunks[0].length * 3,
-        transportStub.getKeys().get(volumeName).get(bucketName).get(keyName)
+    Assert.assertEquals(inputChunks[0].length * 3 * 6,
+        transportStub.getKeys().get(volumeName).get(bucketName).get("mykey")
             .getDataSize());
   }
 

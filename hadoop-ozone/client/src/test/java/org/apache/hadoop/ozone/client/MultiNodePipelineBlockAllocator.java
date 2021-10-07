@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
@@ -31,9 +35,12 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
   private long blockId;
   private HddsProtos.Pipeline pipeline;
   private int requiredNodes;
+  private final ConfigurationSource conf;
 
-  public MultiNodePipelineBlockAllocator(int requiredNodes) {
+  public MultiNodePipelineBlockAllocator(OzoneConfiguration conf,
+      int requiredNodes) {
     this.requiredNodes = requiredNodes;
+    this.conf = conf;
   }
 
   @Override
@@ -61,6 +68,11 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
       pipeline = builder.build();
     }
 
+    long blockSize = (long)conf.getStorageSize(
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+
     List<OzoneManagerProtocolProtos.KeyLocation> results = new ArrayList<>();
     results.add(OzoneManagerProtocolProtos.KeyLocation.newBuilder()
         .setPipeline(pipeline).setBlockID(
@@ -68,7 +80,7 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
                 .setContainerBlockID(
                     HddsProtos.ContainerBlockID.newBuilder().setContainerID(1L)
                         .setLocalID(blockId++).build()).build()).setOffset(0L)
-        .setLength(keyArgs.getDataSize()).build());
+        .setLength(blockSize).build());
     return results;
   }
 }

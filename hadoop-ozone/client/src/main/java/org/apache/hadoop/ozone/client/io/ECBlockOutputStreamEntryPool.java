@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -120,7 +121,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
       List<BlockOutputStreamEntry> streams) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     Map<BlockID, ArrayList<ECBlockOutputStreamEntry>> blkIdVsStream =
-        new HashMap<>();
+        new LinkedHashMap<>();
 
     for (BlockOutputStreamEntry streamEntry : streams) {
       BlockID blkID = streamEntry.getBlockID();

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBlockID;
@@ -25,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Port;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UUID;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 
@@ -39,9 +42,10 @@ public class SinglePipelineBlockAllocator
 
   private long blockId;
   private Pipeline pipeline;
+  private OzoneConfiguration conf;
 
-  public SinglePipelineBlockAllocator() {
-
+  public SinglePipelineBlockAllocator(OzoneConfiguration conf) {
+    this.conf = conf;
   }
 
   @Override
@@ -76,6 +80,11 @@ public class SinglePipelineBlockAllocator
       pipeline = bldr.build();
     }
 
+    long blockSize =  (long)conf.getStorageSize(
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+
     List<KeyLocation> results = new ArrayList<>();
     results.add(KeyLocation.newBuilder()
         .setPipeline(pipeline)
@@ -87,7 +96,7 @@ public class SinglePipelineBlockAllocator
                 .build())
             .build())
         .setOffset(0L)
-        .setLength(keyArgs.getDataSize())
+        .setLength(blockSize)
         .build());
     return results;
   }
