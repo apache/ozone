@@ -71,7 +71,7 @@ public class PipelineManagerImpl implements PipelineManager {
   // Limit the number of on-going ratis operation to be 1.
   private final ReentrantReadWriteLock lock;
   private PipelineFactory pipelineFactory;
-  private StateManager stateManager;
+  private PipelineStateManager stateManager;
   private BackgroundPipelineCreatorV2 backgroundPipelineCreator;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
@@ -89,7 +89,7 @@ public class PipelineManagerImpl implements PipelineManager {
   protected PipelineManagerImpl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
                                 NodeManager nodeManager,
-                                StateManager pipelineStateManager,
+                                PipelineStateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher,
                                 SCMContext scmContext) {
@@ -119,8 +119,8 @@ public class PipelineManagerImpl implements PipelineManager {
       EventPublisher eventPublisher,
       SCMContext scmContext,
       SCMServiceManager serviceManager) throws IOException {
-    // Create PipelineStateManager
-    StateManager stateManager = PipelineStateManagerV2Impl
+    // Create PipelineStateManagerImpl
+    PipelineStateManager stateManager = PipelineStateManagerImpl
         .newBuilder().setPipelineStore(pipelineStore)
         .setRatisServer(scmhaManager.getRatisServer())
         .setNodeManager(nodeManager)
@@ -576,7 +576,7 @@ public class PipelineManagerImpl implements PipelineManager {
     try {
       stateManager.close();
     } catch (Exception ex) {
-      LOG.error("PipelineStateManager close failed", ex);
+      LOG.error("PipelineStateManagerImpl close failed", ex);
     }
   }
 
@@ -592,7 +592,7 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @VisibleForTesting
-  public StateManager getStateManager() {
+  public PipelineStateManager getStateManager() {
     return stateManager;
   }
 

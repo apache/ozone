@@ -163,6 +163,12 @@ public final class OMConfigKeys {
       OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
       = TimeDuration.valueOf(120, TimeUnit.SECONDS);
 
+  public static final String OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE =
+      "ozone.om.ratis.server.leaderelection.pre-vote";
+  public static final boolean
+      OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
+
+
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =
       "ozone.om.ratis.snapshot.dir";

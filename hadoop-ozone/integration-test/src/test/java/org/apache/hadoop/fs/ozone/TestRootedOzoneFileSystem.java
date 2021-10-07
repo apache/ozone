@@ -115,6 +115,8 @@ public class TestRootedOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRootedOzoneFileSystem.class);
 
+  private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
@@ -168,10 +170,9 @@ public class TestRootedOzoneFileSystem {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, (float) 0.15);
-    // Trash with 9 second deletes and 6 seconds checkpoints
-    conf.setFloat(FS_TRASH_INTERVAL_KEY, (float) 0.15); // 9 seconds
-    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
+    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL/2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;

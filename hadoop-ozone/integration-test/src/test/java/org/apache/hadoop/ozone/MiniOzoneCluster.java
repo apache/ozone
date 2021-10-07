@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -314,6 +315,7 @@ public interface MiniOzoneCluster {
     protected Optional<String> omId = Optional.empty();
     
     protected Boolean randomContainerPort = true;
+    protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
@@ -357,6 +359,17 @@ public interface MiniOzoneCluster {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
+      return this;
+    }
+
+    /**
+     * For tests that do not use any features of SCM, we can get by with
+     * 0 datanodes.  Also need to skip safemode in this case.
+     * This allows the cluster to come up much faster.
+     */
+    public Builder withoutDatanodes() {
+      setNumDatanodes(0);
+      conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
       return this;
     }
 
@@ -483,6 +496,24 @@ public interface MiniOzoneCluster {
      */
     public Builder setTrace(Boolean trace) {
       enableTrace = Optional.of(trace);
+      return this;
+    }
+
+    /**
+     * Sets the reserved space
+     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
+     * HDDS_DATANODE_DIR_DU_RESERVED
+     * for each volume in each datanode.
+     * @param reservedSpace String that contains the numeric size value and
+     *                      ends with a
+     *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
+     *                      suffix. For example, "50GB".
+     * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
+     *
+     * @return {@link MiniOzoneCluster} Builder
+     */
+    public Builder setDatanodeReservedSpace(String reservedSpace) {
+      datanodeReservedSpace = Optional.of(reservedSpace);
       return this;
     }
 

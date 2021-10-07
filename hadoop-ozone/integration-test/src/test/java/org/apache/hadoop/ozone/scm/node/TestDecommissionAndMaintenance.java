@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
@@ -95,7 +95,7 @@ public class TestDecommissionAndMaintenance {
   private OzoneBucket bucket;
   private MiniOzoneCluster cluster;
   private NodeManager nm;
-  private ContainerManagerV2 cm;
+  private ContainerManager cm;
   private PipelineManager pm;
   private StorageContainerManager scm;
 

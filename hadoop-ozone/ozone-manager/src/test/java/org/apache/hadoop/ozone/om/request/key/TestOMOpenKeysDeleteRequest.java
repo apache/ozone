@@ -313,16 +313,18 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   private void assertInOpenKeyTable(OpenKeyBucket... openKeys)
       throws Exception {
 
-    for (String keyName: getFullOpenKeyNames(openKeys)) {
-      Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(keyName));
+    for (String keyName : getFullOpenKeyNames(openKeys)) {
+      Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .isExist(keyName));
     }
   }
 
   private void assertNotInOpenKeyTable(OpenKeyBucket... openKeys)
       throws Exception {
 
-    for (String keyName: getFullOpenKeyNames(openKeys)) {
-      Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(keyName));
+    for (String keyName : getFullOpenKeyNames(openKeys)) {
+      Assert.assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .isExist(keyName));
     }
   }
 

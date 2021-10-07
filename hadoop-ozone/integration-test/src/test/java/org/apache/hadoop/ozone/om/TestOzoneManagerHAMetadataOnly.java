@@ -1,4 +1,4 @@
-  /**
+/**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -93,6 +93,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     return retVolume;
   }
+
   @Test
   public void testAllVolumeOperations() throws Exception {
 
@@ -325,7 +326,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     ObjectStore objectStore = getObjectStore();
 
     Set<String> expectedVolumes = new TreeSet<>();
-    for (int i=0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
       String volumeName = "vol" + i;
       expectedVolumes.add(volumeName);
       VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
