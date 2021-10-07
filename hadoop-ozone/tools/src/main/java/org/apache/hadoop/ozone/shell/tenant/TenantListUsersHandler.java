@@ -43,7 +43,7 @@ public class TenantListUsersHandler extends S3Handler {
       description = "Tenant name")
   private String tenantName;
 
-  @CommandLine.Option(names = {"-t", "--prefix"},
+  @CommandLine.Option(names = {"-p", "--prefix"},
       description = "Filter users with this prefix.")
   private String prefix;
 
