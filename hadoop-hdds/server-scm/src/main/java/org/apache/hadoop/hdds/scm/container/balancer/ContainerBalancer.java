@@ -194,6 +194,7 @@ public class ContainerBalancer {
       //if no new move option is generated, it means the cluster can
       //not be balanced any more , so just stop
       IterationResult iR = doIteration();
+      LOG.info("Result of this iteration of Container Balancer: {}", iR);
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
         stop();
         return;
@@ -366,61 +367,23 @@ public class ContainerBalancer {
   }
 
   private IterationResult doIteration() {
-    // note that potential and selected targets are updated in the following
-    // loop
-    List<DatanodeDetails> potentialTargets = getPotentialTargets();
-    Set<DatanodeDetails> selectedTargets =
-        new HashSet<>(potentialTargets.size());
-    moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
-    boolean isMoveGenerated = false;
+    try {
+      // note that potential and selected targets are updated in the following
+      // loop
+      List<DatanodeDetails> potentialTargets = getPotentialTargets();
+      Set<DatanodeDetails> selectedTargets =
+          new HashSet<>(potentialTargets.size());
+      moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
+      boolean isMoveGenerated = false;
 
-    // match each overUtilized node with a target
-    for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
-      if (!balancerRunning) {
-        checkIterationMoveResults();
-        return IterationResult.ITERATION_INTERRUPTED;
-      }
-      DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
-      IterationResult result = checkConditionsForBalancing();
-      if (result != null) {
-        LOG.info("Exiting current iteration: {}", result);
-        checkIterationMoveResults();
-        return result;
-      }
-
-      ContainerMoveSelection moveSelection =
-          matchSourceWithTarget(source, potentialTargets);
-      if (moveSelection != null) {
-        isMoveGenerated = true;
-        LOG.info("ContainerBalancer is trying to move container {} from " +
-                "source datanode {} to target datanode {}",
-            moveSelection.getContainerID().toString(), source.getUuidString(),
-            moveSelection.getTargetNode().getUuidString());
-
-        if (moveContainer(source, moveSelection)) {
-          // consider move successful for now, and update selection criteria
-          potentialTargets = updateTargetsAndSelectionCriteria(potentialTargets,
-              selectedTargets, moveSelection, source);
-        }
-      }
-    }
-
-    // if not all underUtilized nodes have been selected, try to match
-    // withinThresholdUtilized nodes with underUtilized nodes
-    if (selectedTargets.size() < underUtilizedNodes.size()) {
-      potentialTargets.removeAll(selectedTargets);
-      Collections.reverse(withinThresholdUtilizedNodes);
-
-      for (DatanodeUsageInfo datanodeUsageInfo : withinThresholdUtilizedNodes) {
-        if (!balancerRunning) {
-          checkIterationMoveResults();
+      // match each overUtilized node with a target
+      for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
+        if (!isBalancerRunning()) {
           return IterationResult.ITERATION_INTERRUPTED;
         }
         DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
         IterationResult result = checkConditionsForBalancing();
         if (result != null) {
-          LOG.info("Exiting current iteration: {}", result);
-          checkIterationMoveResults();
           return result;
         }
 
@@ -430,29 +393,67 @@ public class ContainerBalancer {
           isMoveGenerated = true;
           LOG.info("ContainerBalancer is trying to move container {} from " +
                   "source datanode {} to target datanode {}",
-              moveSelection.getContainerID().toString(),
-              source.getUuidString(),
+              moveSelection.getContainerID().toString(), source.getUuidString(),
               moveSelection.getTargetNode().getUuidString());
 
           if (moveContainer(source, moveSelection)) {
             // consider move successful for now, and update selection criteria
-            potentialTargets =
-                updateTargetsAndSelectionCriteria(potentialTargets,
-                    selectedTargets, moveSelection, source);
+            potentialTargets = updateTargetsAndSelectionCriteria(
+                potentialTargets, selectedTargets, moveSelection, source);
           }
         }
       }
-    }
-    if (!isMoveGenerated) {
-      //no move option is generated, so the cluster can not be
-      //balanced any more, just stop iteration and exit
-      return IterationResult.CAN_NOT_BALANCE_ANY_MORE;
-    }
 
-    checkIterationMoveResults();
-    return IterationResult.ITERATION_COMPLETED;
+      // if not all underUtilized nodes have been selected, try to match
+      // withinThresholdUtilized nodes with underUtilized nodes
+      if (selectedTargets.size() < underUtilizedNodes.size()) {
+        potentialTargets.removeAll(selectedTargets);
+        Collections.reverse(withinThresholdUtilizedNodes);
+
+        for (DatanodeUsageInfo datanodeUsageInfo :
+            withinThresholdUtilizedNodes) {
+          if (!balancerRunning) {
+            return IterationResult.ITERATION_INTERRUPTED;
+          }
+          DatanodeDetails source = datanodeUsageInfo.getDatanodeDetails();
+          IterationResult result = checkConditionsForBalancing();
+          if (result != null) {
+            return result;
+          }
+
+          ContainerMoveSelection moveSelection =
+              matchSourceWithTarget(source, potentialTargets);
+          if (moveSelection != null) {
+            isMoveGenerated = true;
+            LOG.info("ContainerBalancer is trying to move container {} from " +
+                    "source datanode {} to target datanode {}",
+                moveSelection.getContainerID().toString(),
+                source.getUuidString(),
+                moveSelection.getTargetNode().getUuidString());
+
+            if (moveContainer(source, moveSelection)) {
+              // consider move successful for now, and update selection criteria
+              potentialTargets =
+                  updateTargetsAndSelectionCriteria(potentialTargets,
+                      selectedTargets, moveSelection, source);
+            }
+          }
+        }
+      }
+      if (!isMoveGenerated) {
+        //no move option is generated, so the cluster can not be
+        //balanced any more, just stop iteration and exit
+        return IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+      }
+      return IterationResult.ITERATION_COMPLETED;
+    } finally {
+      checkIterationMoveResults();
+    }
   }
 
+  /**
+   * Checks the results of all move operations when exiting an iteration.
+   */
   private void checkIterationMoveResults() {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
