@@ -90,6 +90,8 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
         identifier.setAwsAccessId(auth.getAccessId());
         identifier.setOwner(new Text(auth.getAccessId()));
         try {
+          // authenticate user with signature verification through
+          // delegationTokenMgr validateToken via retrievePassword
           delegationTokenMgr.retrievePassword(identifier);
         } catch (Throwable e) {
           LOG.error("signatures do NOT match for S3 identifier:{}",
