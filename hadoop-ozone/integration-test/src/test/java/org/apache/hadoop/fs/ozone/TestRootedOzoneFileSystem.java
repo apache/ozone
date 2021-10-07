@@ -31,7 +31,12 @@ import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -82,6 +87,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -108,6 +114,8 @@ public class TestRootedOzoneFileSystem {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRootedOzoneFileSystem.class);
+
+  private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -162,10 +170,9 @@ public class TestRootedOzoneFileSystem {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, (float) 0.15);
-    // Trash with 9 second deletes and 6 seconds checkpoints
-    conf.setFloat(FS_TRASH_INTERVAL_KEY, (float) 0.15); // 9 seconds
-    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
+    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL/2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -178,7 +185,7 @@ public class TestRootedOzoneFileSystem {
     }
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, enableAcl);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = cluster.getClient().getObjectStore();
@@ -1510,6 +1517,67 @@ public class TestRootedOzoneFileSystem {
     } catch (IOException e){
       //expected
     }
+  }
+
+  @Test
+  public void testBucketDefaultsShouldNotBeInheritedToFileForNonEC()
+      throws Exception {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(BucketLayout.LEGACY);
+    builder.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(ReplicationType.STAND_ALONE,
+            ReplicationFactor.ONE));
+    BucketArgs omBucketArgs = builder.build();
+    String vol = UUID.randomUUID().toString();
+    String buck = UUID.randomUUID().toString();
+    final OzoneBucket bucket100 = TestDataUtil
+        .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
+            omBucketArgs);
+    Assert.assertEquals(ReplicationType.STAND_ALONE.name(),
+        bucket100.getReplicationConfig().getReplicationType().name());
+
+    // Bucket has default STAND_ALONE and client has default RATIS.
+    // In this case, it should not inherit from bucket
+    try (OzoneFSOutputStream file = adapter
+        .createFile(vol + "/" + buck + "/test", (short) 3, true, false)) {
+      file.write(new byte[1024]);
+    }
+    OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test");
+    final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
+    final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
+    Assert.assertEquals(key.getReplicationConfig().getReplicationType().name(),
+        ReplicationType.RATIS.name());
+  }
+
+  @Test
+  public void testBucketDefaultsShouldBeInheritedToFileForEC()
+      throws Exception {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(BucketLayout.LEGACY);
+    builder.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig("RS-3-2-1024")));
+    BucketArgs omBucketArgs = builder.build();
+    String vol = UUID.randomUUID().toString();
+    String buck = UUID.randomUUID().toString();
+    final OzoneBucket bucket101 = TestDataUtil
+        .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
+            omBucketArgs);
+    Assert.assertEquals(ReplicationType.EC.name(),
+        bucket101.getReplicationConfig().getReplicationType().name());
+    // Bucket has default EC and client has default RATIS.
+    // In this case, it should inherit from bucket
+    try (OzoneFSOutputStream file = adapter
+        .createFile(vol + "/" + buck + "/test", (short) 3, true, false)) {
+      file.write(new byte[1024]);
+    }
+    OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test");
+    final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
+    final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
+    Assert.assertEquals(key.getReplicationConfig().getReplicationType().name(),
+        ReplicationType.EC.name());
   }
 
 }

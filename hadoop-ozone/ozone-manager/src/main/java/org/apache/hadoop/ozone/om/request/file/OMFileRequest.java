@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -463,8 +464,8 @@ public final class OMFileRequest {
       keyInfoOptional = Optional.of(omFileInfo);
     }
 
-    omMetadataManager.getOpenKeyTable().addCacheEntry(
-            new CacheKey<>(dbOpenFileName),
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .addCacheEntry(new CacheKey<>(dbOpenFileName),
             new CacheValue<>(keyInfoOptional, trxnLogIndex));
   }
 
@@ -511,8 +512,8 @@ public final class OMFileRequest {
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             openKeySessionID);
 
-    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, dbOpenFileKey,
-            omFileInfo);
+    omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .putWithBatch(batchOp, dbOpenFileKey, omFileInfo);
   }
 
   /**
@@ -533,8 +534,8 @@ public final class OMFileRequest {
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             uploadID);
 
-    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, multipartFileKey,
-            omFileInfo);
+    omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .putWithBatch(batchOp, multipartFileKey, omFileInfo);
 
     return multipartFileKey;
   }
@@ -579,7 +580,9 @@ public final class OMFileRequest {
 
     OmKeyInfo dbOmKeyInfo;
     if (openFileTable) {
-      dbOmKeyInfo = omMetadataMgr.getOpenKeyTable().get(dbOpenFileKey);
+      dbOmKeyInfo =
+          omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+              .get(dbOpenFileKey);
     } else {
       dbOmKeyInfo = omMetadataMgr.getKeyTable().get(dbOpenFileKey);
     }
@@ -969,4 +972,5 @@ public final class OMFileRequest {
           BUCKET_NOT_FOUND);
     }
   }
+
 }

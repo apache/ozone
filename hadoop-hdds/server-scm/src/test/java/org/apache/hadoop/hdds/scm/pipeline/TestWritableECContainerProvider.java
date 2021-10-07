@@ -16,9 +16,9 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -27,10 +27,19 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Matchers;
@@ -38,6 +47,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
@@ -68,12 +79,15 @@ public class TestWritableECContainerProvider {
       .getLogger(TestWritableECContainerProvider.class);
   private static final String OWNER = "SCM";
   private PipelineManager pipelineManager;
-  private ContainerManagerV2 containerManager
-      = Mockito.mock(ContainerManagerV2.class);
+  private ContainerManager containerManager
+      = Mockito.mock(ContainerManager.class);
   private PipelineChoosePolicy pipelineChoosingPolicy
       = new HealthyPipelineChoosePolicy();
 
-  private ConfigurationSource conf;
+  private OzoneConfiguration conf;
+  private DBStore dbStore;
+  private SCMHAManager scmhaManager;
+  private NodeManager nodeManager;
   private WritableContainerProvider provider;
   private ReplicationConfig repConfig;
   private int minPipelines;
@@ -81,7 +95,7 @@ public class TestWritableECContainerProvider {
   private Map<ContainerID, ContainerInfo> containers;
 
   @Before
-  public void setup() throws ContainerNotFoundException {
+  public void setup() throws IOException {
     repConfig = new ECReplicationConfig(3, 2);
     conf = new OzoneConfiguration();
     WritableECContainerProvider.WritableECContainerProviderConfig providerConf =
@@ -89,7 +103,15 @@ public class TestWritableECContainerProvider {
             .WritableECContainerProviderConfig.class);
     minPipelines = providerConf.getMinimumPipelines();
     containers = new HashMap<>();
-    pipelineManager = MockPipelineManager.getInstance();
+    File testDir = GenericTestUtils.getTestDir(
+        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(
+        conf, new SCMDBDefinition());
+    scmhaManager = MockSCMHAManager.getInstance(true);
+    nodeManager = new MockNodeManager(true, 10);
+    pipelineManager =
+        new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     provider = new WritableECContainerProvider(
         conf, pipelineManager, containerManager, pipelineChoosingPolicy);
 
@@ -200,7 +222,8 @@ public class TestWritableECContainerProvider {
 
   @Test
   public void testUnableToCreateAnyPipelinesReturnsNull() throws IOException {
-    pipelineManager = new MockPipelineManager() {
+    pipelineManager =
+        new MockPipelineManager(dbStore, scmhaManager, nodeManager) {
       @Override
       public Pipeline createPipeline(ReplicationConfig repConf,
           List<DatanodeDetails> excludedNodes,
@@ -219,7 +242,8 @@ public class TestWritableECContainerProvider {
   @Test
   public void testExistingPipelineReturnedWhenNewCannotBeCreated()
       throws IOException {
-    pipelineManager = new MockPipelineManager() {
+    pipelineManager =
+        new MockPipelineManager(dbStore, scmhaManager, nodeManager) {
 
       private boolean throwError = false;
 
@@ -277,7 +301,8 @@ public class TestWritableECContainerProvider {
       throws IOException {
     // Ensure PM throws PNF exception when we ask for the containers in the
     // pipeline
-    pipelineManager = new MockPipelineManager() {
+    pipelineManager =
+        new MockPipelineManager(dbStore, scmhaManager, nodeManager) {
 
       @Override
       public NavigableSet<ContainerID> getContainersInPipeline(

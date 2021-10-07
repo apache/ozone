@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.slf4j.Logger;
@@ -57,12 +57,12 @@ public class WritableECContainerProvider
   private final ConfigurationSource conf;
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final long containerSize;
   private final WritableECContainerProviderConfig providerConfig;
 
   public WritableECContainerProvider(ConfigurationSource conf,
-      PipelineManager pipelineManager, ContainerManagerV2 containerManager,
+      PipelineManager pipelineManager, ContainerManager containerManager,
       PipelineChoosePolicy pipelineChoosePolicy) {
     this.conf = conf;
     this.providerConfig =

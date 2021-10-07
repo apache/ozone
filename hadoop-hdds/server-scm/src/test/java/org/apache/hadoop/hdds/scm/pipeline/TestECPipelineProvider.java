@@ -47,7 +47,8 @@ public class TestECPipelineProvider {
   private PipelineProvider provider;
   private OzoneConfiguration conf;
   private NodeManager nodeManager = Mockito.mock(NodeManager.class);
-  private StateManager stateManager = Mockito.mock(StateManager.class);
+  private PipelineStateManager stateManager =
+      Mockito.mock(PipelineStateManager.class);
   private PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
   private long containerSizeBytes;
   @Before

@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -24,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Port;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UUID;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 
@@ -38,9 +42,10 @@ public class SinglePipelineBlockAllocator
 
   private long blockId;
   private Pipeline pipeline;
+  private OzoneConfiguration conf;
 
-  public SinglePipelineBlockAllocator() {
-
+  public SinglePipelineBlockAllocator(OzoneConfiguration conf) {
+    this.conf = conf;
   }
 
   @Override
@@ -48,7 +53,7 @@ public class SinglePipelineBlockAllocator
       KeyArgs keyArgs) {
 
     if (pipeline == null) {
-      pipeline = Pipeline.newBuilder()
+      Pipeline.Builder bldr = Pipeline.newBuilder()
           .setFactor(keyArgs.getFactor())
           .setType(keyArgs.getType())
           .setId(PipelineID.newBuilder()
@@ -68,9 +73,17 @@ public class SinglePipelineBlockAllocator
                   .setName("RATIS")
                   .setValue(1234)
                   .build())
-              .build())
-          .build();
+              .build());
+      if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
+        bldr.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+      }
+      pipeline = bldr.build();
     }
+
+    long blockSize =  (long)conf.getStorageSize(
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
 
     List<KeyLocation> results = new ArrayList<>();
     results.add(KeyLocation.newBuilder()
@@ -83,7 +96,7 @@ public class SinglePipelineBlockAllocator
                 .build())
             .build())
         .setOffset(0L)
-        .setLength(keyArgs.getDataSize())
+        .setLength(blockSize)
         .build());
     return results;
   }

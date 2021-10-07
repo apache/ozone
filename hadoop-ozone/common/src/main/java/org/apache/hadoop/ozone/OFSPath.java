@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
@@ -27,7 +28,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import java.math.BigInteger;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -69,28 +69,28 @@ public class OFSPath {
   public static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
 
   public OFSPath(Path path) {
-    initOFSPath(path.toUri());
+    initOFSPath(path.toUri(), false);
   }
 
   public OFSPath(String pathStr) {
-    try {
-      initOFSPath(new URI(pathStr));
-    } catch (URISyntaxException ex) {
-      throw new RuntimeException(ex);
+    if (StringUtils.isEmpty(pathStr)) {
+      return;
     }
+    final Path fsPath = new Path(pathStr);
+    // Preserve '/' at the end of a key if any, as fs.Path(String) discards it
+    final boolean endsWithSlash = pathStr.endsWith(OZONE_URI_DELIMITER);
+    initOFSPath(fsPath.toUri(), endsWithSlash);
   }
 
-  private void initOFSPath(URI uri) {
+  private void initOFSPath(URI uri, boolean endsWithSlash) {
     // Scheme is case-insensitive
     String scheme = uri.getScheme();
-    if (scheme != null) {
-      if (!scheme.toLowerCase().equals(OZONE_OFS_URI_SCHEME)) {
-        throw new ParseException("Can't parse schemes other than ofs://.");
-      }
+    if (scheme != null && !scheme.equalsIgnoreCase(OZONE_OFS_URI_SCHEME)) {
+      throw new ParseException("Can't parse schemes other than ofs.");
     }
     // authority could be empty
     authority = uri.getAuthority() == null ? "" : uri.getAuthority();
-    String pathStr = uri.getPath();
+    final String pathStr = uri.getPath();
     StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
     int numToken = token.countTokens();
 
@@ -120,6 +120,10 @@ public class OFSPath {
     // Compose key name
     if (token.hasMoreTokens()) {
       keyName = token.nextToken("").substring(1);
+      // Restore the '/' at the end
+      if (endsWithSlash) {
+        keyName += OZONE_URI_DELIMITER;
+      }
     }
   }
 
@@ -144,12 +148,23 @@ public class OFSPath {
     return keyName;
   }
 
+  private boolean isEmpty() {
+    return getAuthority().isEmpty()
+        && getMountName().isEmpty()
+        && getVolumeName().isEmpty()
+        && getBucketName().isEmpty()
+        && getKeyName().isEmpty();
+  }
+
   /**
    * Return the reconstructed path string.
    * Directories including volumes and buckets will have a trailing '/'.
    */
   @Override
   public String toString() {
+    if (isEmpty()) {
+      return "";
+    }
     Preconditions.checkNotNull(authority);
     StringBuilder sb = new StringBuilder();
     if (!isMount()) {
@@ -183,11 +198,17 @@ public class OFSPath {
    */
   // Prepend a delimiter at beginning. e.g. /vol1/buc1
   public String getNonKeyPath() {
+    if (isEmpty()) {
+      return "";
+    }
     return OZONE_URI_DELIMITER + getNonKeyPathNoPrefixDelim();
   }
 
   // Don't prepend the delimiter. e.g. vol1/buc1
   public String getNonKeyPathNoPrefixDelim() {
+    if (isEmpty()) {
+      return "";
+    }
     if (isMount()) {
       return mountName;
     } else {

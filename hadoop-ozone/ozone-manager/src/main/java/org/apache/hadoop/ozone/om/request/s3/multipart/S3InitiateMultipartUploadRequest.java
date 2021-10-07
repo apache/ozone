@@ -201,7 +201,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .build();
 
       // Add to cache
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(multipartKey),
           new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
       omMetadataManager.getMultipartInfoTable().addCacheEntry(

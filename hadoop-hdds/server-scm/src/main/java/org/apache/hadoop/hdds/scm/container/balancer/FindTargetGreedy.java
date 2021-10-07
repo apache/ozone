@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.slf4j.Logger;
@@ -42,11 +42,11 @@ public class FindTargetGreedy implements FindTargetStrategy {
   private static final Logger LOG =
       LoggerFactory.getLogger(FindTargetGreedy.class);
 
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private PlacementPolicy placementPolicy;
 
   public FindTargetGreedy(
-      ContainerManagerV2 containerManager,
+      ContainerManager containerManager,
       PlacementPolicy placementPolicy) {
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;

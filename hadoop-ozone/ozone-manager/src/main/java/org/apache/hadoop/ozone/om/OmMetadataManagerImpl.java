@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto
@@ -279,6 +280,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
+    // TODO: Refactor the below function by reading bucketLayout.
+    //  Jira: HDDS-5636
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
       return fileTable;
     }
@@ -301,8 +304,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmKeyInfo> getOpenKeyTable() {
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+  public Table getOpenKeyTable(BucketLayout bucketLayout) {
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       return openFileTable;
     }
     return openKeyTable;
@@ -1134,18 +1137,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
     List<String> expiredKeys = Lists.newArrayList();
 
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+    try (
+        TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+            keyValueTableIterator = getOpenKeyTable(
+            getBucketLayout()).iterator()) {
 
       while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String openKey = openKeyValue.getKey();
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
-        Duration openKeyAge =
-                Duration.between(
-                        Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
-                        Instant.now());
+        Duration openKeyAge = Duration
+            .between(Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
+                Instant.now());
 
         if (openKeyAge.compareTo(expirationDuration) >= 0) {
           expiredKeys.add(openKey);
@@ -1296,5 +1300,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(uploadId);
     return openKey.toString();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

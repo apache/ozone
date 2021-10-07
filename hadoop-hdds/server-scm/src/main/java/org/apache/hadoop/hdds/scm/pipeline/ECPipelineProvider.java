@@ -45,7 +45,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   private final long containerSizeBytes;
 
   public ECPipelineProvider(NodeManager nodeManager,
-                            StateManager stateManager,
+                            PipelineStateManager stateManager,
                             ConfigurationSource conf,
                             PlacementPolicy placementPolicy) {
     super(nodeManager, stateManager);

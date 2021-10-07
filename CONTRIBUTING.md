@@ -188,7 +188,9 @@ Checkstyle plugin may help to detect violations directly from the IDE.
 IntelliJ may not pick up protoc generated classes as they can be very huge. If the protoc files can't be compiled try the following:
 
 1. Open _Help_ -> _Edit custom properties_ menu.
-2. Add `idea.max.intellisense.filesize=5000` entry
+2. Add `idea.max.intellisense.filesize=10000` entry
 3. Restart your IDE
 
 
+## CI
+The Ozone project uses Github Actions for its CI system.  The configuration is described in detail [here](.github/ci.md).

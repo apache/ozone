@@ -43,8 +43,12 @@ _install_tool() {
   if [[ ! -d "${dir}" ]]; then
     mkdir -pv "${dir}"
     pushd "${dir}"
-    eval "${func}"
-    echo "Installed ${tool} in ${dir}"
+    if eval "${func}"; then
+      echo "Installed ${tool} in ${dir}"
+    else
+      echo "Failed to install ${tool}"
+      exit 1
+    fi
     popd
   fi
 

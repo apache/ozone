@@ -159,7 +159,8 @@ public class SequenceIdGenerator {
    * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
    * during SCM reload.
    */
-  public void reinitialize(Table<String, Long> sequenceIdTable) {
+  public void reinitialize(Table<String, Long> sequenceIdTable)
+      throws IOException {
     lock.lock();
     try {
       LOG.info("reinitialize SequenceIdGenerator.");
@@ -197,7 +198,7 @@ public class SequenceIdGenerator {
      * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
      * during SCM reload.
      */
-    void reinitialize(Table<String, Long> sequenceIdTable);
+    void reinitialize(Table<String, Long> sequenceIdTable) throws IOException;
   }
 
   /**
@@ -253,9 +254,28 @@ public class SequenceIdGenerator {
     }
 
     @Override
-    public void reinitialize(Table<String, Long> seqIdTable) {
+    public void reinitialize(Table<String, Long> seqIdTable)
+        throws IOException {
       this.sequenceIdTable = seqIdTable;
       this.sequenceIdToLastIdMap.clear();
+      initialize();
+    }
+
+    private void initialize() throws IOException {
+      TableIterator<String,
+          ? extends Table.KeyValue<String, Long>>
+          iterator = sequenceIdTable.iterator();
+
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, Long> kv = iterator.next();
+        final String sequenceIdName = kv.getKey();
+        final Long lastId = kv.getValue();
+        Preconditions.checkNotNull(sequenceIdName,
+            "sequenceIdName should not be null");
+        Preconditions.checkNotNull(lastId,
+            "lastId should not be null");
+        sequenceIdToLastIdMap.put(sequenceIdName, lastId);
+      }
     }
 
     /**

@@ -49,10 +49,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   @Override
-  ECBlockOutputStream createOutputStream() throws IOException {
+  void createOutputStream() throws IOException {
     this.out = new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
         getPipeline(), getBufferPool(), getConf(), getToken());
-    return this.out;
+  }
+
+  public ECBlockOutputStream getOutputStream() {
+    return out;
   }
 
   CompletableFuture<ContainerProtos.

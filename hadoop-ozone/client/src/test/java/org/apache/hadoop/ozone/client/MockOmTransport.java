@@ -83,10 +83,6 @@ public class MockOmTransport implements OmTransport {
     this.blockAllocator = allocator;
   }
 
-  public MockOmTransport() {
-    this.blockAllocator = new SinglePipelineBlockAllocator();
-  }
-
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     switch (payload.getCmdType()) {
@@ -162,11 +158,28 @@ public class MockOmTransport implements OmTransport {
 
   private CommitKeyResponse commitKey(CommitKeyRequest commitKeyRequest) {
     final KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
-    final KeyInfo remove =
+    final KeyInfo openKey =
         openKeys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
             .remove(keyArgs.getKeyName());
+    final KeyInfo.Builder committedKeyInfoWithLocations =
+        KeyInfo.newBuilder().setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(keyArgs.getKeyName())
+            .setCreationTime(openKey.getCreationTime())
+            .setModificationTime(openKey.getModificationTime())
+            .setDataSize(keyArgs.getDataSize()).setLatestVersion(0L)
+            .addKeyLocationList(KeyLocationList.newBuilder()
+                .addAllKeyLocations(keyArgs.getKeyLocationsList()));
+    // Just inherit replication config details from open Key
+    if (openKey.hasEcReplicationConfig()) {
+      committedKeyInfoWithLocations
+          .setEcReplicationConfig(openKey.getEcReplicationConfig());
+    } else if (openKey.hasFactor()) {
+      committedKeyInfoWithLocations.setFactor(openKey.getFactor());
+    }
+    committedKeyInfoWithLocations.setType(openKey.getType());
     keys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
-        .put(keyArgs.getKeyName(), remove);
+        .put(keyArgs.getKeyName(), committedKeyInfoWithLocations.build());
     return CommitKeyResponse.newBuilder()
         .build();
   }

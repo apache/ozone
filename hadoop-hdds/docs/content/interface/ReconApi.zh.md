@@ -402,7 +402,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
     
 **参数**
 
-请参阅 [Prometheus HTTP API 参考](https://prometheus.io/docs/prometheus/latestquerying/api/) 以获取完整的查询文档。
+请参阅 [Prometheus HTTP API 参考](https://prometheus.io/docs/prometheus/latest/querying/api/) 以获取完整的查询文档。
 
 **回传**
 
