@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
@@ -63,8 +65,8 @@ public class TestReconWithOzoneManagerFSO {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.om.enable.filesystem.paths", true);
-    conf.set("ozone.om.metadata.layout", "PREFIX");
+    TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
+        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     cluster =
             MiniOzoneCluster.newBuilder(conf)
                     .setNumDatanodes(1)
