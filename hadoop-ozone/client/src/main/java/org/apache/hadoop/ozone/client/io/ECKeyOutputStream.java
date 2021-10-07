@@ -234,7 +234,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // executePutBlock for all.
     // TODO: we should alter the put block calls to share CRC to each stream.
     blockOutputStreamEntryPool.executePutBlockForAll();
-    ecChunkBufferCache.clear();
+    ecChunkBufferCache.clear(parityCellSize);
 
     // check if block ends?
     if (shouldEndBlockGroup()) {
@@ -691,9 +691,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
       return pos;
     }
 
-    private void clear() {
-      clearBuffers(cellSize, dataBuffers);
-      clearBuffers(cellSize, parityBuffers);
+    private void clear(int size) {
+      clearBuffers(size, dataBuffers);
+      clearBuffers(size, parityBuffers);
     }
 
     private void release() {
