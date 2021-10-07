@@ -5,6 +5,10 @@ import java.util.List;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 
+/**
+ * Class to encapsulate the list of users and corresponding accessIds
+ * associated with a tenant.
+ */
 public class TenantUserList {
 
   private final String tenantName;
@@ -33,7 +37,8 @@ public class TenantUserList {
   }
 
   public OzoneManagerProtocolProtos.TenantUserList getProtobuf() {
-    final OzoneManagerProtocolProtos.TenantUserList.Builder builder = OzoneManagerProtocolProtos.TenantUserList.newBuilder();
+    final OzoneManagerProtocolProtos.TenantUserList.Builder builder =
+        OzoneManagerProtocolProtos.TenantUserList.newBuilder();
     builder.setTenantName(this.tenantName);
     userAccessIds.forEach(builder::addUserAccessIdInfo);
     return builder.build();

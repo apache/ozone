@@ -136,7 +136,8 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
-    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_NAME)).thenReturn(tenant);
+    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_NAME))
+        .thenReturn(tenant);
   }
 
   @After

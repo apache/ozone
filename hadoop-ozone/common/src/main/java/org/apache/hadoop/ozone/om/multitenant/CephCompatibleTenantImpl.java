@@ -23,8 +23,8 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.ozone.om.multitenantImpl.AccountNameSpaceImpl;
-import org.apache.hadoop.ozone.om.multitenantImpl.BucketNameSpaceImpl;
+import org.apache.hadoop.ozone.om.multitenant.impl.AccountNameSpaceImpl;
+import org.apache.hadoop.ozone.om.multitenant.impl.BucketNameSpaceImpl;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 

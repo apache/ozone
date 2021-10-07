@@ -17,10 +17,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.COMPLETED;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.FAILED;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.NOT_STARTED;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.TenantUserListLoader.UserListLoadState.RUNNING;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TENANT_ACCESSID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
@@ -62,8 +58,8 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerP
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantAdminGroupPrincipal;
-import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantUserGroupPrincipal;
+import org.apache.hadoop.ozone.om.multitenant.impl.OzoneTenantAdminGroupPrincipal;
+import org.apache.hadoop.ozone.om.multitenant.impl.OzoneTenantUserGroupPrincipal;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -91,15 +87,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final OzoneConfiguration conf;
   private final ReentrantReadWriteLock controlPathLock;
   private final Map<String, CachedTenantInfo> tenantCache;
-  private final TenantUserListLoader tenantUserListLoader;
 
   OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf) {
     this.conf = conf;
     controlPathLock = new ReentrantReadWriteLock();
     omMetadataManager = mgr;
     tenantCache = new ConcurrentHashMap<>();
-    tenantUserListLoader = new TenantUserListLoader(omMetadataManager,
-        tenantCache);
   }
 
   @Override
@@ -112,8 +105,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
     }
     authorizer.init(configuration);
-    Thread t = new Thread(tenantUserListLoader);
-    t.start();
+    loadUsersFromDB();
   }
 
   @Override
@@ -209,6 +201,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
+  public Tenant getTenantInfo(String tenantID) throws IOException {
+    // Todo : fix this.
+    return null;
+  }
+
+  @Override
   public void deactivateTenant(String tenantID) throws IOException {
 
   }
@@ -270,6 +268,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   public void destroyUser(String user, String accessID) {
     try {
       controlPathLock.writeLock().lock();
+      //TODO : Remove user from group in Authorizer.
       String tenantName = getTenantForAccessID(accessID);
       if (tenantName == null) {
         LOG.error("Tenant doesn't exist");
@@ -325,12 +324,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
+  public boolean isTenantAdmin(String user, String tenantName) {
+    return true;
+  }
+
+  @Override
   public TenantUserList listUsersInTenant(String tenantID, String prefix)
       throws IOException {
-    if (!tenantUserListLoader.isDone()) {
-      throw new IOException("Loading user list from DB not done, state = " +
-          tenantUserListLoader.state());
-    }
 
     if (!omMetadataManager.getTenantStateTable().isExist(tenantID)) {
       throw new IOException("Tenant '" + tenantID + "' not found!");
@@ -495,66 +495,32 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return conf;
   }
 
-  static class TenantUserListLoader implements Runnable {
+  public void loadUsersFromDB() {
+    Table<String, OmDBAccessIdInfo> tenantAccessIdTable =
+        omMetadataManager.getTenantAccessIdTable();
+    TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
+        iterator = tenantAccessIdTable.iterator();
+    int userCount = 0;
 
-    enum UserListLoadState {
-      NOT_STARTED,
-      RUNNING,
-      COMPLETED,
-      FAILED
-    }
+    try {
+      while (iterator.hasNext()) {
+        KeyValue<String, OmDBAccessIdInfo> next = iterator.next();
+        String accessId = next.getKey();
+        OmDBAccessIdInfo value = next.getValue();
+        String tenantId = value.getTenantId();
+        String user = value.getKerberosPrincipal();
 
-    private OMMetadataManager omMetadataManager;
-    private Map<String, CachedTenantInfo> tenantCacheMap;
-    private UserListLoadState loadState;
-
-    TenantUserListLoader(OMMetadataManager omMetadataManager,
-                         Map<String, CachedTenantInfo> tenantCache) {
-      this.omMetadataManager = omMetadataManager;
-      this.tenantCacheMap = tenantCache; // Same reference
-      this.loadState = NOT_STARTED;
-    }
-
-    @Override
-    public void run() {
-      Table<String, OmDBAccessIdInfo> tenantAccessIdTable =
-          omMetadataManager.getTenantAccessIdTable();
-      TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
-          iterator = tenantAccessIdTable.iterator();
-      int userCount = 0;
-      this.loadState = RUNNING;
-
-      try {
-        while (iterator.hasNext()) {
-
-          KeyValue<String, OmDBAccessIdInfo> next = iterator.next();
-          String accessId = next.getKey();
-          OmDBAccessIdInfo value = next.getValue();
-          String tenantId = value.getTenantId();
-          String user = value.getKerberosPrincipal();
-
-          CachedTenantInfo cachedTenantInfo =
-              tenantCacheMap.getOrDefault(tenantId,
-              new CachedTenantInfo(tenantId));
-          cachedTenantInfo.getTenantUsers().add(new ImmutablePair<>(user,
-                  accessId));
-          userCount++;
-        }
-        LOG.info("Loaded {} tenants and {} tenant-users from the database.",
-            tenantCacheMap.size(), userCount);
-        loadState = COMPLETED;
-      } catch (Exception ex) {
-       LOG.error("Error while loading user list. ", ex);
-       loadState = FAILED;
+        CachedTenantInfo cachedTenantInfo = tenantCache.getOrDefault(tenantId,
+                new CachedTenantInfo(tenantId));
+        cachedTenantInfo.getTenantUsers().add(
+            new ImmutablePair<>(user, accessId));
+        userCount++;
       }
-    }
-
-    UserListLoadState state() {
-      return loadState;
-    }
-
-    boolean isDone() {
-      return loadState == COMPLETED;
+      LOG.info("Loaded {} tenants and {} tenant-users from the database.",
+          tenantCache.size(), userCount);
+    } catch (Exception ex) {
+      LOG.error("Error while loading user list. ", ex);
     }
   }
+
 }

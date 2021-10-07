@@ -15,20 +15,20 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.om.multitenantImpl;
+package org.apache.hadoop.ozone.om.multitenant.impl;
 
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
 
 /**
  * Implements OzoneMultiTenantPrincipal.
  */
-public class OzoneTenantUserGroupPrincipal implements
-    OzoneTenantGroupPrincipal {
+public class OzoneTenantAdminGroupPrincipal
+    implements OzoneTenantGroupPrincipal {
   private final String tenantID;
-  private static final String DEFAULT_TENANT_GROUP_ALL_USERS =
-      "GroupTenantAllUsers";
+  private static final String DEFAULT_TENANT_GROUP_ALL_ADMINS =
+      "GroupTenantAllAdmins";
 
-  public OzoneTenantUserGroupPrincipal(String tenantID) {
+  public OzoneTenantAdminGroupPrincipal(String tenantID) {
     this.tenantID = tenantID;
   }
 
@@ -44,6 +44,6 @@ public class OzoneTenantUserGroupPrincipal implements
 
   @Override
   public String getName() {
-    return tenantID + TENANT_ID_SEPARATOR + DEFAULT_TENANT_GROUP_ALL_USERS;
+    return tenantID + TENANT_ID_SEPARATOR + DEFAULT_TENANT_GROUP_ALL_ADMINS;
   }
 }

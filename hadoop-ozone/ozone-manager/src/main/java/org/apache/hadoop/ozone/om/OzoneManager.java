@@ -107,7 +107,6 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -3154,6 +3153,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.TENANT, tenantName);
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
     try {
+      String userName = getRemoteUser().getUserName();
+      if (!multiTenantManagr.isTenantAdmin(userName, tenantName)
+          && !omAdminUsernames.contains(userName)) {
+        throw new IOException("Only tenant and ozone admins can access this " +
+            "API. '" + userName + "' is not an admin.");
+      }
+
       final TenantUserList userList =
           multiTenantManagr.listUsersInTenant(tenantName, prefix);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -3173,8 +3179,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (tenantName == null) {
     // If the user is not associated with a tenant, they will use the
     // default s3 volume.
-    String defaultS3volume =
-        HddsClientUtils.getDefaultS3VolumeName(configuration);
+      String defaultS3volume =
+          HddsClientUtils.getDefaultS3VolumeName(configuration);
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
@@ -3185,9 +3191,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       Tenant tenant = multiTenantManagr.getTenantInfo(tenantName);
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
-      List<OzoneObj> nameSpaceObjs = bucketNameSpace.getBucketNameSpaceObjects();
-      Preconditions.checkArgument(nameSpaceObjs.size() == 1, "Each S3 tenant " +
-          "currently only supports a single volume in its bucket namespace.");
+      List<OzoneObj> nameSpaceObjs =
+          bucketNameSpace.getBucketNameSpaceObjects();
+      Preconditions.checkArgument(nameSpaceObjs.size() == 1,
+          "Each S3 tenant currently only supports a single " +
+              "volume in its bucket namespace.");
       String volumeName = nameSpaceObjs.get(0).getVolumeName();
 
       // This call performs acl checks and checks volume existence.

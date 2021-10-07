@@ -15,39 +15,35 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.om.multitenantImpl;
+package org.apache.hadoop.ozone.om.multitenant.impl;
 
-import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
 
 /**
- * Implements AccountNameSpace.
+ * Implements OzoneMultiTenantPrincipal.
  */
-public class AccountNameSpaceImpl implements AccountNameSpace {
-  private final String accountNameSpaceID;
+public class OzoneTenantUserGroupPrincipal implements
+    OzoneTenantGroupPrincipal {
+  private final String tenantID;
+  private static final String DEFAULT_TENANT_GROUP_ALL_USERS =
+      "GroupTenantAllUsers";
 
-  public AccountNameSpaceImpl(String id) {
-    accountNameSpaceID = id;
+  public OzoneTenantUserGroupPrincipal(String tenantID) {
+    this.tenantID = tenantID;
   }
 
   @Override
-  public String getAccountNameSpaceID() {
-    return accountNameSpaceID;
+  public String getTenantID() {
+    return tenantID;
   }
 
   @Override
-  public SpaceUsageSource getSpaceUsage() {
-    return null;
+  public String toString() {
+    return getName();
   }
 
   @Override
-  public void setQuota(OzoneQuota quota) {
-
-  }
-
-  @Override
-  public OzoneQuota getQuota() {
-    return null;
+  public String getName() {
+    return tenantID + TENANT_ID_SEPARATOR + DEFAULT_TENANT_GROUP_ALL_USERS;
   }
 }

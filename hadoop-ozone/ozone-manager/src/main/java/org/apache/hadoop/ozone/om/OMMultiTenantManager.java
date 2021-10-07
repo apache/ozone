@@ -70,6 +70,17 @@ public interface OMMultiTenantManager {
    */
   Tenant createTenantAccessInAuthorizer(String tenantID) throws IOException;
 
+
+  /**
+   * Given a TenantID String, Return Tenant Interface. If the Tenant doesn't
+   * exist in the system already, throw Exception.
+   *
+   * @param tenantID
+   * @return Tenant interface.
+   * @throws IOException
+   */
+  Tenant getTenantInfo(String tenantID) throws IOException;
+
   /**
    * Given a TenantID String, deactivate the Tenant. If the Tenant has active
    * users and volumes, tenant gets dectivated. This means
@@ -149,6 +160,14 @@ public interface OMMultiTenantManager {
    * @param accessID
    */
   void deactivateUser(String accessID) throws IOException;
+
+  /**
+   * Check if a user is a tenant Admin.
+   * @param user user name.
+   * @param tenantName tenant name.
+   * @return
+   */
+  boolean isTenantAdmin(String user, String tenantName);
 
   /**
    * List all the user & accessIDs of all users that belong to this Tenant.

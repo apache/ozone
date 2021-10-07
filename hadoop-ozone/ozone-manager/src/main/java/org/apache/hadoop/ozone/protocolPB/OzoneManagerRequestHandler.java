@@ -238,7 +238,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getTenantGetUserInfoRequest());
         responseBuilder.setTenantGetUserInfoResponse(getUserInfoResponse);
         break;
-        case TenantListUser:
+      case TenantListUser:
         TenantListUserResponse listUserResponse = tenantListUsers(
             request.getTenantListUserRequest());
         responseBuilder.setTenantListUserResponse(listUserResponse);

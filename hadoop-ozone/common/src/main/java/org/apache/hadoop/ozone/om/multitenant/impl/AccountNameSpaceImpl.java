@@ -15,41 +15,25 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.om.multitenantImpl;
-
-import java.util.ArrayList;
-import java.util.List;
+package org.apache.hadoop.ozone.om.multitenant.impl;
 
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 
 /**
- * Implements BucketNameSpace.
+ * Implements AccountNameSpace.
  */
-public class BucketNameSpaceImpl implements BucketNameSpace {
-  private final String bucketNameSpaceID;
-  private List<OzoneObj> bucketNameSpaceObjects;
+public class AccountNameSpaceImpl implements AccountNameSpace {
+  private final String accountNameSpaceID;
 
-  public BucketNameSpaceImpl(String id) {
-    bucketNameSpaceID = id;
-    bucketNameSpaceObjects = new ArrayList<>();
+  public AccountNameSpaceImpl(String id) {
+    accountNameSpaceID = id;
   }
 
   @Override
-  public String getBucketNameSpaceID() {
-    return bucketNameSpaceID;
-  }
-
-  @Override
-  public List<OzoneObj> getBucketNameSpaceObjects() {
-    return bucketNameSpaceObjects;
-  }
-
-  @Override
-  public void addBucketNameSpaceObject(OzoneObj e) {
-    bucketNameSpaceObjects.add(e);
+  public String getAccountNameSpaceID() {
+    return accountNameSpaceID;
   }
 
   @Override

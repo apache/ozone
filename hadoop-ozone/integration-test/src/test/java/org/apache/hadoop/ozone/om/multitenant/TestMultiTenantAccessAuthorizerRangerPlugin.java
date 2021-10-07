@@ -35,8 +35,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantAdminGroupPrincipal;
-import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantUserGroupPrincipal;
+import org.apache.hadoop.ozone.om.multitenant.impl.OzoneTenantAdminGroupPrincipal;
+import org.apache.hadoop.ozone.om.multitenant.impl.OzoneTenantUserGroupPrincipal;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.http.auth.BasicUserPrincipal;
