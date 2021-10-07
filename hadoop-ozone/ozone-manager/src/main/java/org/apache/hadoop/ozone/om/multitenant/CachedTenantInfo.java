@@ -38,4 +38,8 @@ public class CachedTenantInfo {
   public Set<Pair<String, String>> getTenantUsers() {
     return tenantUserAccessIds;
   }
+
+  public String getTenantId() {
+    return tenantId;
+  }
 }

@@ -15,9 +15,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * Tenant commands for Ozone.
- */
 
 package org.apache.hadoop.ozone.shell.tenant;
 
@@ -32,6 +29,9 @@ import org.apache.hadoop.ozone.shell.s3.S3Handler;
 
 import picocli.CommandLine;
 
+/**
+ * Command to list users in a tenant along with corresponding accessId.
+ */
 @CommandLine.Command(name = "list-users",
     description = "List Tenant Users")
 public class TenantListUsersHandler extends S3Handler {
