@@ -469,7 +469,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new ConfigurationException(
           defaultBucketLayout +
               " is not a valid default bucket layout. Supported values are " +
-              "[OBJECT_STORE, FILE_SYSTEM_OPTIMIZED]");
+              BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + ", " +
+              BucketLayout.OBJECT_STORE.name() + ".");
     }
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
