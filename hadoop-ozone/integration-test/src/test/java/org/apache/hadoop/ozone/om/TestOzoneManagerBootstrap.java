@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileFilter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -29,18 +31,23 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.grpc.server.GrpcLogAppender;
+import org.apache.ratis.server.leader.FollowerInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
+import org.slf4j.event.Level;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
@@ -63,8 +70,6 @@ public class TestOzoneManagerBootstrap {
   private final String clusterId = UUID.randomUUID().toString();
   private final String scmId = UUID.randomUUID().toString();
 
-  private static final int NUM_INITIAL_OMS = 3;
-
   private static final String OM_SERVICE_ID = "om-bootstrap";
   private static final String VOLUME_NAME;
   private static final String BUCKET_NAME;
@@ -76,12 +81,9 @@ public class TestOzoneManagerBootstrap {
     BUCKET_NAME = "bucket" + RandomStringUtils.randomNumeric(5);
   }
 
-  private void setupCluster() throws Exception {
-    setupCluster(NUM_INITIAL_OMS);
-  }
-
   private void setupCluster(int numInitialOMs) throws Exception {
     conf = new OzoneConfiguration();
+    conf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -161,36 +163,20 @@ public class TestOzoneManagerBootstrap {
   }
 
   /**
-   * Add 1 new OM to cluster.
-   * @throws Exception
+   * 1. Add 2 new OMs to an existing 1 node OM cluster.
+   * 2. Verify that one of the new OMs must becomes the leader by stopping
+   * the old OM.
    */
   @Test
-  public void testBootstrapOneNewOM() throws Exception {
-    setupCluster();
-    testBootstrapOMs(1);
-  }
-
-  /**
-   * Add 2 new OMs to cluster.
-   * @throws Exception
-   */
-  @Test
-  public void testBootstrapTwoNewOMs() throws Exception {
-    setupCluster();
-    testBootstrapOMs(2);
-  }
-
-  /**
-   * Add 2 new OMs to a 1 node OM cluster. Verify that one of the new OMs
-   * must becomes the leader by stopping the old OM.
-   */
-  @Test
-  public void testLeaderChangeToNewOM() throws Exception {
+  public void testBootstrap() throws Exception {
     setupCluster(1);
     OzoneManager oldOM = cluster.getOzoneManager();
+
+    // 1. Add 2 new OMs to an existing 1 node OM cluster.
     List<String> newOMNodeIds = testBootstrapOMs(2);
 
-    // Stop old OM
+    // 2. Verify that one of the new OMs becomes the leader by stopping the
+    // old OM.
     cluster.stopOzoneManager(oldOM.getOMNodeId());
 
     // Wait for Leader Election timeout
@@ -205,12 +191,146 @@ public class TestOzoneManagerBootstrap {
         "other OMs are down", newOMNodeIds.contains(omLeader.getOMNodeId()));
 
     // Perform some read and write operations with new OM leader
-    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
-        .getObjectStore();
+    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID,
+        cluster.getConf()).getObjectStore();
+
     OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
     OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
     String key = createKey(bucket);
 
     Assert.assertNotNull(bucket.getKey(key));
+  }
+
+  /**
+   * Tests the following scenarios:
+   * 1. Bootstrap without updating config on any existing OM -> fail
+   * 2. Force bootstrap without upating config on any OM -> fail
+   */
+  @Test
+  public void testBootstrapWithoutConfigUpdate() throws Exception {
+    // Setup 1 node cluster
+    setupCluster(1);
+    cluster.setupExitManagerForTesting();
+    OzoneManager existingOM = cluster.getOzoneManager(0);
+    String existingOMNodeId = existingOM.getOMNodeId();
+
+    GenericTestUtils.LogCapturer omLog =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
+    GenericTestUtils.LogCapturer miniOzoneClusterLog =
+        GenericTestUtils.LogCapturer.captureLogs(MiniOzoneHAClusterImpl.LOG);
+
+    /***************************************************************************
+     * 1. Bootstrap without updating config on any existing OM -> fail
+     **************************************************************************/
+
+    // Bootstrap a new node without updating the configs on existing OMs.
+    // This should result in the bootstrap failing.
+    String newNodeId = "omNode-bootstrap-1";
+    try {
+      cluster.bootstrapOzoneManager(newNodeId, false, false);
+      Assert.fail("Bootstrap should have failed as configs are not updated on" +
+          " all OMs.");
+    } catch (Exception e) {
+      Assert.assertEquals(OmUtils.getOMAddressListPrintString(
+          Lists.newArrayList(existingOM.getNodeDetails())) + " do not have or" +
+          " have incorrect information of the bootstrapping OM. Update their " +
+          "ozone-site.xml before proceeding.", e.getMessage());
+      Assert.assertTrue(omLog.getOutput().contains("Remote OM config check " +
+          "failed on OM " + existingOMNodeId));
+      Assert.assertTrue(miniOzoneClusterLog.getOutput().contains(newNodeId +
+          " - System Exit"));
+    }
+
+    /***************************************************************************
+     * 2. Force bootstrap without upating config on any OM -> fail
+     **************************************************************************/
+
+    // Force Bootstrap a new node without updating the configs on existing OMs.
+    // This should avoid the bootstrap check but the bootstrap should fail
+    // eventually as the SetConfiguration request cannot succeed.
+
+    miniOzoneClusterLog.clearOutput();
+    omLog.clearOutput();
+
+    newNodeId = "omNode-bootstrap-2";
+    try {
+      cluster.bootstrapOzoneManager(newNodeId, false, true);
+      Assert.fail();
+    } catch (IOException e) {
+      Assert.assertTrue(omLog.getOutput().contains("Couldn't add OM " +
+          newNodeId + " to peer list."));
+      Assert.assertTrue(miniOzoneClusterLog.getOutput().contains(
+          existingOMNodeId + " - System Exit: There is no OM configuration " +
+              "for node ID " + newNodeId + " in ozone-site.xml."));
+
+      // Verify that the existing OM has stopped.
+      Assert.assertFalse(cluster.getOzoneManager(existingOMNodeId).isRunning());
+    }
+  }
+
+  /**
+   * Tests the following scenarios:
+   * 1. Stop 1 OM and update configs on rest, bootstrap new node -> fail
+   * 2. Force bootstrap (with 1 node down and updated configs on rest) -> pass
+   */
+  @Test
+  public void testForceBootstrap() throws Exception {
+    GenericTestUtils.setLogLevel(GrpcLogAppender.LOG, Level.ERROR);
+    GenericTestUtils.setLogLevel(FollowerInfo.LOG, Level.ERROR);
+    // Setup a 3 node cluster and stop 1 OM.
+    setupCluster(3);
+    OzoneManager downOM = cluster.getOzoneManager(2);
+    String downOMNodeId = downOM.getOMNodeId();
+    cluster.stopOzoneManager(downOMNodeId);
+
+    // Set a smaller value for OM Metadata and Client protocol retry attempts
+    OzoneConfiguration conf = cluster.getConf();
+    conf.setInt(OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_KEY, 2);
+    conf.setInt(
+        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY, 100);
+    cluster.setConf(conf);
+
+    GenericTestUtils.LogCapturer omLog =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
+    GenericTestUtils.LogCapturer miniOzoneClusterLog =
+        GenericTestUtils.LogCapturer.captureLogs(MiniOzoneHAClusterImpl.LOG);
+
+    /***************************************************************************
+     * 1. Force bootstrap (with 1 node down and updated configs on rest) -> pass
+     **************************************************************************/
+
+    // Update configs on all active OMs and Bootstrap a new node
+    String newNodeId = "omNode-bootstrap-1";
+    try {
+      cluster.bootstrapOzoneManager(newNodeId, true, false);
+      Assert.fail("Bootstrap should have failed as configs are not updated on" +
+          " all OMs.");
+    } catch (IOException e) {
+      Assert.assertEquals(OmUtils.getOMAddressListPrintString(
+          Lists.newArrayList(downOM.getNodeDetails())) + " do not have or " +
+          "have incorrect information of the bootstrapping OM. Update their " +
+          "ozone-site.xml before proceeding.", e.getMessage());
+      Assert.assertTrue(omLog.getOutput().contains("Remote OM " + downOMNodeId +
+          " configuration returned null"));
+      Assert.assertTrue(omLog.getOutput().contains("Remote OM config check " +
+          "failed on OM " + downOMNodeId));
+      Assert.assertTrue(miniOzoneClusterLog.getOutput().contains(newNodeId +
+          " - System Exit"));
+    }
+
+    /***************************************************************************
+     * 2. Force bootstrap (with 1 node down and updated configs on rest) -> pass
+     **************************************************************************/
+
+    miniOzoneClusterLog.clearOutput();
+    omLog.clearOutput();
+
+    // Update configs on all active OMs and Force Bootstrap a new node
+    newNodeId = "omNode-bootstrap-2";
+    cluster.bootstrapOzoneManager(newNodeId, true, true);
+    OzoneManager newOM = cluster.getOzoneManager(newNodeId);
+
+    // Verify that the newly bootstrapped OM is running
+    Assert.assertTrue(newOM.isRunning());
   }
 }

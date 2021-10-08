@@ -33,6 +33,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocol.OMMetadataProtocol;
@@ -53,8 +54,6 @@ public class OMMetadataProtocolClientSideImpl implements
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-  private static final int MAX_RETRIES = 10;
-  private static final int INTERVAL_BETWEEN_RETRIES_IN_MS = 1000;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMMetadataProtocolClientSideImpl.class);
@@ -71,11 +70,18 @@ public class OMMetadataProtocolClientSideImpl implements
 
     this.omNodeID = omNodeId;
 
+    int maxRetries = conf.getInt(
+        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_KEY,
+        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_DEFAULT);
+    long waitBetweenRetries = conf.getLong(
+        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY,
+        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT);
+
     // OM metadata is requested from a specific OM and hence there is no need
     // of any failover provider.
     RetryPolicy connectionRetryPolicy = RetryPolicies
-        .retryUpToMaximumCountWithFixedSleep(MAX_RETRIES,
-            INTERVAL_BETWEEN_RETRIES_IN_MS, TimeUnit.MILLISECONDS);
+        .retryUpToMaximumCountWithFixedSleep(maxRetries, waitBetweenRetries,
+            TimeUnit.MILLISECONDS);
     Configuration hadoopConf = LegacyHadoopConfigurationSource
         .asHadoopConfiguration(conf);
 

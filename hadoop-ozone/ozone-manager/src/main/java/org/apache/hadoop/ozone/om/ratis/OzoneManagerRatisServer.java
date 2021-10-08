@@ -318,21 +318,15 @@ public final class OzoneManagerRatisServer {
     SetConfigurationRequest request = new SetConfigurationRequest(clientId,
         server.getId(), raftGroupId, nextCallId(), newPeersList);
 
-    try {
-      RaftClientReply raftClientReply = server.setConfiguration(request);
-      if (raftClientReply.isSuccess()) {
-        LOG.info("Added OM {} to Ratis group {}.", newOMNodeId, raftGroupId);
-      } else {
-        LOG.error("Failed to add OM {} to Ratis group {}. Ratis " +
-                "SetConfiguration reply: {}", newOMNodeId, raftGroupId,
-            raftClientReply);
-        throw new IOException("Failed to add OM " + newOMNodeId + " to Ratis " +
-            "ring.");
-      }
-    } catch (IOException e) {
-      LOG.error("Failed to update Ratis configuration and add OM {} to " +
-          "Ratis group {}", newOMNodeId, raftGroupId, e);
-      throw e;
+    RaftClientReply raftClientReply = server.setConfiguration(request);
+    if (raftClientReply.isSuccess()) {
+      LOG.info("Added OM {} to Ratis group {}.", newOMNodeId, raftGroupId);
+    } else {
+      LOG.error("Failed to add OM {} to Ratis group {}. Ratis " +
+              "SetConfiguration reply: {}", newOMNodeId, raftGroupId,
+          raftClientReply);
+      throw new IOException("Failed to add OM " + newOMNodeId + " to Ratis " +
+          "ring.");
     }
   }
 

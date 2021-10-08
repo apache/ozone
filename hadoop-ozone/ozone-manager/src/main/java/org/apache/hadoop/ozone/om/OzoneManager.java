@@ -234,6 +234,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
@@ -546,15 +547,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
 
-    if (isBootstrapping) {
-      // Check that all OM configs have been updated with the new OM info.
-      checkConfigBeforeBootstrap();
-    } else if (isForcedBootstrapping) {
-      LOG.warn("Skipped checking whether existing OM configs have been " +
-          "updated with this OM information as force bootstrap is called.");
+    if (isBootstrapping || isForcedBootstrapping) {
+      omState = State.BOOTSTRAPPING;
+    } else {
+      omState = State.INITIALIZED;
     }
-
-    omState = State.INITIALIZED;
   }
 
   /**
@@ -751,14 +748,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     stop();
   }
 
-  public void shutdown(Exception ex) {
+  public void shutdown(Exception ex) throws IOException {
     if (omState != State.STOPPED) {
       stop();
       exitManager.exitSystem(1, ex.getLocalizedMessage(), ex, LOG);
     }
   }
 
-  public void shutdown(String errorMsg) {
+  public void shutdown(String errorMsg) throws IOException {
     if (omState != State.STOPPED) {
       stop();
       exitManager.exitSystem(1, errorMsg, LOG);
@@ -1319,6 +1316,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void start() throws IOException {
     initFSOLayout();
 
+    if (omState == State.BOOTSTRAPPING) {
+      if (isBootstrapping) {
+        // Check that all OM configs have been updated with the new OM info.
+        checkConfigBeforeBootstrap();
+      } else if (isForcedBootstrapping) {
+        LOG.warn("Skipped checking whether existing OM configs have been " +
+            "updated with this OM information as force bootstrap is called.");
+      }
+    }
+
     omClientProtocolMetrics.register();
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
@@ -1391,8 +1398,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
 
-    if (isBootstrapping || isForcedBootstrapping) {
-      omState = State.BOOTSTRAPPING;
+    if (omState == State.BOOTSTRAPPING) {
       bootstrap(omNodeDetails);
     }
 
@@ -1479,17 +1485,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     }
     if (!omsWihtoutNewConfig.isEmpty()) {
-      StringBuilder errorMsgBuilder = new StringBuilder();
-      errorMsgBuilder.append("OM(s) [")
-          .append(omsWihtoutNewConfig.get(0).getOMPrintInfo());
-      for (int i = 1; i < omsWihtoutNewConfig.size(); i++) {
-        errorMsgBuilder.append(",")
-            .append(omsWihtoutNewConfig.get(i).getOMPrintInfo());
-      }
-      errorMsgBuilder.append("] do not have or have incorrect information " +
-          "of the bootstrapping OM. Update their ozone-site.xml before " +
-          "proceeding.");
-      shutdown(errorMsgBuilder.toString());
+      String errorMsg = OmUtils.getOMAddressListPrintString(omsWihtoutNewConfig)
+          + " do not have or have incorrect information of the bootstrapping " +
+          "OM. Update their ozone-site.xml before proceeding.";
+      exitManager.exitSystem(1, errorMsg, LOG);
     }
   }
 
@@ -1539,6 +1538,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
         LOG.info("Successfully bootstrapped OM {} and joined the Ratis group " +
             "{}", getOMNodeId(), omRatisServer.getRaftGroup());
+      } catch (Exception e) {
+        LOG.error("Failed to Bootstrap OM.");
+        throw e;
       }
     } else {
       throw new IOException("OzoneManager can be bootstrapped only when ratis" +
@@ -1557,7 +1559,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Check if the OM NodeID is already present in the peer list or its
       // the local NodeID.
       if (!peerNodesMap.containsKey(omNodeId) && !isCurrentNode(omNodeId)) {
-        addOMNodeToPeers(omNodeId);
+        try {
+          addOMNodeToPeers(omNodeId);
+        } catch (IOException e) {
+          LOG.error("Fatal Error: Shutting down the system as otherwise it " +
+              "could lead to OM state divergence.", e);
+          exitManager.forceExit(1, e, LOG);
+        }
       } else {
         // Check if the OMNodeID is present in the RatisServer's peer list
         if (!ratisServerPeerIdsList.contains(omNodeId)) {
@@ -1591,14 +1599,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * after a SetConfiguration request has been successfully executed by the
    * Ratis server.
    */
-  public void addOMNodeToPeers(String newOMNodeId) {
+  private void addOMNodeToPeers(String newOMNodeId) throws IOException {
     OMNodeDetails newOMNodeDetails = null;
     try {
       newOMNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
           getConfiguration(), getOMServiceId(), newOMNodeId);
       if (newOMNodeDetails == null) {
         // Load new configuration object to read in new peer information
-        setConfiguration(new OzoneConfiguration());
+        setConfiguration(reloadConfiguration());
+        String s = getConfiguration().get(OZONE_OM_NODES_KEY + "." + getOMServiceId());
         newOMNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
             getConfiguration(), getOMServiceId(), newOMNodeId);
 
@@ -1610,8 +1619,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     } catch (IOException e) {
-      LOG.error("Couldn't add OM {} to peer list.", newOMNodeId);
-      shutdown(e);
+      LOG.error("{}: Couldn't add OM {} to peer list.", getOMNodeId(),
+          newOMNodeId);
+      exitManager.exitSystem(1, e.getLocalizedMessage(), e, LOG);
     }
 
     if (omSnapshotProvider == null) {
@@ -1770,7 +1780,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Stop service.
    */
   public void stop() {
-    LOG.info("Stopping Ozone Manager");
+    LOG.info("{}: Stopping Ozone Manager", getOMNodeId());
     try {
       omState = State.STOPPED;
       // Cancel the metrics timer and set to null.
@@ -3220,6 +3230,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OzoneManager.testSecureOmFlag = testSecureOmFlag;
   }
 
+  public OMNodeDetails getNodeDetails() {
+    return omNodeDetails;
+  }
+
   public String getOMNodeId() {
     return omNodeDetails.getNodeId();
   }
@@ -3453,10 +3467,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  void setExitManagerForTesting(ExitManager exitManagerForTesting) {
-    this.exitManager = exitManagerForTesting;
+  public void setExitManagerForTesting(ExitManager exitManagerForTesting) {
+    exitManager = exitManagerForTesting;
   }
-
 
   public boolean getEnableFileSystemPaths() {
     return configuration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,

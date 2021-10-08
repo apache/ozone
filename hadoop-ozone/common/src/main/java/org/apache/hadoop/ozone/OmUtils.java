@@ -755,4 +755,24 @@ public final class OmUtils {
 
     return omNodesList;
   }
+
+  public static String getOMAddressListPrintString(List<OMNodeDetails> omList) {
+    if (omList.size() == 0) {
+      return null;
+    }
+    StringBuilder printString = new StringBuilder();
+    printString.append("OM");
+    if (omList.size() == 1) {
+      printString.append(" [");
+    } else {
+      printString.append("(s) [");
+    }
+    printString.append(omList.get(0).getOMPrintInfo());
+    for (int i = 1; i < omList.size(); i++) {
+      printString.append(",")
+          .append(omList.get(i).getOMPrintInfo());
+    }
+    printString.append("]");
+    return printString.toString();
+  }
 }
