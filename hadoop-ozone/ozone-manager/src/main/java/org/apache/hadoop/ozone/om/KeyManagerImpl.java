@@ -326,7 +326,8 @@ public class KeyManagerImpl implements KeyManager {
     String openKey = metadataManager.getOpenKey(
         volumeName, bucketName, keyName, clientID);
 
-    OmKeyInfo keyInfo = metadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo keyInfo =
+        metadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (keyInfo == null) {
       LOG.error("Allocate block for a key not in open status in meta store" +
           " /{}/{}/{} with ID {}", volumeName, bucketName, keyName, clientID);
@@ -341,7 +342,7 @@ public class KeyManagerImpl implements KeyManager {
 
     keyInfo.appendNewBlocks(locationInfos, true);
     keyInfo.updateModifcationTime();
-    metadataManager.getOpenKeyTable().put(openKey, keyInfo);
+    metadataManager.getOpenKeyTable(getBucketLayout()).put(openKey, keyInfo);
 
     return locationInfos.get(0);
 
@@ -500,7 +501,7 @@ public class KeyManagerImpl implements KeyManager {
       keyInfo.appendNewBlocks(locationInfos, true);
     }
 
-    metadataManager.getOpenKeyTable().put(openKey, keyInfo);
+    metadataManager.getOpenKeyTable(getBucketLayout()).put(openKey, keyInfo);
 
   }
 
@@ -540,8 +541,8 @@ public class KeyManagerImpl implements KeyManager {
     String multipartKey = metadataManager
         .getMultipartKey(args.getVolumeName(), args.getBucketName(),
             args.getKeyName(), uploadID);
-    OmKeyInfo partKeyInfo = metadataManager.getOpenKeyTable().get(
-        multipartKey);
+    OmKeyInfo partKeyInfo =
+        metadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey);
     if (partKeyInfo == null) {
       throw new OMException("No such Multipart upload is with specified " +
           "uploadId " + uploadID,
@@ -606,7 +607,8 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
       OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
-      OmKeyInfo keyInfo = metadataManager.getOpenKeyTable().get(openKey);
+      OmKeyInfo keyInfo =
+          metadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
       if (keyInfo == null) {
         throw new OMException("Failed to commit key, as " + openKey + "entry " +
             "is not found in the openKey table", KEY_NOT_FOUND);
@@ -620,7 +622,7 @@ public class KeyManagerImpl implements KeyManager {
           openKey,
           objectKey,
           keyInfo,
-          metadataManager.getOpenKeyTable(),
+          metadataManager.getOpenKeyTable(getBucketLayout()),
           metadataManager.getKeyTable());
     } catch (OMException e) {
       throw e;
@@ -1083,7 +1085,7 @@ public class KeyManagerImpl implements KeyManager {
         // this key.
         metadataManager.getMultipartInfoTable().putWithBatch(batch,
             multipartKey, multipartKeyInfo);
-        metadataManager.getOpenKeyTable().putWithBatch(batch,
+        metadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(batch,
             multipartKey, omKeyInfo);
         store.commitBatchOperation(batch);
         return new OmMultipartInfo(volumeName, bucketName, keyName,
@@ -1161,8 +1163,8 @@ public class KeyManagerImpl implements KeyManager {
 
       String openKey = metadataManager.getOpenKey(
           volumeName, bucketName, keyName, clientID);
-      OmKeyInfo keyInfo = metadataManager.getOpenKeyTable().get(
-          openKey);
+      OmKeyInfo keyInfo =
+          metadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
       // set the data size and location info list
       keyInfo.setDataSize(omKeyArgs.getDataSize());
@@ -1197,7 +1199,8 @@ public class KeyManagerImpl implements KeyManager {
           // This is the first time part is being added.
           DBStore store = metadataManager.getStore();
           try (BatchOperation batch = store.initBatchOperation()) {
-            metadataManager.getOpenKeyTable().deleteWithBatch(batch, openKey);
+            metadataManager.getOpenKeyTable(getBucketLayout())
+                .deleteWithBatch(batch, openKey);
             metadataManager.getMultipartInfoTable().putWithBatch(batch,
                 multipartKey, multipartKeyInfo);
             store.commitBatchOperation(batch);
@@ -1224,7 +1227,8 @@ public class KeyManagerImpl implements KeyManager {
             metadataManager.getDeletedTable().putWithBatch(batch,
                 oldPartKeyInfo.getPartName(),
                 repeatedOmKeyInfo);
-            metadataManager.getOpenKeyTable().deleteWithBatch(batch, openKey);
+            metadataManager.getOpenKeyTable(getBucketLayout())
+                .deleteWithBatch(batch, openKey);
             metadataManager.getMultipartInfoTable().putWithBatch(batch,
                 multipartKey, multipartKeyInfo);
             store.commitBatchOperation(batch);
@@ -1309,8 +1313,8 @@ public class KeyManagerImpl implements KeyManager {
           bucketName, keyName, uploadID);
       OmMultipartKeyInfo multipartKeyInfo = metadataManager
           .getMultipartInfoTable().get(multipartKey);
-      OmKeyInfo openKeyInfo = metadataManager.getOpenKeyTable().get(
-          multipartKey);
+      OmKeyInfo openKeyInfo =
+          metadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey);
 
       // If there is no entry in openKeyTable, then there is no multipart
       // upload initiated for this key.
@@ -1347,8 +1351,8 @@ public class KeyManagerImpl implements KeyManager {
           // key table
           metadataManager.getMultipartInfoTable().deleteWithBatch(batch,
               multipartKey);
-          metadataManager.getOpenKeyTable().deleteWithBatch(batch,
-              multipartKey);
+          metadataManager.getOpenKeyTable(getBucketLayout())
+              .deleteWithBatch(batch, multipartKey);
           store.commitBatchOperation(batch);
         }
       }
@@ -1426,6 +1430,14 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(uploadID);
     boolean isTruncated = false;
     int nextPartNumberMarker = 0;
+    BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    if (ozoneManager != null) {
+      String buckKey = ozoneManager.getMetadataManager()
+          .getBucketKey(volumeName, bucketName);
+      OmBucketInfo buckInfo =
+          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+      bucketLayout = buckInfo.getBucketLayout();
+    }
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -1482,7 +1494,8 @@ public class KeyManagerImpl implements KeyManager {
                     uploadID);
           }
           OmKeyInfo omKeyInfo =
-              metadataManager.getOpenKeyTable().get(multipartKey);
+              metadataManager.getOpenKeyTable(bucketLayout)
+                  .get(multipartKey);
 
           if (omKeyInfo == null) {
             throw new IllegalStateException(
@@ -1756,6 +1769,20 @@ public class KeyManagerImpl implements KeyManager {
         .setKeyName(keyName)
         .build();
 
+    BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    if (ozoneManager != null) {
+      String buckKey =
+          ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
+      OmBucketInfo buckInfo = null;
+      try {
+        buckInfo =
+            ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+        bucketLayout = buckInfo.getBucketLayout();
+      } catch (IOException e) {
+        LOG.error("Failed to get bucket for the key: " + buckKey, e);
+      }
+    }
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
@@ -1764,7 +1791,8 @@ public class KeyManagerImpl implements KeyManager {
       // For Acl Type "WRITE", the key can only be found in
       // OpenKeyTable since appends to existing keys are not supported.
       if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
-        keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
+        keyInfo =
+            metadataManager.getOpenKeyTable(bucketLayout).get(objectKey);
       } else {
         // Recursive check is done only for ACL_TYPE DELETE
         // Rename and delete operations will send ACL_TYPE DELETE
@@ -1782,8 +1810,9 @@ public class KeyManagerImpl implements KeyManager {
           if (context.getAclRights() == IAccessAuthorizer.ACLType.READ) {
             return true;
           } else {
-            throw new OMException("Key not found, checkAccess failed. Key:" +
-                objectKey, KEY_NOT_FOUND);
+            throw new OMException(
+                "Key not found, checkAccess failed. Key:" + objectKey,
+                KEY_NOT_FOUND);
           }
         }
       }
@@ -3109,5 +3138,9 @@ public class KeyManagerImpl implements KeyManager {
           .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     }
     return false;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

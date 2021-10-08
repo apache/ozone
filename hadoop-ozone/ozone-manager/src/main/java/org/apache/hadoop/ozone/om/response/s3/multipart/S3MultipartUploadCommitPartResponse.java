@@ -148,8 +148,8 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
 
     //  This information has been added to multipartKeyInfo. So, we can
     //  safely delete part key info from open key table.
-    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        openKey);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .deleteWithBatch(batchOperation, openKey);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

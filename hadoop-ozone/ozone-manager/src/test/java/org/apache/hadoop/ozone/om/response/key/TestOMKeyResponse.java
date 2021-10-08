@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import java.util.Random;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -99,6 +100,10 @@ public class TestOMKeyResponse {
     if (batchOperation != null) {
       batchOperation.close();
     }
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
 }
