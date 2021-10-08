@@ -51,8 +51,6 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerP
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantAdminGroupPrincipal;
-import org.apache.hadoop.ozone.om.multitenantImpl.OzoneTenantUserGroupPrincipal;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -217,13 +215,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // TODO : Make it an idempotent operation. If any ranger state creation
       //  fails because it already exists, Ignore it.
 
-      OzoneTenantUserGroupPrincipal allTenantUsers =
-          new OzoneTenantUserGroupPrincipal(tenantID);
+      OzoneTenantGroupPrincipal allTenantUsers =
+          OzoneTenantGroupPrincipal.newUserGroup(tenantID);
       String allTenantUsersGroupID = authorizer.createGroup(allTenantUsers);
       tenant.addTenantAccessGroup(allTenantUsersGroupID);
 
-      OzoneTenantAdminGroupPrincipal allTenantAdmins =
-          new OzoneTenantAdminGroupPrincipal(tenantID);
+      OzoneTenantGroupPrincipal allTenantAdmins =
+          OzoneTenantGroupPrincipal.newAdminGroup(tenantID);
       String allTenantAdminsGroupID = authorizer.createGroup(allTenantAdmins);
       tenant.addTenantAccessGroup(allTenantAdminsGroupID);
 
@@ -346,7 +344,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         return null;
       }
       final OzoneTenantGroupPrincipal groupTenantAllUsers =
-          new OzoneTenantUserGroupPrincipal(tenantName);
+          OzoneTenantGroupPrincipal.newUserGroup(tenantName);
       String idGroupTenantAllUsers = authorizer.getGroupId(groupTenantAllUsers);
       List<String> userGroupIDs = new ArrayList<>();
       userGroupIDs.add(idGroupTenantAllUsers);

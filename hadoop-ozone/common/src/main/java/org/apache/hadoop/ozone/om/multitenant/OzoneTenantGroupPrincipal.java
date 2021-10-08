@@ -18,17 +18,39 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-
 import java.security.Principal;
 
 /**
- * OzoneMultiTenantPrincipal interface.
+ * Used to identify a tenant's group in Ranger.
  */
-public interface OzoneTenantGroupPrincipal extends Principal {
-  String TENANT_ID_SEPARATOR = OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
+public final class OzoneTenantGroupPrincipal implements Principal {
+  private final String tenantID;
+  private final String groupName;
 
-  /**
-   * @return plain TenantID part
-   */
-  String getTenantID();
+  public static OzoneTenantGroupPrincipal newUserGroup(String tenantID) {
+    return new OzoneTenantGroupPrincipal(tenantID, "GroupTenantAllUsers");
+  }
+
+  public static OzoneTenantGroupPrincipal newAdminGroup(String tenantID) {
+    return new OzoneTenantGroupPrincipal(tenantID, "GroupTenantAllAdmins");
+  }
+
+  private OzoneTenantGroupPrincipal(String tenantID, String groupName) {
+    this.tenantID = tenantID;
+    this.groupName = groupName;
+  }
+
+  public String getTenantID() {
+    return tenantID;
+  }
+
+  @Override
+  public String toString() {
+    return getName();
+  }
+
+  @Override
+  public String getName() {
+    return tenantID + OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + groupName;
+  }
 }
