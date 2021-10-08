@@ -76,10 +76,11 @@ public class PipelineSyncTask extends ReconScmTask {
         recordSingleRunCompletion();
         wait(interval);
       }
-    } catch (NodeNotFoundException | IOException t) {
+    } catch (Throwable t) {
       LOG.error("Exception in Pipeline sync Thread.", t);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
