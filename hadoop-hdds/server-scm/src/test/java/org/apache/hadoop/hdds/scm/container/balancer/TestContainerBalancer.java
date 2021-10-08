@@ -497,6 +497,33 @@ public class TestContainerBalancer {
     Assert.assertFalse(containerBalancer.getSourceToTargetMap().isEmpty());
   }
 
+  @Test
+  public void testMetrics() {
+    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0);
+
+    containerBalancer.start(balancerConfiguration);
+
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(500);
+    } catch (InterruptedException e) {}
+
+    containerBalancer.stop();
+    ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
+    Assert.assertEquals(determineExpectedUnBalancedNodes(
+            balancerConfiguration.getThreshold()).size(),
+        metrics.getDatanodesNumToBalance());
+    Assert.assertEquals(ContainerBalancer.ratioToPercent(
+            nodeUtilizations.get(nodeUtilizations.size() - 1)),
+        metrics.getMaxDatanodeUtilizedPercentage());
+  }
+
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
