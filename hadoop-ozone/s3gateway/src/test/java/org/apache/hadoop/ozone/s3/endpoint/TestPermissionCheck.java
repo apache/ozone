@@ -79,7 +79,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testListS3Buckets() throws IOException {
-    doThrow(exception).when(objectStore).getVolume(anyString());
+    doThrow(exception).when(objectStore).getS3Volume();
     RootEndpoint rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(client);
 
@@ -196,7 +196,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testGetAcl() throws Exception {
-    Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).getAcls();
 
@@ -212,15 +212,15 @@ public class TestPermissionCheck {
     try {
       bucketEndpoint.get("bucketName", null, null, null, 1000,
           null, null, null, null, null, "acl", null);
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception &&
-          ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
+      Assert.fail("Expected OS3Exception with FORBIDDEN http code.");
+    } catch (OS3Exception e) {
+      Assert.assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
     }
   }
 
   @Test
   public void testSetAcl() throws Exception {
-    Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).addAcl(any());
 
@@ -267,7 +267,8 @@ public class TestPermissionCheck {
   public void testPutKey() throws IOException {
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket)
-        .createKey(anyString(), anyLong(), any(), any(), any());
+        .createKey(anyString(), anyLong(), any(), any());
+
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
