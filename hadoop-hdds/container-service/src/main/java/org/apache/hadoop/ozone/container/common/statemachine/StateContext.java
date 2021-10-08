@@ -620,7 +620,7 @@ public class StateContext {
       }
 
       if (!isThreadPoolAvailable(service)) {
-        long count = threadPoolNotAvailableTimeSum.incrementAndGet();
+        long count = threadPoolNotAvailableCount.incrementAndGet();
         long unavailableTime = threadPoolNotAvailableTimeSum.addAndGet(
             lastHeartbeatSent.get() - System.currentTimeMillis());
         if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
