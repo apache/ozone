@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -106,6 +107,7 @@ public class DatanodeStateMachine implements Closeable {
    */
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
   private final MeasuredReplicator replicatorMetrics;
+  private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
 
   /**
    * Constructs a a datanode state machine.
@@ -166,6 +168,10 @@ public class DatanodeStateMachine implements Closeable {
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
             replicatorMetrics, dnConf.getReplicationMaxStreams());
+
+    replicationSupervisorMetrics =
+        ReplicationSupervisorMetrics.create(supervisor);
+
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -346,6 +352,7 @@ public class DatanodeStateMachine implements Closeable {
       cmdProcessThread.interrupt();
     }
     context.setState(DatanodeStates.getLastState());
+    replicationSupervisorMetrics.unRegister();
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
