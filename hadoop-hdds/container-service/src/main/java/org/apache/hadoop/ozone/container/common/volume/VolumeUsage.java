@@ -76,11 +76,11 @@ public class VolumeUsage implements SpaceUsageSource {
     return Math.max(reservedInBytes - getOtherUsed(), 0L);
   }
 
-  public void start() {
+  public synchronized void start() {
     source.start();
   }
 
-  public void shutdown() {
+  public synchronized void shutdown() {
     if (!shutdownComplete) {
       source.shutdown();
       shutdownComplete = true;
