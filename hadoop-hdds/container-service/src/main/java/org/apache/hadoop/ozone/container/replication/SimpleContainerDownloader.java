@@ -92,7 +92,6 @@ public class SimpleContainerDownloader implements ContainerDownloader {
             } catch (ExecutionException | IOException e) {
               LOG.error("Error on replicating container: " + containerId,
                   e);
-              return null;
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
             }
