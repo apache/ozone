@@ -82,10 +82,18 @@ public final class DatanodeIdYaml {
       }
 
       DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-      builder.setUuid(UUID.fromString(datanodeDetailsYaml.getUuid()))
-          .setIpAddress(datanodeDetailsYaml.getIpAddress())
-          .setHostName(datanodeDetailsYaml.getHostName())
-          .setCertSerialId(datanodeDetailsYaml.getCertSerialId());
+      try {
+        builder.setUuid(UUID.fromString(datanodeDetailsYaml.getUuid()))
+            .setIpAddress(datanodeDetailsYaml.getIpAddress())
+            .setHostName(datanodeDetailsYaml.getHostName())
+            .setCertSerialId(datanodeDetailsYaml.getCertSerialId());
+      } catch (NullPointerException e) {
+        DatanodeDetails details = DatanodeDetails.newBuilder()
+            .setUuid(UUID.randomUUID()).build();
+        details.setInitialVersion(DatanodeVersions.CURRENT_VERSION);
+        details.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
+        return details;
+      }
       if (datanodeDetailsYaml.getPersistedOpState() != null) {
         builder.setPersistedOpState(HddsProtos.NodeOperationalState.valueOf(
             datanodeDetailsYaml.getPersistedOpState()));
@@ -106,12 +114,6 @@ public final class DatanodeIdYaml {
           .setCurrentVersion(datanodeDetailsYaml.getCurrentVersion());
 
       datanodeDetails = builder.build();
-    } catch (NullPointerException e) {
-      DatanodeDetails details = DatanodeDetails.newBuilder()
-          .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersions.CURRENT_VERSION);
-      details.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
-      return details;
     }
 
     return datanodeDetails;
