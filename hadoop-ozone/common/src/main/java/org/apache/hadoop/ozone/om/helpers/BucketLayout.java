@@ -62,8 +62,9 @@ public enum BucketLayout {
   }
 
   public static BucketLayout fromString(String value) {
-    // Todo: should we throw error if user configured unsupported value
-    //  during OM startup or bucket creation time.
+    // This will never be null in production but can be null in mocked
+    // unit test cases.
+    // Added safer `isBlank` check for unit test cases.
     return StringUtils.isBlank(value) ? LEGACY : BucketLayout.valueOf(value);
   }
 }
