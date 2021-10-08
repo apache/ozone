@@ -60,6 +60,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
@@ -465,8 +466,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name()) &&
         !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name())
     ) {
-      throw new IllegalArgumentException(
-          defaultBucketLayout + " is not a valid default bucket layout.");
+      throw new ConfigurationException(
+          defaultBucketLayout +
+              " is not a valid default bucket layout. Supported values are " +
+              "[OBJECT_STORE, FILE_SYSTEM_OPTIMIZED]");
     }
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
