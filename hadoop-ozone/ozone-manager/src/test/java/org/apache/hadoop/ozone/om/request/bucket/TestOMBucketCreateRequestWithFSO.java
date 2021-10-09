@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -42,6 +43,8 @@ public class TestOMBucketCreateRequestWithFSO
   public void testValidateAndUpdateCacheWithFSO() throws Exception {
     when(ozoneManager.getOMMetadataLayout()).thenReturn(
             OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -107,6 +110,8 @@ public class TestOMBucketCreateRequestWithFSO
         dbBucketInfo.getMetadata());
     Assert.assertEquals(bucketInfoFromProto.getEncryptionKeyInfo(),
         dbBucketInfo.getEncryptionKeyInfo());
+    Assert.assertEquals(bucketInfoFromProto.getBucketLayout(),
+        dbBucketInfo.getBucketLayout());
 
     // verify OMResponse.
     verifySuccessCreateBucketResponse(omClientResponse.getOMResponse());

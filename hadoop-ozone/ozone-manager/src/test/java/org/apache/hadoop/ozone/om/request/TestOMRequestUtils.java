@@ -503,12 +503,15 @@ public final class TestOMRequestUtils {
           String bucketName, String volumeName, boolean isVersionEnabled,
           OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
     OzoneManagerProtocolProtos.BucketInfo bucketInfo =
-            OzoneManagerProtocolProtos.BucketInfo.newBuilder()
-                    .setBucketName(bucketName)
-                    .setVolumeName(volumeName)
-                    .setIsVersionEnabled(isVersionEnabled)
-                    .setStorageType(storageTypeProto)
-                    .addAllMetadata(getMetadataListFSO()).build();
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setBucketName(bucketName)
+            .setVolumeName(volumeName)
+            .setIsVersionEnabled(isVersionEnabled)
+            .setStorageType(storageTypeProto)
+            .addAllMetadata(getMetadataListFSO()).setBucketLayout(
+                OzoneManagerProtocolProtos.BucketLayoutProto.
+                    FILE_SYSTEM_OPTIMIZED)
+            .build();
     OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
             OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
     req.setBucketInfo(bucketInfo);
@@ -1036,6 +1039,11 @@ public final class TestOMRequestUtils {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
+    if (StringUtils.equalsIgnoreCase(
+        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX, version)) {
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+    }
   }
 
   public static BucketLayout getBucketLayout() {
