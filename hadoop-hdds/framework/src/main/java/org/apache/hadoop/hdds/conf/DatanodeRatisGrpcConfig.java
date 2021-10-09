@@ -68,4 +68,21 @@ public class DatanodeRatisGrpcConfig {
   public void setFlowControlWindow(int flowControlWindow) {
     this.flowControlWindow = flowControlWindow;
   }
+
+  @Config(key = "server.leader.outstanding.appends.max",
+      defaultValue = "128",
+      type = ConfigType.INT,
+      tags = {OZONE, CLIENT, PERFORMANCE},
+      description = "Maximum pending appendEntity requests hold by each " +
+          "GrpcLogAppender "
+  )
+  private int appendMax = 128;
+
+  public int getLeaderLogAppenderOutstandingMax() {
+    return appendMax;
+  }
+
+  public void setLeaderLogAppenderOutstandingMax(int appendMax) {
+    this.appendMax = appendMax;
+  }
 }

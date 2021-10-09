@@ -155,4 +155,20 @@ public class DatanodeRatisServerConfig {
   public void setPreVote(boolean preVote) {
     this.preVoteEnabled = preVote;
   }
+
+  @Config(key = "log.write.buffer.size",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      tags = {OZONE, DATANODE, RATIS},
+      description = "Ratis Log writer buffer size."
+  )
+  private int writeBufferSize = 1024 * 1024;
+
+  public int getLogWriteBufferSize() {
+    return writeBufferSize;
+  }
+
+  public void setLogWriteBufferSize(int writeBufferSize) {
+    this.writeBufferSize = writeBufferSize;
+  }
 }

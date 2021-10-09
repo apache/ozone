@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DatanodeRatisGrpcConfig;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -261,9 +262,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // Set the ratis leader election timeout
     setRatisLeaderElectionTimeout(properties);
 
-    // Set the maximum cache segments
-    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
-
     // Disable the pre vote feature in Ratis
     RaftServerConfigKeys.LeaderElection.setPreVote(properties,
         conf.getObject(DatanodeRatisServerConfig.class).isPreVoteEnabled());
@@ -342,6 +340,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // Set properties starting with prefix raft.server
     RatisHelper.createRaftServerProperties(conf, properties);
 
+    // Set the grpcLogAppender outstanding max
+    int maxAppend = conf.getObject(DatanodeRatisGrpcConfig.class)
+        .getLeaderLogAppenderOutstandingMax();
+    GrpcConfigKeys.Server.setLeaderOutstandingAppendsMax(properties, maxAppend);
     return properties;
   }
 
@@ -413,7 +415,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
     RaftServerConfigKeys.Log.setWriteBufferSize(properties,
-            SizeInBytes.valueOf(raftSegmentSize));
+        SizeInBytes.valueOf(conf.getObject(DatanodeRatisServerConfig.class)
+            .getLogWriteBufferSize()));
+    // Set the maximum cache segments
+    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
   }
 
   private RpcType setRpcType(RaftProperties properties) {
