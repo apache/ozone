@@ -48,7 +48,7 @@ Create buckets for FS test
 Create links for FS test
     Execute And Ignore Error    ozone sh volume create ${VOLUME}-src --space-quota 100TB
     Execute And Ignore Error    ozone sh volume create ${VOL2}-src --space-quota 100TB
-    Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET}-src
+    Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET}-src --space-quota 10GB --namespace-quota=10
     Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET2}-src
     Execute                     ozone sh bucket create ${VOL2}-src/${BUCKET_IN_VOL2}-src
     Execute                     ozone sh bucket link ${VOLUME}-src/${BUCKET}-src ${VOLUME}/${BUCKET}
@@ -63,6 +63,8 @@ Sanity check for FS test
     ${result} =         Execute               ozone sh bucket list ${VOLUME}
                         Should contain        ${result}               ${BUCKET}
                         Should contain        ${result}               ${BUCKET2}
+                        Should Match Regexp   ${result}               "quotaInBytes" : 107374182400
+                        Should Match Regexp   ${result}               "quotaInNamespace" : 10
 
 Assign suite vars for FS test
     ${random} =         Generate Random String  5  [NUMBERS]

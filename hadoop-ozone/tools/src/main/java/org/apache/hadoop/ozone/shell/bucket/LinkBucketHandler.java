@@ -59,11 +59,17 @@ public class LinkBucketHandler extends Handler {
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
+    OzoneVolume sourceVol = client.getObjectStore().getVolume(
+        source.getVolumeName());
+    OzoneBucket sourceBucket = sourceVol.getBucket(source.getBucketName());
+
     BucketArgs.Builder bb = new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
         .setSourceVolume(source.getVolumeName())
-        .setSourceBucket(source.getBucketName());
+        .setSourceBucket(source.getBucketName())
+        .setQuotaInBytes(sourceBucket.getQuotaInBytes())
+        .setQuotaInNamespace(sourceBucket.getQuotaInNamespace());
 
     String volumeName = target.getVolumeName();
     String bucketName = target.getBucketName();
