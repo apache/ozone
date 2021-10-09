@@ -342,7 +342,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // Set the grpcLogAppender outstanding max
     int maxAppend = conf.getObject(DatanodeRatisGrpcConfig.class)
-        .getLeaderLogAppenderOutstandingMax();
+        .getLeaderLogAppenderPendingRequestMax();
     GrpcConfigKeys.Server.setLeaderOutstandingAppendsMax(properties, maxAppend);
     return properties;
   }

@@ -168,7 +168,7 @@ public class DatanodeRatisServerConfig {
     return writeBufferSize;
   }
 
-  public void setLogWriteBufferSize(int writeBufferSize) {
-    this.writeBufferSize = writeBufferSize;
+  public void setLogWriteBufferSize(int bufferSize) {
+    this.writeBufferSize = bufferSize;
   }
 }

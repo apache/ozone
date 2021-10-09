@@ -73,16 +73,16 @@ public class DatanodeRatisGrpcConfig {
       defaultValue = "128",
       type = ConfigType.INT,
       tags = {OZONE, CLIENT, PERFORMANCE},
-      description = "Maximum pending appendEntity requests hold by each " +
-          "GrpcLogAppender "
+      description = "Maximum pending appendEntity requests to sent hold by " +
+          " each GrpcLogAppender"
   )
-  private int appendMax = 128;
+  private int pendingAppendRequestMax = 128;
 
-  public int getLeaderLogAppenderOutstandingMax() {
-    return appendMax;
+  public int getLeaderLogAppenderPendingRequestMax() {
+    return pendingAppendRequestMax;
   }
 
-  public void setLeaderLogAppenderOutstandingMax(int appendMax) {
-    this.appendMax = appendMax;
+  public void setLeaderLogAppenderPendingRequestMax(int pendingMax) {
+    this.pendingAppendRequestMax = pendingMax;
   }
 }
