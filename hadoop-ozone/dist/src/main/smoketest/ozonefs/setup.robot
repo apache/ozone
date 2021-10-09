@@ -63,8 +63,8 @@ Sanity check for FS test
     ${result} =         Execute               ozone sh bucket list ${VOLUME}
                         Should contain        ${result}               ${BUCKET}
                         Should contain        ${result}               ${BUCKET2}
-                        Should Match Regexp   ${result}               "quotaInBytes" : 107374182400
-                        Should Match Regexp   ${result}               "quotaInNamespace" : 10
+                        Should contain   ${result}               "quotaInBytes" : 107374182400
+                        Should contain   ${result}               "quotaInNamespace" : 10
 
 Assign suite vars for FS test
     ${random} =         Generate Random String  5  [NUMBERS]
