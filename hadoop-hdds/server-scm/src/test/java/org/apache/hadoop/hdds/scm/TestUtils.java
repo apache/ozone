@@ -92,6 +92,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class TestUtils {
 
   private static ThreadLocalRandom random = ThreadLocalRandom.current();
+  private static PipelineID randomPipelineID = PipelineID.randomId();
 
   private TestUtils() {
   }
@@ -629,6 +630,20 @@ public final class TestUtils {
             new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(state)
         .setSequenceId(10000L)
+        .setPipelineID(randomPipelineID)
+        .setOwner("TEST")
+        .build();
+  }
+
+  public static ContainerInfo getContainer(
+      final HddsProtos.LifeCycleState state, PipelineID pipelineID) {
+    return new ContainerInfo.Builder()
+        .setContainerID(RandomUtils.nextLong())
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
+        .setState(state)
+        .setSequenceId(10000L)
+        .setPipelineID(pipelineID)
         .setOwner("TEST")
         .build();
   }
