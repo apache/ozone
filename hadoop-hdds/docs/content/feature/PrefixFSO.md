@@ -73,3 +73,19 @@ By default the feature is disabled. It can be enabled with the following
    <value>PREFIX</value>
 </property>
 ```
+
+In reference to efforts towards supporting protocol aware buckets 
+within an Ozone cluster, the following configuration can be used 
+to define the default value for bucket layout during bucket creation 
+if the client has not specified the bucket layout argument. 
+Supported values are `OBJECT_STORE` and `FILE_SYSTEM_OPTIMIZED`.
+
+By default, the buckets will default to `OBJECT_STORE` behaviour.
+
+```XML
+
+<property>
+ <name>ozone.default.bucket.layout</name>
+ <value>OBJECT_STORE</value>
+</property>
+```

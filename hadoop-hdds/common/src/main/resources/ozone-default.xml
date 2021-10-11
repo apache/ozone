@@ -1745,6 +1745,14 @@
   </property>
 
   <property>
+    <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
+    <value>false</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description>Enable/disable OM HA leader election pre-vote phase.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.server.failure.timeout.duration</name>
     <value>120s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
@@ -2100,7 +2108,7 @@
       not be renewed.
     </description>
   </property>
-  
+
   <property>
     <name>ozone.fs.iterate.batch-size</name>
     <value>100</value>
@@ -2805,7 +2813,7 @@
     <tag>OZONE, SCM</tag>
     <description>Thread pool size configured to process container reports.
     </description>
-  </property>  
+  </property>
 
   <property>
     <name>ozone.scm.datanode.ratis.volume.free-space.min</name>
@@ -2903,6 +2911,12 @@
       election. Default is 1s.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
+    <value>false</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Enable/disable SCM HA leader election pre-vote phase.</description>
+  </property>
+  <property>
     <name>ozone.scm.ha.ratis.leader.ready.wait.timeout</name>
     <value>60s</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
@@ -2972,6 +2986,21 @@
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
     <description>
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.default.bucket.layout</name>
+    <value>OBJECT_STORE</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default bucket layout used by Ozone Manager during bucket creation when a client does not specify the
+      bucket layout option. Supported values are OBJECT_STORE and FILE_SYSTEM_OPTIMIZED.
+      OBJECT_STORE: This layout allows the bucket to behave as a pure object store and will not allow
+      interoperability between S3 and FS APIs.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
     </description>
   </property>
 </configuration>

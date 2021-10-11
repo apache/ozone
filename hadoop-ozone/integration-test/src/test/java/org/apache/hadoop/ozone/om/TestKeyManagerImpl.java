@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -272,7 +273,7 @@ public class TestKeyManagerImpl {
         .setDataSize(0)
         .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();
-    metadataManager.getOpenKeyTable().put(
+    metadataManager.getOpenKeyTable(getBucketLayout()).put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
         omKeyInfo);
     LambdaTestUtils.intercept(OMException.class,
@@ -1491,5 +1492,9 @@ public class TestKeyManagerImpl {
         .setAclRights(ACLType.READ)
         .setAclType(ACLIdentityType.USER)
         .build();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.LEGACY;
   }
 }

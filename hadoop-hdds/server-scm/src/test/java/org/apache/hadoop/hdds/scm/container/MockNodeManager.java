@@ -396,6 +396,18 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param datanodeDetails the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
+    SCMNodeStat stat = nodeMetricMap.get(datanodeDetails);
+    return new DatanodeUsageInfo(datanodeDetails, stat);
+  }
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails - datanode details.
    * @return node stat if it is live/stale, null if it is decommissioned or

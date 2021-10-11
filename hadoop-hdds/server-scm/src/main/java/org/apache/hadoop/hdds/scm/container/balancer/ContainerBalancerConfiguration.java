@@ -24,7 +24,9 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -61,25 +63,29 @@ public final class ContainerBalancerConfiguration {
       "ratio of maximum number of datanodes that should be involved in " +
       "balancing in one iteration to the total number of healthy, in service " +
       "nodes known to container balancer.")
-  private String maxDatanodesRatioToInvolvePerIteration = "0.5";
+  private String maxDatanodesRatioToInvolvePerIteration = "0.2";
 
   @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
-      defaultValue = "10GB", tags = {ConfigTag.BALANCER},
+      defaultValue = "30GB", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in bytes that will be moved " +
           "by Container Balancer in one iteration.")
-  private long maxSizeToMovePerIteration = 10 * OzoneConsts.GB;
+  private long maxSizeToMovePerIteration = 30 * OzoneConsts.GB;
 
   @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
-      defaultValue = "5GB", tags = {ConfigTag.BALANCER}, description = "The " +
-      "maximum size that can enter a target datanode while balancing. This is" +
-      " the sum of data from multiple sources.")
-  private long maxSizeEnteringTarget = 5 * OzoneConsts.GB;
+      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      "maximum size that can enter a target datanode in each " +
+      "iteration while balancing. This is the sum of data from multiple " +
+      "sources. The default value is greater than the configured" +
+      " (or default) ozone.scm.container.size by 1GB.")
+  private long maxSizeEnteringTarget;
 
   @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
-      defaultValue = "5GB", tags = {ConfigTag.BALANCER}, description = "The " +
-      "maximum size that can leave a source datanode while balancing. This is" +
-      " the sum of data moving to multiple targets.")
-  private long maxSizeLeavingSource = 5 * OzoneConsts.GB;
+      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      "maximum size that can leave a source datanode in each " +
+      "iteration while balancing. This is the sum of data moving to multiple " +
+      "targets. The default value is greater than the configured" +
+      " (or default) ozone.scm.container.size by 1GB.")
+  private long maxSizeLeavingSource;
 
   @Config(key = "idle.iterations", type = ConfigType.INT,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
@@ -108,16 +114,24 @@ public final class ContainerBalancerConfiguration {
   /**
    * Create configuration with default values.
    *
-   * @param ozoneConfiguration Ozone configuration
+   * @param config Ozone configuration
    */
-  public ContainerBalancerConfiguration(
-      OzoneConfiguration ozoneConfiguration) {
-    Preconditions.checkNotNull(ozoneConfiguration,
+  public ContainerBalancerConfiguration(OzoneConfiguration config) {
+    Preconditions.checkNotNull(config,
         "OzoneConfiguration should not be null.");
-    this.ozoneConfiguration = ozoneConfiguration;
+    this.ozoneConfiguration = config;
+
+    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
+    // greater than container size
+    long size = (long) ozoneConfiguration.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.GB) +
+        OzoneConsts.GB;
+    maxSizeEnteringTarget = size;
+    maxSizeLeavingSource = size;
 
     // balancing interval should be greater than DUFactory refresh period
-    duConf = this.ozoneConfiguration.getObject(DUFactory.Conf.class);
+    duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
     balancingInterval = duConf.getRefreshPeriod().toMillis() +
         Duration.ofMinutes(10).toMillis();
   }
