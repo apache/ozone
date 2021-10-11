@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.ozone.om.protocolPB;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,8 +31,14 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
@@ -45,6 +55,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.ozone.protocol.proto
+    .OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 /**
  * Grpc transport for grpc between s3g and om.
@@ -98,6 +110,33 @@ public class GrpcOmTransport implements OmTransport {
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+
+    final Collection<Token<? extends TokenIdentifier>> tokenS3Requests =
+        ugi.getTokens();
+    if (tokenS3Requests.size() > 1) {
+      throw new OMException(ResultCodes.INVALID_TOKEN);
+    }
+    Iterator<Token<? extends TokenIdentifier>> tokenit =
+        tokenS3Requests.iterator();
+    if (tokenit.hasNext()) {
+      OzoneTokenIdentifier oti = OzoneTokenIdentifier.newInstance();
+      oti.readFields(new DataInputStream(
+          new ByteArrayInputStream(tokenit.next().getIdentifier())));
+      if (oti.getTokenType().equals(S3AUTHINFO)) {
+        payload = OMRequest.newBuilder(payload)
+            .setS3Authentication(
+                OzoneManagerProtocolProtos
+                    .S3Authentication.newBuilder()
+                    .setSignature(oti.getSignature())
+                    .setStringToSign(oti.getStrToSign())
+                    .setAccessId(oti.getAwsAccessId()))
+            .setUserInfo(OzoneManagerProtocolProtos
+                .UserInfo.newBuilder()
+                .setUserName(ugi.getUserName()).build())
+            .build();
+      }
+    }
     return client.submitRequest(payload);
   }
 
