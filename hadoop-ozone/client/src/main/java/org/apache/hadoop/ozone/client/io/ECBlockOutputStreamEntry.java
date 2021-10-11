@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.util.Preconditions;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -43,6 +42,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkState;
+import static org.apache.ratis.util.Preconditions.assertInstanceOf;
+
 /**
  * Helper for {@link ECBlockOutputStream}.
  */
@@ -50,6 +52,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   private ECBlockOutputStream[] blockOutputStreams;
   private final ECReplicationConfig replicationConfig;
   private Map<DatanodeDetails, Integer> replicaIndicies = new HashMap<>();
+  private long length;
 
   private int currentStreamIdx = 0;
   @SuppressWarnings({"parameternumber", "squid:S00107"})
@@ -59,27 +62,36 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       OzoneClientConfig config) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
         token, config);
-    Preconditions.assertInstanceOf(
+    assertInstanceOf(
         pipeline.getReplicationConfig(), ECReplicationConfig.class);
     this.replicationConfig =
         (ECReplicationConfig) pipeline.getReplicationConfig();
+    this.length = replicationConfig.getData() * length;
+  }
+
+  @Override
+  void checkStream() throws IOException {
+    if (!isInitialized()) {
+      blockOutputStreams =
+          new ECBlockOutputStream[replicationConfig.getRequiredNodes()];
+    }
+    if (blockOutputStreams[currentStreamIdx] == null) {
+      createOutputStream();
+    }
   }
 
   @Override
   void createOutputStream() throws IOException {
     Pipeline ecPipeline = getPipeline();
     List<DatanodeDetails> nodes = getPipeline().getNodes();
-    blockOutputStreams =
-        new ECBlockOutputStream[nodes.size()];
-    for (int i = 0; i< getPipeline().getNodes().size(); i++) {
-      blockOutputStreams[i] = new ECBlockOutputStream(
-          getBlockID(),
-          getXceiverClientManager(),
-          createSingleECBlockPipeline(ecPipeline, nodes.get(i), i+1),
-          getBufferPool(),
-          getConf(),
-          getToken());
-    }
+    blockOutputStreams[currentStreamIdx] = new ECBlockOutputStream(
+        getBlockID(),
+        getXceiverClientManager(),
+        createSingleECBlockPipeline(
+            ecPipeline, nodes.get(currentStreamIdx), currentStreamIdx + 1),
+        getBufferPool(),
+        getConf(),
+        getToken());
   }
 
   @Override
@@ -87,12 +99,18 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     if (!isInitialized()) {
       return null;
     }
+    checkState(blockOutputStreams[currentStreamIdx] != null);
     return blockOutputStreams[currentStreamIdx];
   }
 
   @Override
   boolean isInitialized() {
     return blockOutputStreams != null;
+  }
+
+  @Override
+  public long getLength() {
+    return length;
   }
 
   public int getCurrentStreamIdx() {
@@ -105,6 +123,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
 
   public void forceToFirstParityBlock(){
     currentStreamIdx = replicationConfig.getData();
+  }
+
+  public void resetToFirstEntry(){
+    currentStreamIdx = 0;
   }
 
   @Override
@@ -129,7 +151,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       return;
     }
     for(int i=0; i<=currentStreamIdx && i<blockOutputStreams.length; i++) {
-      blockOutputStreams[i].flush();
+      if (blockOutputStreams[i] != null) {
+        blockOutputStreams[i].flush();
+      }
     }
   }
 
@@ -147,7 +171,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       return;
     }
     for (ECBlockOutputStream stream : blockOutputStreams) {
-      stream.close();
+      if (stream != null) {
+        stream.close();
+      }
     }
     updateBlockID(underlyingBlockID());
   }
@@ -166,7 +192,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     // After we have a confirmed ack mechanism, like there is in
     // RatisBlockOutputStream, we should revisit this part, and decide if we
     // want to filter out parity here for example.
-//    return blockStreams()
+//    return dataStreams()
 //        .mapToLong(BlockOutputStream::getTotalAckDataLength)
 //        .sum();
     return 0;
@@ -191,8 +217,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     if (!isInitialized()) {
       return 0;
     }
-    return blockStreams()
-        .limit(replicationConfig.getData())
+    return dataStreams()
         .mapToLong(BlockOutputStream::getWrittenDataLength)
         .sum();
   }
@@ -241,6 +266,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     }
     int failedStreams = 0;
     for (ECBlockOutputStream stream : blockOutputStreams) {
+      if (stream == null) {
+        continue;
+      }
       if (!stream.isClosed()) {
         stream.executePutBlock(false, true);
       } else {
@@ -255,6 +283,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   private BlockID underlyingBlockID() {
+    if (blockOutputStreams[0] == null) {
+      return null;
+    }
     return blockOutputStreams[0].getBlockID();
   }
 
@@ -263,7 +294,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   private Stream<ECBlockOutputStream> blockStreams() {
-    return Arrays.stream(blockOutputStreams);
+    return Arrays.stream(blockOutputStreams).filter(s -> s != null);
+  }
+
+  private Stream<ECBlockOutputStream> dataStreams() {
+    return Arrays.stream(blockOutputStreams)
+        .limit(replicationConfig.getData())
+        .filter(s -> s != null);
   }
 
   /**

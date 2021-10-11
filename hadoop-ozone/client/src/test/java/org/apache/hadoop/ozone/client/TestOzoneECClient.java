@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.LongStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -279,7 +280,7 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testMultipleChunksWithPartialChunkInSigleWripeOp()
+  public void testMultipleChunksWithPartialChunkInSingleWriteOp()
       throws IOException {
     final int partialChunkLen = 10;
     final int numFullChunks = 9;
@@ -311,7 +312,7 @@ public class TestOzoneECClient {
 
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
-    try (OzoneOutputStream out = bucket.createKey("mykey", inputSize)) {
+    try (OzoneOutputStream out = bucket.createKey("mykey", 6*inputSize)) {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
       // Block Size is 2kb, so to create 3 blocks we need 6 iterations here
       for (int j = 0; j < 6; j++) {
@@ -438,7 +439,8 @@ public class TestOzoneECClient {
     }
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    try (OzoneOutputStream out = bucket.createKey(key, inputSize,
+    int size = (int) Arrays.stream(chunks).mapToLong(a -> a.length).sum();
+    try (OzoneOutputStream out = bucket.createKey(key, size,
         new ECReplicationConfig(dataBlocks, parityBlocks,
             ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
       for (int i = 0; i < chunks.length; i++) {

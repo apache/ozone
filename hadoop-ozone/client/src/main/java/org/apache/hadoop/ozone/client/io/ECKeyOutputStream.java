@@ -176,6 +176,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     if (len == 0) {
       return;
     }
+    blockOutputStreamEntryPool.allocateBlockIfNeeded();
 
     int currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
         .getCurrentStreamIdx();
@@ -190,29 +191,34 @@ public class ECKeyOutputStream extends KeyOutputStream {
     int pos = handleDataWrite(currentStreamIdx, b, off,
         currentWriterChunkLenToWrite,
         currentChunkBufferLen + currentWriterChunkLenToWrite == ecChunkSize);
-    checkAndWriteParityCells(pos);
+    //TODO: do we really need this call?
+    checkAndWriteParityCells(pos, false);
     int remLen = len - currentWriterChunkLenToWrite;
     int iters = remLen / ecChunkSize;
     int lastCellSize = remLen % ecChunkSize;
     off += currentWriterChunkLenToWrite;
 
     while (iters > 0) {
-      pos = handleDataWrite(currentStreamIdx, b, off,
-          ecChunkSize, true);
+      currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
+          .getCurrentStreamIdx();
+      pos = handleDataWrite(currentStreamIdx, b, off, ecChunkSize, true);
       off += ecChunkSize;
       iters--;
-      checkAndWriteParityCells(pos);
+      checkAndWriteParityCells(pos, iters > 0 || remLen > 0);
     }
 
     if (lastCellSize > 0) {
+      currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
+          .getCurrentStreamIdx();
       pos = handleDataWrite(currentStreamIdx, b, off,
           lastCellSize, false);
-      checkAndWriteParityCells(pos);
+      checkAndWriteParityCells(pos, false);
     }
     writeOffset += len;
   }
 
-  private void checkAndWriteParityCells(int lastDataBuffPos)
+  private void checkAndWriteParityCells(int lastDataBuffPos,
+      boolean allocateBlockIfFull)
       throws IOException {
     //check data blocks finished
     //If index is > datanum blks
@@ -220,11 +226,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
         .getCurrentStreamIdx();
     if (currentStreamIdx == numDataBlks && lastDataBuffPos == ecChunkSize) {
       //Lets encode and write
-      handleParityWrites(ecChunkSize);
+      handleParityWrites(ecChunkSize, allocateBlockIfFull);
     }
   }
 
-  private void handleParityWrites(int parityCellSize) throws IOException {
+  private void handleParityWrites(int parityCellSize,
+      boolean allocateBlockIfFull)
+      throws IOException {
     writeParityCells(parityCellSize);
     // By this time, we should have finished full stripe. So, lets call
     // executePutBlock for all.
@@ -232,7 +240,14 @@ public class ECKeyOutputStream extends KeyOutputStream {
     blockOutputStreamEntryPool.getCurrentStreamEntry().executePutBlock();
     ecChunkBufferCache.clear(parityCellSize);
 
-    blockOutputStreamEntryPool.getCurrentStreamEntry().close();
+    if (blockOutputStreamEntryPool.getCurrentStreamEntry().getRemaining() <= 0) {
+      blockOutputStreamEntryPool.getCurrentStreamEntry().close();
+      if (allocateBlockIfFull) {
+        blockOutputStreamEntryPool.allocateBlockIfNeeded();
+      }
+    } else {
+      blockOutputStreamEntryPool.getCurrentStreamEntry().resetToFirstEntry();
+    }
     currentBlockGroupLen = 0;
   }
 
@@ -276,14 +291,10 @@ public class ECKeyOutputStream extends KeyOutputStream {
       boolean isFullCell, boolean isParity) throws IOException {
 
     BlockOutputStreamEntry current =
-        blockOutputStreamEntryPool.allocateBlockIfNeeded();
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
     int writeLengthToCurrStream =
         Math.min((int) len, (int) current.getRemaining());
     currentBlockGroupLen += isParity ? 0 : writeLengthToCurrStream;
-    if (current.getRemaining() <= 0) {
-      // since the current block is already written close the stream.
-      closeCurrentStream(StreamAction.CLOSE);
-    }
 
     len -= writeLengthToCurrStream;
     if (isFullCell) {
@@ -408,32 +419,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private void closeCurrentStream(StreamAction op) throws IOException {
-    if (!blockOutputStreamEntryPool.isEmpty()) {
-      List<BlockOutputStreamEntry> allStreamEntries =
-          blockOutputStreamEntryPool.getStreamEntries();
-      for (int i = 0; i < allStreamEntries.size(); i++) {
-        while (true) {
-          try {
-            BlockOutputStreamEntry entry = allStreamEntries.get(i);
-            if (entry != null) {
-              try {
-                handleStreamAction(entry, op);
-              } catch (IOException ioe) {
-                handleException(entry, ioe);
-                continue;
-              }
-            }
-            return;
-          } catch (Exception e) {
-            markStreamClosed();
-            throw e;
-          }
-        }
-      }
-    }
-  }
-
   private void handleStreamAction(BlockOutputStreamEntry entry, StreamAction op)
       throws IOException {
     Collection<DatanodeDetails> failedServers = entry.getFailedServers();
@@ -471,7 +456,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
       if(isPartialStripe()){
         ByteBuffer bytesToWrite =
             ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
@@ -496,8 +480,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
         final int parityCellSize =
             lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize;
         addPadding(parityCellSize);
-        handleParityWrites(parityCellSize);
+        handleParityWrites(parityCellSize, false);
       }
+      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
 
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
@@ -668,7 +653,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
     private int addToDataBuffer(int i, byte[] b, int off, int len) {
       final ByteBuffer buf = dataBuffers[i];
       final int pos = buf.position() + len;
-      Preconditions.checkState(pos <= cellSize);
+      Preconditions.checkState(pos <= cellSize,
+          "Position("+pos+") is greater than the cellSize("+cellSize+").");
       buf.put(b, off, len);
       return pos;
     }

@@ -185,6 +185,10 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       throw new IndexOutOfBoundsException("The index " + index + " is greater "
           + "than the EC Replication Config (" + repConfig + ")");
     }
+    if (index <= 0) {
+      // no data in the block
+      return;
+    }
     if (index <= repConfig.getData()) {
       dataLocations[index - 1] = location;
     } else {
