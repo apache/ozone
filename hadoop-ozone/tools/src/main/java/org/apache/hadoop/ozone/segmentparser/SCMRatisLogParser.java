@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.segmentparser;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;

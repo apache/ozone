@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
@@ -26,8 +25,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import com.google.protobuf.TextFormat;
 import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 
