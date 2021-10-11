@@ -168,8 +168,6 @@ public class TestRootedOzoneFileSystem {
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL/2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
-    conf.setStrings(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     if (isBucketFSOptimized) {
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
       TestOMRequestUtils.configureFSOptimizedPaths(conf,

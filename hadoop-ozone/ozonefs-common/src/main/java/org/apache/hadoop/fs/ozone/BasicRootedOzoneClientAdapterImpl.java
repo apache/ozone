@@ -43,7 +43,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -77,8 +76,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys
-    .OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
@@ -151,16 +148,6 @@ public class BasicRootedOzoneClientAdapterImpl
         // accidentally failing over to an unintended OM.
         throw new IllegalArgumentException("Service ID or host name must not"
             + " be omitted when ozone.om.service.ids is defined.");
-      }
-
-      // TODO: Discuss whether to throw Exception if BucketLayout is
-      //  OBJECT_STORE.
-      if (StringUtils.equalsIgnoreCase(
-          conf.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT),
-          BucketLayout.OBJECT_STORE.name())) {
-        throw new ConfigurationException(
-            "Buckets created through Ozone File System cannot have" +
-                " OBJECT_STORE bucket layout.");
       }
 
       if (omPort != -1) {
