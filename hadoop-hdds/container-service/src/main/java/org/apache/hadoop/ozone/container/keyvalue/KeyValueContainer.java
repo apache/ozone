@@ -157,7 +157,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       containerData.setSchemaVersion(
           VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
-      KeyValueContainerUtil.createContainerMetaData(containerID,
+      KeyValueContainerUtil.createContainerMetaData(
               containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);
 

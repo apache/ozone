@@ -56,24 +56,21 @@ public final class BlockUtils {
    * the caller must close it after using it.
    * If another thread attempts to open the same container when it is already
    * opened by this thread, the other thread will get a RocksDB exception.
-   * @param containerID The containerID
    * @param containerDBPath The absolute path to the container database folder
    * @param schemaVersion The Container Schema version
    * @param conf Configuration
    * @return Handler to the given container.
    * @throws IOException
    */
-  public static DatanodeStore getUncachedDatanodeStore(long containerID,
+  public static DatanodeStore getUncachedDatanodeStore(
       String containerDBPath, String schemaVersion,
       ConfigurationSource conf, boolean readOnly) throws IOException {
 
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-      store = new DatanodeStoreSchemaOneImpl(conf,
-          containerID, containerDBPath, readOnly);
+      store = new DatanodeStoreSchemaOneImpl(conf, containerDBPath, readOnly);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-      store = new DatanodeStoreSchemaTwoImpl(conf,
-          containerID, containerDBPath, readOnly);
+      store = new DatanodeStoreSchemaTwoImpl(conf, containerDBPath, readOnly);
     } else {
       throw new IllegalArgumentException(
           "Unrecognized database schema version: " + schemaVersion);
@@ -94,7 +91,7 @@ public final class BlockUtils {
   public static DatanodeStore getUncachedDatanodeStore(
       KeyValueContainerData containerData, ConfigurationSource conf,
       boolean readOnly) throws IOException {
-    return getUncachedDatanodeStore(containerData.getContainerID(),
+    return getUncachedDatanodeStore(
         containerData.getDbFile().getAbsolutePath(),
         containerData.getSchemaVersion(), conf, readOnly);
   }

@@ -400,8 +400,8 @@ public class TestSchemaOneBackwardsCompatibility {
       Assert.assertEquals(TestDB.BLOCK_IDS, decodedKeys);
 
       // Test reading blocks with block iterator.
-      try (BlockIterator<BlockData> iter =
-              refCountedDB.getStore().getBlockIterator()) {
+      try(BlockIterator<BlockData> iter =
+              refCountedDB.getStore().getBlockIterator(TestDB.CONTAINER_ID)) {
 
         List<String> iteratorBlockIDs = new ArrayList<>();
 
@@ -452,8 +452,9 @@ public class TestSchemaOneBackwardsCompatibility {
       MetadataKeyFilters.KeyPrefixFilter filter =
           MetadataKeyFilters.getDeletingKeyFilter();
 
-      try (BlockIterator<BlockData> iter =
-              refCountedDB.getStore().getBlockIterator(filter)) {
+      try(BlockIterator<BlockData> iter =
+              refCountedDB.getStore().getBlockIterator(TestDB.CONTAINER_ID,
+                  filter)) {
 
         List<String> iteratorBlockIDs = new ArrayList<>();
 

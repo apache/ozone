@@ -79,7 +79,7 @@ public final class KeyValueContainerUtil {
    * @param conf The configuration to use for this container.
    * @throws IOException
    */
-  public static void createContainerMetaData(long containerID,
+  public static void createContainerMetaData(
       File containerMetaDataPath, File chunksPath, File dbFile,
       String schemaVersion, ConfigurationSource conf) throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
@@ -104,11 +104,11 @@ public final class KeyValueContainerUtil {
 
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-      store = new DatanodeStoreSchemaOneImpl(conf,
-              containerID, dbFile.getAbsolutePath(), false);
+      store = new DatanodeStoreSchemaOneImpl(conf, dbFile.getAbsolutePath(),
+          false);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-      store = new DatanodeStoreSchemaTwoImpl(conf,
-              containerID, dbFile.getAbsolutePath(), false);
+      store = new DatanodeStoreSchemaTwoImpl(conf, dbFile.getAbsolutePath(),
+          false);
     } else {
       throw new IllegalArgumentException(
               "Unrecognized schema version for container: " + schemaVersion);
@@ -302,7 +302,7 @@ public final class KeyValueContainerUtil {
     long usedBytes = 0;
 
     try (BlockIterator<BlockData> blockIter =
-             store.getBlockIterator(
+             store.getBlockIterator(kvData.getContainerID(),
                  MetadataKeyFilters.getUnprefixedKeyFilter())) {
 
       while (blockIter.hasNext()) {
@@ -317,7 +317,7 @@ public final class KeyValueContainerUtil {
 
     // Count all deleting blocks.
     try (BlockIterator<BlockData> blockIter =
-             store.getBlockIterator(
+             store.getBlockIterator(kvData.getContainerID(),
                  MetadataKeyFilters.getDeletingKeyFilter())) {
 
       while (blockIter.hasNext()) {
