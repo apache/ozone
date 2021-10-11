@@ -622,7 +622,7 @@ public class KeyManagerImpl implements KeyManager {
           openKey,
           objectKey,
           keyInfo,
-          metadataManager.getOpenKeyTable(),
+          metadataManager.getOpenKeyTable(getBucketLayout()),
           metadataManager.getKeyTable());
     } catch (OMException e) {
       throw e;

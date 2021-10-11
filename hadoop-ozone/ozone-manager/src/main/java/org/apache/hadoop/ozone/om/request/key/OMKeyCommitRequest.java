@@ -280,10 +280,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     // Past keys that was deleted but still in deleted table,
     // waiting for deletion service.
     RepeatedOmKeyInfo keysToDelete =
-            omMetadataManager.getDeletedTable().get(dbOzoneKey);
+            omMetadataManager.getDeletedTable().getReadCopy(dbOzoneKey);
     // Current key to be overwritten
     OmKeyInfo keyToDelete =
-            omMetadataManager.getKeyTable().get(dbOzoneKey);
+            omMetadataManager.getKeyTable().getReadCopy(dbOzoneKey);
 
     if (keyToDelete != null) {
       keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
