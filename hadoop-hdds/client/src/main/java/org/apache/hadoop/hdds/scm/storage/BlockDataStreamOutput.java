@@ -95,14 +95,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   // Similar to 'BufferPool' but this list maintains only references
   // to the ByteBuffers.
-  private List<ByteBuffer> bufferPool;
-
-  // List containing buffers for which the putBlock call will
-  // update the length in the datanodes. This list will just maintain
-  // references to the buffers in the BufferPool which will be cleared
-  // when the watchForCommit acknowledges a putBlock logIndex has been
-  // committed on all datanodes. This list will be a  place holder for buffers
-  // which got written between successive putBlock calls.
   private List<ByteBuffer> bufferList;
 
   // The IOException will be set by response handling thread in case there is an
@@ -147,7 +139,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       Pipeline pipeline,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      List<ByteBuffer> bufferPool
+      List<ByteBuffer> bufferList
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -162,7 +154,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
     this.token = token;
-    this.bufferPool = bufferPool;
+    this.bufferList = bufferList;
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
         .getStreamBufferSize());
 
@@ -173,7 +165,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    commitWatcher = new StreamCommitWatcher(xceiverClient, bufferPool);
+    commitWatcher = new StreamCommitWatcher(xceiverClient, bufferList);
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
@@ -257,9 +249,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
 
-  public List<ByteBuffer> getBufferPool() {
-    return bufferPool;
-  }
 
   @Override
   public void write(ByteBuffer b, int off, int len) throws IOException {
@@ -272,9 +261,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     ByteBuffer buf =
         (ByteBuffer) b.asReadOnlyBuffer().position(off).limit(off + len);
-    bufferPool.add(buf);
+    bufferList.add(buf);
 
-    writeChunkToContainer(buf);
+    writeChunkToContainer(buf.duplicate());
 
     writtenDataLength += len;
   }
@@ -303,9 +292,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     int count = 0;
     while (len > 0) {
-      ByteBuffer buf = bufferPool.get(count);
+      ByteBuffer buf = bufferList.get(count);
       long writeLen = Math.min(buf.limit() - buf.position(), len);
-      writeChunkToContainer(buf);
+      writeChunkToContainer(buf.duplicate());
       len -= writeLen;
       count++;
       writtenDataLength += writeLen;
@@ -359,7 +348,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (!force) {
       Preconditions.checkNotNull(bufferList);
       byteBufferList = bufferList;
-      bufferList = null;
       Preconditions.checkNotNull(byteBufferList);
     } else {
       byteBufferList = null;
@@ -522,10 +510,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (xceiverClientFactory != null) {
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
     }
-    if (bufferList !=  null) {
-      bufferList.clear();
-    }
-    bufferList = null;
     xceiverClientFactory = null;
     xceiverClient = null;
     commitWatcher.cleanup();
@@ -572,10 +556,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    */
   private void writeChunkToContainer(ByteBuffer buf)
       throws IOException {
-    if (bufferList == null) {
-      bufferList = new ArrayList<>();
-    }
-    bufferList.add(buf);
     final int effectiveChunkSize = buf.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     ChecksumData checksumData = checksum.computeChecksum(
