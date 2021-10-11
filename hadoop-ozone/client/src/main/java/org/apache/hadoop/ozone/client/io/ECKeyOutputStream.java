@@ -237,16 +237,18 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // By this time, we should have finished full stripe. So, lets call
     // executePutBlock for all.
     // TODO: we should alter the put block calls to share CRC to each stream.
-    blockOutputStreamEntryPool.getCurrentStreamEntry().executePutBlock();
+    ECBlockOutputStreamEntry streamEntry =
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    streamEntry.executePutBlock();
     ecChunkBufferCache.clear(parityCellSize);
 
-    if (blockOutputStreamEntryPool.getCurrentStreamEntry().getRemaining() <= 0) {
-      blockOutputStreamEntryPool.getCurrentStreamEntry().close();
+    if (streamEntry.getRemaining() <= 0) {
+      streamEntry.close();
       if (allocateBlockIfFull) {
         blockOutputStreamEntryPool.allocateBlockIfNeeded();
       }
     } else {
-      blockOutputStreamEntryPool.getCurrentStreamEntry().resetToFirstEntry();
+      streamEntry.resetToFirstEntry();
     }
     currentBlockGroupLen = 0;
   }
