@@ -580,6 +580,6 @@ public class TestOzoneFileInterfaces {
   }
 
   public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+    return BucketLayout.DEFAULT;
   }
 }

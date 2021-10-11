@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -58,8 +60,13 @@ public class TestS3MultipartUploadCompleteRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
+    BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
+    }
+
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, bucketLayout);
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);

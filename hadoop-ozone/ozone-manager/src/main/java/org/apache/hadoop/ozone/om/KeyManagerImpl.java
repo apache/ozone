@@ -515,7 +515,9 @@ public class KeyManagerImpl implements KeyManager {
     } else if (metadataManager.getKeyTable(
         getBucketLayout(metadataManager, keyArgs.getVolumeName(),
             keyArgs.getBucketName())).isExist(dbKeyName)) {
-      keyInfo = metadataManager.getKeyTable(getBucketLayout()).get(dbKeyName);
+      keyInfo = metadataManager.getKeyTable(
+          getBucketLayout(metadataManager, keyArgs.getVolumeName(),
+              keyArgs.getBucketName())).get(dbKeyName);
       // the key already exist, the new blocks will be added as new version
       // when locations.size = 0, the new version will have identical blocks
       // as its previous version
@@ -624,8 +626,9 @@ public class KeyManagerImpl implements KeyManager {
           openKey,
           objectKey,
           keyInfo,
-          metadataManager.getOpenKeyTable(getBucketLayout()),
-          metadataManager.getKeyTable(getBucketLayout()));
+          metadataManager.getOpenKeyTable(getBucketLayout()), metadataManager
+              .getKeyTable(
+                  getBucketLayout(metadataManager, volumeName, bucketName)));
     } catch (OMException e) {
       throw e;
     } catch (IOException ex) {
@@ -866,8 +869,9 @@ public class KeyManagerImpl implements KeyManager {
       // toKeyName should not exist
       String toKey =
           metadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
-      OmKeyInfo toKeyValue =
-          metadataManager.getKeyTable(getBucketLayout()).get(toKey);
+      OmKeyInfo toKeyValue = metadataManager
+          .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
+          .get(toKey);
       if (toKeyValue != null) {
         LOG.error(
             "Rename key failed for volume:{} bucket:{} fromKey:{} toKey:{}. "
@@ -881,9 +885,11 @@ public class KeyManagerImpl implements KeyManager {
       fromKeyValue.updateModifcationTime();
       DBStore store = metadataManager.getStore();
       try (BatchOperation batch = store.initBatchOperation()) {
-        metadataManager.getKeyTable(getBucketLayout())
+        metadataManager.getKeyTable(
+            getBucketLayout(metadataManager, volumeName, bucketName))
             .deleteWithBatch(batch, fromKey);
-        metadataManager.getKeyTable(getBucketLayout())
+        metadataManager.getKeyTable(
+            getBucketLayout(metadataManager, volumeName, bucketName))
             .putWithBatch(batch, toKey, fromKeyValue);
         store.commitBatchOperation(batch);
       }
@@ -922,7 +928,9 @@ public class KeyManagerImpl implements KeyManager {
         // directly delete key with no blocks from db. This key need not be
         // moved to deleted table.
         if (isKeyEmpty(keyInfo)) {
-          metadataManager.getKeyTable(getBucketLayout()).delete(objectKey);
+          metadataManager.getKeyTable(
+              getBucketLayout(metadataManager, volumeName, bucketName))
+              .delete(objectKey);
           LOG.debug("Key {} deleted from OM DB", keyName);
           return;
         }
@@ -931,7 +939,9 @@ public class KeyManagerImpl implements KeyManager {
           metadataManager.getDeletedTable().get(objectKey);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(keyInfo,
           repeatedOmKeyInfo, 0L, false);
-      metadataManager.getKeyTable(getBucketLayout()).delete(objectKey);
+      metadataManager
+          .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
+          .delete(objectKey);
       metadataManager.getDeletedTable().put(objectKey, repeatedOmKeyInfo);
     } catch (OMException ex) {
       throw ex;
@@ -1622,7 +1632,9 @@ public class KeyManagerImpl implements KeyManager {
       }
       changed = keyInfo.addAcl(acl);
       if (changed) {
-        metadataManager.getKeyTable(getBucketLayout()).put(objectKey, keyInfo);
+        metadataManager
+            .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
+            .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
@@ -1665,7 +1677,9 @@ public class KeyManagerImpl implements KeyManager {
 
       changed = keyInfo.removeAcl(acl);
       if (changed) {
-        metadataManager.getKeyTable(getBucketLayout()).put(objectKey, keyInfo);
+        metadataManager
+            .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
+            .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
@@ -1709,7 +1723,9 @@ public class KeyManagerImpl implements KeyManager {
       changed = keyInfo.setAcls(acls);
 
       if (changed) {
-        metadataManager.getKeyTable(getBucketLayout()).put(objectKey, keyInfo);
+        metadataManager
+            .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
+            .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
@@ -2000,16 +2016,18 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
-      fileKeyInfo =
-          metadataManager.getKeyTable(BucketLayout.DEFAULT).get(fileKeyBytes);
+      fileKeyInfo = metadataManager
+          .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
+          .get(fileKeyBytes);
 
       // Check if the key is a directory.
       if (fileKeyInfo == null) {
         String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
-        OmKeyInfo dirKeyInfo =
-            metadataManager.getKeyTable(BucketLayout.DEFAULT).get(dirKeyBytes);
+        OmKeyInfo dirKeyInfo = metadataManager.getKeyTable(
+            getBucketLayout(metadataManager, volumeName, bucketName))
+            .get(dirKeyBytes);
         if (dirKeyInfo != null) {
           return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
         }
@@ -2593,7 +2611,9 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
           bucketName);
       try {
-        iterator = metadataManager.getKeyTable().iterator();
+        iterator = metadataManager.getKeyTable(
+            getBucketLayout(metadataManager, volumeName, bucketName))
+            .iterator();
         countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
             bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
             prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
@@ -2677,7 +2697,9 @@ public class KeyManagerImpl implements KeyManager {
           metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
               bucketName);
           try {
-            iterator = metadataManager.getKeyTable().iterator();
+            iterator = metadataManager.getKeyTable(
+                getBucketLayout(metadataManager, volumeName, bucketName))
+                .iterator();
             countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
                 bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
                 prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
@@ -2775,9 +2797,10 @@ public class KeyManagerImpl implements KeyManager {
 
     // First under lock obtain both entries from dir/file cache and generate
     // entries marked for delete.
-    countEntries = listStatusFindFilesInTableCache(cacheFileMap,
-        metadataManager.getKeyTable(), prefixKeyInDB, seekFileInDB,
-        prefixPath, startKey, countEntries, numEntries, deletedKeySet);
+    countEntries = listStatusFindFilesInTableCache(cacheFileMap, metadataManager
+        .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName)),
+        prefixKeyInDB, seekFileInDB, prefixPath, startKey, countEntries,
+        numEntries, deletedKeySet);
 
     // Don't count entries from dir cache, as first we need to return all
     // files and then directories.
@@ -3209,8 +3232,9 @@ public class KeyManagerImpl implements KeyManager {
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
-    Table fileTable =
-        metadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    Table fileTable = metadataManager.getKeyTable(
+        getBucketLayout(metadataManager, parentInfo.getVolumeName(),
+            parentInfo.getBucketName()));
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = fileTable.iterator();
 
