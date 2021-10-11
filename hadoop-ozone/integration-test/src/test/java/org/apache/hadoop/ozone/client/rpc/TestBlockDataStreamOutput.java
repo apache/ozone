@@ -82,7 +82,6 @@ public class TestBlockDataStreamOutput {
     blockSize = 2 * maxFlushSize;
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setChecksumType(ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
 
