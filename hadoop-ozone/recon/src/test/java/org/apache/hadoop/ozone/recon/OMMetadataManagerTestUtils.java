@@ -193,7 +193,7 @@ public final class OMMetadataManagerTestUtils {
           throws IOException {
     // DB key in FileTable => "parentId/filename"
     String omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
-    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
+    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(omKey,
             new OmKeyInfo.Builder()
                     .setBucketName(bucket)
                     .setVolumeName(volume)
@@ -216,7 +216,7 @@ public final class OMMetadataManagerTestUtils {
                                   List<OmKeyLocationInfoGroup> locationVersions)
           throws IOException {
     String omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
-    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
+    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(omKey,
             new OmKeyInfo.Builder()
                     .setBucketName(bucketName)
                     .setVolumeName(volName)
@@ -266,7 +266,7 @@ public final class OMMetadataManagerTestUtils {
     Table volTableMock = mock(Table.class);
     Table bucketTableMock = mock(Table.class);
     when(keyTableMock.getName()).thenReturn(FILE_TABLE);
-    when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
+    when(omMetadataManagerMock.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
         .thenReturn(keyTableMock);
     when(dirTableMock.getName()).thenReturn(DIRECTORY_TABLE);
     when(omMetadataManagerMock.getDirectoryTable()).thenReturn(dirTableMock);
