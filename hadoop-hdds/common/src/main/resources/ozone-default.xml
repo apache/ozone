@@ -2842,18 +2842,18 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.segment.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the raft segment used by Apache Ratis on
-      SCM. (16 KB by default)
+      SCM. (4 MB by default)
     </description>
   </property>
   <property>
     <name>ozone.scm.ha.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the buffer which is preallocated for
-      raft segment used by Apache Ratis on SCM.(16 KB by default)
+      raft segment used by Apache Ratis on SCM.(4 MB by default)
     </description>
   </property>
   <property>
