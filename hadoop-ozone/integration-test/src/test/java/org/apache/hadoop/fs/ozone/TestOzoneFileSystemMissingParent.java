@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -54,6 +55,8 @@ public class TestOzoneFileSystemMissingParent {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.setStrings(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
@@ -104,8 +107,8 @@ public class TestOzoneFileSystemMissingParent {
 
     // Close should throw exception, Since parent doesn't exist.
     LambdaTestUtils.intercept(OMException.class,
-        "Cannot create file : parent/file " + "as parent "
-            + "directory doesn't exist", () -> stream.close());
+        "Failed to find parent directory of parent/file in" +
+            " DirectoryTable", () -> stream.close());
   }
 
   /**
@@ -125,7 +128,7 @@ public class TestOzoneFileSystemMissingParent {
 
     // Close should throw exception, Since parent has been moved.
     LambdaTestUtils.intercept(OMException.class,
-        "Cannot create file : parent/file " + "as parent "
-            + "directory doesn't exist", () -> stream.close());
+        "Failed to find parent directory of parent/file in" +
+            " DirectoryTable", () -> stream.close());
   }
 }
