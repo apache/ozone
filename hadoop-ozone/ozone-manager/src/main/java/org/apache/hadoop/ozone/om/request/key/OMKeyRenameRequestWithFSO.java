@@ -276,7 +276,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
               new CacheValue<>(Optional.of(OMFileRequest.
                               getDirectoryInfo(fromKeyValue)), trxnLogIndex));
     } else {
-      Table<String, OmKeyInfo> keyTable = metadataMgr.getKeyTable();
+      Table<String, OmKeyInfo> keyTable =
+          metadataMgr.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(dbFromKey),
               new CacheValue<>(Optional.absent(), trxnLogIndex));

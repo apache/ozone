@@ -68,7 +68,7 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
       omMetadataManager.getDirectoryTable()
           .putWithBatch(batchOperation, ozoneDbKey, dirInfo);
     } else {
-      omMetadataManager.getKeyTable()
+      omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, ozoneDbKey, getOmKeyInfo());
     }
   }

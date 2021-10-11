@@ -114,8 +114,9 @@ public class TestS3MultipartUploadCompleteRequest
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
-    Assert.assertNotNull(omMetadataManager.getKeyTable().get(
-            getOzoneDBKey(volumeName, bucketName, keyName)));
+    Assert.assertNotNull(omMetadataManager
+        .getKeyTable(getBucketLayout(omMetadataManager, volumeName, bucketName))
+        .get(getOzoneDBKey(volumeName, bucketName, keyName)));
   }
 
   @Test

@@ -34,10 +34,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -375,9 +372,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
             HddsProtos.ReplicationFactor.THREE, objID++);
     String ozoneFileName = parentID + "/" + dirs.get(dirs.size() - 1);
     ++txnID;
-    omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneFileName),
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(ozoneFileName),
             new CacheValue<>(Optional.of(omKeyInfo), txnID));
-    omMetadataManager.getKeyTable().put(ozoneFileName, omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(ozoneFileName, omKeyInfo);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
@@ -400,7 +399,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             0, ozoneManager.getMetrics().getNumKeys());
 
     // Key should not exist in DB
-    Assert.assertNotNull(omMetadataManager.getKeyTable().get(ozoneFileName));
+    Assert.assertNotNull(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneFileName));
     // Key should not exist in DB
     Assert.assertEquals("Wrong directories count!", 3,
             omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
@@ -422,7 +422,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
@@ -445,9 +445,10 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     String ozoneKey = parentID + "/" + dirs.get(1);
     ++txnID;
-    omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(ozoneKey),
             new CacheValue<>(Optional.of(omKeyInfo), txnID));
-    omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, omKeyInfo);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
@@ -472,7 +473,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             0, ozoneManager.getMetrics().getNumKeys());
 
     // Key should not exist in DB
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(ozoneKey) != null);
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey) != null);
     // Key should not exist in DB
     Assert.assertEquals("Wrong directories count!",
             1, omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
@@ -652,6 +654,10 @@ public class TestOMDirectoryCreateRequestWithFSO {
                             .setBucketName(bucketName).setKeyName(keyName)))
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
             .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
 }
