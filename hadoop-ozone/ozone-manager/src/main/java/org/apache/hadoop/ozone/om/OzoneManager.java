@@ -111,7 +111,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.GrpcOzoneManagerServer.GrpcOzoneManagerServerConfig;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -1023,9 +1022,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private GrpcOzoneManagerServer startGrpcServer(OzoneConfiguration conf)
           throws IOException {
-    return new GrpcOzoneManagerServer(conf.getObject(
-            GrpcOzoneManagerServerConfig.class),
-            this.omServerProtocol);
+    return new GrpcOzoneManagerServer(conf,
+            this.omServerProtocol,
+            this.delegationTokenMgr);
   }
 
   private static boolean isOzoneSecurityEnabled() {

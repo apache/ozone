@@ -47,9 +47,9 @@ public class TestGrpcOzoneManagerServer {
     ozoneManager = Mockito.mock(OzoneManager.class);
     omServerProtocol = ozoneManager.getOmServerProtocol();
 
-    server = new GrpcOzoneManagerServer(conf.getObject(
-            GrpcOzoneManagerServer.GrpcOzoneManagerServerConfig.class),
-        omServerProtocol);
+    server = new GrpcOzoneManagerServer(conf,
+        omServerProtocol,
+        ozoneManager.getDelegationTokenMgr());
 
     try {
       server.start();

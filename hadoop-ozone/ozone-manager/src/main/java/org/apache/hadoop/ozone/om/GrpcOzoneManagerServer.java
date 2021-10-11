@@ -23,8 +23,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import io.grpc.Server;
 import io.grpc.netty.NettyServerBuilder;
 import org.slf4j.Logger;
@@ -40,17 +42,27 @@ public class GrpcOzoneManagerServer {
   private Server server;
   private int port = 8981;
 
-  public GrpcOzoneManagerServer(GrpcOzoneManagerServerConfig omServerConfig,
+  public GrpcOzoneManagerServer(OzoneConfiguration config,
                                 OzoneManagerProtocolServerSideTranslatorPB
-                                    omTranslator) {
-    this.port = omServerConfig.getPort();
-    init(omTranslator);
+                                    omTranslator,
+                                OzoneDelegationTokenSecretManager
+                                    delegationTokenMgr) {
+    this.port = config.getObject(
+        GrpcOzoneManagerServerConfig.class).
+        getPort();
+    init(omTranslator,
+        delegationTokenMgr,
+        config);
   }
 
-  public void init(OzoneManagerProtocolServerSideTranslatorPB omTranslator) {
+  public void init(OzoneManagerProtocolServerSideTranslatorPB omTranslator,
+                   OzoneDelegationTokenSecretManager delegationTokenMgr,
+                   OzoneConfiguration omServerConfig) {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .addService(new OzoneManagerServiceGrpc(omTranslator));
+        .addService(new OzoneManagerServiceGrpc(omTranslator,
+            delegationTokenMgr,
+            omServerConfig));
 
     server = nettyServerBuilder.build();
   }
