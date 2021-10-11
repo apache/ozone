@@ -3260,19 +3260,17 @@ public class KeyManagerImpl implements KeyManager {
 
   private BucketLayout getBucketLayout(OMMetadataManager omMetadataManager,
       String volName, String buckName) {
-    OmBucketInfo buckInfo = null;
     if (omMetadataManager == null) {
       return BucketLayout.DEFAULT;
     }
-    String buckKey =
-        ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
+    String buckKey = omMetadataManager.getBucketKey(volName, buckName);
     try {
-      buckInfo =
-          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+      OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
+      return buckInfo.getBucketLayout();
     } catch (IOException e) {
       LOG.error("Cannot find the key: " + buckKey);
     }
-    return buckInfo.getBucketLayout();
+    return BucketLayout.DEFAULT;
   }
 
 }

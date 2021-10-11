@@ -277,19 +277,17 @@ public class TestS3MultipartRequest {
 
   public BucketLayout getBucketLayout(OMMetadataManager metadataManager,
       String volumeName, String bucketName) {
-    OmBucketInfo buckInfo = null;
     if (metadataManager == null) {
       return BucketLayout.DEFAULT;
     }
-    String buckKey =
-        metadataManager.getBucketKey(volumeName, bucketName);
+    String buckKey = metadataManager.getBucketKey(volumeName, bucketName);
     try {
-      buckInfo =
-          metadataManager.getBucketTable().get(buckKey);
+      OmBucketInfo buckInfo = metadataManager.getBucketTable().get(buckKey);
+      return buckInfo.getBucketLayout();
     } catch (IOException e) {
       LOG.error("Cannot find the key: " + buckKey);
     }
-    return buckInfo.getBucketLayout();
+    return BucketLayout.DEFAULT;
   }
 
 }
