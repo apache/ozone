@@ -134,7 +134,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
                   if (e == null) {
                     throw new IOException(se);
                   } else {
-                    thsrow e instanceof IOException ?
+                    throw e instanceof IOException ?
                         (IOException) e : new IOException(se);
                   }
                 }
