@@ -131,10 +131,10 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
                       submitRequest(NULL_RPC_CONTROLLER, request);
                 } catch (Throwable se) {
                   Throwable e = se.getCause();
-                  if (se == null) {
+                  if (e == null) {
                     throw new IOException(se);
                   } else {
-                    throw e instanceof IOException ?
+                    thsrow e instanceof IOException ?
                         (IOException) e : new IOException(se);
                   }
                 }
