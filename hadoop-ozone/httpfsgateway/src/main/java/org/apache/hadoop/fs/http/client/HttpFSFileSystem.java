@@ -71,9 +71,6 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInput;
@@ -1408,7 +1405,7 @@ public class HttpFSFileSystem extends FileSystem
   /** Convert xAttrs json to xAttrs map. */
   private Map<String, byte[]> createXAttrMap(JSONArray jsonArray) 
       throws IOException {
-    Map<String, byte[]> xAttrs = Maps.newHashMap();
+    Map<String, byte[]> xAttrs = new HashMap<>();
     for (Object obj : jsonArray) {
       JSONObject jsonObj = (JSONObject) obj;
       final String name = (String)jsonObj.get(XATTR_NAME_JSON);
@@ -1427,7 +1424,7 @@ public class HttpFSFileSystem extends FileSystem
     JSONArray jsonArray;
     try {
       jsonArray = (JSONArray)parser.parse(xattrNamesStr);
-      List<String> names = Lists.newArrayListWithCapacity(jsonArray.size());
+      List<String> names = new ArrayList<>(jsonArray.size());
       for (Object name : jsonArray) {
         names.add((String) name);
       }
@@ -1455,7 +1452,7 @@ public class HttpFSFileSystem extends FileSystem
         "XAttr names cannot be null or empty.");
     Map<String, String> params = new HashMap<String, String>();
     params.put(OP_PARAM, Operation.GETXATTRS.toString());
-    Map<String, List<String>> multiValuedParams = Maps.newHashMap();
+    Map<String, List<String>> multiValuedParams = new HashMap<>();
     multiValuedParams.put(XATTR_NAME_PARAM, names);
     HttpURLConnection conn = getConnection(Operation.GETXATTRS.getMethod(),
         params, multiValuedParams, f, true);
