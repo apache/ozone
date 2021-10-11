@@ -53,7 +53,7 @@ public class StreamCommitWatcher {
   private static final Logger LOG =
       LoggerFactory.getLogger(StreamCommitWatcher.class);
 
-  private Map<Long, List<ByteBuffer>> commitIndexSet;
+  private Map<Long, List<ByteBuffer>> commitIndexMap;
 
   private List<ByteBuffer> bufferPool;
 
@@ -71,19 +71,19 @@ public class StreamCommitWatcher {
   public StreamCommitWatcher(XceiverClientSpi xceiverClient,
       List<ByteBuffer> bufferPool) {
     this.xceiverClient = xceiverClient;
-    commitIndexSet = new ConcurrentSkipListMap<>();
+    commitIndexMap = new ConcurrentSkipListMap<>();
     futureMap = new ConcurrentHashMap<>();
     this.bufferPool = bufferPool;
     totalAckDataLength = 0;
   }
 
   public void updateCommitInfoSet(long index, List<ByteBuffer> buffers) {
-    commitIndexSet.computeIfAbsent(index, k -> new LinkedList<>())
+    commitIndexMap.computeIfAbsent(index, k -> new LinkedList<>())
         .addAll(buffers);
   }
 
   int getCommitInfoSetSize() {
-    return commitIndexSet.size();
+    return commitIndexMap.size();
   }
 
   /**
@@ -93,12 +93,12 @@ public class StreamCommitWatcher {
    * @throws IOException in case watchForCommit fails
    */
   public XceiverClientReply streamWatchOnFirstIndex() throws IOException {
-    if (!commitIndexSet.isEmpty()) {
+    if (!commitIndexMap.isEmpty()) {
       // wait for the  first commit index in the commitIndex2flushedDataMap
       // to get committed to all or majority of nodes in case timeout
       // happens.
       long index =
-          commitIndexSet.keySet().stream().mapToLong(v -> v).min()
+          commitIndexMap.keySet().stream().mapToLong(v -> v).min()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
         LOG.debug("waiting for first index {} to catch up", index);
@@ -117,12 +117,12 @@ public class StreamCommitWatcher {
    */
   public XceiverClientReply streamWatchOnLastIndex()
       throws IOException {
-    if (!commitIndexSet.isEmpty()) {
+    if (!commitIndexMap.isEmpty()) {
       // wait for the  commit index in the commitIndex2flushedDataMap
       // to get committed to all or majority of nodes in case timeout
       // happens.
       long index =
-          commitIndexSet.keySet().stream().mapToLong(v -> v).max()
+          commitIndexMap.keySet().stream().mapToLong(v -> v).max()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
         LOG.debug("waiting for last flush Index {} to catch up", index);
@@ -167,7 +167,7 @@ public class StreamCommitWatcher {
   }
 
   private void adjustBuffers(long commitIndex) {
-    List<Long> keyList = commitIndexSet.keySet().stream()
+    List<Long> keyList = commitIndexMap.keySet().stream()
         .filter(p -> p <= commitIndex).collect(Collectors.toList());
     if (!keyList.isEmpty()) {
       releaseBuffers(keyList);
@@ -175,11 +175,11 @@ public class StreamCommitWatcher {
   }
 
   private long releaseBuffers(List<Long> indexes) {
-    Preconditions.checkArgument(!commitIndexSet.isEmpty());
+    Preconditions.checkArgument(!commitIndexMap.isEmpty());
     for (long index : indexes) {
-      Preconditions.checkState(commitIndexSet.containsKey(index));
+      Preconditions.checkState(commitIndexMap.containsKey(index));
       final List<ByteBuffer> buffers
-          = commitIndexSet.remove(index);
+          = commitIndexMap.remove(index);
       long length =
           buffers.stream().mapToLong(buf -> (buf.limit() - buf.position()))
               .sum();
@@ -221,12 +221,12 @@ public class StreamCommitWatcher {
   }
 
   public void cleanup() {
-    if (commitIndexSet != null) {
-      commitIndexSet.clear();
+    if (commitIndexMap != null) {
+      commitIndexMap.clear();
     }
     if (futureMap != null) {
       futureMap.clear();
     }
-    commitIndexSet = null;
+    commitIndexMap = null;
   }
 }
