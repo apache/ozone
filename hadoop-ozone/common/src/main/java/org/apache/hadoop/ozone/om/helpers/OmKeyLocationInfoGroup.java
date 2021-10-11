@@ -143,16 +143,16 @@ public class OmKeyLocationInfoGroup {
   }
 
   /**
-   * Given a new block location, generate a new version list based upon the
-   * version number of this object. It does not keep past blocks.
+   * Given a new block location, generate a new version list based upon this
+   * one.
    *
    * @param newLocationList a list of new location to be added.
    * @return newly generated OmKeyLocationInfoGroup
    */
   OmKeyLocationInfoGroup generateNextVersion(
       List<OmKeyLocationInfo> newLocationList) {
-    Map<Long, List<OmKeyLocationInfo>> newMap = new HashMap<>();
-
+    Map<Long, List<OmKeyLocationInfo>> newMap =
+        new HashMap<>();
     newMap.put(version + 1, new ArrayList<>(newLocationList));
     return new OmKeyLocationInfoGroup(version + 1, newMap);
   }

@@ -50,9 +50,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -60,8 +57,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Handles CommitKey request - prefix layout.
  */
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
-  private static final Logger LOG =
-          LoggerFactory.getLogger(OMKeyCommitRequestWithFSO.class);
 
   public OMKeyCommitRequestWithFSO(OMRequest omRequest) {
     super(omRequest);
@@ -150,21 +145,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      // TODO(HDDS-5461):  Currently, old versions are all moved to the delete
-      //  table. To preserve old version(s) in the key table on overwrite,
-      //  merge old versions to omKeyInfo here instead of moving the to the
-      //  delete table.
-      //  If bucket versioning is turned on somehow, overwritten blocks will
-      //  leak and never collected by block deletion service. Keep it off.
+      // If bucket versioning is turned on during the update, between key
+      // creation and key commit, old versions will be just overwritten and
+      // not kept. Bucket versioning will be effective from the first key
+      // creation after the knob turned on.
       RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbFileKey,
               omMetadataManager, omBucketInfo.getIsVersionEnabled(),
               trxnLogIndex, ozoneManager.isRatisEnabled());
-      if (omMetadataManager.getKeyTable().isExist(dbFileKey)
-              && omBucketInfo.getIsVersionEnabled()) {
-        // TODO: delete this warning after versioning supported.
-        LOG.warn("Overwritten blocks of {}/{}/{} may have leaked.",
-                volumeName, bucketName, keyName);
-      }
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -172,6 +159,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
               omKeyInfo, fileName, trxnLogIndex);
+
+      if (keysToDelete != null) {
+        OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbFileKey,
+                keysToDelete, trxnLogIndex);
+      }
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();

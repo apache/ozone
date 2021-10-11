@@ -494,6 +494,22 @@ public final class OMFileRequest {
   }
 
   /**
+   * Updating the list of OmKeyInfo eligible for deleting blocks.
+   *
+   * @param omMetadataManager OM Metadata Manager
+   * @param dbDeletedKey      Ozone key in deletion table
+   * @param keysToDelete      Repeated OMKeyInfos
+   * @param trxnLogIndex      transaction log index
+   */
+  public static void addDeletedTableCacheEntry(
+          OMMetadataManager omMetadataManager, String dbDeletedKey,
+          RepeatedOmKeyInfo keysToDelete, long trxnLogIndex) {
+    omMetadataManager.getDeletedTable().addCacheEntry(
+            new CacheKey<>(dbDeletedKey),
+            new CacheValue<>(Optional.of(keysToDelete), trxnLogIndex));
+  }
+
+  /**
    * Adding omKeyInfo to open file table.
    *
    * @param omMetadataMgr    OM Metadata Manager

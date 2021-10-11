@@ -71,7 +71,7 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
             getOmKeyInfo());
 
-    maybeUpdateDeletedTable(omMetadataManager, batchOperation);
+    updateDeletedTable(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

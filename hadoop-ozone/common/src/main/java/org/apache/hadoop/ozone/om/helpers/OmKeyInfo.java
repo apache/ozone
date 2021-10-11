@@ -288,9 +288,9 @@ public final class OmKeyInfo extends WithParentObjectId {
       OmKeyLocationInfoGroup currentLatestVersion =
           keyLocationVersions.get(keyLocationVersions.size() - 1);
 
-      // The new version is created based on the latest version number
-      // and will not include key locations of old versions, until object
-      // versioning is supported and enabled.
+      // Create a new version here. When bucket versioning is enabled,
+      // It includes previous block versions. Otherwise, only the blocks
+      // of new version is included.
       OmKeyLocationInfoGroup newVersion =
           currentLatestVersion.generateNextVersion(newLocationList);
       if (!keepOldVersions) {

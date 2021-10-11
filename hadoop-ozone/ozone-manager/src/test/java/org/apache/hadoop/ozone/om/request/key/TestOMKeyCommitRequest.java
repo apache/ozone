@@ -147,7 +147,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-
+    
     // Entry should be deleted from openKey Table.
     omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(ozoneKey);

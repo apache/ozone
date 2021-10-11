@@ -627,11 +627,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (dbKeyInfo != null) {
       // The key already exist, the new blocks will replace old ones
       // as new versions unless the bucket does not have versioning
-      // turned on. If the versioning is on, the new version will have
-      // identical blocks as its previous version.
-      // versioning \ key | exist | none
-      //   enabled        | add(n)| new(0)
-      //   disabled       | new(n)| new(0)
+      // turned on.
       dbKeyInfo.addNewVersion(locations, false,
               omBucketInfo.getIsVersionEnabled());
       long newSize = size;

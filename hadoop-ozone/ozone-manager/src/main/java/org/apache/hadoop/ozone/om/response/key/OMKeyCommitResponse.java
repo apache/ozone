@@ -77,7 +77,7 @@ public class OMKeyCommitResponse extends OMClientResponse {
     omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
         omKeyInfo);
 
-    maybeUpdateDeletedTable(omMetadataManager, batchOperation);
+    updateDeletedTable(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
@@ -101,8 +101,8 @@ public class OMKeyCommitResponse extends OMClientResponse {
     return ozoneKeyName;
   }
 
-  protected void maybeUpdateDeletedTable(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
+  protected void updateDeletedTable(OMMetadataManager omMetadataManager,
+                                    BatchOperation batchOperation) throws IOException {
     if (this.keysToDelete != null) {
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
               ozoneKeyName, keysToDelete);
