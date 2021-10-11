@@ -60,7 +60,7 @@ public class BlockDataStreamOutputEntryPool {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
-  private List<ByteBuffer> bufferPool;
+  private List<ByteBuffer> bufferList;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockDataStreamOutputEntryPool(
@@ -85,7 +85,7 @@ public class BlockDataStreamOutputEntryPool {
     this.requestID = requestId;
     this.openID = openID;
     this.excludeList = new ExcludeList();
-    this.bufferPool = new ArrayList<>();
+    this.bufferList = new ArrayList<>();
   }
 
   /**
@@ -146,7 +146,7 @@ public class BlockDataStreamOutputEntryPool {
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
             .setToken(subKeyInfo.getToken())
-            .setBufferPool(bufferPool);
+            .setBufferPool(bufferList);
     streamEntries.add(builder.build());
   }
 
@@ -308,7 +308,7 @@ public class BlockDataStreamOutputEntryPool {
 
   long computeBufferData() {
     long totalDataLen =0;
-    for (ByteBuffer b:bufferPool){
+    for (ByteBuffer b: bufferList){
       totalDataLen+=(b.limit()-b.position());
     }
     return totalDataLen;
