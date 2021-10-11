@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -51,6 +52,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -60,6 +62,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -74,6 +77,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys
+    .OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
@@ -146,6 +151,16 @@ public class BasicRootedOzoneClientAdapterImpl
         // accidentally failing over to an unintended OM.
         throw new IllegalArgumentException("Service ID or host name must not"
             + " be omitted when ozone.om.service.ids is defined.");
+      }
+
+      // TODO: Discuss whether to throw Exception if BucketLayout is
+      //  OBJECT_STORE.
+      if (StringUtils.equalsIgnoreCase(
+          conf.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT),
+          BucketLayout.OBJECT_STORE.name())) {
+        throw new ConfigurationException(
+            "Buckets created through Ozone File System cannot have" +
+                " OBJECT_STORE bucket layout.");
       }
 
       if (omPort != -1) {
@@ -242,7 +257,10 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {
-            volume.createBucket(bucketStr);
+            // Buckets created by OFS should be in FSO layout
+            volume.createBucket(bucketStr,
+                BucketArgs.newBuilder().setBucketLayout(
+                    BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
           } catch (OMException newBucEx) {
             // Ignore the case where another client created the bucket
             if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
