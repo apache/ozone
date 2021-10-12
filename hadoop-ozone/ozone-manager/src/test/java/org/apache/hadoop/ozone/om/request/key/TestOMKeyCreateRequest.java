@@ -134,8 +134,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assert.assertEquals(1, omKeyCreateResponse.getOMResponse()
         .getCreateKeyResponse().getKeyInfo().getKeyLocationListCount());
 
-    // Disk should have 2 versions.
-    Assert.assertEquals(2,
+    // Disk should have 1 versions when bucket versioning is off.
+    Assert.assertEquals(1,
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey)
             .getKeyLocationVersions().size());
 
