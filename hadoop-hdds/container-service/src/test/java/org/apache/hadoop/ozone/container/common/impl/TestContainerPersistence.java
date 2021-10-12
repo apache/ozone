@@ -48,9 +48,9 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -220,7 +220,7 @@ public class TestContainerPersistence {
     Path meta = kvData.getDbFile().toPath().getParent();
     Assert.assertTrue(meta != null && Files.exists(meta));
 
-    ReferenceCountedDB store = null;
+    DBHandle store = null;
     try {
       store = BlockUtils.getDB(kvData, conf);
       Assert.assertNotNull(store);

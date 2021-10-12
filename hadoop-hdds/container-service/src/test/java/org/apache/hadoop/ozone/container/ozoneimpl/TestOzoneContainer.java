@@ -35,9 +35,9 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -277,8 +277,7 @@ public class TestOzoneContainer {
 
     long freeBytes = container.getContainerData().getMaxSize();
     long containerId = container.getContainerData().getContainerID();
-    ReferenceCountedDB db = BlockUtils.getDB(container
-        .getContainerData(), conf);
+    DBHandle db = BlockUtils.getDB(container.getContainerData(), conf);
 
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     Table<String, BlockData> blockDataTable = db.getStore().getBlockDataTable();

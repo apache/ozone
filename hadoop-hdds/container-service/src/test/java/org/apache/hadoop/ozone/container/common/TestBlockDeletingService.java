@@ -56,8 +56,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -236,7 +236,7 @@ public class TestBlockDeletingService {
       ChunkBuffer buffer, ChunkManager chunkManager,
       KeyValueContainer container) {
     BlockID blockID = null;
-    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+    try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
       for (int j = 0; j < numOfBlocksPerContainer; j++) {
         blockID = ContainerTestHelper.getTestBlockID(containerID);
         String deleteStateName =
@@ -272,7 +272,7 @@ public class TestBlockDeletingService {
           container, blockID);
       kd.setChunks(chunks);
       String bID = null;
-      try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+      try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
         bID = blockID.getLocalID() + "";
         metadata.getStore().getBlockDataTable().put(bID, kd);
       } catch (IOException exception) {
@@ -294,7 +294,7 @@ public class TestBlockDeletingService {
 
   private void createTxn(KeyValueContainerData data, List<Long> containerBlocks,
       int txnID, long containerID) {
-    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+    try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
       StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
               .newBuilder().setTxID(txnID).setContainerID(containerID)
@@ -344,7 +344,7 @@ public class TestBlockDeletingService {
       KeyValueContainer container, int numOfBlocksPerContainer,
       int numOfChunksPerBlock) {
     long chunkLength = 100;
-    try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+    try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
       container.getContainerData().setBlockCount(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
@@ -375,7 +375,7 @@ public class TestBlockDeletingService {
    * Get under deletion blocks count from DB,
    * note this info is parsed from container.db.
    */
-  private int getUnderDeletionBlocksCount(ReferenceCountedDB meta,
+  private int getUnderDeletionBlocksCount(DBHandle meta,
       KeyValueContainerData data) throws IOException {
     if (data.getSchemaVersion().equals(SCHEMA_V1)) {
       return meta.getStore().getBlockDataTable()
@@ -428,7 +428,7 @@ public class TestBlockDeletingService {
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
     Assert.assertEquals(1, containerData.size());
 
-    try (ReferenceCountedDB meta = BlockUtils.getDB(
+    try (DBHandle meta = BlockUtils.getDB(
         (KeyValueContainerData) containerData.get(0), conf)) {
       Map<Long, Container<?>> containerMap = containerSet.getContainerMapCopy();
       // NOTE: this test assumes that all the container is KetValueContainer and
@@ -560,7 +560,7 @@ public class TestBlockDeletingService {
     KeyValueContainer container =
         (KeyValueContainer) containerSet.getContainerIterator().next();
     KeyValueContainerData data = container.getContainerData();
-    try (ReferenceCountedDB meta = BlockUtils.getDB(data, conf)) {
+    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
       GenericTestUtils.waitFor(() -> {
         try {

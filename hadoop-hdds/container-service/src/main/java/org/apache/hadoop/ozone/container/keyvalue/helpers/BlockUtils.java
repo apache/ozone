@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -108,9 +109,8 @@ public final class BlockUtils {
    * @return DB handle.
    * @throws StorageContainerException
    */
-  public static ReferenceCountedDB getDB(KeyValueContainerData containerData,
-                                    ConfigurationSource conf) throws
-      StorageContainerException {
+  public static DBHandle getDB(KeyValueContainerData containerData,
+      ConfigurationSource conf) throws StorageContainerException {
     Preconditions.checkNotNull(containerData);
     ContainerCache cache = ContainerCache.getInstance(conf);
     Preconditions.checkNotNull(cache);
@@ -153,15 +153,16 @@ public final class BlockUtils {
   /**
    * Add a DB handler into cache.
    *
-   * @param db - DB handler.
+   * @param store - low-level DatanodeStore for DB.
    * @param containerDBPath - DB path of the container.
    * @param conf configuration.
    */
-  public static void addDB(ReferenceCountedDB db, String containerDBPath,
+  public static void addDB(DatanodeStore store, String containerDBPath,
       ConfigurationSource conf) {
     ContainerCache cache = ContainerCache.getInstance(conf);
     Preconditions.checkNotNull(cache);
-    cache.addDB(containerDBPath, db);
+    cache.addDB(containerDBPath,
+        new ReferenceCountedDB(store, containerDBPath));
   }
 
   /**

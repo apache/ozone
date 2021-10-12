@@ -34,11 +34,11 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -114,10 +114,8 @@ public final class KeyValueContainerUtil {
               "Unrecognized schema version for container: " + schemaVersion);
     }
 
-    ReferenceCountedDB db =
-        new ReferenceCountedDB(store, dbFile.getAbsolutePath());
     //add db handler into cache
-    BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf);
+    BlockUtils.addDB(store, dbFile.getAbsolutePath(), conf);
   }
 
   /**
@@ -187,7 +185,7 @@ public final class KeyValueContainerUtil {
     }
 
     boolean isBlockMetadataSet = false;
-    ReferenceCountedDB cachedDB = null;
+    DBHandle cachedDB = null;
     DatanodeStore store = null;
     try {
       try {

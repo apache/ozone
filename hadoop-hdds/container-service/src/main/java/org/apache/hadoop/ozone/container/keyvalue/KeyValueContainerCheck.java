@@ -32,10 +32,10 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import java.io.File;
 import java.io.IOException;
@@ -230,8 +230,7 @@ public class KeyValueContainerCheck {
 
     ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
 
-    try (ReferenceCountedDB db =
-            BlockUtils.getDB(onDiskContainerData, checkConfig);
+    try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
         BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
             onDiskContainerData.getContainerID())) {
 
