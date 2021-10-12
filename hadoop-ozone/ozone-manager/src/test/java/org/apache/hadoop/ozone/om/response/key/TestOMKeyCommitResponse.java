@@ -123,7 +123,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
             .setCreationTime(Time.now()).build();
     OmKeyInfo omKeyInfo = getOmKeyInfo();
     keysToDelete =
-            OmUtils.prepareKeyForDeleteWithoutUpdateID(omKeyInfo, null);
+            OmUtils.prepareKeyForDelete(omKeyInfo, null, 100, false);
     Assert.assertNotNull(keysToDelete);
     testAddToDBBatch();
 
