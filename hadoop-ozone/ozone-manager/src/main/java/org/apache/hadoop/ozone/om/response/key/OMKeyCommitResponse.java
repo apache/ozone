@@ -102,7 +102,7 @@ public class OMKeyCommitResponse extends OMClientResponse {
   }
 
   protected void updateDeletedTable(OMMetadataManager omMetadataManager,
-                                    BatchOperation batchOperation) throws IOException {
+      BatchOperation batchOperation) throws IOException {
     if (this.keysToDelete != null) {
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
               ozoneKeyName, keysToDelete);
