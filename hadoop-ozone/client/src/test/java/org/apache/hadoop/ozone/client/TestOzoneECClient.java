@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.erasurecode.ECSchema;
-import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -82,7 +81,6 @@ public class TestOzoneECClient {
       new MockXceiverClientFactory();
   private MockOmTransport transportStub = null;
   private ECSchema schema = new ECSchema("rs", dataBlocks, parityBlocks);
-  private ErasureCodecOptions options = new ErasureCodecOptions(schema);
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   private final RawErasureEncoder encoder =
