@@ -87,8 +87,9 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
-    return createKey(key, size, ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
+    return createKey(key, size,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.STAND_ALONE,
+        ReplicationFactor.ONE), new HashMap<>());
   }
 
   @Override
@@ -183,8 +184,7 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OmMultipartInfo initiateMultipartUpload(String keyName,
-                                                 ReplicationType type,
-                                                 ReplicationFactor factor)
+                                                 ReplicationConfig config)
       throws IOException {
     String uploadID = UUID.randomUUID().toString();
     multipartUploadIdMap.put(keyName, uploadID);
@@ -274,8 +274,9 @@ public class OzoneBucketStub extends OzoneBucket {
     List<PartInfo> partInfoList = new ArrayList<>();
 
     if (partList.get(key) == null) {
-      return new OzoneMultipartUploadPartListParts(ReplicationType.RATIS,
-          ReplicationFactor.ONE, 0, false);
+      return new OzoneMultipartUploadPartListParts(ReplicationConfig
+          .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+          0, false);
     } else {
       Map<Integer, Part> partMap = partList.get(key);
       Iterator<Map.Entry<Integer, Part>> partIterator =
@@ -304,8 +305,9 @@ public class OzoneBucketStub extends OzoneBucket {
       }
 
       OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
-          new OzoneMultipartUploadPartListParts(ReplicationType.RATIS,
-              ReplicationFactor.ONE,
+          new OzoneMultipartUploadPartListParts(
+              ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                  ReplicationFactor.ONE),
               nextPartNumberMarker, truncated);
       ozoneMultipartUploadPartListParts.addAllParts(partInfoList);
 

@@ -485,7 +485,9 @@ public class ObjectEndpoint extends EndpointBase {
       ReplicationFactor replicationFactor = s3StorageType.getFactor();
 
       OmMultipartInfo multipartInfo = ozoneBucket
-          .initiateMultipartUpload(key, replicationType, replicationFactor);
+          .initiateMultipartUpload(key,
+              ReplicationConfig.fromTypeAndFactor(replicationType,
+              replicationFactor));
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
