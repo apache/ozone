@@ -97,7 +97,7 @@ public class ReplicationServer {
             .setNameFormat("ReplicationServerExecutor-%d")
             .build());
 
-    Class channelType;
+    Class<? extends ServerChannel> channelType;
 
     if (Epoll.isAvailable()) {
       eventLoopGroup = new EpollEventLoopGroup(poolSize * 2);
