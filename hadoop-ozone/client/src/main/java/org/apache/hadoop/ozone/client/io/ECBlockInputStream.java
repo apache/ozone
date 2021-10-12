@@ -338,8 +338,10 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           "EOF encountered at pos: " + pos + " for block: "
               + blockInfo.getBlockID());
     }
-    position = pos;
-    seeked = true;
+    if (position != pos) {
+      position = pos;
+      seeked = true;
+    }
   }
 
   @Override

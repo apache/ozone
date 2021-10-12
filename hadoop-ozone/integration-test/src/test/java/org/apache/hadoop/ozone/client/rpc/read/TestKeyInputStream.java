@@ -229,26 +229,25 @@ public class TestKeyInputStream extends TestInputStreamBase {
     int dataLength = (9 * BLOCK_SIZE + ecChunkSize);
 
     byte[] inputData = writeRandomBytes(keyName, repConfig, dataLength);
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+    try(KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
-    validate(keyInputStream, inputData, 0, ecChunkSize + 1234);
+      validate(keyInputStream, inputData, 0, ecChunkSize + 1234);
 
-    validate(keyInputStream, inputData, 200, ecChunkSize);
+      validate(keyInputStream, inputData, 200, ecChunkSize);
 
-    validate(keyInputStream, inputData, BLOCK_SIZE * 4, ecChunkSize);
+      validate(keyInputStream, inputData, BLOCK_SIZE * 4, ecChunkSize);
 
-    validate(keyInputStream, inputData, BLOCK_SIZE * 4 + 200, ecChunkSize);
+      validate(keyInputStream, inputData, BLOCK_SIZE * 4 + 200, ecChunkSize);
 
-    validate(keyInputStream, inputData, dataLength - ecChunkSize - 100,
-        ecChunkSize + 50);
+      validate(keyInputStream, inputData, dataLength - ecChunkSize - 100,
+          ecChunkSize + 50);
 
-    randomPositionSeek(dataLength, keyInputStream, inputData,
-        ecChunkSize + 200);
+      randomPositionSeek(dataLength, keyInputStream, inputData,
+          ecChunkSize + 200);
 
-    // Read entire key.
-    validate(keyInputStream, inputData, 0, dataLength);
-
-    keyInputStream.close();
+      // Read entire key.
+      validate(keyInputStream, inputData, 0, dataLength);
+    }
   }
 
   public void testSeek() throws Exception {
