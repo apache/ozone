@@ -25,17 +25,25 @@ import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
 import org.apache.ratis.client.api.GroupManagementApi;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.*;
 import org.apache.ratis.retry.ExponentialBackoffRetry;
@@ -44,6 +52,7 @@ import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.security.cert.X509Certificate;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -127,16 +136,18 @@ public class FailoverCommand extends GenericCli
   }
 
   /**
-   * Create ratis client raft client.
+   * Create ratis client.
    *
    * @param raftGroupId the raft group id
    * @param peers       the peers
    * @return the raft client
    */
   public static RaftClient createRatisClient(RaftGroupId raftGroupId,
-                                             Collection<RaftPeer> peers) {
+                                             Collection<RaftPeer> peers,
+                                             GrpcTlsConfig tlsConfig) {
     RaftProperties properties = new RaftProperties();
     Parameters parameters = new Parameters();
+    RaftClient.Builder builder = RaftClient.newBuilder();
     RaftClientConfigKeys.Rpc.setRequestTimeout(properties,
         TimeDuration.valueOf(15, TimeUnit.SECONDS));
     ExponentialBackoffRetry retryPolicy = ExponentialBackoffRetry.newBuilder()
@@ -146,14 +157,18 @@ public class FailoverCommand extends GenericCli
         .setMaxSleepTime(
                 TimeDuration.valueOf(100000, TimeUnit.MILLISECONDS))
         .build();
-    return RaftClient.newBuilder()
-        .setClientId(ClientId.randomId())
-        .setLeaderId(null)
-        .setProperties(properties)
-        .setParameters(parameters)
-        .setRetryPolicy(retryPolicy)
-        .setRaftGroup(RaftGroup.valueOf(raftGroupId, peers))
-        .build();
+    // currently only Grpc supported
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+    }
+    return builder
+            .setClientId(ClientId.randomId())
+            .setLeaderId(null)
+            .setProperties(properties)
+            .setParameters(parameters)
+            .setRetryPolicy(retryPolicy)
+            .setRaftGroup(RaftGroup.valueOf(raftGroupId, peers))
+            .build();
   }
 
   /**
@@ -185,8 +200,11 @@ public class FailoverCommand extends GenericCli
             .build())
             .collect(Collectors.toList());
 
+    final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
+            SecurityConfig(conf), getCACertificates(conf));
     // Pseudo client for inquiry
-    RaftClient raftClient = createRatisClient(PSEUDO_RAFT_GROUP_ID, peerList);
+    RaftClient raftClient = createRatisClient(PSEUDO_RAFT_GROUP_ID, peerList,
+            tlsConfig);
     RaftGroupId remoteGroupId;
     GroupManagementApi groupManagementApi = raftClient.getGroupManagementApi(
             peerList.get(0).getId());
@@ -194,12 +212,12 @@ public class FailoverCommand extends GenericCli
     if (groupIds.size() == 1) {
       remoteGroupId = groupIds.get(0);
     } else {
-      throw new IOException("There are more than one raft group.");
+      throw new IOException("There are more than one raft groups.");
     }
     GroupInfoReply groupInfoReply = groupManagementApi.info(remoteGroupId);
     RaftGroup raftGroup = groupInfoReply.getGroup();
     raftClient = createRatisClient(raftGroup.getGroupId(),
-            raftGroup.getPeers());
+            raftGroup.getPeers(), tlsConfig);
     System.out.println("RaftGroup from raft server: " + raftGroup);
 
     if (tgtAddress.equalsIgnoreCase(RANDOM)) {
@@ -213,7 +231,7 @@ public class FailoverCommand extends GenericCli
           "quorum %s.", tgtAddress, raftGroup.getPeers().stream().
               map(RaftPeer::getAddress).collect(Collectors.toList())));
     }
-    System.out.printf("Trying to transfer to new leader %s", tgtAddress);
+    System.out.printf("Trying to transfer to new leader %s.%n", tgtAddress);
 
     List<RaftPeer> peersWithNewPriorities = new ArrayList<>();
     for (RaftPeer peer : raftGroup.getPeers()) {
@@ -231,7 +249,7 @@ public class FailoverCommand extends GenericCli
           peersWithNewPriorities);
     } else {
       System.out.printf("Failed to set new priority for division: %s." +
-          " Ratis reply: %s%n", peersWithNewPriorities, reply);
+          " Ratis reply: %s.%n", peersWithNewPriorities, reply);
       throw new IOException(reply.getException());
     }
 
@@ -244,13 +262,20 @@ public class FailoverCommand extends GenericCli
       System.out.printf("Successfully transferred leadership: %s.%n",
               tgtAddress);
     } else {
-      System.out.printf("Failed to transferring leadership: %s." +
-          " Ratis reply: %s%n", tgtAddress, reply);
+      System.out.printf("Failed to transfer leadership: %s." +
+          " Ratis reply: %s.%n", tgtAddress, reply);
       throw new IOException(reply.getException());
     }
   }
 
-  private List<String> getOMRatisAddressList(OzoneConfiguration conf)
+  /**
+   * Check OM HA and get ratis address list.
+   *
+   * @param conf the conf
+   * @return the om ratis address list
+   * @throws IOException the io exception
+   */
+  List<String> getOMRatisAddressList(OzoneConfiguration conf)
           throws IOException {
     if (OmUtils.isOmHAServiceId(conf, omServiceId)) {
       OMHANodeDetails omhaNodeDetails = OMHANodeDetails.loadOMHAConfig(conf);
@@ -364,5 +389,26 @@ public class FailoverCommand extends GenericCli
     } else {
       throw new IOException("Not enough Peers for transferring leadership");
     }
+  }
+
+  /**
+   * Gets CA certificates.
+   *
+   * @param conf the conf
+   * @return the ca certificates
+   * @throws IOException the io exception
+   */
+  public List<X509Certificate> getCACertificates(OzoneConfiguration conf)
+      throws IOException {
+    List<X509Certificate> x509Certificates = null;
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      Objects.requireNonNull(omServiceId, "omServiceId must be specified");
+      ClientProtocol omClient =  OzoneClientFactory.
+          getRpcClient(omServiceId, conf).getObjectStore().getClientProxy();
+      ServiceInfoEx serviceInfoEx = omClient.getOmServiceInfo();
+      x509Certificates = OzoneSecurityUtil.convertToX509(
+          serviceInfoEx.getCaCertPemList());
+    }
+    return x509Certificates;
   }
 }

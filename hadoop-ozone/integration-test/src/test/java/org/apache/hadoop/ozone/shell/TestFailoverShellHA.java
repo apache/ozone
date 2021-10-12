@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
+
 /**
  * Tests failover with SCM HA setup.
  */
@@ -48,6 +50,7 @@ public class TestFailoverShellHA {
   private int numOfSCMs = 3;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
+  private static final String HOST_PORT_LIST_ARG = "--hostPortList";
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -99,10 +102,10 @@ public class TestFailoverShellHA {
             .stream().map(RaftPeer::getAddress)
             .collect(Collectors.joining(","));
     hostAddress = hostAddress.replaceAll("0\\.0\\.0\\.0", "localhost");
-    conf.set("ozone.scm.ratis.enable", "true");
+    conf.set(OZONE_SCM_HA_ENABLE_KEY, "true");
     OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
     String[] args = {"failover", "SCM", hostAddress,
-        "--raftHostPortList", ratisAddresses};
+        HOST_PORT_LIST_ARG, ratisAddresses};
     ozoneAdmin.execute(args);
     cluster.waitForSCMToBeReady();
     StorageContainerManager currentLeader = getScmLeader(cluster);
@@ -123,8 +126,8 @@ public class TestFailoverShellHA {
             .collect(Collectors.joining(","));
     hostAddress = hostAddress.replaceAll("0\\.0\\.0\\.0", "localhost");
     OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
-    String[] args = {"failover", "OM", hostAddress, "--raftHostPortList",
-        ratisAddresses};
+    String[] args = {"failover", "OM", hostAddress, HOST_PORT_LIST_ARG,
+        ratisAddresses, "--service-id", cluster.getOMServiceId()};
     ozoneAdmin.execute(args);
     cluster.waitForClusterToBeReady();
     OzoneManager currentLeader = cluster.getOMLeader();

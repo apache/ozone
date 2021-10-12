@@ -289,6 +289,11 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public ServiceInfoEx getOmServiceInfo() throws IOException {
+    return ozoneManagerClient.getServiceInfo();
+  }
+
+  @Override
   public void createVolume(String volumeName) throws IOException {
     createVolume(volumeName, VolumeArgs.newBuilder().build());
   }

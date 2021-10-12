@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -70,6 +71,14 @@ public interface ClientProtocol {
    * @throws IOException
    */
   List<OMRoleInfo> getOmRoleInfos() throws IOException;
+
+  /**
+   * Gets om service info.
+   *
+   * @return the om service infos
+   * @throws IOException the io exception
+   */
+  ServiceInfoEx getOmServiceInfo() throws IOException;
 
   /**
    * Creates a new Volume.
