@@ -156,7 +156,7 @@ public final class SCMRatisRequest {
       builder.append(TextFormat.shortDebugString(
           SCMRatisRequestProto.parseFrom(proto.getLogData().toByteArray())));
     } catch (Throwable ex) {
-      LOG.info("smProtoToString failed", ex);
+      LOG.error("smProtoToString failed", ex);
       builder.append("smProtoToString failed with");
       builder.append(ex.getMessage());
     }
