@@ -154,7 +154,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     if (!isInitialized()) {
       return;
     }
-    for(int i=0; i<=currentStreamIdx && i<blockOutputStreams.length; i++) {
+    for (int i = 0;
+         i <= currentStreamIdx && i < blockOutputStreams.length; i++) {
       if (blockOutputStreams[i] != null) {
         blockOutputStreams[i].flush();
       }
