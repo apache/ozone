@@ -177,6 +177,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void stop() {
+    chunkManager.shutdown();
+    blockManager.shutdown();
   }
 
   @Override

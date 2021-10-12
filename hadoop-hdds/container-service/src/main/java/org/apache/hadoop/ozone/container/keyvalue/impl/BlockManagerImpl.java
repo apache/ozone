@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -348,7 +347,7 @@ public class BlockManagerImpl implements BlockManager {
    */
   @Override
   public void shutdown() {
-    BlockUtils.shutdownCache(ContainerCache.getInstance(config));
+    BlockUtils.shutdownCache(config);
   }
 
   private BlockData getBlockByID(DBHandle db, BlockID blockID,
