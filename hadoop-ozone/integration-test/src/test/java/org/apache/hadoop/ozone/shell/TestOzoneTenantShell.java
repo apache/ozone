@@ -335,7 +335,7 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Created tenant 'finance'.\n", true);
     checkOutput(err, "", true);
 
-    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
+//    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
     // FIXME: Below check is somewhat unstable.
     //  Occasionally lines.size() == 0 -> ArrayIndexOutOfBoundsException
     //  Possibly due to audit log not flushed.

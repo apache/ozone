@@ -385,12 +385,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     final ListTenantResponse.Builder resp = ListTenantResponse.newBuilder();
 
     TenantInfoList ret = impl.listTenant();
-    if (ret != null) {
-      resp.setSuccess(true);
-      resp.addAllTenantInfo(ret.getTenantInfoList());
-    } else {
-      resp.setSuccess(false);
-    }
+    resp.setSuccess(true);
+    resp.addAllTenantInfo(ret.getTenantInfoList());
 
     return resp.build();
   }

@@ -46,9 +46,9 @@ public class TenantRevokeUserAccessIdHandler extends TenantHandler {
     accessIds.forEach(accessId -> {
       try {
         objStore.tenantRevokeUserAccessId(accessId);
-        err().format("Revoked accessId '%s'.\n", accessId);
+        err().format("Revoked accessId '%s'.%n", accessId);
       } catch (IOException e) {
-        err().format("Failed to revoke accessId '%s': %s\n",
+        err().format("Failed to revoke accessId '%s': %s%n",
             accessId, e.getMessage());
       }
     });

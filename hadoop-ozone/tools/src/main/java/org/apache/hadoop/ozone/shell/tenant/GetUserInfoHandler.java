@@ -77,7 +77,7 @@ public class GetUserInfoHandler extends TenantHandler {
           } else {
             adminInfoString = "";
           }
-          out().format("- Tenant '%s'%s with accessId '%s'\n",
+          out().format("- Tenant '%s'%s with accessId '%s'%n",
               accessIdInfo.getTenantName(), adminInfoString,
               accessIdInfo.getAccessId());
         }

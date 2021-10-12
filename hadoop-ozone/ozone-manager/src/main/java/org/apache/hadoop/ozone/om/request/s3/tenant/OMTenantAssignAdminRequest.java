@@ -119,11 +119,11 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
 
   @Override
   public void handleRequestFailure(OzoneManager ozoneManager) {
-    final TenantAssignAdminRequest request =
-        getOmRequest().getTenantAssignAdminRequest();
+//    final TenantAssignAdminRequest request =
+//        getOmRequest().getTenantAssignAdminRequest();
 
     try {
-//      ozoneManager.getMultiTenantManager().revokeTenantAdmin();
+      ozoneManager.getMultiTenantManager().revokeTenantAdmin(null /* TODO */);
     } catch (Exception e) {
       // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
     }
