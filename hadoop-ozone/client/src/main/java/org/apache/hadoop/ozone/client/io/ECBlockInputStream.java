@@ -70,6 +70,14 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     return repConfig;
   }
 
+  protected DatanodeDetails[] getDataLocations() {
+    return dataLocations;
+  }
+
+  protected long getStripeSize() {
+    return stripeSize;
+  }
+
   protected int availableDataLocations() {
     int count = 0;
     for (int i = 0; i < repConfig.getData(); i++) {
@@ -107,7 +115,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         new DatanodeDetails[repConfig.getData() + repConfig.getParity()];
     this.blockStreams = new BlockExtendedInputStream[repConfig.getData()];
 
-    stripeSize = ecChunkSize * repConfig.getData();
+    this.stripeSize = (long)ecChunkSize * repConfig.getData();
     setBlockLocations(this.blockInfo.getPipeline());
   }
 
@@ -373,6 +381,10 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized long getPos() {
     return position;
+  }
+
+  protected void setPos(long pos) {
+    position = pos;
   }
 
   @Override
