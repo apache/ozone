@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,14 +47,18 @@ import static com.google.common.base.Preconditions.checkState;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 
 /**
- * Helper for {@link ECBlockOutputStream}.
+ * ECBlockOutputStreamEntry manages write into EC keys' data block groups.
+ * A block group consists of data and parity blocks. For every block we have
+ * an internal ECBlockOutputStream instance with a single node pipeline, that
+ * is derived from the original EC pipeline.
  */
 public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
-  private ECBlockOutputStream[] blockOutputStreams;
   private final ECReplicationConfig replicationConfig;
-  private long length;
+  private final long length;
 
+  private ECBlockOutputStream[] blockOutputStreams;
   private int currentStreamIdx = 0;
+
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
@@ -182,18 +187,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     if (!isInitialized()) {
       return 0;
     }
-    // blockID is the same for EC blocks inside one block group managed by
-    // this entry.
     updateBlockID(underlyingBlockID());
-    //TODO: A future implementation might require something like this, but
-    // currently as ECBlockOutputStream is inheriting from BlockOutputStream
-    // this method returns 0 all the time from the unrelying streams.
-    // After we have a confirmed ack mechanism, like there is in
-    // RatisBlockOutputStream, we should revisit this part, and decide if we
-    // want to filter out parity here for example.
-//    return dataStreams()
-//        .mapToLong(BlockOutputStream::getTotalAckDataLength)
-//        .sum();
+    // Returning zero here. Underlying streams in EC entry are
+    // ECBlockOutputStreams, extending from BlockOutputStream, without
+    // overriding getTotalAckDataLength, and default implementation returns
+    // constant zero, so even summarizing the return value of this method
+    // from blockStreams entries would yield to 0. Once this changes, we need
+    // to revisit this, and implement a proper sum of data or all streams.
     return 0;
   }
 
@@ -272,6 +272,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     if (blockOutputStreams[0] == null) {
       return null;
     }
+    // blockID is the same for EC blocks inside one block group managed by
+    // this entry, so updating based on the first stream, as when we write any
+    // data that is surely exists.
     return blockOutputStreams[0].getBlockID();
   }
 
@@ -280,13 +283,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   private Stream<ECBlockOutputStream> blockStreams() {
-    return Arrays.stream(blockOutputStreams).filter(s -> s != null);
+    return Arrays.stream(blockOutputStreams).filter(Objects::nonNull);
   }
 
   private Stream<ECBlockOutputStream> dataStreams() {
     return Arrays.stream(blockOutputStreams)
         .limit(replicationConfig.getData())
-        .filter(s -> s != null);
+        .filter(Objects::nonNull);
   }
 
   /**
