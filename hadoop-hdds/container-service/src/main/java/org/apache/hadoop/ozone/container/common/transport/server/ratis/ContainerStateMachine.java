@@ -651,9 +651,11 @@ public class ContainerStateMachine extends BaseStateMachine {
         if (data != null) {
           Preconditions.checkArgument(!data.isEmpty());
           future.complete(data);
+          metrics.incNumDataCacheHit();
           return future;
         }
 
+        metrics.incNumDataCacheMiss();
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
