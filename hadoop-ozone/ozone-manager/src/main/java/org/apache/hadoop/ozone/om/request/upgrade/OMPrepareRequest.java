@@ -258,6 +258,7 @@ public class OMPrepareRequest extends OMClientRequest {
       throw new IOException("Unable to purge logs: " + e.getMessage());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      throw new IOException("Unable to purge logs: " + e.getMessage());
     }
   }
 }

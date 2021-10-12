@@ -589,6 +589,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         throw new IOException(e.getMessage(), e);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        throw new IOException(e.getMessage(), e);
       }
       processReply(reply);
     } finally {

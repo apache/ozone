@@ -284,10 +284,10 @@ public final class OzoneManagerRatisServer {
           .get();
     } catch (ExecutionException | IOException ex) {
       throw new ServiceException(ex.getMessage(), ex);
-    } catch (InterruptedException e) {
+    } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
+      throw new ServiceException(ex.getMessage(), ex);
     }
-    return null;
   }
 
   /**
