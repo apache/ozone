@@ -51,7 +51,6 @@ import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   private ECBlockOutputStream[] blockOutputStreams;
   private final ECReplicationConfig replicationConfig;
-  private Map<DatanodeDetails, Integer> replicaIndicies = new HashMap<>();
   private long length;
 
   private int currentStreamIdx = 0;
@@ -238,25 +237,12 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       DatanodeDetails node, int replicaIndex) {
     Map<DatanodeDetails, Integer> indiciesForSinglePipeline = new HashMap<>();
     indiciesForSinglePipeline.put(node, replicaIndex);
-    replicaIndicies.put(node, replicaIndex);
     return Pipeline.newBuilder()
         .setId(ecPipeline.getId())
         .setReplicationConfig(ecPipeline.getReplicationConfig())
         .setState(ecPipeline.getPipelineState())
         .setNodes(ImmutableList.of(node))
         .setReplicaIndexes(indiciesForSinglePipeline)
-        .build();
-  }
-
-  @Override
-  Pipeline getPipelineForOMLocationReport() {
-    Pipeline original = getPipeline();
-    return Pipeline.newBuilder()
-        .setId(original.getId())
-        .setReplicationConfig(original.getReplicationConfig())
-        .setState(original.getPipelineState())
-        .setNodes(original.getNodes())
-        .setReplicaIndexes(replicaIndicies)
         .build();
   }
 

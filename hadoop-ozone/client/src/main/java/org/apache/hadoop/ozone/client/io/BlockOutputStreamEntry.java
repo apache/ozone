@@ -298,18 +298,6 @@ public class BlockOutputStreamEntry extends OutputStream {
     return this.pipeline;
   }
 
-  /**
-   * Gets the Pipeline based on which the location report can be sent to the OM.
-   * This is necessary, as implementors might use special pipeline information
-   * that can be created during commit, but not during initialization,
-   * and might need to update some Pipeline information returned in
-   * OMKeyLocationInfo.
-   * @return
-   */
-  Pipeline getPipelineForOMLocationReport(){
-    return getPipeline();
-  }
-
   long getCurrentPosition() {
     return this.currentPosition;
   }

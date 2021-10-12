@@ -217,7 +217,7 @@ public class BlockOutputStreamEntryPool {
                 .setLength(streamEntry.getCurrentPosition())
                 .setOffset(0)
                 .setToken(streamEntry.getToken())
-                .setPipeline(streamEntry.getPipelineForOMLocationReport())
+                .setPipeline(streamEntry.getPipeline())
                 .build();
         locationInfoList.add(info);
       }
