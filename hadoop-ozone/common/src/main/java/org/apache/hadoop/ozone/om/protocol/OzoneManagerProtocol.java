@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
@@ -479,10 +480,19 @@ public interface OzoneManagerProtocol
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantName tenant name.
+   * @param delegated true if making delegated admin.
    * @throws IOException
    */
-  void assignAdminToAccessId(String accessId, String tenantName)
-      throws IOException;
+  void tenantAssignAdmin(String accessId, String tenantName,
+      boolean delegated) throws IOException;
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  void tenantRevokeAdmin(String accessId, String tenantName) throws IOException;
 
   /**
    * Get tenant info for a user.
@@ -492,6 +502,13 @@ public interface OzoneManagerProtocol
    */
   TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException;
+
+  /**
+   * List tenants.
+   * @return TenantInfoList
+   * @throws IOException
+   */
+  TenantInfoList listTenant() throws IOException;
 
   /**
    * OzoneFS api to get file status for an entry.

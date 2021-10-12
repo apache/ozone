@@ -188,17 +188,7 @@ public class OMDBDefinition implements DBDefinition {
       String.class,
       new StringCodec());
 
-  // Tables for S3 multi-tenancy
-
-  // TODO: this table will be removed with the disappearance of CreateUser API.
-  public static final DBColumnFamilyDefinition<String, String>
-            TENANT_USER_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.TENANT_USER_TABLE,
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
+  // Tables for multi-tenancy
 
   public static final DBColumnFamilyDefinition<String, OmDBAccessIdInfo>
             TENANT_ACCESS_ID_TABLE =
@@ -274,7 +264,7 @@ public class OMDBDefinition implements DBDefinition {
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
-        TENANT_USER_TABLE, TENANT_ACCESS_ID_TABLE,
+        TENANT_ACCESS_ID_TABLE,
         PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE, TENANT_GROUP_TABLE,
         TENANT_ROLE_TABLE, TENANT_POLICY_TABLE };
   }

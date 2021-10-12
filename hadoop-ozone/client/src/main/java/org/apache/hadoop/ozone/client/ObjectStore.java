@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -202,11 +203,23 @@ public class ObjectStore {
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantName tenant name.
+   * @param delegated true if making delegated admin.
    * @throws IOException
    */
-  public void assignAdminToAccessId(String accessId, String tenantName)
+  public void tenantAssignAdmin(String accessId, String tenantName,
+      boolean delegated) throws IOException {
+    proxy.tenantAssignAdmin(accessId, tenantName, delegated);
+  }
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  public void tenantRevokeAdmin(String accessId, String tenantName)
       throws IOException {
-    proxy.assignAdminToAccessId(accessId, tenantName);
+    proxy.tenantRevokeAdmin(accessId, tenantName);
   }
 
   /**
@@ -218,6 +231,15 @@ public class ObjectStore {
   public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException {
     return proxy.tenantGetUserInfo(userPrincipal);
+  }
+
+  /**
+   * List tenants.
+   * @return TenantInfoList
+   * @throws IOException
+   */
+  public TenantInfoList listTenant() throws IOException {
+    return proxy.listTenant();
   }
 
   /**

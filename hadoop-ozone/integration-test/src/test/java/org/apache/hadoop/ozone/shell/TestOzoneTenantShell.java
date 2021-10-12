@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
@@ -323,6 +324,10 @@ public class TestOzoneTenantShell {
     List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
     Assert.assertEquals(0, lines.size());
 
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
+
     // Create tenants
     // Equivalent to `ozone tenant create finance`
     executeHA(tenantShell, new String[] {"create", "finance"});
@@ -330,9 +335,16 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
-    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
+    // FIXME: Below check is somewhat unstable.
+    //  Occasionally lines.size() == 0 -> ArrayIndexOutOfBoundsException
+    //  Possibly due to audit log not flushed.
+//    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
-    // Creating the tenant with the same name again should result in failure
+    // Check volume creation
+    OmVolumeArgs volArgs = cluster.getOzoneManager().getVolumeInfo("finance");
+    Assert.assertEquals("finance", volArgs.getVolume());
+
+    // Creating the tenant with the same name again should fail
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "", true);
     checkOutput(err, "Failed to create tenant 'finance':"
@@ -344,6 +356,15 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {"create", "dev"});
     checkOutput(out, "Created tenant 'dev'.\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {"ls"});
+    checkOutput(out, "dev\nfinance\nresearch\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {"list", "--long", "--header"});
+    // Not checking the entire output here yet
+    checkOutput(out, "Policy", false);
     checkOutput(err, "", true);
 
     // Assign user
@@ -378,6 +399,35 @@ public class TestOzoneTenantShell {
         + "- Tenant 'research' with accessId 'research$bob@EXAMPLE.COM'\n"
         + "- Tenant 'dev' with accessId 'dev$bob@EXAMPLE.COM'\n\n", true);
     checkOutput(err, "", true);
+
+    // Assign admin
+    executeHA(tenantShell, new String[] {
+        "user", "assignadmin", "dev$bob@EXAMPLE.COM", "--tenant=dev"});
+    checkOutput(out, "", true);
+    checkOutput(err,
+        "Assigned admin to 'dev$bob@EXAMPLE.COM' in tenant 'dev'\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "info", "bob@EXAMPLE.COM"});
+    checkOutput(out, "Tenant 'dev' delegated admin with accessId", false);
+    checkOutput(err, "", true);
+
+    // Assign admin
+    executeHA(tenantShell, new String[] {
+        "user", "revokeadmin", "dev$bob@EXAMPLE.COM", "--tenant=dev"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked admin role of 'dev$bob@EXAMPLE.COM' "
+        + "from tenant 'dev'\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "info", "bob@EXAMPLE.COM"});
+    checkOutput(out, "Tenant 'dev' with accessId", false);
+    checkOutput(err, "", true);
+
+    final String testOut = out.toString(DEFAULT_ENCODING);
+    final String testErr = err.toString(DEFAULT_ENCODING);
+    LOG.error(testOut);
+    LOG.error(testErr);
   }
 
 }

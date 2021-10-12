@@ -104,6 +104,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
@@ -658,16 +659,34 @@ public class RpcClient implements ClientProtocol {
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantName tenant name.
+   * @param delegated true if making delegated admin.
    * @throws IOException
    */
   @Override
-  public void assignAdminToAccessId(String accessId, String tenantName)
+  public void tenantAssignAdmin(String accessId, String tenantName,
+      boolean delegated)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(tenantName),
         "tenantName can't be null or empty.");
-    ozoneManagerClient.assignAdminToAccessId(accessId, tenantName);
+    ozoneManagerClient.tenantAssignAdmin(accessId, tenantName, delegated);
+  }
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  @Override
+  public void tenantRevokeAdmin(String accessId, String tenantName)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
+        "tenantName can't be null or empty.");
+    ozoneManagerClient.tenantRevokeAdmin(accessId, tenantName);
   }
 
   /**
@@ -682,6 +701,16 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(Strings.isNotBlank(userPrincipal),
         "userPrincipal can't be null or empty.");
     return ozoneManagerClient.tenantGetUserInfo(userPrincipal);
+  }
+
+  /**
+   * List tenants.
+   * @return TenantInfoList
+   * @throws IOException
+   */
+  @Override
+  public TenantInfoList listTenant() throws IOException {
+    return ozoneManagerClient.listTenant();
   }
 
   @Override

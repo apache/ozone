@@ -33,28 +33,47 @@ public final class OmDBAccessIdInfo {
    */
   private final String kerberosPrincipal;
   /**
-   * Shared secret of the accessId. TODO: Encryption?
+   * Shared secret of the accessId.
    */
   private final String sharedSecret;
+  /**
+   * Whether this accessId is an administrator of the tenant.
+   */
+  private final boolean isAdmin;
+  /**
+   * Whether this accessId is a delegated admin of the tenant.
+   * Only effective if isAdmin is true.
+   */
+  private final boolean isDelegatedAdmin;
 
   // This implies above String fields should NOT contain the split key.
   public static final String SERIALIZATION_SPLIT_KEY = ";";
 
   public OmDBAccessIdInfo(String tenantId,
-      String kerberosPrincipal, String sharedSecret) {
+      String kerberosPrincipal, String sharedSecret,
+      boolean isAdmin, boolean isDelegatedAdmin) {
     this.tenantId = tenantId;
     this.kerberosPrincipal = kerberosPrincipal;
     this.sharedSecret = sharedSecret;
+    this.isAdmin = isAdmin;
+    this.isDelegatedAdmin = isDelegatedAdmin;
   }
 
   private OmDBAccessIdInfo(String accessIdInfoString) {
     String[] tInfo = accessIdInfoString.split(SERIALIZATION_SPLIT_KEY);
-    Preconditions.checkState(tInfo.length == 3,
+    Preconditions.checkState(tInfo.length == 3 || tInfo.length == 5,
         "Incorrect accessIdInfoString");
 
     tenantId = tInfo[0];
     kerberosPrincipal = tInfo[1];
     sharedSecret = tInfo[2];
+    if (tInfo.length == 5) {
+      isAdmin = Boolean.parseBoolean(tInfo[3]);
+      isDelegatedAdmin = Boolean.parseBoolean(tInfo[4]);
+    } else {
+      isAdmin = false;
+      isDelegatedAdmin = false;
+    }
   }
 
   public String getTenantId() {
@@ -62,10 +81,12 @@ public final class OmDBAccessIdInfo {
   }
 
   private String serialize() {
-    StringBuilder sb = new StringBuilder();
-    sb.append(tenantId).append(SERIALIZATION_SPLIT_KEY);
-    sb.append(kerberosPrincipal).append(SERIALIZATION_SPLIT_KEY);
-    sb.append(sharedSecret);
+    final StringBuilder sb = new StringBuilder();
+    sb.append(tenantId);
+    sb.append(SERIALIZATION_SPLIT_KEY).append(kerberosPrincipal);
+    sb.append(SERIALIZATION_SPLIT_KEY).append(sharedSecret);
+    sb.append(SERIALIZATION_SPLIT_KEY).append(isAdmin);
+    sb.append(SERIALIZATION_SPLIT_KEY).append(isDelegatedAdmin);
     return sb.toString();
   }
 
@@ -93,6 +114,14 @@ public final class OmDBAccessIdInfo {
     return sharedSecret;
   }
 
+  public boolean getIsAdmin() {
+    return isAdmin;
+  }
+
+  public boolean getIsDelegatedAdmin() {
+    return isDelegatedAdmin;
+  }
+
   /**
    * Builder for OmDBAccessIdInfo.
    */
@@ -101,8 +130,10 @@ public final class OmDBAccessIdInfo {
     private String tenantId;
     private String kerberosPrincipal;
     private String sharedSecret;
+    private boolean isAdmin;
+    private boolean isDelegatedAdmin;
 
-    public Builder setTenantName(String tenantId) {
+    public Builder setTenantId(String tenantId) {
       this.tenantId = tenantId;
       return this;
     }
@@ -117,8 +148,19 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
+    public Builder setIsAdmin(boolean isAdmin) {
+      this.isAdmin = isAdmin;
+      return this;
+    }
+
+    public Builder setIsDelegatedAdmin(boolean isDelegatedAdmin) {
+      this.isDelegatedAdmin = isDelegatedAdmin;
+      return this;
+    }
+
     public OmDBAccessIdInfo build() {
-      return new OmDBAccessIdInfo(tenantId, kerberosPrincipal, sharedSecret);
+      return new OmDBAccessIdInfo(tenantId, kerberosPrincipal, sharedSecret,
+          isAdmin, isDelegatedAdmin);
     }
   }
 }

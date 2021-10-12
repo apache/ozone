@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
@@ -928,16 +929,36 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public void assignAdminToAccessId(String accessId, String tenantName)
-      throws IOException {
+  public void tenantAssignAdmin(String accessId, String tenantName,
+      boolean delegated) throws IOException {
 
-    final AssignAdminToAccessIdRequest request =
-        AssignAdminToAccessIdRequest.newBuilder()
+    final TenantAssignAdminRequest request =
+        TenantAssignAdminRequest.newBuilder()
         .setAccessId(accessId)
         .setTenantName(tenantName)
+        .setDelegated(delegated)
         .build();
-    final OMRequest omRequest = createOMRequest(Type.AssignAdminToAccessId)
-        .setAssignAdminToAccessIdRequest(request)
+    final OMRequest omRequest = createOMRequest(Type.TenantAssignAdmin)
+        .setTenantAssignAdminRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void tenantRevokeAdmin(String accessId, String tenantName)
+      throws IOException {
+
+    final TenantRevokeAdminRequest request =
+        TenantRevokeAdminRequest.newBuilder()
+            .setAccessId(accessId)
+            .setTenantName(tenantName)
+            .build();
+    final OMRequest omRequest = createOMRequest(Type.TenantRevokeAdmin)
+        .setTenantRevokeAdminRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
@@ -962,6 +983,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .getTenantGetUserInfoResponse();
 
     return TenantUserInfoValue.fromProtobuf(resp.getTenantUserInfo());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public TenantInfoList listTenant() throws IOException {
+
+    final ListTenantRequest request = ListTenantRequest.newBuilder()
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.ListTenant)
+        .setListTenantRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final ListTenantResponse resp = handleError(omResponse)
+        .getListTenantResponse();
+
+    return TenantInfoList.fromProtobuf(resp.getTenantInfoList());
   }
 
   /**

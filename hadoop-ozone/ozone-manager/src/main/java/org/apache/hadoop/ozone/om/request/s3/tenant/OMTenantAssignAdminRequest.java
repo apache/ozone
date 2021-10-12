@@ -1,0 +1,229 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+package org.apache.hadoop.ozone.om.request.s3.tenant;
+
+import com.google.common.base.Optional;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignAdminResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+
+/*
+  Execution flow
+
+  - preExecute
+    - Check caller admin privilege
+  - validateAndUpdateCache
+    - Update tenantAccessIdTable
+ */
+
+/**
+ * Handles OMTenantAssignAdminRequest.
+ */
+public class OMTenantAssignAdminRequest extends OMClientRequest {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(OMTenantAssignAdminRequest.class);
+
+  public OMTenantAssignAdminRequest(OMRequest omRequest) {
+    super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final TenantAssignAdminRequest request =
+        getOmRequest().getTenantAssignAdminRequest();
+
+    final String accessId = request.getAccessId();
+    String tenantName = request.getTenantName();
+
+    // If tenantName is not provided, figure it out from the table
+    if (StringUtils.isEmpty(tenantName)) {
+      tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
+          ozoneManager.getMetadataManager(), accessId);
+    }
+
+    // Caller should be an Ozone admin or this tenant's delegated admin
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (!ozoneManager.isAdmin(ugi) &&
+        !ozoneManager.isTenantAdmin(ugi, tenantName, true)) {
+      throw new OMException("Permission denied. User '" + ugi.getUserName() +
+          "' is neither an Ozone admin nor a delegated admin of tenant '" +
+          tenantName + "'.", OMException.ResultCodes.PERMISSION_DENIED);
+    }
+
+    // TODO: Check tenant existence?
+
+    OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
+        .getTenantAccessIdTable().get(accessId);
+
+    if (accessIdInfo == null) {
+      throw new OMException("accessId '" + accessId + "' not found.",
+          OMException.ResultCodes.TENANT_USER_NOT_FOUND);
+    }
+
+    // Check if accessId is assigned to the tenant
+    if (!accessIdInfo.getTenantId().equals(tenantName)) {
+      throw new OMException("accessId '" + accessId +
+          "' must be assigned to tenant '" + tenantName + "' first.",
+          OMException.ResultCodes.INVALID_TENANT_NAME);
+    }
+
+    // TODO: Call OMMTM to add user to admin group of the tenant.
+//    ozoneManager.getMultiTenantManager().assignTenantAdminRole();
+
+    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
+        .setUserInfo(getUserInfo())
+        .setTenantAssignAdminRequest(request)
+        .setCmdType(getOmRequest().getCmdType())
+        .setClientId(getOmRequest().getClientId());
+
+    if (getOmRequest().hasTraceID()) {
+      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
+    }
+
+    return omRequestBuilder.build();
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:methodlength")
+  public OMClientResponse validateAndUpdateCache(
+      OzoneManager ozoneManager, long transactionLogIndex,
+      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    OMClientResponse omClientResponse = null;
+    final OMResponse.Builder omResponse =
+        OmResponseUtil.getOMResponseBuilder(getOmRequest());
+
+    final Map<String, String> auditMap = new HashMap<>();
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    final TenantAssignAdminRequest request =
+        getOmRequest().getTenantAssignAdminRequest();
+    final String accessId = request.getAccessId();
+    final String tenantName = request.getTenantName();
+    final boolean delegated = request.getDelegated();
+
+    boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
+    IOException exception = null;
+
+    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
+        omMetadataManager, tenantName);
+
+    try {
+      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volumeName);
+
+      final OmDBAccessIdInfo oldAccessIdInfo =
+          omMetadataManager.getTenantAccessIdTable().get(accessId);
+
+      if (oldAccessIdInfo == null) {
+        throw new OMException("Potential DB error. OmDBAccessIdInfo "
+            + "entry is missing for accessId '" + accessId + "'.",
+            OMException.ResultCodes.METADATA_ERROR);
+      }
+
+      assert(oldAccessIdInfo.getTenantId().equals(tenantName));
+
+      // Update tenantAccessIdTable
+      final OmDBAccessIdInfo newOmDBAccessIdInfo =
+          new OmDBAccessIdInfo.Builder()
+          .setTenantId(oldAccessIdInfo.getTenantId())
+          .setKerberosPrincipal(oldAccessIdInfo.getKerberosPrincipal())
+          .setSharedSecret(oldAccessIdInfo.getSharedSecret())
+          .setIsAdmin(true)
+          .setIsDelegatedAdmin(delegated)
+          .build();
+      omMetadataManager.getTenantAccessIdTable().addCacheEntry(
+          new CacheKey<>(accessId),
+          new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
+              transactionLogIndex));
+
+      // Update tenantRoleTable?
+//      final String roleName = "role_admin";
+//      omMetadataManager.getTenantRoleTable().addCacheEntry(
+//          new CacheKey<>(accessId),
+//          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
+
+      omResponse.setTenantAssignAdminResponse(
+          TenantAssignAdminResponse.newBuilder().setSuccess(true).build());
+      omClientResponse = new OMTenantAssignAdminResponse(omResponse.build(),
+          accessId, newOmDBAccessIdInfo);
+
+    } catch (IOException ex) {
+      // TODO: Uncomment
+//      ozoneManager.getMultiTenantManager().revokeTenantAdmin();
+      exception = ex;
+      // Set success flag to false
+      omResponse.setTenantAssignAdminResponse(
+          TenantAssignAdminResponse.newBuilder().setSuccess(false).build());
+      omClientResponse = new OMTenantAssignAdminResponse(
+          createErrorOMResponse(omResponse, ex));
+    } finally {
+      if (omClientResponse != null) {
+        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
+            .add(omClientResponse, transactionLogIndex));
+      }
+      if (acquiredVolumeLock) {
+        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+      }
+    }
+
+    // Audit
+    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.TENANT_ASSIGN_ADMIN, auditMap, exception,
+        getOmRequest().getUserInfo()));
+
+    if (exception == null) {
+      LOG.info("Assigned admin to accessId '{}' in tenant '{}', "
+              + "delegated: {}", accessId, tenantName, delegated);
+      // TODO: omMetrics.incNumTenantAssignAdmin()
+    } else {
+      LOG.error("Failed to assign admin to accessId '{}' in tenant '{}', "
+              + "delegated: {}: {}",
+          accessId, tenantName, delegated, exception.getMessage());
+      // TODO: omMetrics.incNumTenantAssignAdminFails()
+    }
+    return omClientResponse;
+  }
+}

@@ -20,18 +20,18 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 import java.io.IOException;
 
 /**
- * Handles OMTenantUserModify request.
+ * Handles OMTenantRevokeUserRequest request.
  */
-public class OMRevokeUserAccessToTenantRequest extends OMVolumeRequest {
+public class OMTenantRevokeUserRequest extends OMClientRequest {
 
-  public OMRevokeUserAccessToTenantRequest(OMRequest omRequest) {
+  public OMTenantRevokeUserRequest(OMRequest omRequest) {
     super(omRequest);
   }
 

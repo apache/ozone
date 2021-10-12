@@ -37,17 +37,21 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 @CommandLine.Command(name = "assign-admin",
     aliases = {"assignadmin"},
     description = "Assign admin role to accessIds in a tenant")
-public class TenantUserAssignAdminHandler extends TenantHandler {
+public class TenantAssignAdminHandler extends TenantHandler {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "List of accessId(s)", arity = "1..")
+  @CommandLine.Parameters(description = "List of accessIds", arity = "1..")
   private List<String> accessIds = new ArrayList<>();
 
-  @CommandLine.Option(names = {"-t", "--tenant"}, required = true,
+  @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
   private String tenantName;
+
+  @CommandLine.Option(names = {"-d", "--delegated"}, defaultValue = "true",
+      description = "Make delegated admin")
+  private boolean delegated;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
@@ -55,11 +59,11 @@ public class TenantUserAssignAdminHandler extends TenantHandler {
 
     for (final String accessId : accessIds) {
       try {
-        objStore.assignAdminToAccessId(accessId, tenantName);
-        err().println("Assigned admin role to '" + accessId +
+        objStore.tenantAssignAdmin(accessId, tenantName, delegated);
+        err().println("Assigned admin to '" + accessId +
             "' in tenant '" + tenantName + "'");
       } catch (IOException e) {
-        err().println("Failed to assign admin role to '" + accessId +
+        err().println("Failed to assign admin to '" + accessId +
                 "' in tenant '" + tenantName + "': " + e.getMessage());
         if (e instanceof OMException) {
           final OMException omEx = (OMException) e;

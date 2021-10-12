@@ -69,8 +69,17 @@ public class GetUserInfoHandler extends TenantHandler {
         out().println("User '" + userPrincipal + "' is assigned to:");
 
         for (TenantAccessIdInfo accessIdInfo : accessIdInfoList) {
-          out().println("- Tenant '" + accessIdInfo.getTenantName() +
-              "' with accessId '" + accessIdInfo.getAccessId() + "'");
+          // Get admin info
+          final String adminInfoString;
+          if (accessIdInfo.getIsAdmin()) {
+            adminInfoString = accessIdInfo.getIsDelegatedAdmin() ?
+                " delegated admin" : " admin";
+          } else {
+            adminInfoString = "";
+          }
+          out().format("- Tenant '%s'%s with accessId '%s'\n",
+              accessIdInfo.getTenantName(), adminInfoString,
+              accessIdInfo.getAccessId());
         }
 
         out().println();
