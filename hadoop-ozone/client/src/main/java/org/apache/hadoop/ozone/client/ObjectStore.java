@@ -188,15 +188,25 @@ public class ObjectStore {
 //  }
 
   /**
-   * Assign user to tenant.
+   * Assign user accessId to tenant.
    * @param username user name to be assigned.
    * @param tenantName tenant name.
-   * @param accessId access ID.
+   * @param accessId Specified accessId.
    * @throws IOException
    */
-  public S3SecretValue assignUserToTenant(
+  // TODO: Rename this to tenantAssignUserAccessId ?
+  public S3SecretValue tenantAssignUserAccessId(
       String username, String tenantName, String accessId) throws IOException {
-    return proxy.assignUserToTenant(username, tenantName, accessId);
+    return proxy.tenantAssignUserAccessId(username, tenantName, accessId);
+  }
+
+  /**
+   * Revoke user accessId to tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  public void tenantRevokeUserAccessId(String accessId) throws IOException {
+    proxy.tenantRevokeUserAccessId(accessId);
   }
 
   /**

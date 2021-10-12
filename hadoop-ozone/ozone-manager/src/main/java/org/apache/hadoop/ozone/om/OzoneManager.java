@@ -3082,12 +3082,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Assign user to tenant.
+   * Assign user accessId to tenant.
    */
-  public S3SecretValue assignUserToTenant(
+  public S3SecretValue tenantAssignUserAccessId(
       String username, String tenantName, String accessId) throws IOException {
     throw new NotImplementedException(
-        "non-Ratis assignUserToTenant() is not implemented");
+        "non-Ratis tenantAssignUserAccessId() is not implemented");
+  }
+
+  /**
+   * Revoke user accessId to tenant.
+   */
+  public void tenantRevokeUserAccessId(String accessId) throws IOException {
+    throw new NotImplementedException(
+        "non-Ratis tenantRevokeUserAccessId() is not implemented");
   }
 
   /**

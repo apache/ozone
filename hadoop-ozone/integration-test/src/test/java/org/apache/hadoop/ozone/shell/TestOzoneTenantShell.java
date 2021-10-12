@@ -310,10 +310,11 @@ public class TestOzoneTenantShell {
   }
 
   /**
-   * Test tenant create, assign user and get user info.
+   * Test tenant create, assign user, get user info, assign admin, revoke admin
+   * and revoke user.
    */
   @Test
-  public void testOzoneTenantCreateAssignInfo() throws IOException {
+  public void testOzoneTenantBasicOperations() throws IOException {
 
     // Suppress OMNotLeaderException in the log
     GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
@@ -367,7 +368,7 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Policy", false);
     checkOutput(err, "", true);
 
-    // Assign user
+    // Assign user accessId
     // Equivalent to `ozone tenant user assign bob@EXAMPLE.COM --tenant=finance`
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob@EXAMPLE.COM", "--tenant=finance"});
@@ -421,13 +422,24 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {
         "user", "info", "bob@EXAMPLE.COM"});
-    checkOutput(out, "Tenant 'dev' with accessId", false);
+    checkOutput(out, "User 'bob@EXAMPLE.COM' is assigned to:\n"
+        + "- Tenant 'finance' with accessId 'finance$bob@EXAMPLE.COM'\n"
+        + "- Tenant 'research' with accessId 'research$bob@EXAMPLE.COM'\n"
+        + "- Tenant 'dev' with accessId 'dev$bob@EXAMPLE.COM'\n\n", true);
     checkOutput(err, "", true);
 
-    final String testOut = out.toString(DEFAULT_ENCODING);
-    final String testErr = err.toString(DEFAULT_ENCODING);
-    LOG.error(testOut);
-    LOG.error(testErr);
+    // Revoke user accessId
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "research$bob@EXAMPLE.COM"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId 'research$bob@EXAMPLE.COM'.\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "info", "bob@EXAMPLE.COM"});
+    checkOutput(out, "User 'bob@EXAMPLE.COM' is assigned to:\n"
+        + "- Tenant 'finance' with accessId 'finance$bob@EXAMPLE.COM'\n"
+        + "- Tenant 'dev' with accessId 'dev$bob@EXAMPLE.COM'\n\n", true);
+    checkOutput(err, "", true);
   }
 
 }

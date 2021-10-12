@@ -643,7 +643,7 @@ public class RpcClient implements ClientProtocol {
    * @throws IOException
    */
   @Override
-  public S3SecretValue assignUserToTenant(
+  public S3SecretValue tenantAssignUserAccessId(
       String username, String tenantName, String accessId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(username),
         "username can't be null or empty.");
@@ -651,8 +651,20 @@ public class RpcClient implements ClientProtocol {
         "tenantName can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
-    return ozoneManagerClient.assignUserToTenant(
+    return ozoneManagerClient.tenantAssignUserAccessId(
         username, tenantName, accessId);
+  }
+
+  /**
+   * Revoke user accessId to tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  @Override
+  public void tenantRevokeUserAccessId(String accessId) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+        "accessId can't be null or empty.");
+    ozoneManagerClient.tenantRevokeUserAccessId(accessId);
   }
 
   /**

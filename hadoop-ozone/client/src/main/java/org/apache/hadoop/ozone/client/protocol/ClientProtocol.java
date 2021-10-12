@@ -581,8 +581,15 @@ public interface ClientProtocol {
    * @param accessId access ID.
    * @throws IOException
    */
-  S3SecretValue assignUserToTenant(String username, String tenantName,
+  S3SecretValue tenantAssignUserAccessId(String username, String tenantName,
       String accessId) throws IOException;
+
+  /**
+   * Revoke user accessId to tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  void tenantRevokeUserAccessId(String accessId) throws IOException;
 
   /**
    * Assign admin role to an accessId in a tenant.

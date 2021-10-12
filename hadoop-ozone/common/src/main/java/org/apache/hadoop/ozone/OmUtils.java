@@ -305,8 +305,8 @@ public final class OmUtils {
     case CreateTenant:
     case ModifyTenant:
     case DeleteTenant:
-    case AssignUserToTenant:
-    case TenantRevokeUser:
+    case TenantAssignUserAccessId:
+    case TenantRevokeUserAccessId:
     case TenantAssignAdmin:
     case TenantRevokeAdmin:
       return false;

@@ -36,8 +36,8 @@ import java.util.concurrent.Callable;
     description = "Tenant user management",
     subcommands = {
         GetUserInfoHandler.class,
-        AssignUserToTenantHandler.class,
-        RevokeUserAccessToTenantHandler.class,
+        TenantAssignUserAccessIdHandler.class,
+        TenantRevokeUserAccessIdHandler.class,
         TenantAssignAdminHandler.class,
         TenantRevokeAdminHandler.class
     },

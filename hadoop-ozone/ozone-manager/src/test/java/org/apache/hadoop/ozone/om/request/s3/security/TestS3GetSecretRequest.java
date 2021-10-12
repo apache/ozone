@@ -39,14 +39,14 @@ import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
-import org.apache.hadoop.ozone.om.response.s3.tenant.OMAssignUserToTenantResponse;
+import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssignUserToTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
@@ -163,9 +163,9 @@ public class TestS3GetSecretRequest {
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
-        .setCmdType(Type.AssignUserToTenant)
-        .setAssignUserToTenantRequest(
-            AssignUserToTenantRequest.newBuilder()
+        .setCmdType(Type.TenantAssignUserAccessId)
+        .setTenantAssignUserAccessIdRequest(
+            TenantAssignUserAccessIdRequest.newBuilder()
                 .setTenantName(tenantNameStr)
                 .setTenantUsername(userPrincipalStr)
                 .setAccessId(accessIdStr)
@@ -367,17 +367,19 @@ public class TestS3GetSecretRequest {
             txLogIndex, ozoneManagerDoubleBufferHelper);
 
     // Check response type and cast
-    Assert.assertTrue(omClientResponse instanceof OMAssignUserToTenantResponse);
-    final OMAssignUserToTenantResponse omAssignUserToTenantResponse =
-        (OMAssignUserToTenantResponse) omClientResponse;
+    Assert.assertTrue(
+        omClientResponse instanceof OMTenantAssignUserAccessIdResponse);
+    final OMTenantAssignUserAccessIdResponse
+        omTenantAssignUserAccessIdResponse =
+        (OMTenantAssignUserAccessIdResponse) omClientResponse;
 
     // Check response
-    Assert.assertTrue(omAssignUserToTenantResponse.getOMResponse()
+    Assert.assertTrue(omTenantAssignUserAccessIdResponse.getOMResponse()
         .getSuccess());
-    Assert.assertTrue(omAssignUserToTenantResponse.getOMResponse()
-        .getAssignUserToTenantResponse().getSuccess());
+    Assert.assertTrue(omTenantAssignUserAccessIdResponse.getOMResponse()
+        .getTenantAssignUserAccessIdResponse().getSuccess());
     final OmDBAccessIdInfo omDBAccessIdInfo =
-        omAssignUserToTenantResponse.getOmDBAccessIdInfo();
+        omTenantAssignUserAccessIdResponse.getOmDBAccessIdInfo();
     Assert.assertNotNull(omDBAccessIdInfo);
 
 

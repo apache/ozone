@@ -18,12 +18,9 @@
  */
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -39,7 +36,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_GROUP_TABL
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE;
 
 /**
- * Response for OMAssignUserToTenantRequest.
+ * Response for OMTenantRevokeUserAccessIdRequest.
  */
 @CleanupTableInfo(cleanupTables = {
     S3_SECRET_TABLE,
@@ -48,30 +45,20 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
     TENANT_GROUP_TABLE,
     TENANT_ROLE_TABLE
 })
-public class OMAssignUserToTenantResponse extends OMClientResponse {
+public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
 
-  private S3SecretValue s3SecretValue;
-  private String principal, groupName, roleName, accessId;
-  private OmDBAccessIdInfo omDBAccessIdInfo;
+  private String principal, accessId;
   private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
 
   @SuppressWarnings("checkstyle:parameternumber")
-  public OMAssignUserToTenantResponse(@Nonnull OMResponse omResponse,
-      @Nonnull S3SecretValue s3SecretValue,
-      @Nonnull String principal,
-      @Nonnull String groupName,
-      @Nonnull String roleName,
+  public OMTenantRevokeUserAccessIdResponse(@Nonnull OMResponse omResponse,
       @Nonnull String accessId,
-      @Nonnull OmDBAccessIdInfo omDBAccessIdInfo,
+      @Nonnull String principal,
       @Nonnull OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo
   ) {
     super(omResponse);
-    this.s3SecretValue = s3SecretValue;
     this.principal = principal;
-    this.groupName = groupName;
-    this.roleName = roleName;
     this.accessId = accessId;
-    this.omDBAccessIdInfo = omDBAccessIdInfo;
     this.omDBKerberosPrincipalInfo = omDBKerberosPrincipalInfo;
   }
 
@@ -79,7 +66,7 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMAssignUserToTenantResponse(@Nonnull OMResponse omResponse) {
+  public OMTenantRevokeUserAccessIdResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
   }
@@ -88,26 +75,21 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (s3SecretValue != null &&
-        getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      assert(accessId.equals(s3SecretValue.getKerberosID()));
-      // Add S3SecretTable entry
-      omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
-          accessId, s3SecretValue);
+    assert(accessId != null);
+    // TODO: redundant check? Is status always OK when addToDBBatch is called
+    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+      omMetadataManager.getS3SecretTable().deleteWithBatch(batchOperation,
+          accessId);
     }
 
-    omMetadataManager.getTenantAccessIdTable().putWithBatch(
-        batchOperation, accessId, omDBAccessIdInfo);
+    omMetadataManager.getTenantAccessIdTable().deleteWithBatch(
+        batchOperation, accessId);
+    omMetadataManager.getTenantGroupTable().deleteWithBatch(
+        batchOperation, accessId);
+    omMetadataManager.getTenantRoleTable().deleteWithBatch(
+        batchOperation, accessId);
+
     omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
         batchOperation, principal, omDBKerberosPrincipalInfo);
-    omMetadataManager.getTenantGroupTable().putWithBatch(
-        batchOperation, principal, groupName);
-    omMetadataManager.getTenantRoleTable().putWithBatch(
-        batchOperation, principal, roleName);
-  }
-
-  @VisibleForTesting
-  public OmDBAccessIdInfo getOmDBAccessIdInfo() {
-    return omDBAccessIdInfo;
   }
 }

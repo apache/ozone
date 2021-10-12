@@ -22,7 +22,6 @@ import com.google.common.base.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantA
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,13 +81,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     }
 
     // Caller should be an Ozone admin or this tenant's delegated admin
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isTenantAdmin(ugi, tenantName, true)) {
-      throw new OMException("Permission denied. User '" + ugi.getUserName() +
-          "' is neither an Ozone admin nor a delegated admin of tenant '" +
-          tenantName + "'.", OMException.ResultCodes.PERMISSION_DENIED);
-    }
+    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantName);
 
     // TODO: Check tenant existence?
 
@@ -98,7 +90,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
 
     if (accessIdInfo == null) {
       throw new OMException("accessId '" + accessId + "' not found.",
-          OMException.ResultCodes.TENANT_USER_NOT_FOUND);
+          OMException.ResultCodes.TENANT_USER_ACCESSID_NOT_FOUND);
     }
 
     // Check if accessId is assigned to the tenant
@@ -157,9 +149,8 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           omMetadataManager.getTenantAccessIdTable().get(accessId);
 
       if (oldAccessIdInfo == null) {
-        throw new OMException("Potential DB error. OmDBAccessIdInfo "
-            + "entry is missing for accessId '" + accessId + "'.",
-            OMException.ResultCodes.METADATA_ERROR);
+        throw new OMException("OmDBAccessIdInfo entry is missing for accessId '"
+            + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
       assert(oldAccessIdInfo.getTenantId().equals(tenantName));

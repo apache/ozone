@@ -19,10 +19,13 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 
@@ -32,6 +35,18 @@ import java.io.IOException;
 public final class OMTenantRequestHelper {
 
   private OMTenantRequestHelper() {
+  }
+
+  static void checkTenantAdmin(OzoneManager ozoneManager, String tenantName)
+      throws OMException {
+
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (!ozoneManager.isAdmin(ugi) &&
+        !ozoneManager.isTenantAdmin(ugi, tenantName, true)) {
+      throw new OMException("Permission denied. User '" + ugi.getUserName() +
+          "' is neither an Ozone admin nor a delegated admin of tenant '" +
+          tenantName + "'.", OMException.ResultCodes.PERMISSION_DENIED);
+    }
   }
 
   /**
@@ -70,17 +85,15 @@ public final class OMTenantRequestHelper {
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
-      throw new OMException("Potential DB error. OmDBAccessIdInfo "
-          + "entry is missing for accessId '" + accessId + "'.",
-          OMException.ResultCodes.METADATA_ERROR);
+      throw new OMException("OmDBAccessIdInfo entry is missing for accessId '" +
+          accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
     }
 
     final String tenantName = accessIdInfo.getTenantId();
 
     if (StringUtils.isEmpty(tenantName)) {
-      throw new OMException("Potential DB error. tenantId "
-          + "field is null or empty for accessId '" + accessId + "'.",
-          OMException.ResultCodes.METADATA_ERROR);
+      throw new OMException("tenantId field is null or empty for accessId '" +
+          accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
     }
 
     return tenantName;

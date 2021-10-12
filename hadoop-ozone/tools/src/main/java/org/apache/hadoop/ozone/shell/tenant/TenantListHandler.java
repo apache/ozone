@@ -58,13 +58,13 @@ public class TenantListHandler extends TenantHandler {
       TenantInfoList tenantInfoList = objStore.listTenant();
 
       if (printHeader) {
-        // default console width 80 / 5 = 16. +2 for extra room. Change later?
-        out().format(longFormat ? "%-18s" : "%s\n",
+        // default console width 80 / 5 = 16. +1 for extra room. Change later?
+        out().format(longFormat ? "%-17s" : "%s\n",
             "Tenant");
         if (longFormat) {
           // TODO: rename these fields?
           // TODO: print JSON by default after rebase.
-          out().format("%-18s%-18s%-18s%s\n",
+          out().format("%-17s%-17s%-17s%s\n",
               "BucketNS",
               "AccountNS",  // == Volume name IIRC ?
               "UserPolicy",
@@ -73,10 +73,10 @@ public class TenantListHandler extends TenantHandler {
       }
 
       tenantInfoList.getTenantInfoList().forEach(tenantInfo -> {
-        out().format(longFormat ? "%-18s" : "%s\n",
+        out().format(longFormat ? "%-17s" : "%s\n",
             tenantInfo.getTenantName());
         if (longFormat) {
-          out().format("%-18s%-18s%-18s%s\n",
+          out().format("%-17s%-17s%-17s%s\n",
               tenantInfo.getBucketNamespaceName(),
               tenantInfo.getAccountNamespaceName(),
               tenantInfo.getUserPolicyGroupName(),
