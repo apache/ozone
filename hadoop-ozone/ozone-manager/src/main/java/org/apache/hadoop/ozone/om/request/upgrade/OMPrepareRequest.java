@@ -133,7 +133,6 @@ public class OMPrepareRequest extends OMClientRequest {
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, new OMException(e,
               OMException.ResultCodes.PREPARE_FAILED)));
-      Thread.currentThread().interrupt();
 
       // Disable prepare gate and attempt to delete prepare marker file.
       // Whether marker file delete fails or succeeds, we will return the
@@ -142,6 +141,9 @@ public class OMPrepareRequest extends OMClientRequest {
         ozoneManager.getPrepareState().cancelPrepare();
       } catch (IOException ex) {
         LOG.error("Failed to delete prepare marker file.", ex);
+      }
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
       }
     }
 
