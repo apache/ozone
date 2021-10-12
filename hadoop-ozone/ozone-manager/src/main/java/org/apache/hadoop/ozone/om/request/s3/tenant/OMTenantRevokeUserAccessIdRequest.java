@@ -77,6 +77,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         getOmRequest().getTenantRevokeUserAccessIdRequest();
 
     final String accessId = request.getAccessId();
+
+    // As of now, OMTenantRevokeUserAccessIdRequest does not get tenantName
+    //  from the client, we just get it from the OM DB table. Uncomment
+    //  below if we want the request to be similar to OMTenantRevokeAdminRequest
 //    String tenantName = request.getTenantName();
 //    if (tenantName == null) {
 //    }
@@ -106,8 +110,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           OMException.ResultCodes.PERMISSION_DENIED);
     }
 
-    // TODO: Call OMMTM to revoke user access to tenant
-//    ozoneManager.getMultiTenantManager().revokeAccess();
+    // Call OMMTM to revoke user access to tenant
+    // TODO: DOUBLE CHECK destroyUser() behavior
+    ozoneManager.getMultiTenantManager().destroyUser(
+        tenantName, accessId);
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
@@ -202,7 +208,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           omResponse.build(), accessId, userPrincipal, principalInfo);
     } catch (IOException ex) {
-      // Error handling: do nothing to Authorizer?
+      // Error handling: do nothing to Authorizer here?
       exception = ex;
       // Set response success flag to false
       omResponse.setTenantRevokeUserAccessIdResponse(

@@ -101,6 +101,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     }
 
     // TODO: Call OMMTM to remove user from admin group of the tenant.
+    // The call should remove user (not accessId) from the tenant's admin group
 //    ozoneManager.getMultiTenantManager().revokeTenantAdmin();
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
@@ -181,7 +182,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           accessId, newOmDBAccessIdInfo);
 
     } catch (IOException ex) {
-      // Error handling: Just do nothing to authorizer (Ranger)?
+      // Error handling: do nothing to Authorizer (Ranger) here?
 
       exception = ex;
       // Set success flag to false

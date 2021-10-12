@@ -101,6 +101,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     }
 
     // TODO: Call OMMTM to add user to admin group of the tenant.
+    // The call should add user (not accessId) to the tenant's admin group
 //    ozoneManager.getMultiTenantManager().assignTenantAdminRole();
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
@@ -114,6 +115,18 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     }
 
     return omRequestBuilder.build();
+  }
+
+  @Override
+  public void handleRequestFailure(OzoneManager ozoneManager) {
+    final TenantAssignAdminRequest request =
+        getOmRequest().getTenantAssignAdminRequest();
+
+    try {
+//      ozoneManager.getMultiTenantManager().revokeTenantAdmin();
+    } catch (Exception e) {
+      // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
+    }
   }
 
   @Override
@@ -181,8 +194,8 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           accessId, newOmDBAccessIdInfo);
 
     } catch (IOException ex) {
-      // TODO: Uncomment
-//      ozoneManager.getMultiTenantManager().revokeTenantAdmin();
+      // Error handling
+      handleRequestFailure(ozoneManager);
       exception = ex;
       // Set success flag to false
       omResponse.setTenantAssignAdminResponse(

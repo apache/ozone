@@ -37,13 +37,33 @@ public final class OMTenantRequestHelper {
   private OMTenantRequestHelper() {
   }
 
+  /**
+   * Passes check only when caller is an Ozone admin,
+   * throws OMException otherwise.
+   * @throws OMException PERMISSION_DENIED
+   */
+  static void checkAdmin(OzoneManager ozoneManager) throws OMException {
+
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (!ozoneManager.isAdmin(ugi)) {
+      throw new OMException("User '" + ugi.getUserName() +
+          "' is not an Ozone admin.",
+          OMException.ResultCodes.PERMISSION_DENIED);
+    }
+  }
+
+  /**
+   * Passes check if caller is an Ozone cluster admin or tenant delegated admin,
+   * throws OMException otherwise.
+   * @throws OMException PERMISSION_DENIED
+   */
   static void checkTenantAdmin(OzoneManager ozoneManager, String tenantName)
       throws OMException {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!ozoneManager.isAdmin(ugi) &&
         !ozoneManager.isTenantAdmin(ugi, tenantName, true)) {
-      throw new OMException("Permission denied. User '" + ugi.getUserName() +
+      throw new OMException("User '" + ugi.getUserName() +
           "' is neither an Ozone admin nor a delegated admin of tenant '" +
           tenantName + "'.", OMException.ResultCodes.PERMISSION_DENIED);
     }

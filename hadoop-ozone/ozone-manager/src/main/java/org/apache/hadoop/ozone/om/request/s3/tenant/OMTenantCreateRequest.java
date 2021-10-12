@@ -111,6 +111,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantName = request.getTenantName();
 
+    // Check Ozone admin privilege
+    OMTenantRequestHelper.checkAdmin(ozoneManager);
+
     // Check tenantName validity
     if (tenantName.contains(OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER)) {
       throw new OMException("Invalid tenant name " + tenantName +
@@ -184,7 +187,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
   @Override
   public void handleRequestFailure(OzoneManager ozoneManager) {
-    CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
+    final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
 
     try {
       final Tenant tenant = ozoneManager.getMultiTenantManager()
@@ -223,13 +226,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     IOException exception = null;
 
     final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
-    assert(tenantDefaultPolicies != null);
-
-    LOG.debug("Processing tenant '{}' create request", tenantName);
-    LOG.debug("tenantDefaultPolicies = {}", tenantDefaultPolicies);
 
     try {
-      // Check ACL: requires volume create permission. TODO: tenant create perm?
+      // Check ACL: requires volume create permission.
+      // TODO: tenant create perm?
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,

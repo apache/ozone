@@ -116,14 +116,8 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
 
     final String tenantName = request.getTenantName();
 
-    // Caller should be an Ozone admin or this tenant's admin
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isTenantAdmin(ugi, tenantName, false)) {
-      throw new OMException("Permission denied. User '" + ugi.getUserName() +
-          "' is neither an Ozone admin nor an admin of tenant '" + tenantName +
-          "'.", OMException.ResultCodes.PERMISSION_DENIED);
-    }
+    // Caller should be an Ozone admin or tenant delegated admin
+    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantName);
 
     // Note: Tenant username _is_ the Kerberos principal of the user
     final String tenantUsername = request.getTenantUsername();
@@ -145,6 +139,12 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
 
     // Won't check tenant existence in preExecute.
     // Won't check Kerberos principal existence.
+
+    // Call OMMTM
+    // Inform MultiTenantManager of user assignment so it could
+    //  initialize some policies in Ranger.
+    ozoneManager.getMultiTenantManager()
+        .assignUserToTenant(tenantName, accessId);
 
     // Generate secret. Used only when doesn't the kerberosID entry doesn't
     //  exist in DB, discarded otherwise.
@@ -169,6 +169,20 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
   }
 
   @Override
+  public void handleRequestFailure(OzoneManager ozoneManager) {
+    final TenantAssignUserAccessIdRequest request =
+        getOmRequest().getTenantAssignUserAccessIdRequest();
+
+    try {
+      // Undo Authorizer states established in preExecute
+      ozoneManager.getMultiTenantManager().destroyUser(
+          request.getTenantName(), request.getAccessId());
+    } catch (Exception e) {
+      // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
+    }
+  }
+
+  @Override
   @SuppressWarnings("checkstyle:methodlength")
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
@@ -185,7 +199,6 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
 
     boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
-    OzoneMultiTenantPrincipal tenantPrincipal = null;
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -195,7 +208,6 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     final String principal = request.getTenantUsername();  // TODO: Rename this
     assert(accessId.equals(request.getAccessId()));
     IOException exception = null;
-    String userId;
 
     final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
         omMetadataManager, tenantName);
@@ -260,12 +272,6 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
       acquiredS3SecretLock = false;
 
-      // Inform MultiTenantManager of user assignment so it could
-      //  initialize some policies in Ranger.
-      // TODO: Move this to preExecute
-      userId = ozoneManager.getMultiTenantManager()
-          .assignUserToTenant(tenantName, accessId);
-
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantId(tenantName)
@@ -316,8 +322,8 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           omResponse.build(), s3SecretValue, principal, defaultGroupName,
           roleName, accessId, omDBAccessIdInfo, principalInfo);
     } catch (IOException ex) {
-      ozoneManager.getMultiTenantManager().destroyUser(
-          tenantName, accessId);
+      // Error handling
+      handleRequestFailure(ozoneManager);
       exception = ex;
       // Set response success flag to false
       omResponse.setTenantAssignUserAccessIdResponse(
