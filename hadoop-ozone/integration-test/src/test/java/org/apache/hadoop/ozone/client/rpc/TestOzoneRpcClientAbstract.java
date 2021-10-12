@@ -3678,7 +3678,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
 
     // Bucket created with versioning false.
-    volume.createBucket(bucketName, BucketArgs.newBuilder().setVersioning(versioning).build());
+    volume.createBucket(bucketName,
+        BucketArgs.newBuilder().setVersioning(versioning).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     OzoneOutputStream out = bucket.createKey(keyName,
@@ -3700,19 +3701,23 @@ public abstract class TestOzoneRpcClientAbstract {
             .getOzoneKey(volumeName, bucketName, keyName));
 
     Assert.assertNotNull(omKeyInfo);
-    Assert.assertEquals(expectedCount, omKeyInfo.getKeyLocationVersions().size());
+    Assert.assertEquals(expectedCount,
+        omKeyInfo.getKeyLocationVersions().size());
 
     if (expectedCount == 1) {
-      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster.getOzoneManager().getMetadataManager()
+      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
+          .getOzoneManager().getMetadataManager()
           .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
               .getOzoneKey(volumeName, bucketName, keyName));
 
       Assert.assertNotNull(repeatedOmKeyInfo);
-      Assert.assertEquals(expectedCount, repeatedOmKeyInfo.getOmKeyInfoList().size());
+      Assert.assertEquals(expectedCount,
+          repeatedOmKeyInfo.getOmKeyInfoList().size());
     } else {
       // If expectedCount is greater than 1 means versioning enabled,
       // so delete table should be empty.
-      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster.getOzoneManager().getMetadataManager()
+      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
+          .getOzoneManager().getMetadataManager()
           .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
               .getOzoneKey(volumeName, bucketName, keyName));
 
