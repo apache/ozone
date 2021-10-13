@@ -229,7 +229,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     try {
       // Check ACL: requires volume create permission.
-      // TODO: tenant create perm?
+      // TODO: do we need a tenant create permission ? probably not
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
@@ -251,7 +251,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
       // Add to tenantStateTable. Redundant assignment for clarity
       final String bucketNamespaceName = tenantName;
-      final String accountNamespaceName = tenantName;
+      final String accountNamespaceName = volumeName;
       final String userPolicyGroupName =
           tenantName + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
       final String bucketPolicyGroupName =

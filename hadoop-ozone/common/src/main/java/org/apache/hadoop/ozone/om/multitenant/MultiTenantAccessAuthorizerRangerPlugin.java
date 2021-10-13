@@ -287,6 +287,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   public String createUser(BasicUserPrincipal principal,
                            List<String> groupIDs)
       throws Exception {
+
+    // This is deprecated.
+    // TODO: Should be replaced with "add user to Ranger tenantA-users role".
+
+    // And use this Rangerclient maybe
+    // https://github.com/apache/ranger/blob/master/ranger-examples/sample-client/src/main/java/org/apache/ranger/examples/sampleclient/SampleClient.java
+
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
 

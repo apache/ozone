@@ -82,7 +82,6 @@ public class GetUserInfoHandler extends TenantHandler {
               accessIdInfo.getAccessId());
         }
 
-        out().println();
       } catch (IOException e) {
         err().println("Failed to GetUserInfo of user '" + userPrincipal
             + "': " + e.getMessage());

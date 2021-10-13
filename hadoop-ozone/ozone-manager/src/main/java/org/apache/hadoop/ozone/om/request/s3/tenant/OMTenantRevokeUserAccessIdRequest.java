@@ -112,8 +112,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
     // Call OMMTM to revoke user access to tenant
     // TODO: DOUBLE CHECK destroyUser() behavior
-    ozoneManager.getMultiTenantManager().destroyUser(
-        tenantName, accessId);
+    ozoneManager.getMultiTenantManager().destroyUser(accessId);
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())

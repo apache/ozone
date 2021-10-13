@@ -41,9 +41,9 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "List of user Kerberos principals",
+  @CommandLine.Parameters(description = "List of user principals",
       arity = "1..")
-  private List<String> principals = new ArrayList<>();
+  private List<String> userPrincipals = new ArrayList<>();
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name", required = true)
@@ -68,16 +68,16 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
     final ObjectStore objStore = client.getObjectStore();
 
     if (StringUtils.isEmpty(accessId)) {
-      accessId = getDefaultAccessId(principals.get(0));
-    } else if (principals.size() > 1) {
+      accessId = getDefaultAccessId(userPrincipals.get(0));
+    } else if (userPrincipals.size() > 1) {
       err().println("Manually specifying accessId is only supported when there "
           + "is one user principal in the command line. Reduce the number of "
           + "principal to one and try again.");
       return;
     }
 
-    for (int i = 0; i < principals.size(); i++) {
-      final String principal = principals.get(i);
+    for (int i = 0; i < userPrincipals.size(); i++) {
+      final String principal = userPrincipals.get(i);
       try {
         if (i >= 1) {
           accessId = getDefaultAccessId(principal);
