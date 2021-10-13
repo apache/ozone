@@ -1009,6 +1009,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return TenantUserInfoValue.fromProtobuf(resp.getTenantUserInfo());
   }
 
+  @Override
+  public OmVolumeArgs getS3Volume(String accessID) throws IOException {
+    final GetS3VolumeRequest request = GetS3VolumeRequest.newBuilder()
+        .setAccessID(accessID)
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.GetS3Volume)
+        .setGetS3VolumeRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final GetS3VolumeResponse resp = handleError(omResponse)
+        .getGetS3VolumeResponse();
+
+    return OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
+  }
+
   /**
    * {@inheritDoc}
    */

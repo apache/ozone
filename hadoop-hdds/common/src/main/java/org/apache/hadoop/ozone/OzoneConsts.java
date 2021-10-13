@@ -342,11 +342,6 @@ public final class OzoneConsts {
   public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
   public static final String DEFAULT_TENANT_USER_GROUP_SUFFIX = "-users";
 
-  public static final String DEFAULT_TENANT_GROUP_ALL_ADMINS =
-      "GroupTenantAllAdmins";
-  public static final String DEFAULT_TENANT_GROUP_ALL_USERS =
-      "GroupTenantAllUsers";
-
   // For OM metrics saving to a file
   public static final String OM_METRICS_FILE = "omMetrics";
   public static final String OM_METRICS_TEMP_FILE = OM_METRICS_FILE + ".tmp";

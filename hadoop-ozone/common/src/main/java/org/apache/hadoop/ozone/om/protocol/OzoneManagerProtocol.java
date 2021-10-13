@@ -476,6 +476,9 @@ public interface OzoneManagerProtocol
   S3SecretValue tenantAssignUserAccessId(String username, String tenantName,
       String accessId) throws IOException;
 
+  OmVolumeArgs getS3Volume(String accessID) throws IOException;
+
+  // TODO: modify, delete
   /**
    * Revoke user accessId to tenant.
    * @param accessId accessId to be revoked.

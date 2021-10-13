@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,44 +159,44 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
   @Override
   public void grantAccess(BucketNameSpace bucketNameSpace,
-                          OzoneMultiTenantPrincipal user, ACLType aclType) {
+                          BasicUserPrincipal user, ACLType aclType) {
     // TBD
   }
 
   @Override
   public void revokeAccess(BucketNameSpace bucketNameSpace,
-                           OzoneMultiTenantPrincipal user, ACLType aclType) {
+                           BasicUserPrincipal user, ACLType aclType) {
     // TBD
   }
 
   @Override
   public void grantAccess(AccountNameSpace accountNameSpace,
-                          OzoneMultiTenantPrincipal user, ACLType aclType) {
+                          BasicUserPrincipal user, ACLType aclType) {
     // TBD
   }
 
   @Override
   public void revokeAccess(AccountNameSpace accountNameSpace,
-                           OzoneMultiTenantPrincipal user, ACLType aclType) {
+                           BasicUserPrincipal user, ACLType aclType) {
     // TBD
   }
 
   public List<Pair<BucketNameSpace, ACLType>>
-      getAllBucketNameSpaceAccesses(OzoneMultiTenantPrincipal user) {
+      getAllBucketNameSpaceAccesses(BasicUserPrincipal user) {
     // TBD
     return null;
   }
 
   @Override
   public boolean checkAccess(BucketNameSpace bucketNameSpace,
-                             OzoneMultiTenantPrincipal user) {
+                             BasicUserPrincipal user) {
     // TBD
     return true;
   }
 
   @Override
   public boolean checkAccess(AccountNameSpace accountNameSpace,
-                             OzoneMultiTenantPrincipal user) {
+                             BasicUserPrincipal user) {
     // TBD
     return true;
   }
@@ -222,11 +223,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public String getGroupId(OzoneMultiTenantPrincipal principal)
+  public String getGroupId(OzoneTenantGroupPrincipal principal)
       throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT +
-            principal.getFullMultiTenantPrincipalID();
+            principal.getName();
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);
@@ -238,7 +239,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       int numIndex = info.size();
       for (int i = 0; i < numIndex; ++i) {
         if (info.get(i).getAsJsonObject().get("name").getAsString()
-            .equals(principal.getFullMultiTenantPrincipalID())) {
+            .equals(principal.getName())) {
           groupIDCreated =
               info.get(i).getAsJsonObject().get("id").getAsString();
           break;
@@ -253,11 +254,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public String getUserId(OzoneMultiTenantPrincipal principal)
+  public String getUserId(BasicUserPrincipal principal)
       throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT +
-        principal.getFullMultiTenantPrincipalID();
+        principal.getName();
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);
@@ -269,7 +270,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       int numIndex = userinfo.size();
       for (int i = 0; i < numIndex; ++i) {
         if (userinfo.get(i).getAsJsonObject().get("name").getAsString()
-            .equals(principal.getFullMultiTenantPrincipalID())) {
+            .equals(principal.getName())) {
           userIDCreated =
               userinfo.get(i).getAsJsonObject().get("id").getAsString();
           break;
@@ -283,14 +284,14 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return userIDCreated;
   }
 
-  public String createUser(OzoneMultiTenantPrincipal principal,
+  public String createUser(BasicUserPrincipal principal,
                            List<String> groupIDs)
       throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
 
     String jsonCreateUserString = getCreateUserJsonString(
-        principal.getFullMultiTenantPrincipalID(), groupIDs);
+        principal.getName(), groupIDs);
 
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonCreateUserString, "POST", false);
@@ -315,12 +316,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
 
-  public String createGroup(OzoneMultiTenantPrincipal group) throws Exception {
+  public String createGroup(OzoneTenantGroupPrincipal group) throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT;
 
-    String jsonCreateGroupString = getCreateGroupJsonString(
-        group.getFullMultiTenantPrincipalID());
+    String jsonCreateGroupString = getCreateGroupJsonString(group.toString());
 
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonCreateGroupString,

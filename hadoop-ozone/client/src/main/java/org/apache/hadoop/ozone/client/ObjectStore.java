@@ -61,8 +61,9 @@ public class ObjectStore {
    * Cache size to be used for listVolume calls.
    */
   private int listCacheSize;
-
-  private String s3VolumeName;
+  private final String defaultS3Volume;
+  // TODO: Using for now for multitenancy but remove when HDDS-4440 is merged.
+  private final String accessID;
 
   /**
    * Creates an instance of ObjectStore.
@@ -70,26 +71,29 @@ public class ObjectStore {
    * @param proxy ClientProtocol proxy.
    */
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
+    this(conf, proxy, null);
+  }
+
+  public ObjectStore(ConfigurationSource conf, ClientProtocol proxy,
+      String accessID) {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
+    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
+    this.accessID = accessID;
   }
 
   @VisibleForTesting
   protected ObjectStore() {
     // For the unit test
     OzoneConfiguration conf = new OzoneConfiguration();
-    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
     proxy = null;
+    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
+    this.accessID = null;
   }
 
   @VisibleForTesting
   public ClientProtocol getClientProxy() {
     return proxy;
-  }
-
-  public String getS3VolumeName() {
-    return s3VolumeName;
   }
 
   /**
@@ -120,12 +124,12 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    OzoneVolume volume = getVolume(s3VolumeName);
+    OzoneVolume volume = getS3Volume();
     volume.createBucket(bucketName);
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
-    return getVolume(s3VolumeName).getBucket(bucketName);
+    return getS3Volume().getBucket(bucketName);
   }
 
   /**
@@ -135,7 +139,7 @@ public class ObjectStore {
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
     try {
-      OzoneVolume volume = getVolume(s3VolumeName);
+      OzoneVolume volume = getS3Volume();
       volume.deleteBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {
@@ -146,7 +150,6 @@ public class ObjectStore {
     }
   }
 
-
   /**
    * Returns the volume information.
    * @param volumeName Name of the volume.
@@ -154,8 +157,15 @@ public class ObjectStore {
    * @throws IOException
    */
   public OzoneVolume getVolume(String volumeName) throws IOException {
-    OzoneVolume volume = proxy.getVolumeDetails(volumeName);
-    return volume;
+    return proxy.getVolumeDetails(volumeName);
+  }
+
+  public OzoneVolume getS3Volume() throws IOException {
+    if (accessID == null)  {
+      return proxy.getVolumeDetails(defaultS3Volume);
+    } else {
+      return proxy.getS3VolumeDetails(accessID);
+    }
   }
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {

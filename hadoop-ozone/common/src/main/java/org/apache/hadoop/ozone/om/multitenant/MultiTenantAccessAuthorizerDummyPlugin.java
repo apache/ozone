@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.http.auth.BasicUserPrincipal;
 
 import java.io.IOException;
 import java.util.List;
@@ -35,97 +36,112 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
 
   @Override
   public void init(Configuration configuration) throws IOException {
+
   }
 
   @Override
   public void shutdown() throws Exception {
+
+  }
+
+  @Override
+  public String createUser(BasicUserPrincipal principal, List<String> groupIDs)
+      throws Exception {
+    return null;
+  }
+
+  @Override
+  public String getUserId(BasicUserPrincipal principal) throws Exception {
+    return null;
+  }
+
+  @Override
+  public String getGroupId(OzoneTenantGroupPrincipal principal)
+      throws Exception {
+    return null;
+  }
+
+  @Override
+  public void deleteUser(String opaqueUserID) throws IOException {
+
+  }
+
+  @Override
+  public String createGroup(OzoneTenantGroupPrincipal group) throws Exception {
+    return null;
+  }
+
+  @Override
+  public void deleteGroup(String groupID) throws IOException {
+
+  }
+
+  @Override
+  public String createAccessPolicy(AccessPolicy policy) throws Exception {
+    return null;
+  }
+
+  @Override
+  public AccessPolicy getAccessPolicyByName(String policyName)
+      throws Exception {
+    return null;
+  }
+
+  @Override
+  public void deletePolicybyId(String policyId) throws IOException {
+
+  }
+
+  @Override
+  public void deletePolicybyName(String policyName) throws Exception {
+
   }
 
   @Override
   public void grantAccess(BucketNameSpace bucketNameSpace,
-                          OzoneMultiTenantPrincipal user, ACLType aclType) {
+      BasicUserPrincipal user, ACLType aclType) {
+
   }
 
   @Override
   public void revokeAccess(BucketNameSpace bucketNameSpace,
-                           OzoneMultiTenantPrincipal user, ACLType aclType) {
+      BasicUserPrincipal user, ACLType aclType) {
+
   }
 
   @Override
   public void grantAccess(AccountNameSpace accountNameSpace,
-                          OzoneMultiTenantPrincipal user, ACLType aclType) {
+      BasicUserPrincipal user, ACLType aclType) {
+
   }
 
   @Override
   public void revokeAccess(AccountNameSpace accountNameSpace,
-                           OzoneMultiTenantPrincipal user, ACLType aclType) {
+      BasicUserPrincipal user, ACLType aclType) {
+
   }
 
-  public List<Pair<BucketNameSpace, ACLType>>
-      getAllBucketNameSpaceAccesses(OzoneMultiTenantPrincipal user) {
+  @Override
+  public List<Pair<BucketNameSpace, ACLType>> getAllBucketNameSpaceAccesses(
+      BasicUserPrincipal user) {
     return null;
   }
 
   @Override
   public boolean checkAccess(BucketNameSpace bucketNameSpace,
-                             OzoneMultiTenantPrincipal user) {
-    return true;
+      BasicUserPrincipal user) {
+    return false;
   }
 
   @Override
   public boolean checkAccess(AccountNameSpace accountNameSpace,
-                             OzoneMultiTenantPrincipal user) {
-    return true;
+      BasicUserPrincipal user) {
+    return false;
   }
 
   @Override
   public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException {
-    return true;
+    return false;
   }
-
-  @Override
-  public String getGroupId(OzoneMultiTenantPrincipal principal)
-      throws Exception {
-    return "dummyGroupId";
-  }
-
-  @Override
-  public String getUserId(OzoneMultiTenantPrincipal principal)
-      throws Exception {
-    return "dummyUserId";
-  }
-
-  public String createUser(OzoneMultiTenantPrincipal principal,
-                           List<String> groupIDs)
-      throws Exception {
-    return "dummyCreateUser";
-  }
-
-  public String createGroup(OzoneMultiTenantPrincipal group) throws Exception {
-    return "dummyCreateGroup";
-  }
-
-  public String createAccessPolicy(AccessPolicy policy) throws Exception {
-    return "dummyCreateAccessPolicy";
-  }
-
-  public AccessPolicy getAccessPolicyByName(String policyName)
-      throws Exception {
-    return new RangerAccessPolicy(policyName);
-  }
-
-  public void deleteUser(String userId) throws IOException {
-  }
-
-  public void deleteGroup(String groupId) throws IOException {
-  }
-
-  @Override
-  public void deletePolicybyName(String policyName) throws Exception {
-  }
-
-  public void deletePolicybyId(String policyId) throws IOException {
-  }
-
 }

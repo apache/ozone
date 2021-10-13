@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secre
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
+import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,8 +141,12 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     // Call OMMTM
     // Inform MultiTenantManager of user assignment so it could
     //  initialize some policies in Ranger.
-    ozoneManager.getMultiTenantManager()
-        .assignUserToTenant(tenantName, accessId);
+    final String userId = ozoneManager.getMultiTenantManager()
+        .assignUserToTenant(new BasicUserPrincipal(principal), tenantName,
+            accessId);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("userId for assign user to tenant request = {}", userId);
+    }
 
     // Generate secret. Used only when doesn't the kerberosID entry doesn't
     //  exist in DB, discarded otherwise.
@@ -173,7 +178,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     try {
       // Undo Authorizer states established in preExecute
       ozoneManager.getMultiTenantManager().destroyUser(
-          request.getTenantName(), request.getAccessId());
+          request.getAccessId());
     } catch (Exception e) {
       // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
     }

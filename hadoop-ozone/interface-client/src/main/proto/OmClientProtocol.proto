@@ -114,6 +114,8 @@ enum Type {
 
   TenantAssignAdmin = 101;
   TenantRevokeAdmin = 102;
+
+  GetS3Volume = 104;
 }
 
 message OMRequest {
@@ -208,6 +210,8 @@ message OMRequest {
 
   optional TenantAssignAdminRequest         TenantAssignAdminRequest       = 101;
   optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 102;
+
+  optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
 }
 
 message OMResponse {
@@ -297,6 +301,8 @@ message OMResponse {
 
   optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 101;
   optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 102;
+
+  optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
 }
 
 enum Status {
@@ -1453,6 +1459,10 @@ message TenantRevokeAdminRequest {
     optional string tenantName = 2;
 }
 
+message GetS3VolumeRequest {
+  optional string accessID = 1;
+}
+
 message CreateTenantResponse {
     optional bool success = 1;
 }
@@ -1480,6 +1490,10 @@ message TenantAssignAdminResponse {
 
 message TenantRevokeAdminResponse {
     optional bool success = 1;
+}
+
+message GetS3VolumeResponse {
+  optional VolumeInfo volumeInfo = 1;
 }
 
 /**
