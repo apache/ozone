@@ -1409,7 +1409,8 @@ public class RpcClient implements ClientProtocol {
       keyOutputStream = new ECKeyOutputStream.Builder().setHandler(openKey)
           .setXceiverClientManager(xceiverClientManager)
           .setOmClient(ozoneManagerClient).setRequestID(requestId)
-          .setReplicationConfig((ECReplicationConfig) replicationConfig)
+          .setReplicationConfig(
+              (ECReplicationConfig)openKey.getKeyInfo().getReplicationConfig())
           .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
           .setConfig(clientConfig).build();
     } else {

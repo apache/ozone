@@ -48,6 +48,6 @@ public class XORRawErasureCoderFactory implements RawErasureCoderFactory {
 
   @Override
   public String getCodecName() {
-    return ECReplicationConfig.XOR_CODEC;
+    return ECReplicationConfig.EcCodec.XOR.name().toLowerCase();
   }
 }

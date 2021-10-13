@@ -41,19 +41,21 @@ public class TestCodecRegistry {
   public void testGetCodecs() {
     Set<String> codecs = CodecRegistry.getInstance().getCodecNames();
     assertEquals(2, codecs.size());
-    assertTrue(codecs.contains(ECReplicationConfig.RS_CODEC));
-    assertTrue(codecs.contains(ECReplicationConfig.XOR_CODEC));
+    assertTrue(
+        codecs.contains(ECReplicationConfig.EcCodec.RS.name().toLowerCase()));
+    assertTrue(
+        codecs.contains(ECReplicationConfig.EcCodec.XOR.name().toLowerCase()));
   }
 
   @Test
   public void testGetCoders() {
     List<RawErasureCoderFactory> coders = CodecRegistry.getInstance().
-        getCoders(ECReplicationConfig.RS_CODEC);
+        getCoders(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
     assertEquals(1, coders.size());
     assertTrue(coders.get(0) instanceof RSRawErasureCoderFactory);
 
     coders = CodecRegistry.getInstance().
-        getCoders(ECReplicationConfig.XOR_CODEC);
+        getCoders(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
     assertEquals(1, coders.size());
     assertTrue(coders.get(0) instanceof XORRawErasureCoderFactory);
   }
@@ -68,7 +70,8 @@ public class TestCodecRegistry {
   @Test
   public void testGetCoderByNameWrong() {
     RawErasureCoderFactory coder = CodecRegistry.getInstance().
-        getCoderByName(ECReplicationConfig.RS_CODEC, "WRONG_RS");
+        getCoderByName(ECReplicationConfig.EcCodec.RS.name().toLowerCase(),
+            "WRONG_RS");
     assertNull(coder);
   }
 
@@ -88,7 +91,7 @@ public class TestCodecRegistry {
       }
 
       public String getCodecName() {
-        return ECReplicationConfig.RS_CODEC;
+        return ECReplicationConfig.EcCodec.RS.name().toLowerCase();
       }
     }
 
@@ -98,13 +101,13 @@ public class TestCodecRegistry {
 
     // check RS coders
     List<RawErasureCoderFactory> rsCoders = CodecRegistry.getInstance().
-        getCoders(ECReplicationConfig.RS_CODEC);
+        getCoders(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
     assertEquals(1, rsCoders.size());
     assertTrue(rsCoders.get(0) instanceof RSRawErasureCoderFactory);
 
     // check RS coder names
     String[] rsCoderNames = CodecRegistry.getInstance().
-        getCoderNames(ECReplicationConfig.RS_CODEC);
+        getCoderNames(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
     assertEquals(1, rsCoderNames.length);
     assertEquals(RSRawErasureCoderFactory.CODER_NAME, rsCoderNames[0]);
   }

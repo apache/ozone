@@ -26,6 +26,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
+import org.apache.hadoop.io.erasurecode.CodecUtil;
+import org.apache.hadoop.io.erasurecode.ECSchema;
+import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
+import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
+import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -33,8 +39,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
-import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Assert;
@@ -59,31 +63,25 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Used for testing Ozone client without external network calls.
  */
 public class TestOzoneECClient {
-
   private int chunkSize = 1024;
-
   private int dataBlocks = 3;
-
   private int parityBlocks = 2;
-
   private OzoneClient client;
-
   private ObjectStore store;
-
   private String keyName = UUID.randomUUID().toString();
   private String volumeName = UUID.randomUUID().toString();
   private String bucketName = UUID.randomUUID().toString();
-
   private byte[][] inputChunks = new byte[dataBlocks][chunkSize];
-
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
   private MockOmTransport transportStub = null;
+  private ECSchema schema = new ECSchema("rs", dataBlocks, parityBlocks);
+  private ErasureCodecOptions options = new ErasureCodecOptions(schema);
   private OzoneConfiguration conf = new OzoneConfiguration();
-
-  private final RawErasureEncoder encoder =
-      new RSRawErasureCoderFactory().createEncoder(
-          new ECReplicationConfig(dataBlocks, parityBlocks));
+  private RSErasureCodec codec = new RSErasureCodec(conf, options);
+  private final RawErasureEncoder encoder = CodecUtil.createRawEncoder(conf,
+      SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
+      codec.getCoderOptions());
 
   @Before
   public void init() throws IOException {

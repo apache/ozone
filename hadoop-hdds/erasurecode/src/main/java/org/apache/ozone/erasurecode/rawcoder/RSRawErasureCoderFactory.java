@@ -47,6 +47,6 @@ public class RSRawErasureCoderFactory implements RawErasureCoderFactory {
 
   @Override
   public String getCodecName() {
-    return ECReplicationConfig.RS_CODEC;
+    return ECReplicationConfig.EcCodec.RS.name().toLowerCase();
   }
 }
