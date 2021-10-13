@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.multitenant.OzoneMultiTenantPrincipal;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -43,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
+import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,7 +169,6 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
 
     boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
-    OzoneMultiTenantPrincipal tenantPrincipal = null;
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -234,8 +233,11 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       // TODO: Is userId from MultiTenantManager still useful?
       // TODO: Move this to preExecute as well.
       userId = ozoneManager.getMultiTenantManager()
-          .assignUserToTenant(tenantName, accessId);
-      LOG.debug("userId = {}", userId);
+          .assignUserToTenant(new BasicUserPrincipal(principal), tenantName,
+              accessId);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("userId for assign user to tenant request = {}", userId);
+      }
 
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
@@ -285,8 +287,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           s3SecretValue, principal, defaultGroupName, roleName,
           accessId, omDBAccessIdInfo, omDBKerberosPrincipalInfo);
     } catch (IOException ex) {
-      ozoneManager.getMultiTenantManager().destroyUser(
-          tenantName, accessId);
+      ozoneManager.getMultiTenantManager().destroyUser(accessId);
       exception = ex;
       // Set response success flag to false
       omResponse.setAssignUserToTenantResponse(
