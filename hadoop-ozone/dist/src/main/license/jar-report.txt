@@ -146,7 +146,6 @@ share/ozone/lib/json-smart.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
-share/ozone/lib/junit.jar
 share/ozone/lib/kerb-admin.jar
 share/ozone/lib/kerb-client.jar
 share/ozone/lib/kerb-common.jar
