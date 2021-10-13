@@ -95,7 +95,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   // Similar to 'BufferPool' but this list maintains only references
   // to the ByteBuffers.
-  private List<ByteBuffer> bufferList;
+  private List<StreamBuffer> bufferList;
 
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
@@ -139,7 +139,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       Pipeline pipeline,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      List<ByteBuffer> bufferList
+      List<StreamBuffer> bufferList
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -259,9 +259,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (len == 0) {
       return;
     }
-    ByteBuffer buf =
-        (ByteBuffer) b.asReadOnlyBuffer().position(off).limit(off + len);
-    bufferList.add(buf);
+
+    final StreamBuffer buf = new StreamBuffer(b, off, len);
+    bufferList.add(new StreamBuffer(b, off, len));
 
     writeChunkToContainer(buf.duplicate());
 
@@ -292,8 +292,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     int count = 0;
     while (len > 0) {
-      ByteBuffer buf = bufferList.get(count);
-      long writeLen = Math.min(buf.limit() - buf.position(), len);
+      StreamBuffer buf = bufferList.get(count);
+      long writeLen = Math.min(buf.length(), len);
       writeChunkToContainer(buf.duplicate());
       len -= writeLen;
       count++;
@@ -344,7 +344,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
-    final List<ByteBuffer> byteBufferList;
+    final List<StreamBuffer> byteBufferList;
     if (!force) {
       Preconditions.checkNotNull(bufferList);
       byteBufferList = bufferList;
@@ -382,12 +382,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "Adding index " + asyncReply.getLogIndex() + " commitMap size "
-                    + commitWatcher.getCommitInfoSetSize() + " flushLength "
+                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
                     + flushPos + " blockID " + blockID);
           }
           // for standalone protocol, logIndex will always be 0.
           commitWatcher
-              .updateCommitInfoSet(asyncReply.getLogIndex(), byteBufferList);
+              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {

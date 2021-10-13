@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.StreamBuffer;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -51,7 +52,7 @@ public final class BlockDataStreamOutputEntry
   // the current position of this stream 0 <= currentPosition < length
   private long currentPosition;
   private final Token<OzoneBlockTokenIdentifier> token;
-  private List<ByteBuffer> bufferPool;
+  private List<StreamBuffer> bufferList;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   private BlockDataStreamOutputEntry(
@@ -61,7 +62,7 @@ public final class BlockDataStreamOutputEntry
       long length,
       Token<OzoneBlockTokenIdentifier> token,
       OzoneClientConfig config,
-      List<ByteBuffer> bufferPool
+      List<StreamBuffer> bufferList
   ) {
     this.config = config;
     this.byteBufferStreamOutput = null;
@@ -72,7 +73,7 @@ public final class BlockDataStreamOutputEntry
     this.token = token;
     this.length = length;
     this.currentPosition = 0;
-    this.bufferPool = bufferPool;
+    this.bufferList = bufferList;
   }
 
   long getLength() {
@@ -97,7 +98,7 @@ public final class BlockDataStreamOutputEntry
     if (this.byteBufferStreamOutput == null) {
       this.byteBufferStreamOutput =
           new BlockDataStreamOutput(blockID, xceiverClientManager, pipeline,
-              config, token, bufferPool);
+              config, token, bufferList);
     }
   }
 
@@ -198,7 +199,7 @@ public final class BlockDataStreamOutputEntry
     private long length;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
-    private List<ByteBuffer> bufferPool;
+    private List<StreamBuffer> bufferList;
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -238,8 +239,8 @@ public final class BlockDataStreamOutputEntry
       return this;
     }
 
-    public Builder setBufferPool(List<ByteBuffer> bPool) {
-      this.bufferPool = bPool;
+    public Builder setBufferList(List<StreamBuffer> bList) {
+      this.bufferList = bList;
       return this;
     }
 
@@ -249,7 +250,7 @@ public final class BlockDataStreamOutputEntry
           xceiverClientManager,
           pipeline,
           length,
-          token, config, bufferPool);
+          token, config, bufferList);
     }
   }
 

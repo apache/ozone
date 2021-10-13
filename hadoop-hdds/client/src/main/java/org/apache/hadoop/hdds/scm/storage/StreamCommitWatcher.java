@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -53,9 +52,8 @@ public class StreamCommitWatcher {
   private static final Logger LOG =
       LoggerFactory.getLogger(StreamCommitWatcher.class);
 
-  private Map<Long, List<ByteBuffer>> commitIndexMap;
-
-  private List<ByteBuffer> bufferPool;
+  private Map<Long, List<StreamBuffer>> commitIndexMap;
+  private List<StreamBuffer> bufferList;
 
   // total data which has been successfully flushed and acknowledged
   // by all servers
@@ -69,20 +67,20 @@ public class StreamCommitWatcher {
   private XceiverClientSpi xceiverClient;
 
   public StreamCommitWatcher(XceiverClientSpi xceiverClient,
-      List<ByteBuffer> bufferPool) {
+      List<StreamBuffer> bufferList) {
     this.xceiverClient = xceiverClient;
     commitIndexMap = new ConcurrentSkipListMap<>();
     futureMap = new ConcurrentHashMap<>();
-    this.bufferPool = bufferPool;
+    this.bufferList = bufferList;
     totalAckDataLength = 0;
   }
 
-  public void updateCommitInfoSet(long index, List<ByteBuffer> buffers) {
+  public void updateCommitInfoMap(long index, List<StreamBuffer> buffers) {
     commitIndexMap.computeIfAbsent(index, k -> new LinkedList<>())
         .addAll(buffers);
   }
 
-  int getCommitInfoSetSize() {
+  int getCommitInfoMapSize() {
     return commitIndexMap.size();
   }
 
@@ -142,7 +140,7 @@ public class StreamCommitWatcher {
    */
   public XceiverClientReply streamWatchForCommit(long commitIndex)
       throws IOException {
-    long index;
+    final long index;
     try {
       XceiverClientReply reply =
           xceiverClient.watchForCommit(commitIndex);
@@ -178,11 +176,9 @@ public class StreamCommitWatcher {
     Preconditions.checkArgument(!commitIndexMap.isEmpty());
     for (long index : indexes) {
       Preconditions.checkState(commitIndexMap.containsKey(index));
-      final List<ByteBuffer> buffers
-          = commitIndexMap.remove(index);
-      long length =
-          buffers.stream().mapToLong(buf -> (buf.limit() - buf.position()))
-              .sum();
+      final List<StreamBuffer> buffers = commitIndexMap.remove(index);
+      final long length =
+          buffers.stream().mapToLong(StreamBuffer::length).sum();
       totalAckDataLength += length;
       // clear the future object from the future Map
       final CompletableFuture<ContainerCommandResponseProto> remove =
@@ -193,9 +189,8 @@ public class StreamCommitWatcher {
           LOG.error("Existing acknowledged data: " + key);
         }
       }
-      Preconditions.checkNotNull(remove);
-      for (ByteBuffer byteBuffer : buffers) {
-        bufferPool.remove(byteBuffer);
+      for (StreamBuffer byteBuffer : buffers) {
+        bufferList.remove(byteBuffer);
       }
     }
     return totalAckDataLength;
