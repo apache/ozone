@@ -1,5 +1,24 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,13 +85,14 @@ public class TestContainerBalancer {
 
   // timeout for each test
   @Rule
-  public Timeout timeout = Timeout.seconds(700);
+  public Timeout timeout = Timeout.seconds(300);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConf;
   private StorageContainerManager scm;
   private ContainerBalancerConfiguration balancerConf;
   private ContainerBalancer balancer;
+  private File testDir;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerBalancer.class);
   private static final String BUCKET = "bucket1";
@@ -83,12 +103,16 @@ public class TestContainerBalancer {
   public void setup() throws Exception {
     GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
-    File testDir = GenericTestUtils.getTestDir(
+
+    // test directory is used to calculate space of this partition
+    testDir = GenericTestUtils.getTestDir(
         TestContainerBalancer.class.getSimpleName());
     if (!testDir.mkdirs()) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Failed to create test directory");
+        LOG.debug("Failed to create test directory. Using default test " +
+            "directory instead.");
       }
+      testDir = GenericTestUtils.getTestDir();
     }
     long usedSpace = testDir.getTotalSpace() - testDir.getUsableSpace();
     String reservedSpace = usedSpace + OzoneConsts.GB + "B";
@@ -108,6 +132,7 @@ public class TestContainerBalancer {
     if (cluster != null) {
       cluster.shutdown();
     }
+    FileUtils.deleteQuietly(testDir);
   }
 
   /**
@@ -158,6 +183,8 @@ public class TestContainerBalancer {
     nodes, when three more nodes are introduced, each node should contain 2
     replicas (after balancing).
     */
+
+    // one key should be one container
     int numberOfKeys = 4, keySize = (int) containerSize;
     if (LOG.isDebugEnabled()) {
       LOG.debug("Creating keys for testing Container Balancer");
@@ -180,8 +207,7 @@ public class TestContainerBalancer {
     ContainerBalancerMetrics metrics = balancer.getMetrics();
 
     // there should be six unbalanced datanodes; 3 over and 3 under utilized
-    Assert.assertTrue(metrics.getDatanodesNumToBalance().isEqual(
-        (long) NUM_DATANODES));
+    Assert.assertEquals(metrics.getDatanodesNumToBalance(), NUM_DATANODES);
     try {
       GenericTestUtils.waitFor(() -> !balancer.isBalancerRunning(),
           (int) SECONDS.toMillis(5), (int) SECONDS.toMillis(40));
@@ -215,9 +241,10 @@ public class TestContainerBalancer {
 
     NodeManager nodeManager = scm.getScmNodeManager();
     Thread.sleep(500);
+    // each datanode should have numberOfKeys * 3 / NUM_DATANODES containers now
     nodeManager.getAllNodes().forEach(datanodeDetails -> {
       try {
-        Assert.assertEquals(2,
+        Assert.assertEquals(numberOfKeys * 3 / NUM_DATANODES,
             nodeManager.getContainers(datanodeDetails).size());
       } catch (NodeNotFoundException e) {
         if (LOG.isDebugEnabled()) {
@@ -227,12 +254,24 @@ public class TestContainerBalancer {
         }
       }
     });
-    Assert.assertEquals(NUM_DATANODES,
-        metrics.getMovedContainersNum().get().longValue());
-    Assert.assertEquals(containerSize * NUM_DATANODES,
-        (long) (metrics.getDataSizeBalancedGB() * OzoneConsts.GB));
+
+    // half of all containers should have moved to the new datanodes (for
+    // balance)
+    Assert.assertEquals(numberOfKeys * 3 / 2,
+        metrics.getMovedContainersNum());
+    Assert.assertEquals(containerSize * numberOfKeys * 3 / 2,
+        balancer.getSizeMovedPerIteration() * 2);
   }
 
+  /**
+   * Creates keys and waits for containers to close.
+   * @param numberOfKeys number of keys to write
+   * @param keySize size of each key
+   * @param bucket bucket to write keys into
+   * @throws IOException thrown if key creation fails
+   * @throws InterruptedException thrown while waiting for containers to have
+   * 3 replicas and close
+   */
   private void createKeysAndCloseContainers(int numberOfKeys,
                                             int keySize, OzoneBucket bucket)
       throws IOException, InterruptedException {
