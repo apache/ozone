@@ -80,6 +80,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
@@ -223,6 +225,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case PrepareStatus:
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
+        break;
+      case GetS3Volume:
+        GetS3VolumeResponse s3VolumeResponse =
+            getS3Volume(request.getGetS3VolumeRequest());
+        responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
         break;
       case TenantGetUserInfo:
         TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
@@ -678,6 +685,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return PrepareStatusResponse.newBuilder()
         .setStatus(prepareState.getStatus())
         .setCurrentTxnIndex(prepareState.getIndex()).build();
+  }
+
+  private GetS3VolumeResponse getS3Volume(GetS3VolumeRequest request)
+      throws IOException {
+    OmVolumeArgs s3VolArgs = impl.getS3Volume(request.getAccessID());
+    return GetS3VolumeResponse.newBuilder()
+        .setVolumeInfo(s3VolArgs.getProtobuf())
+        .build();
   }
 
   public OzoneManager getOzoneManager() {

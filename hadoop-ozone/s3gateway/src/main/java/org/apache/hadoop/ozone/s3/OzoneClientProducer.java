@@ -130,7 +130,9 @@ public class OzoneClientProducer {
       }
       ozoneClient =
           remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>) () -> {
-            return createOzoneClient();
+            // TODO: Once HDDS-4440 is merged, access ID should be passed
+            //  through the OM transport.
+            return createOzoneClient(awsAccessId);
           });
     } catch (OS3Exception ex) {
       if (LOG.isDebugEnabled()) {
@@ -149,14 +151,13 @@ public class OzoneClientProducer {
   }
 
   @NotNull
-  @VisibleForTesting
-  OzoneClient createOzoneClient() throws IOException {
+  private OzoneClient createOzoneClient(String accessID) throws IOException {
     if (omServiceID == null) {
-      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
+      return OzoneClientFactory.getRpcClient(ozoneConfiguration, accessID);
     } else {
       // As in HA case, we need to pass om service ID.
       return OzoneClientFactory.getRpcClient(omServiceID,
-          ozoneConfiguration);
+          ozoneConfiguration, accessID);
     }
   }
 
