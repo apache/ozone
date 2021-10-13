@@ -286,8 +286,8 @@ public class ContainerBalancer {
       }
       double utilization = datanodeUsageInfo.calculateUtilization();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Utilization for node {} with capacity {}, used {}, and " +
-                "remaining {} is {}",
+        LOG.debug("Utilization for node {} with capacity {}B, used {}B, and " +
+                "remaining {}B is {}",
             datanodeUsageInfo.getDatanodeDetails().getUuidString(),
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             datanodeUsageInfo.getScmNodeStat().getScmUsed().get(),
@@ -364,15 +364,15 @@ public class ContainerBalancer {
   }
 
   private IterationResult doIteration() {
-    try {
-      // note that potential and selected targets are updated in the following
-      // loop
-      List<DatanodeDetails> potentialTargets = getPotentialTargets();
-      Set<DatanodeDetails> selectedTargets =
-          new HashSet<>(potentialTargets.size());
-      moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
-      boolean isMoveGenerated = false;
+    // note that potential and selected targets are updated in the following
+    // loop
+    List<DatanodeDetails> potentialTargets = getPotentialTargets();
+    Set<DatanodeDetails> selectedTargets =
+        new HashSet<>(potentialTargets.size());
+    moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
+    boolean isMoveGenerated = false;
 
+    try {
       // match each overUtilized node with a target
       for (DatanodeUsageInfo datanodeUsageInfo : overUtilizedNodes) {
         if (!isBalancerRunning()) {
@@ -444,14 +444,16 @@ public class ContainerBalancer {
       }
       return IterationResult.ITERATION_COMPLETED;
     } finally {
-      checkIterationMoveResults();
+      checkIterationMoveResults(selectedTargets);
     }
   }
 
   /**
    * Checks the results of all move operations when exiting an iteration.
+   * @param selectedTargets Set of target datanodes that were selected in
+   *                        current iteration
    */
-  private void checkIterationMoveResults() {
+  private void checkIterationMoveResults(Set<DatanodeDetails> selectedTargets) {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     for (Map.Entry<ContainerMoveSelection,
@@ -552,13 +554,13 @@ public class ContainerBalancer {
    * move limit, or null if balancing can continue
    */
   private IterationResult checkConditionsForBalancing() {
-    if (countDatanodesInvolvedPerIteration + 2 >
-        maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster) {
+    int maxDatanodesToInvolve =
+        (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
+    if (countDatanodesInvolvedPerIteration + 2 > maxDatanodesToInvolve) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Hit max datanodes to involve limit. {} datanodes have" +
                 " already been involved and the limit is {}.",
-            countDatanodesInvolvedPerIteration,
-            maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
+            countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
       }
       return IterationResult.MAX_DATANODES_TO_INVOLVE_REACHED;
     }
