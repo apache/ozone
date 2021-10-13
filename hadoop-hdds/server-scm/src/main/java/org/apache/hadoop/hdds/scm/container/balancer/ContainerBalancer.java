@@ -87,7 +87,7 @@ public class ContainerBalancer {
   private double clusterAvgUtilisation;
   private double upperLimit;
   private volatile boolean balancerRunning;
-  private Thread currentBalancingThread;
+  private volatile Thread currentBalancingThread;
   private Lock lock;
   private ContainerBalancerSelectionCriteria selectionCriteria;
   private Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap;
@@ -143,7 +143,7 @@ public class ContainerBalancer {
   public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
     lock.lock();
     try {
-      if (balancerRunning) {
+      if (balancerRunning || currentBalancingThread != null) {
         LOG.error("Container Balancer is already running.");
         return false;
       }
@@ -185,9 +185,7 @@ public class ContainerBalancer {
     for (int i = 0; i < idleIteration && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
-        if (isBalancerRunning()) {
-          stop();
-        }
+        stop();
         return;
       }
 
@@ -219,9 +217,8 @@ public class ContainerBalancer {
         }
       }
     }
-    if (isBalancerRunning()) {
-      stop();
-    }
+
+    stop();
   }
 
   /**
@@ -771,15 +768,19 @@ public class ContainerBalancer {
       balancerRunning = false;
       if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
         currentBalancingThread.interrupt();
-        currentBalancingThread.join();
       }
-
-      // allow garbage collector to collect balancing thread
-      currentBalancingThread = null;
-    } catch (InterruptedException ignored) {
     } finally {
       lock.unlock();
     }
+
+    // wait for currentBalancingThread to die
+    if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
+      try {
+        currentBalancingThread.join();
+      } catch (InterruptedException ignored) {
+      }
+    }
+    currentBalancingThread = null;
     LOG.info("Container Balancer stopped successfully.");
   }
 
