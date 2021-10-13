@@ -81,7 +81,7 @@ public abstract class ExtendedInputStream extends InputStream
 
   @Override
   public synchronized void seek(long l) throws IOException {
-    throw new NotImplementedException("Seek is not implements for EC");
+    throw new NotImplementedException("Seek is not implemented");
   }
 
   @Override
