@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.primitives.Bytes;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -39,6 +41,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -264,7 +268,7 @@ public class TestBlockInputStream {
     BlockInputStream blockInputStreamWithRetry =
         new DummyBlockInputStreamWithRetry(blockID, blockSize,
             MockPipeline.createSingleNodePipeline(), null,
-            false, null, chunks, chunkDataMap, isRefreshed);
+            false, null, chunks, chunkDataMap, isRefreshed, null);
 
     try {
       Assert.assertFalse(isRefreshed.get());
@@ -272,6 +276,30 @@ public class TestBlockInputStream {
       byte[] b = new byte[200];
       blockInputStreamWithRetry.read(b, 0, 200);
       Assert.assertTrue(isRefreshed.get());
+    } finally {
+      blockInputStreamWithRetry.close();
+    }
+  }
+
+  @Test
+  public void testGetBlockInfoFailWithIOException() throws Exception {
+    GenericTestUtils.setLogLevel(BlockInputStream.getLog(), Level.DEBUG);
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+        LoggerFactory.getLogger(BlockInputStream.class));
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    AtomicBoolean isRefreshed = new AtomicBoolean();
+    createChunkList(5);
+    BlockInputStream blockInputStreamWithRetry =
+        new DummyBlockInputStreamWithRetry(blockID, blockSize,
+            MockPipeline.createSingleNodePipeline(), null,
+            false, null, chunks, chunkDataMap, isRefreshed, new IOException("unavailable"));
+    try {
+      Assert.assertFalse(isRefreshed.get());
+      byte[] b = new byte[200];
+      blockInputStreamWithRetry.read(b, 0, 200);
+      // As in case of IOException we do not do do refresh.
+      Assert.assertFalse(isRefreshed.get());
+      Assert.assertTrue(logCapturer.getOutput().contains("Retry to get chunk info fail"));
     } finally {
       blockInputStreamWithRetry.close();
     }

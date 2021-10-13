@@ -42,9 +42,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
@@ -75,6 +75,7 @@ public class BlockInputStream extends InputStream
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private boolean initialized = false;
+  // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy =
       HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
   private int retries;
@@ -142,12 +143,36 @@ public class BlockInputStream extends InputStream
       return;
     }
 
-    List<ChunkInfo> chunks;
+    List<ChunkInfo> chunks = null;
     try {
       chunks = getChunkInfos();
-    } catch (ContainerNotFoundException ioEx) {
-      refreshPipeline(ioEx);
-      chunks = getChunkInfos();
+    } catch(SCMSecurityException ex) {
+      throw ex;
+    } catch (IOException ioEx) {
+      // If refresh returns new pipeline, retry with it.
+      // If we get IOException due to connectivity issue,
+      // retry according to retry policy.
+      LOG.debug("Retry to get chunk info fail", ioEx);
+      if (ioEx instanceof StorageContainerException) {
+        refreshPipeline(ioEx);
+      }
+      IOException catchEx = ioEx;
+      while (shouldRetryRead(catchEx)) {
+        try {
+          chunks = getChunkInfos();
+        } catch (StorageContainerException ex) {
+          refreshPipeline(ex);
+        } catch (IOException exception) {
+          catchEx = exception;
+        }
+      }
+
+      if (chunks == null) {
+        throw catchEx;
+      } else {
+        // Reset retry count if we get chunks successfully.
+        retries = 0;
+      }
     }
 
     if (chunks != null && !chunks.isEmpty()) {
@@ -319,6 +344,17 @@ public class BlockInputStream extends InputStream
           continue;
         } else {
           throw e;
+        }
+      } catch(SCMSecurityException ex) {
+        throw ex;
+      } catch(IOException ex) {
+        // We got a IOException which might be due
+        // to DN down or connectivity issue.
+        if (shouldRetryRead(ex)) {
+          current.releaseClient();
+          continue;
+        } else {
+          throw ex;
         }
       }
 
@@ -524,5 +560,10 @@ public class BlockInputStream extends InputStream
   @VisibleForTesting
   public synchronized List<ChunkInputStream> getChunkStreams() {
     return chunkStreams;
+  }
+
+  @VisibleForTesting
+  public static Logger getLog() {
+    return LOG;
   }
 }
