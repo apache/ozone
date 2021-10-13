@@ -55,7 +55,7 @@ public class TestCodecRegistry {
     assertTrue(coders.get(0) instanceof RSRawErasureCoderFactory);
 
     coders = CodecRegistry.getInstance().
-        getCoders(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
+        getCoders(ECReplicationConfig.EcCodec.XOR.name().toLowerCase());
     assertEquals(1, coders.size());
     assertTrue(coders.get(0) instanceof XORRawErasureCoderFactory);
   }
