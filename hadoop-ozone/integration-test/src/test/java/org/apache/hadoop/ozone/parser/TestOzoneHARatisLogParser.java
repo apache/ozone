@@ -15,15 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.parser;
+package org.apache.hadoop.ozone.parser;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.segmentparser.OMRatisLogParser;
+import org.apache.hadoop.ozone.segmentparser.SCMRatisLogParser;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -42,9 +47,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 
 /**
- * Test Datanode Ratis log parser.
+ * Test Ozone OM and SCM HA Ratis log parser.
  */
-public class TestOMRatisLogParser {
+public class TestOzoneHARatisLogParser {
 
   /**
     * Set a timeout for each test.
@@ -52,7 +57,7 @@ public class TestOMRatisLogParser {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private MiniOzoneOMHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
@@ -62,11 +67,14 @@ public class TestOMRatisLogParser {
     String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";
     OzoneConfiguration conf = new OzoneConfiguration();
-    cluster =  (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    String scmServiceId = "scmServiceId";
+    cluster =  (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
+        .setSCMServiceId(scmServiceId)
         .setNumOfOzoneManagers(3)
+        .setNumOfStorageContainerManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
     ObjectStore objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
@@ -98,6 +106,10 @@ public class TestOMRatisLogParser {
     OzoneConfiguration ozoneConfiguration =
         cluster.getOMLeader().getConfiguration();
 
+    StorageContainerManager scm = cluster.getActiveSCM();
+    Preconditions.checkNotNull(scm);
+    OzoneConfiguration leaderSCMConfig = scm.getConfiguration();
+
     cluster.stop();
 
     File omMetaDir = new File(ozoneConfiguration.get(OZONE_METADATA_DIRS),
@@ -121,6 +133,34 @@ public class TestOMRatisLogParser {
     omRatisLogParser.setSegmentFile(logFile);
     omRatisLogParser.parseRatisLogs(OMRatisHelper::smProtoToString);
 
+
+    // Not checking total entry count, because of not sure of exact count of
+    // metadata entry changes.
+    Assert.assertTrue(out.toString(UTF_8.name())
+        .contains("Num Total Entries:"));
+    out.reset();
+
+    // Now check for SCM.
+    File scmMetadataDir =
+        new File(RatisUtil.getRatisStorageDir(leaderSCMConfig));
+    Assert.assertTrue(scmMetadataDir.isDirectory());
+
+    ratisDirs = scmMetadataDir.list();
+    Assert.assertNotNull(ratisDirs);
+    Assert.assertEquals(1, ratisDirs.length);
+
+    groupDir = new File(scmMetadataDir, ratisDirs[0]);
+
+    Assert.assertNotNull(groupDir);
+    Assert.assertTrue(groupDir.isDirectory());
+    currentDir = new File(groupDir, "current");
+    logFile = new File(currentDir, "log_inprogress_1");
+    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
+    Assert.assertTrue(logFile.isFile());
+
+    SCMRatisLogParser scmRatisLogParser = new SCMRatisLogParser();
+    scmRatisLogParser.setSegmentFile(logFile);
+    scmRatisLogParser.parseRatisLogs(SCMRatisRequest::smProtoToString);
 
     // Not checking total entry count, because of not sure of exact count of
     // metadata entry changes.

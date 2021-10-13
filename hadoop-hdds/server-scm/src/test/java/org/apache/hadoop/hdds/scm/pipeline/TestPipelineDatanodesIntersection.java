@@ -18,13 +18,26 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,10 +46,12 @@ import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
@@ -53,11 +68,27 @@ public class TestPipelineDatanodesIntersection {
   private int nodeHeaviness;
   private OzoneConfiguration conf;
   private boolean end;
+  private File testDir;
+  private DBStore dbStore;
 
   @Before
-  public void initialize() {
-    conf = new OzoneConfiguration();
+  public void initialize() throws IOException {
+    conf = SCMTestUtils.getConf();
     end = false;
+    testDir = GenericTestUtils.getTestDir(
+        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(
+        conf, new SCMDBDefinition());
+  }
+
+  @After
+  public void cleanup() throws Exception {
+    if (dbStore != null) {
+      dbStore.close();
+    }
+
+    FileUtil.fullyDelete(testDir);
   }
 
   public TestPipelineDatanodesIntersection(int nodeCount, int nodeHeaviness) {
@@ -78,11 +109,20 @@ public class TestPipelineDatanodesIntersection {
   }
 
   @Test
-  public void testPipelineDatanodesIntersection() {
+  public void testPipelineDatanodesIntersection() throws IOException {
     NodeManager nodeManager= new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    StateManager stateManager = new PipelineStateManager();
+    SCMHAManager scmhaManager = MockSCMHAManager.getInstance(true);
+
+    PipelineStateManager stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+
+
     PipelineProvider provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, conf);
 
@@ -94,7 +134,9 @@ public class TestPipelineDatanodesIntersection {
       try {
         Pipeline pipeline = provider.create(new RatisReplicationConfig(
             ReplicationFactor.THREE));
-        stateManager.addPipeline(pipeline);
+        HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+            ClientVersions.CURRENT_VERSION);
+        stateManager.addPipeline(pipelineProto);
         nodeManager.addPipeline(pipeline);
         List<Pipeline> overlapPipelines = RatisPipelineUtils
             .checkPipelineContainSameDatanodes(stateManager, pipeline);

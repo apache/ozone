@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -96,5 +97,10 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
             omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
                     getOmBucketInfo().getBucketName()), getOmBucketInfo());
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

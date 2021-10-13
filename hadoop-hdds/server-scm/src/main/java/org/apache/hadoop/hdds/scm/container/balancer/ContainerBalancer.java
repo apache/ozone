@@ -28,12 +28,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +121,7 @@ public class ContainerBalancer {
     this.replicationManager = replicationManager;
     this.ozoneConfiguration = ozoneConfiguration;
     this.config = new ContainerBalancerConfiguration(ozoneConfiguration);
-    this.metrics = new ContainerBalancerMetrics();
+    this.metrics = ContainerBalancerMetrics.create();
     this.scmContext = scmContext;
 
     this.selectedContainers = new HashSet<>();
@@ -217,7 +217,6 @@ public class ContainerBalancer {
         }
       }
     }
-
     stop();
   }
 
@@ -279,9 +278,7 @@ public class ContainerBalancer {
           "utilization is {}", lowerLimit, upperLimit);
     }
 
-    long countDatanodesToBalance = 0L;
-    double overLoadedBytes = 0D, underLoadedBytes = 0D;
-
+    long overUtilizedBytes = 0L, underUtilizedBytes = 0L;
     // find over and under utilized nodes
     for (DatanodeUsageInfo datanodeUsageInfo : datanodeUsageInfos) {
       if (!isBalancerRunning()) {
@@ -299,20 +296,24 @@ public class ContainerBalancer {
       }
       if (utilization > upperLimit) {
         overUtilizedNodes.add(datanodeUsageInfo);
-        countDatanodesToBalance += 1;
+        metrics.incrementDatanodesNumToBalance(1);
+
+        metrics.setMaxDatanodeUtilizedPercentage(Math.max(
+            metrics.getMaxDatanodeUtilizedPercentage(),
+            ratioToPercent(utilization)));
 
         // amount of bytes greater than upper limit in this node
-        overLoadedBytes += ratioToBytes(
+        overUtilizedBytes += ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             utilization) - ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             upperLimit);
       } else if (utilization < lowerLimit) {
         underUtilizedNodes.add(datanodeUsageInfo);
-        countDatanodesToBalance += 1;
+        metrics.incrementDatanodesNumToBalance(1);
 
         // amount of bytes lesser than lower limit in this node
-        underLoadedBytes += ratioToBytes(
+        underUtilizedBytes += ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             lowerLimit) - ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
@@ -321,9 +322,8 @@ public class ContainerBalancer {
         withinThresholdUtilizedNodes.add(datanodeUsageInfo);
       }
     }
-    metrics.setDatanodesNumToBalance(new LongMetric(countDatanodesToBalance));
-    // TODO update dataSizeToBalanceGB metric with overLoadedBytes and
-    //  underLoadedBytes
+    metrics.setDataSizeToBalanceGB(
+        Math.max(overUtilizedBytes, underUtilizedBytes) / OzoneConsts.GB);
     Collections.reverse(underUtilizedNodes);
 
     unBalancedNodes = new ArrayList<>(
@@ -468,16 +468,15 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-            this.countDatanodesInvolvedPerIteration += 2;
+            metrics.incrementMovedContainersNum(1);
+            LOG.info("Move completed for container {} to target {}",
+                container.containerID(),
+                moveSelection.getTargetNode().getUuidString());
           } catch (ContainerNotFoundException e) {
             LOG.warn("Could not find Container {} while " +
                     "checking move results in ContainerBalancer",
                 moveSelection.getContainerID(), e);
           }
-          metrics.incrementMovedContainersNum(1);
-          // TODO incrementing size balanced this way incorrectly counts the
-          //  size moved twice
-          metrics.incrementDataSizeBalancedGB(sizeMovedPerIteration);
         }
       } catch (InterruptedException e) {
         LOG.warn("Container move for container {} was interrupted.",
@@ -491,6 +490,10 @@ public class ContainerBalancer {
             moveSelection.getContainerID(), e);
       }
     }
+    countDatanodesInvolvedPerIteration =
+        sourceToTargetMap.size() + selectedTargets.size();
+    metrics.incrementDataSizeMovedGB(
+        sizeMovedPerIteration / OzoneConsts.GB);
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
             "in this iteration: {}B.",
         countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
@@ -631,9 +634,15 @@ public class ContainerBalancer {
       Collection<DatanodeDetails> potentialTargets,
       Set<DatanodeDetails> selectedTargets,
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
-    // TODO: counting datanodes involved this way is incorrect when the same
-    //  datanode is involved in different moves
-    countDatanodesInvolvedPerIteration += 2;
+    // count source if it has not been involved in move earlier
+    if (!sourceToTargetMap.containsKey(source) &&
+        !selectedTargets.contains(source)) {
+      countDatanodesInvolvedPerIteration += 1;
+    }
+    // count target if it has not been involved in move earlier
+    if (!selectedTargets.contains(moveSelection.getTargetNode())) {
+      countDatanodesInvolvedPerIteration += 1;
+    }
     incSizeSelectedForMoving(source, moveSelection);
     sourceToTargetMap.put(source, moveSelection);
     selectedTargets.add(moveSelection.getTargetNode());
@@ -652,8 +661,8 @@ public class ContainerBalancer {
    * @param utilizationRatio used space by capacity ratio of the node.
    * @return number of bytes
    */
-  private double ratioToBytes(Long nodeCapacity, double utilizationRatio) {
-    return nodeCapacity * utilizationRatio;
+  private long ratioToBytes(Long nodeCapacity, double utilizationRatio) {
+    return (long) (nodeCapacity * utilizationRatio);
   }
 
   /**
@@ -865,6 +874,10 @@ public class ContainerBalancer {
 
   public ContainerBalancerMetrics getMetrics() {
     return metrics;
+  }
+
+  public static int ratioToPercent(double ratio) {
+    return (int) (ratio * 100);
   }
 
   @Override
