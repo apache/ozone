@@ -36,6 +36,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -281,6 +282,69 @@ public class TestECBlockInputStream {
     }
   }
 
+  @Test(expected = EOFException.class)
+  public void testSeekPastBlockLength() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        ONEMB);
+    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 100);
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+      ecb.seek(1000);
+    }
+  }
+
+  @Test(expected = EOFException.class)
+  public void testSeekToLength() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        ONEMB);
+    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 100);
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+      ecb.seek(100);
+    }
+  }
+
+  @Test
+  public void testSeekToLengthZeroLengthBlock() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        ONEMB);
+    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 0);
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+      ecb.seek(0);
+      Assert.assertEquals(0, ecb.getPos());
+      Assert.assertEquals(0, ecb.getRemaining());
+    }
+  }
+
+  @Test
+  public void testSeekToValidPosition() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        ONEMB);
+    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 5 * ONEMB);
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+      ecb.seek(ONEMB - 1);
+      Assert.assertEquals(ONEMB - 1, ecb.getPos());
+      Assert.assertEquals(ONEMB * 4 + 1, ecb.getRemaining());
+      // First read should read the last byte of the first chunk
+      Assert.assertEquals(0, ecb.read());
+      Assert.assertEquals(ONEMB,
+          streamFactory.getBlockStreams().get(0).position);
+      // Second read should be the first byte of the second chunk.
+      Assert.assertEquals(1, ecb.read());
+
+      // Seek to the end of the file minus one byte
+      ecb.seek(ONEMB * 5 - 1);
+      Assert.assertEquals(1, ecb.read());
+      Assert.assertEquals(ONEMB * 2,
+          streamFactory.getBlockStreams().get(1).position);
+      // Second read should be EOF as there is no data left
+      Assert.assertEquals(-1, ecb.read());
+      Assert.assertEquals(0, ecb.getRemaining());
+    }
+  }
+
   private void validateBufferContents(ByteBuffer buf, int from, int to,
       byte val) {
     for (int i=from; i<to; i++){
@@ -412,8 +476,13 @@ public class TestECBlockInputStream {
     }
 
     @Override
+    public void seek(long pos) {
+      this.position = pos;
+    }
+
+    @Override
     public long getPos() {
-      return 0;
+      return position;
     }
   }
 
