@@ -958,7 +958,7 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     writeKey(bucket, keyName, ONE, value, valueLength);
-    Assert.assertEquals(valueLength * 2,
+    Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     bucket.deleteKey(keyName);

@@ -152,6 +152,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbFileKey,
               omMetadataManager, omBucketInfo.getIsVersionEnabled(),
               trxnLogIndex, ozoneManager.isRatisEnabled());
+      OmKeyInfo keyToDelete =
+              omMetadataManager.getKeyTable().get(dbFileKey);
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -173,6 +175,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
               locationInfoList.size() * scmBlockSize * factor;
+      // Subtract the size of blocks to be overwritten.
+      if (keyToDelete != null) {
+        correctedSpace -= keyToDelete.getDataSize() *
+            keyToDelete.getReplicationConfig().getRequiredNodes();
+      }
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),

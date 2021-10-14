@@ -159,7 +159,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // validateBucketAndVolume guarantees bucket existence and it's not null
 
       // Check for directory exists with same name, if it exists throw error.
       if (ozoneManager.getEnableFileSystemPaths()) {
@@ -203,6 +202,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbOzoneKey,
           omMetadataManager, omBucketInfo.getIsVersionEnabled(), trxnLogIndex,
           ozoneManager.isRatisEnabled());
+      OmKeyInfo keyToDelete =
+              omMetadataManager.getKeyTable().get(dbOzoneKey);
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -227,6 +228,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
           allocatedLocationInfoList.size() * scmBlockSize * factor;
+      // Subtract the size of blocks to be overwritten.
+      if (keyToDelete != null) {
+        correctedSpace -= keyToDelete.getDataSize() *
+            keyToDelete.getReplicationConfig().getRequiredNodes();
+      }
+
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
