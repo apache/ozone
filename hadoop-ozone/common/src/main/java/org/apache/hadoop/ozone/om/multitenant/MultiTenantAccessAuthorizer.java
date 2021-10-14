@@ -60,8 +60,8 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String createUser(BasicUserPrincipal principal,
-                    List<String> groupIDs) throws Exception;
+  String assignUser(BasicUserPrincipal principal,
+                    String existingRole) throws Exception;
 
   /**
    * @param principal
@@ -75,7 +75,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return Unique groupID maintained by the authorizer plugin.
    * @throws Exception
    */
-  String getGroupId(OzoneTenantGroupPrincipal principal)
+  String getRole(OzoneTenantRolePrincipal principal)
       throws Exception;
 
   /**
@@ -87,13 +87,13 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   void deleteUser(String opaqueUserID) throws IOException;
 
   /**
-   * Create Group group entity for MultiTenantGatekeeper plugin.
+   * Create Role entity for MultiTenantGatekeeper plugin.
    * @param group
    * @return unique groupID that can be used to refer to the group in
    * MultiTenantGateKeeper plugin Implementation e.g. corresponding ID on the
    * Ranger end for a ranger based implementation .
    */
-  String createGroup(OzoneTenantGroupPrincipal group) throws Exception;
+  String createRole(OzoneTenantRolePrincipal group) throws Exception;
 
   /**
    * Delete the group groupID in MultiTenantGateKeeper plugin.

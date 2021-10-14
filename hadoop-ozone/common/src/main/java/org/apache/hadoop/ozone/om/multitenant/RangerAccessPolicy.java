@@ -192,8 +192,8 @@ public class RangerAccessPolicy implements AccessPolicy {
         continue;
       }
       policyItems.append("{");
-      if (list.get(0).getPrincipal() instanceof OzoneTenantGroupPrincipal) {
-        policyItems.append("\"groups\":[\"" + mapElem.getKey() + "\"],");
+      if (list.get(0).getPrincipal() instanceof OzoneTenantRolePrincipal) {
+        policyItems.append("\"roles\":[\"" + mapElem.getKey() + "\"],");
       } else {
         policyItems.append("\"users\":[\"" + mapElem.getKey() + "\"],");
       }

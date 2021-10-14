@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
@@ -68,11 +68,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Implements MultiTenantAccessAuthorizer.
+ * Implements MultiTenantAccessAuthorizer for Apache Ranger.
  */
 public class MultiTenantAccessAuthorizerRangerPlugin implements
     MultiTenantAccessAuthorizer {
-  private static final Logger LOG = LoggerFactory
+  public static final Logger LOG = LoggerFactory
       .getLogger(MultiTenantAccessAuthorizerRangerPlugin.class);
 
   private OzoneConfiguration conf;
@@ -207,9 +207,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     // TBD
     return true;
   }
+
   private String getCreateUserJsonString(String userName,
-                                         List<String> groupIDs)
-      throws Exception {
+                                         List<String> groupIDs) {
     String groupIdList = groupIDs.stream().collect(Collectors.joining("\",\"",
         "", ""));
     String jsonCreateUserString = "{ \"name\":\"" + userName  + "\"," +
@@ -222,35 +222,29 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return jsonCreateUserString;
   }
 
+  private String getAssignUserJsonString(String userName,
+      List<String> roleIds) {
+    String groupIdList = roleIds.stream().collect(
+        Collectors.joining("\",\"", "", ""));
+    return "{ \"name\":\"" + userName  + "\"," +
+        "\"firstName\":\"" + userName + "\"," +
+        "  \"loginId\": \"" + userName + "\"," +
+        "  \"password\" : \"user1pass\"," +
+        "  \"userRoleList\":[\"ROLE_USER\"]," +
+        "  \"groupIdList\":[\"" + groupIdList +"\"] " +
+        " }";
+  }
+
   @Override
-  public String getGroupId(OzoneTenantGroupPrincipal principal)
+  public String getRole(OzoneTenantRolePrincipal principal)
       throws Exception {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT +
+
+    String endpointUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT +
             principal.getName();
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
-        "GET", false);
-    String response = getResponseData(conn);
-    String groupIDCreated = null;
-    try {
-      JsonObject jResonse = new JsonParser().parse(response).getAsJsonObject();
-      JsonArray info = jResonse.get("vXGroups").getAsJsonArray();
-      int numIndex = info.size();
-      for (int i = 0; i < numIndex; ++i) {
-        if (info.get(i).getAsJsonObject().get("name").getAsString()
-            .equals(principal.getName())) {
-          groupIDCreated =
-              info.get(i).getAsJsonObject().get("id").getAsString();
-          break;
-        }
-      }
-      System.out.println("Group ID is : " + groupIDCreated);
-    } catch (JsonParseException e) {
-      e.printStackTrace();
-      throw e;
-    }
-    return groupIDCreated;
+    HttpsURLConnection conn = makeHttpsGetCall(endpointUrl, "GET", false);
+    return getResponseData(conn);
   }
 
   @Override
@@ -276,7 +270,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
           break;
         }
       }
-      System.out.println("User ID is : " + userIDCreated);
+      LOG.debug("User ID is: {}", userIDCreated);
     } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
@@ -284,72 +278,93 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return userIDCreated;
   }
 
-  public String createUser(BasicUserPrincipal principal,
-                           List<String> groupIDs)
+  public String assignUser(BasicUserPrincipal principal, String existingRole)
       throws Exception {
 
-    // This is deprecated.
-    // TODO: Should be replaced with "add user to Ranger tenantA-users role".
+    // Add user to Ranger role tenantA-users
+    // Have to do a GET, append the user to the role,
+    //  then PUT to update the role at the moment.
+    //  Maybe RangerClient#grantRole can help.
 
-    // And use this Rangerclient maybe
-    // https://github.com/apache/ranger/blob/master/ranger-examples/sample-client/src/main/java/org/apache/ranger/examples/sampleclient/SampleClient.java
+//    final String endpointUrl = rangerHttpsAddress +
+//        OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT +
+//        "/" + roleIds.get(0);
+//    HttpsURLConnection conn = makeHttpCall(endpointUrl, "", "GET", false);
+//    String existingRole = getResponseData(conn);
+    LOG.debug("existingRole: {}", existingRole);
+    JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
+    // Parse Json
+//    JsonObject roleObj = new JsonParser().parse(response).getAsJsonObject();
+    LOG.debug("Before: {}", roleObj);
+    final String roleId = roleObj.get("id").getAsString();
+    LOG.debug("Got roleId: {}", roleId);
 
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
+    JsonArray usersArray = roleObj.getAsJsonArray("users");
+    JsonObject newUserEntry = new JsonObject();
+    newUserEntry.addProperty("name", principal.getName());
+    newUserEntry.addProperty("isAdmin", false);
+    usersArray.add(newUserEntry);
+    // Update Json array
+    roleObj.add("users", usersArray);
 
-    String jsonCreateUserString = getCreateUserJsonString(
-        principal.getName(), groupIDs);
+    LOG.debug("Updated: {}", roleObj);
 
-    HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
-        jsonCreateUserString, "POST", false);
-    String userInfo = getResponseData(conn);
-    String userIDCreated;
+    final String endpointUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT +
+            "/" + roleId;
+
+    final String jsonData = roleObj.toString();
+//        getCreateUserJsonString(principal.getName(), roleIds);
+
+    HttpsURLConnection conn =
+        makeHttpCall(endpointUrl, jsonData, "PUT", false);
+    String resp = getResponseData(conn);
+    String returnedRoleId;
     try {
-      JsonObject jObject = new JsonParser().parse(userInfo).getAsJsonObject();
-      userIDCreated = jObject.get("id").getAsString();
-      System.out.println("User ID is : " + userIDCreated);
+      JsonObject jObject = new JsonParser().parse(resp).getAsJsonObject();
+      returnedRoleId = jObject.get("id").getAsString();
+      LOG.debug("Ranger returns roleId: {}", roleId);
     } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
-    return userIDCreated;
+    return returnedRoleId;
   }
 
-  private String getCreateGroupJsonString(String groupName) throws Exception {
-    String jsonCreateGroupString = "{ \"name\":\"" + groupName + "\"," +
-        "  \"description\":\"test\" " +
+  private String getCreateRoleJsonString(String roleName) throws Exception {
+    return "{ \"name\":\"" + roleName + "\"," +
+        "  \"description\":\"testrole\" " +
         " }";
-    return jsonCreateGroupString;
   }
 
 
-  public String createGroup(OzoneTenantGroupPrincipal group) throws Exception {
+  public String createRole(OzoneTenantRolePrincipal group) throws Exception {
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT;
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT;
 
-    String jsonCreateGroupString = getCreateGroupJsonString(group.toString());
+    String jsonCreateGroupString = getCreateRoleJsonString(group.toString());
 
-    HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
+    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl,
         jsonCreateGroupString,
         "POST", false);
-    String groupInfo = getResponseData(conn);
-    String groupIdCreated;
+    String roleInfo = getResponseData(conn);
+    String roleId;
     try {
-      JsonObject jObject = new JsonParser().parse(groupInfo).getAsJsonObject();
-      groupIdCreated = jObject.get("id").getAsString();
-      System.out.println("GroupID is: " + groupIdCreated);
+      JsonObject jObject = new JsonParser().parse(roleInfo).getAsJsonObject();
+      roleId = jObject.get("id").getAsString();
+      LOG.debug("Ranger Role ID is: {}", roleId);
     } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
-    return groupIdCreated;
+    return roleId;
   }
 
   public String createAccessPolicy(AccessPolicy policy) throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 
-    HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
+    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl,
         policy.serializePolicyToJsonString(),
         "POST", false);
     String policyInfo = getResponseData(conn);
@@ -357,7 +372,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     try {
       JsonObject jObject = new JsonParser().parse(policyInfo).getAsJsonObject();
       policyID = jObject.get("id").getAsString();
-      System.out.println("policyID is : " + policyID);
+      LOG.debug("policyID is: {}", policyID);
     } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
@@ -387,7 +402,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT
             + userId + "?forceDelete=true";
 
-    HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
+    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
@@ -401,7 +416,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT
             + groupId + "?forceDelete=true";
 
-    HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
+    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
@@ -413,7 +428,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   public void deletePolicybyName(String policyName) throws Exception {
     AccessPolicy policy = getAccessPolicyByName(policyName);
     String  policyID = policy.getPolicyID();
-    System.out.println("policyID is : " + policyID);
+    LOG.debug("policyID is: {}", policyID);
     deletePolicybyId(policyID);
   }
 
@@ -423,7 +438,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT
             + policyId + "?forceDelete=true";
     try {
-      HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl, null,
+      HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
           "DELETE", false);
       int respnseCode = conn.getResponseCode();
       if (respnseCode != 200 && respnseCode != 204) {
@@ -438,12 +453,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
       throws IOException {
     StringBuilder response = new StringBuilder();
     try (BufferedReader br = new BufferedReader(
-        new InputStreamReader(urlConnection.getInputStream(), "utf-8"))) {
+        new InputStreamReader(urlConnection.getInputStream(),
+            StandardCharsets.UTF_8))) {
       String responseLine;
       while ((responseLine = br.readLine()) != null) {
         response.append(responseLine.trim());
       }
-      System.out.println(response);
+      LOG.debug("Got response: {}", response);
     } catch (Exception e) {
       e.printStackTrace();
       throw e;
@@ -451,7 +467,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return response.toString();
   }
 
-  private HttpsURLConnection makeHttpsPostCall(String urlString,
+  private HttpsURLConnection makeHttpCall(String urlString,
                                               String jsonInputString,
                                               String method, boolean isSpnego)
       throws IOException {
@@ -464,11 +480,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     urlConnection.setRequestProperty("Accept", "application/json");
     urlConnection.setRequestProperty("Authorization", authHeaderValue);
 
-    if ((jsonInputString !=null) && !jsonInputString.isEmpty()) {
+    if ((jsonInputString != null) && !jsonInputString.isEmpty()) {
       urlConnection.setDoOutput(true);
       urlConnection.setRequestProperty("Content-Type", "application/json;");
       try (OutputStream os = urlConnection.getOutputStream()) {
-        byte[] input = jsonInputString.getBytes("utf-8");
+        byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
         os.write(input, 0, input.length);
         os.flush();
       }

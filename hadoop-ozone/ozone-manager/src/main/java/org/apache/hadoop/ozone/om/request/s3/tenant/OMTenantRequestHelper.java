@@ -69,6 +69,27 @@ public final class OMTenantRequestHelper {
     }
   }
 
+  static void checkTenantExistence(OMMetadataManager omMetadataManager,
+      String tenantName) throws OMException {
+
+    try {
+      if (!omMetadataManager.getTenantStateTable().isExist(tenantName)) {
+        throw new OMException("Tenant '" + tenantName + "' doesn't exist.",
+            OMException.ResultCodes.TENANT_NOT_FOUND);
+      }
+    } catch (IOException ex) {
+      if (ex instanceof OMException) {
+        final OMException omEx = (OMException) ex;
+        if (omEx.getResult().equals(OMException.ResultCodes.TENANT_NOT_FOUND)) {
+          throw omEx;
+        }
+      }
+      throw new OMException("Unable to retrieve "
+          + "OmDBTenantInfo entry for tenant '" + tenantName + "': "
+          + ex.getMessage(), OMException.ResultCodes.METADATA_ERROR);
+    }
+  }
+
   /**
    * Retrieve volume name of the tenant.
    */
@@ -84,8 +105,8 @@ public final class OMTenantRequestHelper {
     }
 
     if (tenantInfo == null) {
-      throw new RuntimeException("Potential DB error. OmDBTenantInfo "
-          + "entry is missing for tenant '" + tenantName + "'.");
+      throw new RuntimeException("Potential DB error or race condition. "
+          + "OmDBTenantInfo entry is missing for tenant '" + tenantName + "'.");
     }
 
     final String volumeName = tenantInfo.getAccountNamespaceName();

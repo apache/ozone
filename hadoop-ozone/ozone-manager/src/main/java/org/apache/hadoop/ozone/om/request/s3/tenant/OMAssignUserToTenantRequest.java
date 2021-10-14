@@ -54,6 +54,8 @@ import java.util.TreeSet;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 
 /*
   Ratis execution flow for OMAssignUserToTenant request:
@@ -115,7 +117,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     final String tenantName = request.getTenantName();
 
     // Caller should be an Ozone admin or tenant delegated admin
-    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantName);
+    checkTenantAdmin(ozoneManager, tenantName);
 
     // Note: Tenant username _is_ the Kerberos principal of the user
     final String tenantUsername = request.getTenantUsername();
@@ -135,8 +137,10 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_NAME);
     }
 
-    // Won't check tenant existence in preExecute.
-    // Won't check Kerberos principal existence.
+    checkTenantExistence(ozoneManager.getMetadataManager(), tenantName);
+
+    // Below call implies user existence check in authorizer.
+    // If the user doesn't exist, Ranger return 400 and the call should throw.
 
     // Call OMMTM
     // Inform MultiTenantManager of user assignment so it could

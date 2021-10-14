@@ -83,7 +83,7 @@ public class CephCompatibleTenantImpl implements Tenant {
   }
 
   @Override
-  public void addTenantAccessGroup(String groupID) {
+  public void addTenantAccessRole(String groupID) {
     tenantGroupsIDs.add(groupID);
 
   }

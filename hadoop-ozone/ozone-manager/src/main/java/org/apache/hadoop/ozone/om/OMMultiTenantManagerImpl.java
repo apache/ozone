@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.om.multitenant.CephCompatibleTenantImpl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
-import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -215,20 +215,20 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // TODO : Make it an idempotent operation. If any ranger state creation
       //  fails because it already exists, Ignore it.
 
-      OzoneTenantGroupPrincipal allTenantUsers =
-          OzoneTenantGroupPrincipal.newUserGroup(tenantID);
-      String allTenantUsersGroupID = authorizer.createGroup(allTenantUsers);
-      tenant.addTenantAccessGroup(allTenantUsersGroupID);
+      OzoneTenantRolePrincipal allTenantUsers =
+          OzoneTenantRolePrincipal.getUserRole(tenantID);
+      String allTenantUsersRoleID = authorizer.createRole(allTenantUsers);
+      tenant.addTenantAccessRole(allTenantUsersRoleID);
 
-      OzoneTenantGroupPrincipal allTenantAdmins =
-          OzoneTenantGroupPrincipal.newAdminGroup(tenantID);
-      String allTenantAdminsGroupID = authorizer.createGroup(allTenantAdmins);
-      tenant.addTenantAccessGroup(allTenantAdminsGroupID);
+      OzoneTenantRolePrincipal allTenantAdmins =
+          OzoneTenantRolePrincipal.getAdminRole(tenantID);
+      String allTenantAdminsRoleID = authorizer.createRole(allTenantAdmins);
+      tenant.addTenantAccessRole(allTenantAdminsRoleID);
 
-      List<String> allTenantGroups = new ArrayList<>();
-      allTenantGroups.add(allTenantUsers.toString());
-      allTenantGroups.add(allTenantAdmins.toString());
-      inMemoryTenantToTenantGroups.put(tenantID, allTenantGroups);
+      List<String> allTenantRole = new ArrayList<>();
+      allTenantRole.add(allTenantUsers.toString());
+      allTenantRole.add(allTenantAdmins.toString());
+      inMemoryTenantToTenantGroups.put(tenantID, allTenantRole);
 
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
       for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
@@ -249,8 +249,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       }
 
       inMemoryTenantToPolicyNameListMap.put(tenantID,
-          tenant.getTenantAccessPolicies().stream().map(e->e.getPolicyName())
-              .collect(Collectors.toList()));
+          tenant.getTenantAccessPolicies().stream().map(
+              AccessPolicy::getPolicyName).collect(Collectors.toList()));
     } catch (Exception e) {
       try {
         destroyTenant(tenant);
@@ -343,16 +343,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
             tenantName);
         return null;
       }
-      final OzoneTenantGroupPrincipal groupTenantAllUsers =
-          OzoneTenantGroupPrincipal.newUserGroup(tenantName);
-      String idGroupTenantAllUsers = authorizer.getGroupId(groupTenantAllUsers);
-      List<String> userGroupIDs = new ArrayList<>();
-      userGroupIDs.add(idGroupTenantAllUsers);
-
-      String userID = authorizer.createUser(principal, userGroupIDs);
+      final OzoneTenantRolePrincipal roleTenantAllUsers =
+          OzoneTenantRolePrincipal.getUserRole(tenantName);
+      String role = authorizer.getRole(roleTenantAllUsers);
+      String userID = authorizer.assignUser(principal, role);
 
       inMemoryAccessIDToTenantNameMap.put(accessID, tenantName);
-      inMemoryAccessIDToListOfGroupsMap.put(accessID, userGroupIDs);
+//      inMemoryAccessIDToListOfGroupsMap.put(accessID, userRoleIds);
 
       return userID;
     } catch (Exception e) {
@@ -510,7 +507,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   private AccessPolicy createVolumeAccessPolicy(String vol,
-      OzoneTenantGroupPrincipal principal) throws IOException {
+      OzoneTenantRolePrincipal principal) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         principal.getName() + "VolumeAccess" + vol + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
@@ -524,7 +521,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   private AccessPolicy allowCreateBucketPolicy(String vol,
-      OzoneTenantGroupPrincipal principal) throws IOException {
+      OzoneTenantRolePrincipal principal) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         principal.getName() + "AllowBucketCreate" + vol + "Policy");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
@@ -535,7 +532,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   private AccessPolicy allowAccessBucketPolicy(String vol, String bucketName,
-      OzoneTenantGroupPrincipal principal) throws IOException {
+      OzoneTenantRolePrincipal principal) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         principal.getName() + "AllowBucketAccess" + vol + bucketName +
             "Policy");
@@ -552,7 +549,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   private AccessPolicy allowAccessKeyPolicy(String vol, String bucketName,
-      OzoneTenantGroupPrincipal principal) throws IOException {
+      OzoneTenantRolePrincipal principal) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         principal.getName() + "AllowBucketKeyAccess" + vol + bucketName +
             "Policy");

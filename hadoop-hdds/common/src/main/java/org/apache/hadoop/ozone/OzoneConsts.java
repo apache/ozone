@@ -337,6 +337,7 @@ public final class OzoneConsts {
 
   // For multi-tenancy
   public static final String TENANT_NAME_USER_NAME_DELIMITER = "$";
+  public static final String TENANT_NAME_ROLE_DELIMITER = "@";
   public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
   public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
@@ -458,6 +459,13 @@ public final class OzoneConsts {
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
       "/service/xusers/secure/users";
 
+  // Ideally we should use /addUsersAndGroups endpoint for add user to role,
+  // but it always return 405 somehow.
+  // https://ranger.apache.org/apidocs/resource_RoleREST.html
+  // #resource_RoleREST_addUsersAndGroups_PUT
+  public static final String OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT =
+      "/service/roles/roles";
+
   public static final String OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT =
       "/service/xusers/users/?name=";
 
@@ -466,6 +474,12 @@ public final class OzoneConsts {
 
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT =
       "/service/xusers/secure/groups";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT =
+      "/service/roles/roles";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT =
+      "/service/roles/roles/name/";
 
   public static final String OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT =
       "/service/xusers/groups?name=";
