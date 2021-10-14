@@ -60,11 +60,13 @@ public class TenantAssignAdminHandler extends TenantHandler {
     for (final String accessId : accessIds) {
       try {
         objStore.tenantAssignAdmin(accessId, tenantName, delegated);
+        // TODO: Make tenantAssignAdmin return accessId, tenantName, user later.
         err().println("Assigned admin to '" + accessId +
-            "' in tenant '" + tenantName + "'");
+            (tenantName != null ? "' in tenant '" + tenantName + "'" : ""));
       } catch (IOException e) {
         err().println("Failed to assign admin to '" + accessId +
-                "' in tenant '" + tenantName + "': " + e.getMessage());
+            (tenantName != null ? "' in tenant '" + tenantName + "'" : "") +
+            ": " + e.getMessage());
         if (e instanceof OMException) {
           final OMException omEx = (OMException) e;
           // Don't bother continuing the loop if current user isn't Ozone admin

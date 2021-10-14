@@ -207,8 +207,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public String getRole(OzoneTenantRolePrincipal principal)
-      throws Exception {
+  public String getRole(OzoneTenantRolePrincipal principal) throws IOException {
 
     String endpointUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT +
@@ -219,8 +218,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public String getUserId(BasicUserPrincipal principal)
-      throws Exception {
+  public String getUserId(BasicUserPrincipal principal) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT +
         principal.getName();
@@ -254,11 +252,12 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
    *
    * @param principal contains user name, must be an existing user in Ranger.
    * @param existingRole An existing role's JSON response String from Ranger.
+   * @param isAdmin Make it delegated admin of the role.
    * @return roleId (not useful for now)
    * @throws IOException
    */
-  public String assignUser(BasicUserPrincipal principal, String existingRole)
-      throws IOException {
+  public String assignUser(BasicUserPrincipal principal, String existingRole,
+      boolean isAdmin) throws IOException {
 
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
     // Parse Json
@@ -268,7 +267,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     JsonArray usersArray = roleObj.getAsJsonArray("users");
     JsonObject newUserEntry = new JsonObject();
     newUserEntry.addProperty("name", principal.getName());
-    newUserEntry.addProperty("isAdmin", false);
+    newUserEntry.addProperty("isAdmin", isAdmin);
     usersArray.add(newUserEntry);
     // Update Json array
     roleObj.add("users", usersArray);
@@ -282,6 +281,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     HttpsURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
     // TODO: Throw OMException user doesn't exist on 400.
+    if (conn.getResponseCode() != 200) {  // TODO: Replace hard-coded 200
+      LOG.debug("Oops");
+    }
     String resp = getResponseData(conn);
     String returnedRoleId;
     try {

@@ -45,19 +45,18 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String assignUser(BasicUserPrincipal principal, String existingRole)
-      throws Exception {
+  public String assignUser(BasicUserPrincipal principal, String existingRole,
+      boolean isAdmin) throws IOException {
     return null;
   }
 
   @Override
-  public String getUserId(BasicUserPrincipal principal) throws Exception {
+  public String getUserId(BasicUserPrincipal principal) throws IOException {
     return null;
   }
 
   @Override
-  public String getRole(OzoneTenantRolePrincipal principal)
-      throws Exception {
+  public String getRole(OzoneTenantRolePrincipal principal) throws IOException {
     return null;
   }
 

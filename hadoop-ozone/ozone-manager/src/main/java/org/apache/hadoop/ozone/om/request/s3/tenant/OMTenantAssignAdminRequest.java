@@ -78,6 +78,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     if (StringUtils.isEmpty(tenantName)) {
       tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
           ozoneManager.getMetadataManager(), accessId);
+      assert(tenantName != null);
     }
 
     // Caller should be an Ozone admin or this tenant's delegated admin
@@ -100,14 +101,24 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_NAME);
     }
 
-    // TODO: Call OMMTM to add user to admin group of the tenant.
-    // The call should add user (not accessId) to the tenant's admin group
+    final boolean delegated;
+    if (request.hasDelegated()) {
+      delegated = request.getDelegated();
+    } else {
+      delegated = true;
+    }
+    // Call OMMTM to add user to tenant admin role
     ozoneManager.getMultiTenantManager().assignTenantAdmin(
-        request.getAccessId());
+        request.getAccessId(), delegated);
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
-        .setTenantAssignAdminRequest(request)
+        .setTenantAssignAdminRequest(
+            TenantAssignAdminRequest.newBuilder()
+                .setAccessId(accessId)
+                .setTenantName(tenantName)
+                .setDelegated(delegated)
+                .build())
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId());
 

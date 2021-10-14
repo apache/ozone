@@ -53,30 +53,32 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   void shutdown() throws Exception;
 
   /**
-   * Create User Principal entity for MultiTenantGatekeeper plugin.
-   * @param principal
-   * @param groupIDs : groupIDs that this user will belong to
+   * Assign user to an existing role in the Authorizer.
+   * @param principal User principal
+   * @param existingRole A JSON String representation of the existing role
+   *                     returned from the Authorizer (Ranger).
+   * @param isAdmin
    * @return unique and opaque userID that can be used to refer to the user in
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String assignUser(BasicUserPrincipal principal,
-                    String existingRole) throws Exception;
+  String assignUser(BasicUserPrincipal principal, String existingRole,
+      boolean isAdmin) throws IOException;
 
   /**
    * @param principal
    * @return Unique userID maintained by the authorizer plugin.
-   * @throws Exception
+   * @throws IOException
    */
-  String getUserId(BasicUserPrincipal principal) throws Exception;
+  String getUserId(BasicUserPrincipal principal) throws IOException;
 
   /**
    * @param principal
    * @return Unique groupID maintained by the authorizer plugin.
-   * @throws Exception
+   * @throws IOException
    */
   String getRole(OzoneTenantRolePrincipal principal)
-      throws Exception;
+      throws IOException;
 
   /**
    * Delete the user userID in MultiTenantGateKeeper plugin.

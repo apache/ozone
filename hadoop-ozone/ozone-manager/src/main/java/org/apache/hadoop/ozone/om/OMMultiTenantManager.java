@@ -177,8 +177,9 @@ public interface OMMultiTenantManager {
   /**
    * Given a user, make him an admin of the corresponding Tenant.
    * @param accessID
+   * @param delegated
    */
-  void assignTenantAdmin(String accessID) throws IOException;
+  void assignTenantAdmin(String accessID, boolean delegated) throws IOException;
 
   /**
    * Given a user, remove him as admin of the corresponding Tenant.

@@ -956,12 +956,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void tenantAssignAdmin(String accessId, String tenantName,
       boolean delegated) throws IOException {
 
-    final TenantAssignAdminRequest request =
+    final TenantAssignAdminRequest.Builder requestBuilder =
         TenantAssignAdminRequest.newBuilder()
         .setAccessId(accessId)
-        .setTenantName(tenantName)
-        .setDelegated(delegated)
-        .build();
+        .setDelegated(delegated);
+    if (tenantName != null) {
+      requestBuilder.setTenantName(tenantName);
+    }
+    final TenantAssignAdminRequest request = requestBuilder.build();
     final OMRequest omRequest = createOMRequest(Type.TenantAssignAdmin)
         .setTenantAssignAdminRequest(request)
         .build();
@@ -976,11 +978,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void tenantRevokeAdmin(String accessId, String tenantName)
       throws IOException {
 
-    final TenantRevokeAdminRequest request =
+    final TenantRevokeAdminRequest.Builder requestBuilder =
         TenantRevokeAdminRequest.newBuilder()
-            .setAccessId(accessId)
-            .setTenantName(tenantName)
-            .build();
+            .setAccessId(accessId);
+    if (tenantName != null) {
+      requestBuilder.setTenantName(tenantName);
+    }
+    final TenantRevokeAdminRequest request = requestBuilder.build();
     final OMRequest omRequest = createOMRequest(Type.TenantRevokeAdmin)
         .setTenantRevokeAdminRequest(request)
         .build();

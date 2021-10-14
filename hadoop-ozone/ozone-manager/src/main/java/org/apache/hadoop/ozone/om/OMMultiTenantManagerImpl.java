@@ -30,7 +30,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -216,21 +216,20 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // TODO : Make it an idempotent operation. If any ranger state creation
       //  fails because it already exists, Ignore it.
 
-      OzoneTenantRolePrincipal allTenantAdmins =
+      // Create admin role first
+      final OzoneTenantRolePrincipal adminRole =
           OzoneTenantRolePrincipal.getAdminRole(tenantID);
-      String allTenantAdminsRoleID =
-          authorizer.createRole(allTenantAdmins, null);
-      tenant.addTenantAccessRole(allTenantAdminsRoleID);
+      String adminRoleId = authorizer.createRole(adminRole, null);
+      tenant.addTenantAccessRole(adminRoleId);
 
-      OzoneTenantRolePrincipal allTenantUsers =
+      // Then create user role, and add admin role as its delegated admin
+      final OzoneTenantRolePrincipal userRole =
           OzoneTenantRolePrincipal.getUserRole(tenantID);
-      String allTenantUsersRoleID =
-          authorizer.createRole(allTenantUsers, allTenantAdmins.getName());
-      tenant.addTenantAccessRole(allTenantUsersRoleID);
+      String userRoleId = authorizer.createRole(userRole, adminRole.getName());
+      tenant.addTenantAccessRole(userRoleId);
 
-      List<String> allTenantRole = new ArrayList<>();
-      allTenantRole.add(allTenantUsers.toString());
-      allTenantRole.add(allTenantAdmins.toString());
+      final List<String> allTenantRole =
+          Arrays.asList(userRole.getName(), adminRole.getName());
       inMemoryTenantToTenantGroups.put(tenantID, allTenantRole);
 
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
@@ -240,14 +239,14 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
         // Allow Volume List access
         AccessPolicy tenantVolumeAccessPolicy = newDefaultVolumeAccessPolicy(
-            volumeName, allTenantUsers, allTenantAdmins);
+            volumeName, userRole, adminRole);
         tenantVolumeAccessPolicy.setPolicyID(
             authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
         tenant.addTenantAccessPolicy(tenantVolumeAccessPolicy);
 
         // Allow Bucket Create within Volume
         AccessPolicy tenantBucketCreatePolicy =
-            newDefaultAllowBucketCreatePolicy(volumeName, allTenantUsers);
+            newDefaultAllowBucketCreatePolicy(volumeName, userRole);
         tenantBucketCreatePolicy.setPolicyID(
             authorizer.createAccessPolicy(tenantBucketCreatePolicy));
         tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
@@ -350,8 +349,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       }
       final OzoneTenantRolePrincipal roleTenantAllUsers =
           OzoneTenantRolePrincipal.getUserRole(tenantName);
-      String role = authorizer.getRole(roleTenantAllUsers);
-      String roleId = authorizer.assignUser(principal, role);
+      String roleJsonStr = authorizer.getRole(roleTenantAllUsers);
+      String roleId = authorizer.assignUser(principal, roleJsonStr, false);
 
       inMemoryAccessIDToTenantNameMap.put(accessID, tenantName);
 //      inMemoryAccessIDToListOfGroupsMap.put(accessID, userRoleIds);
@@ -440,14 +439,35 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void assignTenantAdmin(String accessID)
+  public void assignTenantAdmin(String accessID, boolean delegated)
       throws IOException {
+    try {
+      controlPathLock.writeLock().lock();
+      // tenantId (tenant name) is necessary to retrieve role name
+      final String tenantId = getTenantForAccessID(accessID);
+      assert(tenantId != null);
 
+      final OzoneTenantRolePrincipal existingAdminRole =
+          OzoneTenantRolePrincipal.getAdminRole(tenantId);
+      final String roleJsonStr = authorizer.getRole(existingAdminRole);
+      final String userPrincipal = getUserNameGivenAccessId(accessID);
+      // Add user principal (not accessId!) to the role
+      final String roleId = authorizer.assignUser(
+          new BasicUserPrincipal(userPrincipal), roleJsonStr, delegated);
+      assert(roleId != null);
+
+      // TODO: update some in-memory mappings?
+
+    } catch (IOException e) {
+      revokeTenantAdmin(accessID);
+      LOG.error(e.getMessage());
+    } finally {
+      controlPathLock.writeLock().unlock();
+    }
   }
 
   @Override
-  public void revokeTenantAdmin(String accessID)
-      throws IOException {
+  public void revokeTenantAdmin(String accessID) throws IOException {
 
   }
 

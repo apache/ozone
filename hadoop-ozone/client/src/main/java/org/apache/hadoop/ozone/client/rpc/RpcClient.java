@@ -690,8 +690,7 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName can't be null or empty.");
+    // tenantName can be empty
     ozoneManagerClient.tenantAssignAdmin(accessId, tenantName, delegated);
   }
 
@@ -706,8 +705,7 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName can't be null or empty.");
+    // tenantName can be empty
     ozoneManagerClient.tenantRevokeAdmin(accessId, tenantName);
   }
 

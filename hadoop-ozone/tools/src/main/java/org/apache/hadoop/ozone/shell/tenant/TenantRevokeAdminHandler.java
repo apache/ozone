@@ -53,12 +53,14 @@ public class TenantRevokeAdminHandler extends TenantHandler {
 
     for (final String accessId : accessIds) {
       try {
+        // TODO: Make tenantRevokeAdmin return accessId, tenantName, user later.
         objStore.tenantRevokeAdmin(accessId, tenantName);
         err().println("Revoked admin role of '" + accessId +
-            "' from tenant '" + tenantName + "'");
+            (tenantName != null ? "' from tenant '" + tenantName + "'" : ""));
       } catch (IOException e) {
         err().println("Failed to revoke admin role of '" + accessId +
-            "' from tenant '" + tenantName + "': " + e.getMessage());
+            (tenantName != null ? "' from tenant '" + tenantName + "'" : "") +
+            ": " + e.getMessage());
         if (e instanceof OMException) {
           final OMException omEx = (OMException) e;
           // Don't bother continuing the loop if current user isn't Ozone admin
