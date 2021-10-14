@@ -109,6 +109,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
+
     // As omResponse is error it is a no-op. So, entry should still be in
     // openKey table.
     Assert.assertTrue(
