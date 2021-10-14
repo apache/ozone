@@ -42,7 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
  *
  * The base implementation is handling Ratis-3 writes, with a single stream,
  * but there can be other implementations that are using a different way.
- * */
+ */
 public class BlockOutputStreamEntry extends OutputStream {
 
   private final OzoneClientConfig config;
@@ -276,7 +276,8 @@ public class BlockOutputStreamEntry extends OutputStream {
    * here.
    * @param id the last know ID of the block.
    */
-  void updateBlockID(BlockID id) {
+  @VisibleForTesting
+  protected void updateBlockID(BlockID id) {
     this.blockID = id;
   }
 
@@ -295,18 +296,6 @@ public class BlockOutputStreamEntry extends OutputStream {
   @VisibleForTesting
   public Pipeline getPipeline() {
     return this.pipeline;
-  }
-
-  /**
-   * Gets the Pipeline based on which the location report can be sent to the OM.
-   * This is necessary, as implementors might use special pipeline information
-   * that can be created during commit, but not during initialization,
-   * and might need to update some Pipeline information returned in
-   * OMKeyLocationInfo.
-   * @return
-   */
-  Pipeline getPipelineForOMLocationReport(){
-    return getPipeline();
   }
 
   long getCurrentPosition() {

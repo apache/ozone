@@ -150,7 +150,6 @@ public class KeyOutputStream extends OutputStream {
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId());
-
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
