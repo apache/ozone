@@ -67,7 +67,8 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String createRole(OzoneTenantRolePrincipal group) throws Exception {
+  public String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+      throws IOException {
     return null;
   }
 

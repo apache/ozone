@@ -88,12 +88,15 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
 
   /**
    * Create Role entity for MultiTenantGatekeeper plugin.
-   * @param group
-   * @return unique groupID that can be used to refer to the group in
+   * @param role
+   * @param adminRoleName (Optional) admin role name that will be added to
+   *                      manage this role.
+   * @return unique groupID that can be used to refer to the role in
    * MultiTenantGateKeeper plugin Implementation e.g. corresponding ID on the
    * Ranger end for a ranger based implementation .
    */
-  String createRole(OzoneTenantRolePrincipal group) throws Exception;
+  String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+      throws IOException;
 
   /**
    * Delete the group groupID in MultiTenantGateKeeper plugin.

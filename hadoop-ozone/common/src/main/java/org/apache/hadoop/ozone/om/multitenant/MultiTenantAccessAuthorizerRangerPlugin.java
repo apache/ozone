@@ -295,28 +295,31 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return returnedRoleId;
   }
 
-  private String getCreateRoleJsonString(String roleName) throws Exception {
-    return "{ \"name\":\"" + roleName + "\"," +
-        "  \"description\":\"testrole\" " +
-        " }";
+  private String getCreateRoleJsonStr(String roleName, String adminRoleName) {
+    return "{"
+        + "  \"name\":\"" + roleName + "\","
+        + "  \"description\":\"Role created by Ozone Multi-Tenancy\""
+        + (adminRoleName == null ? "" : ", \"roles\":"
+        + "[{\"name\":\"" + adminRoleName + "\",\"isAdmin\": true}]")
+        + "}";
   }
 
+  public String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+      throws IOException {
 
-  public String createRole(OzoneTenantRolePrincipal group) throws Exception {
-    String rangerAdminUrl =
+    String endpointUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT;
 
-    String jsonCreateGroupString = getCreateRoleJsonString(group.toString());
+    String jsonData = getCreateRoleJsonStr(role.toString(), adminRoleName);
 
-    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl,
-        jsonCreateGroupString,
-        "POST", false);
+    final HttpsURLConnection conn = makeHttpCall(endpointUrl,
+        jsonData, "POST", false);
     String roleInfo = getResponseData(conn);
     String roleId;
     try {
       JsonObject jObject = new JsonParser().parse(roleInfo).getAsJsonObject();
       roleId = jObject.get("id").getAsString();
-      LOG.debug("Ranger Role ID is: {}", roleId);
+      LOG.debug("Ranger returned roleId: {}", roleId);
     } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
@@ -458,8 +461,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   private HttpsURLConnection makeHttpsGetCall(String urlString,
-                                               String method, boolean isSpnego)
-      throws IOException {
+      String method, boolean isSpnego) throws IOException {
 
     URL url = new URL(urlString);
     HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();

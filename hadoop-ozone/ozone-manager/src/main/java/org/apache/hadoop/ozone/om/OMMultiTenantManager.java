@@ -127,7 +127,7 @@ public interface OMMultiTenantManager {
    * @return
    * @throws IOException
    */
-  void destroyUser(String accessID);
+  void revokeUserAccessId(String accessID);
 
 
   /**
@@ -178,7 +178,7 @@ public interface OMMultiTenantManager {
    * Given a user, make him an admin of the corresponding Tenant.
    * @param accessID
    */
-  void assignTenantAdminRole(String accessID) throws IOException;
+  void assignTenantAdmin(String accessID) throws IOException;
 
   /**
    * Given a user, remove him as admin of the corresponding Tenant.

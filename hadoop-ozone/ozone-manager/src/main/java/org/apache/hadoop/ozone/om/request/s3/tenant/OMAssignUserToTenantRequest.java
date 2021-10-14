@@ -181,7 +181,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
 
     try {
       // Undo Authorizer states established in preExecute
-      ozoneManager.getMultiTenantManager().destroyUser(
+      ozoneManager.getMultiTenantManager().revokeUserAccessId(
           request.getAccessId());
     } catch (Exception e) {
       // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
