@@ -107,6 +107,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(commitKeyRequest.getKeyArgs().getModificationTime(),
         omKeyInfo.getModificationTime());
 
+
     // Check block location.
     Assert.assertEquals(allocatedLocationList,
         omKeyInfo.getLatestVersionLocations().getLocationList());

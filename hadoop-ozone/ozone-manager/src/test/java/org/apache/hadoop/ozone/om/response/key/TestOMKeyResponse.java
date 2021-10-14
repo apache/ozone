@@ -24,7 +24,6 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
@@ -60,7 +59,6 @@ public class TestOMKeyResponse {
   protected long clientID;
   protected Random random;
   protected long txnLogId = 100000L;
-  protected RepeatedOmKeyInfo keysToDelete = null;
 
   @Before
   public void setup() throws Exception {
@@ -77,7 +75,6 @@ public class TestOMKeyResponse {
     replicationType = HddsProtos.ReplicationType.RATIS;
     clientID = 1000L;
     random = new Random();
-    keysToDelete = null;
   }
 
   @NotNull

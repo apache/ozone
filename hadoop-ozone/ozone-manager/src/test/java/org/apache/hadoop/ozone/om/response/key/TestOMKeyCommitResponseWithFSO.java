@@ -39,8 +39,8 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @NotNull
   @Override
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
-          OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey, RepeatedOmKeyInfo deleteKeys) {
+      OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
+      String ozoneKey, RepeatedOmKeyInfo deleteKeys) {
     Assert.assertNotNull(omBucketInfo);
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
         openKey, omBucketInfo, deleteKeys);

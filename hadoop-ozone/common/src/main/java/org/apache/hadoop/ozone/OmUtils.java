@@ -448,7 +448,6 @@ public final class OmUtils {
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
       RepeatedOmKeyInfo repeatedOmKeyInfo, long trxnLogIndex,
       boolean isRatisEnabled) {
-
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
