@@ -204,7 +204,8 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     OzoneTenantRolePrincipal principal =
         OzoneTenantRolePrincipal.getUserRole(tenant);
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        principal.getName() + "VolumeAccess" + vol + "Policy");
+        // principal already contains volume name
+        principal.getName() + "VolumeAccess");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(VOLUME).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("").setKeyName("").build();
@@ -220,7 +221,8 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     OzoneTenantRolePrincipal principal =
         OzoneTenantRolePrincipal.getUserRole(tenant);
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        principal.getName() + "AllowBucketCreate" + vol + "Policy");
+        // principal already contains volume name
+        principal.getName() + "BucketCreate");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(BUCKET).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("*").setKeyName("").build();

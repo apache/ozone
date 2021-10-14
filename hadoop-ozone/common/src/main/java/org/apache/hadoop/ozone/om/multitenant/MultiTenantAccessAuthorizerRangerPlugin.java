@@ -44,7 +44,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -62,7 +61,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -208,33 +206,6 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return true;
   }
 
-  private String getCreateUserJsonString(String userName,
-                                         List<String> groupIDs) {
-    String groupIdList = groupIDs.stream().collect(Collectors.joining("\",\"",
-        "", ""));
-    String jsonCreateUserString = "{ \"name\":\"" + userName  + "\"," +
-        "\"firstName\":\"" + userName + "\"," +
-        "  \"loginId\": \"" + userName + "\"," +
-        "  \"password\" : \"user1pass\"," +
-        "  \"userRoleList\":[\"ROLE_USER\"]," +
-        "  \"groupIdList\":[\"" + groupIdList +"\"] " +
-        " }";
-    return jsonCreateUserString;
-  }
-
-  private String getAssignUserJsonString(String userName,
-      List<String> roleIds) {
-    String groupIdList = roleIds.stream().collect(
-        Collectors.joining("\",\"", "", ""));
-    return "{ \"name\":\"" + userName  + "\"," +
-        "\"firstName\":\"" + userName + "\"," +
-        "  \"loginId\": \"" + userName + "\"," +
-        "  \"password\" : \"user1pass\"," +
-        "  \"userRoleList\":[\"ROLE_USER\"]," +
-        "  \"groupIdList\":[\"" + groupIdList +"\"] " +
-        " }";
-  }
-
   @Override
   public String getRole(OzoneTenantRolePrincipal principal)
       throws Exception {
@@ -278,24 +249,19 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return userIDCreated;
   }
 
+  /**
+   * Update the exising role details and push the changes to Ranger.
+   *
+   * @param principal contains user name, must be an existing user in Ranger.
+   * @param existingRole An existing role's JSON response String from Ranger.
+   * @return roleId (not useful for now)
+   * @throws IOException
+   */
   public String assignUser(BasicUserPrincipal principal, String existingRole)
-      throws Exception {
+      throws IOException {
 
-    // Add user to Ranger role tenantA-users
-    // Have to do a GET, append the user to the role,
-    //  then PUT to update the role at the moment.
-    //  Maybe RangerClient#grantRole can help.
-
-//    final String endpointUrl = rangerHttpsAddress +
-//        OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT +
-//        "/" + roleIds.get(0);
-//    HttpsURLConnection conn = makeHttpCall(endpointUrl, "", "GET", false);
-//    String existingRole = getResponseData(conn);
-    LOG.debug("existingRole: {}", existingRole);
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
     // Parse Json
-//    JsonObject roleObj = new JsonParser().parse(response).getAsJsonObject();
-    LOG.debug("Before: {}", roleObj);
     final String roleId = roleObj.get("id").getAsString();
     LOG.debug("Got roleId: {}", roleId);
 
@@ -309,15 +275,13 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     LOG.debug("Updated: {}", roleObj);
 
-    final String endpointUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT +
-            "/" + roleId;
-
+    final String endpointUrl = rangerHttpsAddress +
+        OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT + roleId;
     final String jsonData = roleObj.toString();
-//        getCreateUserJsonString(principal.getName(), roleIds);
 
     HttpsURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
+    // TODO: Throw OMException user doesn't exist on 400.
     String resp = getResponseData(conn);
     String returnedRoleId;
     try {
@@ -495,7 +459,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
   private HttpsURLConnection makeHttpsGetCall(String urlString,
                                                String method, boolean isSpnego)
-      throws IOException, AuthenticationException {
+      throws IOException {
 
     URL url = new URL(urlString);
     HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();

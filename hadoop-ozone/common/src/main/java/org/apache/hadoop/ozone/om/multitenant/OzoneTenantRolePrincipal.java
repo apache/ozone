@@ -28,11 +28,11 @@ public final class OzoneTenantRolePrincipal implements Principal {
   private final String groupName;
 
   public static OzoneTenantRolePrincipal getUserRole(String tenantID) {
-    return new OzoneTenantRolePrincipal(tenantID, "TenantUsersRole");
+    return new OzoneTenantRolePrincipal(tenantID, "UserRole");
   }
 
   public static OzoneTenantRolePrincipal getAdminRole(String tenantID) {
-    return new OzoneTenantRolePrincipal(tenantID, "TenantAdminsRole");
+    return new OzoneTenantRolePrincipal(tenantID, "AdminRole");
   }
 
   private OzoneTenantRolePrincipal(String tenantID, String groupName) {

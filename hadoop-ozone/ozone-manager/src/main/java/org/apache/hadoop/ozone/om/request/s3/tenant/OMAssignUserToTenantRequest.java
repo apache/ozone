@@ -145,11 +145,11 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     // Call OMMTM
     // Inform MultiTenantManager of user assignment so it could
     //  initialize some policies in Ranger.
-    final String userId = ozoneManager.getMultiTenantManager()
+    final String roleId = ozoneManager.getMultiTenantManager()
         .assignUserToTenant(new BasicUserPrincipal(tenantUsername), tenantName,
             accessId);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("userId for assign user to tenant request = {}", userId);
+      LOG.debug("roleId that the user is assigned to: {}", roleId);
     }
 
     // Generate secret. Used only when doesn't the kerberosID entry doesn't

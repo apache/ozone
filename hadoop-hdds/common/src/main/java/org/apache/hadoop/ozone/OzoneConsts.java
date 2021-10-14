@@ -464,7 +464,7 @@ public final class OzoneConsts {
   // https://ranger.apache.org/apidocs/resource_RoleREST.html
   // #resource_RoleREST_addUsersAndGroups_PUT
   public static final String OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT =
-      "/service/roles/roles";
+      "/service/roles/roles/";
 
   public static final String OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT =
       "/service/xusers/users/?name=";

@@ -346,12 +346,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       final OzoneTenantRolePrincipal roleTenantAllUsers =
           OzoneTenantRolePrincipal.getUserRole(tenantName);
       String role = authorizer.getRole(roleTenantAllUsers);
-      String userID = authorizer.assignUser(principal, role);
+      String roleId = authorizer.assignUser(principal, role);
 
       inMemoryAccessIDToTenantNameMap.put(accessID, tenantName);
 //      inMemoryAccessIDToListOfGroupsMap.put(accessID, userRoleIds);
 
-      return userID;
+      return roleId;
     } catch (Exception e) {
       destroyUser(accessID);
       LOG.error(e.getMessage());
@@ -509,7 +509,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private AccessPolicy createVolumeAccessPolicy(String vol,
       OzoneTenantRolePrincipal principal) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        principal.getName() + "VolumeAccess" + vol + "Policy");
+        // principal already contains volume name
+        principal.getName() + "VolumeAccess");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(VOLUME).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("").setKeyName("").build();
@@ -523,7 +524,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private AccessPolicy allowCreateBucketPolicy(String vol,
       OzoneTenantRolePrincipal principal) throws IOException {
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        principal.getName() + "AllowBucketCreate" + vol + "Policy");
+        // principal already contains volume name
+        principal.getName() + "BucketCreate");
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(BUCKET).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("*").setKeyName("").build();
