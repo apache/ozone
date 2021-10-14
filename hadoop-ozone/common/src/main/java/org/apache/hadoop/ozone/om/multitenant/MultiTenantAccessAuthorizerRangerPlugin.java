@@ -280,9 +280,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     HttpsURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
-    // TODO: Throw OMException user doesn't exist on 400.
     if (conn.getResponseCode() != 200) {  // TODO: Replace hard-coded 200
-      LOG.debug("Oops");
+      throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
+          + " " + conn.getResponseMessage()
+          + ". Error updating Ranger role.");
     }
     String resp = getResponseData(conn);
     String returnedRoleId;
@@ -316,6 +317,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     final HttpsURLConnection conn = makeHttpCall(endpointUrl,
         jsonData, "POST", false);
+    if (conn.getResponseCode() != 200) {  // TODO: Replace hard-coded 200
+      throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
+          + " " + conn.getResponseMessage()
+          + ". Role name '" + role + "' likely already exists in Ranger");
+    }
     String roleInfo = getResponseData(conn);
     String roleId;
     try {

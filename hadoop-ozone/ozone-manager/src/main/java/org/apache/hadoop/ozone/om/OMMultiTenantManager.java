@@ -111,14 +111,14 @@ public interface OMMultiTenantManager {
 
   /**
    * Creates a new user that exists for S3 API access to Ozone.
-   * @param tenantName
    * @param principal
+   * @param tenantName
    * @param accessID
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
   String assignUserToTenant(BasicUserPrincipal principal, String tenantName,
-                            String accessID);
+                            String accessID) throws IOException;
 
   /**
    * Given a user, destroys all state associated with that user.
@@ -127,7 +127,7 @@ public interface OMMultiTenantManager {
    * @return
    * @throws IOException
    */
-  void revokeUserAccessId(String accessID);
+  void revokeUserAccessId(String accessID) throws IOException;
 
 
   /**

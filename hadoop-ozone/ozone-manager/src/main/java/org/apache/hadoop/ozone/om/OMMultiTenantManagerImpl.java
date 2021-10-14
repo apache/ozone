@@ -335,10 +335,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * @param tenantName
    * @param accessID
    * @return Tenant, or null on error
+   * @throws IOException
    */
   @Override
   public String assignUserToTenant(BasicUserPrincipal principal,
-      String tenantName, String accessID) {
+      String tenantName, String accessID) throws IOException {
     try {
       controlPathLock.writeLock().lock();
       Tenant tenant = getTenantInfo(tenantName);
@@ -356,17 +357,16 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 //      inMemoryAccessIDToListOfGroupsMap.put(accessID, userRoleIds);
 
       return roleId;
-    } catch (Exception e) {
+    } catch (IOException e) {
       revokeUserAccessId(accessID);
-      LOG.error(e.getMessage());
-      return null;
+      throw e;
     } finally {
       controlPathLock.writeLock().unlock();
     }
   }
 
   @Override
-  public void revokeUserAccessId(String accessID) {
+  public void revokeUserAccessId(String accessID) throws IOException {
     try {
       controlPathLock.writeLock().lock();
       String tenantName = getTenantForAccessID(accessID);
@@ -380,8 +380,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
       inMemoryAccessIDToTenantNameMap.remove(accessID);
       inMemoryAccessIDToListOfGroupsMap.remove(accessID);
-    } catch (Exception e) {
-      LOG.error(e.getMessage());
     } finally {
       controlPathLock.writeLock().unlock();
     }
@@ -460,7 +458,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     } catch (IOException e) {
       revokeTenantAdmin(accessID);
-      LOG.error(e.getMessage());
+      throw e;
     } finally {
       controlPathLock.writeLock().unlock();
     }
