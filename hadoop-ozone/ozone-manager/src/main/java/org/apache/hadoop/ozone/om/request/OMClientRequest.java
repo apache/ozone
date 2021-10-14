@@ -136,6 +136,11 @@ public abstract class OMClientRequest implements RequestAuditor {
       userInfo.setUserName(user.getUserName());
     }
 
+    // for gRPC s3g omRequests that contain user name
+    if (user == null && omRequest.hasUserInfo()) {
+      userInfo.setUserName(omRequest.getUserInfo().getUserName());
+    }
+
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
@@ -273,15 +278,16 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (userGroupInformation != null) {
       return userGroupInformation;
     }
-
     if (omRequest.hasUserInfo() &&
         !StringUtils.isBlank(omRequest.getUserInfo().getUserName())) {
       userGroupInformation = UserGroupInformation.createRemoteUser(
           omRequest.getUserInfo().getUserName());
+      LOG.debug("creating UGI remote user for acl");
       return userGroupInformation;
     } else {
       // This will never happen, as for every OM request preExecute, we
       // should add userInfo.
+      LOG.debug("NO UGI for acl");
       return null;
     }
   }

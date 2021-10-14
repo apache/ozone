@@ -33,9 +33,9 @@ execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
 execute_robot_test scm kinit.robot
 
-#execute_robot_test scm basic
+execute_robot_test scm basic
 
-#execute_robot_test scm security
+execute_robot_test scm security
 
 for scheme in ofs o3fs; do
   for bucket in link bucket; do
@@ -43,9 +43,9 @@ for scheme in ofs o3fs; do
   done
 done
 
-#for bucket in link generated; do
-#  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} s3
-#done
+for bucket in link generated; do
+  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} s3
+done
 
 #expects 4 pipelines, should be run before
 #admincli which creates STANDALONE pipeline

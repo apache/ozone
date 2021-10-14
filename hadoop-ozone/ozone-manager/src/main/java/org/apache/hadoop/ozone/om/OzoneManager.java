@@ -4038,7 +4038,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (isAclEnabled) {
         InetAddress remoteIp = Server.getRemoteIp();
         resolved = resolveBucketLink(requested, new HashSet<>(),
-            Server.getRemoteUser(),
+            getRemoteUser(),
             remoteIp,
             remoteIp != null ? remoteIp.getHostName() :
                 omRpcAddress.getHostName());
