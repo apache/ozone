@@ -194,7 +194,9 @@ public class HttpFSServer {
   @GET
   @Produces(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8)
   public Response getRoot(@Context UriInfo uriInfo,
-                          @QueryParam(HttpFSParametersProvider.OperationParam.NAME) HttpFSParametersProvider.OperationParam op,
+                          @QueryParam(HttpFSParametersProvider
+                              .OperationParam.NAME)
+                              HttpFSParametersProvider.OperationParam op,
                           @Context Parameters params,
                           @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
@@ -227,7 +229,8 @@ public class HttpFSServer {
       MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8})
   public Response get(@PathParam("path") String path,
                       @Context UriInfo uriInfo,
-                      @QueryParam(HttpFSParametersProvider.OperationParam.NAME) HttpFSParametersProvider.OperationParam op,
+                      @QueryParam(HttpFSParametersProvider.OperationParam.NAME)
+                            HttpFSParametersProvider.OperationParam op,
                       @Context Parameters params,
                       @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
@@ -329,8 +332,10 @@ public class HttpFSServer {
                                      UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String mode = params.get(HttpFSParametersProvider.FsActionParam.NAME, HttpFSParametersProvider.FsActionParam.class);
-    HttpFSParametersProvider.FsActionParam fsparam = new HttpFSParametersProvider.FsActionParam(mode);
+    String mode = params.get(HttpFSParametersProvider.FsActionParam.NAME,
+        HttpFSParametersProvider.FsActionParam.class);
+    HttpFSParametersProvider.FsActionParam fsparam
+        = new HttpFSParametersProvider.FsActionParam(mode);
     FSOperations.FSAccess command = new FSOperations.FSAccess(path,
         FsAction.getFsAction(fsparam.value()));
     fsExecute(user, command);
@@ -366,9 +371,11 @@ public class HttpFSServer {
                                          UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String oldSnapshotName = params.get(HttpFSParametersProvider.OldSnapshotNameParam.NAME,
+    String oldSnapshotName
+        = params.get(HttpFSParametersProvider.OldSnapshotNameParam.NAME,
         HttpFSParametersProvider.OldSnapshotNameParam.class);
-    String snapshotName = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
+    String snapshotName
+        = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
         HttpFSParametersProvider.SnapshotNameParam.class);
     FSOperations.FSGetSnapshotDiff command =
         new FSOperations.FSGetSnapshotDiff(path, oldSnapshotName,
@@ -449,9 +456,11 @@ public class HttpFSServer {
       throws IOException, FileSystemAccessException {
     Response response;
     List<String> xattrNames =
-        params.getValues(HttpFSParametersProvider.XAttrNameParam.NAME, HttpFSParametersProvider.XAttrNameParam.class);
+        params.getValues(HttpFSParametersProvider.XAttrNameParam.NAME,
+            HttpFSParametersProvider.XAttrNameParam.class);
     XAttrCodec encoding =
-        params.get(HttpFSParametersProvider.XAttrEncodingParam.NAME, HttpFSParametersProvider.XAttrEncodingParam.class);
+        params.get(HttpFSParametersProvider.XAttrEncodingParam.NAME,
+            HttpFSParametersProvider.XAttrEncodingParam.class);
     FSOperations.FSGetXAttrs command =
         new FSOperations.FSGetXAttrs(path, xattrNames, encoding);
     @SuppressWarnings("rawtypes") Map json = fsExecute(user, command);
@@ -480,7 +489,8 @@ public class HttpFSServer {
         new FSOperations.FSFileChecksum(path);
 
     Boolean noRedirect = params.get(
-        HttpFSParametersProvider.NoRedirectParam.NAME, HttpFSParametersProvider.NoRedirectParam.class);
+        HttpFSParametersProvider.NoRedirectParam.NAME,
+        HttpFSParametersProvider.NoRedirectParam.class);
     AUDIT_LOG.info("[{}]", path);
     if (noRedirect) {
       URI redirectURL = createOpenRedirectionURL(uriInfo);
@@ -517,7 +527,8 @@ public class HttpFSServer {
   }
 
   private Response handleInstrumentation(String path,
-                                         HttpFSParametersProvider.OperationParam op,
+                                         HttpFSParametersProvider
+                                             .OperationParam op,
                                          UserGroupInformation user)
       throws IOException {
     Response response;
@@ -553,7 +564,8 @@ public class HttpFSServer {
                                     UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String filter = params.get(HttpFSParametersProvider.FilterParam.NAME, HttpFSParametersProvider.FilterParam.class);
+    String filter = params.get(HttpFSParametersProvider.FilterParam.NAME,
+        HttpFSParametersProvider.FilterParam.class);
     FSOperations.FSListStatus command =
         new FSOperations.FSListStatus(path, filter);
     Map json = fsExecute(user, command);
@@ -579,7 +591,8 @@ public class HttpFSServer {
       throws IOException, FileSystemAccessException {
     Response response;
     Boolean noRedirect = params
-        .get(HttpFSParametersProvider.NoRedirectParam.NAME, HttpFSParametersProvider.NoRedirectParam.class);
+        .get(HttpFSParametersProvider.NoRedirectParam.NAME,
+            HttpFSParametersProvider.NoRedirectParam.class);
     if (noRedirect) {
       URI redirectURL = createOpenRedirectionURL(uriInfo);
       final String js = JsonUtil.toJsonString("Location", redirectURL);
@@ -604,8 +617,10 @@ public class HttpFSServer {
         LOG.warn("Open interrupted.", ie);
         Thread.currentThread().interrupt();
       }
-      Long offset = params.get(HttpFSParametersProvider.OffsetParam.NAME, HttpFSParametersProvider.OffsetParam.class);
-      Long len = params.get(HttpFSParametersProvider.LenParam.NAME, HttpFSParametersProvider.LenParam.class);
+      Long offset = params.get(HttpFSParametersProvider.OffsetParam.NAME,
+          HttpFSParametersProvider.OffsetParam.class);
+      Long len = params.get(HttpFSParametersProvider.LenParam.NAME,
+          HttpFSParametersProvider.LenParam.class);
       AUDIT_LOG.info("[{}] offset [{}] len [{}]",
           new Object[]{path, offset, len});
       InputStreamEntity entity = new InputStreamEntity(is, offset, len);
@@ -623,7 +638,8 @@ public class HttpFSServer {
    */
   private URI createOpenRedirectionURL(UriInfo uriInfo) {
     UriBuilder uriBuilder = uriInfo.getRequestUriBuilder();
-    uriBuilder.replaceQueryParam(HttpFSParametersProvider.NoRedirectParam.NAME, (Object[])null);
+    uriBuilder.replaceQueryParam(HttpFSParametersProvider.NoRedirectParam.NAME,
+        (Object[])null);
     return uriBuilder.build((Object[])null);
   }
 
@@ -646,7 +662,9 @@ public class HttpFSServer {
   @Path("{path:.*}")
   @Produces(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8)
   public Response delete(@PathParam("path") String path,
-                         @QueryParam(HttpFSParametersProvider.OperationParam.NAME) HttpFSParametersProvider.OperationParam op,
+                         @QueryParam(HttpFSParametersProvider
+                             .OperationParam.NAME)
+                             HttpFSParametersProvider.OperationParam op,
                          @Context Parameters params,
                          @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
@@ -679,7 +697,8 @@ public class HttpFSServer {
                                         UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String snapshotName = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
+    String snapshotName
+        = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
         HttpFSParametersProvider.SnapshotNameParam.class);
     FSOperations.FSDeleteSnapshot command
         = new FSOperations.FSDeleteSnapshot(path, snapshotName);
@@ -695,7 +714,8 @@ public class HttpFSServer {
       throws IOException, FileSystemAccessException {
     Response response;
     Boolean recursive
-        = params.get(HttpFSParametersProvider.RecursiveParam.NAME,  HttpFSParametersProvider.RecursiveParam.class);
+        = params.get(HttpFSParametersProvider.RecursiveParam.NAME,
+        HttpFSParametersProvider.RecursiveParam.class);
     AUDIT_LOG.info("[{}] recursive [{}]", path, recursive);
     FSOperations.FSDelete command
         = new FSOperations.FSDelete(path, recursive);
@@ -722,7 +742,8 @@ public class HttpFSServer {
   @POST
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8 })
   public Response postRoot(InputStream is, @Context UriInfo uriInfo,
-      @QueryParam(HttpFSParametersProvider.OperationParam.NAME) HttpFSParametersProvider.OperationParam op,
+      @QueryParam(HttpFSParametersProvider.OperationParam.NAME)
+          HttpFSParametersProvider.OperationParam op,
       @Context Parameters params, @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     return post(is, uriInfo, "/", op, params, request);
@@ -752,7 +773,8 @@ public class HttpFSServer {
   public Response post(InputStream is,
                        @Context UriInfo uriInfo,
                        @PathParam("path") String path,
-                       @QueryParam(HttpFSParametersProvider.OperationParam.NAME) HttpFSParametersProvider.OperationParam op,
+                       @QueryParam(HttpFSParametersProvider.OperationParam.NAME)
+                             HttpFSParametersProvider.OperationParam op,
                        @Context Parameters params,
                        @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
@@ -818,7 +840,8 @@ public class HttpFSServer {
                                   UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    Long newLength = params.get(HttpFSParametersProvider.NewLengthParam.NAME, HttpFSParametersProvider.NewLengthParam.class);
+    Long newLength = params.get(HttpFSParametersProvider.NewLengthParam.NAME,
+        HttpFSParametersProvider.NewLengthParam.class);
     FSOperations.FSTruncate command
         = new FSOperations.FSTruncate(path, newLength);
     JSONObject json = fsExecute(user, command);
@@ -832,7 +855,8 @@ public class HttpFSServer {
                                 UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String sources = params.get(HttpFSParametersProvider.SourcesParam.NAME, HttpFSParametersProvider.SourcesParam.class);
+    String sources = params.get(HttpFSParametersProvider.SourcesParam.NAME,
+        HttpFSParametersProvider.SourcesParam.class);
     FSOperations.FSConcat command
         = new FSOperations.FSConcat(path, sources.split(","));
     fsExecute(user, command);
@@ -848,11 +872,13 @@ public class HttpFSServer {
                                 UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    Boolean hasData = params.get(HttpFSParametersProvider.DataParam.NAME, HttpFSParametersProvider.DataParam.class);
+    Boolean hasData = params.get(HttpFSParametersProvider.DataParam.NAME,
+        HttpFSParametersProvider.DataParam.class);
     URI redirectURL = createUploadRedirectionURL(uriInfo,
         HttpFSFileSystem.Operation.APPEND);
     Boolean noRedirect
-        = params.get(HttpFSParametersProvider.NoRedirectParam.NAME, HttpFSParametersProvider.NoRedirectParam.class);
+        = params.get(HttpFSParametersProvider.NoRedirectParam.NAME,
+        HttpFSParametersProvider.NoRedirectParam.class);
     if (noRedirect) {
       final String js = JsonUtil.toJsonString("Location", redirectURL);
       response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
@@ -879,10 +905,12 @@ public class HttpFSServer {
   protected URI createUploadRedirectionURL(UriInfo uriInfo,
                                            Enum<?> uploadOperation) {
     UriBuilder uriBuilder = uriInfo.getRequestUriBuilder();
-    uriBuilder = uriBuilder.replaceQueryParam(HttpFSParametersProvider.OperationParam.NAME,
+    uriBuilder = uriBuilder
+        .replaceQueryParam(HttpFSParametersProvider.OperationParam.NAME,
         uploadOperation)
         .queryParam(HttpFSParametersProvider.DataParam.NAME, Boolean.TRUE)
-        .replaceQueryParam(HttpFSParametersProvider.NoRedirectParam.NAME, (Object[]) null);
+        .replaceQueryParam(HttpFSParametersProvider.NoRedirectParam.NAME,
+            (Object[]) null);
     return uriBuilder.build(null);
   }
 
@@ -904,7 +932,8 @@ public class HttpFSServer {
   @PUT
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8 })
   public Response putRoot(InputStream is, @Context UriInfo uriInfo,
-      @QueryParam(HttpFSParametersProvider.OperationParam.NAME) HttpFSParametersProvider.OperationParam op,
+      @QueryParam(HttpFSParametersProvider.OperationParam.NAME)
+          HttpFSParametersProvider.OperationParam op,
       @Context Parameters params, @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     return put(is, uriInfo, "/", op, params, request);
@@ -934,7 +963,8 @@ public class HttpFSServer {
   public Response put(InputStream is,
                        @Context UriInfo uriInfo,
                        @PathParam("path") String path,
-                       @QueryParam(HttpFSParametersProvider.OperationParam.NAME) HttpFSParametersProvider.OperationParam op,
+                       @QueryParam(HttpFSParametersProvider.OperationParam.NAME)
+                            HttpFSParametersProvider.OperationParam op,
                        @Context Parameters params,
                        @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
@@ -1036,7 +1066,8 @@ public class HttpFSServer {
                                      UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String policyName = params.get(HttpFSParametersProvider.ECPolicyParam.NAME, HttpFSParametersProvider.ECPolicyParam.class);
+    String policyName = params.get(HttpFSParametersProvider.ECPolicyParam.NAME,
+        HttpFSParametersProvider.ECPolicyParam.class);
     FSOperations.FSSetErasureCodingPolicy command
         = new FSOperations.FSSetErasureCodingPolicy(path, policyName);
     fsExecute(user, command);
@@ -1050,7 +1081,8 @@ public class HttpFSServer {
                                           UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String policyName = params.get(HttpFSParametersProvider.PolicyNameParam.NAME,
+    String policyName
+        = params.get(HttpFSParametersProvider.PolicyNameParam.NAME,
         HttpFSParametersProvider.PolicyNameParam.class);
     FSOperations.FSSetStoragePolicy command
         = new FSOperations.FSSetStoragePolicy(path, policyName);
@@ -1077,8 +1109,9 @@ public class HttpFSServer {
                                           UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String aclSpec = params.get(HttpFSParametersProvider.AclPermissionParam.NAME,
-            HttpFSParametersProvider.AclPermissionParam.class);
+    String aclSpec
+        = params.get(HttpFSParametersProvider.AclPermissionParam.NAME,
+        HttpFSParametersProvider.AclPermissionParam.class);
     FSOperations.FSRemoveAclEntries command
         = new FSOperations.FSRemoveAclEntries(path, aclSpec);
     fsExecute(user, command);
@@ -1092,8 +1125,9 @@ public class HttpFSServer {
                                           UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String aclSpec = params.get(HttpFSParametersProvider.AclPermissionParam.NAME,
-            HttpFSParametersProvider.AclPermissionParam.class);
+    String aclSpec
+        = params.get(HttpFSParametersProvider.AclPermissionParam.NAME,
+        HttpFSParametersProvider.AclPermissionParam.class);
     FSOperations.FSModifyAclEntries command
         = new FSOperations.FSModifyAclEntries(path, aclSpec);
     fsExecute(user, command);
@@ -1118,8 +1152,9 @@ public class HttpFSServer {
                                 UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String aclSpec = params.get(HttpFSParametersProvider.AclPermissionParam.NAME,
-            HttpFSParametersProvider.AclPermissionParam.class);
+    String aclSpec
+        = params.get(HttpFSParametersProvider.AclPermissionParam.NAME,
+        HttpFSParametersProvider.AclPermissionParam.class);
     FSOperations.FSSetAcl command
         = new FSOperations.FSSetAcl(path, aclSpec);
     fsExecute(user, command);
@@ -1133,10 +1168,12 @@ public class HttpFSServer {
                                   UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    Long modifiedTime = params.get(HttpFSParametersProvider.ModifiedTimeParam.NAME,
-                                   HttpFSParametersProvider.ModifiedTimeParam.class);
-    Long accessTime = params.get(HttpFSParametersProvider.AccessTimeParam.NAME,
-                                 HttpFSParametersProvider.AccessTimeParam.class);
+    Long modifiedTime
+        = params.get(HttpFSParametersProvider.ModifiedTimeParam.NAME,
+        HttpFSParametersProvider.ModifiedTimeParam.class);
+    Long accessTime
+        = params.get(HttpFSParametersProvider.AccessTimeParam.NAME,
+        HttpFSParametersProvider.AccessTimeParam.class);
     FSOperations.FSSetTimes command
         = new FSOperations.FSSetTimes(path, modifiedTime, accessTime);
     fsExecute(user, command);
@@ -1151,8 +1188,9 @@ public class HttpFSServer {
                                         UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    Short replication = params.get(HttpFSParametersProvider.ReplicationParam.NAME,
-                                   HttpFSParametersProvider.ReplicationParam.class);
+    Short replication
+        = params.get(HttpFSParametersProvider.ReplicationParam.NAME,
+        HttpFSParametersProvider.ReplicationParam.class);
     FSOperations.FSSetReplication command
         = new FSOperations.FSSetReplication(path, replication);
     JSONObject json = fsExecute(user, command);
@@ -1166,8 +1204,9 @@ public class HttpFSServer {
                                        UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    Short permission = params.get(HttpFSParametersProvider.PermissionParam.NAME,
-                                  HttpFSParametersProvider.PermissionParam.class);
+    Short permission
+        = params.get(HttpFSParametersProvider.PermissionParam.NAME,
+        HttpFSParametersProvider.PermissionParam.class);
     FSOperations.FSSetPermission command
         = new FSOperations.FSSetPermission(path, permission);
     fsExecute(user, command);
@@ -1181,8 +1220,12 @@ public class HttpFSServer {
                                   UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String owner = params.get(HttpFSParametersProvider.OwnerParam.NAME, HttpFSParametersProvider.OwnerParam.class);
-    String group = params.get(HttpFSParametersProvider.GroupParam.NAME, HttpFSParametersProvider.GroupParam.class);
+    String owner
+        = params.get(HttpFSParametersProvider.OwnerParam.NAME,
+        HttpFSParametersProvider.OwnerParam.class);
+    String group
+        = params.get(HttpFSParametersProvider.GroupParam.NAME,
+        HttpFSParametersProvider.GroupParam.class);
     FSOperations.FSSetOwner command
         = new FSOperations.FSSetOwner(path, owner, group);
     fsExecute(user, command);
@@ -1196,7 +1239,8 @@ public class HttpFSServer {
                                 UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String toPath = params.get(HttpFSParametersProvider.DestinationParam.NAME, HttpFSParametersProvider.DestinationParam.class);
+    String toPath = params.get(HttpFSParametersProvider.DestinationParam.NAME,
+        HttpFSParametersProvider.DestinationParam.class);
     FSOperations.FSRename command
         = new FSOperations.FSRename(path, toPath);
     JSONObject json = fsExecute(user, command);
@@ -1210,9 +1254,11 @@ public class HttpFSServer {
                                 UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    Short permission = params.get(HttpFSParametersProvider.PermissionParam.NAME,
-                                   HttpFSParametersProvider.PermissionParam.class);
-    Short unmaskedPermission = params.get(HttpFSParametersProvider.UnmaskedPermissionParam.NAME,
+    Short permission
+        = params.get(HttpFSParametersProvider.PermissionParam.NAME,
+        HttpFSParametersProvider.PermissionParam.class);
+    Short unmaskedPermission
+        = params.get(HttpFSParametersProvider.UnmaskedPermissionParam.NAME,
         HttpFSParametersProvider.UnmaskedPermissionParam.class);
     FSOperations.FSMkdirs command =
         new FSOperations.FSMkdirs(path, permission, unmaskedPermission);
@@ -1228,7 +1274,8 @@ public class HttpFSServer {
                                      UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String xattrName = params.get(HttpFSParametersProvider.XAttrNameParam.NAME, HttpFSParametersProvider.XAttrNameParam.class);
+    String xattrName = params.get(HttpFSParametersProvider.XAttrNameParam.NAME,
+        HttpFSParametersProvider.XAttrNameParam.class);
     FSOperations.FSRemoveXAttr command
         = new FSOperations.FSRemoveXAttr(path, xattrName);
     fsExecute(user, command);
@@ -1242,9 +1289,11 @@ public class HttpFSServer {
                                         UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String oldSnapshotName = params.get(HttpFSParametersProvider.OldSnapshotNameParam.NAME,
+    String oldSnapshotName
+        = params.get(HttpFSParametersProvider.OldSnapshotNameParam.NAME,
         HttpFSParametersProvider.OldSnapshotNameParam.class);
-    String snapshotName = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
+    String snapshotName
+        = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
         HttpFSParametersProvider.SnapshotNameParam.class);
     FSOperations.FSRenameSnapshot command
         = new FSOperations.FSRenameSnapshot(path,
@@ -1264,9 +1313,11 @@ public class HttpFSServer {
     Response response;
     String xattrName = params.get(HttpFSParametersProvider.XAttrNameParam.NAME,
         HttpFSParametersProvider.XAttrNameParam.class);
-    String xattrValue = params.get(HttpFSParametersProvider.XAttrValueParam.NAME,
+    String xattrValue
+        = params.get(HttpFSParametersProvider.XAttrValueParam.NAME,
         HttpFSParametersProvider.XAttrValueParam.class);
-    EnumSet<XAttrSetFlag> flag = params.get(HttpFSParametersProvider.XAttrSetFlagParam.NAME,
+    EnumSet<XAttrSetFlag> flag
+        = params.get(HttpFSParametersProvider.XAttrSetFlagParam.NAME,
         HttpFSParametersProvider.XAttrSetFlagParam.class);
 
     FSOperations.FSSetXAttr command = new FSOperations.FSSetXAttr(
@@ -1282,7 +1333,8 @@ public class HttpFSServer {
                                         UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    String snapshotName = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
+    String snapshotName
+        = params.get(HttpFSParametersProvider.SnapshotNameParam.NAME,
         HttpFSParametersProvider.SnapshotNameParam.class);
     FSOperations.FSCreateSnapshot command
         = new FSOperations.FSCreateSnapshot(path, snapshotName);
@@ -1322,25 +1374,33 @@ public class HttpFSServer {
                                 UserGroupInformation user)
       throws IOException, FileSystemAccessException {
     Response response;
-    Boolean hasData = params.get(HttpFSParametersProvider.DataParam.NAME, HttpFSParametersProvider.DataParam.class);
+    Boolean hasData
+        = params.get(HttpFSParametersProvider.DataParam.NAME,
+        HttpFSParametersProvider.DataParam.class);
     URI redirectURL = createUploadRedirectionURL(uriInfo,
         HttpFSFileSystem.Operation.CREATE);
     Boolean noRedirect
-        = params.get(HttpFSParametersProvider.NoRedirectParam.NAME, HttpFSParametersProvider.NoRedirectParam.class);
+        = params.get(HttpFSParametersProvider.NoRedirectParam.NAME,
+        HttpFSParametersProvider.NoRedirectParam.class);
     if (noRedirect) {
       final String js = JsonUtil.toJsonString("Location", redirectURL);
       response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     } else if (hasData) {
-      Short permission = params.get(HttpFSParametersProvider.PermissionParam.NAME,
-                                     HttpFSParametersProvider.PermissionParam.class);
-      Short unmaskedPermission = params.get(HttpFSParametersProvider.UnmaskedPermissionParam.NAME,
+      Short permission
+          = params.get(HttpFSParametersProvider.PermissionParam.NAME,
+          HttpFSParametersProvider.PermissionParam.class);
+      Short unmaskedPermission
+          = params.get(HttpFSParametersProvider.UnmaskedPermissionParam.NAME,
           HttpFSParametersProvider.UnmaskedPermissionParam.class);
-      Boolean override = params.get(HttpFSParametersProvider.OverwriteParam.NAME,
-                                    HttpFSParametersProvider.OverwriteParam.class);
-      Short replication = params.get(HttpFSParametersProvider.ReplicationParam.NAME,
-                                     HttpFSParametersProvider.ReplicationParam.class);
-      Long blockSize = params.get(HttpFSParametersProvider.BlockSizeParam.NAME,
-                                  HttpFSParametersProvider.BlockSizeParam.class);
+      Boolean override
+          = params.get(HttpFSParametersProvider.OverwriteParam.NAME,
+          HttpFSParametersProvider.OverwriteParam.class);
+      Short replication
+          = params.get(HttpFSParametersProvider.ReplicationParam.NAME,
+          HttpFSParametersProvider.ReplicationParam.class);
+      Long blockSize
+          = params.get(HttpFSParametersProvider.BlockSizeParam.NAME,
+          HttpFSParametersProvider.BlockSizeParam.class);
       FSOperations.FSCreate command
           = new FSOperations.FSCreate(is, path, permission, override,
             replication, blockSize, unmaskedPermission);

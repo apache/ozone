@@ -123,7 +123,8 @@ public final class FSOperations {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
     json.put(HttpFSFileSystem.PATH_SUFFIX_JSON,
         (emptyPathSuffix) ? "" : fileStatus.getPath().getName());
-    HttpFSFileSystem.FILETYPE fileType = HttpFSFileSystem.FILETYPE.getType(fileStatus);
+    HttpFSFileSystem.FILETYPE fileType
+        = HttpFSFileSystem.FILETYPE.getType(fileStatus);
     json.put(HttpFSFileSystem.TYPE_JSON, fileType.toString());
     if (fileType.equals(HttpFSFileSystem.FILETYPE.SYMLINK)) {
       // put the symlink into Json
