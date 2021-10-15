@@ -107,7 +107,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-cli.version>1.2</commons-cli.version>
     <commons-codec.version>1.11</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
-    <commons-compress.version>1.20</commons-compress.version>
+    <commons-compress.version>1.21</commons-compress.version>
     <commons-configuration2.version>2.1.1</commons-configuration2.version>
     <commons-csv.version>1.0</commons-csv.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
