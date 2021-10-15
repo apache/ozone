@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -27,8 +29,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 /**
@@ -43,8 +47,10 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
-    Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
+    Map<String, Entry<OmKeyInfo, OmBucketInfo>> keysToDelete =
+        addOpenKeysToDB(volumeName, 3);
+    Map<String, Entry<OmKeyInfo, OmBucketInfo>> keysToKeep =
+        addOpenKeysToDB(volumeName, 3);
     createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
@@ -69,10 +75,10 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
-        KEY_LENGTH);
-    Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3,
-        KEY_LENGTH);
+    Map<String, Entry<OmKeyInfo, OmBucketInfo>> keysToDelete =
+        addOpenKeysToDB(volumeName, 3, KEY_LENGTH);
+    Map<String, Entry<OmKeyInfo, OmBucketInfo>> keysToKeep =
+        addOpenKeysToDB(volumeName, 3, KEY_LENGTH);
 
     createAndCommitResponse(keysToDelete, Status.OK);
 
@@ -99,7 +105,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
+    Map<String, Entry<OmKeyInfo, OmBucketInfo>> keysToDelete =
+        addOpenKeysToDB(volumeName, 3);
     createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
@@ -118,8 +125,9 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * to a batch operation and committed to the database.
    * @throws Exception
    */
-  private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete,
-      Status status) throws Exception {
+  private void createAndCommitResponse(Map<String,
+      Entry<OmKeyInfo, OmBucketInfo>> keysToDelete, Status status)
+      throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setStatus(status)
@@ -141,8 +149,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * new {@link OmKeyInfo} object, adds them to the open key table cache, and
    * returns them. These keys will have no associated block data.
    */
-  private Map<String, OmKeyInfo> addOpenKeysToDB(String volume, int numKeys)
-      throws Exception {
+  private Map<String, Entry<OmKeyInfo, OmBucketInfo>> addOpenKeysToDB(
+      String volume, int numKeys) throws Exception {
     return addOpenKeysToDB(volume, numKeys, 0);
   }
 
@@ -154,11 +162,11 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * bytes of data for each key.
    * @throws Exception
    */
-  private Map<String, OmKeyInfo> addOpenKeysToDB(String volume, int numKeys,
-      long keyLength) throws Exception {
+  private Map<String, Entry<OmKeyInfo, OmBucketInfo>> addOpenKeysToDB(
+      String volume, int numKeys, long keyLength) throws Exception {
 
-    Map<String, OmKeyInfo> newOpenKeys = new HashMap<>();
-
+    Map<String, Entry<OmKeyInfo, OmBucketInfo>> newOpenKeys =
+        new HashMap<>();
     for (int i = 0; i < numKeys; i++) {
       String bucket = UUID.randomUUID().toString();
       String key = UUID.randomUUID().toString();
@@ -173,7 +181,13 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
 
       String openKey = omMetadataManager.getOpenKey(volume, bucket,
           key, clientID);
+      OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+              .setVolumeName(volumeName).setBucketName(bucketName)
+              .setCreationTime(Time.now()).build();
 
+      Entry<OmKeyInfo, OmBucketInfo> deletedEntry =
+          new AbstractMap.SimpleEntry<>(omKeyInfo,
+              omBucketInfo.copyObject());
       // Add to the open key table DB, not cache.
       // In a real execution, the open key would have been removed from the
       // cache by the request, and it would only remain in the DB.
@@ -182,7 +196,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
           .isExist(openKey));
 
-      newOpenKeys.put(openKey, omKeyInfo);
+      newOpenKeys.put(openKey, deletedEntry);
     }
 
     return newOpenKeys;
