@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -150,9 +151,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (Files.notExists(dirPath)) {
       return;
     }
-
-    if (Files.list(dirPath).count() == 0) {
-      return;
+    try (Stream<Path> stream = Files.list(dirPath)) {
+      if (stream.count() == 0) {
+        return;
+      }
     }
 
     throw new IllegalArgumentException(
