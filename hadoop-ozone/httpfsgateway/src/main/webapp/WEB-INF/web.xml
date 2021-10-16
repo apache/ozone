@@ -23,7 +23,7 @@
     <servlet-class>com.sun.jersey.spi.container.servlet.ServletContainer</servlet-class>
     <init-param>
       <param-name>com.sun.jersey.config.property.packages</param-name>
-      <param-value>org.apache.hadoop.fs.http.server,org.apache.hadoop.lib.wsrs</param-value>
+      <param-value>org.apache.ozone.fs.http.server,org.apache.ozone.lib.wsrs</param-value>
     </init-param>
 
     <!-- Enables detailed Jersey request/response logging -->
