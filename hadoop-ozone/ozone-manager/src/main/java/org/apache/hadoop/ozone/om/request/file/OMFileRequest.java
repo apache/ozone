@@ -513,7 +513,7 @@ public final class OMFileRequest {
       OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
       return buckInfo.getBucketLayout();
     } catch (IOException e) {
-      LOG.error("Cannot find the key: " + buckKey);
+      LOG.error("Cannot find the key: " + buckKey, e);
     }
     return BucketLayout.DEFAULT;
   }
