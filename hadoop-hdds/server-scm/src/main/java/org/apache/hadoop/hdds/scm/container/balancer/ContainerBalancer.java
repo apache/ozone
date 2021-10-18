@@ -155,14 +155,10 @@ public class ContainerBalancer {
 
       //we should start a new balancer thread async
       //and response to cli as soon as possible
-
-      //TODO: this is a temporary implementation
-      //modify this later
       currentBalancingThread = new Thread(this::balance);
       currentBalancingThread.setName("ContainerBalancer");
       currentBalancingThread.setDaemon(true);
       currentBalancingThread.start();
-      ////////////////////////
     } finally {
       lock.unlock();
     }
