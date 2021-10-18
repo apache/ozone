@@ -68,6 +68,9 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
       throws IOException;
 
+  void addContainerToPipelineSCMStart(PipelineID pipelineID,
+      ContainerID containerID) throws IOException;
+
   void removeContainerFromPipeline(PipelineID pipelineID,
       ContainerID containerID) throws IOException;
 

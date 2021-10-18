@@ -105,6 +105,27 @@ class PipelineStateMap {
   }
 
   /**
+   * Add container to an existing pipeline during SCM Start.
+   *
+   * @param pipelineID - PipelineID of the pipeline to which container is added
+   * @param containerID - ContainerID of the container to add
+   */
+  void addContainerToPipelineSCMStart(PipelineID pipelineID,
+      ContainerID containerID) throws IOException {
+    Preconditions.checkNotNull(pipelineID,
+            "Pipeline Id cannot be null");
+    Preconditions.checkNotNull(containerID,
+            "Container Id cannot be null");
+
+    Pipeline pipeline = getPipeline(pipelineID);
+    if (pipeline.isClosed()) {
+      LOG.info("Container {} in open state for pipeline={} in closed state",
+              containerID, pipelineID);
+    }
+    pipeline2container.get(pipelineID).add(containerID);
+  }
+
+  /**
    * Get pipeline corresponding to specified pipelineID.
    *
    * @param pipelineID - PipelineID of the pipeline to be retrieved
