@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.lib.wsrs;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import com.sun.jersey.api.core.HttpContext;
 import com.sun.jersey.core.spi.component.ComponentContext;
 import com.sun.jersey.core.spi.component.ComponentScope;
@@ -32,6 +31,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MultivaluedMap;
 import java.lang.reflect.Type;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +82,7 @@ public class ParametersProvider
     }
     for (Class<Param<?>> paramClass : paramsDef.get(op)) {
       Param<?> param = newParam(paramClass);
-      List<Param<?>> paramList = Lists.newArrayList();
+      List<Param<?>> paramList = new ArrayList<>();
       List<String> ps = queryString.get(param.getName());
       if (ps != null) {
         for (String p : ps) {

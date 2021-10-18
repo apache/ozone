@@ -19,8 +19,7 @@ package org.apache.hadoop.lib.wsrs;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
-
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -69,7 +68,7 @@ public class Parameters {
   public <V, T extends Param<V>> List<V> getValues(String name,
                                                    Class<T> klass) {
     List<Param<?>> multiParams = (List<Param<?>>)params.get(name);
-    List<V> values = Lists.newArrayList();
+    List<V> values = new ArrayList<>();
     if (multiParams != null) {
       for (Param<?> param : multiParams) {
         V value = ((T) param).value();
