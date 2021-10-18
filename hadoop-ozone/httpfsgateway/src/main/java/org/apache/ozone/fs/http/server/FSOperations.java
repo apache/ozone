@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.ozone.fs.http.client.HttpFSFileSystem;
+import org.apache.ozone.fs.http.client.HttpFSFileSystem.FILETYPE;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -123,10 +124,9 @@ public final class FSOperations {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
     json.put(HttpFSFileSystem.PATH_SUFFIX_JSON,
         (emptyPathSuffix) ? "" : fileStatus.getPath().getName());
-    HttpFSFileSystem.FILETYPE fileType
-        = HttpFSFileSystem.FILETYPE.getType(fileStatus);
+    FILETYPE fileType = FILETYPE.getType(fileStatus);
     json.put(HttpFSFileSystem.TYPE_JSON, fileType.toString());
-    if (fileType.equals(HttpFSFileSystem.FILETYPE.SYMLINK)) {
+    if (fileType.equals(FILETYPE.SYMLINK)) {
       // put the symlink into Json
       try {
         json.put(HttpFSFileSystem.SYMLINK_JSON,

@@ -21,6 +21,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.ozone.fs.http.client.HttpFSFileSystem;
+import org.apache.ozone.fs.http.client.HttpFSFileSystem.Operation;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.ozone.lib.service.FileSystemAccess;
 import org.apache.ozone.lib.wsrs.BooleanParam;
@@ -50,96 +51,79 @@ public class HttpFSParametersProvider extends ParametersProvider {
       = new HashMap<Enum, Class<Param<?>>[]>();
 
   static {
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.OPEN,
+    PARAMS_DEF.put(Operation.OPEN,
         new Class[]{OffsetParam.class, LenParam.class, NoRedirectParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETFILESTATUS, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.LISTSTATUS,
-        new Class[]{FilterParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETHOMEDIRECTORY, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETCONTENTSUMMARY, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETQUOTAUSAGE, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETFILECHECKSUM,
+    PARAMS_DEF.put(Operation.GETFILESTATUS, new Class[]{});
+    PARAMS_DEF.put(Operation.LISTSTATUS, new Class[]{FilterParam.class});
+    PARAMS_DEF.put(Operation.GETHOMEDIRECTORY, new Class[]{});
+    PARAMS_DEF.put(Operation.GETCONTENTSUMMARY, new Class[]{});
+    PARAMS_DEF.put(Operation.GETQUOTAUSAGE, new Class[]{});
+    PARAMS_DEF.put(Operation.GETFILECHECKSUM,
         new Class[]{NoRedirectParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETFILEBLOCKLOCATIONS,
-        new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETACLSTATUS, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETTRASHROOT, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.INSTRUMENTATION, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.APPEND,
+    PARAMS_DEF.put(Operation.GETFILEBLOCKLOCATIONS, new Class[]{});
+    PARAMS_DEF.put(Operation.GETACLSTATUS, new Class[]{});
+    PARAMS_DEF.put(Operation.GETTRASHROOT, new Class[]{});
+    PARAMS_DEF.put(Operation.INSTRUMENTATION, new Class[]{});
+    PARAMS_DEF.put(Operation.APPEND,
         new Class[]{DataParam.class, NoRedirectParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.CONCAT,
-        new Class[]{SourcesParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.TRUNCATE,
-        new Class[]{NewLengthParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.CREATE,
+    PARAMS_DEF.put(Operation.CONCAT, new Class[]{SourcesParam.class});
+    PARAMS_DEF.put(Operation.TRUNCATE, new Class[]{NewLengthParam.class});
+    PARAMS_DEF.put(Operation.CREATE,
         new Class[]{PermissionParam.class, OverwriteParam.class,
             ReplicationParam.class, BlockSizeParam.class, DataParam.class,
             UnmaskedPermissionParam.class, NoRedirectParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.MKDIRS,
-        new Class[]{PermissionParam.class, UnmaskedPermissionParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.RENAME,
-        new Class[]{DestinationParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETOWNER,
+    PARAMS_DEF.put(Operation.MKDIRS, new Class[]{PermissionParam.class,
+        UnmaskedPermissionParam.class});
+    PARAMS_DEF.put(Operation.RENAME, new Class[]{DestinationParam.class});
+    PARAMS_DEF.put(Operation.SETOWNER,
         new Class[]{OwnerParam.class, GroupParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETPERMISSION,
-        new Class[]{PermissionParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETREPLICATION,
+    PARAMS_DEF.put(Operation.SETPERMISSION, new Class[]{PermissionParam.class});
+    PARAMS_DEF.put(Operation.SETREPLICATION,
         new Class[]{ReplicationParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETTIMES,
+    PARAMS_DEF.put(Operation.SETTIMES,
         new Class[]{ModifiedTimeParam.class, AccessTimeParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.DELETE,
-        new Class[]{RecursiveParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETACL,
+    PARAMS_DEF.put(Operation.DELETE, new Class[]{RecursiveParam.class});
+    PARAMS_DEF.put(Operation.SETACL, new Class[]{AclPermissionParam.class});
+    PARAMS_DEF.put(Operation.REMOVEACL, new Class[]{});
+    PARAMS_DEF.put(Operation.MODIFYACLENTRIES,
         new Class[]{AclPermissionParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.REMOVEACL, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.MODIFYACLENTRIES,
+    PARAMS_DEF.put(Operation.REMOVEACLENTRIES,
         new Class[]{AclPermissionParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.REMOVEACLENTRIES,
-        new Class[]{AclPermissionParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.REMOVEDEFAULTACL, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETXATTR,
+    PARAMS_DEF.put(Operation.REMOVEDEFAULTACL, new Class[]{});
+    PARAMS_DEF.put(Operation.SETXATTR,
         new Class[]{XAttrNameParam.class,
             XAttrValueParam.class,
             XAttrSetFlagParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.REMOVEXATTR,
-        new Class[]{XAttrNameParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETXATTRS,
+    PARAMS_DEF.put(Operation.REMOVEXATTR, new Class[]{XAttrNameParam.class});
+    PARAMS_DEF.put(Operation.GETXATTRS,
         new Class[]{XAttrNameParam.class, XAttrEncodingParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.LISTXATTRS, new Class[]{});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.LISTSTATUS_BATCH,
+    PARAMS_DEF.put(Operation.LISTXATTRS, new Class[]{});
+    PARAMS_DEF.put(Operation.LISTSTATUS_BATCH,
         new Class[]{StartAfterParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETALLSTORAGEPOLICY,
-        new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETSTORAGEPOLICY,
-        new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETSTORAGEPOLICY,
+    PARAMS_DEF.put(Operation.GETALLSTORAGEPOLICY, new Class[] {});
+    PARAMS_DEF.put(Operation.GETSTORAGEPOLICY, new Class[] {});
+    PARAMS_DEF.put(Operation.SETSTORAGEPOLICY,
         new Class[] {PolicyNameParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.UNSETSTORAGEPOLICY,
-        new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.ALLOWSNAPSHOT, new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.DISALLOWSNAPSHOT, new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.CREATESNAPSHOT,
+    PARAMS_DEF.put(Operation.UNSETSTORAGEPOLICY, new Class[] {});
+    PARAMS_DEF.put(Operation.ALLOWSNAPSHOT, new Class[] {});
+    PARAMS_DEF.put(Operation.DISALLOWSNAPSHOT, new Class[] {});
+    PARAMS_DEF.put(Operation.CREATESNAPSHOT,
             new Class[] {SnapshotNameParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.DELETESNAPSHOT,
+    PARAMS_DEF.put(Operation.DELETESNAPSHOT,
             new Class[] {SnapshotNameParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.RENAMESNAPSHOT,
+    PARAMS_DEF.put(Operation.RENAMESNAPSHOT,
             new Class[] {OldSnapshotNameParam.class,
                 SnapshotNameParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETSNAPSHOTDIFF,
+    PARAMS_DEF.put(Operation.GETSNAPSHOTDIFF,
         new Class[] {OldSnapshotNameParam.class,
             SnapshotNameParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETSNAPSHOTTABLEDIRECTORYLIST,
-        new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETSERVERDEFAULTS,
-        new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.CHECKACCESS,
-        new Class[] {FsActionParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SETECPOLICY,
-        new Class[] {ECPolicyParam.class});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.GETECPOLICY, new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.UNSETECPOLICY, new Class[] {});
-    PARAMS_DEF.put(HttpFSFileSystem.Operation.SATISFYSTORAGEPOLICY,
-        new Class[] {});
+    PARAMS_DEF.put(Operation.GETSNAPSHOTTABLEDIRECTORYLIST, new Class[] {});
+    PARAMS_DEF.put(Operation.GETSERVERDEFAULTS, new Class[] {});
+    PARAMS_DEF.put(Operation.CHECKACCESS, new Class[] {FsActionParam.class});
+    PARAMS_DEF.put(Operation.SETECPOLICY, new Class[] {ECPolicyParam.class});
+    PARAMS_DEF.put(Operation.GETECPOLICY, new Class[] {});
+    PARAMS_DEF.put(Operation.UNSETECPOLICY, new Class[] {});
+    PARAMS_DEF.put(Operation.SATISFYSTORAGEPOLICY, new Class[] {});
   }
 
   public HttpFSParametersProvider() {
