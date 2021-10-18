@@ -622,7 +622,7 @@ public class StateContext {
       if (!isThreadPoolAvailable(service)) {
         long count = threadPoolNotAvailableCount.incrementAndGet();
         long unavailableTime = threadPoolNotAvailableTimeSum.addAndGet(
-            lastHeartbeatSent.get() - System.currentTimeMillis());
+            System.currentTimeMillis() - lastHeartbeatSent.get());
         if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
           LOG.warn("No available thread in pool for the past {} seconds " +
               "and {} times.", unit.toSeconds(unavailableTime), count);
