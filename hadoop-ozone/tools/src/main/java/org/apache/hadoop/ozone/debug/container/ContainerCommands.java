@@ -171,7 +171,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
     Preconditions.checkNotNull(storageDir);
     try (Stream<Path> stream = Files.list(Paths.get(storageDir, "hdds"))) {
       final Path firstStorageDirPath = stream.filter(Files::isDirectory)
-        .findFirst().get().getFileName();
+          .findFirst().get().getFileName();
       if (firstStorageDirPath == null) {
         throw new IllegalArgumentException(
             "HDDS storage dir couldn't be identified!");
