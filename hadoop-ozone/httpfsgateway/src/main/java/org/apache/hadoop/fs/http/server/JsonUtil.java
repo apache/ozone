@@ -28,7 +28,6 @@ import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
@@ -366,7 +365,7 @@ final class JsonUtil {
   
   public static String toJsonString(final List<XAttr> xAttrs)
       throws IOException {
-    final List<String> names = Lists.newArrayListWithCapacity(xAttrs.size());
+    final List<String> names = new ArrayList<>(xAttrs.size());
     for (XAttr xAttr : xAttrs) {
       names.add(XAttrHelper.getPrefixedName(xAttr));
     }

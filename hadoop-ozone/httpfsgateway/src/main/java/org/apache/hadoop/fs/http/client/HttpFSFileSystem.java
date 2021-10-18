@@ -24,7 +24,6 @@ import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonPathCapabilities;
@@ -66,14 +65,11 @@ import org.apache.hadoop.util.HttpExceptionUtils;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.ratis.thirdparty.com.google.common.base.Preconditions;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -88,6 +84,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.text.MessageFormat;
 import java.util.HashMap;
@@ -802,7 +799,7 @@ public class HttpFSFileSystem extends FileSystem
     Map<String, String> params = new HashMap<String, String>();
     params.put(OP_PARAM, Operation.LISTSTATUS_BATCH.toString());
     if (token != null) {
-      params.put(START_AFTER_PARAM, new String(token, Charsets.UTF_8));
+      params.put(START_AFTER_PARAM, new String(token, StandardCharsets.UTF_8));
     }
     HttpURLConnection conn = getConnection(
         Operation.LISTSTATUS_BATCH.getMethod(),
@@ -817,7 +814,7 @@ public class HttpFSFileSystem extends FileSystem
     byte[] newToken = null;
     if (statuses.length > 0) {
       newToken = statuses[statuses.length - 1].getPath().getName().toString()
-          .getBytes(Charsets.UTF_8);
+          .getBytes(StandardCharsets.UTF_8);
     }
     // Parse the remainingEntries boolean into hasMore
     final long remainingEntries = (Long) listing.get(REMAINING_ENTRIES_JSON);
@@ -1402,13 +1399,13 @@ public class HttpFSFileSystem extends FileSystem
     JSONObject json = (JSONObject) HttpFSUtils.jsonParse(conn);
     Map<String, byte[]> xAttrs = createXAttrMap(
         (JSONArray) json.get(XATTRS_JSON));
-    return xAttrs != null ? xAttrs.get(name) : null;
+    return xAttrs.get(name);
   }
 
   /** Convert xAttrs json to xAttrs map. */
   private Map<String, byte[]> createXAttrMap(JSONArray jsonArray) 
       throws IOException {
-    Map<String, byte[]> xAttrs = Maps.newHashMap();
+    Map<String, byte[]> xAttrs = new HashMap<>();
     for (Object obj : jsonArray) {
       JSONObject jsonObj = (JSONObject) obj;
       final String name = (String)jsonObj.get(XATTR_NAME_JSON);
@@ -1427,7 +1424,7 @@ public class HttpFSFileSystem extends FileSystem
     JSONArray jsonArray;
     try {
       jsonArray = (JSONArray)parser.parse(xattrNamesStr);
-      List<String> names = Lists.newArrayListWithCapacity(jsonArray.size());
+      List<String> names = new ArrayList<>(jsonArray.size());
       for (Object name : jsonArray) {
         names.add((String) name);
       }
@@ -1455,7 +1452,7 @@ public class HttpFSFileSystem extends FileSystem
         "XAttr names cannot be null or empty.");
     Map<String, String> params = new HashMap<String, String>();
     params.put(OP_PARAM, Operation.GETXATTRS.toString());
-    Map<String, List<String>> multiValuedParams = Maps.newHashMap();
+    Map<String, List<String>> multiValuedParams = new HashMap<>();
     multiValuedParams.put(XATTR_NAME_PARAM, names);
     HttpURLConnection conn = getConnection(Operation.GETXATTRS.getMethod(),
         params, multiValuedParams, f, true);
