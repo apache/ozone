@@ -773,15 +773,13 @@ public class ContainerBalancer {
         return;
       }
       balancerRunning = false;
-      if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
-        currentBalancingThread.interrupt();
-      }
     } finally {
       lock.unlock();
     }
 
     // wait for currentBalancingThread to die
     if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
+      currentBalancingThread.interrupt();
       try {
         currentBalancingThread.join();
       } catch (InterruptedException ignored) {
