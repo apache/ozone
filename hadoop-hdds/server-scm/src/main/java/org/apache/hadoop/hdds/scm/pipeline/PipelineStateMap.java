@@ -119,6 +119,12 @@ class PipelineStateMap {
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (pipeline.isClosed()) {
+      /*
+      When SCM restarts it can be an inconsistent state where some
+      containers are in an OPEN state for a CLOSED pipeline. This happens when
+      close pipeline transaction in flushed before SCM goes down and close
+      container is not flushed into DB.
+      */
       LOG.info("Container {} in open state for pipeline={} in closed state",
               containerID, pipelineID);
     }
