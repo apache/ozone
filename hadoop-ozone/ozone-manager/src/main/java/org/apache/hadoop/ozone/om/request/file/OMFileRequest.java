@@ -100,7 +100,9 @@ public final class OMFileRequest {
       String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
           bucketName, pathName);
 
-      if (omMetadataManager.getKeyTable().isExist(dbKeyName)) {
+      if (omMetadataManager.getKeyTable(
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
+          .isExist(dbKeyName)) {
         // Found a file in the given path.
         // Check if this is actual file or a file in the given path
         if (dbKeyName.equals(fileNameFromDetails)) {
@@ -108,15 +110,18 @@ public final class OMFileRequest {
         } else {
           result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
-      } else if (omMetadataManager.getKeyTable().isExist(dbDirKeyName)) {
+      } else if (omMetadataManager.getKeyTable(
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
+          .isExist(dbDirKeyName)) {
         // Found a directory in the given path.
         // Check if this is actual directory or a directory in the given path
         if (dbDirKeyName.equals(dirNameFromDetails)) {
           result = OMDirectoryResult.DIRECTORY_EXISTS;
         } else {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
-          inheritAcls = omMetadataManager.getKeyTable().get(dbDirKeyName)
-              .getAcls();
+          inheritAcls = omMetadataManager.getKeyTable(
+              getBucketLayout(omMetadataManager, volumeName, bucketName))
+              .get(dbDirKeyName).getAcls();
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
         }
@@ -224,7 +229,8 @@ public final class OMFileRequest {
         // Get parentID from the lastKnownParent. For any files, directly under
         // the bucket, the parent is the bucketID. Say, "/vol1/buck1/file1"
         // TODO: Need to add UT for this case along with OMFileCreateRequest.
-        if (omMetadataManager.getKeyTable().isExist(dbNodeName)) {
+        if (omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .isExist(dbNodeName)) {
           if (elements.hasNext()) {
             // Found a file in the given key name.
             result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
@@ -398,17 +404,19 @@ public final class OMFileRequest {
       Optional<List<OmKeyInfo>> parentInfoList,
       long index) {
     for (OmKeyInfo parentInfo : parentInfoList.get()) {
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-              parentInfo.getKeyName())),
-          new CacheValue<>(Optional.of(parentInfo), index));
+      omMetadataManager.getKeyTable(
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
+          .addCacheEntry(new CacheKey<>(omMetadataManager
+          .getOzoneKey(volumeName, bucketName, parentInfo.getKeyName())),
+              new CacheValue<>(Optional.of(parentInfo), index));
     }
 
     if (keyInfo.isPresent()) {
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-                  keyInfo.get().getKeyName())),
-          new CacheValue<>(keyInfo, index));
+      omMetadataManager.getKeyTable(
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
+          .addCacheEntry(new CacheKey<>(omMetadataManager
+          .getOzoneKey(volumeName, bucketName, keyInfo.get().getKeyName())),
+              new CacheValue<>(keyInfo, index));
     }
   }
 
@@ -488,9 +496,26 @@ public final class OMFileRequest {
     omFileInfo.setKeyName(fileName);
     omFileInfo.setFileName(fileName);
 
-    omMetadataManager.getKeyTable().addCacheEntry(
-            new CacheKey<>(dbFileKey),
+    omMetadataManager.getKeyTable(
+        getBucketLayout(omMetadataManager, omFileInfo.getVolumeName(),
+            omFileInfo.getBucketName()))
+        .addCacheEntry(new CacheKey<>(dbFileKey),
             new CacheValue<>(Optional.of(omFileInfo), trxnLogIndex));
+  }
+
+  public static BucketLayout getBucketLayout(
+      OMMetadataManager omMetadataManager, String volName, String buckName) {
+    if (omMetadataManager == null) {
+      return BucketLayout.DEFAULT;
+    }
+    String buckKey = omMetadataManager.getBucketKey(volName, buckName);
+    try {
+      OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
+      return buckInfo.getBucketLayout();
+    } catch (IOException e) {
+      LOG.error("Cannot find the key: " + buckKey, e);
+    }
+    return BucketLayout.DEFAULT;
   }
 
   /**
@@ -557,8 +582,8 @@ public final class OMFileRequest {
     String dbFileKey = omMetadataMgr.getOzonePathKey(
             omFileInfo.getParentObjectID(), omFileInfo.getFileName());
 
-    omMetadataMgr.getKeyTable().putWithBatch(batchOp,
-            dbFileKey, omFileInfo);
+    omMetadataMgr.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .putWithBatch(batchOp, dbFileKey, omFileInfo);
     return dbFileKey;
   }
 
@@ -584,7 +609,9 @@ public final class OMFileRequest {
           omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
               .get(dbOpenFileKey);
     } else {
-      dbOmKeyInfo = omMetadataMgr.getKeyTable().get(dbOpenFileKey);
+      dbOmKeyInfo =
+          omMetadataMgr.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+              .get(dbOpenFileKey);
     }
 
     // DB OMKeyInfo will store only fileName into keyName field. This
@@ -854,7 +881,9 @@ public final class OMFileRequest {
   private static boolean checkSubFileExists(OmKeyInfo omKeyInfo,
       OMMetadataManager metaMgr) throws IOException {
     // Check all fileTable cache for any sub paths.
-    Table fileTable = metaMgr.getKeyTable();
+    Table fileTable = metaMgr.getKeyTable(
+        getBucketLayout(metaMgr, omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName()));
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = fileTable.cacheIterator();
 

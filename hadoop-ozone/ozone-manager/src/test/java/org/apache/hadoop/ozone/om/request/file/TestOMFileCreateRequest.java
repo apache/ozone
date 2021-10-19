@@ -229,10 +229,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath("a/b/c", false, false, true);
 
     // Delete child key but retain path "a/b/ in the key table
-    omMetadataManager.getKeyTable().delete(omMetadataManager.getOzoneKey(
-        volumeName, bucketName, "a/b/c/d"));
-    omMetadataManager.getKeyTable().delete(omMetadataManager.getOzoneKey(
-        volumeName, bucketName, "a/b/c/"));
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, "a/b/c/d"));
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, "a/b/c/"));
 
     // can create non-recursive because parents already exist.
     testNonRecursivePath("a/b/e", false, false, false);

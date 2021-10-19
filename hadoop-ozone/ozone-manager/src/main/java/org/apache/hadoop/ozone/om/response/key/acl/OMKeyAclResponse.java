@@ -60,8 +60,8 @@ public class OMKeyAclResponse extends OMClientResponse {
 
     String dbKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, dbKey,
-        omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation, dbKey, omKeyInfo);
   }
 
   public OmKeyInfo getOmKeyInfo() {

@@ -143,7 +143,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
                 new CacheValue<>(Optional.absent(), trxnLogIndex));
       } else {
         // Update table cache.
-        omMetadataManager.getKeyTable().addCacheEntry(
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
                 new CacheKey<>(ozonePathKey),
                 new CacheValue<>(Optional.absent(), trxnLogIndex));
       }

@@ -232,8 +232,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // Check if Key already exists
       String dbKeyName = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
-      OmKeyInfo dbKeyInfo =
-          omMetadataManager.getKeyTable().getIfExist(dbKeyName);
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .getIfExist(dbKeyName);
 
       if (dbKeyInfo != null) {
         ozoneManager.getKeyManager().refresh(dbKeyInfo);
