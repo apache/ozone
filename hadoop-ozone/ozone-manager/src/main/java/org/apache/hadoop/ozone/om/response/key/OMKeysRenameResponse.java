@@ -68,12 +68,13 @@ public class OMKeysRenameResponse extends OMClientResponse {
       OmKeyInfo newKeyInfo = entry.getValue();
       String toKeyName = newKeyInfo.getKeyName();
 
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .deleteWithBatch(batchOperation, omMetadataManager
               .getOzoneKey(volumeName, bucketName, fromKeyName));
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
-          newKeyInfo);
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .putWithBatch(batchOperation,
+              omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
+              newKeyInfo);
     }
   }
 

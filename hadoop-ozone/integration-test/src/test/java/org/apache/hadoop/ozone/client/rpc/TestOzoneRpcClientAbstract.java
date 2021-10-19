@@ -90,15 +90,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -3372,8 +3364,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     String ozoneKey = ozoneManager.getMetadataManager()
         .getOzoneKey(bucket.getVolumeName(), bucket.getName(), keyName);
-    OmKeyInfo omKeyInfo = ozoneManager.getMetadataManager().getKeyTable()
-        .get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        ozoneManager.getMetadataManager().getKeyTable(getBucketLayout())
+            .get(ozoneKey);
 
     OmKeyLocationInfoGroup latestVersionLocations =
         omKeyInfo.getLatestVersionLocations();
@@ -3511,14 +3504,14 @@ public abstract class TestOzoneRpcClientAbstract {
 
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable().get(omMetadataManager.getOzoneKey(
-            volumeName, bucketName, keyName));
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
     omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
 
-    omMetadataManager.getKeyTable().put(omMetadataManager.getOzoneKey(
-         volumeName, bucketName, keyName), omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
+            omKeyInfo);
 
     //Step 5
     key = bucket.getKey(keyName);
@@ -3665,5 +3658,9 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertEquals(ResultCodes.KEY_NOT_FOUND, ex.getResult());
     }
 
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

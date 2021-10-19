@@ -34,12 +34,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.VolumeManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -297,22 +292,26 @@ public class TestParentAcl {
   private void addKeyAcl(String vol, String buck, String key,
       OzoneAcl ozoneAcl) throws IOException {
     String objKey = metadataManager.getOzoneKey(vol, buck, key);
-    OmKeyInfo omKeyInfo = metadataManager.getKeyTable().get(objKey);
+    OmKeyInfo omKeyInfo =
+        metadataManager.getKeyTable(getBucketLayout()).get(objKey);
 
     omKeyInfo.addAcl(ozoneAcl);
 
-    metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(objKey),
-        new CacheValue<>(Optional.of(omKeyInfo), 1L));
+    metadataManager.getKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(objKey),
+            new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
 
   private void setKeyAcl(String vol, String buck, String key,
                          List<OzoneAcl> ozoneAcls) throws IOException {
     String objKey = metadataManager.getOzoneKey(vol, buck, key);
-    OmKeyInfo omKeyInfo = metadataManager.getKeyTable().get(objKey);
+    OmKeyInfo omKeyInfo =
+        metadataManager.getKeyTable(getBucketLayout()).get(objKey);
     omKeyInfo.setAcls(ozoneAcls);
 
-    metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(objKey),
-        new CacheValue<>(Optional.of(omKeyInfo), 1L));
+    metadataManager.getKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(objKey),
+            new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
 
   private void addBucketAcl(String vol, String buck, OzoneAcl ozoneAcl)
@@ -407,5 +406,9 @@ public class TestParentAcl {
         .setResType(KEY)
         .setStoreType(OZONE)
         .build();
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }
