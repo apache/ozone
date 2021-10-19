@@ -1245,7 +1245,6 @@ public class TestRootedOzoneFileSystem {
    * 3.Create a second Key in different bucket and verify deletion.
    * @throws Exception
    */
-  @Ignore
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
@@ -1289,12 +1288,13 @@ public class TestRootedOzoneFileSystem {
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
     Path userTrash = new Path(trashRoot, username);
-    Path trashPath = getTrashKeyPath(keyPath1, userTrash);
+    Path trashPath = getTrashKeyPath(new Path("/" + testKeyName), userTrash);
 
     // Construct paths for second key in different bucket
     Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
     Path userTrash2 = new Path(trashRoot2, username);
-    Path trashPath2 = getTrashKeyPath(keyPath2, userTrash2);
+    Path trashPath2 =
+        getTrashKeyPath(new Path("/" + testKeyName + "1"), userTrash2);
 
 
     // Wait until the TrashEmptier purges the keys

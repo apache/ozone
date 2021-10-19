@@ -180,6 +180,8 @@ public class TestOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+        TrashPolicy.class);
 
     fs = FileSystem.get(conf);
     trash = new Trash(conf);

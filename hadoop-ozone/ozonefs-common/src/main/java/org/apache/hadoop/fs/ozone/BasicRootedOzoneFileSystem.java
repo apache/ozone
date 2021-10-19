@@ -433,7 +433,18 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // if doesn't have TO_TRASH option, just pass the call to super
       super.rename(src, dst, options);
     } else {
-      rename(src, dst);
+      OFSPath dstpath = new OFSPath(dst);
+      String keyName = dstpath.getKeyName();
+      // omit volume name and bucket name from Key
+      String keyNamewithoutVolumeAndBucket = keyName.replace(
+          OZONE_URI_DELIMITER + dstpath.getVolumeName() + OZONE_URI_DELIMITER
+              + dstpath.getBucketName(), "");
+      Path newDest = new Path(
+          OZONE_URI_DELIMITER + dstpath.getVolumeName() + OZONE_URI_DELIMITER
+              + dstpath.getBucketName() + OZONE_URI_DELIMITER
+              + keyNamewithoutVolumeAndBucket);
+      LOG.info("Moved key to destination: {}", newDest);
+      rename(src, newDest);
     }
   }
 
@@ -447,7 +458,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       super(f);
       this.recursive = recursive;
       if (getStatus().isDirectory()
-          && !this.recursive
+          && !this. recursive
           && listStatus(f).length != 0) {
         throw new PathIsNotEmptyDirectoryException(f.toString());
       }
