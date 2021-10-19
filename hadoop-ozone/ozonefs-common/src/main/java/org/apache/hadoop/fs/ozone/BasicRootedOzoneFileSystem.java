@@ -458,7 +458,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       super(f);
       this.recursive = recursive;
       if (getStatus().isDirectory()
-          && !this. recursive
+          && !this.recursive
           && listStatus(f).length != 0) {
         throw new PathIsNotEmptyDirectoryException(f.toString());
       }
