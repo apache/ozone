@@ -44,12 +44,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -148,7 +149,7 @@ public final class OMMetadataManagerTestUtils {
     String omKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", key);
 
-    omMetadataManager.getKeyTable().put(omKey,
+    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
@@ -172,7 +173,7 @@ public final class OMMetadataManagerTestUtils {
     String omKey = omMetadataManager.getOzoneKey(volume,
         bucket, key);
 
-    omMetadataManager.getKeyTable().put(omKey,
+    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucket)
             .setVolumeName(volume)
@@ -198,7 +199,7 @@ public final class OMMetadataManagerTestUtils {
           throws IOException {
     // DB key in FileTable => "parentId/filename"
     String omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
-    omMetadataManager.getKeyTable().put(omKey,
+    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(omKey,
             new OmKeyInfo.Builder()
                     .setBucketName(bucket)
                     .setVolumeName(volume)
@@ -221,7 +222,7 @@ public final class OMMetadataManagerTestUtils {
                                   List<OmKeyLocationInfoGroup> locationVersions)
           throws IOException {
     String omKey = omMetadataManager.getOzonePathKey(parentObjectId, fileName);
-    omMetadataManager.getKeyTable().put(omKey,
+    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(omKey,
             new OmKeyInfo.Builder()
                     .setBucketName(bucketName)
                     .setVolumeName(volName)
@@ -254,7 +255,8 @@ public final class OMMetadataManagerTestUtils {
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table tableMock = mock(Table.class);
     when(tableMock.getName()).thenReturn("keyTable");
-    when(omMetadataManagerMock.getKeyTable()).thenReturn(tableMock);
+    when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
+        .thenReturn(tableMock);
     when(omServiceProviderMock.getOMMetadataManagerInstance())
             .thenReturn(omMetadataManagerMock);
     return omServiceProviderMock;
@@ -270,7 +272,8 @@ public final class OMMetadataManagerTestUtils {
     Table volTableMock = mock(Table.class);
     Table bucketTableMock = mock(Table.class);
     when(keyTableMock.getName()).thenReturn(FILE_TABLE);
-    when(omMetadataManagerMock.getKeyTable()).thenReturn(keyTableMock);
+    when(omMetadataManagerMock.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
+        .thenReturn(keyTableMock);
     when(dirTableMock.getName()).thenReturn(DIRECTORY_TABLE);
     when(omMetadataManagerMock.getDirectoryTable()).thenReturn(dirTableMock);
     when(volTableMock.getName()).thenReturn(VOLUME_TABLE);
@@ -315,5 +318,9 @@ public final class OMMetadataManagerTestUtils {
         .setBlockID(blockID)
         .setPipeline(pipeline)
         .build();
+  }
+
+  public static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

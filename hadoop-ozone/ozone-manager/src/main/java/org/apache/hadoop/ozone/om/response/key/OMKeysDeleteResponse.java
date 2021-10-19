@@ -73,7 +73,8 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     String volumeName = "";
     String bucketName = "";
     String keyName = "";
-    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+    Table<String, OmKeyInfo> keyTable =
+        omMetadataManager.getKeyTable(getBucketLayout());
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       volumeName = omKeyInfo.getVolumeName();
       bucketName = omKeyInfo.getBucketName();

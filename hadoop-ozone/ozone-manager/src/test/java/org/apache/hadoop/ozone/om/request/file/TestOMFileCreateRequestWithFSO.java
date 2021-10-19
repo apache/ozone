@@ -61,8 +61,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
     String dbFileD = omMetadataManager.getOzonePathKey(
             dirPathC.getObjectID(), fileNameD);
-    omMetadataManager.getKeyTable().delete(dbFileD);
-    omMetadataManager.getKeyTable().delete(dirPathC.getPath());
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dbFileD);
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dirPathC.getPath());
 
     // can create non-recursive because parents already exist.
     testNonRecursivePath("a/b/e", false, false, false);
