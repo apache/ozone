@@ -110,10 +110,10 @@
   <property>
     <name>httpfs.services</name>
     <value>
-      org.apache.hadoop.lib.service.instrumentation.InstrumentationService,
-      org.apache.hadoop.lib.service.scheduler.SchedulerService,
-      org.apache.hadoop.lib.service.security.GroupsService,
-      org.apache.hadoop.lib.service.hadoop.FileSystemAccessService
+      org.apache.ozone.lib.service.instrumentation.InstrumentationService,
+      org.apache.ozone.lib.service.scheduler.SchedulerService,
+      org.apache.ozone.lib.service.security.GroupsService,
+      org.apache.ozone.lib.service.hadoop.FileSystemAccessService
     </value>
     <description>
       Services used by the httpfs server.

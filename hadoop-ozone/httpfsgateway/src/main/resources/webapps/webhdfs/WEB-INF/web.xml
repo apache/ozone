@@ -15,7 +15,7 @@
 <web-app version="2.4" xmlns="http://java.sun.com/xml/ns/j2ee">
 
   <listener>
-    <listener-class>org.apache.hadoop.fs.http.server.HttpFSServerWebApp</listener-class>
+    <listener-class>org.apache.ozone.fs.http.server.HttpFSServerWebApp</listener-class>
   </listener>
 
   <servlet>
@@ -23,7 +23,7 @@
     <servlet-class>com.sun.jersey.spi.container.servlet.ServletContainer</servlet-class>
     <init-param>
       <param-name>com.sun.jersey.config.property.packages</param-name>
-      <param-value>org.apache.hadoop.fs.http.server,org.apache.hadoop.lib.wsrs</param-value>
+      <param-value>org.apache.ozone.fs.http.server,org.apache.ozone.lib.wsrs</param-value>
     </init-param>
 
     <!-- Enables detailed Jersey request/response logging -->
@@ -47,27 +47,27 @@
 
   <filter>
     <filter-name>authFilter</filter-name>
-    <filter-class>org.apache.hadoop.fs.http.server.HttpFSAuthenticationFilter</filter-class>
+    <filter-class>org.apache.ozone.fs.http.server.HttpFSAuthenticationFilter</filter-class>
   </filter>
 
   <filter>
     <filter-name>MDCFilter</filter-name>
-    <filter-class>org.apache.hadoop.lib.servlet.MDCFilter</filter-class>
+    <filter-class>org.apache.ozone.lib.servlet.MDCFilter</filter-class>
   </filter>
 
   <filter>
     <filter-name>hostnameFilter</filter-name>
-    <filter-class>org.apache.hadoop.lib.servlet.HostnameFilter</filter-class>
+    <filter-class>org.apache.ozone.lib.servlet.HostnameFilter</filter-class>
   </filter>
 
   <filter>
     <filter-name>checkUploadContentType</filter-name>
-    <filter-class>org.apache.hadoop.fs.http.server.CheckUploadContentTypeFilter</filter-class>
+    <filter-class>org.apache.ozone.fs.http.server.CheckUploadContentTypeFilter</filter-class>
   </filter>
 
   <filter>
     <filter-name>fsReleaseFilter</filter-name>
-    <filter-class>org.apache.hadoop.fs.http.server.HttpFSReleaseFilter</filter-class>
+    <filter-class>org.apache.ozone.fs.http.server.HttpFSReleaseFilter</filter-class>
   </filter>
 
   <filter-mapping>
