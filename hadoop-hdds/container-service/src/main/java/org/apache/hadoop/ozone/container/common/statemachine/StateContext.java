@@ -117,7 +117,6 @@ public class StateContext {
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
-  private final AtomicLong threadPoolNotAvailableTimeSum;
   private final AtomicLong threadPoolNotAvailableCount;
   private final AtomicLong lastHeartbeatSent;
   // Endpoint -> ReportType -> Boolean of whether the full report should be
@@ -174,7 +173,6 @@ public class StateContext {
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
-    threadPoolNotAvailableTimeSum = new AtomicLong(0);
     lastHeartbeatSent = new AtomicLong(0);
     fullReportSendIndicator = new HashMap<>();
     fullReportTypeList = new ArrayList<>();
@@ -621,16 +619,15 @@ public class StateContext {
 
       if (!isThreadPoolAvailable(service)) {
         long count = threadPoolNotAvailableCount.incrementAndGet();
-        long unavailableTime = threadPoolNotAvailableTimeSum.addAndGet(
-            System.currentTimeMillis() - lastHeartbeatSent.get());
+        long unavailableTime =
+            System.currentTimeMillis() - lastHeartbeatSent.get();
         if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
           LOG.warn("No available thread in pool for the past {} seconds " +
               "and {} times.", unit.toSeconds(unavailableTime), count);
         }
         return;
       }
-
-      threadPoolNotAvailableTimeSum.set(0);
+      
       threadPoolNotAvailableCount.set(0);
       task.execute(service);
       lastHeartbeatSent.set(System.currentTimeMillis());
