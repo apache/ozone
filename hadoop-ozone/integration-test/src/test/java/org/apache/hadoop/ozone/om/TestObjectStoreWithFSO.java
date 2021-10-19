@@ -196,7 +196,8 @@ public class TestObjectStoreWithFSO {
     ozoneOutputStream.close();
 
     Table<String, OmKeyInfo> fileTable =
-            cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
     // After closing the file. File entry should be removed from openFileTable
     // and it should be added to fileTable.
     verifyKeyInFileTable(fileTable, file, dirPathC.getObjectID(), false);
@@ -264,7 +265,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(key, keyDetails.getName());
 
     Table<String, OmKeyInfo> fileTable =
-            cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
 
     // When closing the key, entry should be removed from openFileTable
     // and it should be added to fileTable.

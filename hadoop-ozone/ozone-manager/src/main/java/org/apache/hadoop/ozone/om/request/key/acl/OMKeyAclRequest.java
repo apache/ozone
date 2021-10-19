@@ -95,7 +95,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
               bucket);
 
       String dbKey = omMetadataManager.getOzoneKey(volume, bucket, key);
-      omKeyInfo = omMetadataManager.getKeyTable().get(dbKey);
+      omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout(ozoneManager))
+          .get(dbKey);
 
       if (omKeyInfo == null) {
         throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
@@ -120,9 +121,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       omKeyInfo.setModificationTime(modificationTime);
 
       // update cache.
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(dbKey),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      omMetadataManager.getKeyTable(getBucketLayout(ozoneManager))
+          .addCacheEntry(new CacheKey<>(dbKey),
+              new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;

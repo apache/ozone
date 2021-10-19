@@ -70,8 +70,8 @@ public class OMKeyCommitResponse extends OMClientResponse {
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .deleteWithBatch(batchOperation, openKeyName);
 
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
-        omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation, ozoneKeyName, omKeyInfo);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

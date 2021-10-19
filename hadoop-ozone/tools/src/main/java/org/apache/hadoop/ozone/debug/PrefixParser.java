@@ -187,8 +187,12 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
         metadataManager.getDirectoryTable(), lastObjectId);
 
     dumpTableInfo(Types.FILE, effectivePath,
-        metadataManager.getKeyTable(), lastObjectId);
+        metadataManager.getKeyTable(getBucketLayout()), lastObjectId);
     metadataManager.stop();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   private void dumpTableInfo(Types type,
