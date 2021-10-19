@@ -87,8 +87,8 @@ public class TestContainerBalancer {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration ozoneConf;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration ozoneConf;
   private StorageContainerManager scm;
   private ContainerBalancerConfiguration balancerConf;
   private ContainerBalancer balancer;
@@ -312,7 +312,7 @@ public class TestContainerBalancer {
     }
   }
 
-  private static OmKeyLocationInfo lookupKey(
+  private OmKeyLocationInfo lookupKey(
       String keyName, int keySize) throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(VOLUME)
