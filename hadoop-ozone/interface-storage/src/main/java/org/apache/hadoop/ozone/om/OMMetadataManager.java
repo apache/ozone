@@ -294,8 +294,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout);
 
-  Table<String, OmKeyInfo> getKeyTable();
-
   /**
    * Returns the FileTable.
    *
