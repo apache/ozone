@@ -190,7 +190,7 @@ function ozonecmd_case
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_OPTS="${OZONE_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp"
-      OZONE_CLASSNAME='org.apache.hadoop.fs.http.server.HttpFSServerWebServer'
+      OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
     csi)
