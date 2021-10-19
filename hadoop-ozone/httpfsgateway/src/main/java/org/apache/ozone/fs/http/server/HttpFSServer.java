@@ -23,8 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
-import org.apache.ozone.fs.http.client.HttpFSFileSystem;
-import org.apache.ozone.fs.http.client.HttpFSUtils;
+import org.apache.ozone.fs.http.HttpFSConstants;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.AccessTimeParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.AclPermissionParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.BlockSizeParam;
@@ -102,7 +101,7 @@ import java.util.Map;
  * The <code>HttpFSServer</code> class uses Jersey JAX-RS to binds HTTP
  * requests to the different operations.
  */
-@Path(HttpFSFileSystem.SERVICE_VERSION)
+@Path(HttpFSConstants.SERVICE_VERSION)
 @InterfaceAudience.Private
 public class HttpFSServer {
 
@@ -197,7 +196,7 @@ public class HttpFSServer {
     return fs;
   }
 
-  private void enforceRootPath(HttpFSFileSystem.Operation op, String path) {
+  private void enforceRootPath(HttpFSConstants.Operation op, String path) {
     if (!path.equals("/")) {
       throw new UnsupportedOperationException(
         MessageFormat.format("Operation [{0}], invalid path [{1}], must be '/'",
@@ -261,15 +260,15 @@ public class HttpFSServer {
                       @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     // Restrict access to only GETFILESTATUS and LISTSTATUS in write-only mode
-    if((op.value() != HttpFSFileSystem.Operation.GETFILESTATUS) &&
-            (op.value() != HttpFSFileSystem.Operation.LISTSTATUS) &&
+    if((op.value() != HttpFSConstants.Operation.GETFILESTATUS) &&
+            (op.value() != HttpFSConstants.Operation.LISTSTATUS) &&
             accessMode == AccessMode.WRITEONLY) {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();
     Response response;
     path = makeAbsolute(path);
-    MDC.put(HttpFSFileSystem.OP_PARAM, op.value().name());
+    MDC.put(HttpFSConstants.OP_PARAM, op.value().name());
     MDC.put("hostname", request.getRemoteAddr());
     switch (op.value()) {
     case OPEN:
@@ -450,7 +449,7 @@ public class HttpFSServer {
     String startAfter = params.get(
         HttpFSParametersProvider.StartAfterParam.NAME,
         HttpFSParametersProvider.StartAfterParam.class);
-    byte[] token = HttpFSUtils.EMPTY_BYTES;
+    byte[] token = HttpFSConstants.EMPTY_BYTES;
     if (startAfter != null) {
       token = startAfter.getBytes(StandardCharsets.UTF_8);
     }
@@ -686,7 +685,7 @@ public class HttpFSServer {
     UserGroupInformation user = HttpUserGroupInformation.get();
     Response response;
     path = makeAbsolute(path);
-    MDC.put(HttpFSFileSystem.OP_PARAM, op.value().name());
+    MDC.put(HttpFSConstants.OP_PARAM, op.value().name());
     MDC.put("hostname", request.getRemoteAddr());
     switch (op.value()) {
     case DELETE:
@@ -792,7 +791,7 @@ public class HttpFSServer {
     UserGroupInformation user = HttpUserGroupInformation.get();
     Response response;
     path = makeAbsolute(path);
-    MDC.put(HttpFSFileSystem.OP_PARAM, op.value().name());
+    MDC.put(HttpFSConstants.OP_PARAM, op.value().name());
     MDC.put("hostname", request.getRemoteAddr());
     switch (op.value()) {
     case APPEND:
@@ -879,7 +878,7 @@ public class HttpFSServer {
     Response response;
     Boolean hasData = params.get(DataParam.NAME, DataParam.class);
     URI redirectURL = createUploadRedirectionURL(uriInfo,
-        HttpFSFileSystem.Operation.APPEND);
+        HttpFSConstants.Operation.APPEND);
     Boolean noRedirect
         = params.get(NoRedirectParam.NAME, NoRedirectParam.class);
     if (noRedirect) {
@@ -974,7 +973,7 @@ public class HttpFSServer {
     UserGroupInformation user = HttpUserGroupInformation.get();
     Response response;
     path = makeAbsolute(path);
-    MDC.put(HttpFSFileSystem.OP_PARAM, op.value().name());
+    MDC.put(HttpFSConstants.OP_PARAM, op.value().name());
     MDC.put("hostname", request.getRemoteAddr());
     switch (op.value()) {
     case CREATE:
@@ -1353,7 +1352,7 @@ public class HttpFSServer {
     Response response;
     Boolean hasData = params.get(DataParam.NAME, DataParam.class);
     URI redirectURL = createUploadRedirectionURL(uriInfo,
-        HttpFSFileSystem.Operation.CREATE);
+        HttpFSConstants.Operation.CREATE);
     Boolean noRedirect
         = params.get(NoRedirectParam.NAME, NoRedirectParam.class);
     if (noRedirect) {

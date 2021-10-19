@@ -20,7 +20,7 @@ package org.apache.ozone.fs.http.server;
 
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.ozone.fs.http.client.HttpFSFileSystem;
+import org.apache.ozone.fs.http.HttpFSConstants;
 import org.apache.hadoop.util.StringUtils;
 
 import javax.servlet.Filter;
@@ -45,8 +45,8 @@ public class CheckUploadContentTypeFilter implements Filter {
   private static final Set<String> UPLOAD_OPERATIONS = new HashSet<String>();
 
   static {
-    UPLOAD_OPERATIONS.add(HttpFSFileSystem.Operation.APPEND.toString());
-    UPLOAD_OPERATIONS.add(HttpFSFileSystem.Operation.CREATE.toString());
+    UPLOAD_OPERATIONS.add(HttpFSConstants.Operation.APPEND.toString());
+    UPLOAD_OPERATIONS.add(HttpFSConstants.Operation.CREATE.toString());
   }
 
   /**
@@ -82,14 +82,14 @@ public class CheckUploadContentTypeFilter implements Filter {
     HttpServletResponse httpRes = (HttpServletResponse) response;
     String method = httpReq.getMethod();
     if (method.equals("PUT") || method.equals("POST")) {
-      String op = httpReq.getParameter(HttpFSFileSystem.OP_PARAM);
+      String op = httpReq.getParameter(HttpFSConstants.OP_PARAM);
       if (op != null && UPLOAD_OPERATIONS.contains(
           StringUtils.toUpperCase(op))) {
         if ("true".equalsIgnoreCase(httpReq
             .getParameter(HttpFSParametersProvider.DataParam.NAME))) {
           String contentType = httpReq.getContentType();
           contentTypeOK =
-            HttpFSFileSystem.UPLOAD_CONTENT_TYPE.equalsIgnoreCase(contentType);
+              HttpFSConstants.UPLOAD_CONTENT_TYPE.equalsIgnoreCase(contentType);
         }
       }
     }
@@ -98,7 +98,7 @@ public class CheckUploadContentTypeFilter implements Filter {
     } else {
       httpRes.sendError(HttpServletResponse.SC_BAD_REQUEST,
                         "Data upload requests must have content-type set to '" +
-                        HttpFSFileSystem.UPLOAD_CONTENT_TYPE + "'");
+                            HttpFSConstants.UPLOAD_CONTENT_TYPE + "'");
 
     }
   }

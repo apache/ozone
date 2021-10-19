@@ -16,6 +16,6 @@
  */
 
 /**
- * HttpFS filesystem implementations.
+ * Basic server implementations for the HttpFS and its constants.
  */
-package org.apache.ozone.fs.http.client;
+package org.apache.ozone.fs.http;
