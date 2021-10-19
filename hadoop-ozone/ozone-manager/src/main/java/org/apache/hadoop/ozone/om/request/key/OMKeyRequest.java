@@ -567,11 +567,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Return bucket info for the specified bucket.
-   * @param omMetadataManager
-   * @param volume
-   * @param bucket
-   * @return OmVolumeArgs
-   * @throws IOException
    */
   protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
       String volume, String bucket) {
