@@ -217,7 +217,7 @@ public class TestBucketManagerImpl {
     TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
   }
 
-  //@Test
+  @Test
   public void testSetBucketPropertyChangeStorageType() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
 
