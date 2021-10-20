@@ -292,6 +292,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     while (len > 0) {
       StreamBuffer buf = bufferList.get(count);
       long writeLen = Math.min(buf.length(), len);
+      if (writeLen == len){
+        buf.setLimit((int) len);
+      }
       writeChunkToContainer(buf.duplicate());
       len -= writeLen;
       count++;

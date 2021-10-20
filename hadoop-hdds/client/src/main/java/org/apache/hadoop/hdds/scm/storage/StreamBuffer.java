@@ -42,4 +42,8 @@ public class StreamBuffer {
   public int length() {
     return buffer.limit() - buffer.position();
   }
+
+  public void setLimit(int limit) {
+    buffer.limit(limit);
+  }
 }
