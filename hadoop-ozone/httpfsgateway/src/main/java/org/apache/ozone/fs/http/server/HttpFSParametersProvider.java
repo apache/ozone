@@ -20,8 +20,8 @@ package org.apache.ozone.fs.http.server;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
-import org.apache.ozone.fs.http.client.HttpFSFileSystem;
-import org.apache.ozone.fs.http.client.HttpFSFileSystem.Operation;
+import org.apache.ozone.fs.http.HttpFSConstants;
+import org.apache.ozone.fs.http.HttpFSConstants.Operation;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.ozone.lib.service.FileSystemAccess;
 import org.apache.ozone.lib.wsrs.BooleanParam;
@@ -127,7 +127,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
   }
 
   public HttpFSParametersProvider() {
-    super(HttpFSFileSystem.OP_PARAM, HttpFSFileSystem.Operation.class,
+    super(HttpFSConstants.OP_PARAM, HttpFSConstants.Operation.class,
           PARAMS_DEF);
   }
 
@@ -140,7 +140,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.ACCESS_TIME_PARAM;
+    public static final String NAME = HttpFSConstants.ACCESS_TIME_PARAM;
     /**
      * Constructor.
      */
@@ -158,7 +158,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.BLOCKSIZE_PARAM;
+    public static final String NAME = HttpFSConstants.BLOCKSIZE_PARAM;
 
     /**
      * Constructor.
@@ -209,18 +209,18 @@ public class HttpFSParametersProvider extends ParametersProvider {
    */
   @InterfaceAudience.Private
   public static class OperationParam
-      extends EnumParam<HttpFSFileSystem.Operation> {
+      extends EnumParam<HttpFSConstants.Operation> {
 
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.OP_PARAM;
+    public static final String NAME = HttpFSConstants.OP_PARAM;
     /**
      * Constructor.
      */
     public OperationParam(String operation) {
-      super(NAME, HttpFSFileSystem.Operation.class,
-            HttpFSFileSystem.Operation.valueOf(
+      super(NAME, HttpFSConstants.Operation.class,
+          HttpFSConstants.Operation.valueOf(
                 StringUtils.toUpperCase(operation)));
     }
   }
@@ -234,7 +234,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.RECURSIVE_PARAM;
+    public static final String NAME = HttpFSConstants.RECURSIVE_PARAM;
 
     /**
      * Constructor.
@@ -273,7 +273,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.GROUP_PARAM;
+    public static final String NAME = HttpFSConstants.GROUP_PARAM;
 
     /**
      * Constructor.
@@ -312,7 +312,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.MODIFICATION_TIME_PARAM;
+    public static final String NAME = HttpFSConstants.MODIFICATION_TIME_PARAM;
 
     /**
      * Constructor.
@@ -350,7 +350,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.NEW_LENGTH_PARAM;
+    public static final String NAME = HttpFSConstants.NEW_LENGTH_PARAM;
 
     /**
      * Constructor.
@@ -369,7 +369,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.OVERWRITE_PARAM;
+    public static final String NAME = HttpFSConstants.OVERWRITE_PARAM;
 
     /**
      * Constructor.
@@ -388,7 +388,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.OWNER_PARAM;
+    public static final String NAME = HttpFSConstants.OWNER_PARAM;
 
     /**
      * Constructor.
@@ -408,14 +408,14 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.PERMISSION_PARAM;
+    public static final String NAME = HttpFSConstants.PERMISSION_PARAM;
 
 
     /**
      * Constructor.
      */
     public PermissionParam() {
-      super(NAME, HttpFSFileSystem.DEFAULT_PERMISSION, 8);
+      super(NAME, HttpFSConstants.DEFAULT_PERMISSION, 8);
     }
 
   }
@@ -430,7 +430,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Parameter name.
      */
     public static final String NAME =
-        HttpFSFileSystem.UNMASKED_PERMISSION_PARAM;
+        HttpFSConstants.UNMASKED_PERMISSION_PARAM;
 
 
     /**
@@ -451,14 +451,14 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.ACLSPEC_PARAM;
+    public static final String NAME = HttpFSConstants.ACLSPEC_PARAM;
 
     /**
      * Constructor.
      */
     public AclPermissionParam() {
       super(NAME,
-          HttpFSFileSystem.ACLSPEC_DEFAULT,
+          HttpFSConstants.ACLSPEC_DEFAULT,
           Pattern.compile(HttpFSServerWebApp.get()
               .get(FileSystemAccess.class)
               .getFileSystemConfiguration()
@@ -477,7 +477,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.REPLICATION_PARAM;
+    public static final String NAME = HttpFSConstants.REPLICATION_PARAM;
 
     /**
      * Constructor.
@@ -496,7 +496,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.SOURCES_PARAM;
+    public static final String NAME = HttpFSConstants.SOURCES_PARAM;
 
     /**
      * Constructor.
@@ -515,7 +515,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.DESTINATION_PARAM;
+    public static final String NAME = HttpFSConstants.DESTINATION_PARAM;
 
     /**
      * Constructor.
@@ -535,7 +535,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.XATTR_NAME_PARAM;
+    public static final String NAME = HttpFSConstants.XATTR_NAME_PARAM;
     private static final Pattern PATTERN = Pattern.compile(XATTR_NAME_REGX);
 
     /**
@@ -554,7 +554,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.XATTR_VALUE_PARAM;
+    public static final String NAME = HttpFSConstants.XATTR_VALUE_PARAM;
 
     /**
      * Constructor.
@@ -572,7 +572,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.XATTR_SET_FLAG_PARAM;
+    public static final String NAME = HttpFSConstants.XATTR_SET_FLAG_PARAM;
 
     /**
      * Constructor.
@@ -590,7 +590,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.XATTR_ENCODING_PARAM;
+    public static final String NAME = HttpFSConstants.XATTR_ENCODING_PARAM;
 
     /**
      * Constructor.
@@ -608,7 +608,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.START_AFTER_PARAM;
+    public static final String NAME = HttpFSConstants.START_AFTER_PARAM;
 
     /**
      * Constructor.
@@ -626,7 +626,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.POLICY_NAME_PARAM;
+    public static final String NAME = HttpFSConstants.POLICY_NAME_PARAM;
 
     /**
      * Constructor.
@@ -644,7 +644,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.SNAPSHOT_NAME_PARAM;
+    public static final String NAME = HttpFSConstants.SNAPSHOT_NAME_PARAM;
 
     /**
      * Constructor.
@@ -663,7 +663,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.OLD_SNAPSHOT_NAME_PARAM;
+    public static final String NAME = HttpFSConstants.OLD_SNAPSHOT_NAME_PARAM;
 
     /**
      * Constructor.
@@ -686,7 +686,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.FSACTION_MODE_PARAM;
+    public static final String NAME = HttpFSConstants.FSACTION_MODE_PARAM;
 
     /**
      * Constructor.
@@ -712,7 +712,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
     /**
      * Parameter name.
      */
-    public static final String NAME = HttpFSFileSystem.EC_POLICY_NAME_PARAM;
+    public static final String NAME = HttpFSConstants.EC_POLICY_NAME_PARAM;
 
     /**
      * Constructor.

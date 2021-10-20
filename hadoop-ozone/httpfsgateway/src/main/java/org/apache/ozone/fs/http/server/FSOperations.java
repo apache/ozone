@@ -33,8 +33,8 @@ import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
-import org.apache.ozone.fs.http.client.HttpFSFileSystem;
-import org.apache.ozone.fs.http.client.HttpFSFileSystem.FILETYPE;
+import org.apache.ozone.fs.http.HttpFSConstants;
+import org.apache.ozone.fs.http.HttpFSConstants.FILETYPE;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -93,7 +93,7 @@ public final class FSOperations {
    */
   private static Map<String, Object> toJson(FileStatus fileStatus) {
     Map<String, Object> json = new LinkedHashMap<>();
-    json.put(HttpFSFileSystem.FILE_STATUS_JSON, toJsonInner(fileStatus, true));
+    json.put(HttpFSConstants.FILE_STATUS_JSON, toJsonInner(fileStatus, true));
     return json;
   }
 
@@ -111,8 +111,8 @@ public final class FSOperations {
     for (FileStatus f : fileStatuses) {
       statuses.add(toJsonInner(f, isFile));
     }
-    inner.put(HttpFSFileSystem.FILE_STATUS_JSON, statuses);
-    json.put(HttpFSFileSystem.FILE_STATUSES_JSON, inner);
+    inner.put(HttpFSConstants.FILE_STATUS_JSON, statuses);
+    json.put(HttpFSConstants.FILE_STATUSES_JSON, inner);
     return json;
   }
 
@@ -122,37 +122,37 @@ public final class FSOperations {
   private static Map<String, Object> toJsonInner(FileStatus fileStatus,
       boolean emptyPathSuffix) {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
-    json.put(HttpFSFileSystem.PATH_SUFFIX_JSON,
+    json.put(HttpFSConstants.PATH_SUFFIX_JSON,
         (emptyPathSuffix) ? "" : fileStatus.getPath().getName());
     FILETYPE fileType = FILETYPE.getType(fileStatus);
-    json.put(HttpFSFileSystem.TYPE_JSON, fileType.toString());
+    json.put(HttpFSConstants.TYPE_JSON, fileType.toString());
     if (fileType.equals(FILETYPE.SYMLINK)) {
       // put the symlink into Json
       try {
-        json.put(HttpFSFileSystem.SYMLINK_JSON,
+        json.put(HttpFSConstants.SYMLINK_JSON,
             fileStatus.getSymlink().getName());
       } catch (IOException e) {
         // Can't happen.
       }
     }
-    json.put(HttpFSFileSystem.LENGTH_JSON, fileStatus.getLen());
-    json.put(HttpFSFileSystem.OWNER_JSON, fileStatus.getOwner());
-    json.put(HttpFSFileSystem.GROUP_JSON, fileStatus.getGroup());
-    json.put(HttpFSFileSystem.PERMISSION_JSON,
-        HttpFSFileSystem.permissionToString(fileStatus.getPermission()));
-    json.put(HttpFSFileSystem.ACCESS_TIME_JSON, fileStatus.getAccessTime());
-    json.put(HttpFSFileSystem.MODIFICATION_TIME_JSON,
+    json.put(HttpFSConstants.LENGTH_JSON, fileStatus.getLen());
+    json.put(HttpFSConstants.OWNER_JSON, fileStatus.getOwner());
+    json.put(HttpFSConstants.GROUP_JSON, fileStatus.getGroup());
+    json.put(HttpFSConstants.PERMISSION_JSON,
+        HttpFSConstants.permissionToString(fileStatus.getPermission()));
+    json.put(HttpFSConstants.ACCESS_TIME_JSON, fileStatus.getAccessTime());
+    json.put(HttpFSConstants.MODIFICATION_TIME_JSON,
         fileStatus.getModificationTime());
-    json.put(HttpFSFileSystem.BLOCK_SIZE_JSON, fileStatus.getBlockSize());
-    json.put(HttpFSFileSystem.REPLICATION_JSON, fileStatus.getReplication());
+    json.put(HttpFSConstants.BLOCK_SIZE_JSON, fileStatus.getBlockSize());
+    json.put(HttpFSConstants.REPLICATION_JSON, fileStatus.getReplication());
     if (fileStatus instanceof HdfsFileStatus) {
       // Add HDFS-specific fields to response
       HdfsFileStatus hdfsFileStatus = (HdfsFileStatus) fileStatus;
-      json.put(HttpFSFileSystem.CHILDREN_NUM_JSON,
+      json.put(HttpFSConstants.CHILDREN_NUM_JSON,
           hdfsFileStatus.getChildrenNum());
-      json.put(HttpFSFileSystem.FILE_ID_JSON,
+      json.put(HttpFSConstants.FILE_ID_JSON,
           hdfsFileStatus.getFileId());
-      json.put(HttpFSFileSystem.STORAGEPOLICY_JSON,
+      json.put(HttpFSConstants.STORAGEPOLICY_JSON,
           hdfsFileStatus.getStoragePolicy());
 //      if (hdfsFileStatus.getErasureCodingPolicy() != null) {
 //        json.put(HttpFSFileSystem.ECPOLICYNAME_JSON,
@@ -163,16 +163,16 @@ public final class FSOperations {
 //      }
     }
     if (fileStatus.getPermission().getAclBit()) {
-      json.put(HttpFSFileSystem.ACL_BIT_JSON, true);
+      json.put(HttpFSConstants.ACL_BIT_JSON, true);
     }
     if (fileStatus.getPermission().getEncryptedBit()) {
-      json.put(HttpFSFileSystem.ENC_BIT_JSON, true);
+      json.put(HttpFSConstants.ENC_BIT_JSON, true);
     }
     if (fileStatus.getPermission().getErasureCodedBit()) {
-      json.put(HttpFSFileSystem.EC_BIT_JSON, true);
+      json.put(HttpFSConstants.EC_BIT_JSON, true);
     }
     if (fileStatus.isSnapshotEnabled()) {
-      json.put(HttpFSFileSystem.SNAPSHOT_BIT_JSON, true);
+      json.put(HttpFSConstants.SNAPSHOT_BIT_JSON, true);
     }
     return json;
   }
@@ -192,10 +192,10 @@ public final class FSOperations {
     Map<String, Object> json = new LinkedHashMap<>();
     Map<String, Object> inner = new LinkedHashMap<>();
     Map<String, Object> fileStatuses = toJson(entries.getEntries(), isFile);
-    inner.put(HttpFSFileSystem.PARTIAL_LISTING_JSON, fileStatuses);
-    inner.put(HttpFSFileSystem.REMAINING_ENTRIES_JSON, entries.hasMore() ? 1
+    inner.put(HttpFSConstants.PARTIAL_LISTING_JSON, fileStatuses);
+    inner.put(HttpFSConstants.REMAINING_ENTRIES_JSON, entries.hasMore() ? 1
         : 0);
-    json.put(HttpFSFileSystem.DIRECTORY_LISTING_JSON, inner);
+    json.put(HttpFSConstants.DIRECTORY_LISTING_JSON, inner);
     return json;
   }
 
@@ -210,16 +210,16 @@ public final class FSOperations {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
     Map<String, Object> inner = new LinkedHashMap<String, Object>();
     JSONArray entriesArray = new JSONArray();
-    inner.put(HttpFSFileSystem.OWNER_JSON, aclStatus.getOwner());
-    inner.put(HttpFSFileSystem.GROUP_JSON, aclStatus.getGroup());
-    inner.put(HttpFSFileSystem.PERMISSION_JSON,
-        HttpFSFileSystem.permissionToString(aclStatus.getPermission()));
-    inner.put(HttpFSFileSystem.ACL_STICKY_BIT_JSON, aclStatus.isStickyBit());
+    inner.put(HttpFSConstants.OWNER_JSON, aclStatus.getOwner());
+    inner.put(HttpFSConstants.GROUP_JSON, aclStatus.getGroup());
+    inner.put(HttpFSConstants.PERMISSION_JSON,
+        HttpFSConstants.permissionToString(aclStatus.getPermission()));
+    inner.put(HttpFSConstants.ACL_STICKY_BIT_JSON, aclStatus.isStickyBit());
     for (AclEntry e : aclStatus.getEntries()) {
       entriesArray.add(e.toString());
     }
-    inner.put(HttpFSFileSystem.ACL_ENTRIES_JSON, entriesArray);
-    json.put(HttpFSFileSystem.ACL_STATUS_JSON, inner);
+    inner.put(HttpFSConstants.ACL_ENTRIES_JSON, entriesArray);
+    json.put(HttpFSConstants.ACL_STATUS_JSON, inner);
     return json;
   }
 
@@ -234,14 +234,14 @@ public final class FSOperations {
   @SuppressWarnings({"unchecked"})
   private static Map fileChecksumToJSON(FileChecksum checksum) {
     Map json = new LinkedHashMap();
-    json.put(HttpFSFileSystem.CHECKSUM_ALGORITHM_JSON,
+    json.put(HttpFSConstants.CHECKSUM_ALGORITHM_JSON,
         checksum.getAlgorithmName());
-    json.put(HttpFSFileSystem.CHECKSUM_BYTES_JSON,
+    json.put(HttpFSConstants.CHECKSUM_BYTES_JSON,
              org.apache.hadoop.util.StringUtils
                  .byteToHexString(checksum.getBytes()));
-    json.put(HttpFSFileSystem.CHECKSUM_LENGTH_JSON, checksum.getLength());
+    json.put(HttpFSConstants.CHECKSUM_LENGTH_JSON, checksum.getLength());
     Map response = new LinkedHashMap();
-    response.put(HttpFSFileSystem.FILE_CHECKSUM_JSON, json);
+    response.put(HttpFSConstants.FILE_CHECKSUM_JSON, json);
     return response;
   }
 
@@ -262,15 +262,15 @@ public final class FSOperations {
     if (xAttrs != null) {
       for (Entry<String, byte[]> e : xAttrs.entrySet()) {
         Map json = new LinkedHashMap();
-        json.put(HttpFSFileSystem.XATTR_NAME_JSON, e.getKey());
+        json.put(HttpFSConstants.XATTR_NAME_JSON, e.getKey());
         if (e.getValue() != null) {
-          json.put(HttpFSFileSystem.XATTR_VALUE_JSON, 
+          json.put(HttpFSConstants.XATTR_VALUE_JSON,
               XAttrCodec.encodeValue(e.getValue(), encoding));
         }
         jsonArray.add(json);
       }
     }
-    jsonMap.put(HttpFSFileSystem.XATTRS_JSON, jsonArray);
+    jsonMap.put(HttpFSConstants.XATTRS_JSON, jsonArray);
     return jsonMap;
   }
 
@@ -285,7 +285,7 @@ public final class FSOperations {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static Map xAttrNamesToJSON(List<String> names) throws IOException {
     Map jsonMap = new LinkedHashMap();
-    jsonMap.put(HttpFSFileSystem.XATTRNAMES_JSON,
+    jsonMap.put(HttpFSConstants.XATTRNAMES_JSON,
         JSONArray.toJSONString(names));
     return jsonMap;
   }
@@ -301,25 +301,25 @@ public final class FSOperations {
   @SuppressWarnings({"unchecked"})
   private static Map contentSummaryToJSON(ContentSummary contentSummary) {
     Map json = new LinkedHashMap();
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_DIRECTORY_COUNT_JSON,
+    json.put(HttpFSConstants.CONTENT_SUMMARY_DIRECTORY_COUNT_JSON,
         contentSummary.getDirectoryCount());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_ECPOLICY_JSON,
+    json.put(HttpFSConstants.CONTENT_SUMMARY_ECPOLICY_JSON,
         contentSummary.getErasureCodingPolicy());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_FILE_COUNT_JSON,
+    json.put(HttpFSConstants.CONTENT_SUMMARY_FILE_COUNT_JSON,
         contentSummary.getFileCount());
-    json.put(HttpFSFileSystem.CONTENT_SUMMARY_LENGTH_JSON,
+    json.put(HttpFSConstants.CONTENT_SUMMARY_LENGTH_JSON,
         contentSummary.getLength());
     Map<String, Object> quotaUsageMap = quotaUsageToMap(contentSummary);
     for (Map.Entry<String, Object> e : quotaUsageMap.entrySet()) {
       // For ContentSummary we don't need this since we already have
       // separate count for file and directory.
       if (!e.getKey().equals(
-          HttpFSFileSystem.QUOTA_USAGE_FILE_AND_DIRECTORY_COUNT_JSON)) {
+          HttpFSConstants.QUOTA_USAGE_FILE_AND_DIRECTORY_COUNT_JSON)) {
         json.put(e.getKey(), e.getValue());
       }
     }
     Map response = new LinkedHashMap();
-    response.put(HttpFSFileSystem.CONTENT_SUMMARY_JSON, json);
+    response.put(HttpFSConstants.CONTENT_SUMMARY_JSON, json);
     return response;
   }
 
@@ -331,18 +331,18 @@ public final class FSOperations {
   private static Map quotaUsageToJSON(QuotaUsage quotaUsage) {
     Map response = new LinkedHashMap();
     Map quotaUsageMap = quotaUsageToMap(quotaUsage);
-    response.put(HttpFSFileSystem.QUOTA_USAGE_JSON, quotaUsageMap);
+    response.put(HttpFSConstants.QUOTA_USAGE_JSON, quotaUsageMap);
     return response;
   }
 
   private static Map<String, Object> quotaUsageToMap(QuotaUsage quotaUsage) {
     Map<String, Object> result = new LinkedHashMap<>();
-    result.put(HttpFSFileSystem.QUOTA_USAGE_FILE_AND_DIRECTORY_COUNT_JSON,
+    result.put(HttpFSConstants.QUOTA_USAGE_FILE_AND_DIRECTORY_COUNT_JSON,
         quotaUsage.getFileAndDirectoryCount());
-    result.put(HttpFSFileSystem.QUOTA_USAGE_QUOTA_JSON, quotaUsage.getQuota());
-    result.put(HttpFSFileSystem.QUOTA_USAGE_SPACE_CONSUMED_JSON,
+    result.put(HttpFSConstants.QUOTA_USAGE_QUOTA_JSON, quotaUsage.getQuota());
+    result.put(HttpFSConstants.QUOTA_USAGE_SPACE_CONSUMED_JSON,
         quotaUsage.getSpaceConsumed());
-    result.put(HttpFSFileSystem.QUOTA_USAGE_SPACE_QUOTA_JSON,
+    result.put(HttpFSConstants.QUOTA_USAGE_SPACE_QUOTA_JSON,
         quotaUsage.getSpaceQuota());
     Map<String, Map<String, Long>> typeQuota = new TreeMap<>();
     for (StorageType t : StorageType.getTypesSupportingQuota()) {
@@ -353,13 +353,13 @@ public final class FSOperations {
           type = new TreeMap<>();
           typeQuota.put(t.toString(), type);
         }
-        type.put(HttpFSFileSystem.QUOTA_USAGE_QUOTA_JSON,
+        type.put(HttpFSConstants.QUOTA_USAGE_QUOTA_JSON,
             quotaUsage.getTypeQuota(t));
-        type.put(HttpFSFileSystem.QUOTA_USAGE_CONSUMED_JSON,
+        type.put(HttpFSConstants.QUOTA_USAGE_CONSUMED_JSON,
             quotaUsage.getTypeConsumed(t));
       }
     }
-    result.put(HttpFSFileSystem.QUOTA_USAGE_TYPE_QUOTA_JSON, typeQuota);
+    result.put(HttpFSConstants.QUOTA_USAGE_TYPE_QUOTA_JSON, typeQuota);
     return result;
   }
 
@@ -416,8 +416,8 @@ public final class FSOperations {
         jsonArray.add(policyMap);
       }
     }
-    policies.put(HttpFSFileSystem.STORAGE_POLICY_JSON, jsonArray);
-    json.put(HttpFSFileSystem.STORAGE_POLICIES_JSON, policies);
+    policies.put(HttpFSConstants.STORAGE_POLICY_JSON, jsonArray);
+    json.put(HttpFSConstants.STORAGE_POLICIES_JSON, policies);
     return json;
   }
 
@@ -540,7 +540,7 @@ public final class FSOperations {
       boolean result = fs.truncate(path, newLength);
       HttpFSServerWebApp.get().getMetrics().incrOpsTruncate();
       return toJSON(
-          StringUtils.toLowerCase(HttpFSFileSystem.TRUNCATE_JSON), result);
+          StringUtils.toLowerCase(HttpFSConstants.TRUNCATE_JSON), result);
     }
 
   }
@@ -758,7 +758,7 @@ public final class FSOperations {
       boolean deleted = fs.delete(path, recursive);
       HttpFSServerWebApp.get().getMetrics().incrOpsDelete();
       return toJSON(
-          StringUtils.toLowerCase(HttpFSFileSystem.DELETE_JSON), deleted);
+          StringUtils.toLowerCase(HttpFSConstants.DELETE_JSON), deleted);
     }
 
   }
@@ -856,7 +856,7 @@ public final class FSOperations {
     public JSONObject execute(FileSystem fs) throws IOException {
       Path homeDir = fs.getHomeDirectory();
       JSONObject json = new JSONObject();
-      json.put(HttpFSFileSystem.HOME_DIR_JSON, homeDir.toUri().getPath());
+      json.put(HttpFSConstants.HOME_DIR_JSON, homeDir.toUri().getPath());
       return json;
     }
   }
@@ -992,7 +992,7 @@ public final class FSOperations {
       }
       boolean mkdirs = fs.mkdirs(path, fsPermission);
       HttpFSServerWebApp.get().getMetrics().incrOpsMkdir();
-      return toJSON(HttpFSFileSystem.MKDIRS_JSON, mkdirs);
+      return toJSON(HttpFSConstants.MKDIRS_JSON, mkdirs);
     }
 
   }
@@ -1066,7 +1066,7 @@ public final class FSOperations {
     public JSONObject execute(FileSystem fs) throws IOException {
       boolean renamed = fs.rename(path, toPath);
       HttpFSServerWebApp.get().getMetrics().incrOpsRename();
-      return toJSON(HttpFSFileSystem.RENAME_JSON, renamed);
+      return toJSON(HttpFSConstants.RENAME_JSON, renamed);
     }
 
   }
@@ -1352,7 +1352,7 @@ public final class FSOperations {
     public JSONObject execute(FileSystem fs) throws IOException {
       Path trashRoot = fs.getTrashRoot(this.path);
       JSONObject json = new JSONObject();
-      json.put(HttpFSFileSystem.TRASH_DIR_JSON, trashRoot.toUri().getPath());
+      json.put(HttpFSConstants.TRASH_DIR_JSON, trashRoot.toUri().getPath());
       return json;
     }
 
@@ -1428,7 +1428,7 @@ public final class FSOperations {
     public JSONObject execute(FileSystem fs) throws IOException {
       boolean ret = fs.setReplication(path, replication);
       JSONObject json = new JSONObject();
-      json.put(HttpFSFileSystem.SET_REPLICATION_JSON, ret);
+      json.put(HttpFSConstants.SET_REPLICATION_JSON, ret);
       return json;
     }
 
@@ -1639,7 +1639,7 @@ public final class FSOperations {
     public JSONObject execute(FileSystem fs) throws IOException {
       BlockStoragePolicySpi storagePolicy = fs.getStoragePolicy(path);
       JSONObject json = new JSONObject();
-      json.put(HttpFSFileSystem.STORAGE_POLICY_JSON,
+      json.put(HttpFSConstants.STORAGE_POLICY_JSON,
           storagePolicyToJSON(storagePolicy));
       return json;
     }
@@ -1790,7 +1790,7 @@ public final class FSOperations {
     @Override
     public String execute(FileSystem fs) throws IOException {
       Path snapshotPath = fs.createSnapshot(path, snapshotName);
-      JSONObject json = toJSON(HttpFSFileSystem.HOME_DIR_JSON,
+      JSONObject json = toJSON(HttpFSConstants.HOME_DIR_JSON,
           snapshotPath.toString());
       return json.toJSONString().replaceAll("\\\\", "");
     }
