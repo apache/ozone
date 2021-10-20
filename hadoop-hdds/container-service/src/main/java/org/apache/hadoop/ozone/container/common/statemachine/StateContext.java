@@ -68,6 +68,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 
 import org.apache.commons.collections.CollectionUtils;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -619,18 +620,16 @@ public class StateContext {
 
       if (!isThreadPoolAvailable(service)) {
         long count = threadPoolNotAvailableCount.incrementAndGet();
-        long unavailableTime =
-            System.currentTimeMillis() - lastHeartbeatSent.get();
+        long unavailableTime = Time.monotonicNow() - lastHeartbeatSent.get();
         if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
           LOG.warn("No available thread in pool for the past {} seconds " +
               "and {} times.", unit.toSeconds(unavailableTime), count);
         }
         return;
       }
-      
       threadPoolNotAvailableCount.set(0);
       task.execute(service);
-      lastHeartbeatSent.set(System.currentTimeMillis());
+      lastHeartbeatSent.set(Time.monotonicNow());
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
       if (this.state != newState) {
         if (LOG.isDebugEnabled()) {
