@@ -2117,7 +2117,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 obj.getVolumeName() + " ": "";
         String bucketName = obj.getBucketName() != null?
                 obj.getBucketName() + " ": "";
-        String keyName = obj.getKeyName() != null? obj.getKeyName() + " ": "";
+        String keyName = obj.getKeyName() != null? obj.getKeyName() : "";
         LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
             context.getClientUgi().getUserName(), context.getAclRights(),
             obj.getResourceType(), obj.getVolumeName(), obj.getBucketName(),
