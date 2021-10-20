@@ -248,8 +248,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     return ioException.get();
   }
 
-
-
   @Override
   public void write(ByteBuffer b, int off, int len) throws IOException {
     checkOpen();
@@ -459,7 +457,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
       } finally {
-
         cleanup(false);
       }
 
