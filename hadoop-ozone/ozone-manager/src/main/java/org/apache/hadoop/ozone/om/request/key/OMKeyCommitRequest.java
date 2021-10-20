@@ -197,6 +197,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
+      // Strip out tokens before adding to cache.
+      // This way during listStatus token information does not pass on to
+      // client when reading from cache.
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        omKeyInfo = omKeyInfo.copyObject();
+        omKeyInfo.getLatestVersionLocations().getLocationList()
+            .forEach(keyInfo -> keyInfo.setToken(null));
+      }
+
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOzoneKey),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
