@@ -622,7 +622,7 @@ public final class TestUtils {
     return StorageContainerManager.createSCM(conf, configurator);
   }
 
-  public static ContainerInfo getContainer(
+  private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
         .setContainerID(RandomUtils.nextLong())
@@ -630,21 +630,20 @@ public final class TestUtils {
             new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(state)
         .setSequenceId(10000L)
+        .setOwner("TEST");
+  }
+
+  public static ContainerInfo getContainer(
+      final HddsProtos.LifeCycleState state) {
+    return getDefaultContainerInfoBuilder(state)
         .setPipelineID(randomPipelineID)
-        .setOwner("TEST")
         .build();
   }
 
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state, PipelineID pipelineID) {
-    return new ContainerInfo.Builder()
-        .setContainerID(RandomUtils.nextLong())
-        .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
-        .setState(state)
-        .setSequenceId(10000L)
+    return getDefaultContainerInfoBuilder(state)
         .setPipelineID(pipelineID)
-        .setOwner("TEST")
         .build();
   }
 
