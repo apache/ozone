@@ -106,7 +106,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
             .getKeyLocationVersions().size());
 
     // Write to DB like key commit.
-    omMetadataManager.getKeyTable().put(getOzoneKey(),
+    omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(),
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
 
     // Override same key again
@@ -567,9 +567,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Check intermediate paths are created
     keyPath = keyPath.getParent();
     while(keyPath != null) {
-      Assert.assertNotNull(omMetadataManager.getKeyTable().get(
-          omMetadataManager.getOzoneDirKey(volumeName, bucketName,
-              keyPath.toString())));
+      Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
+          omMetadataManager
+              .getOzoneDirKey(volumeName, bucketName, keyPath.toString())));
       keyPath = keyPath.getParent();
     }
     return -1;

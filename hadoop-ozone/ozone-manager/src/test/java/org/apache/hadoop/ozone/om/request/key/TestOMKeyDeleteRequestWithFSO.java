@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -48,6 +47,11 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
   }
 
   @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Override
   protected String addKeyToTable() throws Exception {
     String parentDir = "c/d/e";
     String fileName = "file1";
@@ -70,14 +74,6 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     return omKeyInfo.getPath();
   }
 
-  @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Setting explicitly to FSO
-    super.setBucketlayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    return config;
-  }
-
   @Test
   public void testOzonePrefixPathViewer() throws Exception {
     // Add volume, bucket and key entries to OM DB.
@@ -86,7 +82,8 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     String ozoneKey = addKeyToTable();
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);

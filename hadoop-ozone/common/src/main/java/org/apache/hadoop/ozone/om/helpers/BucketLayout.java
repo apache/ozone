@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -58,5 +59,12 @@ public enum BucketLayout {
       throw new IllegalArgumentException(
           "Error: BucketLayout not found, type=" + this);
     }
+  }
+
+  public static BucketLayout fromString(String value) {
+    // This will never be null in production but can be null in mocked
+    // unit test cases.
+    // Added safer `isBlank` check for unit test cases.
+    return StringUtils.isBlank(value) ? LEGACY : BucketLayout.valueOf(value);
   }
 }

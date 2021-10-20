@@ -943,4 +943,20 @@ public class TestOzoneShellHA {
     testVolumes.forEach(vol -> execute(ozoneShell, new String[] {
         "volume", "delete", vol}));
   }
+
+  @Test
+  public void testClientBucketLayoutValidation() throws Exception {
+    String[] args = new String[]{
+        "bucket", "create", "o3://" + omServiceId + "/volume7" + "/bucketTest1",
+        "--type", "LEGACY"
+    };
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Should throw exception on unsupported bucket layouts!");
+    } catch (Exception e) {
+      GenericTestUtils.assertExceptionContains(
+          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE] ",
+          e);
+    }
+  }
 }

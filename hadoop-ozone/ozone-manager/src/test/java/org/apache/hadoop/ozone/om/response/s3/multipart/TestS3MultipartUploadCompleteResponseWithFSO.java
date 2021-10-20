@@ -111,7 +111,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNotNull(omMetadataManager.getKeyTable().get(dbKey));
+    Assert.assertNotNull(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
     Assert.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
@@ -178,7 +179,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     String dbKey = omMetadataManager.getOzonePathKey(parentID,
           omKeyInfoFSO.getFileName());
-    Assert.assertNotNull(omMetadataManager.getKeyTable().get(dbKey));
+    Assert.assertNotNull(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
     Assert.assertNull(
             omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
     Assert.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
