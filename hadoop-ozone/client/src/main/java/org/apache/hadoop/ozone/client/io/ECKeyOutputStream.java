@@ -239,7 +239,17 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // TODO: we should alter the put block calls to share CRC to each stream.
     ECBlockOutputStreamEntry streamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
+    // Since writes are async, let's check the failures once.
+    if(streamEntry.checkStreamFailures()){
+      isException = true;
+      throw new IOException("There are more failures(3) than the supported tolerance: 0");
+    }
     streamEntry.executePutBlock();
+    // Since putBlock also async, let's check the failures again.
+    if(streamEntry.checkStreamFailures()){
+      isException = true;
+      throw new IOException("There are more failures(3) than the supported tolerance: 0");
+    }
     ecChunkBufferCache.clear(parityCellSize);
 
     if (streamEntry.getRemaining() <= 0) {

@@ -87,7 +87,7 @@ public class BlockOutputStream extends OutputStream {
   private OzoneClientConfig config;
 
   private int chunkIndex;
-  private final AtomicLong chunkOffset = new AtomicLong();
+  private AtomicLong chunkOffset = new AtomicLong();
   private final BufferPool bufferPool;
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
@@ -176,6 +176,18 @@ public class BlockOutputStream extends OutputStream {
     currentBuffer = bufferPool.getCurrentBuffer();
     currentBufferRemaining =
         currentBuffer != null ? currentBuffer.remaining() : 0;
+  }
+
+  public Checksum getCheckSum(){
+    return this.checksum;
+  }
+
+  public AtomicLong getChunkOffset(){
+    return this.chunkOffset;
+  }
+
+  public int incrChunkIdx(){
+    return ++this.chunkIndex;
   }
 
   public BlockID getBlockID() {
@@ -598,7 +610,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  void setIoException(Exception e) {
+  public void setIoException(Exception e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -654,8 +666,9 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException if there is an I/O error while performing the call
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
+   * @return
    */
-  void writeChunkToContainer(ChunkBuffer chunk) throws IOException {
+  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -700,6 +713,7 @@ public class BlockOutputStream extends OutputStream {
       handleInterruptedException(ex, false);
     }
     containerBlockData.addChunks(chunkInfo);
+    return null;
   }
 
   @VisibleForTesting

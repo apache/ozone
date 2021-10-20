@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.client;
 
+import com.sun.xml.internal.bind.v2.runtime.output.StAXExStreamWriterOutput;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -46,6 +47,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -420,6 +422,88 @@ public class TestOzoneECClient {
     }
   }
 
+  @Test
+  public void testWriteShouldFailIfMoreThanParityNodesFail()
+      throws IOException {
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, 1024*3,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      Map<DatanodeDetails, MockDatanodeStorage> storages =
+          ((MockXceiverClientFactory) factoryStub).getStorages();
+      DatanodeDetails[] dnDetails =
+          storages.keySet().toArray(new DatanodeDetails[storages.size()]);
+      for (int i = 0; i < parityBlocks + 1; i++) {
+        failedDNs.add(dnDetails[i]);
+      }
+
+
+      // First let's set > parity storages as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      ((MockXceiverClientFactory) ((ECKeyOutputStream) out.getOutputStream())
+          .getXceiverClientFactory()).getStorages().clear();
+
+      try {
+        for (int i = 0; i < dataBlocks; i++) {
+          out.write(inputChunks[i]);
+        }
+        Assert.fail(
+            "Expected the failure as we have more than parity blocks failed.");
+      } catch (IOException e) {
+        Assert.assertEquals(
+            "There are more failures(3) than the supported tolerance: 0",
+            e.getMessage());
+      }
+    }
+  }
+
+ // @Test
+  public void testWriteShouldSuccessIfLessThanParityNodesFail()
+      throws IOException {
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    try (OzoneOutputStream out = bucket
+        .createKey(keyName, 2000, new ECReplicationConfig(3, 2),
+            new HashMap<>())) {
+      for (int i = 0; i < dataBlocks; i++) {
+        out.write(inputChunks[i]);
+      }
+
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      Map<DatanodeDetails, MockDatanodeStorage> storages =
+          ((MockXceiverClientFactory) factoryStub).getStorages();
+      DatanodeDetails[] dnDetails =
+          storages.keySet().toArray(new DatanodeDetails[storages.size()]);
+      for (int i = 0; i < parityBlocks - 1; i++) {
+        failedDNs.add(dnDetails[i]);
+      }
+
+      // First let's set > parity storages as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      ((MockXceiverClientFactory) ((ECKeyOutputStream) out.getOutputStream())
+          .getXceiverClientFactory()).getStorages().clear();
+
+      for (int i = 0; i < 1024; i++) {
+        out.write(inputChunks[0]);
+      }
+    }
+  }
+
+
   private OzoneBucket writeIntoECKey(byte[] data, String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     return writeIntoECKey(new byte[][] {data}, key, defaultReplicationConfig);
@@ -448,6 +532,8 @@ public class TestOzoneECClient {
     }
     return bucket;
   }
+
+
 
   private void updatePipelineToKeepSingleNode(int keepingNodeIndex) {
     Map<String, Map<String, Map<String, OzoneManagerProtocolProtos.KeyInfo>>>

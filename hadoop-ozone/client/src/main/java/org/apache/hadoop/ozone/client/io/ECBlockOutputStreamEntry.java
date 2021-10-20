@@ -22,11 +22,14 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -37,9 +40,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -58,6 +64,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
 
   private ECBlockOutputStream[] blockOutputStreams;
   private int currentStreamIdx = 0;
+  private boolean isFailed = false;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
@@ -123,6 +130,14 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
 
   public void useNextBlockStream() {
     currentStreamIdx++;
+  }
+
+  public void markFailed() {
+    this.isFailed = true;
+  }
+
+  public boolean isFailed() {
+    return this.isFailed;
   }
 
   public void forceToFirstParityBlock(){
@@ -251,23 +266,14 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     if (!isInitialized()) {
       return;
     }
-    int failedStreams = 0;
     for (ECBlockOutputStream stream : blockOutputStreams) {
       if (stream == null) {
         continue;
       }
-      if (!stream.isClosed()) {
-        stream.executePutBlock(false, true);
-      } else {
-        failedStreams++;
-      }
-      if(failedStreams > replicationConfig.getParity()) {
-        throw new IOException(
-            "There are " + failedStreams + " block write failures,"
-                + " supported tolerance: " + replicationConfig.getParity());
-      }
+      stream.executePutBlock(false, true);
     }
   }
+
 
   private BlockID underlyingBlockID() {
     if (blockOutputStreams[0] == null) {
@@ -277,6 +283,63 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     // this entry, so updating based on the first stream, as when we write any
     // data that is surely exists.
     return blockOutputStreams[0].getBlockID();
+  }
+
+  public boolean checkStreamFailures(){
+    final Iterator<ECBlockOutputStream> iter = blockStreams().iterator();
+    while(iter.hasNext()){
+      final ECBlockOutputStream stream = iter.next();
+      final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          chunkWriteResponseFuture = stream != null ?
+          stream.getCurrentChunkResponseFuture() : null;
+      if(isFailed(stream, chunkWriteResponseFuture)){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean isFailed(
+      ECBlockOutputStream outputStream,
+      CompletableFuture<ContainerProtos.
+          ContainerCommandResponseProto> chunkWriteResponseFuture) {
+    ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto
+        = null;
+    try {
+      containerCommandResponseProto = chunkWriteResponseFuture != null ?
+          chunkWriteResponseFuture.get() :
+          null;
+    } catch (InterruptedException e) {
+      outputStream.setIoException(e);
+      Thread.currentThread().interrupt();
+    } catch (ExecutionException e) {
+      outputStream.setIoException(e);
+    }
+
+    if ((outputStream != null && containerCommandResponseProto != null)
+        && (outputStream.getIoException() != null || isStreamFailed(
+        containerCommandResponseProto, outputStream))) {
+      return true;
+    }
+    return false;
+  }
+
+  boolean isStreamFailed(
+      ContainerProtos.ContainerCommandResponseProto responseProto,
+      ECBlockOutputStream stream) {
+    try {
+      // if the ioException is already set, it means a prev request has failed
+      // just return true.
+      IOException exception = stream.getIoException();
+      if (exception != null) {
+        return true;
+      }
+      ContainerProtocolCalls.validateContainerResponse(responseProto);
+    } catch (StorageContainerException sce) {
+      stream.setIoException(sce);
+      return true;
+    }
+    return false;
   }
 
   private boolean isWritingParity() {
