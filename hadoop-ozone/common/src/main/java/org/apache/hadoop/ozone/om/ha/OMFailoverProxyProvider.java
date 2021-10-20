@@ -45,6 +45,9 @@ import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc.RpcException;
+import org.apache.hadoop.ipc.RpcNoSuchMethodException;
+import org.apache.hadoop.ipc.RpcNoSuchProtocolException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -54,6 +57,7 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.ratis.protocol.exceptions.StateMachineException;
@@ -451,8 +455,9 @@ public class OMFailoverProxyProvider<T> implements
     return waitBetweenRetries;
   }
 
-  public synchronized boolean shouldFailover(Exception ex) {
-    if (OmUtils.isAccessControlException(ex)) {
+  private synchronized boolean shouldFailover(Exception ex) {
+    Throwable unwrappedException = OmUtils.getUnwrappedException(ex);
+    if (unwrappedException instanceof AccessControlException) {
       // Retry all available OMs once before failing with
       // AccessControlException.
       if (accessControlExceptionOMs.contains(currentProxyOMNodeId)) {
@@ -463,6 +468,19 @@ public class OMFailoverProxyProvider<T> implements
         if (accessControlExceptionOMs.containsAll(omNodeIDList)) {
           return false;
         }
+      }
+    } else if (unwrappedException instanceof RpcException) {
+      // Do not failover for following exceptions
+      if (unwrappedException instanceof RpcNoSuchMethodException ||
+          unwrappedException instanceof RpcNoSuchProtocolException ||
+          unwrappedException instanceof RPC.VersionMismatch) {
+        return false;
+      }
+      if (unwrappedException.getMessage().contains(
+          "RPC response exceeds maximum data length") ||
+          unwrappedException.getMessage().contains(
+              "RPC response has invalid length")) {
+        return false;
       }
     } else if (ex instanceof StateMachineException) {
       StateMachineException smEx = (StateMachineException) ex;

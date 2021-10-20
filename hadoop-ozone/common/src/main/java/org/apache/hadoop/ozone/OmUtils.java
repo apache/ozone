@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc.RpcException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -621,23 +622,27 @@ public final class OmUtils {
 
   /**
    * Unwrap exception to check if it is some kind of access control problem
-   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
+   * ({@link AccessControlException} or {@link SecretManager.InvalidToken})
+   * or a RpcException.
    */
-  public static boolean isAccessControlException(Exception ex) {
+  public static Throwable getUnwrappedException(Exception ex) {
     if (ex instanceof ServiceException) {
       Throwable t = ex.getCause();
       if (t instanceof RemoteException) {
         t = ((RemoteException) t).unwrapRemoteException();
       }
       while (t != null) {
+        if (t instanceof RpcException) {
+          return t;
+        }
         if (t instanceof AccessControlException ||
             t instanceof SecretManager.InvalidToken) {
-          return true;
+          return t;
         }
         t = t.getCause();
       }
     }
-    return false;
+    return null;
   }
 
   /**
