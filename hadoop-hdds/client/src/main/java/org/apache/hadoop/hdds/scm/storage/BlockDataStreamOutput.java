@@ -259,7 +259,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
 
     final StreamBuffer buf = new StreamBuffer(b, off, len);
-    bufferList.add(new StreamBuffer(b, off, len));
+    bufferList.add(buf);
 
     writeChunkToContainer(buf.duplicate());
 
@@ -290,12 +290,13 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     int count = 0;
     while (len > 0) {
-      StreamBuffer buf = bufferList.get(count);
-      long writeLen = Math.min(buf.length(), len);
-      if (writeLen == len){
-        buf.setLimit((int) len);
+      final StreamBuffer buf = bufferList.get(count);
+      final long writeLen = Math.min(buf.length(), len);
+      final ByteBuffer duplicated = buf.duplicate();
+      if (writeLen != buf.length()) {
+        duplicated.limit(Math.toIntExact(len));
       }
-      writeChunkToContainer(buf.duplicate());
+      writeChunkToContainer(duplicated);
       len -= writeLen;
       count++;
       writtenDataLength += writeLen;
