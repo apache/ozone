@@ -182,22 +182,22 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // Allow Volume List access
         AccessPolicy tenantVolumeAccessPolicy = createVolumeAccessPolicy(
             volumeName, allTenantUsers);
-//        tenantVolumeAccessPolicy.setPolicyID(
-//            authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
+        tenantVolumeAccessPolicy.setPolicyID(
+            authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
         tenant.addTenantAccessPolicy(tenantVolumeAccessPolicy);
 
         // Allow Bucket Create within Volume
         AccessPolicy tenantBucketCreatePolicy = allowCreateBucketPolicy(
             volumeName, allTenantUsers);
-        //tenantBucketCreatePolicy.setPolicyID(
-        //    authorizer.createAccessPolicy(tenantBucketCreatePolicy));
-        //tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
+        tenantBucketCreatePolicy.setPolicyID(
+            authorizer.createAccessPolicy(tenantBucketCreatePolicy));
+        tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
       }
 
       tenantCache.put(tenantID, new CachedTenantInfo(tenantID));
     } catch (Exception e) {
       try {
-//        removeTenantAccessFromAuthorizer(tenant);
+        removeTenantAccessFromAuthorizer(tenant);
       } catch (Exception exception) {
         // Best effort cleanup.
       }
@@ -376,7 +376,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       throw new OMException(INVALID_TENANT_ACCESSID);
     }
     return omDBAccessIdInfo.getTenantId();
-    }
+  }
 
   public List<String> listAllAccessIDs(String tenantID)
       throws IOException {

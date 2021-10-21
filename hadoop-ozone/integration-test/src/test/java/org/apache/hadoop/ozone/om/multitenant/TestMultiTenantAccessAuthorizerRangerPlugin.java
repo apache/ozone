@@ -228,8 +228,8 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     return tenantVolumeAccessPolicy;
   }
 
-  private AccessPolicy allowAccessBucketPolicy(String vol, String bucketName,
-                                               String tenant) throws IOException {
+  private AccessPolicy allowAccessBucketPolicy(
+      String vol, String bucketName, String tenant) throws IOException {
     OzoneTenantGroupPrincipal principal =
         OzoneTenantGroupPrincipal.newUserGroup(tenant);
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(

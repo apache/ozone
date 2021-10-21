@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
