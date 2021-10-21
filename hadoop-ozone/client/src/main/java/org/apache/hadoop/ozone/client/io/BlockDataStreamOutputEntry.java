@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.StreamBuffer;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Helper class used inside {@link BlockDataStreamOutput}.
@@ -50,6 +52,7 @@ public final class BlockDataStreamOutputEntry
   // the current position of this stream 0 <= currentPosition < length
   private long currentPosition;
   private final Token<OzoneBlockTokenIdentifier> token;
+  private List<StreamBuffer> bufferList;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   private BlockDataStreamOutputEntry(
@@ -58,7 +61,8 @@ public final class BlockDataStreamOutputEntry
       Pipeline pipeline,
       long length,
       Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config
+      OzoneClientConfig config,
+      List<StreamBuffer> bufferList
   ) {
     this.config = config;
     this.byteBufferStreamOutput = null;
@@ -69,6 +73,7 @@ public final class BlockDataStreamOutputEntry
     this.token = token;
     this.length = length;
     this.currentPosition = 0;
+    this.bufferList = bufferList;
   }
 
   long getLength() {
@@ -92,8 +97,8 @@ public final class BlockDataStreamOutputEntry
   private void checkStream() throws IOException {
     if (this.byteBufferStreamOutput == null) {
       this.byteBufferStreamOutput =
-          new BlockDataStreamOutput(blockID, xceiverClientManager,
-              pipeline, config, token);
+          new BlockDataStreamOutput(blockID, xceiverClientManager, pipeline,
+              config, token, bufferList);
     }
   }
 
@@ -151,6 +156,20 @@ public final class BlockDataStreamOutputEntry
     }
   }
 
+  long getTotalAckDataLength() {
+    if (byteBufferStreamOutput != null) {
+      BlockDataStreamOutput out =
+          (BlockDataStreamOutput) this.byteBufferStreamOutput;
+      blockID = out.getBlockID();
+      return out.getTotalAckDataLength();
+    } else {
+      // For a pre allocated block for which no write has been initiated,
+      // the OutputStream will be null here.
+      // In such cases, the default blockCommitSequenceId will be 0
+      return 0;
+    }
+  }
+
   void cleanup(boolean invalidateClient) throws IOException {
     checkStream();
     BlockDataStreamOutput out =
@@ -180,6 +199,7 @@ public final class BlockDataStreamOutputEntry
     private long length;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
+    private List<StreamBuffer> bufferList;
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -219,13 +239,18 @@ public final class BlockDataStreamOutputEntry
       return this;
     }
 
+    public Builder setBufferList(List<StreamBuffer> bList) {
+      this.bufferList = bList;
+      return this;
+    }
+
     public BlockDataStreamOutputEntry build() {
       return new BlockDataStreamOutputEntry(blockID,
           key,
           xceiverClientManager,
           pipeline,
           length,
-          token, config);
+          token, config, bufferList);
     }
   }
 
