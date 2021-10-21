@@ -92,6 +92,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
+
+  // Similar to 'BufferPool' but this list maintains only references
+  // to the ByteBuffers.
+  private List<StreamBuffer> bufferList;
+
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
   // request will fail upfront.
@@ -133,7 +138,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       OzoneClientConfig config,
-      Token<? extends TokenIdentifier> token
+      Token<? extends TokenIdentifier> token,
+      List<StreamBuffer> bufferList
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -148,7 +154,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
     this.token = token;
-
+    this.bufferList = bufferList;
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
         .getStreamBufferSize());
 
@@ -159,7 +165,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    commitWatcher = new StreamCommitWatcher(xceiverClient);
+    commitWatcher = new StreamCommitWatcher(xceiverClient, bufferList);
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
@@ -251,8 +257,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (len == 0) {
       return;
     }
-    writeChunkToContainer(
-            (ByteBuffer) b.asReadOnlyBuffer().position(off).limit(off + len));
+
+    final StreamBuffer buf = new StreamBuffer(b, off, len);
+    bufferList.add(buf);
+
+    writeChunkToContainer(buf.duplicate());
 
     writtenDataLength += len;
   }
@@ -261,6 +270,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     totalDataFlushedLength = writtenDataLength;
   }
 
+  @VisibleForTesting
+  public long getTotalDataFlushedLength() {
+    return totalDataFlushedLength;
+  }
   /**
    * Will be called on the retryPath in case closedContainerException/
    * TimeoutException.
@@ -268,8 +281,27 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @throws IOException if error occurred
    */
 
-  // TODO: We need add new retry policy without depend on bufferPool.
   public void writeOnRetry(long len) throws IOException {
+    if (len == 0) {
+      return;
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Retrying write length {} for blockID {}", len, blockID);
+    }
+    int count = 0;
+    while (len > 0) {
+      final StreamBuffer buf = bufferList.get(count);
+      final long writeLen = Math.min(buf.length(), len);
+      final ByteBuffer duplicated = buf.duplicate();
+      if (writeLen != buf.length()) {
+        duplicated.limit(Math.toIntExact(len));
+      }
+      writeChunkToContainer(duplicated);
+      len -= writeLen;
+      count++;
+      writtenDataLength += writeLen;
+    }
+
 
   }
 
@@ -314,6 +346,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
+    final List<StreamBuffer> byteBufferList;
+    if (!force) {
+      Preconditions.checkNotNull(bufferList);
+      byteBufferList = bufferList;
+      Preconditions.checkNotNull(byteBufferList);
+    } else {
+      byteBufferList = null;
+    }
     flush();
     if (close) {
       dataStreamCloseReply = out.closeAsync();
@@ -344,12 +384,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "Adding index " + asyncReply.getLogIndex() + " commitMap size "
-                    + commitWatcher.getCommitInfoSetSize() + " flushLength "
+                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
                     + flushPos + " blockID " + blockID);
           }
           // for standalone protocol, logIndex will always be 0.
-          commitWatcher.updateCommitInfoSet(
-              asyncReply.getLogIndex());
+          commitWatcher
+              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -588,5 +628,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
     throw getIoException();
+  }
+
+  public long getTotalAckDataLength() {
+    return commitWatcher.getTotalAckDataLength();
   }
 }
