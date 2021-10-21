@@ -199,9 +199,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // Strip out tokens before adding to cache.
       // This way during listStatus token information does not pass on to
-      // client when reading from cache.
+      // client when returning from cache.
       if (ozoneManager.isGrpcBlockTokenEnabled()) {
-        omKeyInfo = omKeyInfo.copyObject();
         omKeyInfo.getLatestVersionLocations().getLocationList()
             .forEach(keyInfo -> keyInfo.setToken(null));
       }
