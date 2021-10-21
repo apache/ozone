@@ -144,35 +144,30 @@ public class BlockInputStream extends InputStream
     }
 
     List<ChunkInfo> chunks = null;
-    try {
-      chunks = getChunkInfos();
-    } catch(SCMSecurityException ex) {
-      throw ex;
-    } catch (IOException ioEx) {
-      // If refresh returns new pipeline, retry with it.
-      // If we get IOException due to connectivity issue,
-      // retry according to retry policy.
-      LOG.debug("Retry to get chunk info fail", ioEx);
-      if (ioEx instanceof StorageContainerException) {
-        refreshPipeline(ioEx);
+    IOException catchEx = null;
+    do {
+      try {
+        // If refresh returns new pipeline, retry with it.
+        // If we get IOException due to connectivity issue,
+        // retry according to retry policy.
+        chunks = getChunkInfos();
+        break;
+      } catch(SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException ex) {
+        refreshPipeline(ex);
+        catchEx = ex;
+      } catch (IOException ex) {
+        LOG.debug("Retry to get chunk info fail", ex);
+        catchEx = ex;
       }
-      IOException catchEx = ioEx;
-      while (shouldRetryRead(catchEx)) {
-        try {
-          chunks = getChunkInfos();
-        } catch (StorageContainerException ex) {
-          refreshPipeline(ex);
-        } catch (IOException exception) {
-          catchEx = exception;
-        }
-      }
+    } while (shouldRetryRead(catchEx));
 
-      if (chunks == null) {
-        throw catchEx;
-      } else {
-        // Reset retry count if we get chunks successfully.
-        retries = 0;
-      }
+    if (chunks == null) {
+      throw catchEx;
+    } else {
+      // Reset retry count if we get chunks successfully.
+      retries = 0;
     }
 
     if (chunks != null && !chunks.isEmpty()) {
