@@ -267,6 +267,7 @@ public final class OmUtils {
     case PrepareStatus:
     case GetS3Volume:
     case TenantGetUserInfo:
+    case TenantListUser:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -307,7 +308,6 @@ public final class OmUtils {
     case DeleteTenant:
     case AssignUserToTenant:
     case RevokeUserAccessToTenant:
-    case TenantListUser:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

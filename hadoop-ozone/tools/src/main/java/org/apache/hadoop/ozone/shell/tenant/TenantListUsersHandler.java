@@ -19,11 +19,15 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.s3.S3Handler;
 
@@ -32,7 +36,7 @@ import picocli.CommandLine;
 /**
  * Command to list users in a tenant along with corresponding accessId.
  */
-@CommandLine.Command(name = "list-users",
+@CommandLine.Command(name = "list",
     description = "List Tenant Users")
 public class TenantListUsersHandler extends S3Handler {
 
@@ -58,7 +62,10 @@ public class TenantListUsersHandler extends S3Handler {
     try {
       TenantUserList usersInTenant =
           objStore.listUsersInTenant(tenantName, prefix);
-      printObjectAsJson(usersInTenant);
+      for (TenantUserAccessId accessIdInfo : usersInTenant.getUserAccessIds()) {
+        out().println("- User '" + accessIdInfo.getUser() +
+            "' with accessId '" + accessIdInfo.getAccessId() + "'");
+      }
     } catch (IOException e) {
       err().println("Failed to Get Users in tenant '" + tenantName
           + "': " + e.getMessage());

@@ -395,9 +395,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       builder.setSuccess(false);
     } else {
       builder.setSuccess(true);
-      builder.setTenantUserList(usersInTenant.getProtobuf());
+      builder.setTenantName(request.getTenantName());
+      builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
     }
-    return builder.build();
+    TenantListUserResponse response = builder.build();
+    LOG.info("Response size : " + response.getUserAccessIdInfoCount());
+    return response;
   }
 
   private ListVolumeResponse listVolumes(ListVolumeRequest request)

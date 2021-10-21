@@ -182,21 +182,22 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // Allow Volume List access
         AccessPolicy tenantVolumeAccessPolicy = createVolumeAccessPolicy(
             volumeName, allTenantUsers);
-        tenantVolumeAccessPolicy.setPolicyID(
-            authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
+//        tenantVolumeAccessPolicy.setPolicyID(
+//            authorizer.createAccessPolicy(tenantVolumeAccessPolicy));
         tenant.addTenantAccessPolicy(tenantVolumeAccessPolicy);
 
         // Allow Bucket Create within Volume
         AccessPolicy tenantBucketCreatePolicy = allowCreateBucketPolicy(
             volumeName, allTenantUsers);
-        tenantBucketCreatePolicy.setPolicyID(
-            authorizer.createAccessPolicy(tenantBucketCreatePolicy));
-        tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
+        //tenantBucketCreatePolicy.setPolicyID(
+        //    authorizer.createAccessPolicy(tenantBucketCreatePolicy));
+        //tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
       }
 
+      tenantCache.put(tenantID, new CachedTenantInfo(tenantID));
     } catch (Exception e) {
       try {
-        removeTenantAccessFromAuthorizer(tenant);
+//        removeTenantAccessFromAuthorizer(tenant);
       } catch (Exception exception) {
         // Best effort cleanup.
       }
@@ -350,6 +351,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     List<TenantUserAccessId> userAccessIds = new ArrayList<>();
     CachedTenantInfo cachedTenantInfo = tenantCache.get(tenantID);
+    if (cachedTenantInfo == null) {
+      throw new IOException("Inconsistent in memory Tenant cache '" + tenantID
+          + "' not found in cache, but present in OM DB!");
+    }
+
     cachedTenantInfo.getTenantUsers().stream()
         .filter(
             k -> StringUtils.isEmpty(prefix) || k.getKey().startsWith(prefix))
@@ -528,8 +534,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         String tenantId = value.getTenantId();
         String user = value.getKerberosPrincipal();
 
-        CachedTenantInfo cachedTenantInfo = tenantCache.getOrDefault(tenantId,
-                new CachedTenantInfo(tenantId));
+        CachedTenantInfo cachedTenantInfo = tenantCache
+            .computeIfAbsent(tenantId, k -> new CachedTenantInfo(tenantId));
         cachedTenantInfo.getTenantUsers().add(
             new ImmutablePair<>(user, accessId));
         userCount++;

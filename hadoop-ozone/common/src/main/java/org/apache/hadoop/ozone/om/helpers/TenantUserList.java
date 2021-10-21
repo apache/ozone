@@ -19,8 +19,9 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.List;
+import java.util.Objects;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 
 /**
@@ -48,17 +49,32 @@ public class TenantUserList {
     return userAccessIds;
   }
 
-  public static TenantUserList fromProtobuf(
-      OzoneManagerProtocolProtos.TenantUserList tenantUserListInfo) {
-    return new TenantUserList(tenantUserListInfo.getTenantName(),
-        tenantUserListInfo.getUserAccessIdInfoList());
+  public static TenantUserList fromProtobuf(TenantListUserResponse response) {
+    return new TenantUserList(response.getTenantName(),
+        response.getUserAccessIdInfoList());
   }
 
-  public OzoneManagerProtocolProtos.TenantUserList getProtobuf() {
-    final OzoneManagerProtocolProtos.TenantUserList.Builder builder =
-        OzoneManagerProtocolProtos.TenantUserList.newBuilder();
-    builder.setTenantName(this.tenantName);
-    userAccessIds.forEach(builder::addUserAccessIdInfo);
-    return builder.build();
+  @Override
+  public String toString() {
+    return "tenantName=" + tenantName +
+        "\nuserAccessIds=" + userAccessIds;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    TenantUserList that = (TenantUserList) o;
+    return tenantName.equals(that.tenantName) &&
+        userAccessIds.equals(that.userAccessIds);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(tenantName, userAccessIds);
   }
 }

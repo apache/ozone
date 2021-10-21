@@ -33,8 +33,8 @@ import org.apache.http.auth.BasicUserPrincipal;
  * OM MultiTenant manager interface.
  */
 public interface OMMultiTenantManager {
-  /**
-   * Start multi-tenant manager. Performs initialization e.g.
+  /*
+   * Init multi-tenant manager. Performs initialization e.g.
    *  - Initialize Multi-Tenant-Gatekeeper-Plugin
    *  - Validate Multi-Tenant Bucket-NameSpaces
    *  - Validate Multi-Tenant Account-NameSpaces

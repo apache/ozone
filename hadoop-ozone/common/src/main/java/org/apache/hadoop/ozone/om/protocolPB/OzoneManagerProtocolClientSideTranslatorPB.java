@@ -945,15 +945,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public TenantUserList listUsersInTenant(String tenantName, String prefix)
       throws IOException {
-    TenantListUserRequest request =
-        TenantListUserRequest.newBuilder().setTenantName(tenantName)
-            .setPrefix(prefix).build();
+    TenantListUserRequest.Builder builder =
+        TenantListUserRequest.newBuilder().setTenantName(tenantName);
+    if (prefix != null) {
+      builder.setPrefix(prefix);
+    }
+    TenantListUserRequest request = builder.build();
+
     final OMRequest omRequest = createOMRequest(Type.TenantListUser)
         .setTenantListUserRequest(request).build();
     final OMResponse response = submitRequest(omRequest);
     final TenantListUserResponse resp =
         handleError(response).getTenantListUserResponse();
-    return TenantUserList.fromProtobuf(resp.getTenantUserList());
+    return TenantUserList.fromProtobuf(resp);
   }
 
   @Override
