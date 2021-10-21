@@ -153,6 +153,18 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
+
+    // Check if bucket layout is valid, OFS buckets cannot be in
+    // OBJECT_STORE layout
+    String bucketLayout = bucket.getBucketLayout().name();
+    if (StringUtils.equalsIgnoreCase(bucketLayout,
+        BucketLayout.OBJECT_STORE.name())) {
+      throw new IllegalArgumentException(bucketLayout + " does not support" +
+          " file system semantics. Bucket Layout must be " +
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + " or "
+          + BucketLayout.LEGACY.name());
+    }
+
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);

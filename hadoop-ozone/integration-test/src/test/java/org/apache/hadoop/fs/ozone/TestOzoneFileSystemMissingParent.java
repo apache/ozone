@@ -107,8 +107,8 @@ public class TestOzoneFileSystemMissingParent {
 
     // Close should throw exception, Since parent doesn't exist.
     LambdaTestUtils.intercept(OMException.class,
-        "Failed to find parent directory of parent/file in" +
-            " DirectoryTable", () -> stream.close());
+        "Cannot create file : parent/file " + "as parent "
+            + "directory doesn't exist", () -> stream.close());
   }
 
   /**
@@ -128,7 +128,7 @@ public class TestOzoneFileSystemMissingParent {
 
     // Close should throw exception, Since parent has been moved.
     LambdaTestUtils.intercept(OMException.class,
-        "Failed to find parent directory of parent/file in" +
-            " DirectoryTable", () -> stream.close());
+        "Cannot create file : parent/file " + "as parent "
+            + "directory doesn't exist", () -> stream.close());
   }
 }

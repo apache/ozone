@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -81,10 +80,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .BUCKET_NOT_FOUND;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -226,11 +221,12 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
       String bucketLayout = bucket.getBucketLayout().name();
-      if (!StringUtils.equalsIgnoreCase(bucketLayout,
-          OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED)) {
+      if (StringUtils.equalsIgnoreCase(bucketLayout,
+          BucketLayout.OBJECT_STORE.name())) {
         throw new IllegalArgumentException(bucketLayout + " does not support" +
             " file system semantics. Bucket Layout must be " +
-            OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+            BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + " or "
+            + BucketLayout.LEGACY.name());
       }
     } catch (OMException ex) {
       if (createIfNotExist) {
