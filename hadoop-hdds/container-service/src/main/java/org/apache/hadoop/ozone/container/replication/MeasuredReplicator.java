@@ -38,19 +38,25 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   private final ContainerReplicator delegate;
 
-  @Metric
+  @Metric(about = "Number of successful replication tasks")
   private MutableCounterLong success;
 
-  @Metric
+  @Metric(about = "Time spent on successful replication tasks")
   private MutableGaugeLong successTime;
 
-  @Metric
+  @Metric(about = "Number of failed replication attempts")
   private MutableCounterLong failure;
 
-  @Metric
+  @Metric(about = "Time spent waiting in the queue before starting the task")
   private MutableGaugeLong queueTime;
 
-  @Metric
+  @Metric(about = "Time spent on failed replication attempts")
+  private MutableGaugeLong failureTime;
+
+  @Metric(about = "Bytes transferred for failed replication attempts")
+  private MutableGaugeLong failureBytes;
+
+  @Metric(about = "Bytes transferred for successful replication tasks")
   private MutableGaugeLong transferredBytes;
 
   public MeasuredReplicator(ContainerReplicator delegate) {
@@ -67,12 +73,15 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
         (Instant.now().getNano() - task.getQueued().getNano()) / 1_000_000;
     queueTime.incr(msInQueue);
     delegate.replicate(task);
+    long end = System.currentTimeMillis();
     if (task.getStatus() == Status.FAILED) {
       failure.incr();
+      failureBytes.incr(task.getTransferredBytes());
+      failureTime.incr(end - start);
     } else if (task.getStatus() == Status.DONE) {
       transferredBytes.incr(task.getTransferredBytes());
       success.incr();
-      successTime.incr(System.currentTimeMillis() - start);
+      successTime.incr(end - start);
     }
   }
 
@@ -92,6 +101,11 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   }
 
   @VisibleForTesting
+  public MutableGaugeLong getFailureTime() {
+    return failureTime;
+  }
+
+  @VisibleForTesting
   public MutableCounterLong getFailure() {
     return failure;
   }
@@ -104,6 +118,11 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   @VisibleForTesting
   public MutableGaugeLong getTransferredBytes() {
     return transferredBytes;
+  }
+
+  @VisibleForTesting
+  public MutableGaugeLong getFailureBytes() {
+    return failureBytes;
   }
 
 }

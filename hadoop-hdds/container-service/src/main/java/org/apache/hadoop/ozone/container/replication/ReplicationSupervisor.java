@@ -120,7 +120,6 @@ public class ReplicationSupervisor {
    *
    * @return Count of in-flight replications.
    */
-  @VisibleForTesting
   int getInFlightReplications() {
     return containersInFlight.size();
   }

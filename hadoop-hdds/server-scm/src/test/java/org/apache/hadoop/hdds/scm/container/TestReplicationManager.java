@@ -457,6 +457,7 @@ public class TestReplicationManager {
   public void testOverReplicatedQuasiClosedContainer() throws
       SCMException, ContainerNotFoundException, InterruptedException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
+    container.setUsedBytes(101);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
@@ -502,6 +503,8 @@ public class TestReplicationManager {
 
     final long currentDeleteCommandCompleted = replicationManager.getMetrics()
         .getNumDeletionCmdsCompleted();
+    final long deleteBytesCompleted =
+        replicationManager.getMetrics().getNumDeletionBytesCompleted();
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -510,6 +513,8 @@ public class TestReplicationManager {
         .getInflightDeletion());
     Assert.assertEquals(currentDeleteCommandCompleted + 1,
         replicationManager.getMetrics().getNumDeletionCmdsCompleted());
+    Assert.assertEquals(deleteBytesCompleted + 101,
+        replicationManager.getMetrics().getNumDeletionBytesCompleted());
   }
 
   /**
@@ -656,6 +661,7 @@ public class TestReplicationManager {
       throws SCMException, ContainerNotFoundException, InterruptedException,
       ContainerReplicaNotFoundException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
+    container.setUsedBytes(99);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
@@ -671,6 +677,8 @@ public class TestReplicationManager {
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+    final long currentBytesToDelete = replicationManager.getMetrics()
+        .getNumDeletionBytesTotal();
 
     replicationManager.processAll();
     GenericTestUtils.waitFor(
@@ -707,6 +715,8 @@ public class TestReplicationManager {
         replicaTwo.getDatanodeDetails()));
     Assert.assertEquals(currentDeleteCommandCount + 1,
         replicationManager.getMetrics().getNumDeletionCmdsSent());
+    Assert.assertEquals(currentBytesToDelete + 99,
+        replicationManager.getMetrics().getNumDeletionBytesTotal());
     Assert.assertEquals(1, replicationManager.getInflightDeletion().size());
     Assert.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
