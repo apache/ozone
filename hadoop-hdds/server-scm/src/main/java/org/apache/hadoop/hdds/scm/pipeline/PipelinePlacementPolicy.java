@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -160,6 +161,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // Pipeline placement doesn't take node space left into account.
     // Sort the DNs by pipeline load.
     // TODO check if sorting could cause performance issue: HDDS-3466.
+    Collections.shuffle(healthyNodes);
     List<DatanodeDetails> healthyList = healthyNodes.stream()
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
@@ -376,8 +378,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     if (healthyNodes == null || healthyNodes.isEmpty()) {
       return null;
     }
-    DatanodeDetails selectedNode =
-            healthyNodes.get(getRand().nextInt(healthyNodes.size()));
+    DatanodeDetails selectedNode = healthyNodes.get(0);
     healthyNodes.remove(selectedNode);
     if (selectedNode != null) {
       removePeers(selectedNode, healthyNodes);
