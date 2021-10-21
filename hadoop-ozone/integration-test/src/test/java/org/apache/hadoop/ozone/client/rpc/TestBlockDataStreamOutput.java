@@ -21,15 +21,19 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -127,21 +131,25 @@ public class TestBlockDataStreamOutput {
   @Test
   public void testHalfChunkWrite() throws Exception {
     testWrite(chunkSize / 2);
+    testWriteWithFailure(chunkSize/2);
   }
 
   @Test
   public void testSingleChunkWrite() throws Exception {
     testWrite(chunkSize);
+    testWriteWithFailure(chunkSize);
   }
 
   @Test
   public void testMultiChunkWrite() throws Exception {
     testWrite(chunkSize + 50);
+    testWriteWithFailure(chunkSize + 50);
   }
 
   @Test
   public void testMultiBlockWrite() throws Exception {
     testWrite(blockSize + 50);
+    testWriteWithFailure(blockSize + 50);
   }
 
   private void testWrite(int dataLength) throws Exception {
@@ -156,6 +164,28 @@ public class TestBlockDataStreamOutput {
     key.close();
     validateData(keyName, data);
   }
+
+  private void testWriteWithFailure(int dataLength) throws Exception {
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(
+        keyName, ReplicationType.RATIS, 0);
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+            .getBytes(UTF_8);
+    ByteBuffer b = ByteBuffer.wrap(data);
+    key.write(b);
+    KeyDataStreamOutput keyDataStreamOutput =
+        (KeyDataStreamOutput) key.getByteBufStreamOutput();
+    ByteBufferStreamOutput stream =
+        keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
+    Assert.assertTrue(stream instanceof BlockDataStreamOutput);
+    TestHelper.waitForContainerClose(key, cluster);
+    key.write(b);
+    key.close();
+    String dataString = new String(data, UTF_8);
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
+  }
+
   private OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
       long size) throws Exception {
     return TestHelper.createStreamKey(
