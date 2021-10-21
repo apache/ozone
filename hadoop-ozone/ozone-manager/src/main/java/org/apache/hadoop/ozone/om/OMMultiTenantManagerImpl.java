@@ -172,10 +172,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       String allTenantAdminsGroupID = authorizer.createGroup(allTenantAdmins);
       tenant.addTenantAccessGroup(allTenantAdminsGroupID);
 
-      List<String> allTenantGroups = new ArrayList<>();
-      allTenantGroups.add(allTenantUsers.toString());
-      allTenantGroups.add(allTenantAdmins.toString());
-
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
       for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
         String volumeName = volume.getVolumeName();
