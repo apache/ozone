@@ -216,6 +216,8 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("Fail to get scm addresses", e);
     }
 
+    LOG.info("Datanode State Machine Task Thread Pool size {}",
+        totalServerCount);
     return totalServerCount;
   }
 
@@ -470,7 +472,7 @@ public class DatanodeStateMachine implements Closeable {
     };
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("Datanode State Machine Thread - %d")
+        .setNameFormat("Datanode State Machine Daemon Thread")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate Datanode, encounter uncaught exception"
               + " in Datanode State Machine Thread";
