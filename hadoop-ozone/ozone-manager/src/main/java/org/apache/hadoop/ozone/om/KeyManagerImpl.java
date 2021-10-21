@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
@@ -652,7 +653,9 @@ public class KeyManagerImpl implements KeyManager {
         enableFileSystemPaths, args.getKeyName());
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
-    OmKeyInfo value = null;
+    //support chinese key，for english key, it will keep the same
+    keyName = URLDecoder.decode(keyName, "UTF-8");
+    OmKeyInfo value;
     try {
       if (isBucketFSOptimized(volumeName, bucketName)) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
