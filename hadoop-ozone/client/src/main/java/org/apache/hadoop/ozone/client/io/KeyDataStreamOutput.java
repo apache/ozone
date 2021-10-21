@@ -278,11 +278,14 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     }
     Pipeline pipeline = streamEntry.getPipeline();
     PipelineID pipelineId = pipeline.getId();
-
+    long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
+    //set the correct length for the current stream
+    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
     Preconditions.checkNotNull(failedServers);
     ExcludeList excludeList = blockDataStreamOutputEntryPool.getExcludeList();
+    long bufferedDataLen = blockDataStreamOutputEntryPool.computeBufferData();
     if (!failedServers.isEmpty()) {
       excludeList.addDatanodes(failedServers);
     }
@@ -315,6 +318,13 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
       // blocks
       blockDataStreamOutputEntryPool
           .discardPreallocatedBlocks(-1, pipelineId);
+    }
+    if (bufferedDataLen > 0) {
+      // If the data is still cached in the underlying stream, we need to
+      // allocate new block and write this data in the datanode.
+      handleRetry(exception, bufferedDataLen);
+      // reset the retryCount after handling the exception
+      retryCount = 0;
     }
   }
 
