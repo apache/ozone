@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
+import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,6 +178,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
         getOmRequest().getAssignUserToTenantRequest();
     final String tenantName = request.getTenantName();
     final String principal = request.getTenantUsername();
+    BasicUserPrincipal userPrincipal = new BasicUserPrincipal(principal);
     assert(accessId.equals(request.getAccessId()));
     final String volumeName = tenantName;  // TODO: Configurable
     IOException exception = null;
@@ -229,7 +231,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       acquiredS3SecretLock = false;
 
       // TODO: Move this to preExecute as well.
-      tenantManager.assignUserToTenant(tenantName, principal, accessId);
+      tenantManager.assignUserToTenant(userPrincipal, tenantName, accessId);
 
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
@@ -279,7 +281,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           s3SecretValue, principal, defaultGroupName, roleName,
           accessId, omDBAccessIdInfo, omDBKerberosPrincipalInfo);
     } catch (IOException ex) {
-      ozoneManager.getMultiTenantManager().destroyUser(principal, accessId);
+      tenantManager.destroyUser(userPrincipal, accessId);
       exception = ex;
       // Set response success flag to false
       omResponse.setAssignUserToTenantResponse(

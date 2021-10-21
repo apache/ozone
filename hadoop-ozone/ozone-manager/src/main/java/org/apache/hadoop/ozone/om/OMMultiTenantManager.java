@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
+import org.apache.http.auth.BasicUserPrincipal;
 
 /**
  * OM MultiTenant manager interface.
@@ -45,15 +46,14 @@ public interface OMMultiTenantManager {
    *       . OM-DB state <-in-sync-> IMultiTenantGateKeeperPluginState
    *       . OM DB state is always the source of truth.
    *
-   * @param configuration
    * @throws IOException
    */
-  void start(OzoneConfiguration configuration) throws IOException;
-
-  /**
-   * Stop multi-tenant manager.
-   */
-  void stop() throws Exception;
+//  void start() throws IOException;
+//
+//  /**
+//   * Stop multi-tenant manager.
+//   */
+//  void stop() throws Exception;
 
   /**
    * Returns the corresponding OzoneManager instance.
@@ -119,8 +119,8 @@ public interface OMMultiTenantManager {
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  void assignUserToTenant(String tenantName, String user,
-                          String accessId) throws OMException;
+  void assignUserToTenant(BasicUserPrincipal principal, String tenantName,
+                            String accessID) throws OMException;
 
   /**
    * Given a user, destroys all state associated with that user.
@@ -129,7 +129,7 @@ public interface OMMultiTenantManager {
    * @return
    * @throws IOException
    */
-  void destroyUser(String username, String accessID);
+  void destroyUser(BasicUserPrincipal principal, String accessID);
 
 
   /**
@@ -175,6 +175,14 @@ public interface OMMultiTenantManager {
    * @return List of users
    */
   TenantUserList listUsersInTenant(String tenantID, String prefix)
+      throws IOException;
+
+  /**
+   * List all the access IDs of all users that belong to this Tenant.
+   * @param tenantID
+   * @return List of users
+   */
+  List<String> listAllAccessIDs(String tenantID)
       throws IOException;
 
   /**

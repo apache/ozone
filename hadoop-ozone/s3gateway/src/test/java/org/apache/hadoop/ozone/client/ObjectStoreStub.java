@@ -121,6 +121,14 @@ public class ObjectStoreStub extends ObjectStore {
   }
 
   @Override
+  public OzoneVolume getS3Volume() throws IOException {
+    // Always return default S3 volume. This class will not be used for
+    // multitenant testing.
+    String volumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
+    return getVolume(volumeName);
+  }
+
+  @Override
   public void createS3Bucket(String s3BucketName) throws
       IOException {
     if (!bucketEmptyStatus.containsKey(s3BucketName)) {

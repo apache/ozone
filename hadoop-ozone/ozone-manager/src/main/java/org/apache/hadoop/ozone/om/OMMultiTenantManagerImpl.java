@@ -39,6 +39,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -58,12 +59,11 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerP
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantGroupPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.om.multitenant.impl.OzoneTenantAdminGroupPrincipal;
-import org.apache.hadoop.ozone.om.multitenant.impl.OzoneTenantUserGroupPrincipal;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,15 +88,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final ReentrantReadWriteLock controlPathLock;
   private final Map<String, CachedTenantInfo> tenantCache;
 
-  OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf) {
+  OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
+      throws IOException {
     this.conf = conf;
     controlPathLock = new ReentrantReadWriteLock();
     omMetadataManager = mgr;
     tenantCache = new ConcurrentHashMap<>();
-  }
-
-  @Override
-  public void start(OzoneConfiguration configuration) throws IOException {
     boolean devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER,
         false);
     if (devSkipRanger) {
@@ -104,14 +101,20 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     } else {
       authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
     }
-    authorizer.init(configuration);
+    authorizer.init(conf);
     loadUsersFromDB();
   }
 
-  @Override
-  public void stop() throws Exception {
-
-  }
+// start() and stop() lifeycle methods can be added when there is a background
+// work going on.
+//  @Override
+//  public void start() throws IOException {
+//  }
+//
+//  @Override
+//  public void stop() throws Exception {
+//
+//  }
 
   @Override
   public OMMetadataManager getOmMetadataManager() {
@@ -159,15 +162,19 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     try {
       controlPathLock.writeLock().lock();
 
-      OzoneTenantUserGroupPrincipal allTenantUsers =
-          new OzoneTenantUserGroupPrincipal(tenantID);
+      OzoneTenantGroupPrincipal allTenantUsers =
+          OzoneTenantGroupPrincipal.newUserGroup(tenantID);
       String allTenantUsersGroupID = authorizer.createGroup(allTenantUsers);
       tenant.addTenantAccessGroup(allTenantUsersGroupID);
 
-      OzoneTenantAdminGroupPrincipal allTenantAdmins =
-          new OzoneTenantAdminGroupPrincipal(tenantID);
+      OzoneTenantGroupPrincipal allTenantAdmins =
+          OzoneTenantGroupPrincipal.newAdminGroup(tenantID);
       String allTenantAdminsGroupID = authorizer.createGroup(allTenantAdmins);
       tenant.addTenantAccessGroup(allTenantAdminsGroupID);
+
+      List<String> allTenantGroups = new ArrayList<>();
+      allTenantGroups.add(allTenantUsers.toString());
+      allTenantGroups.add(allTenantAdmins.toString());
 
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
       for (OzoneObj volume : bucketNameSpace.getBucketNameSpaceObjects()) {
@@ -246,17 +253,19 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * @return Tenant, or null on error
    */
   @Override
-  public void assignUserToTenant(String tenantName, String user,
+  public void assignUserToTenant(BasicUserPrincipal principal,
+                                 String tenantName,
                                  String accessID) throws OMException {
     try {
       controlPathLock.writeLock().lock();
-      //TODO : Add user to group in Authorizer.
+      //TODO : Add user to role in Authorizer.
       CachedTenantInfo cachedTenantInfo =
           tenantCache.getOrDefault(tenantName,
               new CachedTenantInfo(tenantName));
-      cachedTenantInfo.getTenantUsers().add(new ImmutablePair<>(user,
-          accessID));
-      LOG.info("Adding user '{}' to tenant '{}' in-memory state.");
+      cachedTenantInfo.getTenantUsers().add(new ImmutablePair<>(
+          principal.getName(), accessID));
+      LOG.info("Adding user '{}' to tenant '{}' in-memory state.",
+          principal.getName(), tenantName);
     } catch (Exception e) {
       throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
     } finally {
@@ -265,7 +274,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void destroyUser(String user, String accessID) {
+  public void destroyUser(BasicUserPrincipal principal, String accessID) {
     try {
       controlPathLock.writeLock().lock();
       //TODO : Remove user from group in Authorizer.
@@ -275,7 +284,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         return;
       }
       tenantCache.get(tenantName).getTenantUsers()
-          .remove(new ImmutablePair<>(user, accessID));
+          .remove(new ImmutablePair<>(principal.getName(), accessID));
+      // TODO: Determine how to replace this code.
+//      final String userID = authorizer.getUserId(userPrincipal);
+//      authorizer.deleteUser(userID);
     } catch (Exception e) {
       LOG.error(e.getMessage());
     } finally {
@@ -358,7 +370,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       throw new OMException(INVALID_TENANT_ACCESSID);
     }
     return omDBAccessIdInfo.getTenantId();
+    }
+
+  public List<String> listAllAccessIDs(String tenantID)
+      throws IOException {
+    return null;
   }
+
 
   @Override
   public void assignTenantAdminRole(String accessID)
