@@ -43,10 +43,10 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
 
   public OMKeyCommitResponseWithFSO(@Nonnull OMResponse omResponse,
-                                    @Nonnull OmKeyInfo omKeyInfo,
-                                    String ozoneKeyName, String openKeyName,
-                                    @Nonnull OmBucketInfo omBucketInfo,
-                                    RepeatedOmKeyInfo deleteKeys) {
+                               @Nonnull OmKeyInfo omKeyInfo,
+                               String ozoneKeyName, String openKeyName,
+                               @Nonnull OmBucketInfo omBucketInfo,
+                               RepeatedOmKeyInfo deleteKeys) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
             omBucketInfo, deleteKeys);
   }
