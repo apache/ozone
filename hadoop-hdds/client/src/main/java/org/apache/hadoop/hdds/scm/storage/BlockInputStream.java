@@ -170,7 +170,7 @@ public class BlockInputStream extends InputStream
       retries = 0;
     }
 
-    if (chunks != null && !chunks.isEmpty()) {
+    if (!chunks.isEmpty()) {
       // For each chunk in the block, create a ChunkInputStream and compute
       // its chunkOffset
       this.chunkOffsets = new long[chunks.size()];
