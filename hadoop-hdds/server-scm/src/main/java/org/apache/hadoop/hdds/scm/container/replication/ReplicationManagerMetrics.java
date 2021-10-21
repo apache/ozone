@@ -27,7 +27,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -82,10 +81,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of deletion bytes completed.")
   private MutableCounterLong numDeletionBytesCompleted;
 
-  @Metric("Time elapsed for replication (between sending the command and processing its completion)")
+  @Metric("Time elapsed for replication")
   private MutableRate replicationTime;
 
-  @Metric("Time elapsed for deletion (between sending the command and processing its completion)")
+  @Metric("Time elapsed for deletion")
   private MutableRate deletionTime;
 
   private MetricsRegistry registry;
