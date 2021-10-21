@@ -46,7 +46,9 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
 import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
+import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -189,6 +191,24 @@ public final class TestHelper {
         keyOutputStream.getStreamEntries();
     List<Long> containerIdList = new ArrayList<>();
     for (BlockOutputStreamEntry entry : streamEntryList) {
+      long id = entry.getBlockID().getContainerID();
+      if (!containerIdList.contains(id)) {
+        containerIdList.add(id);
+      }
+    }
+    Assert.assertTrue(!containerIdList.isEmpty());
+    waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
+  }
+
+
+  public static void waitForContainerClose(OzoneDataStreamOutput outputStream,
+      MiniOzoneCluster cluster) throws Exception {
+    KeyDataStreamOutput keyOutputStream =
+        (KeyDataStreamOutput) outputStream.getByteBufStreamOutput();
+    List<BlockDataStreamOutputEntry> streamEntryList =
+        keyOutputStream.getStreamEntries();
+    List<Long> containerIdList = new ArrayList<>();
+    for (BlockDataStreamOutputEntry entry : streamEntryList) {
       long id = entry.getBlockID().getContainerID();
       if (!containerIdList.contains(id)) {
         containerIdList.add(id);
