@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.storage.StreamBuffer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -59,6 +60,7 @@ public class BlockDataStreamOutputEntryPool {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private List<StreamBuffer> bufferList;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockDataStreamOutputEntryPool(
@@ -83,6 +85,7 @@ public class BlockDataStreamOutputEntryPool {
     this.requestID = requestId;
     this.openID = openID;
     this.excludeList = new ExcludeList();
+    this.bufferList = new ArrayList<>();
   }
 
   /**
@@ -142,7 +145,8 @@ public class BlockDataStreamOutputEntryPool {
             .setPipeline(subKeyInfo.getPipeline())
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
-            .setToken(subKeyInfo.getToken());
+            .setToken(subKeyInfo.getToken())
+            .setBufferList(bufferList);
     streamEntries.add(builder.build());
   }
 
@@ -300,5 +304,13 @@ public class BlockDataStreamOutputEntryPool {
 
   boolean isEmpty() {
     return streamEntries.isEmpty();
+  }
+
+  long computeBufferData() {
+    long totalDataLen =0;
+    for (StreamBuffer b : bufferList){
+      totalDataLen += b.length();
+    }
+    return totalDataLen;
   }
 }
