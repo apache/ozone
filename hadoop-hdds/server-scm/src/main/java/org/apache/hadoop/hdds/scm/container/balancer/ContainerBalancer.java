@@ -208,6 +208,7 @@ public class ContainerBalancer {
           } catch (InterruptedException e) {
             LOG.info("Container Balancer was interrupted while waiting for" +
                 " next iteration.");
+            Thread.currentThread().interrupt();
             return;
           }
         }
@@ -782,7 +783,8 @@ public class ContainerBalancer {
       currentBalancingThread.interrupt();
       try {
         currentBalancingThread.join();
-      } catch (InterruptedException ignored) {
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
       }
     }
     currentBalancingThread = null;
