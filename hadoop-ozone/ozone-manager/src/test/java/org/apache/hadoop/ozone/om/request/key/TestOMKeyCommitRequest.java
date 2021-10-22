@@ -298,9 +298,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     KeyArgs keyArgs = modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
 
+    String ozoneKey = getOzonePathKey();
     // Key should be there in key table, as validateAndUpdateCache is called.
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable().get(getOzonePathKey());
+    OmKeyInfo omKeyInfo = omMetadataManager
+        .getKeyTable(getBucketLayout()).get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
     // Previously committed version
@@ -312,7 +313,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             keyArgs.getKeyLocationsList().stream()
                     .map(OmKeyLocationInfo::getFromProtobuf)
                     .collect(Collectors.toList());
-    String ozoneKey = addKeyToOpenKeyTable(allocatedLocationList);
+    addKeyToOpenKeyTable(allocatedLocationList);
 
     OMClientResponse omClientResponse =
             omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
@@ -322,7 +323,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             omClientResponse.getOMResponse().getStatus());
 
     // New entry should be created in key Table.
-    omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
     Assert.assertEquals(version,
