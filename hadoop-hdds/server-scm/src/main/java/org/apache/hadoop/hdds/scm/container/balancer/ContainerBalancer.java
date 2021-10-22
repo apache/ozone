@@ -707,9 +707,14 @@ public class ContainerBalancer {
       // MaxSizeEnteringTarget
       //2 current usage of target datanode plus sizeEnteringAfterMove
       // is smaller than or equal to upperLimit
-      return sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
-           nodeManager.getUsageInfo(target)
-               .calculateUtilization(sizeEnteringAfterMove) <= upperLimit;
+      if (sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
+          nodeManager.getUsageInfo(target)
+              .calculateUtilization(sizeEnteringAfterMove) <= upperLimit) {
+        return true;
+      } else {
+        LOG.debug("Data size {} cannot enter target datanode {}", size,
+            target.getUuidString());
+      }
     }
     return false;
   }

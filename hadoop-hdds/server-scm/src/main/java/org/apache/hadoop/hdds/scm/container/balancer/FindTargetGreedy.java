@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * Find a target giving preference to more under-utilized nodes.
  */
 public class FindTargetGreedy implements FindTargetStrategy {
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(FindTargetGreedy.class);
 
   private ContainerManager containerManager;
@@ -93,8 +93,8 @@ public class FindTargetGreedy implements FindTargetStrategy {
         }
       }
     }
-    LOG.info("Container Balancer could not find a target for source datanode " +
-        "{}", source.getUuidString());
+    LOG.debug("Container Balancer could not find a target for source" +
+          " datanode {}", source.getUuidString());
     return null;
   }
 
@@ -130,6 +130,13 @@ public class FindTargetGreedy implements FindTargetStrategy {
         placementPolicy.validateContainerPlacement(replicaList,
         containerInfo.getReplicationConfig().getRequiredNodes());
 
-    return placementStatus.isPolicySatisfied();
+    if (placementStatus.isPolicySatisfied()) {
+      return true;
+    } else {
+      LOG.debug("Moving container {} from source datanode {} to target " +
+              "datanode {} does not satisfy placement policy", containerID,
+          source.getUuidString(), target.getUuidString());
+      return false;
+    }
   }
 }

@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerMetrics;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerSelectionCriteria;
+import org.apache.hadoop.hdds.scm.container.balancer.FindTargetGreedy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -101,7 +103,12 @@ public class TestContainerBalancer {
 
   @Before
   public void setup() throws Exception {
+    //TODO reset log levels
+    GenericTestUtils.setLogLevel(TestContainerBalancer.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(FindTargetGreedy.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancerSelectionCriteria.LOG,
+        Level.DEBUG);
     GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
 
     // test directory is used to calculate space of this partition
@@ -240,7 +247,7 @@ public class TestContainerBalancer {
         });
 
     NodeManager nodeManager = scm.getScmNodeManager();
-    Thread.sleep(500);
+    Thread.sleep(1000); // sleeping for longer to debug CI
     // each datanode should have numberOfKeys * 3 / NUM_DATANODES containers now
     nodeManager.getAllNodes().forEach(datanodeDetails -> {
       try {

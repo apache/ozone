@@ -39,7 +39,7 @@ import java.util.TreeSet;
  * selecting datanodes that containers will move to.
  */
 public class ContainerBalancerSelectionCriteria {
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerSelectionCriteria.class);
 
   private ContainerBalancerConfiguration balancerConfiguration;
@@ -95,11 +95,27 @@ public class ContainerBalancerSelectionCriteria {
           "containers for Container Balancer.", node.toString(), e);
       return containerIDSet;
     }
+
+    // following is some temporary logging for debugging CI failure
+    if (containerIDSet.isEmpty()) {
+      LOG.debug("Candidate containers set is empty after getting containers " +
+          "from NodeManager");
+    }
+
     if (excludeContainers != null) {
       containerIDSet.removeAll(excludeContainers);
     }
+    if (containerIDSet.isEmpty()) {
+      LOG.debug("Candidate containers set is empty after removing exclude " +
+          "containers");
+    }
+
     if (selectedContainers != null) {
       containerIDSet.removeAll(selectedContainers);
+    }
+    if (containerIDSet.isEmpty()) {
+      LOG.debug("Candidate containers set is empty after removing selected " +
+          "containers");
     }
 
     // remove not closed containers
@@ -114,8 +130,16 @@ public class ContainerBalancerSelectionCriteria {
         return true;
       }
     });
+    if (containerIDSet.isEmpty()) {
+      LOG.debug("Candidate containers set is empty after removing not open " +
+          "containers");
+    }
 
     containerIDSet.removeIf(this::isContainerReplicatingOrDeleting);
+    if (containerIDSet.isEmpty()) {
+      LOG.debug("Candidate containers set is empty after removing replicating" +
+          " or deleting containers");
+    }
     return containerIDSet;
   }
 
