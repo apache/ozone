@@ -137,6 +137,11 @@ public class OzoneClientProducer {
         LOG.debug("Error during Client Creation: ", ex);
       }
       throw wrapOS3Exception(ex);
+    } catch(InterruptedException ex){
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Client Creation: ", ex);
+      }
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
       // For any other critical errors during object creation throw Internal
       // error.
