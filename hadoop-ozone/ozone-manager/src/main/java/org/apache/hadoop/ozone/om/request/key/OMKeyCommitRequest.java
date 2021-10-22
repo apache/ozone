@@ -148,7 +148,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
       for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
+        OmKeyLocationInfo locationInfo =
+            OmKeyLocationInfo.getFromProtobuf(keyLocation);
+
+        // Strip out tokens before adding to cache.
+        // This way during listStatus token information does not pass on to
+        // client when returning from cache.
+        if (ozoneManager.isGrpcBlockTokenEnabled()) {
+          locationInfo.setToken(null);
+        }
+        locationInfoList.add(locationInfo);
       }
 
       bucketLockAcquired =
