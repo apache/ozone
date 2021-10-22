@@ -307,7 +307,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             keyArgs.getKeyLocationsList().stream()
                     .map(OmKeyLocationInfo::getFromProtobuf)
                     .collect(Collectors.toList());
-    addKeyToOpenKeyTable(allocatedLocationList);
+    String ozoneKey = addKeyToOpenKeyTable(allocatedLocationList);
 
     OMClientResponse omClientResponse =
             omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
