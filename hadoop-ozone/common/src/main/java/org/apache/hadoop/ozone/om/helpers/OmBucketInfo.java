@@ -91,6 +91,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketLayout bucketLayout;
 
+  private String owner;
+  private String admin;
+
   /**
    * Private constructor, constructed via builder.
    * @param volumeName - Volume name.
@@ -108,6 +111,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout Bucket Layout.
+   * @param owner owner of the bucket.
+   * @param admin admin of the bucket.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -127,7 +132,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       long usedNamespace,
       long quotaInBytes,
       long quotaInNamespace,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout,
+      String owner,
+      String admin) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -146,6 +153,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
+    this.owner = owner;
+    this.admin = admin;
   }
 
   /**
@@ -288,6 +297,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return sourceVolume != null && sourceBucket != null;
   }
 
+  public String getOwner() {
+    return owner;
+  }
+
+  public String getAdmin() {
+    return admin;
+  }
+
   /**
    * Returns new builder class that builds a OmBucketInfo.
    *
@@ -362,7 +379,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
-        .setBucketLayout(bucketLayout);
+        .setBucketLayout(bucketLayout)
+        .setOwner(owner)
+        .setAdmin(admin);
   }
 
   /**
@@ -387,6 +406,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private long quotaInBytes;
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
+    private String owner;
+    private String admin;
 
     public Builder() {
       //Default values
@@ -510,6 +531,16 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setOwner(String ownerName) {
+      this.owner = ownerName;
+      return this;
+    }
+
+    public Builder setAdmin(String adminName) {
+      this.admin = adminName;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketInfo.
      * @return instance of OmBucketInfo.
@@ -524,7 +555,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, modificationTime, objectID, updateID,
           metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout);
+          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout,
+          owner, admin);
     }
   }
 
@@ -546,7 +578,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setUsedNamespace(usedNamespace)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .setQuotaInBytes(quotaInBytes)
-        .setQuotaInNamespace(quotaInNamespace);
+        .setQuotaInNamespace(quotaInNamespace)
+        .setOwner(owner)
+        .setAdmin(admin);
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -591,7 +625,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setModificationTime(bucketInfo.getModificationTime())
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
         .setUsedNamespace(bucketInfo.getUsedNamespace())
-        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
+        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace())
+        .setOwner(bucketInfo.getOwner())
+        .setAdmin(bucketInfo.getAdmin());
     if (buckLayout != null) {
       obib.setBucketLayout(buckLayout);
     } else if (bucketInfo.getBucketLayout() != null) {
