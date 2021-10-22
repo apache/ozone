@@ -133,21 +133,15 @@ public class OzoneClientProducer {
             return createOzoneClient();
           });
     } catch (OS3Exception ex) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", ex);
-      }
+      LOG.debug("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);
     } catch(InterruptedException ex){
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", ex);
-      }
+      LOG.debug("Error during Client Creation: ", ex);
       Thread.currentThread().interrupt();
     } catch (Exception e) {
       // For any other critical errors during object creation throw Internal
       // error.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", e);
-      }
+      LOG.debug("Error during Client Creation: ", e);
       throw wrapOS3Exception(INTERNAL_ERROR);
     }
     return ozoneClient;

@@ -783,7 +783,7 @@ public class ContainerBalancer {
       currentBalancingThread.interrupt();
       try {
         currentBalancingThread.join();
-      } catch (InterruptedException ignored) {
+      } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
       }
     }
