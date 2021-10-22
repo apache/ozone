@@ -521,7 +521,7 @@ public class KeyManagerImpl implements KeyManager {
       // the key already exist, the new blocks will be added as new version
       // when locations.size = 0, the new version will have identical blocks
       // as its previous version
-      keyInfo.addNewVersion(locations, true);
+      keyInfo.addNewVersion(locations, true, true);
       keyInfo.setDataSize(size + keyInfo.getDataSize());
     }
     if(keyInfo != null) {

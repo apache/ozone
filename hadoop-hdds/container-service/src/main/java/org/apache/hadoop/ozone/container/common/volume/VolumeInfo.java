@@ -206,12 +206,12 @@ public final class VolumeInfo {
     return Math.max(Math.min(avail, usage.getAvailable()), 0);
   }
 
-  public long getScmUsed() {
-    return usage.getUsedSpace();
+  public void refreshNow() {
+    usage.refreshNow();
   }
 
-  void start() {
-    usage.start();
+  public long getScmUsed() {
+    return usage.getUsedSpace();
   }
 
   void shutdownUsageThread() {
