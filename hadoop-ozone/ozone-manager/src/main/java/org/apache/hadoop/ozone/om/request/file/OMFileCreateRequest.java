@@ -219,7 +219,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
-      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(ozoneKey);
 
       if (dbKeyInfo != null) {

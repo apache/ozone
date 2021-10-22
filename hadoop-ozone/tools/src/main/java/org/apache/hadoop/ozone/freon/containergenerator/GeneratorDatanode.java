@@ -31,6 +31,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -181,19 +182,21 @@ public class GeneratorDatanode extends BaseGenerator {
 
   private String getScmIdFromStoragePath(Path hddsDir)
       throws IOException {
-    final Optional<Path> scmSpecificDir = Files.list(hddsDir)
-        .filter(Files::isDirectory)
-        .findFirst();
-    if (!scmSpecificDir.isPresent()) {
-      throw new NoSuchFileException(
+    try (Stream<Path> stream = Files.list(hddsDir)) {
+      final Optional<Path> scmSpecificDir = stream
+          .filter(Files::isDirectory)
+          .findFirst();
+      if (!scmSpecificDir.isPresent()) {
+        throw new NoSuchFileException(
           "SCM specific datanode directory doesn't exist " + hddsDir);
-    }
-    final Path scmDirName = scmSpecificDir.get().getFileName();
-    if (scmDirName == null) {
-      throw new IllegalArgumentException(
+      }
+      final Path scmDirName = scmSpecificDir.get().getFileName();
+      if (scmDirName == null) {
+        throw new IllegalArgumentException(
           "SCM specific datanode directory doesn't exist");
+      }
+      return scmDirName.toString();
     }
-    return scmDirName.toString();
   }
 
 

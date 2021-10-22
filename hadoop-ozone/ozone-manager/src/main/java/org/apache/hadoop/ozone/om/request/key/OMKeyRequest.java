@@ -541,7 +541,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected boolean checkDirectoryAlreadyExists(String volumeName,
       String bucketName, String keyName, OMMetadataManager omMetadataManager)
       throws IOException {
-    if (omMetadataManager.getKeyTable().isExist(
+    if (omMetadataManager.getKeyTable(getBucketLayout()).isExist(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName,
             keyName))) {
       return true;

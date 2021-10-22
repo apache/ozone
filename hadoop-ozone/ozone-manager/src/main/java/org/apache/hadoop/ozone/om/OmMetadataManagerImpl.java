@@ -74,9 +74,9 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -281,8 +281,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
     // TODO: Refactor the below function by reading bucketLayout.
-    //  Jira: HDDS-5636
+    //  Jira: HDDS-5679
     if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+      return fileTable;
+    }
+    return keyTable;
+  }
+
+  @Override
+  public Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout) {
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       return fileTable;
     }
     return keyTable;
@@ -926,7 +934,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // Get maxKeys from DB if it has.
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyIter = getKeyTable().iterator()) {
+             keyIter = getKeyTable(getBucketLayout()).iterator()) {
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
       // we need to iterate maxKeys + 1 here because if skipStartKey is true,

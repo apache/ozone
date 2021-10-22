@@ -69,8 +69,10 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       String toKey = parentDir.concat("/newKey" + i);
       key = omMetadataManager.getOzoneKey(volumeName, bucketName, key);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKey);
-      Assert.assertFalse(omMetadataManager.getKeyTable().isExist(key));
-      Assert.assertTrue(omMetadataManager.getKeyTable().isExist(toKey));
+      Assert.assertFalse(
+          omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
+      Assert.assertTrue(
+          omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
     }
   }
 
@@ -99,8 +101,10 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       key = omMetadataManager.getOzoneKey(volumeName, bucketName, key);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKey);
       // As omResponse has error, it is a no-op. So, no changes should happen.
-      Assert.assertTrue(omMetadataManager.getKeyTable().isExist(key));
-      Assert.assertFalse(omMetadataManager.getKeyTable().isExist(toKey));
+      Assert.assertTrue(
+          omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
+      Assert.assertFalse(
+          omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
     }
 
   }
@@ -119,8 +123,8 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
           bucketName, parentDir.concat("/key" + i), 0L, RATIS, THREE,
           omMetadataManager);
 
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(
-          omMetadataManager.getOzoneKey(volumeName, bucketName, key));
+      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .get(omMetadataManager.getOzoneKey(volumeName, bucketName, key));
       omKeyInfo.setKeyName(toKey);
       formAndToKeyInfo.put(key, omKeyInfo);
     }

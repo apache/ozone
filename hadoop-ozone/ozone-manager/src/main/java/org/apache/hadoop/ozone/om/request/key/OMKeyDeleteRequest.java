@@ -138,7 +138,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
+      OmKeyInfo omKeyInfo =
+          omMetadataManager.getKeyTable(bucketLayout).get(objectKey);
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
@@ -147,7 +148,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Update table cache.
-      omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(
+      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+          new CacheKey<>(
               omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 

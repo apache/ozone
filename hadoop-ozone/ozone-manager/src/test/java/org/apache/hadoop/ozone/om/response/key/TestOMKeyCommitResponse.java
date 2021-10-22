@@ -72,7 +72,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     // When key commit key is deleted from openKey table and added to keyTable.
     Assert.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
   }
 
   @Test
@@ -114,7 +115,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     // openKey table.
     Assert.assertTrue(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
+    Assert.assertFalse(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
   }
 
   @Test

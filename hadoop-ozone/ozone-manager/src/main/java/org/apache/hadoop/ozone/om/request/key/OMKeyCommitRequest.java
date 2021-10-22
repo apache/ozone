@@ -210,7 +210,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      omMetadataManager.getKeyTable().addCacheEntry(
+      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOzoneKey),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 

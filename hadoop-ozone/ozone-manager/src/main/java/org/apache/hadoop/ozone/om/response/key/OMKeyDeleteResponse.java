@@ -66,7 +66,8 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     // not called in failure scenario in OM code.
     String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+    Table<String, OmKeyInfo> keyTable =
+        omMetadataManager.getKeyTable(getBucketLayout());
     addDeletionToBatch(omMetadataManager, batchOperation, keyTable, ozoneKey,
         omKeyInfo);
 

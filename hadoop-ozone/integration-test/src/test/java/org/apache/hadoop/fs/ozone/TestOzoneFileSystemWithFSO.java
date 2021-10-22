@@ -432,7 +432,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     // trigger CommitKeyRequest
     outputStream.close();
 
-    OmKeyInfo omKeyInfo = omMgr.getKeyTable().get(openFileKey);
+    OmKeyInfo omKeyInfo = omMgr.getKeyTable(getBucketLayout()).get(openFileKey);
     Assert.assertNotNull("Invalid Key!", omKeyInfo);
     verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
 
