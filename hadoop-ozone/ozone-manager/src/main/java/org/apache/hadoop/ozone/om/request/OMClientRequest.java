@@ -134,6 +134,11 @@ public abstract class OMClientRequest implements RequestAuditor {
     // Added not null checks, as in UT's these values might be null.
     if (user != null) {
       userInfo.setUserName(user.getUserName());
+    } else {
+      // If S3 Authentication is set, use AccessId as user.
+      if (omRequest.hasS3Authentication()) {
+        userInfo.setUserName(omRequest.getS3Authentication().getAccessId());
+      }
     }
 
     if (remoteAddress != null) {

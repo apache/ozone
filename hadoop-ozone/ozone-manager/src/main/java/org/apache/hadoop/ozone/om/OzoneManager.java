@@ -380,6 +380,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private static final int MSECS_PER_MINUTE = 60 * 1000;
 
+  private final boolean isSecurityEnabled;
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -390,6 +392,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OMHANodeDetails omhaNodeDetails =
         OMHANodeDetails.loadOMHAConfig(configuration);
 
+    this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
 
@@ -696,6 +699,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isGrpcBlockTokenEnabled() {
     return grpcBlockTokenEnabled;
+  }
+
+  /**
+   * Return config value of {@link OzoneConfigKeys#OZONE_SECURITY_ENABLED_KEY}.
+   */
+  public boolean isSecurityEnabled() {
+    return isSecurityEnabled;
   }
 
   private KeyProviderCryptoExtension createKeyProviderExt(
