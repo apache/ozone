@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
 /**
  * This class contains configuration values for the ContainerBalancer.
  */
-@ConfigGroup(prefix = "hdds.container.balancer.")
+@ConfigGroup(prefix = "hdds.container.balancer")
 public final class ContainerBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
