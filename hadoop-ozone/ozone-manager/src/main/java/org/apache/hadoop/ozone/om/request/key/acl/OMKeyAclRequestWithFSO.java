@@ -118,8 +118,9 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
             new CacheValue<>(Optional.of(OMFileRequest.
                 getDirectoryInfo(omKeyInfo)), trxnLogIndex));
       } else {
-        omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(dbKey),
-            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+        omMetadataManager.getKeyTable(getBucketLayout(ozoneManager))
+            .addCacheEntry(new CacheKey<>(dbKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
       omClientResponse =
           onSuccess(omResponse, omKeyInfo, operationResult, isDirectory);

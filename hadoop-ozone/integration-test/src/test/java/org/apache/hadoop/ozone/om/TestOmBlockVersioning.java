@@ -96,7 +96,10 @@ public class TestOmBlockVersioning {
     String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
 
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    // Versioning isn't supported currently, but just preserving old behaviour
+    bucket.setVersioning(true);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)

@@ -99,6 +99,8 @@ import org.slf4j.LoggerFactory;
 @RunWith(Parameterized.class)
 public class TestOzoneFileSystem {
 
+  private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
@@ -150,10 +152,9 @@ public class TestOzoneFileSystem {
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, (float) 0.15);
-    // Trash with 9 second deletes and 6 seconds checkpoints
-    conf.setFloat(FS_TRASH_INTERVAL_KEY, (float) 0.15); // 9 seconds
-    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
+    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
@@ -229,6 +230,10 @@ public class TestOzoneFileSystem {
 
   public static String getVolumeName() {
     return volumeName;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   @Test
@@ -1258,7 +1263,7 @@ public class TestOzoneFileSystem {
     Assert.assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
-    Assert.assertEquals((float) 0.15, trash.getConf().
+    assertEquals(TRASH_INTERVAL, trash.getConf().
         getFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0), 0);
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);

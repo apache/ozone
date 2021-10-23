@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -88,11 +89,13 @@ public class SimpleContainerDownloader implements ContainerDownloader {
             LOG.error("Error on replicating container: " + containerId, t);
             try {
               return downloadContainer(containerId, datanode).get();
-            } catch (Exception e) {
+            } catch (ExecutionException | IOException e) {
               LOG.error("Error on replicating container: " + containerId,
                   e);
-              return null;
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
             }
+            return null;
           });
         }
       } catch (Exception ex) {

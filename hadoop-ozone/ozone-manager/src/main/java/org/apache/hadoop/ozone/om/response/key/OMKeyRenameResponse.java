@@ -63,11 +63,13 @@ public class OMKeyRenameResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
     String volumeName = renameKeyInfo.getVolumeName();
     String bucketName = renameKeyInfo.getBucketName();
-    omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-        omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-        omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
-        renameKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .deleteWithBatch(batchOperation,
+            omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation,
+            omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
+            renameKeyInfo);
   }
 
   public OmKeyInfo getRenameKeyInfo() {

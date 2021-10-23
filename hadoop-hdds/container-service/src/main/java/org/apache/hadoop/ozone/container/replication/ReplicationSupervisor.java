@@ -184,6 +184,14 @@ public class ReplicationSupervisor {
     return requestCounter.get();
   }
 
+  public long getQueueSize() {
+    if (executor instanceof ThreadPoolExecutor) {
+      return ((ThreadPoolExecutor)executor).getQueue().size();
+    } else {
+      return 0;
+    }
+  }
+
   public long getReplicationSuccessCount() {
     return successCounter.get();
   }

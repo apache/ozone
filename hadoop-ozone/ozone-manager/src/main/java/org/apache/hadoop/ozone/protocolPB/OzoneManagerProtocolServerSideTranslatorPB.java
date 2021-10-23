@@ -234,6 +234,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       String errorMessage = "Got error during waiting for flush to be " +
           "completed for " + "request" + request.toString();
       ExitUtils.terminate(1, errorMessage, ex, LOG);
+      Thread.currentThread().interrupt();
     }
     return omClientResponse.getOMResponse();
   }

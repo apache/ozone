@@ -34,7 +34,7 @@ public class SimplePipelineProvider
     extends PipelineProvider<StandaloneReplicationConfig> {
 
   public SimplePipelineProvider(NodeManager nodeManager,
-      StateManager stateManager) {
+      PipelineStateManager stateManager) {
     super(nodeManager, stateManager);
   }
 
