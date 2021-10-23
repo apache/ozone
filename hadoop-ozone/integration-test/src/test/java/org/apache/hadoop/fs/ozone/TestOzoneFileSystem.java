@@ -588,7 +588,6 @@ public class TestOzoneFileSystem {
     writeClient.commitKey(keyArgs, session.getId());
 
     Path parent = new Path("/");
-    FileStatus[] fileStatuses = fs.listStatus(parent);
 
     // Wait until the filestatus is updated
     if (!enabledFileSystemPaths) {
@@ -602,6 +601,9 @@ public class TestOzoneFileSystem {
         }
       }, 1000, 120000);
     }
+
+    FileStatus[] fileStatuses = fs.listStatus(parent);
+
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
     writeClient.deleteKey(keyArgs);
