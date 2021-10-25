@@ -143,6 +143,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -269,6 +271,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AuditLoggerType.OMLOGGER);
 
   private static final String OM_DAEMON = "om";
+
+  // This is set for read requests when OMRequest has S3Authentication set,
+  // and it is reset when read request is processed.
+  private static final ThreadLocal<S3Authentication> S3_AUTH =
+      new ThreadLocal<>();
 
   private static boolean securityEnabled = false;
   private OzoneDelegationTokenSecretManager delegationTokenMgr;
@@ -538,6 +545,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
+  }
+
+  public static void setS3Auth(S3Authentication val) {
+    S3_AUTH.set(val);
+  }
+
+  public static S3Authentication getS3Auth() {
+    return S3_AUTH.get();
   }
 
   /**
@@ -1973,8 +1988,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
       throws IOException {
-    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
+    UserGroupInformation user;
+    if (getS3Auth() != null) {
+      user = UserGroupInformation.createRemoteUser(
+          getS3Auth().getAccessId());
+    } else {
+      user = ProtobufRpcEngine.Server.getRemoteUser();
+    }
+
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
+
     checkAcls(resType, store, acl, vol, bucket, key,
         user != null ? user : getRemoteUser(),
         remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
