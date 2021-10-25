@@ -105,33 +105,6 @@ class PipelineStateMap {
   }
 
   /**
-   * Add container to an existing pipeline during SCM Start.
-   *
-   * @param pipelineID - PipelineID of the pipeline to which container is added
-   * @param containerID - ContainerID of the container to add
-   */
-  void addContainerToPipelineSCMStart(PipelineID pipelineID,
-      ContainerID containerID) throws IOException {
-    Preconditions.checkNotNull(pipelineID,
-            "Pipeline Id cannot be null");
-    Preconditions.checkNotNull(containerID,
-            "Container Id cannot be null");
-
-    Pipeline pipeline = getPipeline(pipelineID);
-    if (pipeline.isClosed()) {
-      /*
-      When SCM restarts,the SCM DB may not be upto date where some
-      containers are in an OPEN state for a CLOSED pipeline. This happens when
-      close pipeline transaction in flushed before SCM goes down and close
-      container is not flushed into DB.
-      */
-      LOG.info("Container {} in open state for pipeline={} in closed state",
-              containerID, pipelineID);
-    }
-    pipeline2container.get(pipelineID).add(containerID);
-  }
-
-  /**
    * Get pipeline corresponding to specified pipelineID.
    *
    * @param pipelineID - PipelineID of the pipeline to be retrieved

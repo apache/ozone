@@ -229,8 +229,8 @@ public final class ContainerStateManagerImpl
       containers.addContainer(container);
       if (container.getState() == LifeCycleState.OPEN) {
         try {
-          pipelineManager.addContainerToPipelineSCMStart(
-              container.getPipelineID(), container.containerID());
+          pipelineManager.addContainerToPipeline(container.getPipelineID(),
+              container.containerID());
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Found container {} which is in OPEN state with " +
                   "pipeline {} that does not exist. Marking container for " +

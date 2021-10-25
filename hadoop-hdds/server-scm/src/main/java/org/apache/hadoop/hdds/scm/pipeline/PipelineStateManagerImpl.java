@@ -118,18 +118,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(
-          PipelineID pipelineId, ContainerID containerID)
-          throws IOException {
-    lock.writeLock().lock();
-    try {
-      pipelineStateMap.addContainerToPipelineSCMStart(pipelineId, containerID);
-    } finally {
-      lock.writeLock().unlock();
-    }
-  }
-
-  @Override
   public Pipeline getPipeline(PipelineID pipelineID)
       throws PipelineNotFoundException {
     lock.readLock().lock();

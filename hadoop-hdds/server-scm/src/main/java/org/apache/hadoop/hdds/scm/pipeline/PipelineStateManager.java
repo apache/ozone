@@ -70,11 +70,6 @@ public interface PipelineStateManager {
       ContainerID containerID
   ) throws IOException;
 
-  void addContainerToPipelineSCMStart(
-      PipelineID pipelineID,
-      ContainerID containerID
-  ) throws IOException;
-
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
   List<Pipeline> getPipelines();
