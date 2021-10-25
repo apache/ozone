@@ -253,6 +253,13 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
+  public void addContainerToPipelineSCMStart(
+      PipelineID pipelineID, ContainerID containerID) throws IOException {
+    // should not lock here, since no ratis operation happens.
+    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+  }
+
+  @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     // should not lock here, since no ratis operation happens.
