@@ -133,6 +133,12 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public void addContainerToPipelineSCMStart(
+          PipelineID pipelineID, ContainerID containerID) throws IOException {
+    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+  }
+
+  @Override
   public void removeContainerFromPipeline(final PipelineID pipelineID,
                                           final ContainerID containerID)
       throws IOException {
