@@ -350,7 +350,7 @@ public class TestContainerBalancer {
     ozoneConf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3,
         TimeUnit.SECONDS);
     ozoneConf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
-    ozoneConf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+//    ozoneConf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
     ozoneConf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
