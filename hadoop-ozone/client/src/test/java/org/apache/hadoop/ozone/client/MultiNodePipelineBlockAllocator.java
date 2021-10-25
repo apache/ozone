@@ -33,6 +33,7 @@ import java.util.Random;
  * Allocates the block with required number of nodes in the pipeline.
  */
 public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
+  public static final Random RANDOM = new Random();
   private long blockId;
   private int requiredNodes;
   private final ConfigurationSource conf;
@@ -46,36 +47,33 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
   @Override
   public Iterable<? extends OzoneManagerProtocolProtos.KeyLocation>
       allocateBlock(OzoneManagerProtocolProtos.KeyArgs keyArgs) {
-    HddsProtos.Pipeline pipeline =  null;
-    if (pipeline == null) {
-      HddsProtos.Pipeline.Builder builder =
-          HddsProtos.Pipeline.newBuilder().setFactor(keyArgs.getFactor())
-              .setType(keyArgs.getType()).setId(
-              HddsProtos.PipelineID.newBuilder().setUuid128(
-                  HddsProtos.UUID.newBuilder().setLeastSigBits(1L)
-                      .setMostSigBits(1L).build()).build());
-      final int rand = new Random().nextInt();
-      for (int i = 1; i <= requiredNodes; i++) {
-        builder.addMembers(HddsProtos.DatanodeDetailsProto.newBuilder()
-            .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(rand)
-                .setMostSigBits(i).build()).setHostName("localhost")
-            .setIpAddress("1.2.3.4").addPorts(
-                HddsProtos.Port.newBuilder().setName("RATIS")
-                    .setValue(rand).build()).build());
-        if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
-          builder.addMemberReplicaIndexes(i);
-        }
-      }
+    HddsProtos.Pipeline.Builder builder =
+        HddsProtos.Pipeline.newBuilder().setFactor(keyArgs.getFactor())
+            .setType(keyArgs.getType()).setId(HddsProtos.PipelineID.newBuilder()
+            .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(1L)
+                .setMostSigBits(1L).build()).build());
+    final int rand = RANDOM.nextInt(); // used for port and UUID combination.
+    // It's ok here for port number limit as don't really create any socket
+    // connection.
+    for (int i = 1; i <= requiredNodes; i++) {
+      builder.addMembers(HddsProtos.DatanodeDetailsProto.newBuilder()
+          .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(rand)
+              .setMostSigBits(i).build()).setHostName("localhost")
+          .setIpAddress("1.2.3.4").addPorts(
+              HddsProtos.Port.newBuilder().setName("RATIS").setValue(rand)
+                  .build()).build());
       if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
-        builder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+        builder.addMemberReplicaIndexes(i);
       }
-      pipeline = builder.build();
     }
+    if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
+      builder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+    }
+    final HddsProtos.Pipeline pipeline = builder.build();
 
-    long blockSize = (long)conf.getStorageSize(
-        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
-        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
-        StorageUnit.BYTES);
+    long blockSize = (long) conf
+        .getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+            OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
     List<OzoneManagerProtocolProtos.KeyLocation> results = new ArrayList<>();
     results.add(OzoneManagerProtocolProtos.KeyLocation.newBuilder()
