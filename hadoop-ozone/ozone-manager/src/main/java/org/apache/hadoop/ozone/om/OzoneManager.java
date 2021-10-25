@@ -253,6 +253,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_AL
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TENANT_ACCESSID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -3172,19 +3173,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OmVolumeArgs getS3Volume(String accessID) throws IOException {
-    String tenantName = multiTenantManagr.getTenantForAccessID(accessID);
-    if (tenantName == null) {
-      // If the user is not associated with a tenant, they will use the
-      // default s3 volume.
-      String defaultS3volume =
-          HddsClientUtils.getDefaultS3VolumeName(configuration);
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("No tenant found for access ID {}. Directing " +
-            "requests to default s3 volume {}.", accessID, defaultS3volume);
-      }
-      return getVolumeInfo(defaultS3volume);
-    } else {
+    String tenantName;
+    try {
+      tenantName = multiTenantManagr.getTenantForAccessID(accessID);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Get S3 volume request for access ID {} belonging to tenant" +
                 " {} is directed to the volume {}.", accessID, tenantName,
@@ -3192,6 +3184,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       // This call performs acl checks and checks volume existence.
       return getVolumeInfo(tenantName);
+
+    } catch (OMException ex) {
+      if (ex.getResult().equals(INVALID_TENANT_ACCESSID)) {
+        // If the user is not associated with a tenant, they will use the
+        // default s3 volume.
+        String defaultS3volume =
+            HddsClientUtils.getDefaultS3VolumeName(configuration);
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("No tenant found for access ID {}. Directing " +
+              "requests to default s3 volume {}.", accessID, defaultS3volume);
+        }
+        return getVolumeInfo(defaultS3volume);
+      }
+      throw ex;
     }
   }
 

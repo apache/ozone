@@ -17,21 +17,16 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.ozone.om.multitenant.impl.AccountNameSpaceImpl;
-import org.apache.hadoop.ozone.om.multitenant.impl.BucketNameSpaceImpl;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.om.multitenant.impl.SingleVolumeTenantNamespace;
 
 /**
  * Implements Tenant.
  */
-public class CephCompatibleTenantImpl implements Tenant {
+public class DefaultOzoneS3Tenant implements Tenant {
   private final String tenantID;
   private List<String> tenantGroupsIDs;
   private List<AccessPolicy> accessPolicies;
@@ -39,17 +34,12 @@ public class CephCompatibleTenantImpl implements Tenant {
   private final BucketNameSpace bucketNameSpace;
 
 
-  public CephCompatibleTenantImpl(String id) {
+  public DefaultOzoneS3Tenant(String id) {
     tenantID = id;
     accessPolicies = new ArrayList<>();
     tenantGroupsIDs = new ArrayList<>();
     accountNameSpace = new AccountNameSpaceImpl(id);
-    bucketNameSpace = new BucketNameSpaceImpl(id);
-    OzoneObj volume = new OzoneObjInfo.Builder()
-        .setResType(VOLUME)
-        .setStoreType(OZONE)
-        .setVolumeName(bucketNameSpace.getBucketNameSpaceID()).build();
-    bucketNameSpace.addBucketNameSpaceObject(volume);
+    bucketNameSpace = new SingleVolumeTenantNamespace(id);
   }
 
   @Override

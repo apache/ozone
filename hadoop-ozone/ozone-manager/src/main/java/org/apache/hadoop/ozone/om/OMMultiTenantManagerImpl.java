@@ -52,7 +52,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantInfo;
-import org.apache.hadoop.ozone.om.multitenant.CephCompatibleTenantImpl;
+import org.apache.hadoop.ozone.om.multitenant.DefaultOzoneS3Tenant;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
@@ -67,6 +67,7 @@ import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 /**
@@ -158,7 +159,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   public Tenant createTenantAccessInAuthorizer(String tenantID)
       throws IOException {
 
-    Tenant tenant = new CephCompatibleTenantImpl(tenantID);
+    Tenant tenant = new DefaultOzoneS3Tenant(tenantID);
     try {
       controlPathLock.writeLock().lock();
 
@@ -276,10 +277,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       controlPathLock.writeLock().lock();
       //TODO : Remove user from group in Authorizer.
       String tenantName = getTenantForAccessID(accessID);
-      if (tenantName == null) {
-        LOG.error("Tenant doesn't exist");
-        return;
-      }
       tenantCache.get(tenantName).getTenantUsers()
           .remove(new ImmutablePair<>(principal.getName(), accessID));
       // TODO: Determine how to replace this code.
@@ -543,4 +540,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
   }
 
+  @VisibleForTesting
+  Map<String, CachedTenantInfo> getTenantCache() {
+    return tenantCache;
+  }
 }
