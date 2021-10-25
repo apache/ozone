@@ -668,7 +668,8 @@ public class BlockOutputStream extends OutputStream {
    * checksum
    * @return
    */
-  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(ChunkBuffer chunk) throws IOException {
+  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(
+      ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(

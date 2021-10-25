@@ -82,8 +82,8 @@ public class ECBlockOutputStream extends BlockOutputStream{
    * checksum
    * @return ContainerCommandResponseProto
    */
-  CompletableFuture<ContainerProtos.ContainerCommandResponseProto> writeChunkToContainer(
-      ChunkBuffer chunk) throws IOException {
+  CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      writeChunkToContainer(ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = getChunkOffset().getAndAdd(effectiveChunkSize);
     final ByteString data =
@@ -188,7 +188,7 @@ public class ECBlockOutputStream extends BlockOutputStream{
   }
 
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-  getCurrentChunkResponseFuture() {
+      getCurrentChunkResponseFuture() {
     return this.currentChunkRspFuture;
   }
 }

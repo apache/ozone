@@ -65,6 +65,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private final RawErasureEncoder encoder;
   private final ECReplicationConfig.EcCodec ecCodec;
 
+  private enum StripeWriteStatus {
+    SUCCESS,
+    FAILED,
+    NOT_FULL_YET
+  }
+
   private long currentBlockGroupLen = 0;
   /**
    * Defines stream action while calling handleFlushOrClose.
@@ -217,20 +223,74 @@ public class ECKeyOutputStream extends KeyOutputStream {
     writeOffset += len;
   }
 
-  private void checkAndWriteParityCells(int lastDataBuffPos,
-      boolean allocateBlockIfFull)
+  private void handleStripeFailure(int chunkSize, int failedStripeDataSize)
       throws IOException {
+    long[] failedDataStripeChunkLens = new long[numDataBlks];
+    long[] failedParityStripeChunkLens = new long[numParityBlks];
+    final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
+    for (int i = 0; i < numDataBlks; i++) {
+      failedDataStripeChunkLens[i] = dataBuffers[i].limit();
+    }
+    final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
+    for (int i = 0; i <  numParityBlks; i++) {
+      failedParityStripeChunkLens[i] = parityBuffers[i].limit();
+    }
+
+    blockOutputStreamEntryPool.getCurrentStreamEntry().resetToFirstEntry();
+    offset -= failedStripeDataSize;
+    clearFailedStripeLength(blockOutputStreamEntryPool.getCurrentStreamEntry(),
+        failedStripeDataSize);
+
+    // Let's close the current entry.
+    blockOutputStreamEntryPool.getCurrentStreamEntry().close();
+    currentBlockGroupLen = 0;
+
+    // Let's rewrite the last stripe, so that it will be written to new block
+    // group.
+    // TODO: we can improve to write partial stripe failures. In that case,
+    //  we just need to write only available buffers.
+    blockOutputStreamEntryPool.allocateBlockIfNeeded();
+    final ECBlockOutputStreamEntry currentStreamEntry =
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    for (int i = 0; i < numDataBlks; i++) {
+      handleOutputStreamWrite(i, failedDataStripeChunkLens[i], true, false);
+      currentStreamEntry.useNextBlockStream();
+    }
+    for (int i = 0; i < (numParityBlks); i++) {
+      handleOutputStreamWrite(i + numDataBlks, failedParityStripeChunkLens[i],
+          true, true);
+      currentStreamEntry.useNextBlockStream();
+    }
+    currentStreamEntry.executePutBlock();
+    ecChunkBufferCache.clear(chunkSize);
+    ecChunkBufferCache.release();
+  }
+
+  private void clearFailedStripeLength(
+      ECBlockOutputStreamEntry currentBlkGrpStreamEntry,
+      long failedStripeChunkLens) {
+    /*currentBlkGrpStreamEntry
+        .removeWrittenDataLengthsOnFailure(failedStripeChunkLens);*/
+    currentBlkGrpStreamEntry
+        .incCurrentPosition(-failedStripeChunkLens);
+  }
+
+  private void checkAndWriteParityCells(int lastDataBuffPos,
+      boolean allocateBlockIfFull) throws IOException {
     //check data blocks finished
     //If index is > datanum blks
     int currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
         .getCurrentStreamIdx();
     if (currentStreamIdx == numDataBlks && lastDataBuffPos == ecChunkSize) {
       //Lets encode and write
-      handleParityWrites(ecChunkSize, allocateBlockIfFull);
+      if (handleParityWrites(ecChunkSize,
+          allocateBlockIfFull) == StripeWriteStatus.FAILED) {
+        handleStripeFailure(ecChunkSize, numDataBlks * ecChunkSize);
+      }
     }
   }
 
-  private void handleParityWrites(int parityCellSize,
+  private StripeWriteStatus handleParityWrites(int parityCellSize,
       boolean allocateBlockIfFull)
       throws IOException {
     writeParityCells(parityCellSize);
@@ -242,13 +302,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // Since writes are async, let's check the failures once.
     if(streamEntry.checkStreamFailures()){
       isException = true;
-      throw new IOException("There are more failures(3) than the supported tolerance: 0");
+      return StripeWriteStatus.FAILED;
     }
     streamEntry.executePutBlock();
     // Since putBlock also async, let's check the failures again.
     if(streamEntry.checkStreamFailures()){
       isException = true;
-      throw new IOException("There are more failures(3) than the supported tolerance: 0");
+      return StripeWriteStatus.FAILED;
     }
     ecChunkBufferCache.clear(parityCellSize);
 
@@ -261,6 +321,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       streamEntry.resetToFirstEntry();
     }
     currentBlockGroupLen = 0;
+    return StripeWriteStatus.SUCCESS;
   }
 
   void writeParityCells(int parityCellSize) throws IOException {
@@ -285,7 +346,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private int handleDataWrite(int currIdx, byte[] b, int off, long len,
       boolean isFullCell) throws IOException {
     int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, (int) len);
-    handleOutputStreamWrite(currIdx, b, off, len, isFullCell, false);
+    handleOutputStreamWrite(currIdx, len, isFullCell, false);
 
     if(pos == ecChunkSize){
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
@@ -295,11 +356,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   private void handleParityWrite(int currIdx, byte[] b, int off, long len,
       boolean isFullCell) throws IOException {
-    handleOutputStreamWrite(currIdx, b, off, len, isFullCell, true);
+    handleOutputStreamWrite(currIdx, len, isFullCell, true);
     blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
   }
 
-  private void handleOutputStreamWrite(int currIdx, byte[] b, int off, long len,
+  private void handleOutputStreamWrite(int currIdx, long len,
       boolean isFullCell, boolean isParity) throws IOException {
 
     BlockOutputStreamEntry current =
@@ -492,13 +553,16 @@ public class ECKeyOutputStream extends KeyOutputStream {
         final int parityCellSize =
             lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize;
         addPadding(parityCellSize);
-        handleParityWrites(parityCellSize, false);
+        if (handleParityWrites(parityCellSize,
+            false) == StripeWriteStatus.FAILED) {
+          handleStripeFailure(parityCellSize, lastStripeSize);
+        }
       }
       handleFlushOrCloseAllStreams(StreamAction.CLOSE);
-
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
+
       blockOutputStreamEntryPool.getCurrentStreamEntry().close();
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {

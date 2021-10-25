@@ -27,13 +27,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Allocates the block with required number of nodes in the pipeline.
  */
 public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
   private long blockId;
-  private HddsProtos.Pipeline pipeline;
   private int requiredNodes;
   private final ConfigurationSource conf;
 
@@ -46,6 +46,7 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
   @Override
   public Iterable<? extends OzoneManagerProtocolProtos.KeyLocation>
       allocateBlock(OzoneManagerProtocolProtos.KeyArgs keyArgs) {
+    HddsProtos.Pipeline pipeline =  null;
     if (pipeline == null) {
       HddsProtos.Pipeline.Builder builder =
           HddsProtos.Pipeline.newBuilder().setFactor(keyArgs.getFactor())
@@ -53,14 +54,14 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
               HddsProtos.PipelineID.newBuilder().setUuid128(
                   HddsProtos.UUID.newBuilder().setLeastSigBits(1L)
                       .setMostSigBits(1L).build()).build());
-
+      final int rand = new Random().nextInt();
       for (int i = 1; i <= requiredNodes; i++) {
         builder.addMembers(HddsProtos.DatanodeDetailsProto.newBuilder()
-            .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(i)
+            .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(rand)
                 .setMostSigBits(i).build()).setHostName("localhost")
             .setIpAddress("1.2.3.4").addPorts(
-                HddsProtos.Port.newBuilder().setName("RATIS").setValue(1234 + i)
-                    .build()).build());
+                HddsProtos.Port.newBuilder().setName("RATIS")
+                    .setValue(rand).build()).build());
         if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
           builder.addMemberReplicaIndexes(i);
         }
