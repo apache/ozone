@@ -96,6 +96,7 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
       // Add unused parts to deleted key table.
       RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager.getDeletedTable()
           .get(ozoneKey);
+
       if (repeatedOmKeyInfo == null) {
         repeatedOmKeyInfo = new RepeatedOmKeyInfo(partsUnusedList);
       } else {
@@ -118,6 +119,7 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
         getBucketLayout(omMetadataManager, omKeyInfo.getVolumeName(),
             omKeyInfo.getBucketName()))
         .putWithBatch(batchOperation, ozoneKey, omKeyInfo);
+
     return ozoneKey;
   }
 
