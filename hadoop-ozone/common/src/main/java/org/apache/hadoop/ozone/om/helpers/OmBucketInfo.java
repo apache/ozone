@@ -91,8 +91,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketLayout bucketLayout;
 
-  private String owner;
-  private String admin;
+  private final String owner;
+  private final String admin;
 
   /**
    * Private constructor, constructed via builder.
@@ -578,9 +578,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setUsedNamespace(usedNamespace)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .setQuotaInBytes(quotaInBytes)
-        .setQuotaInNamespace(quotaInNamespace)
-        .setOwner(owner)
-        .setAdmin(admin);
+        .setQuotaInNamespace(quotaInNamespace);
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -592,6 +590,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (sourceBucket != null) {
       bib.setSourceBucket(sourceBucket);
+    }
+    if (owner != null) {
+      bib.setOwner(owner);
+    }
+    if (admin != null) {
+      bib.setAdmin(admin);
     }
     return bib.build();
   }
@@ -625,9 +629,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setModificationTime(bucketInfo.getModificationTime())
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
         .setUsedNamespace(bucketInfo.getUsedNamespace())
-        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace())
-        .setOwner(bucketInfo.getOwner())
-        .setAdmin(bucketInfo.getAdmin());
+        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
     if (buckLayout != null) {
       obib.setBucketLayout(buckLayout);
     } else if (bucketInfo.getBucketLayout() != null) {
@@ -652,6 +654,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (bucketInfo.hasSourceBucket()) {
       obib.setSourceBucket(bucketInfo.getSourceBucket());
+    }
+    if (bucketInfo.hasOwner()) {
+      obib.setOwner(bucketInfo.getOwner());
+    }
+    if (bucketInfo.hasAdmin()) {
+      obib.setAdmin(bucketInfo.getAdmin());
     }
     return obib.build();
   }
@@ -700,7 +708,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
-        Objects.equals(bekInfo, that.bekInfo);
+        Objects.equals(bekInfo, that.bekInfo) &&
+        Objects.equals(owner, that.owner) &&
+        Objects.equals(admin, that.admin);
   }
 
   @Override
@@ -728,6 +738,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +
+        ", owner=" + owner +
+        ", admin=" + admin +
         '}';
   }
 }
