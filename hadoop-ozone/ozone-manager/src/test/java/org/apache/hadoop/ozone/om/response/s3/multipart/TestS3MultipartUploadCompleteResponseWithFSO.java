@@ -238,6 +238,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     return omKeyInfoFSO.getObjectID();
   }
 
+  @SuppressWarnings("parameterNumber")
   private OmKeyInfo commitS3MultipartUpload(String volumeName,
       String bucketName, String keyName, String multipartUploadID,
       String fileName, String multipartKey,
