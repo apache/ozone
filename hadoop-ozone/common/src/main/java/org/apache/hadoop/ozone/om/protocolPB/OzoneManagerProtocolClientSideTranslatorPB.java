@@ -25,9 +25,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -172,12 +172,13 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 @InterfaceAudience.Private
 public final class OzoneManagerProtocolClientSideTranslatorPB
-    implements OzoneManagerProtocol {
+    implements OzoneManagerClientProtocol {
 
   private final String clientID;
 
   private OmTransport transport;
-
+  private ThreadLocal<S3Authentication> threadLocalS3Authentication
+      = new ThreadLocal<>();
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
     this.clientID = clientId;
@@ -223,11 +224,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   private OMResponse submitRequest(OMRequest omRequest)
       throws IOException {
-    OMRequest payload = OMRequest.newBuilder(omRequest)
-        .setTraceID(TracingUtil.exportCurrentSpan())
-        .build();
-
-    return transport.submitRequest(payload);
+    OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
+    // Insert S3 Authentication information for each request.
+    if (getThreadLocalS3Authentication() != null) {
+      builder.setS3Authentication(
+          org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
+              S3Authentication.newBuilder()
+              .setSignature(
+                  threadLocalS3Authentication.get().getSignature())
+              .setStringToSign(
+                  threadLocalS3Authentication.get().getStringTosSign())
+              .setAccessId(
+                  threadLocalS3Authentication.get().getAccessID())
+              .build());
+    }
+    OMResponse response =
+        transport.submitRequest(
+            builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+    return response;
   }
 
   /**
@@ -1257,6 +1271,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throw new OMException("Cancel delegation token failed.", e,
           TOKEN_ERROR_OTHER);
     }
+  }
+
+  @Override
+  public void setThreadLocalS3Authentication(
+      S3Authentication ozoneSharedSecretAuth) {
+    this.threadLocalS3Authentication.set(ozoneSharedSecretAuth);
+  }
+  @Override
+  public void clearThreadLocalS3Authentication() {
+    this.threadLocalS3Authentication.remove();
+  }
+  @Override
+  public S3Authentication getThreadLocalS3Authentication() {
+    return this.threadLocalS3Authentication.get();
   }
 
   /**
