@@ -378,6 +378,32 @@ public class TestOzoneTenantShell {
         + "- Tenant 'research' with accessId 'research$bob@EXAMPLE.COM'\n"
         + "- Tenant 'dev' with accessId 'dev$bob@EXAMPLE.COM'\n\n", true);
     checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "alice@EXAMPLE.COM", "--tenant=research"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='research$alice@EXAMPLE.COM'\n"
+        + "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'alice@EXAMPLE.COM' to 'research'" +
+        " with accessId 'research$alice@EXAMPLE.COM'.\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=research"});
+    checkOutput(out,
+        "- User 'bob@EXAMPLE.COM' with accessId 'research$bob@EXAMPLE.COM'\n"
+        + "- User 'alice@EXAMPLE.COM' with accessId 'research$alice@EXAMPLE" +
+            ".COM'\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=research", "--prefix=b"});
+    checkOutput(out, "- User 'bob@EXAMPLE.COM' with accessId " +
+            "'research$bob@EXAMPLE.COM'\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=unknown"});
+    checkOutput(err, "Failed to Get Users in tenant 'unknown': " +
+        "Tenant 'unknown' not found!\n", true);
   }
 
 }
