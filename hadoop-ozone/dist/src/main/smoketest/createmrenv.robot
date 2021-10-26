@@ -24,7 +24,7 @@ Test Timeout        2 minute
 *** Variables ***
 ${SCHEME}       o3fs
 ${volume}       volume1
-${bucket}       bucket1
+${bucket}       mrbucket1
 
 
 *** Keywords ***
