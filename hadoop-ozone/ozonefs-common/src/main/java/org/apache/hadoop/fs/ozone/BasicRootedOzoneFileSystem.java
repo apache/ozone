@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -235,6 +236,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   private FSDataOutputStream createOutputStream(String key, short replication,
       boolean overwrite, boolean recursive) throws IOException {
+    boolean isRatisStreamingEnabled = getConf().getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLE_DEFAULT);
+    if (isRatisStreamingEnabled){
+      return new FSDataOutputStream(adapter.createStreamFile(key,
+          replication, overwrite, recursive), statistics);
+    }
     return new FSDataOutputStream(adapter.createFile(key,
         replication, overwrite, recursive), statistics);
   }
