@@ -246,6 +246,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             .getStreamWriteThreads();
     RaftServerConfigKeys.DataStream.setAsyncWriteThreadPoolSize(properties,
         dataStreamWriteRequestThreadPoolSize);
+    int dataStreamClientPoolSize =
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getClientPoolSize();
+    RaftServerConfigKeys.DataStream.setClientPoolSize(properties,
+        dataStreamClientPoolSize);
   }
 
   @SuppressWarnings("checkstyle:methodlength")
