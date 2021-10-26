@@ -44,30 +44,12 @@ Create volume
     ${vol} =     Execute curl command    ${volume}    MKDIRS      -X PUT
     Should contain  ${vol.stdout}   true
 
-# Check owner before
-    # ${status_after} =     Execute curl command    ${volume}          GETFILESTATUS      ${EMPTY}
-    # ${json_after} =       Evaluate                json.loads('''${status_after.stdout}''')    json
-    # ${owner_after} =      Set Variable     ${json_after["FileStatus"]["owner"]}
-    # Should be equal       httpfs   ${owner_after}
+Set owner of volume
+    ${rc} =                             Run And Return Rc       ozone sh volume update --user=testuser /${volume}
+    Should Be Equal As Integers         ${rc}       0
 
-# Set owner of volume
-    # ${rc} =                             Run And Return Rc       ozone sh volume update --user=testuser /${volume}
-    # Should Be Equal As Integers         ${rc}       0
-
-# Kinit
-   # Kinit test user     testuser     testuser.keytab
-
-# Check owner
-    # ${status_after} =     Execute curl command    ${volume}          GETFILESTATUS      ${EMPTY}
-    # ${json_after} =       Evaluate                json.loads('''${status_after.stdout}''')    json
-    # ${owner_after} =      Set Variable     ${json_after["FileStatus"]["owner"]}
-    # Should be equal       testuser   ${owner_after}
-
-# Check permission
-    # ${status_after} =       Execute curl command    ${volume}          GETFILESTATUS      ${EMPTY}
-    # ${json_after} =       evaluate                json.loads('''${status_after.stdout}''')    json
-    # ${permission_after} =   Set Variable     ${json_after["FileStatus"]["permission"]}
-    # Should be equal As Integers     777   ${permission_after}
+Kinit
+   Kinit test user     testuser     testuser.keytab
 
 Create first bucket
     ${bucket} =     Execute curl command    ${volume}/buck1          MKDIRS      -X PUT
