@@ -126,26 +126,22 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() {
-    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
-    InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder();
-
-    // Added not null checks, as in UT's these values might be null.
-    if (user != null) {
-      userInfo.setUserName(user.getUserName());
-    } else {
-      // If S3 Authentication is set, use AccessId as user.
-      if (omRequest.hasS3Authentication()) {
-        userInfo.setUserName(omRequest.getS3Authentication().getAccessId());
-      }
-    }
-
+    InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
     }
 
+    // If S3 Authentication is set, use AccessId as user.
+    if (omRequest.hasS3Authentication()) {
+      userInfo.setUserName(omRequest.getS3Authentication().getAccessId());
+      return userInfo.build();
+    }
+
+    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
+    userInfo.setUserName(user.getUserName());
     return userInfo.build();
   }
 

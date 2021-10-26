@@ -105,8 +105,10 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Authentication;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
@@ -147,7 +149,7 @@ public class RpcClient implements ClientProtocol {
       LoggerFactory.getLogger(RpcClient.class);
 
   private final ConfigurationSource conf;
-  private final OzoneManagerProtocol ozoneManagerClient;
+  private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
   private final int chunkSize;
   private final UserGroupInformation ugi;
@@ -183,11 +185,10 @@ public class RpcClient implements ClientProtocol {
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
     OmTransport omTransport = createOmTransport(omServiceId);
-
     this.ozoneManagerClient = TracingUtil.createProxy(
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
             clientId.toString()),
-        OzoneManagerProtocol.class, conf
+        OzoneManagerClientProtocol.class, conf
     );
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
@@ -543,6 +544,11 @@ public class RpcClient implements ClientProtocol {
    * @return listOfAcls
    * */
   private List<OzoneAcl> getAclList() {
+    if (ozoneManagerClient.getThreadLocalS3Authentication() != null) {
+     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(ozoneManagerClient.getThreadLocalS3Authentication().getAccessID());
+     return OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
+         userRights, groupRights);
+    }
     return OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
         userRights, groupRights);
   }
@@ -782,7 +788,6 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadata(metadata)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation);
-
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try{
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
@@ -1494,5 +1499,21 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig());
 
+  }
+
+  @Override
+  public void setTheadLocalS3Authentication(
+      S3Authentication ozoneSharedSecretAuth) {
+      ozoneManagerClient.setThreadLocalS3Authentication(ozoneSharedSecretAuth);
+  }
+
+  @Override
+  public S3Authentication getThreadLocalS3Authentication() {
+    return ozoneManagerClient.getThreadLocalS3Authentication();
+  }
+
+  @Override
+  public void clearTheadLocalS3Authentication() {
+    ozoneManagerClient.clearThreadLocalS3Authentication();
   }
 }
