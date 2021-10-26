@@ -113,6 +113,7 @@
                     <include>org.apache.commons.beanutils.**.*</include>
                     <include>org.apache.commons.collections.**.*</include>
                     <include>org.apache.commons.digester.**.*</include>
+                    <include>org.apache.commons.io.**.*</include>
                     <include>org.apache.commons.logging.**.*</include>
                     <include>org.apache.commons.pool2.**.*</include>
                     <include>org.apache.commons.validator.**.*</include>
@@ -130,6 +131,7 @@
                     <include>com.google.common.**.*</include>
                     <include>com.google.gson.**.*</include>
                     <include>com.codahale.**.*</include>
+                    <include>com.fasterxml.**.*</include>
                     <include>com.lmax.**.*</include>
                     <include>com.github.joshelser.**.*</include>
                     <include>com.twitter.**.*</include>

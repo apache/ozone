@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
@@ -187,6 +188,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
+        .addHandler(new RefreshVolumeUsageCommandHandler())
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -214,6 +216,8 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("Fail to get scm addresses", e);
     }
 
+    LOG.info("Datanode State Machine Task Thread Pool size {}",
+        totalServerCount);
     return totalServerCount;
   }
 
@@ -468,7 +472,7 @@ public class DatanodeStateMachine implements Closeable {
     };
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("Datanode State Machine Thread - %d")
+        .setNameFormat("Datanode State Machine Daemon Thread")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate Datanode, encounter uncaught exception"
               + " in Datanode State Machine Thread";
