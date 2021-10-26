@@ -156,9 +156,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
     // Check if bucket layout is valid, OFS buckets cannot be in
     // OBJECT_STORE layout
-    String bucketLayout = bucket.getBucketLayout().name();
-    if (StringUtils.equalsIgnoreCase(bucketLayout,
-        BucketLayout.OBJECT_STORE.name())) {
+    BucketLayout bucketLayout = bucket.getBucketLayout();
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
       throw new IllegalArgumentException(bucketLayout + " does not support" +
           " file system semantics. Bucket Layout must be " +
           BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + " or "

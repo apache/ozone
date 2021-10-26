@@ -32,7 +32,7 @@ Create volume
     ${result} =     Execute             ozone sh volume create /${volume} --user hadoop --space-quota 100TB --namespace-quota 100
                     Should not contain  ${result}       Failed
 Create bucket
-                    Execute             ozone sh bucket create /${volume}/${bucket}
+                    Execute             ozone sh bucket create /${volume}/${bucket} --type FILE_SYSTEM_OPTIMIZED
 
 *** Test Cases ***
 Create test volume, bucket and key
