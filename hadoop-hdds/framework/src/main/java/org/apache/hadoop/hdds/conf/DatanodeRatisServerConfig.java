@@ -158,6 +158,23 @@ public class DatanodeRatisServerConfig {
     this.streamWriteThreads = streamWriteThreads;
   }
 
+  @Config(key = "datastream.client.pool.size",
+      defaultValue = "10",
+      type = ConfigType.INT,
+      tags = {OZONE, DATANODE, RATIS, DATASTREAM},
+      description = "Maximum number of client proxy in NettyServerStreamRpc " +
+          "for datastream write."
+  )
+  private int clientPoolSize;
+
+  public int getClientPoolSize() {
+    return clientPoolSize;
+  }
+
+  public void setClientPoolSize(int clientPoolSize) {
+    this.clientPoolSize = clientPoolSize;
+  }
+
   @Config(key = "delete.ratis.log.directory",
           defaultValue = "true",
           type = ConfigType.BOOLEAN,
