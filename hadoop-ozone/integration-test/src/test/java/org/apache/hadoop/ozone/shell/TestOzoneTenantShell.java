@@ -151,6 +151,7 @@ public class TestOzoneTenantShell {
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
+        .withoutDatanodes()  // Remove this once we are actually writing data
         .build();
     cluster.waitForClusterToBeReady();
   }

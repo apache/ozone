@@ -99,17 +99,16 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
     omm.init(conf);
 
     try {
-      OzoneTenantRolePrincipal group1Principal =
-          OzoneTenantRolePrincipal.getAdminRole("tenant1");
-      OzoneTenantRolePrincipal group2Principal =
-          OzoneTenantRolePrincipal.getUserRole("tenant1");
-      groupIdsCreated.add(omm.createRole(group1Principal, null));
-      groupIdsCreated.add(omm.createRole(group2Principal,
-          group1Principal.getName()));
+      OzoneTenantRolePrincipal adminRole =
+          OzoneTenantRolePrincipal.getAdminRole("tenant1-AdminRole");
+      OzoneTenantRolePrincipal userRole =
+          OzoneTenantRolePrincipal.getUserRole("tenant1-UserRole");
 
-      BasicUserPrincipal userPrincipal =
-          new BasicUserPrincipal("user1Test");
-//      usersIdsCreated.add(omm.assignUser(userPrincipal, groupIdsCreated));
+      BasicUserPrincipal userPrincipal = new BasicUserPrincipal("user1Test");
+      usersIdsCreated.add(
+          omm.assignUser(userPrincipal, userRole.getName(), false));
+      usersIdsCreated.add(
+          omm.assignUser(userPrincipal, adminRole.getName(), true));
 
       AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
           "vol1", "tenant1");
@@ -164,7 +163,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       groupIdsCreated.add(omm.getRole(group2Principal));
 
       userPrincipal = new BasicUserPrincipal("user1Test");
-//      omm.assignUser(userPrincipal, groupIdsCreated);
+      omm.assignUser(userPrincipal, group2Principal.getName(), false);
 
       AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
           "vol1", "tenant1");
