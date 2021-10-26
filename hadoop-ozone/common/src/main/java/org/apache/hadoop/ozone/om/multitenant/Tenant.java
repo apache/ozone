@@ -53,7 +53,7 @@ public interface Tenant {
 
   void addTenantAccessRole(String groupID);
 
-  void removeTenantAccessGroup(String groupID);
+  void removeTenantAccessRole(String groupID);
 
-  List<String> getTenantGroups();
+  List<String> getTenantRoles();
 }

@@ -17,31 +17,14 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
-import org.apache.hadoop.ozone.OzoneConsts;
 import java.security.Principal;
 
 /**
- * Used to identify a tenant's role in Ranger.
+ * Used to specify {OWNER} tag in Ranger.
  */
-public final class OzoneTenantRolePrincipal implements Principal {
-  private final String tenantID;
-  private final String roleName;
+public final class OzoneOwnerPrincipal implements Principal {
 
-  public static OzoneTenantRolePrincipal getUserRole(String tenantID) {
-    return new OzoneTenantRolePrincipal(tenantID, "UserRole");
-  }
-
-  public static OzoneTenantRolePrincipal getAdminRole(String tenantID) {
-    return new OzoneTenantRolePrincipal(tenantID, "AdminRole");
-  }
-
-  private OzoneTenantRolePrincipal(String tenantID, String roleName) {
-    this.tenantID = tenantID;
-    this.roleName = roleName;
-  }
-
-  public String getTenantID() {
-    return tenantID;
+  public OzoneOwnerPrincipal() {
   }
 
   @Override
@@ -51,6 +34,6 @@ public final class OzoneTenantRolePrincipal implements Principal {
 
   @Override
   public String getName() {
-    return tenantID + OzoneConsts.TENANT_NAME_ROLE_DELIMITER + roleName;
+    return "{OWNER}";
   }
 }

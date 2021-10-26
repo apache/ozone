@@ -89,7 +89,13 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
     omMetadataManager.getTenantRoleTable().deleteWithBatch(
         batchOperation, accessId);
 
-    omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
-        batchOperation, principal, omDBKerberosPrincipalInfo);
+    if (omDBKerberosPrincipalInfo.getAccessIds().size() > 0) {
+      omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
+          batchOperation, principal, omDBKerberosPrincipalInfo);
+    } else {
+      // Remove entry from DB if accessId set is empty
+      omMetadataManager.getPrincipalToAccessIdsTable().deleteWithBatch(
+          batchOperation, principal);
+    }
   }
 }

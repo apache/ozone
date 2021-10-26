@@ -52,6 +52,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
+import static org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo.SERIALIZATION_SPLIT_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
@@ -135,6 +136,13 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       throw new OMException("Invalid tenant name '" + tenantUsername +
           "'. Tenant name shouldn't contain delimiter.",
           OMException.ResultCodes.INVALID_TENANT_NAME);
+    }
+
+    // Check accessId validity.
+    if (accessId.contains(SERIALIZATION_SPLIT_KEY)) {
+      throw new OMException("Invalid accessId '" + accessId +
+          "'. accessId should not contain '" + SERIALIZATION_SPLIT_KEY + "'",
+          OMException.ResultCodes.INVALID_ACCESSID);
     }
 
     checkTenantExistence(ozoneManager.getMetadataManager(), tenantName);
@@ -245,6 +253,11 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
         for (final String existingAccId : principalInfo.getAccessIds()) {
           final OmDBAccessIdInfo accessIdInfo =
               omMetadataManager.getTenantAccessIdTable().get(existingAccId);
+          if (accessIdInfo == null) {
+            LOG.error("Metadata error: accessIdInfo is null for accessId '{}'. "
+                + "Ignoring.", existingAccId);
+            throw new NullPointerException("accessIdInfo is null");
+          }
           if (tenantName.equals(accessIdInfo.getTenantId())) {
             throw new OMException("The same user is not allowed to be assigned "
                 + "to the same tenant more than once. User '" + principal

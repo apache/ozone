@@ -3182,7 +3182,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         final OmDBAccessIdInfo accessIdInfo =
             metadataManager.getTenantAccessIdTable().get(accessId);
         // Sanity check
-        assert(accessIdInfo != null);
+        if (accessIdInfo == null) {
+          LOG.error("Potential metadata error. Unexpected null accessIdInfo: "
+              + "entry for accessId '{}' doesn't exist in TenantAccessIdTable",
+              accessId);
+          throw new NullPointerException("accessIdInfo is null");
+        }
         assert(accessIdInfo.getKerberosPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
@@ -3193,6 +3198,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } catch (IOException e) {
         LOG.error("Potential DB issue. Failed to retrieve OmDBAccessIdInfo "
             + "for accessId '{}' in TenantAccessIdTable.", accessId);
+        // Audit
         auditMap.put("accessId", accessId);
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
             OMAction.TENANT_GET_USER_INFO, auditMap, e));

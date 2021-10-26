@@ -47,7 +47,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   @Override
   public String assignUser(BasicUserPrincipal principal, String existingRole,
       boolean isAdmin) throws IOException {
-    return null;
+    return "assignUser-roleId-returned";
   }
 
   @Override
@@ -72,7 +72,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public void deleteGroup(String groupID) throws IOException {
+  public void deleteRole(String groupID) throws IOException {
 
   }
 

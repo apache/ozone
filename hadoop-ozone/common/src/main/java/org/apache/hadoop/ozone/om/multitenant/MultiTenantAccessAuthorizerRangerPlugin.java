@@ -385,7 +385,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     }
   }
 
-  public void deleteGroup(String groupId) throws IOException {
+  public void deleteRole(String groupId) throws IOException {
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT

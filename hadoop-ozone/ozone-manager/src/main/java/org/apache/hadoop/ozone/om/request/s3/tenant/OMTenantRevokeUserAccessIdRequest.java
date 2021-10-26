@@ -92,8 +92,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
     if (accessIdInfo == null) {
       // Note: This potentially leaks which accessIds exists in OM.
-      throw new OMException("accessId '" + accessId +
-          "' doesn't exist in TenantAccessIdTable.",
+      throw new OMException("accessId '" + accessId + "' doesn't exist",
           OMException.ResultCodes.TENANT_USER_ACCESSID_NOT_FOUND);
     }
 
@@ -182,7 +181,9 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       principalInfo.removeAccessId(accessId);
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),
-          new CacheValue<>(Optional.of(principalInfo),
+          new CacheValue<>(principalInfo.getAccessIds().size() > 0 ?
+              // Invalidate (remove) the entry if accessIds set is empty
+              Optional.of(principalInfo) : Optional.absent(),
               transactionLogIndex));
 
       // Remove from TenantAccessIdTable

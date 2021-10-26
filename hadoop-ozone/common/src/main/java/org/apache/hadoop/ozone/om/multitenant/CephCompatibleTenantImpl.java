@@ -33,16 +33,15 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
  */
 public class CephCompatibleTenantImpl implements Tenant {
   private final String tenantID;
-  private List<String> tenantGroupsIDs;
+  private List<String> tenantRoleIds;
   private List<AccessPolicy> accessPolicies;
   private final AccountNameSpace accountNameSpace;
   private final BucketNameSpace bucketNameSpace;
 
-
   public CephCompatibleTenantImpl(String id) {
     tenantID = id;
     accessPolicies = new ArrayList<>();
-    tenantGroupsIDs = new ArrayList<>();
+    tenantRoleIds = new ArrayList<>();
     accountNameSpace = new AccountNameSpaceImpl(id);
     bucketNameSpace = new BucketNameSpaceImpl(id);
     OzoneObj volume = new OzoneObjInfo.Builder()
@@ -83,18 +82,17 @@ public class CephCompatibleTenantImpl implements Tenant {
   }
 
   @Override
-  public void addTenantAccessRole(String groupID) {
-    tenantGroupsIDs.add(groupID);
-
+  public void addTenantAccessRole(String roleId) {
+    tenantRoleIds.add(roleId);
   }
 
   @Override
-  public void removeTenantAccessGroup(String groupID) {
-    tenantGroupsIDs.remove(groupID);
+  public void removeTenantAccessRole(String roleId) {
+    tenantRoleIds.remove(roleId);
   }
 
   @Override
-  public List<String> getTenantGroups() {
-    return tenantGroupsIDs;
+  public List<String> getTenantRoles() {
+    return tenantRoleIds;
   }
 }
