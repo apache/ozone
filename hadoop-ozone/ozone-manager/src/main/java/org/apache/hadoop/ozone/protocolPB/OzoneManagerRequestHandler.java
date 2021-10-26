@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -34,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
@@ -49,8 +47,6 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
@@ -451,27 +447,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (RepeatedOmKeyInfo key: deletedKeys) {
       resp.addDeletedKeys(key.getProto(false, clientVersion));
     }
-
-    return resp.build();
-  }
-
-  private AllocateBlockResponse allocateBlock(AllocateBlockRequest request,
-      int clientVersion) throws IOException {
-    AllocateBlockResponse.Builder resp =
-        AllocateBlockResponse.newBuilder();
-
-    KeyArgs keyArgs = request.getKeyArgs();
-    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(keyArgs.getKeyName())
-        .build();
-
-    OmKeyLocationInfo newLocation = impl.allocateBlock(omKeyArgs,
-        request.getClientID(), ExcludeList.getFromProtoBuf(
-            request.getExcludeList()));
-
-    resp.setKeyLocation(newLocation.getProtobuf(clientVersion));
 
     return resp.build();
   }

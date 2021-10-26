@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
@@ -142,6 +143,7 @@ public class TestOzoneFileSystem {
   private static boolean omRatisEnabled;
 
   private static MiniOzoneCluster cluster;
+  private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
   private static String volumeName;
@@ -168,6 +170,8 @@ public class TestOzoneFileSystem {
             .build();
     cluster.waitForClusterToBeReady();
 
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
@@ -580,15 +584,29 @@ public class TestOzoneFileSystem {
         .setLocationInfoList(new ArrayList<>())
         .build();
 
-    OpenKeySession session = cluster.getOzoneManager().openKey(keyArgs);
-    cluster.getOzoneManager().commitKey(keyArgs, session.getId());
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, session.getId());
 
     Path parent = new Path("/");
+
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(()-> {
+        try {
+          return fs.listStatus(parent).length!=0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
+
     FileStatus[] fileStatuses = fs.listStatus(parent);
 
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
-    cluster.getOzoneManager().deleteKey(keyArgs);
+    writeClient.deleteKey(keyArgs);
   }
 
   /**
