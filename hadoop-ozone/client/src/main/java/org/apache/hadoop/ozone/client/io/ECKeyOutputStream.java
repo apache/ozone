@@ -237,9 +237,10 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     blockOutputStreamEntryPool.getCurrentStreamEntry().resetToFirstEntry();
+    // Rollback the length/offset updated as part of this failed stripe write.
     offset -= failedStripeDataSize;
-    clearFailedStripeLength(blockOutputStreamEntryPool.getCurrentStreamEntry(),
-        failedStripeDataSize);
+    blockOutputStreamEntryPool.getCurrentStreamEntry()
+        .incCurrentPosition(-failedStripeDataSize);
 
     // Let's close the current entry.
     blockOutputStreamEntryPool.getCurrentStreamEntry().close();
@@ -252,9 +253,16 @@ public class ECKeyOutputStream extends KeyOutputStream {
     blockOutputStreamEntryPool.allocateBlockIfNeeded();
     final ECBlockOutputStreamEntry currentStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
+    long totalLenToWrite = failedStripeDataSize;
     for (int i = 0; i < numDataBlks; i++) {
-      handleOutputStreamWrite(i, failedDataStripeChunkLens[i], true, false);
+      long currentLen = totalLenToWrite < failedDataStripeChunkLens[i] ?
+          totalLenToWrite :
+          failedDataStripeChunkLens[i];
+      if (currentLen > 0) {
+        handleOutputStreamWrite(i, currentLen, true, false);
+      }
       currentStreamEntry.useNextBlockStream();
+      totalLenToWrite -= currentLen;
     }
     for (int i = 0; i < (numParityBlks); i++) {
       handleOutputStreamWrite(i + numDataBlks, failedParityStripeChunkLens[i],
@@ -264,15 +272,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     currentStreamEntry.executePutBlock();
     ecChunkBufferCache.clear(chunkSize);
     ecChunkBufferCache.release();
-  }
-
-  private void clearFailedStripeLength(
-      ECBlockOutputStreamEntry currentBlkGrpStreamEntry,
-      long failedStripeChunkLens) {
-    /*currentBlkGrpStreamEntry
-        .removeWrittenDataLengthsOnFailure(failedStripeChunkLens);*/
-    currentBlkGrpStreamEntry
-        .incCurrentPosition(-failedStripeChunkLens);
   }
 
   private void checkAndWriteParityCells(int lastDataBuffPos,
@@ -301,13 +300,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     // Since writes are async, let's check the failures once.
     if(streamEntry.checkStreamFailures()){
-      isException = true;
       return StripeWriteStatus.FAILED;
     }
     streamEntry.executePutBlock();
     // Since putBlock also async, let's check the failures again.
     if(streamEntry.checkStreamFailures()){
-      isException = true;
       return StripeWriteStatus.FAILED;
     }
     ecChunkBufferCache.clear(parityCellSize);
@@ -339,7 +336,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
          numDataBlks; i < (this.numDataBlks + this.numParityBlks); i++) {
       // Move the stream entry cursor to parity block index
       handleParityWrite(i, parityBuffers[i - numDataBlks].array(), 0,
-          ecChunkSize, true);
+          parityCellSize, true);
     }
   }
 
@@ -369,12 +366,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
         Math.min((int) len, (int) current.getRemaining());
     currentBlockGroupLen += isParity ? 0 : writeLengthToCurrStream;
 
-    len -= writeLengthToCurrStream;
     if (isFullCell) {
       ByteBuffer bytesToWrite = isParity ?
           ecChunkBufferCache.getParityBuffers()[currIdx - numDataBlks] :
           ecChunkBufferCache.getDataBuffers()[currIdx];
       try {
+        // Since it's a fullcell, let's write all content from buffer.
         writeToOutputStream(current, len, bytesToWrite.array(),
             bytesToWrite.array().length, 0, current.getWrittenDataLength(),
             isParity);
