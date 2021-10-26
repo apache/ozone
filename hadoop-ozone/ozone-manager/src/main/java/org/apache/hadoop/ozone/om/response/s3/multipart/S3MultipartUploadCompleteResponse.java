@@ -97,7 +97,9 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
       if (repeatedOmKeyInfo == null) {
         repeatedOmKeyInfo = new RepeatedOmKeyInfo(partsUnusedList);
       } else {
-        repeatedOmKeyInfo.addOmKeyInfo(omKeyInfo);
+        for (OmKeyInfo unUsedPart : partsUnusedList) {
+          repeatedOmKeyInfo.addOmKeyInfo(unUsedPart);
+        }
       }
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
