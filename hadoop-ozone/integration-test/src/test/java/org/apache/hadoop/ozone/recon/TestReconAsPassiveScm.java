@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -117,7 +117,7 @@ public class TestReconAsPassiveScm {
         () -> reconPipelineManager
             .createPipeline(new RatisReplicationConfig(ONE)));
 
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
 
     // Verify if all the 3 nodes are registered with Recon.
@@ -127,7 +127,7 @@ public class TestReconAsPassiveScm {
         reconNodeManager.getAllNodes().size());
 
     // Create container
-    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
             .allocateContainer(new RatisReplicationConfig(ONE), "test");
@@ -158,9 +158,9 @@ public class TestReconAsPassiveScm {
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
     // Stop Recon
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
-    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
     assertTrue(reconContainerManager.getContainers().isEmpty());
 
     LambdaTestUtils.await(60000, 5000,

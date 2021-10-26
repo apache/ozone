@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.KeyDeletingService;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -209,7 +210,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -255,7 +257,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -328,7 +331,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
     Table<String, RepeatedOmKeyInfo> deletedKeyTable =
@@ -398,5 +402,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     // verify whether KeyDeletingService has purged the keys
     currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     Assert.assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

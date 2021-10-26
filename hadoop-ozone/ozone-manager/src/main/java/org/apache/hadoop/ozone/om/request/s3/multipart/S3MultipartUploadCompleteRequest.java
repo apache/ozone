@@ -378,20 +378,22 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
-    return omMetadataManager.getKeyTable().get(dbOzoneKey);
+    return omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
   }
 
   protected OmKeyInfo getOmKeyInfoFromOpenKeyTable(String dbMultipartKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
-    return omMetadataManager.getOpenKeyTable().get(dbMultipartKey);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartKey);
   }
 
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
       String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex) {
 
     // Add key entry to file table.
-    omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(dbOzoneKey),
-        new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(dbOzoneKey),
+            new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
   }
 
   private int getPartsListSize(String requestedVolume,
@@ -496,7 +498,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
         transactionLogIndex);
 
-    omMetadataManager.getOpenKeyTable().addCacheEntry(
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
         new CacheKey<>(dbMultipartOpenKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(

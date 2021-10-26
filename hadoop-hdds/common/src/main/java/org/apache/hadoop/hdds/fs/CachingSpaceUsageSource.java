@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -31,6 +30,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -52,12 +52,12 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   private final SpaceUsagePersistence persistence;
   private boolean running;
   private ScheduledFuture<?> scheduledFuture;
+  private final AtomicBoolean isRefreshRunning;
 
   public CachingSpaceUsageSource(SpaceUsageCheckParams params) {
     this(params, createExecutor(params));
   }
 
-  @VisibleForTesting
   CachingSpaceUsageSource(SpaceUsageCheckParams params,
       ScheduledExecutorService executor) {
     Preconditions.checkArgument(params != null, "params == null");
@@ -66,6 +66,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     source = params.getSource();
     persistence = params.getPersistence();
     this.executor = executor;
+    isRefreshRunning = new AtomicBoolean();
 
     Preconditions.checkArgument(refresh.isZero() == (executor == null),
         "executor should be provided if and only if refresh is requested");
@@ -114,16 +115,26 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     }
   }
 
+  public void refreshNow() {
+    //refresh immediately
+    executor.schedule(this::refresh, 0, MILLISECONDS);
+  }
+
   private void loadInitialValue() {
     final OptionalLong initialValue = persistence.load();
     initialValue.ifPresent(cachedValue::set);
   }
 
   private void refresh() {
-    try {
-      cachedValue.set(source.getUsedSpace());
-    } catch (RuntimeException e) {
-      LOG.warn("Error refreshing space usage for {}", source, e);
+    //only one `refresh` can be running at a certain moment
+    if(isRefreshRunning.compareAndSet(false, true)) {
+      try {
+        cachedValue.set(source.getUsedSpace());
+      } catch (RuntimeException e) {
+        LOG.warn("Error refreshing space usage for {}", source, e);
+      } finally {
+        isRefreshRunning.set(false);
+      }
     }
   }
 

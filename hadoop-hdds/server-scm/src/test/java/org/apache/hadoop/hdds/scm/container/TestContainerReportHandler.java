@@ -56,7 +56,7 @@ import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 public class TestContainerReportHandler {
 
   private NodeManager nodeManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
 
@@ -64,7 +64,7 @@ public class TestContainerReportHandler {
   public void setup() throws IOException, InvalidStateTransitionException {
     final ConfigurationSource conf = new OzoneConfiguration();
     this.nodeManager = new MockNodeManager(true, 10);
-    this.containerManager = Mockito.mock(ContainerManagerV2.class);
+    this.containerManager = Mockito.mock(ContainerManager.class);
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
 

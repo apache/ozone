@@ -941,6 +941,32 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testBucketUsedBytes() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    String keyName = UUID.randomUUID().toString();
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    bucket.deleteKey(keyName);
+    Assert.assertEquals(0L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+  }
+
+  @Test
   public void testVolumeUsedNamespace() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -3639,5 +3665,83 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertEquals(ResultCodes.KEY_NOT_FOUND, ex.getResult());
     }
 
+  }
+
+  private void createRequiredForVersioningTest(String volumeName,
+      String bucketName, String keyName, boolean versioning) throws Exception {
+
+    ReplicationConfig replicationConfig = fromTypeAndFactor(RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    // Bucket created with versioning false.
+    volume.createBucket(bucketName,
+        BucketArgs.newBuilder().setVersioning(versioning).build());
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, replicationConfig, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    // Override key
+    out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, replicationConfig, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+  }
+
+  private void checkExceptedResultForVersioningTest(String volumeName,
+      String bucketName, String keyName, int expectedCount) throws Exception {
+    OmKeyInfo omKeyInfo = cluster.getOzoneManager().getMetadataManager()
+        .getKeyTable().get(cluster.getOzoneManager().getMetadataManager()
+            .getOzoneKey(volumeName, bucketName, keyName));
+
+    Assert.assertNotNull(omKeyInfo);
+    Assert.assertEquals(expectedCount,
+        omKeyInfo.getKeyLocationVersions().size());
+
+    if (expectedCount == 1) {
+      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
+          .getOzoneManager().getMetadataManager()
+          .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
+              .getOzoneKey(volumeName, bucketName, keyName));
+
+      Assert.assertNotNull(repeatedOmKeyInfo);
+      Assert.assertEquals(expectedCount,
+          repeatedOmKeyInfo.getOmKeyInfoList().size());
+    } else {
+      // If expectedCount is greater than 1 means versioning enabled,
+      // so delete table should be empty.
+      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
+          .getOzoneManager().getMetadataManager()
+          .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
+              .getOzoneKey(volumeName, bucketName, keyName));
+
+      Assert.assertNull(repeatedOmKeyInfo);
+    }
+  }
+
+  @Test
+  public void testOverWriteKeyWithAndWithOutVersioning() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    createRequiredForVersioningTest(volumeName, bucketName, keyName, false);
+
+    checkExceptedResultForVersioningTest(volumeName, bucketName, keyName, 1);
+
+
+    // Versioning turned on
+    volumeName = UUID.randomUUID().toString();
+    bucketName = UUID.randomUUID().toString();
+    keyName = UUID.randomUUID().toString();
+
+    createRequiredForVersioningTest(volumeName, bucketName, keyName, true);
+    checkExceptedResultForVersioningTest(volumeName, bucketName, keyName, 2);
   }
 }

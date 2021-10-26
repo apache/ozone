@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 
@@ -281,7 +282,10 @@ public final class OzoneManagerRatisServer {
     try {
       return server.submitClientRequestAsync(raftClientRequest)
           .get();
-    } catch (Exception ex) {
+    } catch (ExecutionException | IOException ex) {
+      throw new ServiceException(ex.getMessage(), ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
       throw new ServiceException(ex.getMessage(), ex);
     }
   }
@@ -549,8 +553,10 @@ public final class OzoneManagerRatisServer {
     // Set Ratis storage directory
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(ratisStorageDir)));
-    // Disable the pre vote feature in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+    // Disable/enable the pre vote feature in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        conf.getBoolean(OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE,
+            OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT));
 
     // Set RAFT segment size
     final long raftSegmentSize = (long) conf.getStorageSize(

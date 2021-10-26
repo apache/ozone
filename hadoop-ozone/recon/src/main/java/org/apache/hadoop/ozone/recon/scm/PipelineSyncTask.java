@@ -78,6 +78,9 @@ public class PipelineSyncTask extends ReconScmTask {
       }
     } catch (Throwable t) {
       LOG.error("Exception in Pipeline sync Thread.", t);
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

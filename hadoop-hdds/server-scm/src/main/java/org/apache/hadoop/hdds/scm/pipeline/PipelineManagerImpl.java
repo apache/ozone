@@ -70,8 +70,8 @@ public class PipelineManagerImpl implements PipelineManager {
   // Limit the number of on-going ratis operation to be 1.
   private final ReentrantReadWriteLock lock;
   private PipelineFactory pipelineFactory;
-  private StateManager stateManager;
-  private BackgroundPipelineCreatorV2 backgroundPipelineCreator;
+  private PipelineStateManager stateManager;
+  private BackgroundPipelineCreator backgroundPipelineCreator;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -88,7 +88,7 @@ public class PipelineManagerImpl implements PipelineManager {
   protected PipelineManagerImpl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
                                 NodeManager nodeManager,
-                                StateManager pipelineStateManager,
+                                PipelineStateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher,
                                 SCMContext scmContext) {
@@ -118,8 +118,8 @@ public class PipelineManagerImpl implements PipelineManager {
       EventPublisher eventPublisher,
       SCMContext scmContext,
       SCMServiceManager serviceManager) throws IOException {
-    // Create PipelineStateManager
-    StateManager stateManager = PipelineStateManagerV2Impl
+    // Create PipelineStateManagerImpl
+    PipelineStateManager stateManager = PipelineStateManagerImpl
         .newBuilder().setPipelineStore(pipelineStore)
         .setRatisServer(scmhaManager.getRatisServer())
         .setNodeManager(nodeManager)
@@ -136,8 +136,8 @@ public class PipelineManagerImpl implements PipelineManager {
         eventPublisher, scmContext);
 
     // Create background thread.
-    BackgroundPipelineCreatorV2 backgroundPipelineCreator =
-        new BackgroundPipelineCreatorV2(
+    BackgroundPipelineCreator backgroundPipelineCreator =
+        new BackgroundPipelineCreator(
             pipelineManager, conf, serviceManager, scmContext);
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
@@ -250,6 +250,13 @@ public class PipelineManagerImpl implements PipelineManager {
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     // should not lock here, since no ratis operation happens.
     stateManager.addContainerToPipeline(pipelineID, containerID);
+  }
+
+  @Override
+  public void addContainerToPipelineSCMStart(
+      PipelineID pipelineID, ContainerID containerID) throws IOException {
+    // should not lock here, since no ratis operation happens.
+    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
   }
 
   @Override
@@ -553,7 +560,7 @@ public class PipelineManagerImpl implements PipelineManager {
     try {
       stateManager.close();
     } catch (Exception ex) {
-      LOG.error("PipelineStateManager close failed", ex);
+      LOG.error("PipelineStateManagerImpl close failed", ex);
     }
   }
 
@@ -569,7 +576,7 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @VisibleForTesting
-  public StateManager getStateManager() {
+  public PipelineStateManager getStateManager() {
     return stateManager;
   }
 
@@ -579,12 +586,12 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private void setBackgroundPipelineCreator(
-      BackgroundPipelineCreatorV2 backgroundPipelineCreator) {
+      BackgroundPipelineCreator backgroundPipelineCreator) {
     this.backgroundPipelineCreator = backgroundPipelineCreator;
   }
 
   @VisibleForTesting
-  public BackgroundPipelineCreatorV2 getBackgroundPipelineCreator() {
+  public BackgroundPipelineCreator getBackgroundPipelineCreator() {
     return this.backgroundPipelineCreator;
   }
 

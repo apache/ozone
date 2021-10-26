@@ -79,14 +79,14 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
                 parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
         LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
             parentKeyInfo);
-        omMetadataManager.getKeyTable()
+        omMetadataManager.getKeyTable(getBucketLayout())
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
 
       String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
           dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
-          dirKeyInfo);
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .putWithBatch(batchOperation, dirKey, dirKeyInfo);
     } else if (Result.DIRECTORY_ALREADY_EXISTS == result) {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.

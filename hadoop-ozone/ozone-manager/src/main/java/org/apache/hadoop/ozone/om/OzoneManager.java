@@ -60,13 +60,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -114,24 +115,14 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
@@ -152,7 +143,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -244,10 +234,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
@@ -321,7 +312,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final int SHUTDOWN_HOOK_PRIORITY = 30;
   private final Runnable shutdownHook;
   private final File omMetaDir;
-  private final boolean isAclEnabled;
+  private boolean isAclEnabled;
   private final boolean isSpnegoEnabled;
   private IAccessAuthorizer accessAuthorizer;
   private JvmPauseMonitor jvmPauseMonitor;
@@ -358,6 +349,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
+  private final String defaultBucketLayout;
 
   private boolean isNativeAuthorizerEnabled;
 
@@ -419,9 +411,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     loginOMUserIfSecurityEnabled(conf);
-
-    this.allowListAllVolumes = conf.getBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED,
-        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
+    setInstanceVariablesFromConf();
     this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
         OZONE_OM_USER_MAX_VOLUME_DEFAULT);
     Preconditions.checkArgument(this.maxUserVolumeCount > 0,
@@ -437,8 +427,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-    this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
-        OZONE_ACL_ENABLED_DEFAULT);
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
@@ -456,6 +444,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     isRatisEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+
+    this.defaultBucketLayout =
+        configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
+            OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
+    // Make sure defaultBucketLayout is set to a valid value
+    if (!defaultBucketLayout.equals(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name()) &&
+        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name())
+    ) {
+      throw new ConfigurationException(
+          defaultBucketLayout +
+              " is not a valid default bucket layout. Supported values are " +
+              BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + ", " +
+              BucketLayout.OBJECT_STORE.name() + ".");
+    }
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
@@ -532,6 +535,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
+  }
+
+  /**
+   * This method is used to set selected instance variables in this class from
+   * the passed in config. This allows these variable to be reset when the OM
+   * instance is restarted (normally from a test mini-cluster). Note, not all
+   * variables are added here as variables are selectively added as tests
+   * require.
+   */
+  private void setInstanceVariablesFromConf() {
+    this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
+        OZONE_ACL_ENABLED_DEFAULT);
+    this.allowListAllVolumes = configuration.getBoolean(
+        OZONE_OM_VOLUME_LISTALL_ALLOWED,
+        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
 
   /**
@@ -1349,6 +1367,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void restart() throws IOException {
     initFSOLayout();
+    setInstanceVariablesFromConf();
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
@@ -1931,34 +1950,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Creates a volume.
-   *
-   * @param args - Arguments to create Volume.
-   * @throws IOException
-   */
-  @Override
-  public void createVolume(OmVolumeArgs args) throws IOException {
-    try {
-      metrics.incNumVolumeCreates();
-      if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
-            args.getVolume(), null, null);
-      }
-      volumeManager.createVolume(args);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
-          (args == null) ? null : args.toAuditMap()));
-      metrics.incNumVolumes();
-    } catch (Exception ex) {
-      metrics.incNumVolumeCreateFails();
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(OMAction.CREATE_VOLUME,
-              (args == null) ? null : args.toAuditMap(), ex)
-      );
-      throw ex;
-    }
-  }
-
-  /**
    * Checks if current caller has acl permissions.
    *
    * @param resType - Type of ozone resource. Ex volume, bucket.
@@ -2119,84 +2110,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * {@inheritDoc}
-   */
-  @Override
-  public boolean setOwner(String volume, String owner) throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.WRITE_ACL, volume,
-          null, null);
-    }
-    Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.OWNER, owner);
-    try {
-      metrics.incNumVolumeUpdates();
-      volumeManager.setOwner(volume, owner);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.SET_OWNER,
-          auditMap));
-      return true;
-    } catch (Exception ex) {
-      metrics.incNumVolumeUpdateFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.SET_OWNER,
-          auditMap, ex)
-      );
-      throw ex;
-    }
-  }
-
-  /**
-   * Changes the Quota on a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param quotaInNamespace - Volume quota in counts.
-   * @param quotaInBytes - Volume quota in bytes.
-   * @throws IOException
-   */
-  @Override
-  public void setQuota(String volume, long quotaInNamespace,
-                       long quotaInBytes) throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As this requests use a new approach");
-  }
-
-  /**
-   * Checks if the specified user can access this volume.
-   *
-   * @param volume  - volume
-   * @param userAcl - user acls which needs to be checked for access
-   * @return true if the user has required access for the volume, false
-   * otherwise
-   * @throws IOException
-   */
-  @Override
-  public boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
-      throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE,
-          ACLType.READ, volume, null, null);
-    }
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.USER_ACL,
-        (userAcl == null) ? null : userAcl.getName());
-    try {
-      metrics.incNumVolumeCheckAccesses();
-      return volumeManager.checkVolumeAccess(volume, userAcl);
-    } catch (Exception ex) {
-      metrics.incNumVolumeCheckAccessFails();
-      auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          OMAction.CHECK_VOLUME_ACCESS, auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            OMAction.CHECK_VOLUME_ACCESS, auditMap));
-      }
-    }
-  }
-
-  /**
    * Gets the volume information.
    *
    * @param volume - Volume name.
@@ -2226,32 +2139,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_VOLUME,
             auditMap));
       }
-    }
-  }
-
-  /**
-   * Deletes an existing empty volume.
-   *
-   * @param volume - Name of the volume.
-   * @throws IOException
-   */
-  @Override
-  public void deleteVolume(String volume) throws IOException {
-    try {
-      if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.DELETE, volume,
-            null, null);
-      }
-      metrics.incNumVolumeDeletes();
-      volumeManager.deleteVolume(volume);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.DELETE_VOLUME,
-          buildAuditMap(volume)));
-      metrics.decNumVolumes();
-    } catch (Exception ex) {
-      metrics.incNumVolumeDeleteFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.DELETE_VOLUME,
-          buildAuditMap(volume), ex));
-      throw ex;
     }
   }
 
@@ -2361,32 +2248,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Creates a bucket.
-   *
-   * @param bucketInfo - BucketInfo to create bucket.
-   * @throws IOException
-   */
-  @Override
-  public void createBucket(OmBucketInfo bucketInfo) throws IOException {
-    try {
-      if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
-            bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
-      }
-      metrics.incNumBucketCreates();
-      bucketManager.createBucket(bucketInfo);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_BUCKET,
-          (bucketInfo == null) ? null : bucketInfo.toAuditMap()));
-      metrics.incNumBuckets();
-    } catch (Exception ex) {
-      metrics.incNumBucketCreateFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.CREATE_BUCKET,
-          (bucketInfo == null) ? null : bucketInfo.toAuditMap(), ex));
-      throw ex;
-    }
-  }
-
-  /**
    * {@inheritDoc}
    */
   @Override
@@ -2457,149 +2318,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Allocate a key.
-   *
-   * @param args - attributes of the key.
-   * @return OpenKeySession - a handler to key that client uses to
-   * talk to container.
-   * @throws IOException
-   */
-  @Override
-  public OpenKeySession openKey(OmKeyArgs args) throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
-
-    if (isAclEnabled) {
-      try {
-        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-      } catch (OMException ex) {
-        // For new keys key checkAccess call will fail as key doesn't exist.
-        // Check user access for bucket.
-        if (ex.getResult().equals(KEY_NOT_FOUND)) {
-          checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-        } else {
-          throw ex;
-        }
-      }
-    }
-
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
-
-    args = bucket.update(args);
-
-    try {
-      metrics.incNumKeyAllocates();
-      return keyManager.openKey(args);
-    } catch (Exception ex) {
-      metrics.incNumKeyAllocateFails();
-      auditSuccess = false;
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.ALLOCATE_KEY,
-          auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-            OMAction.ALLOCATE_KEY, auditMap));
-      }
-    }
-  }
-
-  @Override
-  public void commitKey(OmKeyArgs args, long clientID)
-      throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
-
-    if (isAclEnabled) {
-      try {
-        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-      } catch (OMException ex) {
-        // For new keys key checkAccess call will fail as key doesn't exist.
-        // Check user access for bucket.
-        if (ex.getResult().equals(KEY_NOT_FOUND)) {
-          checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-        } else {
-          throw ex;
-        }
-      }
-    }
-
-    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
-    auditMap.put(OzoneConsts.CLIENT_ID, String.valueOf(clientID));
-
-    args = bucket.update(args);
-
-    try {
-      metrics.incNumKeyCommits();
-      keyManager.commitKey(args, clientID);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.COMMIT_KEY,
-          auditMap));
-      // As when we commit the key it is visible, so we should increment here.
-      // As key also can have multiple versions, we need to increment keys
-      // only if version is 0. Currently we have not complete support of
-      // versioning of keys. So, this can be revisited later.
-      if (args.getLocationInfoList() != null &&
-          args.getLocationInfoList().size() > 0 &&
-          args.getLocationInfoList().get(0) != null &&
-          args.getLocationInfoList().get(0).getCreateVersion() == 0) {
-        metrics.incNumKeys();
-      }
-    } catch (Exception ex) {
-      metrics.incNumKeyCommitFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.COMMIT_KEY,
-          auditMap, ex));
-      throw ex;
-    }
-  }
-
-  @Override
-  public OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientID,
-      ExcludeList excludeList) throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
-
-    if (isAclEnabled) {
-      try {
-        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-      } catch (OMException ex) {
-        // For new keys key checkAccess call will fail as key doesn't exist.
-        // Check user access for bucket.
-        if (ex.getResult().equals(KEY_NOT_FOUND)) {
-          checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-        } else {
-          throw ex;
-        }
-      }
-    }
-
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
-    auditMap.put(OzoneConsts.CLIENT_ID, String.valueOf(clientID));
-
-    args = bucket.update(args);
-
-    try {
-      metrics.incNumBlockAllocateCalls();
-      return keyManager.allocateBlock(args, clientID, excludeList);
-    } catch (Exception ex) {
-      metrics.incNumBlockAllocateCallFails();
-      auditSuccess = false;
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.ALLOCATE_BLOCK,
-          auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-            OMAction.ALLOCATE_BLOCK, auditMap));
-      }
-    }
-  }
-
-  /**
    * Lookup a key.
    *
    * @param args - attributes of the key.
@@ -2635,86 +2353,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             auditMap));
       }
     }
-  }
-
-
-  @Override
-  public void renameKeys(OmRenameKeys omRenameKeys)
-      throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
-  }
-
-  @Override
-  public void renameKey(OmKeyArgs args, String toKeyName) throws IOException {
-    Preconditions.checkNotNull(args);
-
-    ResolvedBucket bucket = resolveBucketLink(args);
-
-    if (isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-    }
-
-    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
-    auditMap.put(OzoneConsts.TO_KEY_NAME, toKeyName);
-
-    args = bucket.update(args);
-
-    try {
-      metrics.incNumKeyRenames();
-      keyManager.renameKey(args, toKeyName);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.RENAME_KEY,
-          auditMap));
-    } catch (IOException e) {
-      metrics.incNumKeyRenameFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.RENAME_KEY,
-          auditMap, e));
-      throw e;
-    }
-  }
-
-  /**
-   * Deletes an existing key.
-   *
-   * @param args - attributes of the key.
-   * @throws IOException
-   */
-  @Override
-  public void deleteKey(OmKeyArgs args) throws IOException {
-    Map<String, String> auditMap = args.toAuditMap();
-    try {
-      ResolvedBucket bucket = resolveBucketLink(args);
-      args = bucket.update(args);
-
-      if (isAclEnabled) {
-        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.DELETE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-      }
-
-      metrics.incNumKeyDeletes();
-      keyManager.deleteKey(args);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.DELETE_KEY,
-          auditMap));
-      metrics.decNumKeys();
-    } catch (Exception ex) {
-      metrics.incNumKeyDeleteFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.DELETE_KEY,
-          auditMap, ex));
-      throw ex;
-    }
-  }
-
-  /**
-   * Deletes an existing key.
-   *
-   * @param deleteKeys - List of keys to be deleted from volume and a bucket.
-   * @throws IOException
-   */
-  @Override
-  public void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
   }
 
   @Override
@@ -2786,61 +2424,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_TRASH,
             auditMap));
       }
-    }
-  }
-
-  /**
-   * Sets bucket property from args.
-   *
-   * @param args - BucketArgs.
-   * @throws IOException
-   */
-  @Override
-  public void setBucketProperty(OmBucketArgs args)
-      throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-          args.getVolumeName(), args.getBucketName(), null);
-    }
-    try {
-      metrics.incNumBucketUpdates();
-      bucketManager.setBucketProperty(args);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.UPDATE_BUCKET,
-          (args == null) ? null : args.toAuditMap()));
-    } catch (Exception ex) {
-      metrics.incNumBucketUpdateFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.UPDATE_BUCKET,
-          (args == null) ? null : args.toAuditMap(), ex));
-      throw ex;
-    }
-  }
-
-  /**
-   * Deletes an existing empty bucket from volume.
-   *
-   * @param volume - Name of the volume.
-   * @param bucket - Name of the bucket.
-   * @throws IOException
-   */
-  @Override
-  public void deleteBucket(String volume, String bucket) throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE, volume,
-          bucket, null);
-    }
-    Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.BUCKET, bucket);
-    try {
-      metrics.incNumBucketDeletes();
-      bucketManager.deleteBucket(volume, bucket);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.DELETE_BUCKET,
-          auditMap));
-      metrics.decNumBuckets();
-    } catch (Exception ex) {
-      metrics.incNumBucketDeleteFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.DELETE_BUCKET,
-          auditMap, ex));
-      throw ex;
     }
   }
 
@@ -3024,135 +2607,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  /**
-   * {@inheritDoc}
-   */
-  public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
-
-    // Check whether user name passed is matching with the current user or not.
-    if (!user.getUserName().equals(kerberosID)) {
-      throw new OMException("User mismatch. Requested user name is " +
-          "mismatched " + kerberosID + ", with current user " +
-          user.getUserName(), OMException.ResultCodes.USER_MISMATCH);
-    }
-    return s3SecretManager.getS3Secret(kerberosID);
-  }
-
-  @Override
-  /**
-   * {@inheritDoc}
-   */
-  public void revokeS3Secret(String kerberosID) {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-            "this to be implemented. As write requests use a new approach");
-  }
-
-  @Override
-  public OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws
-      IOException {
-
-    Preconditions.checkNotNull(keyArgs);
-    ResolvedBucket bucket = resolveBucketLink(keyArgs);
-
-    Map<String, String> auditMap = bucket.audit(keyArgs.toAuditMap());
-
-    keyArgs = bucket.update(keyArgs);
-
-    metrics.incNumInitiateMultipartUploads();
-    try {
-      OmMultipartInfo result = keyManager.initiateMultipartUpload(keyArgs);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          OMAction.INITIATE_MULTIPART_UPLOAD, auditMap));
-      return result;
-    } catch (IOException ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          OMAction.INITIATE_MULTIPART_UPLOAD, auditMap, ex));
-      metrics.incNumInitiateMultipartUploadFails();
-      throw ex;
-    }
-  }
-
-  @Override
-  public OmMultipartCommitUploadPartInfo commitMultipartUploadPart(
-      OmKeyArgs keyArgs, long clientID) throws IOException {
-
-    Preconditions.checkNotNull(keyArgs);
-    ResolvedBucket bucket = resolveBucketLink(keyArgs);
-
-    Map<String, String> auditMap = bucket.audit(keyArgs.toAuditMap());
-
-    keyArgs = bucket.update(keyArgs);
-
-    metrics.incNumCommitMultipartUploadParts();
-    try {
-      OmMultipartCommitUploadPartInfo result =
-          keyManager.commitMultipartUploadPart(keyArgs, clientID);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY, auditMap));
-      return result;
-    } catch (IOException ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          OMAction.INITIATE_MULTIPART_UPLOAD, auditMap, ex));
-      metrics.incNumCommitMultipartUploadPartFails();
-      throw ex;
-    }
-  }
-
-  @Override
-  public OmMultipartUploadCompleteInfo completeMultipartUpload(
-      OmKeyArgs omKeyArgs, OmMultipartUploadCompleteList multipartUploadList)
-      throws IOException {
-
-    Preconditions.checkNotNull(omKeyArgs);
-    ResolvedBucket bucket = resolveBucketLink(omKeyArgs);
-
-    Map<String, String> auditMap = bucket.audit(omKeyArgs.toAuditMap());
-    auditMap.put(OzoneConsts.MULTIPART_LIST, multipartUploadList
-        .getMultipartMap().toString());
-
-    omKeyArgs = bucket.update(omKeyArgs);
-
-    metrics.incNumCompleteMultipartUploads();
-    try {
-      OmMultipartUploadCompleteInfo result = keyManager.completeMultipartUpload(
-              omKeyArgs, multipartUploadList);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction
-          .COMPLETE_MULTIPART_UPLOAD, auditMap));
-      return result;
-    } catch (IOException ex) {
-      metrics.incNumCompleteMultipartUploadFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
-          .COMPLETE_MULTIPART_UPLOAD, auditMap, ex));
-      throw ex;
-    }
-  }
-
-  @Override
-  public void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
-
-    Preconditions.checkNotNull(omKeyArgs);
-    ResolvedBucket bucket = resolveBucketLink(omKeyArgs);
-
-    Map<String, String> auditMap = bucket.audit(omKeyArgs.toAuditMap());
-
-    omKeyArgs = bucket.update(omKeyArgs);
-
-    metrics.incNumAbortMultipartUploads();
-    try {
-      keyManager.abortMultipartUpload(omKeyArgs);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction
-          .COMPLETE_MULTIPART_UPLOAD, auditMap));
-    } catch (IOException ex) {
-      metrics.incNumAbortMultipartUploadFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
-          .COMPLETE_MULTIPART_UPLOAD, auditMap, ex));
-      throw ex;
-    }
-
-  }
-
-  @Override
   public OmMultipartUploadListParts listParts(final String volumeName,
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
@@ -3243,59 +2697,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public void createDirectory(OmKeyArgs args) throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
-
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
-
-    args = bucket.update(args);
-
-    try {
-      metrics.incNumCreateDirectory();
-      keyManager.createDirectory(args);
-    } catch (IOException ex) {
-      metrics.incNumCreateDirectoryFails();
-      auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(OMAction.CREATE_DIRECTORY, auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(OMAction.CREATE_DIRECTORY, auditMap));
-      }
-    }
-  }
-
-  @Override
-  public OpenKeySession createFile(OmKeyArgs args, boolean overWrite,
-      boolean recursive) throws IOException {
-    ResolvedBucket bucket = resolveBucketLink(args);
-
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
-
-    args = bucket.update(args);
-
-    try {
-      metrics.incNumCreateFile();
-      return keyManager.createFile(args, overWrite, recursive);
-    } catch (Exception ex) {
-      metrics.incNumCreateFileFails();
-      auditSuccess = false;
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.CREATE_FILE,
-          auditMap, ex));
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-            OMAction.CREATE_FILE, auditMap));
-      }
-    }
-  }
-
-  @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
     ResolvedBucket bucket = resolveBucketLink(args);
 
@@ -3373,133 +2774,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(omAction, auditMap, ex));
-    }
-  }
-
-  /**
-   * Add acl for Ozone object. Return true if acl is added successfully else
-   * false.
-   *
-   * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl to be added.
-   * @throws IOException if there is error.
-   */
-  @Override
-  public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    boolean auditSuccess = true;
-
-    try {
-      if (isAclEnabled) {
-        checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
-      }
-      metrics.incNumAddAcl();
-      switch (obj.getResourceType()) {
-      case VOLUME:
-        return volumeManager.addAcl(obj, acl);
-      case BUCKET:
-        return bucketManager.addAcl(obj, acl);
-      case KEY:
-        return keyManager.addAcl(obj, acl);
-      case PREFIX:
-        return prefixManager.addAcl(obj, acl);
-      default:
-        throw new OMException("Unexpected resource type: " +
-            obj.getResourceType(), INVALID_REQUEST);
-      }
-    } catch (Exception ex) {
-      auditSuccess = false;
-      auditAcl(obj, Arrays.asList(acl), OMAction.ADD_ACL, ex);
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        auditAcl(obj, Arrays.asList(acl), OMAction.ADD_ACL, null);
-      }
-    }
-  }
-
-  /**
-   * Remove acl for Ozone object. Return true if acl is removed successfully
-   * else false.
-   *
-   * @param obj Ozone object.
-   * @param acl Ozone acl to be removed.
-   * @throws IOException if there is error.
-   */
-  @Override
-  public boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    boolean auditSuccess = true;
-
-    try {
-      if (isAclEnabled) {
-        checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
-      }
-      metrics.incNumRemoveAcl();
-      switch (obj.getResourceType()) {
-      case VOLUME:
-        return volumeManager.removeAcl(obj, acl);
-      case BUCKET:
-        return bucketManager.removeAcl(obj, acl);
-      case KEY:
-        return keyManager.removeAcl(obj, acl);
-      case PREFIX:
-        return prefixManager.removeAcl(obj, acl);
-
-      default:
-        throw new OMException("Unexpected resource type: " +
-            obj.getResourceType(), INVALID_REQUEST);
-      }
-    } catch (Exception ex) {
-      auditSuccess = false;
-      auditAcl(obj, Arrays.asList(acl), OMAction.REMOVE_ACL, ex);
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        auditAcl(obj, Arrays.asList(acl), OMAction.REMOVE_ACL, null);
-      }
-    }
-  }
-
-  /**
-   * Acls to be set for given Ozone object. This operations reset ACL for given
-   * object to list of ACLs provided in argument.
-   *
-   * @param obj  Ozone object.
-   * @param acls List of acls.
-   * @throws IOException if there is error.
-   */
-  @Override
-  public boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
-    boolean auditSuccess = true;
-
-    try {
-      if (isAclEnabled) {
-        checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
-      }
-      metrics.incNumSetAcl();
-      switch (obj.getResourceType()) {
-      case VOLUME:
-        return volumeManager.setAcl(obj, acls);
-      case BUCKET:
-        return bucketManager.setAcl(obj, acls);
-      case KEY:
-        return keyManager.setAcl(obj, acls);
-      case PREFIX:
-        return prefixManager.setAcl(obj, acls);
-      default:
-        throw new OMException("Unexpected resource type: " +
-            obj.getResourceType(), INVALID_REQUEST);
-      }
-    } catch (Exception ex) {
-      auditSuccess = false;
-      auditAcl(obj, acls, OMAction.SET_ACL, ex);
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        auditAcl(obj, acls, OMAction.SET_ACL, null);
-      }
     }
   }
 
@@ -4058,6 +3332,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public String getOMMetadataLayout() {
     return configuration
         .getTrimmed(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_DEFAULT);
+  }
+
+  public String getOMDefaultBucketLayout() {
+    return this.defaultBucketLayout;
   }
 
   /**

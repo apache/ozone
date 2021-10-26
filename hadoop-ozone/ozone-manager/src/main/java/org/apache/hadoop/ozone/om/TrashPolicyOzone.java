@@ -202,6 +202,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
             continue;
           }
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           break;                                  // exit on interrupt
         }
 

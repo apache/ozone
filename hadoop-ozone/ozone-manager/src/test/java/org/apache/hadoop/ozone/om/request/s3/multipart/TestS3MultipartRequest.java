@@ -22,6 +22,8 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.junit.After;
 import org.junit.Assert;
@@ -47,6 +49,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
+import static org.apache.hadoop.ozone.om.OzoneManager.LOG;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -266,6 +269,25 @@ public class TestS3MultipartRequest {
   protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(
       OMRequest omRequest) {
     return new S3MultipartUploadAbortRequest(omRequest);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
+  public BucketLayout getBucketLayout(OMMetadataManager metadataManager,
+      String volumeName, String bucketName) {
+    if (metadataManager == null) {
+      return BucketLayout.DEFAULT;
+    }
+    String buckKey = metadataManager.getBucketKey(volumeName, bucketName);
+    try {
+      OmBucketInfo buckInfo = metadataManager.getBucketTable().get(buckKey);
+      return buckInfo.getBucketLayout();
+    } catch (IOException e) {
+      LOG.error("Cannot find the key: " + buckKey);
+    }
+    return BucketLayout.DEFAULT;
   }
 
 }
