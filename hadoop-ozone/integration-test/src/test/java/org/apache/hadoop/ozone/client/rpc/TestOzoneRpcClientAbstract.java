@@ -3703,8 +3703,9 @@ public abstract class TestOzoneRpcClientAbstract {
   private void checkExceptedResultForVersioningTest(String volumeName,
       String bucketName, String keyName, int expectedCount) throws Exception {
     OmKeyInfo omKeyInfo = cluster.getOzoneManager().getMetadataManager()
-        .getKeyTable().get(cluster.getOzoneManager().getMetadataManager()
-            .getOzoneKey(volumeName, bucketName, keyName));
+        .getKeyTable(getBucketLayout()).get(
+            cluster.getOzoneManager().getMetadataManager()
+                .getOzoneKey(volumeName, bucketName, keyName));
 
     Assert.assertNotNull(omKeyInfo);
     Assert.assertEquals(expectedCount,

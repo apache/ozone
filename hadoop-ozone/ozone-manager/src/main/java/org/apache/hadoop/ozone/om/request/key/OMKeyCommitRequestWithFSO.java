@@ -153,7 +153,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               omMetadataManager, omBucketInfo.getIsVersionEnabled(),
               trxnLogIndex, ozoneManager.isRatisEnabled());
       OmKeyInfo keyToDelete =
-              omMetadataManager.getKeyTable().get(dbFileKey);
+              omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
