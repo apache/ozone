@@ -548,14 +548,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.keytab.file</name>
-    <value/>
-    <tag>OM, SECURITY</tag>
-    <description>
-      The keytab file for Kerberos authentication in OM.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.db.cache.size.mb</name>
     <value>128</value>
     <tag>OM, PERFORMANCE</tag>
