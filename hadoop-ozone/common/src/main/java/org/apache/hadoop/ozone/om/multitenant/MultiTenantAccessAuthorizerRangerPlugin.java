@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
+import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT;
@@ -280,7 +281,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     HttpsURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
-    if (conn.getResponseCode() != 200) {  // TODO: Replace hard-coded 200
+    if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
           + " " + conn.getResponseMessage()
           + ". Error updating Ranger role.");
@@ -301,7 +302,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   private String getCreateRoleJsonStr(String roleName, String adminRoleName) {
     return "{"
         + "  \"name\":\"" + roleName + "\","
-        + "  \"description\":\"Role created by Ozone Multi-Tenancy\""
+        + "  \"description\":\"Role created by Ozone for Multi-Tenancy\""
         + (adminRoleName == null ? "" : ", \"roles\":"
         + "[{\"name\":\"" + adminRoleName + "\",\"isAdmin\": true}]")
         + "}";
@@ -317,7 +318,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     final HttpsURLConnection conn = makeHttpCall(endpointUrl,
         jsonData, "POST", false);
-    if (conn.getResponseCode() != 200) {  // TODO: Replace hard-coded 200
+    if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
           + " " + conn.getResponseMessage()
           + ". Role name '" + role + "' likely already exists in Ranger");

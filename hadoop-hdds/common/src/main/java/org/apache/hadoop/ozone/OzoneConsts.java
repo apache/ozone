@@ -472,18 +472,13 @@ public final class OzoneConsts {
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT =
       "/service/xusers/secure/users/id/";
 
-  public static final String OZONE_OM_RANGER_ADMIN_CREATE_GROUP_HTTP_ENDPOINT =
-      "/service/xusers/secure/groups";
-
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT =
       "/service/roles/roles";
 
   public static final String OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT =
       "/service/roles/roles/name/";
 
-  public static final String OZONE_OM_RANGER_ADMIN_GET_GROUP_HTTP_ENDPOINT =
-      "/service/xusers/groups?name=";
-
+  // TODO: Change to delete role endpoint
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT =
       "/service/xusers/secure/groups/id/";
 
