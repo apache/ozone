@@ -54,7 +54,7 @@ execute_robot_test scm recon
 execute_robot_test scm admincli
 execute_robot_test scm spnego
 
-execute_robot_test scm -v SECURITY_ENABLED:${SECURITY_ENABLED} -v USERNAME:httpfs httpfs
+execute_robot_test scm -v SECURITY_ENABLED:${SECURITY_ENABLED} httpfs
 
 # test replication
 docker-compose up -d --scale datanode=2
