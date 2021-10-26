@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +39,7 @@ import org.apache.ranger.RangerClient;
 
 /**
  * Implementation of {@link MultiTenantAccessController} using the
- * {@link RangerClient}.
+ * {@link RangerClient} to communicate with Ranger.
  */
 public class RangerClientMultiTenantAccessController implements
     MultiTenantAccessController {
@@ -45,17 +47,13 @@ public class RangerClientMultiTenantAccessController implements
   private static final Logger LOG = LoggerFactory
       .getLogger(MultiTenantAccessController.class);
 
-  private OzoneConfiguration conf;
-  private String rangerHttpsAddress;
-  private RangerClient client;
-  private String service;
+  private final RangerClient client;
+  private final String service;
 
-  public RangerClientMultiTenantAccessController(Configuration configuration) {
-    conf = new OzoneConfiguration(configuration);
-
+  public RangerClientMultiTenantAccessController(Configuration conf) {
     // TODO get these from the existing ranger plugin config.
-    rangerHttpsAddress = "";
-    service = "";
+    String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
+    service = "cm_ozone";
 
     String principal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
     String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
@@ -74,18 +72,29 @@ public class RangerClientMultiTenantAccessController implements
   }
 
   @Override
-  public void enablePolicy(String policyName) throws RangerServiceException {
-    // TODO may not be implemented in client.
+  public void enablePolicy(long policyID) throws RangerServiceException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sending enable request for policy ID {} to Ranger.",
+          policyID);
+    }
+    RangerPolicy rangerPolicy = client.getPolicy(policyID);
+    rangerPolicy.setIsEnabled(true);
+    client.updatePolicy(policyID, rangerPolicy);
   }
 
   @Override
-  public void disablePolicy(String policyName) throws RangerServiceException {
-    // TODO may not be implemented in client.
+  public void disablePolicy(long policyID) throws RangerServiceException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sending disable request for policy ID {} to Ranger.",
+          policyID);
+    }
+    RangerPolicy rangerPolicy = client.getPolicy(policyID);
+    rangerPolicy.setIsEnabled(true);
+    client.updatePolicy(policyID, rangerPolicy);
   }
 
   @Override
-  public void deletePolicy(long policyID)
-      throws RangerServiceException {
+  public void deletePolicy(long policyID) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending delete request for policy ID {} to Ranger.",
           policyID);
@@ -114,8 +123,7 @@ public class RangerClientMultiTenantAccessController implements
 
   @Override
   public void addUsersToRole(long roleID,
-      Collection<BasicUserPrincipal> newUsers)
-      throws RangerServiceException {
+      Collection<BasicUserPrincipal> newUsers) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Adding users {} to role ID {} in Ranger.",
           toUserListString(newUsers), roleID);
@@ -161,7 +169,7 @@ public class RangerClientMultiTenantAccessController implements
 
     Map<String, RangerPolicy.RangerPolicyResource> resource = new HashMap<>();
     // TODO check if these are correct key strings in Ranger.
-    resource.put("Ozone Volume",
+    resource.put("volume",
         new RangerPolicy.RangerPolicyResource(policy.getVolume()));
 
     if (policy.getBucket().isPresent()) {
@@ -176,7 +184,10 @@ public class RangerClientMultiTenantAccessController implements
     rangerPolicy.setService(service);
     rangerPolicy.setResources(resource);
 
-    // TODO: Add roles to policy. Not currently supported by client.
+    // Add roles to the policy.
+    RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
+    item.setRoles(policy.getRoles());
+    rangerPolicy.getPolicyItems().add(item);
     return rangerPolicy;
   }
 

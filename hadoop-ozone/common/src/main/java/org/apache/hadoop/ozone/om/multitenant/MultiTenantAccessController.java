@@ -5,6 +5,7 @@ import org.apache.http.auth.BasicUserPrincipal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -19,8 +20,8 @@ public interface MultiTenantAccessController {
   void removeUsersFromRole(long roleID, Collection<BasicUserPrincipal> users)
       throws Exception;
   void deleteRole(long roleID) throws Exception;
-  void enablePolicy(String policyName) throws Exception;
-  void disablePolicy(String policyName) throws Exception;
+  void enablePolicy(long policyID) throws Exception;
+  void disablePolicy(long policyID) throws Exception;
 
   /**
    * Define a role to be created.
@@ -58,7 +59,7 @@ public interface MultiTenantAccessController {
   class Policy {
     private final String name;
     private final String volume;
-    private final Collection<Role> roles;
+    private final List<String> roles;
     private String bucket;
     private String key;
     private String description;
@@ -89,7 +90,7 @@ public interface MultiTenantAccessController {
       return Optional.ofNullable(description);
     }
 
-    public Collection<Role> getRoles() {
+    public List<String> getRoles() {
       return roles;
     }
 
