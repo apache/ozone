@@ -64,7 +64,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
 
   private ECBlockOutputStream[] blockOutputStreams;
   private int currentStreamIdx = 0;
-  private boolean isFailed = false;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
@@ -132,12 +131,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     currentStreamIdx++;
   }
 
-  public void markFailed() {
-    this.isFailed = true;
-  }
-
-  public boolean isFailed() {
-    return this.isFailed;
+  public void markFailed(Exception e) {
+    if (blockOutputStreams[currentStreamIdx] != null) {
+      blockOutputStreams[currentStreamIdx].setIoException(e);
+    }
   }
 
   public void forceToFirstParityBlock(){

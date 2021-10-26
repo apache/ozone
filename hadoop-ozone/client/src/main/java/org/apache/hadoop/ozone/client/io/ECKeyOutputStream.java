@@ -67,8 +67,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   private enum StripeWriteStatus {
     SUCCESS,
-    FAILED,
-    NOT_FULL_YET
+    FAILED
   }
 
   private long currentBlockGroupLen = 0;
@@ -376,7 +375,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
             bytesToWrite.array().length, 0, current.getWrittenDataLength(),
             isParity);
       } catch (Exception e) {
-        markStreamClosed();
+        markStreamAsFailed(e);
       }
     }
   }
@@ -421,6 +420,10 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private void markStreamClosed() {
     blockOutputStreamEntryPool.cleanup();
     closed = true;
+  }
+
+  private void markStreamAsFailed(Exception e) {
+    blockOutputStreamEntryPool.getCurrentStreamEntry().markFailed(e);
   }
 
   @Override
@@ -541,7 +544,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
                 bytesToWrite.position(), 0, current.getWrittenDataLength(),
                 false);
           } catch (Exception e) {
-            markStreamClosed();
+            markStreamAsFailed(e);
           }
         }
         final int lastStripeSize =
@@ -552,6 +555,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         addPadding(parityCellSize);
         if (handleParityWrites(parityCellSize,
             false) == StripeWriteStatus.FAILED) {
+          // TODO: loop this until we succeed?
           handleStripeFailure(parityCellSize, lastStripeSize);
         }
       }
