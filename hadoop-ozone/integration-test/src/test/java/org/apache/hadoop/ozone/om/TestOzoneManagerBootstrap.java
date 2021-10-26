@@ -284,11 +284,11 @@ public class TestOzoneManagerBootstrap {
     cluster.stopOzoneManager(downOMNodeId);
 
     // Set a smaller value for OM Metadata and Client protocol retry attempts
-    OzoneConfiguration conf = cluster.getConf();
-    conf.setInt(OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_KEY, 2);
-    conf.setInt(
+    OzoneConfiguration config = cluster.getConf();
+    config.setInt(OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_KEY, 2);
+    config.setInt(
         OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY, 100);
-    cluster.setConf(conf);
+    cluster.setConf(config);
 
     GenericTestUtils.LogCapturer omLog =
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);

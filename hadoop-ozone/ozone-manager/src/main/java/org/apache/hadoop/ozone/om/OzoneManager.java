@@ -1607,7 +1607,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (newOMNodeDetails == null) {
         // Load new configuration object to read in new peer information
         setConfiguration(reloadConfiguration());
-        String s = getConfiguration().get(OZONE_OM_NODES_KEY + "." + getOMServiceId());
         newOMNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
             getConfiguration(), getOMServiceId(), newOMNodeId);
 

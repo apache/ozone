@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -1030,7 +1029,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         .collect(Collectors.toList());
   }
 
-  private static class ExitManagerForOM extends ExitManager {
+  private final static class ExitManagerForOM extends ExitManager {
 
     private MiniOzoneHAClusterImpl cluster;
     private String omNodeId;
