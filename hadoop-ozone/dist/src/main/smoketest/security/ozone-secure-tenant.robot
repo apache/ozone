@@ -46,6 +46,5 @@ Secure Tenant GetUserInfo Success
 
 Secure Tenant Assign User Failure
     ${rc}  ${result} =  Run And Return Rc And Output  ozone tenant user assign bob --tenant=thistenantdoesnotexist
-#    Should Be True	${rc} > 0
-                        Should contain   ${result}         tenant 'thistenantdoesnotexist' doesn't exist
+                        Should contain   ${result}         Tenant 'thistenantdoesnotexist' doesn't exist
 
