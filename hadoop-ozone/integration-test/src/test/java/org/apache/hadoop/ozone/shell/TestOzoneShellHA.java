@@ -496,6 +496,20 @@ public class TestOzoneShellHA {
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
         state};
     execute(ozoneAdminShell, args);
+
+    // Test case 3: list THREE replica container
+    String factor = "--factor=THREE";
+    args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        factor};
+    execute(ozoneAdminShell, args);
+
+    // Test case 4: list ONE replica container
+    factor = "--factor=ONE";
+    args = new String[] {"container", "list", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
+        factor};
+    execute(ozoneAdminShell, args);
   }
 
   /**
