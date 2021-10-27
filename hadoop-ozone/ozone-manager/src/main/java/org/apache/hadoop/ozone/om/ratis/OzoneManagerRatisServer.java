@@ -384,8 +384,10 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
-    Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
-    Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
+      Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
+    }
     return RaftClientRequest.newBuilder()
         .setClientId(
             ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))
