@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -259,7 +260,28 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     OMResponse omResponse = cluster.getOzoneManager().getOmServerProtocol()
         .submitRequest(null, omRequest);
 
+    // Read Request
+    omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
+        .setVersion(CURRENT_VERSION)
+        .setClientId(UUID.randomUUID().toString())
+        .setInfoVolumeRequest(InfoVolumeRequest.newBuilder()
+            .setVolumeName(volumeName).build())
+        .setS3Authentication(S3Authentication.newBuilder()
+            .setAccessId(accessKey)
+            .setSignature(signature).setStringToSign(strToSign))
+        .build();
     Assert.assertTrue(omResponse.getStatus() == Status.OK);
+
+    // Verify response.
+    VolumeInfo volumeInfo = omResponse.getInfoVolumeResponse().getVolumeInfo();
+    Assert.assertNotNull(volumeInfo);
+    Assert.assertEquals(volumeName, volumeInfo.getVolume());
+    Assert.assertEquals(accessKey, volumeInfo.getAdminName());
+    Assert.assertEquals(accessKey, volumeInfo.getOwnerName());
+
+    cluster.getOzoneManager().getOmServerProtocol()
+        .submitRequest(null, omRequest);
 
 
     // Override secret to S3Secret table with some dummy value

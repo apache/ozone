@@ -128,17 +128,36 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
     if (isRatisEnabled) {
+      boolean s3Auth = false;
+      try {
+        // If Request has S3Authentication validate S3 credentials
+        // if current OM is leader and then proceed with processing the request.
+        if (request.hasS3Authentication()) {
+          s3Auth = true;
+          checkLeaderStatus();
+          S3SecurityUtil.validateS3Credential(request, ozoneManager);
+        }
+      } catch (IOException ex) {
+        // If validate credentials fail return error OM Response.
+        return createErrorResponse(request, ex);
+      }
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
-        return submitReadRequestToOM(request);
-      } else {
-        checkLeaderStatus();
         try {
-          // If Request has S3Authentication validate S3 credentials and
-          // then proceed with processing the request.
           if (request.hasS3Authentication()) {
-            S3SecurityUtil.validateS3Credential(request, ozoneManager);
+            ozoneManager.setS3Auth(request.getS3Authentication());
           }
+          return submitReadRequestToOM(request);
+        } finally {
+          ozoneManager.setS3Auth(null);
+        }
+      } else {
+        // To validate credentials we have already verified leader status.
+        // This will skip of checking leader status again if request has S3Auth.
+        if (!s3Auth) {
+          checkLeaderStatus();
+        }
+        try {
           OMClientRequest omClientRequest =
               createClientRequest(request, ozoneManager);
           request = omClientRequest.preExecute(ozoneManager);
@@ -215,8 +234,20 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
+      // If Request has S3Authentication validate S3 credentials and
+      // then proceed with processing the request.
+      if (request.hasS3Authentication()) {
+        S3SecurityUtil.validateS3Credential(request, ozoneManager);
+      }
       if (OmUtils.isReadOnly(request)) {
-        return handler.handleReadRequest(request);
+        try {
+          if (request.hasS3Authentication()) {
+            ozoneManager.setS3Auth(request.getS3Authentication());
+          }
+          return handler.handleReadRequest(request);
+        } finally {
+          ozoneManager.setS3Auth(null);
+        }
       } else {
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
