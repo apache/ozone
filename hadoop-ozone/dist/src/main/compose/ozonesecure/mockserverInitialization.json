@@ -33,6 +33,14 @@
   },
   {
     "httpRequest": {
+      "path": "/service/roles/roles/222"
+    },
+    "httpResponse": {
+      "body": "{id: 222}"
+    }
+  },
+  {
+    "httpRequest": {
       "path": "/service/public/v2/api/policy"
     },
     "httpResponse": {
