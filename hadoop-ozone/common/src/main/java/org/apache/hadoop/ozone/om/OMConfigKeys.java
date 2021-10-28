@@ -66,8 +66,6 @@ public final class OMConfigKeys {
       "ozone.om.http-address";
   public static final String OZONE_OM_HTTPS_ADDRESS_KEY =
       "ozone.om.https-address";
-  public static final String OZONE_OM_KEYTAB_FILE =
-      "ozone.om.keytab.file";
   public static final String OZONE_OM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
