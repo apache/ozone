@@ -597,49 +597,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public void commitKey(OmKeyArgs args, long clientID) throws IOException {
-    Preconditions.checkNotNull(args);
-    String volumeName = args.getVolumeName();
-    String bucketName = args.getBucketName();
-    String keyName = args.getKeyName();
-    List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
-    String objectKey = metadataManager
-        .getOzoneKey(volumeName, bucketName, keyName);
-    String openKey = metadataManager
-        .getOpenKey(volumeName, bucketName, keyName, clientID);
-    Preconditions.checkNotNull(locationInfoList);
-    try {
-      metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-          bucketName);
-      OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
-      OmKeyInfo keyInfo =
-          metadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
-      if (keyInfo == null) {
-        throw new OMException("Failed to commit key, as " + openKey + "entry " +
-            "is not found in the openKey table", KEY_NOT_FOUND);
-      }
-      keyInfo.setDataSize(args.getDataSize());
-      keyInfo.setModificationTime(Time.now());
-
-      //update the block length for each block
-      keyInfo.updateLocationInfoList(locationInfoList, false);
-      metadataManager.getStore().move(
-          openKey,
-          objectKey,
-          keyInfo,
-          metadataManager.getOpenKeyTable(getBucketLayout()), metadataManager
-              .getKeyTable(
-                  getBucketLayout(metadataManager, volumeName, bucketName)));
-    } catch (OMException e) {
-      throw e;
-    } catch (IOException ex) {
-      LOG.error("Key commit failed for volume:{} bucket:{} key:{}",
-          volumeName, bucketName, keyName, ex);
-      throw new OMException(ex.getMessage(),
-          ResultCodes.KEY_ALLOCATION_ERROR);
-    } finally {
-      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-          bucketName);
-    }
+    throw new OMException("gbj was here", KEY_NOT_FOUND);
   }
 
   @Override
