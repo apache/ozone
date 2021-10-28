@@ -101,8 +101,8 @@ public class OMPathsPurgeResponseWithFSO extends OMClientResponse {
       OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
       String ozoneDbKey = omMetadataManager.getOzonePathKey(
           keyInfo.getParentObjectID(), keyInfo.getFileName());
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          ozoneDbKey);
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .deleteWithBatch(batchOperation, ozoneDbKey);
 
       if (LOG.isDebugEnabled()) {
         LOG.info("Move keyName:{} to DeletedTable DBKey: {}",

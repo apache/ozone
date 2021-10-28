@@ -99,6 +99,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   public BucketLayout getBucketLayout() {
+    // Returning Bucket.default since this is a non fso code path.
     return BucketLayout.DEFAULT;
   }
 
