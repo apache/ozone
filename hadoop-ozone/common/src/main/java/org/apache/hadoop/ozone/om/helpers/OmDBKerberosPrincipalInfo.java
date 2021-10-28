@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This class is used for storing info related to the Kerberos principal.
@@ -45,8 +46,9 @@ public final class OmDBKerberosPrincipalInfo {
   }
 
   private OmDBKerberosPrincipalInfo(String serialized) {
-    accessIds = new HashSet<>(
-        Arrays.asList(serialized.split(SERIALIZATION_SPLIT_KEY)));
+    accessIds = Arrays.stream(serialized.split(SERIALIZATION_SPLIT_KEY))
+        // Remove any empty accessId strings when deserializing
+        .filter(e -> !e.isEmpty()).collect(Collectors.toSet());
   }
 
   public Set<String> getAccessIds() {

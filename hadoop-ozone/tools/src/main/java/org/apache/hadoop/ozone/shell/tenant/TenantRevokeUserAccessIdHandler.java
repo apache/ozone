@@ -17,19 +17,40 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * ozone tenant user revoke.
  */
 @CommandLine.Command(name = "revoke",
-    description = "Revoke user access to tenant")
-public class RevokeUserAccessToTenantHandler extends TenantHandler {
+    description = "Revoke user accessId to tenant")
+public class TenantRevokeUserAccessIdHandler extends TenantHandler {
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
+  @CommandLine.Parameters(description = "List of user accessIds", arity = "1..")
+  private List<String> accessIds = new ArrayList<>();
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    out().println("Not Implemented.");
+    final ObjectStore objStore = client.getObjectStore();
+
+    accessIds.forEach(accessId -> {
+      try {
+        objStore.tenantRevokeUserAccessId(accessId);
+        err().format("Revoked accessId '%s'.%n", accessId);
+      } catch (IOException e) {
+        err().format("Failed to revoke accessId '%s': %s%n",
+            accessId, e.getMessage());
+      }
+    });
   }
 }

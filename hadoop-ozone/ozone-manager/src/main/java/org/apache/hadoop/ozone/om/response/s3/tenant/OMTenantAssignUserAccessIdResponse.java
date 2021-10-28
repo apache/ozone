@@ -48,7 +48,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
     TENANT_GROUP_TABLE,
     TENANT_ROLE_TABLE
 })
-public class OMAssignUserToTenantResponse extends OMClientResponse {
+public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
 
   private S3SecretValue s3SecretValue;
   private String principal, groupName, roleName, accessId;
@@ -56,7 +56,7 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
   private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
 
   @SuppressWarnings("checkstyle:parameternumber")
-  public OMAssignUserToTenantResponse(@Nonnull OMResponse omResponse,
+  public OMTenantAssignUserAccessIdResponse(@Nonnull OMResponse omResponse,
       @Nonnull S3SecretValue s3SecretValue,
       @Nonnull String principal,
       @Nonnull String groupName,
@@ -79,7 +79,7 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMAssignUserToTenantResponse(@Nonnull OMResponse omResponse) {
+  public OMTenantAssignUserAccessIdResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
   }
@@ -101,9 +101,9 @@ public class OMAssignUserToTenantResponse extends OMClientResponse {
     omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
         batchOperation, principal, omDBKerberosPrincipalInfo);
     omMetadataManager.getTenantGroupTable().putWithBatch(
-        batchOperation, principal, groupName);
+        batchOperation, accessId, groupName);
     omMetadataManager.getTenantRoleTable().putWithBatch(
-        batchOperation, principal, roleName);
+        batchOperation, accessId, roleName);
   }
 
   @VisibleForTesting

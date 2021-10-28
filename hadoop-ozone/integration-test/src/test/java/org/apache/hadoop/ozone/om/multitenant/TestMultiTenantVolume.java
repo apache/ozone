@@ -99,7 +99,7 @@ public class TestMultiTenantVolume {
 
     ObjectStore store = getStoreForAccessID(accessID);
     store.createTenant(tenant);
-    store.assignUserToTenant(principal, tenant, accessID);
+    store.tenantAssignUserAccessId(principal, tenant, accessID);
 
     // S3 volume pointed to by the store should be for the tenant.
     Assert.assertEquals(tenant, store.getS3Volume().getName());
