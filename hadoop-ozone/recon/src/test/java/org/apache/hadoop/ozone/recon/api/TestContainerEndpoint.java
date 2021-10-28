@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
@@ -227,7 +228,8 @@ public class TestContainerEndpoint {
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table tableMock = mock(Table.class);
     when(tableMock.getName()).thenReturn("KeyTable");
-    when(omMetadataManagerMock.getKeyTable()).thenReturn(tableMock);
+    when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
+        .thenReturn(tableMock);
     ContainerKeyMapperTask containerKeyMapperTask  =
         new ContainerKeyMapperTask(reconContainerMetadataManager);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
@@ -757,5 +759,9 @@ public class TestContainerEndpoint {
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L);
     reconContainerManager.upsertContainerHistory(cID, uuid3, 3L);
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L);
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

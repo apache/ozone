@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -272,7 +273,7 @@ public class TestKeyManagerImpl {
         .setDataSize(0)
         .setReplicationConfig(keyArgs.getReplicationConfig())
         .setFileEncryptionInfo(null).build();
-    metadataManager.getOpenKeyTable().put(
+    metadataManager.getOpenKeyTable(getBucketLayout()).put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
         omKeyInfo);
     LambdaTestUtils.intercept(OMException.class,
@@ -958,10 +959,11 @@ public class TestKeyManagerImpl {
 
     // Clean up cache by marking those keys in cache as deleted
     for (int i = 1; i <= 100; i += 2) {
-      String key = metadataManager.getOzoneKey(
-          VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i);
-      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.absent(), 2L));
+      String key = metadataManager
+          .getOzoneKey(VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i);
+      metadataManager.getKeyTable(getBucketLayout())
+          .addCacheEntry(new CacheKey<>(key),
+              new CacheValue<>(Optional.absent(), 2L));
     }
   }
 
@@ -1029,8 +1031,9 @@ public class TestKeyManagerImpl {
       String key = metadataManager.getOzoneKey(
           VOLUME_NAME, BUCKET_NAME,
           keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i);
-      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.absent(), 2L));
+      metadataManager.getKeyTable(getBucketLayout())
+          .addCacheEntry(new CacheKey<>(key),
+              new CacheValue<>(Optional.absent(), 2L));
     }
   }
 
@@ -1056,8 +1059,9 @@ public class TestKeyManagerImpl {
         String key = metadataManager.getOzoneKey(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i);
         // Mark as deleted in cache.
-        metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.absent(), 2L));
+        metadataManager.getKeyTable(getBucketLayout())
+            .addCacheEntry(new CacheKey<>(key),
+                new CacheValue<>(Optional.absent(), 2L));
         deletedKeySet.add(key);
       }
     }
@@ -1089,10 +1093,11 @@ public class TestKeyManagerImpl {
     boolean doDelete = false;
     for (String key : existKeySet) {
       if (doDelete) {
-        String ozoneKey = metadataManager.getOzoneKey(
-            VOLUME_NAME, BUCKET_NAME, key);
-        metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.absent(), 2L));
+        String ozoneKey =
+            metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, key);
+        metadataManager.getKeyTable(getBucketLayout())
+            .addCacheEntry(new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.absent(), 2L));
         deletedKeySet.add(key);
       }
       doDelete = !doDelete;
@@ -1137,10 +1142,11 @@ public class TestKeyManagerImpl {
 
     // Clean up by marking remaining entries as deleted
     for (String key : existKeySet) {
-      String ozoneKey = metadataManager.getOzoneKey(
-          VOLUME_NAME, BUCKET_NAME, key);
-      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
-          new CacheValue<>(Optional.absent(), 2L));
+      String ozoneKey =
+          metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, key);
+      metadataManager.getKeyTable(getBucketLayout())
+          .addCacheEntry(new CacheKey<>(ozoneKey),
+              new CacheValue<>(Optional.absent(), 2L));
       deletedKeySet.add(key);
     }
     // Update existKeySet
@@ -1491,5 +1497,9 @@ public class TestKeyManagerImpl {
         .setAclRights(ACLType.READ)
         .setAclType(ACLIdentityType.USER)
         .build();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.LEGACY;
   }
 }

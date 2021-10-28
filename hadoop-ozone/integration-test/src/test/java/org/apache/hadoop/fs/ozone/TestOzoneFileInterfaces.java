@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -239,9 +240,12 @@ public class TestOzoneFileInterfaces {
         o3fs.pathToKey(path));
 
     // verify prefix directories and the file, do not already exist
-    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
-    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
-    assertTrue(metadataManager.getKeyTable().get(fileKey) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev1key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev2key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(fileKey) == null);
 
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
@@ -269,10 +273,12 @@ public class TestOzoneFileInterfaces {
     FileStatus lev2status;
 
     // verify prefix directories got created when creating the file.
-    assertTrue(metadataManager.getKeyTable().get(lev1key).getKeyName()
-        .equals("l1dir/"));
-    assertTrue(metadataManager.getKeyTable().get(lev2key).getKeyName()
-        .equals("l1dir/l2dir/"));
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev1key).getKeyName()
+            .equals("l1dir/"));
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev2key).getKeyName()
+            .equals("l1dir/l2dir/"));
     lev1status = getDirectoryStat(lev1path);
     lev2status = getDirectoryStat(lev2path);
     assertTrue((lev1status != null) && (lev2status != null));
@@ -347,9 +353,12 @@ public class TestOzoneFileInterfaces {
         o3fs.pathToKey(leaf));
 
     // verify prefix directories and the leaf, do not already exist
-    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
-    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
-    assertTrue(metadataManager.getKeyTable().get(leafKey) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev1key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev2key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(leafKey) == null);
 
     assertTrue("Makedirs returned with false for the path " + leaf,
         fs.mkdirs(leaf));
@@ -363,11 +372,11 @@ public class TestOzoneFileInterfaces {
 
     // verify prefix directories got created when creating the leaf directory.
     assertTrue(metadataManager
-        .getKeyTable()
+        .getKeyTable(getBucketLayout())
         .get(lev1key)
         .getKeyName().equals("abc/"));
     assertTrue(metadataManager
-        .getKeyTable()
+        .getKeyTable(getBucketLayout())
         .get(lev2key)
         .getKeyName().equals("abc/def/"));
     lev1status = getDirectoryStat(lev1path);
@@ -568,5 +577,9 @@ public class TestOzoneFileInterfaces {
 
   private void assertCounter(long value, String key) {
     assertEquals(value, statistics.getLong(key).longValue());
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

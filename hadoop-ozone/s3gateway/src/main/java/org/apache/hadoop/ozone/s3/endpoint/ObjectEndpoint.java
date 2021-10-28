@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -858,33 +859,47 @@ public class ObjectEndpoint extends EndpointBase {
     return partMarker;
   }
 
-  private static long parseOzoneDate(String ozoneDateStr) throws OS3Exception {
+  // Parses date string and return long representation. Returns an
+  // empty if DateStr is null or invalid. Dates in the future are
+  // considered invalid.
+  private static OptionalLong parseAndValidateDate(String ozoneDateStr) {
     long ozoneDateInMs;
+    if (ozoneDateStr == null) {
+      return OptionalLong.empty();
+    }
     try {
       ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
     } catch (ParseException e) {
-      throw S3ErrorTable.newError(S3ErrorTable
-          .INVALID_ARGUMENT, ozoneDateStr);
+      // if time not parseable, then return empty()
+      return OptionalLong.empty();
     }
-    return ozoneDateInMs;
+
+    long currentDate = System.currentTimeMillis();
+    if  (ozoneDateInMs <= currentDate){
+      return OptionalLong.of(ozoneDateInMs);
+    } else {
+      // dates in the future are invalid, so return empty()
+      return OptionalLong.empty();
+    }
   }
 
   private boolean checkCopySourceModificationTime(Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
-      String copySourceIfUnmodifiedSinceStr) throws OS3Exception {
+      String copySourceIfUnmodifiedSinceStr) {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
     long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
-    if (copySourceIfModifiedSinceStr != null) {
-      copySourceIfModifiedSince =
-          parseOzoneDate(copySourceIfModifiedSinceStr);
+    OptionalLong modifiedDate =
+        parseAndValidateDate(copySourceIfModifiedSinceStr);
+    if (modifiedDate.isPresent()) {
+      copySourceIfModifiedSince = modifiedDate.getAsLong();
     }
 
-    if (copySourceIfUnmodifiedSinceStr != null) {
-      copySourceIfUnmodifiedSince =
-          parseOzoneDate(copySourceIfUnmodifiedSinceStr);
+    OptionalLong unmodifiedDate =
+        parseAndValidateDate(copySourceIfUnmodifiedSinceStr);
+    if (unmodifiedDate.isPresent()) {
+      copySourceIfUnmodifiedSince = unmodifiedDate.getAsLong();
     }
-
     return (copySourceIfModifiedSince <= lastModificationTime) &&
         (lastModificationTime <= copySourceIfUnmodifiedSince);
   }

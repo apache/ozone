@@ -76,7 +76,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
             TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, 100,
-                    Time.now());
+                    Time.now(), version);
     omKeyInfoFSO.appendNewBlocks(locationList, false);
 
     String fileName = OzoneFSUtils.getFileName(keyName);

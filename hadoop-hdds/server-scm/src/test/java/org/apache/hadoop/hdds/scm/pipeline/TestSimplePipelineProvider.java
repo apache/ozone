@@ -18,19 +18,34 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Test for SimplePipelineProvider.
@@ -40,12 +55,35 @@ public class TestSimplePipelineProvider {
   private NodeManager nodeManager;
   private PipelineProvider provider;
   private PipelineStateManager stateManager;
+  private File testDir;
+  private DBStore dbStore;
 
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    stateManager = new PipelineStateManager();
+    final OzoneConfiguration conf = SCMTestUtils.getConf();
+    testDir = GenericTestUtils.getTestDir(
+        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(
+        conf, new SCMDBDefinition());
+    SCMHAManager scmhaManager = MockSCMHAManager.getInstance(true);
+    stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
     provider = new SimplePipelineProvider(nodeManager, stateManager);
+  }
+
+  @After
+  public void cleanup() throws Exception {
+    if (dbStore != null) {
+      dbStore.close();
+    }
+
+    FileUtil.fullyDelete(testDir);
   }
 
   @Test
@@ -53,7 +91,9 @@ public class TestSimplePipelineProvider {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
         provider.create(new StandaloneReplicationConfig(factor));
-    stateManager.addPipeline(pipeline);
+    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+        ClientVersions.CURRENT_VERSION);
+    stateManager.addPipeline(pipelineProto);
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
     Assert.assertEquals(pipeline.getReplicationConfig().getRequiredNodes(),
@@ -65,7 +105,9 @@ public class TestSimplePipelineProvider {
     factor = HddsProtos.ReplicationFactor.ONE;
     Pipeline pipeline1 =
         provider.create(new StandaloneReplicationConfig(factor));
-    stateManager.addPipeline(pipeline1);
+    HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
+        ClientVersions.CURRENT_VERSION);
+    stateManager.addPipeline(pipelineProto1);
     Assert.assertEquals(pipeline1.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
     Assert.assertEquals(

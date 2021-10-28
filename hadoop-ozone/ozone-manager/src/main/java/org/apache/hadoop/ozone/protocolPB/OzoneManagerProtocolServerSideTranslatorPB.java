@@ -134,7 +134,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       } else {
         checkLeaderStatus();
         try {
-          OMClientRequest omClientRequest = createClientRequest(request);
+          OMClientRequest omClientRequest =
+              createClientRequest(request, ozoneManager);
           request = omClientRequest.preExecute(ozoneManager);
         } catch (IOException ex) {
           // As some of the preExecute returns error. So handle here.
@@ -212,12 +213,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
       } else {
-        OMClientRequest omClientRequest = createClientRequest(request);
+        OMClientRequest omClientRequest =
+            createClientRequest(request, ozoneManager);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);
       }
-    } catch(IOException ex) {
+    } catch (IOException ex) {
       // As some of the preExecute returns error. So handle here.
       return createErrorResponse(request, ex);
     }
@@ -232,6 +234,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       String errorMessage = "Got error during waiting for flush to be " +
           "completed for " + "request" + request.toString();
       ExitUtils.terminate(1, errorMessage, ex, LOG);
+      Thread.currentThread().interrupt();
     }
     return omClientResponse.getOMResponse();
   }

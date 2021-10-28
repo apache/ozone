@@ -87,4 +87,7 @@ public class VolumeUsage implements SpaceUsageSource {
     }
   }
 
+  public void refreshNow(){
+    source.refreshNow();
+  }
 }

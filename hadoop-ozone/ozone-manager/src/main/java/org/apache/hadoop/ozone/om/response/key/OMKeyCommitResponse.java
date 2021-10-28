@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -29,28 +30,31 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for CommitKey request.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE})
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE})
 public class OMKeyCommitResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
   private String ozoneKeyName;
   private String openKeyName;
   private OmBucketInfo omBucketInfo;
+  private RepeatedOmKeyInfo keysToDelete;
 
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, RepeatedOmKeyInfo keysToDelete) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
     this.openKeyName = openKeyName;
     this.omBucketInfo = omBucketInfo;
+    this.keysToDelete = keysToDelete;
   }
 
   /**
@@ -67,11 +71,13 @@ public class OMKeyCommitResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     // Delete from OpenKey table
-    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        openKeyName);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .deleteWithBatch(batchOperation, openKeyName);
 
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
-        omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation, ozoneKeyName, omKeyInfo);
+
+    updateDeletedTable(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
@@ -93,5 +99,13 @@ public class OMKeyCommitResponse extends OMClientResponse {
 
   protected String getOzoneKeyName() {
     return ozoneKeyName;
+  }
+
+  protected void updateDeletedTable(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    if (this.keysToDelete != null) {
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+              ozoneKeyName, keysToDelete);
+    }
   }
 }

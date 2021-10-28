@@ -85,7 +85,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     String openKey = getOpenKey(id);
 
     // Before calling
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -100,12 +101,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .getCreateKeyResponse().getKeyInfo().getKeyLocationListCount());
 
     // Disk should have 1 version, as it is fresh key create.
-    Assert.assertEquals(1, omMetadataManager.getOpenKeyTable()
-        .get(openKey).getKeyLocationVersions().size());
+    Assert.assertEquals(1,
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey)
+            .getKeyLocationVersions().size());
 
     // Write to DB like key commit.
-    omMetadataManager.getKeyTable().put(
-        getOzoneKey(), omMetadataManager.getOpenKeyTable().get(openKey));
+    omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(),
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
 
     // Override same key again
     modifiedOmRequest =
@@ -115,7 +117,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     openKey = getOpenKey(id);
 
     // Before calling
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     Assert.assertNull(omKeyInfo);
 
     omKeyCreateRequest =
@@ -131,9 +134,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assert.assertEquals(1, omKeyCreateResponse.getOMResponse()
         .getCreateKeyResponse().getKeyInfo().getKeyLocationListCount());
 
-    // Disk should have 2 versions.
-    Assert.assertEquals(2, omMetadataManager.getOpenKeyTable()
-        .get(openKey).getKeyLocationVersions().size());
+    // Disk should have 1 versions when bucket versioning is off.
+    Assert.assertEquals(1,
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey)
+            .getKeyLocationVersions().size());
 
   }
 
@@ -148,7 +152,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Check open table whether key is added or not.
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNotNull(omKeyInfo);
 
@@ -202,7 +207,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         keyName, id);
 
     // Before calling
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -216,7 +222,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // As we got error, no entry should be created in openKeyTable.
 
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNull(omKeyInfo);
   }
@@ -240,7 +247,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
 
     // Before calling
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -253,7 +261,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
 
     // As We got an error, openKey Table should not have entry.
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -280,7 +289,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     // Before calling
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -293,7 +303,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
 
     // As We got an error, openKey Table should not have entry.
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -547,7 +558,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Check open key entry
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, omRequest.getCreateKeyRequest().getClientID());
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     Assert.assertNotNull(omKeyInfo);
   }
 
@@ -555,9 +567,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Check intermediate paths are created
     keyPath = keyPath.getParent();
     while(keyPath != null) {
-      Assert.assertNotNull(omMetadataManager.getKeyTable().get(
-          omMetadataManager.getOzoneDirKey(volumeName, bucketName,
-              keyPath.toString())));
+      Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
+          omMetadataManager
+              .getOzoneDirKey(volumeName, bucketName, keyPath.toString())));
       keyPath = keyPath.getParent();
     }
     return -1;
