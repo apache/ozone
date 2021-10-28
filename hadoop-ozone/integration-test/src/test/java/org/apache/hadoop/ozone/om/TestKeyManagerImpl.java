@@ -158,6 +158,7 @@ public class TestKeyManagerImpl {
   private static final String BUCKET_NAME = "bucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
+  private static OzoneManager om;
 
 
   @Rule
@@ -203,7 +204,7 @@ public class TestKeyManagerImpl {
     omStorage.setOmId("om1");
     omStorage.initialize();
 
-    OzoneManager om = OzoneManager.createOm(conf);
+    om = OzoneManager.createOm(conf);
     metadataManager = (OMMetadataManager) HddsWhiteboxTestUtils.getInternalState(
         om, "metadataManager");
 
@@ -233,13 +234,16 @@ public class TestKeyManagerImpl {
   public static void cleanup() throws Exception {
     scm.stop();
     scm.join();
-    metadataManager.stop();
-    keyManager.stop();
+    om.stop();
     FileUtils.deleteDirectory(dir);
   }
 
   @After
   public void cleanupTest() throws IOException {
+    ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(), mockScmContainerClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+
     List<OzoneFileStatus> fileStatuses = keyManager
         .listStatus(createBuilder().setKeyName("").build(), true, "", 100000);
     for (OzoneFileStatus fileStatus : fileStatuses) {
@@ -275,8 +279,10 @@ public class TestKeyManagerImpl {
 
   @Test
   public void allocateBlockFailureInSafeMode() throws Exception {
-    KeyManager keyManager1 = new KeyManagerImpl(mockScmBlockLocationProtocol,
-        metadataManager, conf, "om1", null);
+    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .build();
@@ -300,16 +306,18 @@ public class TestKeyManagerImpl {
         omKeyInfo);
     LambdaTestUtils.intercept(OMException.class,
         "SafeModePrecheck failed for allocateBlock", () -> {
-          keyManager1
+          keyManager
               .allocateBlock(keyArgs, 1L, new ExcludeList());
         });
   }
 
   @Test
   public void openKeyFailureInSafeMode() throws Exception {
+    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    KeyManager keyManager1 = new KeyManagerImpl(mockScmBlockLocationProtocol,
-        metadataManager, conf, "om1", null);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
@@ -319,7 +327,7 @@ public class TestKeyManagerImpl {
         .build();
     LambdaTestUtils.intercept(OMException.class,
         "SafeModePrecheck failed for allocateBlock", () -> {
-          keyManager1.openKey(keyArgs);
+          keyManager.openKey(keyArgs);
         });
   }
 
@@ -841,7 +849,7 @@ public class TestKeyManagerImpl {
         .getLocationList().get(0).getPipeline().getClosestNode());
   }
 
-  //@Test
+  @Test
   public void testLatestLocationVersion() throws IOException {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
@@ -1259,7 +1267,6 @@ public class TestKeyManagerImpl {
 
   //@Test
   public void testRefreshPipeline() throws Exception {
-
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build();
     try {
       cluster.waitForClusterToBeReady();
@@ -1336,6 +1343,7 @@ public class TestKeyManagerImpl {
 
   //@Test
   public void testRefreshPipelineException() throws Exception {
+    om.stop();
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build();
     try {
       cluster.waitForClusterToBeReady();
