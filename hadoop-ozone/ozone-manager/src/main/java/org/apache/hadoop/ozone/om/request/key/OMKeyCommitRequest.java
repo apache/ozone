@@ -212,7 +212,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omMetadataManager, omBucketInfo.getIsVersionEnabled(), trxnLogIndex,
           ozoneManager.isRatisEnabled());
       OmKeyInfo keyToDelete =
-              omMetadataManager.getKeyTable().get(dbOzoneKey);
+              omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -299,7 +299,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             omMetadataManager.getDeletedTable().get(dbOzoneKey);
     // Current key to be overwritten
     OmKeyInfo keyToDelete =
-            omMetadataManager.getKeyTable().get(dbOzoneKey);
+            omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
 
     if (keyToDelete != null) {
       keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,

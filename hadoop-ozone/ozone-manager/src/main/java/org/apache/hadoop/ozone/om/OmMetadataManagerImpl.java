@@ -74,7 +74,6 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -276,16 +275,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmBucketInfo> getBucketTable() {
     return bucketTable;
-  }
-
-  @Override
-  public Table<String, OmKeyInfo> getKeyTable() {
-    // TODO: Refactor the below function by reading bucketLayout.
-    //  Jira: HDDS-5679
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      return fileTable;
-    }
-    return keyTable;
   }
 
   @Override

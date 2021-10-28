@@ -99,6 +99,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -3372,8 +3373,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     String ozoneKey = ozoneManager.getMetadataManager()
         .getOzoneKey(bucket.getVolumeName(), bucket.getName(), keyName);
-    OmKeyInfo omKeyInfo = ozoneManager.getMetadataManager().getKeyTable()
-        .get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        ozoneManager.getMetadataManager().getKeyTable(getBucketLayout())
+            .get(ozoneKey);
 
     OmKeyLocationInfoGroup latestVersionLocations =
         omKeyInfo.getLatestVersionLocations();
@@ -3511,14 +3513,14 @@ public abstract class TestOzoneRpcClientAbstract {
 
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable().get(omMetadataManager.getOzoneKey(
-            volumeName, bucketName, keyName));
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
     omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
 
-    omMetadataManager.getKeyTable().put(omMetadataManager.getOzoneKey(
-         volumeName, bucketName, keyName), omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
+            omKeyInfo);
 
     //Step 5
     key = bucket.getKey(keyName);
@@ -3667,6 +3669,10 @@ public abstract class TestOzoneRpcClientAbstract {
 
   }
 
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
   private void createRequiredForVersioningTest(String volumeName,
       String bucketName, String keyName, boolean versioning) throws Exception {
 
@@ -3697,8 +3703,9 @@ public abstract class TestOzoneRpcClientAbstract {
   private void checkExceptedResultForVersioningTest(String volumeName,
       String bucketName, String keyName, int expectedCount) throws Exception {
     OmKeyInfo omKeyInfo = cluster.getOzoneManager().getMetadataManager()
-        .getKeyTable().get(cluster.getOzoneManager().getMetadataManager()
-            .getOzoneKey(volumeName, bucketName, keyName));
+        .getKeyTable(getBucketLayout()).get(
+            cluster.getOzoneManager().getMetadataManager()
+                .getOzoneKey(volumeName, bucketName, keyName));
 
     Assert.assertNotNull(omKeyInfo);
     Assert.assertEquals(expectedCount,

@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -128,16 +129,16 @@ public class TestOzoneManagerServiceProviderImpl {
             reconOMMetadataManager, reconTaskController, reconUtilsMock,
             ozoneManagerProtocol);
 
-    Assert.assertNull(reconOMMetadataManager.getKeyTable()
+    Assert.assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
-    Assert.assertNull(reconOMMetadataManager.getKeyTable()
+    Assert.assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
 
     assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
 
-    assertNotNull(reconOMMetadataManager.getKeyTable()
+    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
-    assertNotNull(reconOMMetadataManager.getKeyTable()
+    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
   }
 
@@ -255,11 +256,11 @@ public class TestOzoneManagerServiceProviderImpl {
     String fullKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", "key_one");
     assertTrue(ozoneManagerServiceProvider.getOMMetadataManagerInstance()
-        .getKeyTable().isExist(fullKey));
+        .getKeyTable(getBucketLayout()).isExist(fullKey));
     fullKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", "key_two");
     assertTrue(ozoneManagerServiceProvider.getOMMetadataManagerInstance()
-        .getKeyTable().isExist(fullKey));
+        .getKeyTable(getBucketLayout()).isExist(fullKey));
   }
 
   @Test
@@ -361,6 +362,10 @@ public class TestOzoneManagerServiceProviderImpl {
     when(ozoneManagerProtocolMock.getDBUpdates(any(OzoneManagerProtocolProtos
         .DBUpdatesRequest.class))).thenReturn(dbUpdatesWrapper);
     return ozoneManagerProtocolMock;
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }
 
