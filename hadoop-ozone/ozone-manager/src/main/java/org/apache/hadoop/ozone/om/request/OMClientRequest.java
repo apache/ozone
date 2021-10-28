@@ -131,8 +131,11 @@ public abstract class OMClientRequest implements RequestAuditor {
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder();
 
-    // Added not null checks, as in UT's these values might be null.
-    if (user != null) {
+    // If S3 Authentication is set, use AccessId as user.
+    if (omRequest.hasS3Authentication()) {
+      userInfo.setUserName(omRequest.getS3Authentication().getAccessId());
+    } else if (user != null) {
+      // Added not null checks, as in UT's these values might be null.
       userInfo.setUserName(user.getUserName());
     }
 
