@@ -109,6 +109,20 @@ public final class ContainerBalancerConfiguration {
       "iteration of Container Balancer.")
   private long balancingInterval;
 
+  @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
+      "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
+      "hostnames or ip addresses separated by commas. Only the Datanodes " +
+      "specified in this list are balanced. This configuration is empty by " +
+      "default.")
+  private String includeNodes = "";
+
+  @Config(key = "exclude.datanodes", type = ConfigType.STRING, defaultValue =
+      "", tags = ConfigTag.BALANCER, description = "A list of Datanode " +
+      "hostnames or ip addresses separated by commas. The Datanodes specified" +
+      " in this list are excluded from balancing. This configuration is empty" +
+      " by default.")
+  private String excludeNodes = "";
+
   private DUFactory.Conf duConf;
 
   /**
@@ -290,6 +304,42 @@ public final class ContainerBalancerConfiguration {
       LOG.warn("Balancing interval duration must be greater than du refresh " +
           "period, {} milliseconds", duConf.getRefreshPeriod().toMillis());
     }
+  }
+
+  /**
+   * Gets a set of datanode hostnames or ip addresses that will be the exclusive
+   * participants in balancing.
+   * @return Set of hostname strings
+   */
+  public Set<String> getIncludeNodes() {
+    if (includeNodes.isEmpty()) {
+      return new HashSet<>();
+    }
+    return Arrays.stream(includeNodes.split(","))
+        .map(String::trim)
+        .collect(Collectors.toSet());
+  }
+
+  public void setIncludeNodes(String includeNodes) {
+    this.includeNodes = includeNodes;
+  }
+
+  /**
+   * Gets a set of datanode hostnames or ip addresses that will be excluded
+   * from balancing.
+   * @return Set of hostname strings
+   */
+  public Set<String> getExcludeNodes() {
+    if (excludeNodes.isEmpty()) {
+      return new HashSet<>();
+    }
+    return Arrays.stream(excludeNodes.split(","))
+        .map(String::trim)
+        .collect(Collectors.toSet());
+  }
+
+  public void setExcludeNodes(String excludeNodes) {
+    this.excludeNodes = excludeNodes;
   }
 
   /**

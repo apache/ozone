@@ -525,6 +525,65 @@ public class TestContainerBalancer {
   }
 
   /**
+   * Tests if {@link ContainerBalancer} follows the includeNodes and
+   * excludeNodes configurations in {@link ContainerBalancerConfiguration}.
+   * If the includeNodes configuration is not empty, only the specified
+   * includeNodes should be included in balancing. excludeNodes should be
+   * excluded from balancing. If a datanode is specified in both include and
+   * exclude configurations, then it should be excluded.
+   */
+  @Test
+  public void balancerShouldFollowExcludeAndIncludeDatanodesConfigurations() {
+    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0);
+
+    // only these nodes should be included, except the ones also specified in
+    // excludeNodes
+    int firstIncludeIndex = 0, secondIncludeIndex = 1;
+    int thirdIncludeIndex = nodesInCluster.size() - 2;
+    int fourthIncludeIndex = nodesInCluster.size() - 1;
+    String includeNodes =
+        nodesInCluster.get(firstIncludeIndex).getDatanodeDetails()
+            .getIpAddress() + ", " +
+            nodesInCluster.get(secondIncludeIndex).getDatanodeDetails()
+                .getIpAddress() + ", " +
+            nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails()
+                .getHostName() + ", " +
+            nodesInCluster.get(fourthIncludeIndex).getDatanodeDetails()
+                .getHostName();
+
+    // these nodes should be excluded
+    int firstExcludeIndex = 0, secondExcludeIndex = nodesInCluster.size() - 1;
+    String excludeNodes =
+        nodesInCluster.get(firstExcludeIndex).getDatanodeDetails()
+            .getIpAddress() + ", " +
+            nodesInCluster.get(secondExcludeIndex).getDatanodeDetails()
+                .getHostName();
+    balancerConfiguration.setIncludeNodes(includeNodes);
+    balancerConfiguration.setExcludeNodes(excludeNodes);
+    containerBalancer.start(balancerConfiguration);
+    sleepWhileBalancing(500);
+    containerBalancer.stop();
+
+    // finally, these should be the only nodes included in balancing
+    // (included - excluded)
+    DatanodeDetails dn1 =
+        nodesInCluster.get(secondIncludeIndex).getDatanodeDetails();
+    DatanodeDetails dn2 =
+        nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails();
+    for (Map.Entry<DatanodeDetails, ContainerMoveSelection> entry :
+        containerBalancer.getSourceToTargetMap().entrySet()) {
+      DatanodeDetails source = entry.getKey();
+      DatanodeDetails target = entry.getValue().getTargetNode();
+      Assert.assertTrue(source.equals(dn1) || source.equals(dn2));
+      Assert.assertTrue(target.equals(dn1) || target.equals(dn2));
+    }
+  }
+
+  /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
    *
@@ -696,4 +755,13 @@ public class TestContainerBalancer {
         .setBytesUsed(usedBytes)
         .build();
   }
+
+  private void sleepWhileBalancing(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
 }
