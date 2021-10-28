@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.2.0</version>
   </parent>
   <artifactId>hdds-docs</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.2.0</version>
   <description>Apache Ozone/HDDS Documentation</description>
   <name>Apache Ozone/HDDS Documentation</name>
   <packaging>jar</packaging>
