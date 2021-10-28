@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -126,7 +127,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
-    RaftServerStatus raftServerStatus;
     if (isRatisEnabled) {
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
@@ -134,6 +134,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       } else {
         checkLeaderStatus();
         try {
+          // If Request has S3Authentication validate S3 credentials and
+          // then proceed with processing the request.
+          if (request.hasS3Authentication()) {
+            S3SecurityUtil.validateS3Credential(request, ozoneManager);
+          }
           OMClientRequest omClientRequest =
               createClientRequest(request, ozoneManager);
           request = omClientRequest.preExecute(ozoneManager);
@@ -271,5 +276,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     if (!isRatisEnabled) {
       ozoneManagerDoubleBuffer.stop();
     }
+  }
+
+  public static Logger getLog() {
+    return LOG;
   }
 }
