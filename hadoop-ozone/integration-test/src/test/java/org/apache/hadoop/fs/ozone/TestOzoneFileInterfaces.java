@@ -154,8 +154,11 @@ public class TestOzoneFileInterfaces {
 
   public void init() throws Exception {
     OzoneConfiguration conf = getOzoneConfiguration();
+    // Todo: Workaround for upgrade scenario with pre-created buckets.
+    //  Since we don't have a bucket conversion tool in place all the
+    //  pre-created LEGACY buckets should be allowed to perform FS operations.
     conf.setStrings(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+        BucketLayout.LEGACY.name());
     MiniOzoneCluster newCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();

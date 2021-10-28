@@ -448,16 +448,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.defaultBucketLayout =
         configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
             OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
+
     // Make sure defaultBucketLayout is set to a valid value
+    // ToDo: Workaround for upgrade scenario with pre-created buckets.
+    //  Since we don't have a bucket conversion tool in place all the
+    //  pre-created LEGACY buckets should be allowed to perform FS operations.
     if (!defaultBucketLayout.equals(
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name()) &&
-        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name())
+        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name()) &&
+        !defaultBucketLayout.equals(BucketLayout.LEGACY.name())
     ) {
       throw new ConfigurationException(
           defaultBucketLayout +
               " is not a valid default bucket layout. Supported values are " +
               BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + ", " +
-              BucketLayout.OBJECT_STORE.name() + ".");
+              BucketLayout.OBJECT_STORE.name() + ", " +
+              BucketLayout.LEGACY.name());
     }
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();

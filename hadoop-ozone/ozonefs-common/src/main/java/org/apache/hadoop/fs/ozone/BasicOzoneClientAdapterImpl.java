@@ -160,8 +160,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
       throw new IllegalArgumentException(bucketLayout + " does not support" +
           " file system semantics. Bucket Layout must be " +
-          BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + " or "
-          + BucketLayout.LEGACY.name());
+          BucketLayout.FILE_SYSTEM_OPTIMIZED + " or "
+          + BucketLayout.LEGACY);
     }
 
     this.configuredDnPort = conf.getInt(
