@@ -45,19 +45,18 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String createUser(BasicUserPrincipal principal, List<String> groupIDs)
-      throws Exception {
+  public String assignUser(BasicUserPrincipal principal, String existingRole,
+      boolean isAdmin) throws IOException {
+    return "assignUser-roleId-returned";
+  }
+
+  @Override
+  public String getUserId(BasicUserPrincipal principal) throws IOException {
     return null;
   }
 
   @Override
-  public String getUserId(BasicUserPrincipal principal) throws Exception {
-    return null;
-  }
-
-  @Override
-  public String getGroupId(OzoneTenantGroupPrincipal principal)
-      throws Exception {
+  public String getRole(OzoneTenantRolePrincipal principal) throws IOException {
     return null;
   }
 
@@ -67,12 +66,13 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String createGroup(OzoneTenantGroupPrincipal group) throws Exception {
+  public String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+      throws IOException {
     return null;
   }
 
   @Override
-  public void deleteGroup(String groupID) throws IOException {
+  public void deleteRole(String groupID) throws IOException {
 
   }
 

@@ -106,11 +106,16 @@ enum Type {
   CreateTenant = 95;
   ModifyTenant = 96;
   DeleteTenant = 97;
+  ListTenant = 103;  // TODO: Renumber this when rebasing
 
   TenantGetUserInfo = 98;
-  AssignUserToTenant = 99;
-  RevokeUserAccessToTenant = 100;
-  GetS3Volume = 101;
+  TenantAssignUserAccessId = 99;
+  TenantRevokeUserAccessId = 100;
+
+  TenantAssignAdmin = 101;
+  TenantRevokeAdmin = 102;
+
+  GetS3Volume = 104;
 }
 
 message OMRequest {
@@ -194,14 +199,19 @@ message OMRequest {
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
-  optional CreateTenantRequest              createTenantRequest            = 95;
-  optional ModifyTenantRequest              modifyTenantRequest            = 96;
-  optional DeleteTenantRequest              deleteTenantRequest            = 97;
+  optional CreateTenantRequest              CreateTenantRequest            = 95;
+  optional ModifyTenantRequest              ModifyTenantRequest            = 96;
+  optional DeleteTenantRequest              DeleteTenantRequest            = 97;
+  optional ListTenantRequest                ListTenantRequest              = 103;  // TODO: Renumber this when rebasing
 
   optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 98;
-  optional AssignUserToTenantRequest        AssignUserToTenantRequest      = 99;
-  optional RevokeUserAccessToTenantRequest  RevokeUserAccessToTenantRequest = 100;
-  optional GetS3VolumeRequest               getS3VolumeRequest             = 101;
+  optional TenantAssignUserAccessIdRequest  TenantAssignUserAccessIdRequest= 99;
+  optional TenantRevokeUserAccessIdRequest  TenantRevokeUserAccessIdRequest= 100;
+
+  optional TenantAssignAdminRequest         TenantAssignAdminRequest       = 101;
+  optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 102;
+
+  optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
 }
 
 message OMResponse {
@@ -280,14 +290,19 @@ message OMResponse {
   optional PurgePathsResponse                 purgePathsResponse           = 93;
 
   // Skipped 94 to align with OMRequest
-  optional CreateTenantResponse              createTenantResponse          = 95;
-  optional ModifyTenantResponse              modifyTenantResponse          = 96;
-  optional DeleteTenantResponse              deleteTenantResponse          = 97;
+  optional CreateTenantResponse              CreateTenantResponse          = 95;
+  optional ModifyTenantResponse              ModifyTenantResponse          = 96;
+  optional DeleteTenantResponse              DeleteTenantResponse          = 97;
+  optional ListTenantResponse                ListTenantResponse            = 103;  // TODO: Renumber this when rebasing
 
   optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 98;
-  optional AssignUserToTenantResponse        AssignUserToTenantResponse    = 99;
-  optional RevokeUserAccessToTenantResponse  RevokeUserAccessToTenantResponse = 100;
-  optional GetS3VolumeResponse               getS3VolumeResponse           = 101;
+  optional TenantAssignUserAccessIdResponse  TenantAssignUserAccessIdResponse= 99;
+  optional TenantRevokeUserAccessIdResponse  TenantRevokeUserAccessIdResponse= 100;
+
+  optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 101;
+  optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 102;
+
+  optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
 }
 
 enum Status {
@@ -387,9 +402,10 @@ enum Status {
     TENANT_ALREADY_EXISTS = 76;
     INVALID_TENANT_NAME = 77;
 
-    TENANT_USER_NOT_FOUND = 78;
-    TENANT_USER_ALREADY_EXISTS = 79;
+    TENANT_USER_ACCESSID_NOT_FOUND = 78;
+    TENANT_USER_ACCESSID_ALREADY_EXISTS = 79;  // TODO: Remove if not used
     INVALID_TENANT_USER_NAME = 80;
+    INVALID_ACCESSID = 81;
 }
 
 /**
@@ -1362,24 +1378,44 @@ message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
 }
 
-message TenantUserInfo {
-  optional string userPrincipal = 1;
-  repeated TenantAccessIdInfo accessIdInfo = 2;
+message TenantInfo {
+    optional string tenantName = 1;
+    optional string bucketNamespaceName = 2;
+    optional string accountNamespaceName = 3;
+    optional string userPolicyGroupName = 4;
+    optional string bucketPolicyGroupName = 5;
 }
 
-message TenantAccessIdInfo {
-  optional string accessId = 1;
-  optional string tenantName = 2;
+message ListTenantRequest {
+
+}
+
+message ListTenantResponse {
+    optional bool success = 1;
+    repeated TenantInfo tenantInfo = 2;
 }
 
 message TenantGetUserInfoRequest {
-  optional string userPrincipal = 1;
+    optional string userPrincipal = 1;
 }
 
 message TenantGetUserInfoResponse {
-  optional bool success = 1;
-  optional TenantUserInfo tenantUserInfo = 2;
+    optional bool success = 1;
+    optional TenantUserInfo tenantUserInfo = 2;
 }
+
+message TenantUserInfo {
+    optional string userPrincipal = 1;
+    repeated TenantAccessIdInfo accessIdInfo = 2;
+}
+
+message TenantAccessIdInfo {
+    optional string accessId = 1;
+    optional string tenantName = 2;
+    optional bool isAdmin = 3;
+    optional bool isDelegatedAdmin = 4;
+}
+
 
 message LayoutVersion {
   required uint64 version = 1;
@@ -1402,13 +1438,24 @@ message DeleteTenantRequest {
     optional string tenantName = 1;
 }
 
-message AssignUserToTenantRequest {
+message TenantAssignUserAccessIdRequest {
     optional string tenantUsername = 1;
     optional string tenantName = 2;
     optional string accessId = 3;
 }
 
-message RevokeUserAccessToTenantRequest {
+message TenantRevokeUserAccessIdRequest {
+    optional string accessId = 1;
+    optional string tenantName = 2;
+}
+
+message TenantAssignAdminRequest {
+    optional string accessId = 1;
+    optional string tenantName = 2;
+    optional bool delegated = 3;
+}
+
+message TenantRevokeAdminRequest {
     optional string accessId = 1;
     optional string tenantName = 2;
 }
@@ -1429,12 +1476,20 @@ message DeleteTenantResponse {
     optional bool success = 1;
 }
 
-message AssignUserToTenantResponse {
+message TenantAssignUserAccessIdResponse {
     optional bool success = 1;
     optional S3Secret s3Secret = 2;
 }
 
-message RevokeUserAccessToTenantResponse {
+message TenantRevokeUserAccessIdResponse {
+    optional bool success = 1;
+}
+
+message TenantAssignAdminResponse {
+    optional bool success = 1;
+}
+
+message TenantRevokeAdminResponse {
     optional bool success = 1;
 }
 

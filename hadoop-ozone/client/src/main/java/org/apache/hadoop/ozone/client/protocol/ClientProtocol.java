@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
@@ -588,8 +589,33 @@ public interface ClientProtocol {
    * @param accessId access ID.
    * @throws IOException
    */
-  S3SecretValue assignUserToTenant(String username, String tenantName,
+  S3SecretValue tenantAssignUserAccessId(String username, String tenantName,
       String accessId) throws IOException;
+
+  /**
+   * Revoke user accessId to tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  void tenantRevokeUserAccessId(String accessId) throws IOException;
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @param delegated true if making delegated admin.
+   * @throws IOException
+   */
+  void tenantAssignAdmin(String accessId, String tenantName,
+      boolean delegated) throws IOException;
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  void tenantRevokeAdmin(String accessId, String tenantName) throws IOException;
 
   /**
    * Get tenant info for a user.
@@ -599,6 +625,13 @@ public interface ClientProtocol {
    */
   TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException;
+
+  /**
+   * List tenants.
+   * @return TenantInfoList
+   * @throws IOException
+   */
+  TenantInfoList listTenant() throws IOException;
 
   /**
    * Get KMS client provider.

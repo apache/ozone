@@ -193,8 +193,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       "transactionInfoTable";
   public static final String META_TABLE = "metaTable";
 
-  // Tables for S3 multi-tenancy
-  public static final String TENANT_USER_TABLE = "tenantUserTable";
+  // Tables for multi-tenancy
   public static final String TENANT_ACCESS_ID_TABLE = "tenantAccessIdTable";
   public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
       "principalToAccessIdsTable";
@@ -220,7 +219,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       DELETED_DIR_TABLE,
       OPEN_FILE_TABLE,
       META_TABLE,
-      TENANT_USER_TABLE,
       TENANT_ACCESS_ID_TABLE,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
@@ -250,8 +248,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table transactionInfoTable;
   private Table metaTable;
 
-  // Tables for S3 multi-tenancy
-  private Table tenantUserTable;
+  // Tables for multi-tenancy
   private Table tenantAccessIdTable;
   private Table principalToAccessIdsTable;
   private Table tenantStateTable;
@@ -463,7 +460,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DELETED_DIR_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addTable(META_TABLE)
-        .addTable(TENANT_USER_TABLE)
         .addTable(TENANT_ACCESS_ID_TABLE)
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
@@ -561,12 +557,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     metaTable = this.store.getTable(META_TABLE, String.class, String.class);
     checkTableStatus(metaTable, META_TABLE);
-
-    // tenant user name -> tenant name string
-    // TODO: Unused. Remove.
-    tenantUserTable = this.store.getTable(TENANT_USER_TABLE,
-        String.class, String.class);
-    checkTableStatus(tenantUserTable, TENANT_USER_TABLE);
 
     // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
     tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
@@ -1335,11 +1325,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, String> getMetaTable() {
     return metaTable;
-  }
-
-  @Override
-  public Table<String, String> getTenantUserTable() {
-    return tenantUserTable;
   }
 
   @Override

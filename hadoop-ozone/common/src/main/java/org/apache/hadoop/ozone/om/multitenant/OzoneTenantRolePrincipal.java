@@ -21,23 +21,23 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import java.security.Principal;
 
 /**
- * Used to identify a tenant's group in Ranger.
+ * Used to identify a tenant's role in Ranger.
  */
-public final class OzoneTenantGroupPrincipal implements Principal {
+public final class OzoneTenantRolePrincipal implements Principal {
   private final String tenantID;
-  private final String groupName;
+  private final String roleName;
 
-  public static OzoneTenantGroupPrincipal newUserGroup(String tenantID) {
-    return new OzoneTenantGroupPrincipal(tenantID, "GroupTenantAllUsers");
+  public static OzoneTenantRolePrincipal getUserRole(String tenantID) {
+    return new OzoneTenantRolePrincipal(tenantID, "UserRole");
   }
 
-  public static OzoneTenantGroupPrincipal newAdminGroup(String tenantID) {
-    return new OzoneTenantGroupPrincipal(tenantID, "GroupTenantAllAdmins");
+  public static OzoneTenantRolePrincipal getAdminRole(String tenantID) {
+    return new OzoneTenantRolePrincipal(tenantID, "AdminRole");
   }
 
-  private OzoneTenantGroupPrincipal(String tenantID, String groupName) {
+  private OzoneTenantRolePrincipal(String tenantID, String roleName) {
     this.tenantID = tenantID;
-    this.groupName = groupName;
+    this.roleName = roleName;
   }
 
   public String getTenantID() {
@@ -51,6 +51,6 @@ public final class OzoneTenantGroupPrincipal implements Principal {
 
   @Override
   public String getName() {
-    return tenantID + OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + groupName;
+    return tenantID + OzoneConsts.TENANT_NAME_ROLE_DELIMITER + roleName;
   }
 }

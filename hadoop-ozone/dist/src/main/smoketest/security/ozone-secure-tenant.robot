@@ -33,19 +33,18 @@ Init Ranger MockServer
 Secure Tenant Create Tenant Success
 #    Run Keyword   Kinit test user     testuser     testuser.keytab
     Run Keyword         Init Ranger MockServer
-    ${output} =         Execute          ozone tenant create finance
-                        Should contain   ${output}         Created tenant 'finance'
+    ${output} =         Execute          ozone tenant create tenantone
+                        Should contain   ${output}         Created tenant 'tenantone'
 
 Secure Tenant Assign User Success
-    ${output} =         Execute          ozone tenant user assign bob@EXAMPLE.COM --tenant=finance
-                        Should contain   ${output}         Assigned 'bob@EXAMPLE.COM' to 'finance'
+    ${output} =         Execute          ozone tenant user assign bob --tenant=tenantone
+                        Should contain   ${output}         Assigned 'bob' to 'tenantone'
 
 Secure Tenant GetUserInfo Success
-    ${output} =         Execute          ozone tenant user info bob@EXAMPLE.COM
-                        Should contain   ${output}         Tenant 'finance' with accessId 'finance$bob@EXAMPLE.COM'
+    ${output} =         Execute          ozone tenant user info bob
+                        Should contain   ${output}         Tenant 'tenantone' with accessId 'tenantone$bob'
 
 Secure Tenant Assign User Failure
-    ${rc}  ${result} =  Run And Return Rc And Output  ozone tenant user assign bob@EXAMPLE.COM --tenant=nonexistenttenant
-#    Should Be True	${rc} > 0
-                        Should contain   ${result}         tenant 'nonexistenttenant' doesn't exist
+    ${rc}  ${result} =  Run And Return Rc And Output  ozone tenant user assign bob --tenant=thistenantdoesnotexist
+                        Should contain   ${result}         Tenant 'thistenantdoesnotexist' doesn't exist
 
