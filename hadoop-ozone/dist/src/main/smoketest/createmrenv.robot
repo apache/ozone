@@ -24,7 +24,7 @@ Test Timeout        2 minute
 *** Variables ***
 ${SCHEME}       o3fs
 ${volume}       volume1
-${bucket}       mrbucket1
+${bucket}       bucket1
 
 
 *** Keywords ***
@@ -32,7 +32,7 @@ Create volume
     ${result} =     Execute             ozone sh volume create /${volume} --user hadoop --space-quota 100TB --namespace-quota 100
                     Should not contain  ${result}       Failed
 Create bucket
-                    Execute             ozone sh bucket create /${volume}/${bucket} --type FILE_SYSTEM_OPTIMIZED
+                    Execute             ozone sh bucket create /${volume}/${bucket}
 
 *** Test Cases ***
 Create test volume, bucket and key

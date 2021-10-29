@@ -24,7 +24,7 @@ Test Timeout        4 minute
 *** Variables ***
 ${SCHEME}          o3fs
 ${volume}          volume1
-${bucket}          mrbucket1
+${bucket}          bucket1
 
 *** Keywords ***
 Find example jar

@@ -164,11 +164,6 @@ public class TestOzoneFileSystem {
     } else {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
-      // Todo: Workaround for upgrade scenario with pre-created buckets.
-      //  Since we don't have a bucket conversion tool in place all the
-      //  pre-created LEGACY buckets should be allowed to perform FS operations.
-      conf.setStrings(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          BucketLayout.LEGACY.name());
     }
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)

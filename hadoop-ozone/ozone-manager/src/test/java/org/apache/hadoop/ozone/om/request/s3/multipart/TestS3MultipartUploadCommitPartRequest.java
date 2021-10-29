@@ -20,7 +20,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -174,13 +173,8 @@ public class TestS3MultipartUploadCommitPartRequest
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
             2L, ozoneManagerDoubleBufferHelper);
 
-    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-          == OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND);
-    } else {
-      Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-          == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
-    }
+    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
 
   }
 

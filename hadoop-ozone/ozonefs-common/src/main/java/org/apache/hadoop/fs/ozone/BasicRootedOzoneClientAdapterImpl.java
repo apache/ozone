@@ -220,13 +220,6 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-      BucketLayout bucketLayout = bucket.getBucketLayout();
-      if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-        throw new IllegalArgumentException(bucketLayout + " does not support" +
-            " file system semantics. Bucket Layout must be " +
-            BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + " or "
-            + BucketLayout.LEGACY.name());
-      }
     } catch (OMException ex) {
       if (createIfNotExist) {
         // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
