@@ -312,7 +312,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setQueueElementLimit(
         properties, logQueueNumElements);
-    RaftServerConfigKeys.Log.setQueueByteLimit(properties, logQueueByteLimit);
+    RaftServerConfigKeys.Log.setQueueByteLimit(properties,
+        SizeInBytes.valueOf(logQueueByteLimit));
 
     int numSyncRetries = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
