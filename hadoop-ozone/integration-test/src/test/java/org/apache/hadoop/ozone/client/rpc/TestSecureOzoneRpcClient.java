@@ -242,7 +242,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     cluster.getOzoneManager().getMetadataManager().getS3SecretTable().put(
         accessKey, new S3SecretValue(accessKey, secret));
 
-    OMRequest omRequest = OMRequest.newBuilder()
+    OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
         .setVersion(CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
@@ -258,10 +258,13 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     GenericTestUtils.waitFor(() -> cluster.getOzoneManager().isLeaderReady(),
         100, 120000);
     OMResponse omResponse = cluster.getOzoneManager().getOmServerProtocol()
-        .submitRequest(null, omRequest);
+        .submitRequest(null, writeRequest);
+
+    // Verify response.
+    Assert.assertTrue(omResponse.getStatus() == Status.OK);
 
     // Read Request
-    omRequest = OMRequest.newBuilder()
+    OMRequest readRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
         .setVersion(CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
@@ -271,25 +274,33 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
             .setAccessId(accessKey)
             .setSignature(signature).setStringToSign(strToSign))
         .build();
-    Assert.assertTrue(omResponse.getStatus() == Status.OK);
+
+    omResponse = cluster.getOzoneManager().getOmServerProtocol()
+        .submitRequest(null, readRequest);
 
     // Verify response.
+    Assert.assertTrue(omResponse.getStatus() == Status.OK);
+
     VolumeInfo volumeInfo = omResponse.getInfoVolumeResponse().getVolumeInfo();
     Assert.assertNotNull(volumeInfo);
     Assert.assertEquals(volumeName, volumeInfo.getVolume());
     Assert.assertEquals(accessKey, volumeInfo.getAdminName());
     Assert.assertEquals(accessKey, volumeInfo.getOwnerName());
 
-    cluster.getOzoneManager().getOmServerProtocol()
-        .submitRequest(null, omRequest);
-
-
     // Override secret to S3Secret table with some dummy value
     cluster.getOzoneManager().getMetadataManager().getS3SecretTable().put(
         accessKey, new S3SecretValue(accessKey, "dummy"));
+
+    // Write request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()
-        .submitRequest(null, omRequest);
+        .submitRequest(null, writeRequest);
     Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);
+
+  // Read request with invalid credentials.
+    omResponse = cluster.getOzoneManager().getOmServerProtocol()
+        .submitRequest(null, readRequest);
+    Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);
+
 
   }
 
