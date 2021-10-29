@@ -517,9 +517,9 @@ public class ContainerStateMachine extends BaseStateMachine {
             requestProto, context);
         final StreamDataChannel channel = new StreamDataChannel(
             Paths.get(response.getMessage()));
-        final ExecutorService executor = requestProto.hasWriteChunk() ?
+        final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
-        return new LocalStream(channel, executor);
+        return new LocalStream(channel, chunkExecutor);
       } catch (IOException e) {
         throw new CompletionException("Failed to create data stream", e);
       }
