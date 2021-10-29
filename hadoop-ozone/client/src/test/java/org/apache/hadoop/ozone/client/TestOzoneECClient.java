@@ -523,8 +523,6 @@ public class TestOzoneECClient {
     return bucket;
   }
 
-
-
   private void updatePipelineToKeepSingleNode(int keepingNodeIndex) {
     Map<String, Map<String, Map<String, OzoneManagerProtocolProtos.KeyInfo>>>
         keys = ((MockOmTransport) transportStub).getKeys();

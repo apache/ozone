@@ -271,7 +271,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     }
   }
 
-
   private BlockID underlyingBlockID() {
     if (blockOutputStreams[0] == null) {
       return null;
@@ -325,12 +324,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       ContainerProtos.ContainerCommandResponseProto responseProto,
       ECBlockOutputStream stream) {
     try {
-      // if the ioException is already set, it means a prev request has failed
-      // just return true.
-      IOException exception = stream.getIoException();
-      if (exception != null) {
-        return true;
-      }
       ContainerProtocolCalls.validateContainerResponse(responseProto);
     } catch (StorageContainerException sce) {
       stream.setIoException(sce);

@@ -86,9 +86,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private long offset;
   // how much data has been ingested into the stream
   private long writeOffset;
-  // whether an exception is encountered while write and whole write could
-  // not succeed
-  private boolean isException;
   private final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
   @VisibleForTesting
@@ -129,7 +126,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
             replicationConfig, uploadID, partNumber, isMultipart, info,
             unsafeByteBufferConversion, xceiverClientManager, handler.getId());
 
-    this.isException = false;
     this.writeOffset = 0;
     OzoneConfiguration conf = new OzoneConfiguration();
     ECSchema schema =
@@ -414,7 +410,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
     // In EC, we will just close the current stream.
-    streamEntry.close();
+    markStreamAsFailed(exception);
   }
 
   private void markStreamClosed() {
@@ -559,11 +555,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
           handleStripeFailure(parityCellSize, lastStripeSize);
         }
       }
-      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
-      if (!isException) {
-        Preconditions.checkArgument(writeOffset == offset);
-      }
 
+      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
+      Preconditions.checkArgument(writeOffset == offset);
       blockOutputStreamEntryPool.getCurrentStreamEntry().close();
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {

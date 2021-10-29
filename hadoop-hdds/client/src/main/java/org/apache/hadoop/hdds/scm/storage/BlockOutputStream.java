@@ -87,7 +87,7 @@ public class BlockOutputStream extends OutputStream {
   private OzoneClientConfig config;
 
   private int chunkIndex;
-  private AtomicLong chunkOffset = new AtomicLong();
+  private final AtomicLong chunkOffset = new AtomicLong();
   private final BufferPool bufferPool;
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
@@ -178,15 +178,15 @@ public class BlockOutputStream extends OutputStream {
         currentBuffer != null ? currentBuffer.remaining() : 0;
   }
 
-  public Checksum getCheckSum(){
+  Checksum getCheckSum(){
     return this.checksum;
   }
 
-  public AtomicLong getChunkOffset(){
+  AtomicLong getChunkOffset(){
     return this.chunkOffset;
   }
 
-  public int incrChunkIdx(){
+  int incrChunkIdx(){
     return ++this.chunkIndex;
   }
 
