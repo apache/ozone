@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.om.exceptions;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.RaftPeerId;
 
@@ -32,8 +32,7 @@ import org.apache.ratis.protocol.RaftPeerId;
  */
 public class OMNotLeaderException extends IOException {
 
-  private final String currentPeerId;
-  private final String leaderPeerId;
+  private final String leaderPeerAddress;
   private static final Pattern CURRENT_PEER_ID_PATTERN =
       Pattern.compile("OM:(.*) is not the leader[.]+.*", Pattern.DOTALL);
   private static final Pattern SUGGESTED_LEADER_PATTERN =
@@ -42,40 +41,18 @@ public class OMNotLeaderException extends IOException {
   public OMNotLeaderException(RaftPeerId currentPeerId) {
     super("OM:" + currentPeerId + " is not the leader. Could not " +
         "determine the leader node.");
-    this.currentPeerId = currentPeerId.toString();
-    this.leaderPeerId = null;
+    this.leaderPeerAddress = null;
   }
 
   public OMNotLeaderException(RaftPeerId currentPeerId,
-      RaftPeerId suggestedLeaderPeerId) {
-    super("OM:" + currentPeerId + " is not the leader. Suggested leader is" +
-        " OM:" + suggestedLeaderPeerId + ".");
-    this.currentPeerId = currentPeerId.toString();
-    this.leaderPeerId = suggestedLeaderPeerId.toString();
+                              String suggestedLeaderAddress) {
+    super("OM:" + currentPeerId + " is not the leader. Suggested leader " +
+        " Address is:" + suggestedLeaderAddress + ".");
+    this.leaderPeerAddress = suggestedLeaderAddress;
   }
 
-  public OMNotLeaderException(String message) {
-    super(message);
-
-    Matcher currentLeaderMatcher = CURRENT_PEER_ID_PATTERN.matcher(message);
-    if (currentLeaderMatcher.matches()) {
-      this.currentPeerId = currentLeaderMatcher.group(1);
-
-      Matcher suggestedLeaderMatcher =
-          SUGGESTED_LEADER_PATTERN.matcher(message);
-      if (suggestedLeaderMatcher.matches()) {
-        this.leaderPeerId = suggestedLeaderMatcher.group(1);
-      } else {
-        this.leaderPeerId = null;
-      }
-    } else {
-      this.currentPeerId = null;
-      this.leaderPeerId = null;
-    }
-  }
-
-  public String getSuggestedLeaderNodeId() {
-    return leaderPeerId;
+  public String getSuggestedLeaderAddress() {
+    return leaderPeerAddress;
   }
 
   /**
@@ -86,13 +63,13 @@ public class OMNotLeaderException extends IOException {
    */
   public static OMNotLeaderException convertToOMNotLeaderException(
       NotLeaderException notLeaderException, RaftPeerId currentPeer) {
-    RaftPeerId suggestedLeader =
+    RaftPeer suggestedLeader =
         notLeaderException.getSuggestedLeader() != null ?
-            notLeaderException.getSuggestedLeader().getId() : null;
+            notLeaderException.getSuggestedLeader() : null;
     OMNotLeaderException omNotLeaderException;
     if (suggestedLeader != null) {
       omNotLeaderException = new OMNotLeaderException(currentPeer,
-          suggestedLeader);
+          suggestedLeader.getAddress());
     } else {
       omNotLeaderException =
           new OMNotLeaderException(currentPeer);

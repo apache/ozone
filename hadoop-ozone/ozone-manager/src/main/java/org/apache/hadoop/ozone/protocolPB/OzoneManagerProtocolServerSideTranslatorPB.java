@@ -184,12 +184,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private ServiceException createNotLeaderException() {
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
-
-    OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
+    String leaderAddress = omRatisServer.getLeaderAddress();
+    OMNotLeaderException notLeaderException;
+    if (leaderAddress == null) {
+      notLeaderException = new OMNotLeaderException(raftPeerId);
+    } else {
+      notLeaderException =
+          new OMNotLeaderException(raftPeerId, leaderAddress);
+    }
 
     LOG.debug(notLeaderException.getMessage());
 

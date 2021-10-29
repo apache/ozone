@@ -732,6 +732,28 @@ public final class OzoneManagerRatisServer {
   }
 
   /**
+   * get RAFT leader ID.
+   *
+   * @return raft leader ID.
+   */
+  public String getLeaderAddress() {
+    String leaderAddress = null;
+    try {
+      RaftServer.Division division = server.getDivision(raftGroupId);
+      if (division != null) {
+        leaderAddress =
+            division.getInfo().getRoleInfoProto().getFollowerInfo()
+                .getLeaderInfo().getId().getAddress();
+      }
+    } catch (IOException ioe) {
+      // In this case we return not a leader.
+      LOG.warn("Fail to get RaftServer impl and therefore it's not clear " +
+          "whether it's leader. ", ioe);
+    }
+    return leaderAddress;
+  }
+
+  /**
    * Get list of peer NodeIds from Ratis.
    * @return List of Peer NodeId's.
    */

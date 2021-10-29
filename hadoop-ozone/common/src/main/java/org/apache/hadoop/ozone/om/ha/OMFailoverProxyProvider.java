@@ -233,8 +233,7 @@ public class OMFailoverProxyProvider<T> implements
     RetryPolicy retryPolicy = new RetryPolicy() {
       @Override
       public RetryAction shouldRetry(Exception exception, int retries,
-          int failovers, boolean isIdempotentOrAtMostOnce)
-          throws Exception {
+          int failovers, boolean isIdempotentOrAtMostOnce) {
 
         String omNodeId = getCurrentProxyOMNodeId();
 
@@ -253,13 +252,30 @@ public class OMFailoverProxyProvider<T> implements
           OMNotLeaderException notLeaderException =
               getNotLeaderException(exception);
           if (notLeaderException != null) {
-            // TODO: NotLeaderException should include the host
-            //  address of the suggested leader along with the nodeID.
-            //  Failing over just based on nodeID is not very robust.
-
-            // OMFailoverProxyProvider#performFailover() is a dummy call and
-            // does not perform any failover. Failover manually to the next OM.
-            performFailoverToNextProxy();
+            String suggestedLeaderAddress =
+                notLeaderException.getSuggestedLeaderAddress();
+            String suggestedLeader = null;
+            if (suggestedLeaderAddress != null) {
+              //find the omid who`s address is the suggestedLeaderAddress;
+              for(Map.Entry<String, OMProxyInfo> kv : omProxyInfos.entrySet()) {
+                if (kv.getValue().getAddress().equals(suggestedLeaderAddress)) {
+                  suggestedLeader = kv.getKey();
+                  break;
+                }
+              }
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("suggested leader address is : {},  OM {}",
+                    suggestedLeaderAddress, suggestedLeader);
+              }
+            }
+            if (suggestedLeader != null) {
+              performFailoverIfRequired(suggestedLeader);
+            } else {
+              // OMFailoverProxyProvider#performFailover() is a dummy call and
+              // does not perform any failover.
+              // Failover manually to the next OM.
+              performFailoverToNextProxy();
+            }
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
 
