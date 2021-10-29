@@ -308,15 +308,15 @@ public class TestKeyManagerImpl {
         omKeyInfo);
     LambdaTestUtils.intercept(OMException.class,
         "SafeModePrecheck failed for allocateBlock", () -> {
-          keyManager
+          writeClient
               .allocateBlock(keyArgs, 1L, new ExcludeList());
         });
   }
 
   @Test
   public void openKeyFailureInSafeMode() throws Exception {
-    mockBlockClient();
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    mockBlockClient();
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
@@ -326,7 +326,7 @@ public class TestKeyManagerImpl {
         .build();
     LambdaTestUtils.intercept(OMException.class,
         "SafeModePrecheck failed for allocateBlock", () -> {
-          keyManager.openKey(keyArgs);
+          writeClient.openKey(keyArgs);
         });
   }
 
