@@ -170,10 +170,6 @@ public class TestKeyManagerImpl {
 
     conf = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
-    //    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-    //          true);
-    //    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
-    
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
@@ -203,6 +199,7 @@ public class TestKeyManagerImpl {
 
     mockScmContainerClient =
         Mockito.mock(StorageContainerLocationProtocol.class);
+    // Create an OM and connect writeClient to it
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(scm.getClientProtocolServer().getScmInfo().getClusterId());
     omStorage.setOmId("om1");
@@ -221,6 +218,7 @@ public class TestKeyManagerImpl {
     prefixManager = (PrefixManager) HddsWhiteboxTestUtils.getInternalState(
         om, "prefixManager");
     om.start();
+    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
@@ -231,7 +229,6 @@ public class TestKeyManagerImpl {
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
     createBucket(VOLUME_NAME, BUCKET_NAME);
-    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
   }
 
   @AfterClass
@@ -1348,7 +1345,6 @@ public class TestKeyManagerImpl {
 
   //@Test
   public void testRefreshPipelineException() throws Exception {
-    om.stop();
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build();
     try {
       cluster.waitForClusterToBeReady();
