@@ -92,6 +92,8 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.junit.Assert.assertEquals;
@@ -199,6 +201,8 @@ public class TestRootedOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+    conf.setStrings(OZONE_DEFAULT_BUCKET_LAYOUT,
+        OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
     conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
