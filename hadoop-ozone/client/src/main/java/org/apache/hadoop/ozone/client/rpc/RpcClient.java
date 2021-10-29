@@ -105,7 +105,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.protocol.S3Authentication;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
@@ -544,10 +544,10 @@ public class RpcClient implements ClientProtocol {
    * @return listOfAcls
    * */
   private List<OzoneAcl> getAclList() {
-    if (ozoneManagerClient.getThreadLocalS3Authentication() != null) {
+    if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
       UserGroupInformation aclUgi =
           UserGroupInformation.createRemoteUser(
-             ozoneManagerClient.getThreadLocalS3Authentication().getAccessID());
+             ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
       return OzoneAclUtil.getAclList(
           aclUgi.getUserName(),
           aclUgi.getGroupNames(),
@@ -1506,18 +1506,18 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void setTheadLocalS3Authentication(
-      S3Authentication ozoneSharedSecretAuth) {
-    ozoneManagerClient.setThreadLocalS3Authentication(ozoneSharedSecretAuth);
+  public void setTheadLocalS3Auth(
+      S3Auth ozoneSharedSecretAuth) {
+    ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
   }
 
   @Override
-  public S3Authentication getThreadLocalS3Authentication() {
-    return ozoneManagerClient.getThreadLocalS3Authentication();
+  public S3Auth getThreadLocalS3Auth() {
+    return ozoneManagerClient.getThreadLocalS3Auth();
   }
 
   @Override
-  public void clearTheadLocalS3Authentication() {
-    ozoneManagerClient.clearThreadLocalS3Authentication();
+  public void clearTheadLocalS3Auth() {
+    ozoneManagerClient.clearThreadLocalS3Auth();
   }
 }

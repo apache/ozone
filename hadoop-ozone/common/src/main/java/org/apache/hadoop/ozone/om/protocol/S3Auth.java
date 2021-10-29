@@ -18,15 +18,15 @@
 package org.apache.hadoop.ozone.om.protocol;
 
 /**
- * S3Authentication wraps the data needed for S3 Authentication.
+ * S3Auth wraps the data needed for S3 Authentication.
  */
-public class S3Authentication {
+public class S3Auth {
   private String stringToSign;
   private String signature;
   private String accessID;
 
-  public S3Authentication(final String stringToSign,
-                          final String signature, final String accessID) {
+  public S3Auth(final String stringToSign,
+                final String signature, final String accessID) {
     this.accessID = accessID;
     this.stringToSign = stringToSign;
     this.signature = signature;

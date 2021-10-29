@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.protocol.S3Authentication;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -177,7 +177,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private final String clientID;
 
   private OmTransport transport;
-  private ThreadLocal<S3Authentication> threadLocalS3Authentication
+  private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
@@ -226,16 +226,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws IOException {
     OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
-    if (getThreadLocalS3Authentication() != null) {
+    if (getThreadLocalS3Auth() != null) {
       builder.setS3Authentication(
-          org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
-              S3Authentication.newBuilder()
+          S3Authentication.newBuilder()
               .setSignature(
-                  threadLocalS3Authentication.get().getSignature())
+                  threadLocalS3Auth.get().getSignature())
               .setStringToSign(
-                  threadLocalS3Authentication.get().getStringTosSign())
+                  threadLocalS3Auth.get().getStringTosSign())
               .setAccessId(
-                  threadLocalS3Authentication.get().getAccessID())
+                  threadLocalS3Auth.get().getAccessID())
               .build());
     }
     OMResponse response =
@@ -1274,17 +1273,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void setThreadLocalS3Authentication(
-      S3Authentication ozoneSharedSecretAuth) {
-    this.threadLocalS3Authentication.set(ozoneSharedSecretAuth);
+  public void setThreadLocalS3Auth(
+      S3Auth s3Auth) {
+    this.threadLocalS3Auth.set(s3Auth);
   }
   @Override
-  public void clearThreadLocalS3Authentication() {
-    this.threadLocalS3Authentication.remove();
+  public void clearThreadLocalS3Auth() {
+    this.threadLocalS3Auth.remove();
   }
   @Override
-  public S3Authentication getThreadLocalS3Authentication() {
-    return this.threadLocalS3Authentication.get();
+  public S3Auth getThreadLocalS3Auth() {
+    return this.threadLocalS3Auth.get();
   }
 
   /**

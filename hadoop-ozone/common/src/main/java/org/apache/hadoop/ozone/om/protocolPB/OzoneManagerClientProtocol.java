@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.protocol.S3Authentication;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 
 /**
  * OzoneManagerClientProtocol defines interfaces needed on the client side
@@ -32,7 +32,7 @@ public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
    * authentication information on a per-request basis which is attached as
    * a thread local variable.
    */
-  void setThreadLocalS3Authentication(S3Authentication ozoneSharedSecretAuth);
-  S3Authentication getThreadLocalS3Authentication();
-  void clearThreadLocalS3Authentication();
+  void setThreadLocalS3Auth(S3Auth s3Auth);
+  S3Auth getThreadLocalS3Auth();
+  void clearThreadLocalS3Auth();
 }

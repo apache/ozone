@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.protocol.S3Authentication;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -46,7 +46,7 @@ public abstract class EndpointBase {
   @Inject
   private OzoneClient client;
   @Inject
-  private S3Authentication s3Authentication;
+  private S3Auth s3Auth;
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
@@ -71,10 +71,10 @@ public abstract class EndpointBase {
    */
   @PostConstruct
   public void initialization() {
-    LOG.debug("S3 access id: {}", s3Authentication.getAccessID());
+    LOG.debug("S3 access id: {}", s3Auth.getAccessID());
     getClient().getObjectStore().
         getClientProxy().
-        setTheadLocalS3Authentication(s3Authentication);
+        setTheadLocalS3Auth(s3Auth);
     init();
   }
 

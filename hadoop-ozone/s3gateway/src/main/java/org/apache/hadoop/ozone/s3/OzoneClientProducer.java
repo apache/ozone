@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.om.protocol.S3Authentication;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
@@ -81,10 +81,10 @@ public class OzoneClientProducer {
 
   @PreDestroy
   public void destroy() throws IOException {
-    client.getObjectStore().getClientProxy().clearTheadLocalS3Authentication();
+    client.getObjectStore().getClientProxy().clearTheadLocalS3Auth();
   }
   @Produces
-  public S3Authentication getSignature() {
+  public S3Auth getSignature() {
     try {
       SignatureInfo signatureInfo = signatureProcessor.parseSignature();
       String stringToSign = "";
@@ -95,7 +95,7 @@ public class OzoneClientProducer {
 
       String awsAccessId = signatureInfo.getAwsAccessId();
       validateAccessId(awsAccessId);
-      return new S3Authentication(stringToSign,
+      return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
           awsAccessId);
     } catch (OS3Exception ex) {
