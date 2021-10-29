@@ -170,6 +170,10 @@ public class TestKeyManagerImpl {
 
     conf = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
+    //    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+    //          true);
+    //    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
+    
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
@@ -926,7 +930,7 @@ public class TestKeyManagerImpl {
 
     // Test lookupKey (latestLocationVersion == false)
     key = keyManager.lookupKey(keyArgs, null);
-  //  Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
+    Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListStatus (latestLocationVersion == false)
     fileStatuses = keyManager.listStatus(keyArgs, false, "", 100);
@@ -1267,6 +1271,7 @@ public class TestKeyManagerImpl {
 
   //@Test
   public void testRefreshPipeline() throws Exception {
+
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build();
     try {
       cluster.waitForClusterToBeReady();
