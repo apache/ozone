@@ -325,7 +325,7 @@ public class TestKeyManagerImpl {
             ALL, ALL))
         .build();
     LambdaTestUtils.intercept(OMException.class,
-        "SafeModePrecheck failed for allocateBlock", () -> {
+        "Allocated 0 blocks. Requested 1 blocks", () -> {
           writeClient.openKey(keyArgs);
         });
   }
