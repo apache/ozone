@@ -167,7 +167,6 @@ public class TestKeyManagerImpl {
   @BeforeClass
   public static void setUp() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);
-
     conf = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
@@ -210,15 +209,13 @@ public class TestKeyManagerImpl {
         om, "metadataManager");
 
     keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
-    ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(), mockScmContainerClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "scmClient", scmClient);
-
+    mockContainerClient();
 
     prefixManager = (PrefixManager) HddsWhiteboxTestUtils.getInternalState(
         om, "prefixManager");
     om.start();
     writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
+
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
@@ -241,10 +238,7 @@ public class TestKeyManagerImpl {
 
   @After
   public void cleanupTest() throws IOException {
-    ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(), mockScmContainerClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "scmClient", scmClient);
-
+    mockContainerClient();
     List<OzoneFileStatus> fileStatuses = keyManager
         .listStatus(createBuilder().setKeyName("").build(), true, "", 100000);
     for (OzoneFileStatus fileStatus : fileStatuses) {
@@ -259,6 +253,16 @@ public class TestKeyManagerImpl {
     }
   }
 
+  private static void mockContainerClient() {
+    ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(), mockScmContainerClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+  }
+  private static void mockBlockClient() {
+    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+  }
   private static void createBucket(String volumeName, String bucketName)
       throws IOException {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
@@ -280,10 +284,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void allocateBlockFailureInSafeMode() throws Exception {
-    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "scmClient", scmClient);
-
+    mockBlockClient();
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .build();
@@ -314,10 +315,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void openKeyFailureInSafeMode() throws Exception {
-    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "scmClient", scmClient);
-
+    mockBlockClient();
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
