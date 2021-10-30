@@ -282,10 +282,12 @@ public abstract class OMClientRequest implements RequestAuditor {
         !StringUtils.isBlank(omRequest.getUserInfo().getUserName())) {
       userGroupInformation = UserGroupInformation.createRemoteUser(
           omRequest.getUserInfo().getUserName());
+      LOG.debug("creating UGI remote user for acl");
       return userGroupInformation;
     } else {
       // This will never happen, as for every OM request preExecute, we
       // should add userInfo.
+      LOG.debug("NO UGI for acl");
       return null;
     }
   }
