@@ -141,4 +141,36 @@ public final class SCMContainerPlacementCapacity
     healthyNodes.remove(datanodeDetails);
     return datanodeDetails;
   }
+
+  /**
+   * Find a node from the healthy list and return it after removing it from the
+   * list that we are operating on.
+   *
+   * @param healthyNodes - List of healthy nodes that meet the size
+   * requirement.
+   * @return DatanodeDetails that is chosen.
+   */
+  @Override
+  public DatanodeDetails chooseFirstNode(List<DatanodeDetails> healthyNodes) {
+    int firstNodeNdx = getRand().nextInt(healthyNodes.size());
+    int secondNodeNdx = getRand().nextInt(healthyNodes.size());
+
+    DatanodeDetails datanodeDetails;
+    // There is a possibility that both numbers will be same.
+    // if that is so, we just return the node.
+    if (firstNodeNdx == secondNodeNdx) {
+      datanodeDetails = healthyNodes.get(firstNodeNdx);
+    } else {
+      DatanodeDetails firstNodeDetails = healthyNodes.get(firstNodeNdx);
+      DatanodeDetails secondNodeDetails = healthyNodes.get(secondNodeNdx);
+      SCMNodeMetric firstNodeMetric =
+              getNodeManager().getNodeStat(firstNodeDetails);
+      SCMNodeMetric secondNodeMetric =
+              getNodeManager().getNodeStat(secondNodeDetails);
+      datanodeDetails = firstNodeMetric.isGreater(secondNodeMetric.get())
+              ? firstNodeDetails : secondNodeDetails;
+    }
+    healthyNodes.remove(datanodeDetails);
+    return datanodeDetails;
+  }
 }

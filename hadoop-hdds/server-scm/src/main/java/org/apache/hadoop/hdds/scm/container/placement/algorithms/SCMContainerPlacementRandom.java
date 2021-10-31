@@ -98,4 +98,19 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
     healthyNodes.remove(selectedNode);
     return selectedNode;
   }
+
+  /**
+   * Just chose the first node and remove it from the set of nodes we can
+   * chose from.
+   *
+   * @param healthyNodes - all healthy datanodes.
+   * @return First datanode
+   */
+  @Override
+  public DatanodeDetails chooseFirstNode(
+      final List<DatanodeDetails> healthyNodes) {
+    DatanodeDetails selectedNode = healthyNodes.get(0);
+    healthyNodes.remove(selectedNode);
+    return selectedNode;
+  }
 }
