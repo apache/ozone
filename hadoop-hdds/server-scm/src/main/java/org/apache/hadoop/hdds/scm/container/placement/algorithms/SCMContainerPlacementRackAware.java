@@ -239,7 +239,8 @@ public final class SCMContainerPlacementRackAware
   @Override
   public DatanodeDetails chooseFirstNode(
       List<DatanodeDetails> healthyNodes) {
-    return null; }
+    return null;
+  }
 
   /**
    * Choose a datanode which meets the requirements. If there is no node which
