@@ -35,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -161,7 +160,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // Pipeline placement doesn't take node space left into account.
     // Sort the DNs by pipeline load.
     // TODO check if sorting could cause performance issue: HDDS-3466.
-    Collections.shuffle(healthyNodes);
     List<DatanodeDetails> healthyList = healthyNodes.stream()
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
@@ -289,7 +287,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // base on distance in topology, rack awareness and load balancing.
     List<DatanodeDetails> exclude = new ArrayList<>();
     // First choose an anchor node.
-    DatanodeDetails anchor = chooseNode(healthyNodes);
+    DatanodeDetails anchor = chooseFirstNode(healthyNodes);
     if (anchor != null) {
       results.add(anchor);
       removePeers(anchor, healthyNodes);
@@ -369,12 +367,33 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   /**
    * Find a node from the healthy list and return it after removing it from the
    * list that we are operating on.
+   * Return random node in the list.
    *
    * @param healthyNodes - Set of healthy nodes we can choose from.
    * @return chosen datanodeDetails
    */
   @Override
   public DatanodeDetails chooseNode(final List<DatanodeDetails> healthyNodes) {
+    if (healthyNodes == null || healthyNodes.isEmpty()) {
+      return null;
+    }
+    DatanodeDetails selectedNode =
+            healthyNodes.get(getRand().nextInt(healthyNodes.size()));
+    healthyNodes.remove(selectedNode);
+    if (selectedNode != null) {
+      removePeers(selectedNode, healthyNodes);
+    }
+    return selectedNode;
+  }
+  /**
+   * Find a node from the healthy list and return it after removing it from the
+   * list that we are operating on.
+   * Return the first node in the list.
+   *
+   * @param healthyNodes - Set of healthy nodes we can choose from.
+   * @return chosen datanodeDetails
+   */
+  public DatanodeDetails chooseFirstNode(final List<DatanodeDetails> healthyNodes) {
     if (healthyNodes == null || healthyNodes.isEmpty()) {
       return null;
     }
