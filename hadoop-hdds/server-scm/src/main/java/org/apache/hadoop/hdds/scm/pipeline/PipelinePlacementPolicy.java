@@ -394,7 +394,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @return chosen datanodeDetails
    */
   public DatanodeDetails chooseFirstNode
-    (final List<DatanodeDetails> healthyNodes) {
+      (final List<DatanodeDetails> healthyNodes) {
     if (healthyNodes == null || healthyNodes.isEmpty()) {
       return null;
     }
