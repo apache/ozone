@@ -144,10 +144,6 @@ public class OzoneBucket extends WithMetadata {
    * Bucket Owner.
    */
   private String owner;
-  /**
-   * Bucket Admin.
-   */
-  private String admin;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ClientProtocol proxy) {
@@ -237,13 +233,12 @@ public class OzoneBucket extends WithMetadata {
        Map<String, String> metadata, String encryptionKeyName,
        String sourceVolume, String sourceBucket, long usedBytes,
        long usedNamespace, long quotaInBytes, long quotaInNamespace,
-       BucketLayout bucketLayout, String owner, String admin) {
+       BucketLayout bucketLayout, String owner) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, modificationTime, metadata, encryptionKeyName,
         sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
         quotaInNamespace, bucketLayout);
     this.owner = owner;
-    this.admin = admin;
   }
 
   /**
@@ -417,15 +412,6 @@ public class OzoneBucket extends WithMetadata {
    */
   public String getOwner() {
     return owner;
-  }
-
-  /**
-   * Returns admin of the Bucket.
-   *
-   * @return admin
-   */
-  public String getAdmin() {
-    return admin;
   }
 
   /**

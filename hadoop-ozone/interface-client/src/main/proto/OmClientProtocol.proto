@@ -544,7 +544,6 @@ message BucketInfo {
     optional uint64 usedNamespace = 17;
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
-    optional string admin = 20;
 }
 
 enum StorageTypeProto {

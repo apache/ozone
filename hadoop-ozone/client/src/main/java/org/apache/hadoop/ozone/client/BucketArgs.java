@@ -63,7 +63,6 @@ public final class BucketArgs {
   private long quotaInNamespace;
 
   private String owner;
-  private String admin;
 
   /**
    * Bucket Type.
@@ -83,14 +82,13 @@ public final class BucketArgs {
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout Bucket Layouts.
    * @param owner owner of the bucket.
-   * @param admin admin of the bucket.
    */
   @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
       long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout,
-      String owner, String admin) {
+      String owner) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -102,7 +100,6 @@ public final class BucketArgs {
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
     this.owner = owner;
-    this.admin = admin;
   }
 
   /**
@@ -194,13 +191,6 @@ public final class BucketArgs {
   }
 
   /**
-   * Returns the Admin Name.
-   */
-  public String getAdmin() {
-    return admin;
-  }
-
-  /**
    * Builder for OmBucketInfo.
    */
   public static class Builder {
@@ -215,7 +205,6 @@ public final class BucketArgs {
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
     private String owner;
-    private String admin;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -278,12 +267,6 @@ public final class BucketArgs {
       return this;
     }
 
-    public BucketArgs.Builder setAdmin(String adminName) {
-      admin = adminName;
-      return this;
-    }
-
-
     /**
      * Constructs the BucketArgs.
      * @return instance of BucketArgs.
@@ -291,7 +274,7 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace, bucketLayout, owner, admin);
+          quotaInNamespace, bucketLayout, owner);
     }
   }
 }

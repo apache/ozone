@@ -92,7 +92,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   private BucketLayout bucketLayout;
 
   private final String owner;
-  private final String admin;
 
   /**
    * Private constructor, constructed via builder.
@@ -112,7 +111,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout Bucket Layout.
    * @param owner owner of the bucket.
-   * @param admin admin of the bucket.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -133,8 +131,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       long quotaInBytes,
       long quotaInNamespace,
       BucketLayout bucketLayout,
-      String owner,
-      String admin) {
+      String owner) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -154,7 +151,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
     this.owner = owner;
-    this.admin = admin;
   }
 
   /**
@@ -301,10 +297,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return owner;
   }
 
-  public String getAdmin() {
-    return admin;
-  }
-
   /**
    * Returns new builder class that builds a OmBucketInfo.
    *
@@ -380,8 +372,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
         .setBucketLayout(bucketLayout)
-        .setOwner(owner)
-        .setAdmin(admin);
+        .setOwner(owner);
   }
 
   /**
@@ -407,7 +398,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
     private String owner;
-    private String admin;
 
     public Builder() {
       //Default values
@@ -536,11 +526,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
-    public Builder setAdmin(String adminName) {
-      this.admin = adminName;
-      return this;
-    }
-
     /**
      * Constructs the OmBucketInfo.
      * @return instance of OmBucketInfo.
@@ -555,8 +540,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, modificationTime, objectID, updateID,
           metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout,
-          owner, admin);
+          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, owner);
     }
   }
 
@@ -593,9 +577,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (owner != null) {
       bib.setOwner(owner);
-    }
-    if (admin != null) {
-      bib.setAdmin(admin);
     }
     return bib.build();
   }
@@ -658,9 +639,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     if (bucketInfo.hasOwner()) {
       obib.setOwner(bucketInfo.getOwner());
     }
-    if (bucketInfo.hasAdmin()) {
-      obib.setAdmin(bucketInfo.getAdmin());
-    }
     return obib.build();
   }
 
@@ -709,8 +687,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
         Objects.equals(bekInfo, that.bekInfo) &&
-        Objects.equals(owner, that.owner) &&
-        Objects.equals(admin, that.admin);
+        Objects.equals(owner, that.owner);
   }
 
   @Override
@@ -739,7 +716,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +
         ", owner=" + owner +
-        ", admin=" + admin +
         '}';
   }
 }

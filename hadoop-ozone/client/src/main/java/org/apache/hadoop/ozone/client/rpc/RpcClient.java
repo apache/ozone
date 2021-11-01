@@ -466,8 +466,6 @@ public class RpcClient implements ClientProtocol {
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
 
-    String admin = bucketArgs.getAdmin() == null ?
-            ugi.getShortUserName() : bucketArgs.getAdmin();
     String owner = bucketArgs.getOwner() == null ?
             ugi.getShortUserName() : bucketArgs.getOwner();
     Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
@@ -498,8 +496,7 @@ public class RpcClient implements ClientProtocol {
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
         .setBucketLayout(bucketArgs.getBucketLayout())
-        .setOwner(owner)
-        .setAdmin(admin);
+        .setOwner(owner);
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
@@ -724,8 +721,7 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInNamespace(),
         bucketInfo.getBucketLayout(),
-        bucketInfo.getOwner(),
-        bucketInfo.getAdmin()
+        bucketInfo.getOwner()
     );
   }
 
@@ -755,8 +751,7 @@ public class RpcClient implements ClientProtocol {
         bucket.getQuotaInBytes(),
         bucket.getQuotaInNamespace(),
         bucket.getBucketLayout(),
-        bucket.getOwner(),
-        bucket.getAdmin()))
+        bucket.getOwner()))
         .collect(Collectors.toList());
   }
 

@@ -53,7 +53,7 @@ public class CreateBucketHandler extends BucketHandler {
   private Boolean isGdprEnforced;
 
   @Option(names = {"--user", "-u"},
-          description = "Owner of the volume")
+          description = "Owner of the bucket")
   private String ownerName;
 
   enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
@@ -77,14 +77,12 @@ public class CreateBucketHandler extends BucketHandler {
       ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
     }
 
-    String adminName = UserGroupInformation.getCurrentUser().getShortUserName();
-
     BucketArgs.Builder bb;
     BucketLayout bucketLayout =
         BucketLayout.valueOf(allowedBucketLayout.toString());
     bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
         .setVersioning(false).setBucketLayout(bucketLayout)
-        .setAdmin(adminName).setOwner(ownerName);
+        .setOwner(ownerName);
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {
