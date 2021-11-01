@@ -216,13 +216,11 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     boolean acquiredS3SecretLock = false;
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OMMultiTenantManager tenantManager = ozoneManager.getMultiTenantManager();
 
     final TenantAssignUserAccessIdRequest request =
         getOmRequest().getTenantAssignUserAccessIdRequest();
     final String tenantName = request.getTenantName();
     final String principal = request.getTenantUsername();
-    BasicUserPrincipal userPrincipal = new BasicUserPrincipal(principal);
 
     assert(accessId.equals(request.getAccessId()));
     IOException exception = null;
