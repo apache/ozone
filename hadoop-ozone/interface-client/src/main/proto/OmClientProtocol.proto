@@ -1393,6 +1393,8 @@ message TenantInfo {
 message TenantUserAccessId {
     optional string user = 1;
     optional string accessId = 2;
+    optional bool isAdmin = 3;
+    optional bool isDelegatedAdmin = 4;
 }
 
 
