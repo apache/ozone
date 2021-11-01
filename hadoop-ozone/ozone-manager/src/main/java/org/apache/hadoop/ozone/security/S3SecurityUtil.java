@@ -50,20 +50,18 @@ public final class S3SecurityUtil {
   public static void validateS3Credential(OMRequest omRequest,
       OzoneManager ozoneManager) throws OMException {
     if (ozoneManager.isSecurityEnabled()) {
-      if (omRequest.hasS3Authentication()) {
-        OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
-        try {
-          // authenticate user with signature verification through
-          // delegationTokenMgr validateToken via retrievePassword
-          ozoneManager.getDelegationTokenMgr().retrievePassword(s3Token);
-        } catch (SecretManager.InvalidToken e) {
-          // TODO: Just check are we okay to log enitre token in failure case.
-          OzoneManagerProtocolServerSideTranslatorPB.getLog().error(
-              "signatures do NOT match for S3 identifier:{}", s3Token, e);
-          throw new OMException("User " + s3Token.getAwsAccessId()
-              + " request authorization failure: signatures do NOT match",
-              INVALID_TOKEN);
-        }
+      OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
+      try {
+        // authenticate user with signature verification through
+        // delegationTokenMgr validateToken via retrievePassword
+        ozoneManager.getDelegationTokenMgr().retrievePassword(s3Token);
+      } catch (SecretManager.InvalidToken e) {
+        // TODO: Just check are we okay to log enitre token in failure case.
+        OzoneManagerProtocolServerSideTranslatorPB.getLog().error(
+            "signatures do NOT match for S3 identifier:{}", s3Token, e);
+        throw new OMException("User " + s3Token.getAwsAccessId()
+            + " request authorization failure: signatures do NOT match",
+            INVALID_TOKEN);
       }
     }
   }
