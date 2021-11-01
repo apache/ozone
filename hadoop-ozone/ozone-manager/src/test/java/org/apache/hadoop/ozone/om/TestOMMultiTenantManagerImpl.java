@@ -74,8 +74,7 @@ public class TestOMMultiTenantManagerImpl {
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
         new OmDBAccessIdInfo(tenantName, "seed-user1",
-            "sharedsecret1"));
-
+            "sharedsecret1", false, false));
 
     tenantManager = new OMMultiTenantManagerImpl(omMetadataManager, conf);
     assertEquals(1, tenantManager.getTenantCache().size());
@@ -115,14 +114,13 @@ public class TestOMMultiTenantManagerImpl {
   }
 
   @Test
-  public void testDestroyUser() throws IOException {
+  public void testRevokeUserAccessId() throws Exception {
 
-    tenantManager.destroyUser(new BasicUserPrincipal("invalid-user1"),
-        "accessId1");
+    LambdaTestUtils.intercept(OMException.class, () ->
+        tenantManager.revokeUserAccessId("accessId1"));
     assertEquals(1, tenantManager.getTenantCache().size());
 
-    tenantManager.destroyUser(new BasicUserPrincipal("seed-user1"),
-        "seed-accessId1");
+    tenantManager.revokeUserAccessId("seed-accessId1");
     assertTrue(tenantManager.getTenantCache()
         .get(tenantName).getTenantUsers().isEmpty());
     assertTrue(tenantManager.listUsersInTenant(tenantName, null)

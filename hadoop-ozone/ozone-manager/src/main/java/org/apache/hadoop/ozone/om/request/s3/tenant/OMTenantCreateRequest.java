@@ -113,6 +113,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantName = request.getTenantName();
 
+    // Check Ozone admin privilege
+    OMTenantRequestHelper.checkAdmin(ozoneManager);
+
     // Check tenantName validity
     if (tenantName.contains(OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER)) {
       throw new OMException("Invalid tenant name " + tenantName +
@@ -223,13 +226,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     IOException exception = null;
 
     final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
-    assert(tenantDefaultPolicies != null);
-
-    LOG.debug("Processing tenant '{}' create request", tenantName);
-    LOG.debug("tenantDefaultPolicies = {}", tenantDefaultPolicies);
 
     try {
-      // Check ACL: requires volume create permission. TODO: tenant create perm?
+      // Check ACL: requires volume create permission.
+      // TODO: do we need a tenant create permission ? probably not
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
@@ -251,7 +251,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
       // Add to tenantStateTable. Redundant assignment for clarity
       final String bucketNamespaceName = tenantName;
-      final String accountNamespaceName = tenantName;
+      final String accountNamespaceName = volumeName;
       final String userPolicyGroupName =
           tenantName + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
       final String bucketPolicyGroupName =

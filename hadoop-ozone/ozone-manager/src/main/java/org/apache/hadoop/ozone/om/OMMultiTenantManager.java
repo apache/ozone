@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
@@ -112,24 +111,21 @@ public interface OMMultiTenantManager {
 
   /**
    * Creates a new user that exists for S3 API access to Ozone.
-   * @param tenantName
    * @param principal
+   * @param tenantName
    * @param accessID
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  void assignUserToTenant(BasicUserPrincipal principal, String tenantName,
-                            String accessID) throws OMException;
+  String assignUserToTenant(BasicUserPrincipal principal, String tenantName,
+                            String accessID) throws IOException;
 
   /**
-   * Given a user, destroys all state associated with that user.
-   * This is different from deactivateUser().
+   * Revoke user accessId.
    * @param accessID
-   * @return
    * @throws IOException
    */
-  void destroyUser(BasicUserPrincipal principal, String accessID);
-
+  void revokeUserAccessId(String accessID) throws IOException;
 
   /**
    * Given an accessId, return kerberos user name for the tenant user.
@@ -194,8 +190,9 @@ public interface OMMultiTenantManager {
   /**
    * Given a user, make him an admin of the corresponding Tenant.
    * @param accessID
+   * @param delegated
    */
-  void assignTenantAdminRole(String accessID) throws IOException;
+  void assignTenantAdmin(String accessID, boolean delegated) throws IOException;
 
   /**
    * Given a user, remove him as admin of the corresponding Tenant.

@@ -17,31 +17,14 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
-import org.apache.hadoop.ozone.OzoneConsts;
 import java.security.Principal;
 
 /**
- * Used to identify a tenant's group in Ranger.
+ * Used to specify {OWNER} tag in Ranger.
  */
-public final class OzoneTenantGroupPrincipal implements Principal {
-  private final String tenantID;
-  private final String groupName;
+public final class OzoneOwnerPrincipal implements Principal {
 
-  public static OzoneTenantGroupPrincipal newUserGroup(String tenantID) {
-    return new OzoneTenantGroupPrincipal(tenantID, "GroupTenantAllUsers");
-  }
-
-  public static OzoneTenantGroupPrincipal newAdminGroup(String tenantID) {
-    return new OzoneTenantGroupPrincipal(tenantID, "GroupTenantAllAdmins");
-  }
-
-  private OzoneTenantGroupPrincipal(String tenantID, String groupName) {
-    this.tenantID = tenantID;
-    this.groupName = groupName;
-  }
-
-  public String getTenantID() {
-    return tenantID;
+  public OzoneOwnerPrincipal() {
   }
 
   @Override
@@ -51,6 +34,6 @@ public final class OzoneTenantGroupPrincipal implements Principal {
 
   @Override
   public String getName() {
-    return tenantID + OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER + groupName;
+    return "{OWNER}";
   }
 }

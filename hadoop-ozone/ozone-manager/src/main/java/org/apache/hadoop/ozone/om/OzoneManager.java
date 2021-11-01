@@ -119,6 +119,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -137,6 +138,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
@@ -160,6 +162,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantInfo;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
@@ -253,8 +256,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_AL
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TENANT_ACCESSID;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESSID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
@@ -3079,15 +3083,77 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "non-Ratis createTenant() is not implemented");
   }
 
-  // TODO: modify, delete
-
   /**
-   * Assign user to tenant.
+   * Assign user accessId to tenant.
    */
-  public S3SecretValue assignUserToTenant(
+  public S3SecretValue tenantAssignUserAccessId(
       String username, String tenantName, String accessId) throws IOException {
     throw new NotImplementedException(
-        "non-Ratis assignUserToTenant() is not implemented");
+        "non-Ratis tenantAssignUserAccessId() is not implemented");
+  }
+
+  /**
+   * Revoke user accessId to tenant.
+   */
+  public void tenantRevokeUserAccessId(String accessId) throws IOException {
+    throw new NotImplementedException(
+        "non-Ratis tenantRevokeUserAccessId() is not implemented");
+  }
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   */
+  public void tenantAssignAdmin(String accessId, String tenantName,
+      boolean delegated) throws IOException {
+    throw new NotImplementedException(
+        "non-Ratis tenantAssignAdmin() is not implemented");
+  }
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   */
+  public void tenantRevokeAdmin(String accessId, String tenantName)
+      throws IOException {
+    throw new NotImplementedException(
+        "non-Ratis tenantRevokeAdmin() is not implemented");
+  }
+
+  /**
+   * List tenants.
+   */
+  public TenantInfoList listTenant() throws IOException {
+
+    final UserGroupInformation ugi = getRemoteUser();
+    if (!isAdmin(ugi)) {
+      final OMException omEx = new OMException(
+          "Only Ozone admins are allowed to list tenants.", PERMISSION_DENIED);
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          OMAction.LIST_TENANT, new LinkedHashMap<>(), omEx));
+      throw omEx;
+    }
+
+    final List<TenantInfo> tenantInfoList = new ArrayList<>();
+
+    TableIterator<String, ? extends Table.KeyValue<String, OmDBTenantInfo>>
+        iterator = metadataManager.getTenantStateTable().iterator();
+
+    while (iterator.hasNext()) {
+      final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
+      final OmDBTenantInfo omDBTenantInfo = dbEntry.getValue();
+      assert(dbEntry.getKey().equals(omDBTenantInfo.getTenantName()));
+      tenantInfoList.add(TenantInfo.newBuilder()
+          .setTenantName(omDBTenantInfo.getTenantName())
+          .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
+          .setAccountNamespaceName(omDBTenantInfo.getAccountNamespaceName())
+          .setUserPolicyGroupName(omDBTenantInfo.getUserPolicyGroupName())
+          .setBucketNamespaceName(omDBTenantInfo.getBucketPolicyGroupName())
+          .build());
+    }
+
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        OMAction.LIST_TENANT, new LinkedHashMap<>()));
+
+    return new TenantInfoList(tenantInfoList);
   }
 
   /**
@@ -3111,26 +3177,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final Set<String> accessIds = kerberosPrincipalInfo.getAccessIds();
 
     final Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.TENANT, userPrincipal);
+    auditMap.put("userPrincipal", userPrincipal);
 
     accessIds.forEach(accessId -> {
       try {
-        // Use get() intentionally, which throws if entry doesn't exist in table
         final OmDBAccessIdInfo accessIdInfo =
             metadataManager.getTenantAccessIdTable().get(accessId);
         // Sanity check
+        if (accessIdInfo == null) {
+          LOG.error("Potential metadata error. Unexpected null accessIdInfo: "
+              + "entry for accessId '{}' doesn't exist in TenantAccessIdTable",
+              accessId);
+          throw new NullPointerException("accessIdInfo is null");
+        }
         assert(accessIdInfo.getKerberosPrincipal().equals(userPrincipal));
-        // Build TenantAccessIdInfo instances from accessId and tenantName
-        final String tenantName = accessIdInfo.getTenantId();
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
-            .setTenantName(tenantName)
+            .setTenantName(accessIdInfo.getTenantId())
+            .setIsAdmin(accessIdInfo.getIsAdmin())
+            .setIsDelegatedAdmin(accessIdInfo.getIsDelegatedAdmin())
             .build());
       } catch (IOException e) {
-        LOG.error("Found potential DB consistency issue! "
-            + "accessId '" + "' is supposed to exist in TenantAccessIdTable.");
+        LOG.error("Potential DB issue. Failed to retrieve OmDBAccessIdInfo "
+            + "for accessId '{}' in TenantAccessIdTable.", accessId);
+        // Audit
+        auditMap.put("accessId", accessId);
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
             OMAction.TENANT_GET_USER_INFO, auditMap, e));
+        auditMap.remove("accessId");
       }
     });
 
@@ -3186,7 +3260,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return getVolumeInfo(tenantName);
 
     } catch (OMException ex) {
-      if (ex.getResult().equals(INVALID_TENANT_ACCESSID)) {
+      if (ex.getResult().equals(INVALID_ACCESSID)) {
         // If the user is not associated with a tenant, they will use the
         // default s3 volume.
         String defaultS3volume =
@@ -4089,6 +4163,58 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD) ||
           omAdminUsernames.contains(username);
     }
+  }
+
+  public boolean isTenantAdmin(UserGroupInformation callerUgi,
+      String tenantName, Boolean delegated) {
+    if (callerUgi == null) {
+      return false;
+    } else {
+      return isTenantAdmin(callerUgi.getShortUserName(), tenantName, delegated)
+          || isTenantAdmin(callerUgi.getUserName(), tenantName, delegated);
+    }
+  }
+
+  /**
+   * Returns true if user is a tenant's admin, false otherwise.
+   * @param username User name string.
+   * @param tenantName Tenant name string.
+   * @param delegated True if operation requires delegated admin permission.
+   */
+  public boolean isTenantAdmin(String username,
+      String tenantName, Boolean delegated) {
+    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantName)) {
+      return false;
+    }
+
+    try {
+      final OmDBKerberosPrincipalInfo principalInfo =
+          getMetadataManager().getPrincipalToAccessIdsTable().get(username);
+
+      if (principalInfo == null) {
+        // The user is not assigned to any tenant
+        return false;
+      }
+
+      // Find accessId assigned to the specified tenant
+      for (final String accessId : principalInfo.getAccessIds()) {
+        final OmDBAccessIdInfo accessIdInfo =
+            getMetadataManager().getTenantAccessIdTable().get(accessId);
+        if (tenantName.equals(accessIdInfo.getTenantId())) {
+          if (!delegated) {
+            return accessIdInfo.getIsAdmin();
+          } else {
+            return accessIdInfo.getIsAdmin()
+                && accessIdInfo.getIsDelegatedAdmin();
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Error while retrieving value for key '" + username
+          + "' in PrincipalToAccessIdsTable");
+    }
+
+    return false;
   }
 
   /**

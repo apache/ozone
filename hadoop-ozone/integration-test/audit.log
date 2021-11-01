@@ -1,0 +1,89 @@
+2021-11-01 12:13:10,416 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=LIST_TENANT {} | ret=SUCCESS |  
+2021-11-01 12:13:10,561 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=finance, creationTime=1635793990457, modificationTime=1635793990457, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854775552, updateID=1, tenant=finance} | ret=SUCCESS |  
+2021-11-01 12:13:10,561 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=finance, creationTime=1635793990457, modificationTime=1635793990457, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854775552, updateID=1, tenant=finance} | ret=SUCCESS |  
+2021-11-01 12:13:10,561 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=finance, creationTime=1635793990457, modificationTime=1635793990457, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854775552, updateID=1, tenant=finance} | ret=SUCCESS |  
+2021-11-01 12:13:10,572 | INFO  | OMAudit | user=null | ip=null | op=READ_VOLUME {volume=finance} | ret=SUCCESS |  
+2021-11-01 12:13:10,647 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=research, creationTime=1635793990628, modificationTime=1635793990628, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854775040, updateID=3, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:10,654 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=research, creationTime=1635793990628, modificationTime=1635793990628, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854775040, updateID=3, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:10,654 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=research, creationTime=1635793990628, modificationTime=1635793990628, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854775040, updateID=3, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:10,725 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=dev, creationTime=1635793990709, modificationTime=1635793990709, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854774528, updateID=5, tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:10,732 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=dev, creationTime=1635793990709, modificationTime=1635793990709, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854774528, updateID=5, tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:10,732 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=dev, creationTime=1635793990709, modificationTime=1635793990709, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854774528, updateID=5, tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:10,772 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=LIST_TENANT {} | ret=SUCCESS |  
+2021-11-01 12:13:10,802 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=LIST_TENANT {} | ret=SUCCESS |  
+2021-11-01 12:13:10,885 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=finance$bob, user=bob, tenant=finance} | ret=SUCCESS |  
+2021-11-01 12:13:10,885 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=finance$bob, user=bob, tenant=finance} | ret=SUCCESS |  
+2021-11-01 12:13:10,885 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=finance$bob, user=bob, tenant=finance} | ret=SUCCESS |  
+2021-11-01 12:13:10,965 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:10,966 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:10,966 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,000 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=dev$bob, user=bob, tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,002 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=dev$bob, user=bob, tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,002 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=dev$bob, user=bob, tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,029 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_GET_USER_INFO {userPrincipal=bob} | ret=SUCCESS |  
+2021-11-01 12:13:11,065 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,066 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,066 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,090 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_GET_USER_INFO {userPrincipal=bob} | ret=SUCCESS |  
+2021-11-01 12:13:11,183 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,184 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,184 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=dev} | ret=SUCCESS |  
+2021-11-01 12:13:11,231 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_GET_USER_INFO {userPrincipal=bob} | ret=SUCCESS |  
+2021-11-01 12:13:11,268 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,268 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,268 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,292 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_GET_USER_INFO {userPrincipal=bob} | ret=SUCCESS |  
+2021-11-01 12:13:11,318 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,321 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,321 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,343 | ERROR | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob42, user=bob, tenant=research} | ret=FAILURE | TENANT_USER_ACCESSID_ALREADY_EXISTS org.apache.hadoop.ozone.om.exceptions.OMException: The same user is not allowed to be assigned to the same tenant more than once. User 'bob' is already assigned to tenant 'research' with accessId 'research$bob'.
+	at org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest.validateAndUpdateCache(OMAssignUserToTenantRequest.java:266)
+	at org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler.handleWriteRequest(OzoneManagerRequestHandler.java:277) 
+2021-11-01 12:13:11,345 | ERROR | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob42, user=bob, tenant=research} | ret=FAILURE | TENANT_USER_ACCESSID_ALREADY_EXISTS org.apache.hadoop.ozone.om.exceptions.OMException: The same user is not allowed to be assigned to the same tenant more than once. User 'bob' is already assigned to tenant 'research' with accessId 'research$bob'.
+	at org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest.validateAndUpdateCache(OMAssignUserToTenantRequest.java:266)
+	at org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler.handleWriteRequest(OzoneManagerRequestHandler.java:277) 
+2021-11-01 12:13:11,345 | ERROR | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=research$bob42, user=bob, tenant=research} | ret=FAILURE | TENANT_USER_ACCESSID_ALREADY_EXISTS org.apache.hadoop.ozone.om.exceptions.OMException: The same user is not allowed to be assigned to the same tenant more than once. User 'bob' is already assigned to tenant 'research' with accessId 'research$bob'.
+	at org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest.validateAndUpdateCache(OMAssignUserToTenantRequest.java:266)
+	at org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler.handleWriteRequest(OzoneManagerRequestHandler.java:277) 
+2021-11-01 12:13:11,369 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,376 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,376 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=research$bob, user=bob, tenant=research} | ret=SUCCESS |  
+2021-11-01 12:13:11,477 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=devaa, creationTime=1635793991461, modificationTime=1635793991461, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854769408, updateID=25, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,483 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=devaa, creationTime=1635793991461, modificationTime=1635793991461, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854769408, updateID=25, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,483 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=CREATE_TENANT {admin=avijayan, owner=avijayan, volume=devaa, creationTime=1635793991461, modificationTime=1635793991461, quotaInBytes=0, quotaInNamespace=-2, usedNamespace=0, objectID=-9223372036854769408, updateID=25, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,517 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,520 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,520 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,546 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,548 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,548 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,572 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,574 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,574 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,596 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,598 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,598 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,621 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,622 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,622 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,649 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,651 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,651 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,714 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,718 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,718 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,783 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,785 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,785 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,814 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,816 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,816 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,842 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,844 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,844 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_ASSIGN_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,887 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,894 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,894 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_ADMIN {tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,962 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,972 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  
+2021-11-01 12:13:11,972 | INFO  | OMAudit | user=avijayan | ip=127.0.0.1 | op=TENANT_REVOKE_USER_ACCESSID {accessId=devaa$alice, user=alice, tenant=devaa} | ret=SUCCESS |  

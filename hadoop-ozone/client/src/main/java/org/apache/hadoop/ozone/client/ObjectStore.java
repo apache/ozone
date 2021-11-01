@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -197,18 +198,49 @@ public class ObjectStore {
 //    proxy.createTenant(tenantName, tenantArgs);
 //  }
 
-  // TODO: modify, delete
-
   /**
-   * Assign user to tenant.
+   * Assign user accessId to tenant.
    * @param username user name to be assigned.
    * @param tenantName tenant name.
-   * @param accessId access ID.
+   * @param accessId Specified accessId.
    * @throws IOException
    */
-  public S3SecretValue assignUserToTenant(
+  // TODO: Rename this to tenantAssignUserAccessId ?
+  public S3SecretValue tenantAssignUserAccessId(
       String username, String tenantName, String accessId) throws IOException {
-    return proxy.assignUserToTenant(username, tenantName, accessId);
+    return proxy.tenantAssignUserAccessId(username, tenantName, accessId);
+  }
+
+  /**
+   * Revoke user accessId to tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  public void tenantRevokeUserAccessId(String accessId) throws IOException {
+    proxy.tenantRevokeUserAccessId(accessId);
+  }
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @param delegated true if making delegated admin.
+   * @throws IOException
+   */
+  public void tenantAssignAdmin(String accessId, String tenantName,
+      boolean delegated) throws IOException {
+    proxy.tenantAssignAdmin(accessId, tenantName, delegated);
+  }
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  public void tenantRevokeAdmin(String accessId, String tenantName)
+      throws IOException {
+    proxy.tenantRevokeAdmin(accessId, tenantName);
   }
 
   public TenantUserList listUsersInTenant(String tenantName, String userPrefix)
@@ -225,6 +257,15 @@ public class ObjectStore {
   public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException {
     return proxy.tenantGetUserInfo(userPrincipal);
+  }
+
+  /**
+   * List tenants.
+   * @return TenantInfoList
+   * @throws IOException
+   */
+  public TenantInfoList listTenant() throws IOException {
+    return proxy.listTenant();
   }
 
   /**

@@ -53,30 +53,32 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   void shutdown() throws Exception;
 
   /**
-   * Create User Principal entity for MultiTenantGatekeeper plugin.
-   * @param principal
-   * @param groupIDs : groupIDs that this user will belong to
+   * Assign user to an existing role in the Authorizer.
+   * @param principal User principal
+   * @param existingRole A JSON String representation of the existing role
+   *                     returned from the Authorizer (Ranger).
+   * @param isAdmin
    * @return unique and opaque userID that can be used to refer to the user in
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String createUser(BasicUserPrincipal principal,
-                    List<String> groupIDs) throws Exception;
+  String assignUser(BasicUserPrincipal principal, String existingRole,
+      boolean isAdmin) throws IOException;
 
   /**
    * @param principal
    * @return Unique userID maintained by the authorizer plugin.
-   * @throws Exception
+   * @throws IOException
    */
-  String getUserId(BasicUserPrincipal principal) throws Exception;
+  String getUserId(BasicUserPrincipal principal) throws IOException;
 
   /**
    * @param principal
    * @return Unique groupID maintained by the authorizer plugin.
-   * @throws Exception
+   * @throws IOException
    */
-  String getGroupId(OzoneTenantGroupPrincipal principal)
-      throws Exception;
+  String getRole(OzoneTenantRolePrincipal principal)
+      throws IOException;
 
   /**
    * Delete the user userID in MultiTenantGateKeeper plugin.
@@ -87,20 +89,23 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   void deleteUser(String opaqueUserID) throws IOException;
 
   /**
-   * Create Group group entity for MultiTenantGatekeeper plugin.
-   * @param group
-   * @return unique groupID that can be used to refer to the group in
+   * Create Role entity for MultiTenantGatekeeper plugin.
+   * @param role
+   * @param adminRoleName (Optional) admin role name that will be added to
+   *                      manage this role.
+   * @return unique groupID that can be used to refer to the role in
    * MultiTenantGateKeeper plugin Implementation e.g. corresponding ID on the
    * Ranger end for a ranger based implementation .
    */
-  String createGroup(OzoneTenantGroupPrincipal group) throws Exception;
+  String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+      throws IOException;
 
   /**
    * Delete the group groupID in MultiTenantGateKeeper plugin.
    * @param groupID : unique opaque ID that was returned by
    *                MultiTenantGatekeeper in createGroup().
    */
-  void deleteGroup(String groupID) throws IOException;
+  void deleteRole(String groupID) throws IOException;
 
   /**
    *

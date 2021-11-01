@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
@@ -68,6 +69,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
@@ -239,6 +242,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getTenantGetUserInfoRequest());
         responseBuilder.setTenantGetUserInfoResponse(getUserInfoResponse);
         break;
+      case ListTenant:
+        ListTenantResponse listTenantResponse = listTenant(
+            request.getListTenantRequest());
+        responseBuilder.setListTenantResponse(listTenantResponse);
+        break;
       case TenantListUser:
         TenantListUserResponse listUserResponse = tenantListUsers(
             request.getTenantListUserRequest());
@@ -370,6 +378,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private TenantGetUserInfoResponse tenantGetUserInfo(
       TenantGetUserInfoRequest request) throws IOException {
+
     final TenantGetUserInfoResponse.Builder resp =
         TenantGetUserInfoResponse.newBuilder();
     final String userPrincipal = request.getUserPrincipal();
@@ -399,6 +408,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
     }
     return builder.build();
+  }
+
+  private ListTenantResponse listTenant(
+      ListTenantRequest request) throws IOException {
+
+    final ListTenantResponse.Builder resp = ListTenantResponse.newBuilder();
+
+    TenantInfoList ret = impl.listTenant();
+    resp.setSuccess(true);
+    resp.addAllTenantInfo(ret.getTenantInfoList());
+
+    return resp.build();
   }
 
   private ListVolumeResponse listVolumes(ListVolumeRequest request)
