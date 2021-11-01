@@ -108,7 +108,8 @@ public class TestOmKeyInfo {
       Assert.assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
       Assert.assertEquals(orig.getVersion(), clone.getVersion());
 
-      Assert.assertEquals(orig.getLocationList().size(), clone.getLocationList().size());
+      Assert.assertEquals(orig.getLocationList().size(),
+          clone.getLocationList().size());
 
       for (int j = 0; j < orig.getLocationList().size(); j++) {
         OmKeyLocationInfo origLocationInfo = orig.getLocationList().get(j);
