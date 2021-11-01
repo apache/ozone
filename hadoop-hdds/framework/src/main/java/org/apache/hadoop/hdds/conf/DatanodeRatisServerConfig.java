@@ -141,23 +141,6 @@ public class DatanodeRatisServerConfig {
     this.streamRequestThreads = streamRequestThreads;
   }
 
-  @Config(key = "datastream.write.threads",
-      defaultValue = "20",
-      type = ConfigType.INT,
-      tags = {OZONE, DATANODE, RATIS, DATASTREAM},
-      description = "Maximum number of threads in the thread pool for " +
-          "datastream write."
-  )
-  private int streamWriteThreads;
-
-  public int getStreamWriteThreads() {
-    return streamWriteThreads;
-  }
-
-  public void setStreamWriteThreads(int streamWriteThreads) {
-    this.streamWriteThreads = streamWriteThreads;
-  }
-
   @Config(key = "datastream.client.pool.size",
       defaultValue = "10",
       type = ConfigType.INT,

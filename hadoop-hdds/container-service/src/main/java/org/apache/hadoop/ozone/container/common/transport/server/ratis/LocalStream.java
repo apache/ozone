@@ -23,12 +23,15 @@ import org.apache.ratis.statemachine.StateMachine;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 
 class LocalStream implements StateMachine.DataStream {
   private final StateMachine.DataChannel dataChannel;
+  private final Executor executor;
 
-  LocalStream(StateMachine.DataChannel dataChannel) {
+  LocalStream(StateMachine.DataChannel dataChannel, Executor executor) {
     this.dataChannel = dataChannel;
+    this.executor = executor;
   }
 
   @Override
@@ -46,5 +49,10 @@ class LocalStream implements StateMachine.DataStream {
         throw new CompletionException("Failed to close data channel", e);
       }
     });
+  }
+
+  @Override
+  public Executor getExecutor() {
+    return executor;
   }
 }
