@@ -80,8 +80,6 @@ public class TestOzoneECClient {
   public void init() throws IOException {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
         StorageUnit.KB);
-    //transportStub = new MockOmTransport(
-      //  new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks));
 
     client = new OzoneClient(conf, new RpcClient(conf, null) {
 
