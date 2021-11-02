@@ -676,7 +676,8 @@ public final class OmKeyInfo extends WithParentObjectId {
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(
             new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                keyLocationVersion.getLocationList())));
+                keyLocationVersion.getLocationList(),
+                keyLocationVersion.isMultipartKey())));
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),
