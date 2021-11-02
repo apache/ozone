@@ -188,17 +188,21 @@ public class TestRDBStoreIterator {
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
     RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
-    ByteArrayKeyValue entry = null;
+    ByteArrayKeyValue entry;
+    byte[] key = null;
+    byte[] value = null;
     if(iter.hasNext()) {
       entry = iter.next();
+      key = entry.getKey();
+      value = entry.getValue();
     }
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
 
     verifier.verify(rocksDBIteratorMock, times(1)).isValid();
     verifier.verify(rocksDBIteratorMock, times(1)).key();
-    assertArrayEquals(new byte[]{0x00}, entry.getKey());
-    assertArrayEquals(new byte[]{0x7f}, entry.getValue());
+    assertArrayEquals(new byte[]{0x00}, key);
+    assertArrayEquals(new byte[]{0x7f}, value);
   }
 
   @Test
