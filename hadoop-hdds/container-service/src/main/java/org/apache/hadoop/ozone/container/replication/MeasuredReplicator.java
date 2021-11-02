@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
 
 /**
  * ContainerReplicator wrapper with additional metrics.
@@ -67,21 +68,21 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   @Override
   public void replicate(ReplicationTask task) {
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
 
     long msInQueue =
         (Instant.now().getNano() - task.getQueued().getNano()) / 1_000_000;
     queueTime.incr(msInQueue);
     delegate.replicate(task);
-    long end = System.currentTimeMillis();
+    long elapsed = Time.monotonicNow() - start;
     if (task.getStatus() == Status.FAILED) {
       failure.incr();
       failureBytes.incr(task.getTransferredBytes());
-      failureTime.incr(end - start);
+      failureTime.incr(elapsed);
     } else if (task.getStatus() == Status.DONE) {
       transferredBytes.incr(task.getTransferredBytes());
       success.incr();
-      successTime.incr(end - start);
+      successTime.incr(elapsed);
     }
   }
 
