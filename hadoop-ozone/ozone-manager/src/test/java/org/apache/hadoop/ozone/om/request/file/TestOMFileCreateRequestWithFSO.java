@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -60,8 +61,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
     String dbFileD = omMetadataManager.getOzonePathKey(
             dirPathC.getObjectID(), fileNameD);
-    omMetadataManager.getKeyTable().delete(dbFileD);
-    omMetadataManager.getKeyTable().delete(dirPathC.getPath());
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dbFileD);
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dirPathC.getPath());
 
     // can create non-recursive because parents already exist.
     testNonRecursivePath("a/b/e", false, false, false);
@@ -138,7 +139,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
       if (indx == pathComponents.length - 1) {
         String dbOpenFileName = omMetadataManager.getOpenFileName(
                 parentId, pathElement, id);
-        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
           Assert.assertNotNull("Invalid key!", omKeyInfo);
@@ -193,5 +195,10 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   @Override
   protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
     return new OMFileCreateRequestWithFSO(omRequest);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

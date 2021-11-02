@@ -118,9 +118,8 @@ public class OzoneClientProducer {
         identifier.setSignature(signatureInfo.getSignature());
         identifier.setAwsAccessId(awsAccessId);
         identifier.setOwner(new Text(awsAccessId));
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Adding token for service:{}", omService);
-        }
+        LOG.trace("Adding token for service:{}", omService);
+
         Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
             identifier.getSignature().getBytes(StandardCharsets.UTF_8),
             identifier.getKind(),
@@ -133,16 +132,15 @@ public class OzoneClientProducer {
             return createOzoneClient();
           });
     } catch (OS3Exception ex) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", ex);
-      }
+      LOG.debug("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);
+    } catch(InterruptedException ex){
+      LOG.debug("Error during Client Creation: ", ex);
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
       // For any other critical errors during object creation throw Internal
       // error.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", e);
-      }
+      LOG.debug("Error during Client Creation: ", e);
       throw wrapOS3Exception(INTERNAL_ERROR);
     }
     return ozoneClient;

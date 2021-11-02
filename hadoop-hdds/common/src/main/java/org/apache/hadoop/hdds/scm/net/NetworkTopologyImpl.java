@@ -421,7 +421,8 @@ public class NetworkTopologyImpl implements NetworkTopology{
    */
   @Override
   public Node chooseRandom(String scope, List<String> excludedScopes,
-      Collection<Node> excludedNodes, Node affinityNode, int ancestorGen) {
+      Collection<? extends Node> excludedNodes, Node affinityNode,
+      int ancestorGen) {
     if (scope == null) {
       scope = ROOT;
     }
@@ -511,7 +512,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
   }
 
   private Node chooseNodeInternal(String scope, int leafIndex,
-      List<String> excludedScopes, Collection<Node> excludedNodes,
+      List<String> excludedScopes, Collection<? extends Node> excludedNodes,
       Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(scope != null);
     if (LOG.isDebugEnabled()) {

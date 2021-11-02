@@ -651,9 +651,11 @@ public class ContainerStateMachine extends BaseStateMachine {
         if (data != null) {
           Preconditions.checkArgument(!data.isEmpty());
           future.complete(data);
+          metrics.incNumDataCacheHit();
           return future;
         }
 
+        metrics.incNumDataCacheMiss();
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
@@ -726,7 +728,12 @@ public class ContainerStateMachine extends BaseStateMachine {
             throw e;
           }
         };
-    return queue.submit(task, executor);
+    final CompletableFuture<ContainerCommandResponseProto> f
+        = queue.submit(task, executor);
+    // after the task is completed, remove the queue if the queue is empty.
+    f.thenAccept(dummy -> containerTaskQueues.computeIfPresent(containerId,
+        (id, q) -> q.isEmpty()? null: q));
+    return f;
   }
 
   /*

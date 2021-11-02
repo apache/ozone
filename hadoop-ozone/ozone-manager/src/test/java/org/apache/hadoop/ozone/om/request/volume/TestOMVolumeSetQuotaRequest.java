@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.util.UUID;
 
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -179,16 +180,21 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
 
-    int countException = 0;
-    try {
-      omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
-          ozoneManagerDoubleBufferHelper);
-    } catch (IllegalArgumentException ex) {
-      countException++;
-      GenericTestUtils.assertExceptionContains(
-          "Total buckets quota in this volume should not be " +
-              "greater than volume quota", ex);
-    }
-    Assert.assertEquals(1, countException);
+    GenericTestUtils.LogCapturer logs = GenericTestUtils.LogCapturer
+        .captureLogs(LogFactory.getLog(OMVolumeSetQuotaRequest.class));
+
+    OMClientResponse omClientResponse = omVolumeSetQuotaRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+    //capture the error log
+    Assert.assertTrue(logs.getOutput().contains(
+        "Changing volume quota failed for volume"));
+
+    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+    Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
+        contains("Total buckets quota in this volume " +
+            "should not be greater than volume quota"));
   }
 }

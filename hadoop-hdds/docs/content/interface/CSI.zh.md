@@ -69,7 +69,7 @@ kubectl create -f /ozone/kubernetes/examples/ozone/pv-test
 ```bash
 kubectl exec -it  scm-0  bash
 [hadoop@scm-0 ~]$ ozone sh bucket list s3v
-{
+[ {
   "metadata" : { },
   "volumeName" : "s3v",
   "name" : "pvc-861e2d8b-2232-4cd1-b43c-c0c26697ab6b",
@@ -77,7 +77,7 @@ kubectl exec -it  scm-0  bash
   "versioning" : false,
   "creationTime" : "2020-06-11T08:19:47.469Z",
   "encryptionKeyName" : null
-}
+} ]
 [hadoop@scm-0 ~]$ ozone sh key put /s3v/pvc-861e2d8b-2232-4cd1-b43c-c0c26697ab6b/A LICENSE.txt
 ```
 

@@ -60,14 +60,14 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
 
     for (int i = 0; i < count; i++) {
       // Original key should be deleted, toKey should exist.
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(
-          omMetadataManager.getOzoneKey(volumeName, bucketName,
+      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
               parentDir.concat("/key" + i)));
       Assert.assertNull(omKeyInfo);
 
-      omKeyInfo =
-          omMetadataManager.getKeyTable().get(omMetadataManager.getOzoneKey(
-              volumeName, bucketName, parentDir.concat("/newKey" + i)));
+      omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(
+          omMetadataManager.getOzoneKey(volumeName, bucketName,
+              parentDir.concat("/newKey" + i)));
       Assert.assertNotNull(omKeyInfo);
     }
 
@@ -91,14 +91,14 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
     // The keys（key0 to key9）can be renamed success.
     for (int i = 0; i < count; i++) {
       // Original key should be deleted, toKey should exist.
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(
-          omMetadataManager.getOzoneKey(volumeName, bucketName,
+      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
               parentDir.concat("/key" + i)));
       Assert.assertNull(omKeyInfo);
 
-      omKeyInfo =
-          omMetadataManager.getKeyTable().get(omMetadataManager.getOzoneKey(
-              volumeName, bucketName, parentDir.concat("/newKey" + i)));
+      omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(
+          omMetadataManager.getOzoneKey(volumeName, bucketName,
+              parentDir.concat("/newKey" + i)));
       Assert.assertNotNull(omKeyInfo);
     }
 

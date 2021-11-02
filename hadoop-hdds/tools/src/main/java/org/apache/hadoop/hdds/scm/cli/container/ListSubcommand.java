@@ -65,6 +65,10 @@ public class ListSubcommand extends ScmSubcommand {
           "DELETING, DELETED)")
   private HddsProtos.LifeCycleState state;
 
+  @Option(names = {"--factor"},
+      description = "Container factor(ONE, THREE)")
+  private HddsProtos.ReplicationFactor factor;
+
   private static final ObjectWriter WRITER;
 
   static {
@@ -87,7 +91,7 @@ public class ListSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     List<ContainerInfo> containerList =
-        scmClient.listContainer(startId, count, state);
+        scmClient.listContainer(startId, count, state, factor);
 
     // Output data list
     for (ContainerInfo container : containerList) {

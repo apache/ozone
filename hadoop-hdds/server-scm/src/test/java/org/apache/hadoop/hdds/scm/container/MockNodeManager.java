@@ -384,15 +384,27 @@ public class MockNodeManager implements NodeManager {
     }
     Comparator<DatanodeUsageInfo> comparator;
     if (mostUsed) {
-      comparator = DatanodeUsageInfo.getMostUsedByRemainingRatio().reversed();
+      comparator = DatanodeUsageInfo.getMostUtilized().reversed();
     } else {
-      comparator = DatanodeUsageInfo.getMostUsedByRemainingRatio();
+      comparator = DatanodeUsageInfo.getMostUtilized();
     }
 
     return datanodeDetailsList.stream()
         .map(node -> new DatanodeUsageInfo(node, nodeMetricMap.get(node)))
         .sorted(comparator)
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param datanodeDetails the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
+    SCMNodeStat stat = nodeMetricMap.get(datanodeDetails);
+    return new DatanodeUsageInfo(datanodeDetails, stat);
   }
 
   /**

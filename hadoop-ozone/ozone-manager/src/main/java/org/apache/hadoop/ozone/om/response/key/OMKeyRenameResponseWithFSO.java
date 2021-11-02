@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -68,10 +69,15 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
               getToKeyName(), renameDirInfo);
 
     } else {
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-              getFromKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-              getToKeyName(), getRenameKeyInfo());
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .deleteWithBatch(batchOperation, getFromKeyName());
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .putWithBatch(batchOperation, getToKeyName(), getRenameKeyInfo());
     }
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

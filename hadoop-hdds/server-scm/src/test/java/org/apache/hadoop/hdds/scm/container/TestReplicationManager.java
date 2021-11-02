@@ -20,11 +20,13 @@ package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.primitives.Longs;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto
@@ -36,13 +38,14 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.MoveResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -50,6 +53,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
@@ -90,6 +94,7 @@ import static org.apache.hadoop.hdds.protocol.proto
 import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.mockito.Mockito.when;
 
 /**
  * Test cases to verify the functionality of ReplicationManager.
@@ -102,27 +107,44 @@ public class TestReplicationManager {
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private GenericTestUtils.LogCapturer scmLogs;
   private SCMServiceManager serviceManager;
   private TestClock clock;
   private File testDir;
   private DBStore dbStore;
+  private PipelineManager pipelineManager;
+  private SCMHAManager scmhaManager;
 
   @Before
   public void setup()
-      throws IOException, InterruptedException, NodeNotFoundException {
+      throws IOException, InterruptedException,
+      NodeNotFoundException, InvalidStateTransitionException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
 
-    scmLogs = GenericTestUtils.LogCapturer
-      .captureLogs(ReplicationManager.LOG);
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    scmLogs = GenericTestUtils.LogCapturer.captureLogs(ReplicationManager.LOG);
+    containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
-    containerStateManager = new ContainerStateManager(conf);
+    scmhaManager = MockSCMHAManager.getInstance(true);
+    testDir = GenericTestUtils.getTestDir(
+        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(
+        conf, new SCMDBDefinition());
+    pipelineManager = Mockito.mock(PipelineManager.class);
+    when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
+        .thenReturn(true);
+    containerStateManager = ContainerStateManagerImpl.newBuilder()
+        .setConfiguration(conf)
+        .setPipelineManager(pipelineManager)
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
     serviceManager = new SCMServiceManager();
 
     datanodeCommandHandler = new DatanodeCommandHandler();
@@ -130,29 +152,31 @@ public class TestReplicationManager {
 
     Mockito.when(containerManager.getContainers())
         .thenAnswer(invocation -> {
-          Set<ContainerID> ids = containerStateManager.getAllContainerIDs();
+          Set<ContainerID> ids = containerStateManager.getContainerIDs();
           List<ContainerInfo> containers = new ArrayList<>();
           for (ContainerID id : ids) {
-            containers.add(containerStateManager.getContainer(id));
+            containers.add(containerStateManager.getContainer(
+                id.getProtobuf()));
           }
           return containers;
         });
 
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
-            .getContainer((ContainerID)invocation.getArguments()[0]));
+            .getContainer(((ContainerID)invocation
+                .getArguments()[0]).getProtobuf()));
 
     Mockito.when(containerManager.getContainerReplicas(
         Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
-            .getContainerReplicas((ContainerID)invocation.getArguments()[0]));
+            .getContainerReplicas(((ContainerID)invocation
+                .getArguments()[0]).getProtobuf()));
 
     containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
     Mockito.when(containerPlacementPolicy.chooseDatanodes(
-        Mockito.any(),
-        Mockito.any(),
-        Mockito.anyInt(), Mockito.anyLong(), Mockito.anyLong()))
+        Mockito.any(), Mockito.any(), Mockito.anyInt(),
+            Mockito.anyLong(), Mockito.anyLong()))
         .thenAnswer(invocation -> {
           int count = (int) invocation.getArguments()[2];
           return IntStream.range(0, count)
@@ -173,7 +197,7 @@ public class TestReplicationManager {
       throws InterruptedException, IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     testDir = GenericTestUtils
-      .getTestDir(TestSCMContainerManager.class.getSimpleName());
+      .getTestDir(TestContainerManagerImpl.class.getSimpleName());
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.getAbsolutePath());
     config.setTimeDuration(
@@ -203,6 +227,15 @@ public class TestReplicationManager {
     Thread.sleep(100L);
   }
 
+  @After
+  public void tearDown() throws Exception {
+    containerStateManager.close();
+    if (dbStore != null) {
+      dbStore.close();
+    }
+
+    FileUtil.fullyDelete(testDir);
+  }
 
   /**
    * Checks if restarting of replication manager works.
@@ -225,9 +258,9 @@ public class TestReplicationManager {
    * any action on OPEN containers.
    */
   @Test
-  public void testOpenContainer() throws SCMException, InterruptedException {
+  public void testOpenContainer() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.OPEN);
-    containerStateManager.loadContainer(container);
+    containerStateManager.addContainer(container.getProtobuf());
     replicationManager.processAll();
     eventQueue.processAll(1000);
     Assert.assertEquals(0, datanodeCommandHandler.getInvocation());
@@ -239,12 +272,11 @@ public class TestReplicationManager {
    * to all the datanodes.
    */
   @Test
-  public void testClosingContainer() throws
-      SCMException, ContainerNotFoundException, InterruptedException {
+  public void testClosingContainer() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
     final ContainerID id = container.containerID();
 
-    containerStateManager.loadContainer(container);
+    containerStateManager.addContainer(container.getProtobuf());
 
     // Two replicas in CLOSING state
     final Set<ContainerReplica> replicas = getReplicas(id, State.CLOSING,
@@ -256,7 +288,7 @@ public class TestReplicationManager {
     replicas.addAll(getReplicas(id, State.OPEN, datanode));
 
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id, replica);
+      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
     }
 
     final int currentCloseCommandCount = datanodeCommandHandler
@@ -269,7 +301,7 @@ public class TestReplicationManager {
 
     // Update the OPEN to CLOSING
     for (ContainerReplica replica : getReplicas(id, State.CLOSING, datanode)) {
-      containerStateManager.updateContainerReplica(id, replica);
+      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
     }
 
     replicationManager.processAll();
@@ -285,8 +317,7 @@ public class TestReplicationManager {
    * datanodes.
    */
   @Test
-  public void testQuasiClosedContainerWithTwoOpenReplica() throws
-      SCMException, ContainerNotFoundException, InterruptedException {
+  public void testQuasiClosedContainerWithTwoOpenReplica() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -298,10 +329,11 @@ public class TestReplicationManager {
     final ContainerReplica replicaThree = getReplicas(
         id, State.OPEN, 1000L, datanodeDetails.getUuid(), datanodeDetails);
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
 
     final int currentCloseCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
@@ -324,8 +356,7 @@ public class TestReplicationManager {
    * the container, ReplicationManager will not do anything.
    */
   @Test
-  public void testHealthyQuasiClosedContainer() throws
-      SCMException, ContainerNotFoundException, InterruptedException {
+  public void testHealthyQuasiClosedContainer() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -336,10 +367,11 @@ public class TestReplicationManager {
     final ContainerReplica replicaThree = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
 
     // All the QUASI_CLOSED replicas have same originNodeId, so the
     // container will not be closed. ReplicationManager should take no action.
@@ -359,8 +391,7 @@ public class TestReplicationManager {
    */
   @Test
   public void testQuasiClosedContainerWithUnhealthyReplica()
-      throws SCMException, ContainerNotFoundException, InterruptedException,
-      ContainerReplicaNotFoundException {
+      throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     container.setUsedBytes(100);
     final ContainerID id = container.containerID();
@@ -372,10 +403,11 @@ public class TestReplicationManager {
     final ContainerReplica replicaThree = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
 
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -392,7 +424,8 @@ public class TestReplicationManager {
     final ContainerReplica unhealthyReplica = getReplicas(
         id, State.UNHEALTHY, 1000L, originNodeId,
         replicaOne.getDatanodeDetails());
-    containerStateManager.updateContainerReplica(id, unhealthyReplica);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), unhealthyReplica);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -405,7 +438,7 @@ public class TestReplicationManager {
         replicationManager.getMetrics().getNumDeletionCmdsSent());
 
     // Now we will delete the unhealthy replica from in-memory.
-    containerStateManager.removeContainerReplica(id, replicaOne);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaOne);
 
     final long currentBytesToReplicate = replicationManager.getMetrics()
         .getNumReplicationBytesTotal();
@@ -431,7 +464,8 @@ public class TestReplicationManager {
         .get(id).get(0).getDatanode();
     final ContainerReplica replicatedReplicaOne = getReplicas(
         id, State.CLOSED, 1000L, originNodeId, targetDn);
-    containerStateManager.updateContainerReplica(id, replicatedReplicaOne);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicatedReplicaOne);
 
     final long currentReplicationCommandCompleted = replicationManager
         .getMetrics().getNumReplicationCmdsCompleted();
@@ -455,8 +489,7 @@ public class TestReplicationManager {
    * deletes the excess replicas.
    */
   @Test
-  public void testOverReplicatedQuasiClosedContainer() throws
-      SCMException, ContainerNotFoundException, InterruptedException {
+  public void testOverReplicatedQuasiClosedContainer() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -469,11 +502,12 @@ public class TestReplicationManager {
     final ContainerReplica replicaFour = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
-    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
 
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -492,13 +526,17 @@ public class TestReplicationManager {
     DatanodeDetails targetDn = replicationManager.getInflightDeletion()
         .get(id).get(0).getDatanode();
     if (targetDn.equals(replicaOne.getDatanodeDetails())) {
-      containerStateManager.removeContainerReplica(id, replicaOne);
+      containerStateManager.removeContainerReplica(
+          id.getProtobuf(), replicaOne);
     } else if (targetDn.equals(replicaTwo.getDatanodeDetails())) {
-      containerStateManager.removeContainerReplica(id, replicaTwo);
+      containerStateManager.removeContainerReplica(
+          id.getProtobuf(), replicaTwo);
     } else if (targetDn.equals(replicaThree.getDatanodeDetails())) {
-      containerStateManager.removeContainerReplica(id, replicaThree);
+      containerStateManager.removeContainerReplica(
+          id.getProtobuf(), replicaThree);
     } else if (targetDn.equals(replicaFour.getDatanodeDetails())) {
-      containerStateManager.removeContainerReplica(id, replicaFour);
+      containerStateManager.removeContainerReplica(
+          id.getProtobuf(), replicaFour);
     }
 
     final long currentDeleteCommandCompleted = replicationManager.getMetrics()
@@ -521,7 +559,7 @@ public class TestReplicationManager {
    */
   @Test
   public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
-      throws SCMException, ContainerNotFoundException, InterruptedException {
+      throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -534,11 +572,12 @@ public class TestReplicationManager {
     final ContainerReplica replicaFour = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
-    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
 
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -559,7 +598,7 @@ public class TestReplicationManager {
     final long currentDeleteCommandCompleted = replicationManager.getMetrics()
         .getNumDeletionCmdsCompleted();
     // Now we remove the replica to simulate deletion complete
-    containerStateManager.removeContainerReplica(id, replicaOne);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaOne);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -576,8 +615,7 @@ public class TestReplicationManager {
    * under replicated.
    */
   @Test
-  public void testUnderReplicatedQuasiClosedContainer() throws
-      SCMException, ContainerNotFoundException, InterruptedException {
+  public void testUnderReplicatedQuasiClosedContainer() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     container.setUsedBytes(100);
     final ContainerID id = container.containerID();
@@ -587,9 +625,9 @@ public class TestReplicationManager {
     final ContainerReplica replicaTwo = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
 
     final int currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
@@ -619,7 +657,8 @@ public class TestReplicationManager {
         .get(id).get(0).getDatanode();
     final ContainerReplica replicatedReplicaThree = getReplicas(
         id, State.CLOSED, 1000L, originNodeId, targetDn);
-    containerStateManager.updateContainerReplica(id, replicatedReplicaThree);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicatedReplicaThree);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -654,8 +693,8 @@ public class TestReplicationManager {
    */
   @Test
   public void testUnderReplicatedQuasiClosedContainerWithUnhealthyReplica()
-      throws SCMException, ContainerNotFoundException, InterruptedException,
-      ContainerReplicaNotFoundException, TimeoutException {
+      throws IOException, InterruptedException,
+      TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -664,9 +703,9 @@ public class TestReplicationManager {
     final ContainerReplica replicaTwo = getReplicas(
         id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
 
     final int currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
@@ -691,7 +730,7 @@ public class TestReplicationManager {
         replicateCommand.get().getDatanodeId());
     ContainerReplica newReplica = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, newNode);
-    containerStateManager.updateContainerReplica(id, newReplica);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), newReplica);
 
     /*
      * We have report the replica to SCM, in the next ReplicationManager
@@ -712,7 +751,7 @@ public class TestReplicationManager {
     Assert.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
 
-    containerStateManager.removeContainerReplica(id, replicaTwo);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaTwo);
 
     final long currentDeleteCommandCompleted = replicationManager.getMetrics()
         .getNumDeletionCmdsCompleted();
@@ -749,17 +788,16 @@ public class TestReplicationManager {
    * highest BCSID.
    */
   @Test
-  public void testQuasiClosedToClosed() throws
-      SCMException, ContainerNotFoundException, InterruptedException {
+  public void testQuasiClosedToClosed() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.QUASI_CLOSED,
         randomDatanodeDetails(),
         randomDatanodeDetails(),
         randomDatanodeDetails());
-    containerStateManager.loadContainer(container);
+    containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id, replica);
+      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
     }
 
     final int currentCloseCommandCount = datanodeCommandHandler
@@ -780,8 +818,7 @@ public class TestReplicationManager {
    * CLOSED and healthy.
    */
   @Test
-  public void testHealthyClosedContainer()
-      throws SCMException, ContainerNotFoundException, InterruptedException {
+  public void testHealthyClosedContainer() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.CLOSED,
@@ -789,9 +826,9 @@ public class TestReplicationManager {
         randomDatanodeDetails(),
         randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
+    containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id, replica);
+      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
     }
 
     replicationManager.processAll();
@@ -803,8 +840,7 @@ public class TestReplicationManager {
    * ReplicationManager should close the unhealthy OPEN container.
    */
   @Test
-  public void testUnhealthyOpenContainer()
-      throws SCMException, ContainerNotFoundException, InterruptedException {
+  public void testUnhealthyOpenContainer() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.OPEN);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.OPEN,
@@ -812,9 +848,9 @@ public class TestReplicationManager {
         randomDatanodeDetails());
     replicas.addAll(getReplicas(id, State.UNHEALTHY, randomDatanodeDetails()));
 
-    containerStateManager.loadContainer(container);
+    containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id, replica);
+      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
     }
 
     final CloseContainerEventHandler closeContainerHandler =
@@ -831,8 +867,7 @@ public class TestReplicationManager {
    * ReplicationManager should skip send close command to unhealthy replica.
    */
   @Test
-  public void testCloseUnhealthyReplica()
-      throws SCMException, ContainerNotFoundException, InterruptedException {
+  public void testCloseUnhealthyReplica() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.UNHEALTHY,
@@ -840,9 +875,9 @@ public class TestReplicationManager {
     replicas.addAll(getReplicas(id, State.OPEN, randomDatanodeDetails()));
     replicas.addAll(getReplicas(id, State.OPEN, randomDatanodeDetails()));
 
-    containerStateManager.loadContainer(container);
+    containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id, replica);
+      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
     }
 
     replicationManager.processAll();
@@ -864,8 +899,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void additionalReplicaScheduledWhenMisReplicated()
-      throws SCMException, ContainerNotFoundException, InterruptedException {
+  public void additionalReplicaScheduledWhenMisReplicated() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     container.setUsedBytes(100);
     final ContainerID id = container.containerID();
@@ -877,10 +911,11 @@ public class TestReplicationManager {
     final ContainerReplica replicaThree = getReplicas(
         id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
 
     // Ensure a mis-replicated status is returned for any containers in this
     // test where there are 3 replicas. When there are 2 or 4 replicas
@@ -940,8 +975,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void overReplicatedButRemovingMakesMisReplicated()
-      throws SCMException, ContainerNotFoundException, InterruptedException {
+  public void overReplicatedButRemovingMakesMisReplicated() throws IOException {
     // In this test, the excess replica should not be removed.
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
@@ -957,12 +991,13 @@ public class TestReplicationManager {
     final ContainerReplica replicaFive = getReplicas(
         id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
-    containerStateManager.updateContainerReplica(id, replicaFour);
-    containerStateManager.updateContainerReplica(id, replicaFive);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFive);
 
     // Ensure a mis-replicated status is returned for any containers in this
     // test where there are exactly 3 replicas checked.
@@ -994,8 +1029,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testOverReplicatedAndPolicySatisfied() throws
-      SCMException, ContainerNotFoundException, InterruptedException {
+  public void testOverReplicatedAndPolicySatisfied() throws IOException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -1008,11 +1042,12 @@ public class TestReplicationManager {
     final ContainerReplica replicaFour = getReplicas(
         id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
-    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
 
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list.size() == 3),
@@ -1036,7 +1071,7 @@ public class TestReplicationManager {
 
   @Test
   public void testOverReplicatedAndPolicyUnSatisfiedAndDeleted() throws
-      SCMException {
+      IOException {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -1051,12 +1086,13 @@ public class TestReplicationManager {
     final ContainerReplica replicaFive = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
-    containerStateManager.loadContainer(container);
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    containerStateManager.updateContainerReplica(id, replicaThree);
-    containerStateManager.updateContainerReplica(id, replicaFour);
-    containerStateManager.updateContainerReplica(id, replicaFive);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(
+        id.getProtobuf(), replicaThree);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFive);
 
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list != null && list.size() <= 4),
@@ -1083,8 +1119,7 @@ public class TestReplicationManager {
    * decommissioned replicas.
    */
   @Test
-  public void testUnderReplicatedDueToDecommission() throws
-      SCMException {
+  public void testUnderReplicatedDueToDecommission() throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
@@ -1097,8 +1132,7 @@ public class TestReplicationManager {
    * are decommissioning.
    */
   @Test
-  public void testUnderReplicatedDueToAllDecommission() throws
-      SCMException {
+  public void testUnderReplicatedDueToAllDecommission() throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
@@ -1111,8 +1145,7 @@ public class TestReplicationManager {
    * correctly replicated with decommissioned replicas still present.
    */
   @Test
-  public void testCorrectlyReplicatedWithDecommission() throws
-      SCMException {
+  public void testCorrectlyReplicatedWithDecommission() throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1126,8 +1159,7 @@ public class TestReplicationManager {
    * is not met for maintenance.
    */
   @Test
-  public void testUnderReplicatedDueToMaintenance() throws
-      SCMException {
+  public void testUnderReplicatedDueToMaintenance() throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
@@ -1180,8 +1212,7 @@ public class TestReplicationManager {
    * are going into maintenance.
    */
   @Test
-  public void testUnderReplicatedDueToAllMaintenance() throws
-      SCMException {
+  public void testUnderReplicatedDueToAllMaintenance() throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
@@ -1194,8 +1225,7 @@ public class TestReplicationManager {
    * replica are available.
    */
   @Test
-  public void testCorrectlyReplicatedWithMaintenance() throws
-      SCMException {
+  public void testCorrectlyReplicatedWithMaintenance() throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1209,8 +1239,8 @@ public class TestReplicationManager {
    * are decommissioning or maintenance.
    */
   @Test
-  public void testUnderReplicatedWithDecommissionAndMaintenance() throws
-      SCMException {
+  public void testUnderReplicatedWithDecommissionAndMaintenance()
+      throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
@@ -1227,7 +1257,7 @@ public class TestReplicationManager {
    */
   @Test
   public void testOverReplicatedClosedContainerWithDecomAndMaint()
-      throws SCMException {
+      throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
@@ -1252,7 +1282,8 @@ public class TestReplicationManager {
     // Get the DECOM and Maint replica and ensure none of them are scheduled
     // for removal
     Set<ContainerReplica> decom =
-        containerStateManager.getContainerReplicas(container.containerID())
+        containerStateManager.getContainerReplicas(
+            container.containerID().getProtobuf())
         .stream()
         .filter(r -> r.getDatanodeDetails().getPersistedOpState() != IN_SERVICE)
         .collect(Collectors.toSet());
@@ -1270,8 +1301,7 @@ public class TestReplicationManager {
    * scheduled.
    */
   @Test
-  public void testUnderReplicatedNotHealthySource()
-      throws SCMException {
+  public void testUnderReplicatedNotHealthySource() throws IOException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     addReplica(container, NodeStatus.inServiceStale(), CLOSED);
     addReplica(container, new NodeStatus(DECOMMISSIONED, STALE), CLOSED);
@@ -1285,7 +1315,7 @@ public class TestReplicationManager {
    * if all the prerequisites are satisfied, move should work as expected.
    */
   @Test
-  public void testMove() throws SCMException, NodeNotFoundException,
+  public void testMove() throws IOException, NodeNotFoundException,
       InterruptedException, ExecutionException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     ContainerID id = container.containerID();
@@ -1316,7 +1346,7 @@ public class TestReplicationManager {
         SCMCommandProto.Type.deleteContainerCommand, dn1.getDatanodeDetails()));
     Assert.assertEquals(1, datanodeCommandHandler.getInvocationCount(
         SCMCommandProto.Type.deleteContainerCommand));
-    containerStateManager.removeContainerReplica(id, dn1);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), dn1);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -1399,10 +1429,10 @@ public class TestReplicationManager {
     //deleteContainerCommand will be sent again
     Assert.assertEquals(2, datanodeCommandHandler.getInvocationCount(
         SCMCommandProto.Type.deleteContainerCommand));
-    containerStateManager.removeContainerReplica(id, dn1);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), dn1);
 
     //replica in src datanode is deleted now
-    containerStateManager.removeContainerReplica(id, dn1);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), dn1);
     replicationManager.processAll();
     eventQueue.processAll(1000);
 
@@ -1423,7 +1453,7 @@ public class TestReplicationManager {
    */
   @Test
   public void testMoveNotDeleteSrcIfPolicyNotSatisfied()
-      throws SCMException, NodeNotFoundException,
+      throws IOException, NodeNotFoundException,
       InterruptedException, ExecutionException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     ContainerID id = container.containerID();
@@ -1450,7 +1480,7 @@ public class TestReplicationManager {
     //now, replication succeeds, but replica in dn2 lost,
     //and there are only tree replicas totally, so rm should
     //not delete the replica on dn1
-    containerStateManager.removeContainerReplica(id, dn2);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), dn2);
     replicationManager.processAll();
     eventQueue.processAll(1000);
 
@@ -1465,7 +1495,7 @@ public class TestReplicationManager {
    * test src and target datanode become unhealthy when moving.
    */
   @Test
-  public void testDnBecameUnhealthyWhenMoving() throws SCMException,
+  public void testDnBecameUnhealthyWhenMoving() throws IOException,
       NodeNotFoundException, InterruptedException, ExecutionException {
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
     ContainerID id = container.containerID();
@@ -1509,11 +1539,11 @@ public class TestReplicationManager {
    * some Prerequisites should be satisfied.
    */
   @Test
-  public void testMovePrerequisites()
-      throws SCMException, NodeNotFoundException,
-      InterruptedException, ExecutionException {
+  public void testMovePrerequisites() throws IOException, NodeNotFoundException,
+      InterruptedException, ExecutionException,
+      InvalidStateTransitionException {
     //all conditions is met
-    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    final ContainerInfo container = createContainer(LifeCycleState.OPEN);
     ContainerID id = container.containerID();
     ContainerReplica dn1 = addReplica(container,
         new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1537,17 +1567,31 @@ public class TestReplicationManager {
     replicationManager.start();
     Thread.sleep(100L);
 
-    //container in not in CLOSED state
-    for (LifeCycleState state : LifeCycleState.values()) {
-      if (state != LifeCycleState.CLOSED) {
-        container.setState(state);
-        cf = replicationManager.move(id,
-            new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
-        Assert.assertTrue(cf.isDone() && cf.get() ==
-            MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
-      }
-    }
-    container.setState(LifeCycleState.CLOSED);
+    //container in not in OPEN state
+    cf = replicationManager.move(id,
+        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    Assert.assertTrue(cf.isDone() && cf.get() ==
+        MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+    //open -> closing
+    containerStateManager.updateContainerState(id.getProtobuf(),
+        LifeCycleEvent.FINALIZE);
+    cf = replicationManager.move(id,
+        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    Assert.assertTrue(cf.isDone() && cf.get() ==
+        MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+    //closing -> quasi_closed
+    containerStateManager.updateContainerState(id.getProtobuf(),
+        LifeCycleEvent.QUASI_CLOSE);
+    cf = replicationManager.move(id,
+        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    Assert.assertTrue(cf.isDone() && cf.get() ==
+        MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+
+    //quasi_closed -> closed
+    containerStateManager.updateContainerState(id.getProtobuf(),
+        LifeCycleEvent.FORCE_CLOSE);
+    Assert.assertTrue(LifeCycleState.CLOSED ==
+        containerStateManager.getContainer(id.getProtobuf()).getState());
 
     //Node is not in healthy state
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
@@ -1611,8 +1655,8 @@ public class TestReplicationManager {
 
     //make the replica num be 2 to test the case
     //that container is in inflightReplication
-    containerStateManager.removeContainerReplica(id, dn5);
-    containerStateManager.removeContainerReplica(id, dn4);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), dn5);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), dn4);
     //replication manager should generate inflightReplication
     replicationManager.processAll();
     //waiting for inflightReplication generation
@@ -1624,8 +1668,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testReplicateCommandTimeout() throws
-      SCMException, InterruptedException {
+  public void testReplicateCommandTimeout() throws IOException {
     long timeout = new ReplicationManagerConfiguration().getEventTimeout();
 
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
@@ -1646,7 +1689,7 @@ public class TestReplicationManager {
 
   @Test
   public void testDeleteCommandTimeout() throws
-      SCMException, InterruptedException {
+      IOException, InterruptedException {
     long timeout = new ReplicationManagerConfiguration().getEventTimeout();
 
     final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
@@ -1668,9 +1711,9 @@ public class TestReplicationManager {
   }
 
   private ContainerInfo createContainer(LifeCycleState containerState)
-      throws SCMException {
+      throws IOException {
     final ContainerInfo container = getContainer(containerState);
-    containerStateManager.loadContainer(container);
+    containerStateManager.addContainer(container.getProtobuf());
     return container;
   }
 
@@ -1708,7 +1751,7 @@ public class TestReplicationManager {
     final ContainerReplica replica = getReplicas(
         container.containerID(), replicaState, 1000L, originNodeId, dn);
     containerStateManager
-        .updateContainerReplica(container.containerID(), replica);
+        .updateContainerReplica(container.containerID().getProtobuf(), replica);
     return replica;
   }
 
@@ -1742,7 +1785,9 @@ public class TestReplicationManager {
   public void teardown() throws Exception {
     containerStateManager.close();
     replicationManager.stop();
-    dbStore.close();
+    if (dbStore != null) {
+      dbStore.close();
+    }
     FileUtils.deleteDirectory(testDir);
   }
 
