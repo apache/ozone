@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.grpc.Status;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -137,7 +138,17 @@ public class GrpcOmTransport implements OmTransport {
             .build();
       }
     }
-    return client.submitRequest(payload);
+    OMResponse resp = null;
+    try {
+      resp = client.submitRequest(payload);
+    } catch (io.grpc.StatusRuntimeException e) {
+      ResultCodes resultCode = ResultCodes.INTERNAL_ERROR;
+      if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
+        resultCode = ResultCodes.TIMEOUT;
+      }
+      throw new OMException(e.getCause(), resultCode);
+    }
+    return resp;
   }
 
   // stub implementation for interface
