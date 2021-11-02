@@ -2472,7 +2472,9 @@ public class KeyManagerImpl implements KeyManager {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
                       immediateChild, omKeyInfo.getAcls());
-                  cacheKeyMap.put(entryInDb, new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
+                  cacheKeyMap.put(entryInDb,
+                      new OzoneFileStatus(fakeDirEntry,
+                          scmBlockSize, true));
                 } else {
                   // If entryKeyName matches dir name, we have the info
                   cacheKeyMap.put(entryInDb,
