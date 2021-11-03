@@ -43,6 +43,9 @@ public class ECBlockOutputStream extends BlockOutputStream{
 
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       currentChunkRspFuture = null;
+
+  private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      putBlkRspFuture = null;
   /**
    * Creates a new ECBlockOutputStream.
    *
@@ -116,7 +119,7 @@ public class ECBlockOutputStream extends BlockOutputStream{
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    this.currentChunkRspFuture = flushFuture;
+    this.putBlkRspFuture = flushFuture;
     return flushFuture;
   }
 
@@ -126,8 +129,19 @@ public class ECBlockOutputStream extends BlockOutputStream{
     cleanup(false);
   }
 
+  /**
+   * @return The current chunk writer response future.
+   */
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       getCurrentChunkResponseFuture() {
     return this.currentChunkRspFuture;
+  }
+
+  /**
+   * @return The current chunk putBlock response future.
+   */
+  public CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      getCurrentPutBlkResponseFuture() {
+    return this.putBlkRspFuture;
   }
 }

@@ -281,14 +281,30 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     return blockOutputStreams[0].getBlockID();
   }
 
-  public boolean checkStreamFailures(){
+  /**
+   * In EC, we will do async write calls for writing data in the scope of a
+   * stripe. After every stripe write finishes, use this method to validate the
+   * responses of current stripe data writes. This method can also be used to
+   * validate the stripe put block responses.
+   * @param forPutBlock : If true, it will validate the put block response
+   *                   futures. It will validates stripe data write response
+   *                   futures if false.
+   * @return
+   */
+  public boolean checkStreamFailures(boolean forPutBlock) {
     final Iterator<ECBlockOutputStream> iter = blockStreams().iterator();
-    while(iter.hasNext()){
+    while (iter.hasNext()) {
       final ECBlockOutputStream stream = iter.next();
-      final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-          chunkWriteResponseFuture = stream != null ?
-          stream.getCurrentChunkResponseFuture() : null;
-      if(isFailed(stream, chunkWriteResponseFuture)){
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          responseFuture = null;
+      if (forPutBlock) {
+        responseFuture =
+            stream != null ? stream.getCurrentPutBlkResponseFuture() : null;
+      } else {
+        responseFuture =
+            stream != null ? stream.getCurrentChunkResponseFuture() : null;
+      }
+      if (isFailed(stream, responseFuture)) {
         return true;
       }
     }

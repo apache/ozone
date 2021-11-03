@@ -294,12 +294,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
     ECBlockOutputStreamEntry streamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     // Since writes are async, let's check the failures once.
-    if(streamEntry.checkStreamFailures()){
+    if(streamEntry.checkStreamFailures(false)){
       return StripeWriteStatus.FAILED;
     }
     streamEntry.executePutBlock();
     // Since putBlock also async, let's check the failures again.
-    if(streamEntry.checkStreamFailures()){
+    if(streamEntry.checkStreamFailures(true)){
       return StripeWriteStatus.FAILED;
     }
     ecChunkBufferCache.clear(parityCellSize);
