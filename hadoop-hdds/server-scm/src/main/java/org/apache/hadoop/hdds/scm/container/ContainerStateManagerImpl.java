@@ -415,6 +415,11 @@ public final class ContainerStateManagerImpl
           deleteTransactionMap.entrySet()) {
         final ContainerInfo info = containers.getContainerInfo(
             transaction.getKey());
+        if (info == null) {
+          LOG.warn("can not find container id {}, transaction id is {}",
+              transaction.getKey(), transaction.getValue());
+          continue;
+        }
         info.updateDeleteTransactionId(transaction.getValue());
         transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
       }
