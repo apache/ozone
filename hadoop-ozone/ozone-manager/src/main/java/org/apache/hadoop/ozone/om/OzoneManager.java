@@ -403,6 +403,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
 
     omStorage = new OMStorage(conf);
+    omStorage.setOmNodeId(omNodeDetails.getNodeId(), true);
     omId = omStorage.getOmId();
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
@@ -1082,7 +1083,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public static boolean omInit(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
-    OMHANodeDetails.loadOMHAConfig(conf);
+    OMHANodeDetails omhaNodeDetails = OMHANodeDetails.loadOMHAConfig(conf);
+    String nodeId = omhaNodeDetails.getLocalNodeDetails().getNodeId();
     loginOMUserIfSecurityEnabled(conf);
     OMStorage omStorage = new OMStorage(conf);
     StorageState state = omStorage.getState();
@@ -1097,6 +1099,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         if (scmId == null || scmId.isEmpty()) {
           throw new IOException("Invalid SCM ID");
         }
+        omStorage.setOmNodeId(nodeId, false);
         omStorage.setClusterId(clusterId);
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
           initializeSecurity(conf, omStorage, scmId);

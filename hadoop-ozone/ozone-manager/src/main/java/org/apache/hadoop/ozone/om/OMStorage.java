@@ -40,6 +40,7 @@ public class OMStorage extends Storage {
   public static final String STORAGE_DIR = "om";
   public static final String OM_ID = "omUuid";
   public static final String OM_CERT_SERIAL_ID = "omCertSerialId";
+  public static final String OM_NODE_ID = "nodeId";
 
   /**
    * Construct OMStorage.
@@ -64,11 +65,51 @@ public class OMStorage extends Storage {
   }
 
   /**
+   * Set the OM NodeId property.
+   * @param nodeId OM NodeId
+   * @param persistToDisk if true, persist the nodeId to VERSION file if not
+   *                      already present
+   * @throws IOException if existing nodeId from VERSION file does not match
+   * the new nodeId.
+   */
+  public void setOmNodeId(String nodeId, boolean persistToDisk)
+      throws IOException {
+    String nodeIdFromDisk = getOmNodeId();
+    if (nodeIdFromDisk != null) {
+      // Verify the existing NodeId from VERSION file equals that from the
+      // configuration
+      if (!nodeIdFromDisk.equals(nodeId)) {
+        throw new IOException("OM NodeId: " + nodeId + " does not match " +
+            "existing nodeId from VERSION file: " + nodeIdFromDisk);
+      } else {
+        // NodeId is already set correctly.
+        return;
+      }
+    }
+
+    getStorageInfo().setProperty(OM_NODE_ID, nodeId);
+
+    if (persistToDisk) {
+      // Current VERSION file does not have the nodeId. Persist the nodeId to
+      // disk.
+      persistCurrentState();
+    }
+  }
+
+  /**
    * Retrieves the OM ID from the version file.
    * @return OM_ID
    */
   public String getOmId() {
     return getStorageInfo().getProperty(OM_ID);
+  }
+
+  /**
+   * Retrieves the OM NodeId from the version file.
+   * @return OM_NODE_ID
+   */
+  public String getOmNodeId() {
+    return getStorageInfo().getProperty(OM_NODE_ID);
   }
 
   /**
@@ -87,6 +128,10 @@ public class OMStorage extends Storage {
     }
     Properties omProperties = new Properties();
     omProperties.setProperty(OM_ID, omId);
+    String nodeId = getOmNodeId();
+    if (nodeId != null) {
+      omProperties.setProperty(OM_NODE_ID, nodeId);
+    }
 
     if (getOmCertSerialId() != null) {
       omProperties.setProperty(OM_CERT_SERIAL_ID, getOmCertSerialId());

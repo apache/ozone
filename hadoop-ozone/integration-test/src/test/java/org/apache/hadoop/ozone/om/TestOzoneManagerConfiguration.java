@@ -83,6 +83,7 @@ public class TestOzoneManagerConfiguration {
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
+    omStore.setOmNodeId(OzoneConsts.OM_DEFAULT_NODE_ID, false);
     // writes the version file properties
     omStore.initialize();
   }
@@ -485,5 +486,28 @@ public class TestOzoneManagerConfiguration {
   private String getOMAddrKeyWithSuffix(String serviceId, String nodeId) {
     return ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceId, nodeId);
+  }
+
+  /**
+   * Re-initializing OMStorage with new nodeId should fail.
+   */
+  @Test
+  public void testChangeOMNodeId() throws Exception {
+    OMStorage omStore = new OMStorage(conf);
+    // As the OMStorage is already initialized in the setup, the nodeId
+    // must be set to the default OM NodeId - om1.
+    Assert.assertEquals(OzoneConsts.OM_DEFAULT_NODE_ID, omStore.getOmNodeId());
+
+    // Setting NodeId to a different value should throw an IOException
+    String newNodeId = "om1-hash";
+    try {
+      omStore.setOmNodeId(newNodeId, false);
+      Assert.fail("Setting new OM NodeId should fail.");
+    } catch (IOException e) {
+      String expectedErrorMsg = "OM NodeId: " + newNodeId + " does not match " +
+          "existing nodeId from VERSION file: " +
+          OzoneConsts.OM_DEFAULT_NODE_ID;
+      Assert.assertEquals(expectedErrorMsg, e.getLocalizedMessage());
+    }
   }
 }
