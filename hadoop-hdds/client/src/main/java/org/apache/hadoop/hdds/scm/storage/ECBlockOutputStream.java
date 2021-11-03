@@ -24,12 +24,9 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -38,7 +35,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 
 /**
  * Handles the chunk EC writes for an EC internal block.
@@ -71,63 +67,6 @@ public class ECBlockOutputStream extends BlockOutputStream{
   public void write(byte[] b, int off, int len) throws IOException {
     this.currentChunkRspFuture =
         writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
-  }
-
-  /**
-   * Writes buffered data as a new chunk to the container and saves chunk
-   * information to be used later in putKey call.
-   *
-   * @throws IOException if there is an I/O error while performing the call
-   * @throws OzoneChecksumException if there is an error while computing
-   * checksum
-   * @return ContainerCommandResponseProto
-   */
-  CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-      writeChunkToContainer(ChunkBuffer chunk) throws IOException {
-    int effectiveChunkSize = chunk.remaining();
-    final long offset = getChunkOffset().getAndAdd(effectiveChunkSize);
-    final ByteString data =
-        chunk.toByteString(getBufferPool().byteStringConversion());
-    ChecksumData checksumData = getCheckSum().computeChecksum(chunk);
-    ContainerProtos.ChunkInfo chunkInfo = ContainerProtos.ChunkInfo.newBuilder()
-        .setChunkName(getBlockID().getLocalID() + "_chunk_" + incrChunkIdx())
-        .setOffset(offset).setLen(effectiveChunkSize)
-        .setChecksumData(checksumData.getProtoBufMessage()).build();
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Writing chunk {} length {} at offset {}",
-          chunkInfo.getChunkName(), effectiveChunkSize, offset);
-    }
-    try {
-      XceiverClientReply asyncReply =
-          writeChunkAsync(getXceiverClient(), chunkInfo, getBlockID(), data,
-              getToken(), 1);
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-          asyncReply.getResponse();
-      future.thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          future.completeExceptionally(sce);
-        }
-        return e;
-      }, getResponseExecutor()).exceptionally(e -> {
-        String msg = "Failed to write chunk " + chunkInfo
-            .getChunkName() + " " + "into block " + getBlockID();
-        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-        CompletionException ce = new CompletionException(msg, e);
-        setIoException(ce);
-        throw ce;
-      });
-      getContainerBlockData().addChunks(chunkInfo);
-      return future;
-    } catch (IOException | ExecutionException e) {
-      throw new IOException(EXCEPTION_MSG + e.toString(), e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      handleInterruptedException(ex, false);
-    }
-    return null;
   }
 
   /**

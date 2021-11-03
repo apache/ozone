@@ -475,6 +475,10 @@ public class TestOzoneECClient {
       }
     }
     final OzoneKeyDetails key = bucket.getKey(keyName);
+    // Data supposed to store in single block group. Since we introduced the
+    // failures after first stripe, the second stripe data should have been
+    // written into new blockgroup. So, we should have 2 block groups. That
+    // means two keyLocations.
     Assert.assertEquals(2, key.getOzoneKeyLocations().size());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];

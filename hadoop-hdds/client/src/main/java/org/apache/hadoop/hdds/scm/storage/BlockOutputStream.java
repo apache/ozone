@@ -178,18 +178,6 @@ public class BlockOutputStream extends OutputStream {
         currentBuffer != null ? currentBuffer.remaining() : 0;
   }
 
-  Checksum getCheckSum(){
-    return this.checksum;
-  }
-
-  AtomicLong getChunkOffset(){
-    return this.chunkOffset;
-  }
-
-  int incrChunkIdx(){
-    return ++this.chunkIndex;
-  }
-
   public BlockID getBlockID() {
     return blockID.get();
   }
@@ -707,13 +695,14 @@ public class BlockOutputStream extends OutputStream {
         setIoException(ce);
         throw ce;
       });
+      containerBlockData.addChunks(chunkInfo);
+      return future;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    containerBlockData.addChunks(chunkInfo);
     return null;
   }
 
