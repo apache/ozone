@@ -383,7 +383,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     return position;
   }
 
-  protected void setPos(long pos) {
+  protected synchronized void setPos(long pos) {
     position = pos;
   }
 
