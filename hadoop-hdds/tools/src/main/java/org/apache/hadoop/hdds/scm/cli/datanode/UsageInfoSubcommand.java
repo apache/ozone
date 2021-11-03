@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.util.StringUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -96,19 +97,37 @@ public class UsageInfoSubcommand extends ScmSubcommand {
    * @param info Information such as Capacity, SCMUsed etc.
    */
   public void printInfo(HddsProtos.DatanodeUsageInfoProto info) {
-    double capacity = (double) info.getCapacity();
-    double usedRatio = info.getUsed() / capacity;
-    double remainingRatio = info.getRemaining() / capacity;
+    long capacity = info.getCapacity();
+    long used = info.getUsed(), remaining = info.getRemaining();
+    long totalUsed = capacity - remaining;
+    double usedRatio = used / (double) capacity;
+    double remainingRatio = remaining / (double) capacity;
     NumberFormat percentFormat = NumberFormat.getPercentInstance();
-    percentFormat.setMinimumFractionDigits(5);
+    percentFormat.setMinimumFractionDigits(2);
+    percentFormat.setMaximumFractionDigits(2);
 
     System.out.printf("Usage info for datanode with UUID %s:%n",
         info.getNode().getUuid());
-    System.out.printf("%-10s: %20sB %n", "Capacity", info.getCapacity());
-    System.out.printf("%-10s: %20sB (%s) %n", "SCMUsed", info.getUsed(),
+    // print capacity in a readable format
+    System.out.printf("%-13s: %-21s (%s) %n", "Capacity", capacity + " B",
+        StringUtils.byteDesc(capacity));
+
+    // print total used space and its percentage in a readable format
+    System.out.printf("%-13s: %-21s (%s) %n", "Total Used", totalUsed + " B",
+        StringUtils.byteDesc(totalUsed));
+    System.out.printf("%-13s: %s %n", "Total Used %",
+        percentFormat.format(1 - remainingRatio));
+
+    // print space used by ozone and its percentage in a readable format
+    System.out.printf("%-13s: %-21s (%s) %n", "Ozone Used", used + " B",
+        StringUtils.byteDesc(used));
+    System.out.printf("%-13s: %s %n", "Ozone Used %",
         percentFormat.format(usedRatio));
-    System.out.printf("%-10s: %20sB (%s) %n%n",
-        "Remaining", info.getRemaining(),
+
+    // print total remaining space and its percentage in a readable format
+    System.out.printf("%-13s: %-21s (%s) %n", "Remaining", remaining + " B",
+        StringUtils.byteDesc(remaining));
+    System.out.printf("%-13s: %s %n%n", "Remaining %",
         percentFormat.format(remainingRatio));
   }
 }
