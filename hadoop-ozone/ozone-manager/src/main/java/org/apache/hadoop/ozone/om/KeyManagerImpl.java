@@ -2429,8 +2429,7 @@ public class KeyManagerImpl implements KeyManager {
     // Then, find key in DB
     String seekKeyInDb =
         metadataManager.getOzoneKey(volumeName, bucketName, startKey);
-    Table.KeyValue<String, OmKeyInfo> entry;
-    entry = iterator.seek(seekKeyInDb);
+    Table.KeyValue<String, OmKeyInfo> entry = iterator.seek(seekKeyInDb);
     int countEntries = 0;
     if (iterator.hasNext()) {
       if (entry.getKey().equals(keyArgs)) {
@@ -2828,7 +2827,7 @@ public class KeyManagerImpl implements KeyManager {
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
-      if (deletedKeySet.contains(dirInfo.getPath()) && iterator.hasNext()) {
+      if (deletedKeySet.contains(dirInfo.getPath())) {
         iterator.next(); // move to next entry in the table
         // entry is actually deleted in cache and can exists in DB
         continue;
@@ -2865,7 +2864,7 @@ public class KeyManagerImpl implements KeyManager {
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
       OmKeyInfo keyInfo = entry.getValue();
-      if (iterator.hasNext() && deletedKeySet.contains(keyInfo.getPath())) {
+      if (deletedKeySet.contains(keyInfo.getPath())) {
         iterator.next(); // move to next entry in the table
         // entry is actually deleted in cache and can exists in DB
         continue;
