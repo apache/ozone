@@ -397,6 +397,15 @@ public class SCMNodeManager implements NodeManager {
         LOG.error("Cannot find datanode {} from nodeStateManager",
             datanodeDetails.toString());
       }
+    } else {
+      // IP address of DN could be changed in K8s env, need to be updated in SCM
+      // once DN restarts
+      try {
+        nodeStateManager.updateLastKnownIpAddress(datanodeDetails);
+      } catch (NodeNotFoundException e) {
+        LOG.error("Cannot find datanode {} from nodeStateManager",
+            datanodeDetails.toString());
+      }
     }
 
     return RegisteredCommand.newBuilder().setErrorCode(ErrorCode.success)

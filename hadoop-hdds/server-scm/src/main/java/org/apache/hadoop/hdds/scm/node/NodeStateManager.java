@@ -390,6 +390,22 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Update last known ip address.
+   *
+   * @param datanodeDetails the datanode details
+   * @throws NodeNotFoundException the node not found exception
+   */
+  public void updateLastKnownIpAddress(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    LOG.info("updateLastKnownIpAddress of {} from {} to {}",
+        datanodeDetails.getUuidString(),
+        nodeStateMap.getNodeInfo(datanodeDetails.getUuid()).getIpAddress(),
+        datanodeDetails.getIpAddress());
+    nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
+        .updateLastIpAddress(datanodeDetails.getIpAddress());
+  }
+
+  /**
    * Returns the current state of the node.
    *
    * @param datanodeDetails DatanodeDetails

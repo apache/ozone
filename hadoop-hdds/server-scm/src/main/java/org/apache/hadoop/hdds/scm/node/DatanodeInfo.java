@@ -112,6 +112,22 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Update last ip address.
+   *
+   * @param lastIp the last ip
+   */
+  public void updateLastIpAddress(String lastIp) {
+    if (!lastIp.equalsIgnoreCase(getIpAddress())) {
+      try {
+        lock.writeLock().lock();
+        setIpAddress(lastIp);
+      } finally {
+        lock.writeLock().unlock();
+      }
+    }
+  }
+
+  /**
    * Returns the last heartbeat time.
    *
    * @return last heartbeat time.
