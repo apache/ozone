@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import org.apache.hadoop.util.OzoneUtils;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -456,7 +457,7 @@ public class OMFailoverProxyProvider<T> implements
   }
 
   private synchronized boolean shouldFailover(Exception ex) {
-    Throwable unwrappedException = OmUtils.getUnwrappedException(ex);
+    Throwable unwrappedException = OzoneUtils.getUnwrappedException(ex);
     if (unwrappedException instanceof AccessControlException) {
       // Retry all available OMs once before failing with
       // AccessControlException.
@@ -469,19 +470,8 @@ public class OMFailoverProxyProvider<T> implements
           return false;
         }
       }
-    } else if (unwrappedException instanceof RpcException) {
-      // Do not failover for following exceptions
-      if (unwrappedException instanceof RpcNoSuchMethodException ||
-          unwrappedException instanceof RpcNoSuchProtocolException ||
-          unwrappedException instanceof RPC.VersionMismatch) {
-        return false;
-      }
-      if (unwrappedException.getMessage().contains(
-          "RPC response exceeds maximum data length") ||
-          unwrappedException.getMessage().contains(
-              "RPC response has invalid length")) {
-        return false;
-      }
+    } else if (OzoneUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
+      return false;
     } else if (ex instanceof StateMachineException) {
       StateMachineException smEx = (StateMachineException) ex;
       Throwable cause = smEx.getCause();

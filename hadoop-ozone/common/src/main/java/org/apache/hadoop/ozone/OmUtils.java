@@ -621,31 +621,6 @@ public final class OmUtils {
   }
 
   /**
-   * Unwrap exception to check if it is some kind of access control problem
-   * ({@link AccessControlException} or {@link SecretManager.InvalidToken})
-   * or a RpcException.
-   */
-  public static Throwable getUnwrappedException(Exception ex) {
-    if (ex instanceof ServiceException) {
-      Throwable t = ex.getCause();
-      if (t instanceof RemoteException) {
-        t = ((RemoteException) t).unwrapRemoteException();
-      }
-      while (t != null) {
-        if (t instanceof RpcException) {
-          return t;
-        }
-        if (t instanceof AccessControlException ||
-            t instanceof SecretManager.InvalidToken) {
-          return t;
-        }
-        t = t.getCause();
-      }
-    }
-    return null;
-  }
-
-  /**
    * Normalize the key name. This method used {@link Path} to
    * normalize the key name.
    * @param keyName
