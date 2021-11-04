@@ -626,6 +626,21 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
+   * Returns s3 secret given a kerberos user.
+   * @param kerberosID
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  @Override
+  public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
+            "kerberosID cannot be null or empty.");
+    // No need to check createIfNotExist here which is a primitive
+    return ozoneManagerClient.getS3Secret(kerberosID, createIfNotExist);
+  }
+
+  /**
    * {@inheritDoc}
    */
   @Override

@@ -878,6 +878,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException {
+    GetS3SecretRequest request = GetS3SecretRequest.newBuilder()
+            .setKerberosID(kerberosID)
+            .setCreateIfNotExist(createIfNotExist)
+            .build();
+    OMRequest omRequest = createOMRequest(Type.GetS3Secret)
+            .setGetS3SecretRequest(request)
+            .build();
+    final GetS3SecretResponse resp = handleError(submitRequest(omRequest))
+            .getGetS3SecretResponse();
+
+    return S3SecretValue.fromProtobuf(resp.getS3Secret());
+  }
+
+  @Override
   public void revokeS3Secret(String kerberosID) throws IOException {
     RevokeS3SecretRequest request = RevokeS3SecretRequest.newBuilder()
             .setKerberosID(kerberosID)

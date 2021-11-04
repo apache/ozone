@@ -376,6 +376,7 @@ public class TestOzoneTenantShell {
    * and revoke user flow.
    */
   @Test
+  @SuppressWarnings("methodlength")
   public void testOzoneTenantBasicOperations() throws IOException {
 
     List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
@@ -424,6 +425,13 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Policy", false);
     checkOutput(err, "", true);
 
+    // Attempt user getsecret before assignment, should fail
+    executeHA(tenantShell, new String[] {
+        "user", "getsecret", "finance$bob"});
+    checkOutput(out, "", false);
+    checkOutput(err, "AccessId 'finance$bob' doesn't exist\n",
+        true);
+
     // Assign user accessId
     // Equivalent to `ozone tenant user assign bob --tenant=finance`
     executeHA(tenantShell, new String[] {
@@ -432,6 +440,19 @@ public class TestOzoneTenantShell {
         + "export AWS_SECRET_ACCESS_KEY='", false);
     checkOutput(err, "Assigned 'bob' to 'finance' with accessId"
         + " 'finance$bob'.\n", true);
+
+    // Try user getsecret again after assignment, should succeed
+    executeHA(tenantShell, new String[] {
+        "user", "getsecret", "finance$bob"});
+    checkOutput(out, "awsAccessKey=finance$bob\n", false);
+    checkOutput(err, "", true);
+
+    // Try user getsecret again with -e option
+    executeHA(tenantShell, new String[] {
+        "user", "getsecret", "-e", "finance$bob"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n",
+            false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research"});

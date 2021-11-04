@@ -402,7 +402,7 @@ enum Status {
     TENANT_ALREADY_EXISTS = 76;
     INVALID_TENANT_NAME = 77;
 
-    TENANT_USER_ACCESSID_NOT_FOUND = 78;
+    ACCESSID_NOT_FOUND = 78;
     TENANT_USER_ACCESSID_ALREADY_EXISTS = 79;  // TODO: Remove if not used
     INVALID_TENANT_USER_NAME = 80;
     INVALID_ACCESSID = 81;
@@ -1372,10 +1372,20 @@ message S3Secret {
 
 message GetS3SecretRequest {
     required string kerberosID = 1;
+    optional bool createIfNotExist = 2;
 }
 
 message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
+}
+
+message SetSecretRequest {
+    optional string accessId = 1;
+    optional string secret = 2;
+}
+
+message SetSecretResponse {
+    optional bool success = 1;
 }
 
 message TenantInfo {

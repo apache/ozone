@@ -3073,6 +3073,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return s3SecretManager.getS3Secret(kerberosID);
   }
 
+  @Override
+  /**
+   * {@inheritDoc}
+   */
+  public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException {
+    throw new NotImplementedException(
+            "non-Ratis getS3Secret(String, boolean) is not implemented");
+  }
+
   /**
    * Create tenant.
    */
