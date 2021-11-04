@@ -40,6 +40,3 @@ RpcClient prefix acls
 
 RpcClient without host
     Test ozone shell      o3://            ${EMPTY}    ${prefix}-rpcwport
-
-RpcClient without scheme
-    Test ozone shell      ${EMPTY}         ${EMPTY}    ${prefix}-rpcwoscheme
