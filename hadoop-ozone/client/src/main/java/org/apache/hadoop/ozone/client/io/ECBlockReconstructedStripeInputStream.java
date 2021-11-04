@@ -212,11 +212,16 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     validateBuffers(bufs);
     assignBuffers(bufs);
     clearParityBuffers();
+    // Set the read limits on the buffers so we do not read any garbage data
+    // from the end of the block that is unexpected.
+    setBufferReadLimits(bufs, toRead);
     loadDataBuffersFromStream();
     padBuffers(toRead);
     flipInputs();
     decodeStripe();
-    unPadBuffers(bufs, toRead);
+    // Reset the buffer positions after padding to the read limits so the client
+    // reads the correct amount of data.
+    setBufferReadLimits(bufs, toRead);
     setPos(getPos() + toRead);
     return toRead;
   }
@@ -233,11 +238,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     int dataNum = getRepConfig().getData();
     int parityNum = getRepConfig().getParity();
     int chunkSize = getRepConfig().getEcChunkSize();
-    int fullChunks = toRead / chunkSize;
-    if (fullChunks == dataNum) {
+    if (toRead >= getStripeSize()) {
       // There is no padding to do - we are reading a full stripe.
       return;
     }
+    int fullChunks = toRead / chunkSize;
     // The size of each chunk is governed by the size of the first chunk.
     // The parity always matches the first chunk size.
     int paritySize = Math.min(toRead, chunkSize);
@@ -264,22 +269,32 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
-  private void unPadBuffers(ByteBuffer[] bufs, int toRead) {
+  private void setBufferReadLimits(ByteBuffer[] bufs, int toRead) {
     int chunkSize = getRepConfig().getEcChunkSize();
     int fullChunks = toRead / chunkSize;
-    int remainingLength = toRead % chunkSize;
     if (fullChunks == getRepConfig().getData()) {
       // We are reading a full stripe, no concerns over padding.
       return;
     }
 
     if (fullChunks == 0){
+      bufs[0].limit(toRead);
       // All buffers except the first contain no data.
       for (int i = 1; i < bufs.length; i++) {
         bufs[i].position(0);
         bufs[i].limit(0);
       }
+      // If we have less than 1 chunk, then the parity buffers are the size
+      // of the first chunk.
+      for (int i = getRepConfig().getData();
+           i < getRepConfig().getRequiredNodes(); i++) {
+        ByteBuffer b = decoderInputBuffers[i];
+        if (b != null) {
+          b.limit(toRead);
+        }
+      }
     } else {
+      int remainingLength = toRead % chunkSize;
       // The first partial has the remaining length
       bufs[fullChunks].limit(remainingLength);
       // All others have a zero limit
@@ -354,10 +369,21 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     for (int i = 0; i < dataIndexes.size(); i++) {
       BlockExtendedInputStream stream =
           getOrOpenStream(i, dataIndexes.get(i));
+      seekStreamIfNecessary(stream, 0);
       ByteBuffer b = decoderInputBuffers[dataIndexes.get(i)];
       while (b.hasRemaining()) {
         int read = stream.read(b);
         if (read == EOF) {
+          // We should not reach EOF, as the block should have enough data to
+          // fill the buffer. If the block does not, then it indicates the block
+          // is not as long as it should be, based on the block length stored in
+          // OM. Therefore if there is any remaining space in the buffer, we
+          // should throw an exception.
+          if (b.hasRemaining()) {
+            throw new IOException("Expected to read " + b.remaining() +
+                " bytes from block " + getBlockID() + " EC index " + (i + 1) +
+                " but reached EOF");
+          }
           break;
         }
       }
@@ -410,6 +436,17 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   protected int readWithStrategy(ByteReaderStrategy strategy) {
     throw new NotImplementedException("readWithStrategy is not implemented. " +
         "Use readStripe() instead");
+  }
+
+  @Override
+  public synchronized void seek(long pos) throws IOException {
+    if (pos % getStripeSize() != 0) {
+      // As this reader can only return full stripes, we only seek to the start
+      // stripe offsets
+      throw new IOException("Requested position " + pos
+          + " does not align with a stripe offset");
+    }
+    super.seek(pos);
   }
 
 }
