@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
@@ -1027,6 +1028,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .getTenantGetUserInfoResponse();
 
     return TenantUserInfoValue.fromProtobuf(resp.getTenantUserInfo());
+  }
+
+  @Override
+  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+      throws IOException {
+    TenantListUserRequest.Builder builder =
+        TenantListUserRequest.newBuilder().setTenantName(tenantName);
+    if (prefix != null) {
+      builder.setPrefix(prefix);
+    }
+    TenantListUserRequest request = builder.build();
+
+    final OMRequest omRequest = createOMRequest(Type.TenantListUser)
+        .setTenantListUserRequest(request).build();
+    final OMResponse response = submitRequest(omRequest);
+    final TenantListUserResponse resp =
+        handleError(response).getTenantListUserResponse();
+    return TenantUserList.fromProtobuf(resp);
   }
 
   @Override

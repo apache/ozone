@@ -268,6 +268,7 @@ public final class OmUtils {
     case GetS3Volume:
     case ListTenant:
     case TenantGetUserInfo:
+    case TenantListUser:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

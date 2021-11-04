@@ -40,6 +40,7 @@ import java.util.concurrent.Callable;
         TenantRevokeUserAccessIdHandler.class,
         TenantAssignAdminHandler.class,
         TenantRevokeAdminHandler.class,
+        TenantListUsersHandler.class,
         TenantGetSecretHandler.class,
         TenantSetSecretHandler.class
     },

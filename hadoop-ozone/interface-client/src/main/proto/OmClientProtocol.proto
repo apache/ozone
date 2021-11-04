@@ -116,6 +116,7 @@ enum Type {
   TenantRevokeAdmin = 102;
 
   GetS3Volume = 104;
+  TenantListUser = 105;
 }
 
 message OMRequest {
@@ -212,6 +213,7 @@ message OMRequest {
   optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 102;
 
   optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
+  optional TenantListUserRequest            tenantListUserRequest         = 105;
 }
 
 message OMResponse {
@@ -303,6 +305,7 @@ message OMResponse {
   optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 102;
 
   optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
+  optional TenantListUserResponse            tenantListUserResponse        = 105;
 }
 
 enum Status {
@@ -406,6 +409,7 @@ enum Status {
     TENANT_USER_ACCESSID_ALREADY_EXISTS = 79;  // TODO: Remove if not used
     INVALID_TENANT_USER_NAME = 80;
     INVALID_ACCESSID = 81;
+    TENANT_AUTHORIZER_ERROR = 82;
 }
 
 /**
@@ -1396,6 +1400,14 @@ message TenantInfo {
     optional string bucketPolicyGroupName = 5;
 }
 
+message TenantUserAccessId {
+    optional string user = 1;
+    optional string accessId = 2;
+    optional bool isAdmin = 3;
+    optional bool isDelegatedAdmin = 4;
+}
+
+
 message ListTenantRequest {
 
 }
@@ -1409,9 +1421,20 @@ message TenantGetUserInfoRequest {
     optional string userPrincipal = 1;
 }
 
+message TenantListUserRequest {
+    optional string tenantName = 1;
+    optional string prefix = 2;
+}
+
 message TenantGetUserInfoResponse {
     optional bool success = 1;
     optional TenantUserInfo tenantUserInfo = 2;
+}
+
+message TenantListUserResponse {
+    optional bool success = 1;
+    optional string tenantName = 2;
+    repeated TenantUserAccessId userAccessIdInfo = 3;
 }
 
 message TenantUserInfo {

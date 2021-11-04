@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -245,6 +246,11 @@ public class ObjectStore {
   public void tenantRevokeAdmin(String accessId, String tenantName)
       throws IOException {
     proxy.tenantRevokeAdmin(accessId, tenantName);
+  }
+
+  public TenantUserList listUsersInTenant(String tenantName, String userPrefix)
+      throws IOException {
+    return proxy.listUsersInTenant(tenantName, userPrefix);
   }
 
   /**
