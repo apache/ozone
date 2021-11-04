@@ -15,26 +15,39 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.om.multitenantImpl;
+package org.apache.hadoop.ozone.om.multitenant.impl;
 
-import java.util.ArrayList;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+
+import com.google.common.collect.ImmutableList;
 
 /**
- * Implements BucketNameSpace.
+ * Implements BucketNameSpace which allows exactly ONE VOLUME.
  */
-public class BucketNameSpaceImpl implements BucketNameSpace {
+public class SingleVolumeTenantNamespace implements BucketNameSpace {
+  public static final String BUCKET_NS_PREFIX = "BucketNS-";
   private final String bucketNameSpaceID;
-  private List<OzoneObj> bucketNameSpaceObjects;
+  private final List<OzoneObj> nsObjects;
 
-  public BucketNameSpaceImpl(String id) {
-    bucketNameSpaceID = id;
-    bucketNameSpaceObjects = new ArrayList<>();
+  public SingleVolumeTenantNamespace(String id) {
+    this(id, id);
+  }
+
+  public SingleVolumeTenantNamespace(String id, String volumeName) {
+    this.bucketNameSpaceID = BUCKET_NS_PREFIX + id;
+    this.nsObjects = ImmutableList.of(new OzoneObjInfo.Builder()
+        .setResType(VOLUME)
+        .setStoreType(OZONE)
+        .setVolumeName(volumeName).build());
   }
 
   @Override
@@ -44,12 +57,13 @@ public class BucketNameSpaceImpl implements BucketNameSpace {
 
   @Override
   public List<OzoneObj> getBucketNameSpaceObjects() {
-    return bucketNameSpaceObjects;
+    return nsObjects;
   }
 
   @Override
   public void addBucketNameSpaceObject(OzoneObj e) {
-    bucketNameSpaceObjects.add(e);
+    throw new UnsupportedOperationException("Cannot add an object to a single" +
+        " SingleVolumeTenantNamespace.");
   }
 
   @Override

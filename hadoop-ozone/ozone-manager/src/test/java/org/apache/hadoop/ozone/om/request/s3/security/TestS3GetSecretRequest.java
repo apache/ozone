@@ -133,11 +133,11 @@ public class TestS3GetSecretRequest {
     // Multi-tenant related initializations
     omMultiTenantManager = mock(OMMultiTenantManager.class);
     tenant = mock(Tenant.class);
-    when(omMultiTenantManager.getTenantInfo(TENANT_NAME)).thenReturn(tenant);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
-    when(omMultiTenantManager.createTenant(TENANT_NAME)).thenReturn(tenant);
+    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_NAME))
+        .thenReturn(tenant);
   }
 
   @After

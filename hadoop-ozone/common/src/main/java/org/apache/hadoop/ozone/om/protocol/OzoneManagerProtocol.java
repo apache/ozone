@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
@@ -511,6 +512,9 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException;
+
+  TenantUserList listUsersInTenant(String tenantName, String prefix)
       throws IOException;
 
   /**
