@@ -544,6 +544,7 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Revoked accessId", false);
   }
 
+  @Test
   private void testListTenantUsers() throws IOException {
     executeHA(tenantShell, new String[] {
         "user", "assign", "alice@EXAMPLE.COM", "--tenant=research"});

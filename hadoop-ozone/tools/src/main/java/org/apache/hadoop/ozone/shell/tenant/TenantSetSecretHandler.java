@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
@@ -35,8 +34,7 @@ public class TenantSetSecretHandler extends TenantHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objectStore = client.getObjectStore();
-
+//    final ObjectStore objectStore = client.getObjectStore();
   }
 }
 
