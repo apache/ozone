@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -88,6 +89,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3Vo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
@@ -244,6 +247,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getListTenantRequest());
         responseBuilder.setListTenantResponse(listTenantResponse);
         break;
+      case TenantListUser:
+        TenantListUserResponse listUserResponse = tenantListUsers(
+            request.getTenantListUserRequest());
+        responseBuilder.setTenantListUserResponse(listUserResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -384,6 +392,22 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     return resp.build();
+  }
+
+  private TenantListUserResponse tenantListUsers(
+      TenantListUserRequest request) throws IOException {
+    TenantListUserResponse.Builder builder =
+        TenantListUserResponse.newBuilder();
+    TenantUserList usersInTenant =
+        impl.listUsersInTenant(request.getTenantName(), request.getPrefix());
+    if (usersInTenant == null) {
+      builder.setSuccess(false);
+    } else {
+      builder.setSuccess(true);
+      builder.setTenantName(request.getTenantName());
+      builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
+    }
+    return builder.build();
   }
 
   private ListTenantResponse listTenant(

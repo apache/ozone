@@ -219,7 +219,8 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     final TenantAssignUserAccessIdRequest request =
         getOmRequest().getTenantAssignUserAccessIdRequest();
     final String tenantName = request.getTenantName();
-    final String principal = request.getTenantUsername();  // TODO: Rename this
+    final String principal = request.getTenantUsername();
+
     assert(accessId.equals(request.getAccessId()));
     IOException exception = null;
 
@@ -341,7 +342,6 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           omResponse.build(), s3SecretValue, principal, defaultGroupName,
           roleName, accessId, omDBAccessIdInfo, principalInfo);
     } catch (IOException ex) {
-      // Error handling
       handleRequestFailure(ozoneManager);
       exception = ex;
       // Set response success flag to false

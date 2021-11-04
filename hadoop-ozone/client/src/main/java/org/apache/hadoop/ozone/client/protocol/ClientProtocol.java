@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -624,6 +625,16 @@ public interface ClientProtocol {
    * @throws IOException
    */
   TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException;
+
+  /**
+   * Get List of users in a tenant.
+   * @param tenantName tenant name
+   * @param prefix optional prefix
+   * @return List of username, accessIds in tenant.
+   * @throws IOException on server error.
+   */
+  TenantUserList listUsersInTenant(String tenantName, String prefix)
       throws IOException;
 
   /**

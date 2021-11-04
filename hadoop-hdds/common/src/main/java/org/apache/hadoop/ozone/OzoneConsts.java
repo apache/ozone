@@ -334,6 +334,7 @@ public final class OzoneConsts {
   public static final String SOURCE_VOLUME = "sourceVolume";
   public static final String SOURCE_BUCKET = "sourceBucket";
   public static final String TENANT = "tenant";
+  public static final String USER_PREFIX = "userPrefix";
 
   // For multi-tenancy
   public static final String TENANT_NAME_USER_NAME_DELIMITER = "$";

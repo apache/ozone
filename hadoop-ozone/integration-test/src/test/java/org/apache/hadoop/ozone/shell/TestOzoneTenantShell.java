@@ -228,7 +228,7 @@ public class TestOzoneTenantShell {
    * was thrown.
    */
   private void executeWithError(OzoneShell shell, String[] args,
-      String expectedError) {
+                                String expectedError) {
     if (Strings.isNullOrEmpty(expectedError)) {
       execute(shell, args);
     } else {
@@ -315,7 +315,7 @@ public class TestOzoneTenantShell {
    * Helper function that checks command output AND clears it.
    */
   private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
-      boolean exactMatch) throws IOException {
+                           boolean exactMatch) throws IOException {
     stream.flush();
     final String str = stream.toString(DEFAULT_ENCODING);
     checkOutput(str, stringToMatch, exactMatch);
@@ -323,7 +323,7 @@ public class TestOzoneTenantShell {
   }
 
   private void checkOutput(String str, String stringToMatch,
-      boolean exactMatch) {
+                           boolean exactMatch) {
     if (exactMatch) {
       Assert.assertEquals(stringToMatch, str);
     } else {
@@ -523,4 +523,31 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Revoked accessId", false);
   }
 
+  private void testListTenantUsers() throws IOException {
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "alice@EXAMPLE.COM", "--tenant=research"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='research$alice@EXAMPLE.COM'\n"
+        + "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'alice@EXAMPLE.COM' to 'research'" +
+        " with accessId 'research$alice@EXAMPLE.COM'.\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=research"});
+    checkOutput(out,
+        "- User 'bob@EXAMPLE.COM' with accessId 'research$bob@EXAMPLE.COM'\n"
+            + "- User 'alice@EXAMPLE.COM' with accessId 'research$alice@EXAMPLE"
+            + ".COM'\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=research", "--prefix=b"});
+    checkOutput(out, "- User 'bob@EXAMPLE.COM' with accessId " +
+        "'research$bob@EXAMPLE.COM'\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=unknown"});
+    checkOutput(err, "Failed to Get Users in tenant 'unknown': " +
+        "Tenant 'unknown' not found!\n", true);
+  }
 }
