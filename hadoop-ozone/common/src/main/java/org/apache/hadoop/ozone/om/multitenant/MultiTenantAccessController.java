@@ -1,11 +1,17 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
+import org.apache.commons.collections.Unmodifiable;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.auth.BasicUserPrincipal;
 
+import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,53 +59,91 @@ public interface MultiTenantAccessController {
     }
   }
 
+  class Acl {
+    private final boolean isAllowed;
+    private final IAccessAuthorizer.ACLType acl;
+
+    private Acl(IAccessAuthorizer.ACLType acl, boolean isAllowed) {
+      this.isAllowed = isAllowed;
+      this.acl = acl;
+    }
+
+    public static Acl allow(IAccessAuthorizer.ACLType acl) {
+      return new Acl(acl, true);
+    }
+
+    public static Acl deny(IAccessAuthorizer.ACLType acl) {
+      return new Acl(acl, false);
+    }
+
+    public IAccessAuthorizer.ACLType getAclType() {
+      return acl;
+    }
+
+    public boolean isAllowed() {
+      return isAllowed;
+    }
+  }
+
   /**
    * Define a policy to be created.
    */
   class Policy {
     private final String name;
-    private final String volume;
-    private final List<String> roles;
-    private String bucket;
-    private String key;
+    private final Collection<String> volumes;
+    private final Collection<String> buckets;
+    private final Collection<String> keys;
     private String description;
+    private final Map<String, Collection<Acl>> roleAcls;
 
     public Policy(String policyName, String volumeName) {
       this.name = policyName;
-      this.volume = volumeName;
-      this.roles = new ArrayList<>();
+      this.volumes = new ArrayList<>();
+      this.volumes.add(volumeName);
+      this.buckets = new ArrayList<>();
+      this.keys = new ArrayList<>();
+      this.roleAcls = new HashMap<>();
     }
 
-    public String getVolume() {
-      return volume;
+    public Collection<String> getVolumes() {
+      return Collections.unmodifiableCollection(volumes);
+    }
+
+    public Collection<String> getBuckets() {
+      return Collections.unmodifiableCollection(buckets);
+    }
+
+    public Collection<String> getKeys() {
+      return Collections.unmodifiableCollection(keys);
+    }
+
+    public void addVolume(String volumeName) {
+      volumes.add(volumeName);
+    }
+
+    public void addBucket(String bucketName) {
+      buckets.add(bucketName);
+    }
+
+    public void addKey(String keyName) {
+      keys.add(keyName);
     }
 
     public String getName() {
       return name;
     }
 
-    public Optional<String> getBucket() {
-      return Optional.ofNullable(bucket);
-    }
-
-    public Optional<String> getKey() {
-      return Optional.ofNullable(key);
-    }
-
     public Optional<String> getDescription() {
       return Optional.ofNullable(description);
     }
 
-    public List<String> getRoles() {
-      return roles;
+    public void addRoleAcl(String roleName, Acl acl) {
+      roleAcls.putIfAbsent(roleName, new ArrayList<>());
+      roleAcls.get(roleName).add(acl);
     }
 
-    public void setBucket(String bucket) {
-      this.bucket = bucket;
-    }
-
-    public void setKey(String key) {
-      this.key = key;
+    public Map<String, Collection<Acl>> getRoleAcls() {
+      return Collections.unmodifiableMap(roleAcls);
     }
 
     public void setDescription(String description) {
