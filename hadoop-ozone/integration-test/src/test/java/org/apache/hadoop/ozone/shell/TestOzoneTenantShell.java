@@ -542,34 +542,53 @@ public class TestOzoneTenantShell {
         "user", "revoke", "research$bob"});
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
+
+    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
   }
 
   @Test
-  private void testListTenantUsers() throws IOException {
-    executeHA(tenantShell, new String[] {
-        "user", "assign", "alice@EXAMPLE.COM", "--tenant=research"});
-    checkOutput(out, "export AWS_ACCESS_KEY_ID='research$alice@EXAMPLE.COM'\n"
-        + "export AWS_SECRET_ACCESS_KEY='", false);
-    checkOutput(err, "Assigned 'alice@EXAMPLE.COM' to 'research'" +
-        " with accessId 'research$alice@EXAMPLE.COM'.\n", true);
-
-    executeHA(tenantShell, new String[] {
-        "user", "list", "--tenant=research"});
-    checkOutput(out,
-        "- User 'bob@EXAMPLE.COM' with accessId 'research$bob@EXAMPLE.COM'\n"
-            + "- User 'alice@EXAMPLE.COM' with accessId 'research$alice@EXAMPLE"
-            + ".COM'\n", true);
+  public void testListTenantUsers() throws IOException {
+    executeHA(tenantShell, new String[] {"create", "tenant1"});
+    checkOutput(out, "Created tenant 'tenant1'.\n", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
-        "user", "list", "--tenant=research", "--prefix=b"});
-    checkOutput(out, "- User 'bob@EXAMPLE.COM' with accessId " +
-        "'research$bob@EXAMPLE.COM'\n", true);
+        "user", "assign", "alice", "--tenant=tenant1"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='tenant1$alice'\n"
+        + "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'alice' to 'tenant1'" +
+        " with accessId 'tenant1$alice'.\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob", "--tenant=tenant1"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='tenant1$bob'\n"
+        + "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'bob' to 'tenant1'" +
+        " with accessId 'tenant1$bob'.\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=tenant1"});
+    checkOutput(out, "- User 'bob' with accessId 'tenant1$bob'\n" +
+        "- User 'alice' with accessId 'tenant1$alice'\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "list", "--tenant=tenant1", "--prefix=b"});
+    checkOutput(out, "- User 'bob' with accessId " +
+        "'tenant1$bob'\n", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "list", "--tenant=unknown"});
     checkOutput(err, "Failed to Get Users in tenant 'unknown': " +
         "Tenant 'unknown' not found!\n", true);
+
+    // Clean up
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "tenant1$alice"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
   }
 }
