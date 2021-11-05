@@ -1,9 +1,11 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
+import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.auth.BasicUserPrincipal;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,10 +36,10 @@ public interface MultiTenantAccessController {
    */
   long createRole(Role role) throws Exception;
 
-  void addUsersToRole(long roleID, Collection<BasicUserPrincipal> newUsers)
+  void addUsersToRole(long roleID, BasicUserPrincipal... newUsers)
       throws Exception;
 
-  void removeUsersFromRole(long roleID, Collection<BasicUserPrincipal> users)
+  void removeUsersFromRole(long roleID, BasicUserPrincipal... users)
       throws Exception;
 
   void deleteRole(long roleID) throws Exception;
@@ -63,12 +65,16 @@ public interface MultiTenantAccessController {
       return name;
     }
 
+    public void addUser(BasicUserPrincipal user) {
+      users.add(user);
+    }
+
     public Collection<BasicUserPrincipal> getUsers() {
-      return users;
+      return Collections.unmodifiableCollection(users);
     }
 
     public Optional<String> getDescription() {
-      return Optional.of(description);
+      return Optional.ofNullable(description);
     }
 
     public void setDescription(String description) {
@@ -116,10 +122,10 @@ public interface MultiTenantAccessController {
     private String description;
     private final Map<String, Collection<Acl>> roleAcls;
 
-    public Policy(String policyName, String volumeName) {
+    public Policy(String policyName, String... volumeName) {
       this.name = policyName;
       this.volumes = new ArrayList<>();
-      this.volumes.add(volumeName);
+      this.volumes.addAll(Arrays.asList(volumeName));
       this.buckets = new ArrayList<>();
       this.keys = new ArrayList<>();
       this.roleAcls = new HashMap<>();
@@ -137,16 +143,16 @@ public interface MultiTenantAccessController {
       return Collections.unmodifiableCollection(keys);
     }
 
-    public void addVolume(String volumeName) {
-      volumes.add(volumeName);
+    public void addVolumes(String... volumeNames) {
+      volumes.addAll(Arrays.asList(volumeNames));
     }
 
-    public void addBucket(String bucketName) {
-      buckets.add(bucketName);
+    public void addBuckets(String... bucketNames) {
+      buckets.addAll(Arrays.asList(bucketNames));
     }
 
-    public void addKey(String keyName) {
-      keys.add(keyName);
+    public void addKeys(String... keyNames) {
+      keys.addAll(Arrays.asList(keyNames));
     }
 
     public String getName() {
@@ -157,9 +163,9 @@ public interface MultiTenantAccessController {
       return Optional.ofNullable(description);
     }
 
-    public void addRoleAcl(String roleName, Acl acl) {
+    public void addRoleAcls(String roleName, Acl... acl) {
       roleAcls.putIfAbsent(roleName, new ArrayList<>());
-      roleAcls.get(roleName).add(acl);
+      roleAcls.get(roleName).addAll(Arrays.asList(acl));
     }
 
     public Map<String, Collection<Acl>> getRoleAcls() {

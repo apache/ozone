@@ -34,9 +34,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.*;
 
+/**
+ * Access controller for multi-tenancy implemented using Ranger's REST API.
+ * This class is for testing and is not intended for production use.
+ */
 public class RangerRestMultiTenantAccessController
     implements MultiTenantAccessController {
 
@@ -192,13 +197,14 @@ public class RangerRestMultiTenantAccessController
           "Http response code: %d", role.getName(), conn.getResponseCode()));
     }
     String responseString = getResponseData(conn);
-    JsonObject jObject = new JsonParser().parse(responseString).getAsJsonObject();
+    JsonObject jObject = new JsonParser().parse(responseString)
+        .getAsJsonObject();
     return jObject.get("id").getAsLong();
   }
 
   @Override
   public void addUsersToRole(long roleID,
-      Collection<BasicUserPrincipal> newUsers) throws IOException {
+      BasicUserPrincipal... newUsers) throws IOException {
     // Get current role from Ranger.
     JsonObject roleJson = getRoleJson(roleID);
     // Add users to role.
@@ -212,8 +218,8 @@ public class RangerRestMultiTenantAccessController
 
   @Override
   public void removeUsersFromRole(long roleID,
-      Collection<BasicUserPrincipal> usersToRemove) throws IOException {
-    Set<String> usersToRemoveSet = usersToRemove.stream()
+      BasicUserPrincipal... usersToRemove) throws IOException {
+    Set<String> usersToRemoveSet = Stream.of(usersToRemove)
         .map(BasicUserPrincipal::getName)
         .collect(Collectors.toSet());
     // Get current role from Ranger.
@@ -318,7 +324,7 @@ public class RangerRestMultiTenantAccessController
 
   private HttpsURLConnection makeHttpsPutCall(String url, JsonObject content)
       throws IOException {
-   return makeHttpsCallWithJsonContent(url, content, "PUT");
+    return makeHttpsCallWithJsonContent(url, content, "PUT");
   }
 
   private HttpsURLConnection makeHttpsPostCall(String url, JsonObject content)
@@ -327,7 +333,7 @@ public class RangerRestMultiTenantAccessController
   }
 
   private HttpsURLConnection makeHttpsCallWithJsonContent(String urlString,
-     JsonObject content, String method) throws IOException {
+      JsonObject content, String method) throws IOException {
 
     URL url = new URL(urlString);
     HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
@@ -380,7 +386,8 @@ public class RangerRestMultiTenantAccessController
       throws IOException {
     StringBuilder response = new StringBuilder();
     try (BufferedReader br = new BufferedReader(
-        new InputStreamReader(urlConnection.getInputStream(), StandardCharsets.UTF_8))) {
+        new InputStreamReader(
+            urlConnection.getInputStream(), StandardCharsets.UTF_8))) {
       String responseLine;
       while ((responseLine = br.readLine()) != null) {
         response.append(responseLine.trim());
@@ -395,7 +402,8 @@ public class RangerRestMultiTenantAccessController
 
   /// SERIALIZATION ///
 
-  JsonSerializer<Policy> policySerializer = new JsonSerializer<Policy>() {
+  private final JsonSerializer<Policy> policySerializer =
+      new JsonSerializer<Policy>() {
     @Override
     public JsonElement serialize(Policy javaPolicy, Type typeOfSrc,
         JsonSerializationContext context) {
@@ -403,7 +411,8 @@ public class RangerRestMultiTenantAccessController
       jsonPolicy.addProperty("name", javaPolicy.getName());
       jsonPolicy.addProperty("service", rangerService);
       if (javaPolicy.getDescription().isPresent()) {
-        jsonPolicy.addProperty("description", javaPolicy.getDescription().get());
+        jsonPolicy.addProperty("description",
+            javaPolicy.getDescription().get());
       }
 
       // All resources under this policy are added to this object.
@@ -476,7 +485,8 @@ public class RangerRestMultiTenantAccessController
     }
   };
 
-  JsonSerializer<Role> roleSerializer = new JsonSerializer<Role>() {
+  private final JsonSerializer<Role> roleSerializer =
+      new JsonSerializer<Role>() {
     @Override
     public JsonElement serialize(Role javaRole, Type typeOfSrc,
         JsonSerializationContext context) {
@@ -493,7 +503,7 @@ public class RangerRestMultiTenantAccessController
     }
   };
 
-  JsonSerializer<BasicUserPrincipal> userSerializer =
+  private final JsonSerializer<BasicUserPrincipal> userSerializer =
       new JsonSerializer<BasicUserPrincipal>() {
     @Override
     public JsonElement serialize(BasicUserPrincipal user, Type typeOfSrc,
