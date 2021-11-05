@@ -1,16 +1,13 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
-import org.apache.commons.collections.Unmodifiable;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.auth.BasicUserPrincipal;
 
-import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -18,15 +15,35 @@ import java.util.Optional;
  * Defines the operations needed for multi-tenant access control.
  */
 public interface MultiTenantAccessController {
+  /**
+   * This operation will fail if a policy with the same name already exists,
+   * or a policy for the same set of resources already exists.
+   *
+   * Roles defined in this policy that do not already exist will be created.
+   *
+   * @return The unique ID to refer to this policy.
+   */
   long createPolicy(Policy policy) throws Exception;
+
   void deletePolicy(long policyID) throws Exception;
+
+  /**
+   * This operation will fail if a role with the same name already exists.
+   *
+   * @return The unique ID to refer to this role.
+   */
   long createRole(Role role) throws Exception;
+
   void addUsersToRole(long roleID, Collection<BasicUserPrincipal> newUsers)
       throws Exception;
+
   void removeUsersFromRole(long roleID, Collection<BasicUserPrincipal> users)
       throws Exception;
+
   void deleteRole(long roleID) throws Exception;
+
   void enablePolicy(long policyID) throws Exception;
+
   void disablePolicy(long policyID) throws Exception;
 
   /**
@@ -59,6 +76,9 @@ public interface MultiTenantAccessController {
     }
   }
 
+  /**
+   * Define an acl.
+   */
   class Acl {
     private final boolean isAllowed;
     private final IAccessAuthorizer.ACLType acl;

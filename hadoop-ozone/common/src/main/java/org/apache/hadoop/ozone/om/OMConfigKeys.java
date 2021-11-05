@@ -294,19 +294,8 @@ public final class OMConfigKeys {
       "ozone.om.ranger.https.admin.api.user";
   public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD =
       "ozone.om.ranger.https.admin.api.passwd";
-
-  /**
-   * Temporary configurations properties for Ranger REST and client use in
-   * multitenancy.
-   */
   public static final String OZONE_RANGER_HTTPS_ADDRESS_KEY =
       "ozone.om.ranger.https-address";
-
-  /**
-   * Temporary configuration properties for Ranger client use in multitenancy
-   */
-  public static final String OZONE_RANGER_CLIENT_SSL_FILE =
-      "ozone.om.ranger.client.ssl.file";
   public static final String OZONE_RANGER_SERVICE =
       "ozone.om.ranger.service";
 }

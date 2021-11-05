@@ -5,7 +5,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
@@ -63,8 +62,7 @@ public class RangerRestMultiTenantAccessController
       throws IOException {
     conf = new OzoneConfiguration(configuration);
     rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
-    // TODO: get this from config.
-    rangerService = "cm_ozone";
+    rangerService = conf.get(OZONE_RANGER_SERVICE);
 
     GsonBuilder gsonBuilder = new GsonBuilder();
     gsonBuilder.registerTypeAdapter(Role.class, roleSerializer);
@@ -74,7 +72,6 @@ public class RangerRestMultiTenantAccessController
 
     rangerAclStrings = new HashMap<>();
     fillRangerAclStrings();
-
     initializeRangerConnection();
   }
 
@@ -161,8 +158,6 @@ public class RangerRestMultiTenantAccessController
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonConverter.toJsonTree(policy).getAsJsonObject());
     if (!successfulResponseCode(conn.getResponseCode())) {
-      String policyInfo = getResponseData(conn);
-      System.err.println(policyInfo);
       throw new IOException(String.format("Failed to create policy %s. " +
           "Http response code: %d", policy.getName(), conn.getResponseCode()));
     }
@@ -203,7 +198,7 @@ public class RangerRestMultiTenantAccessController
 
   @Override
   public void addUsersToRole(long roleID,
-                             Collection<BasicUserPrincipal> newUsers) throws IOException {
+      Collection<BasicUserPrincipal> newUsers) throws IOException {
     // Get current role from Ranger.
     JsonObject roleJson = getRoleJson(roleID);
     // Add users to role.
@@ -217,7 +212,7 @@ public class RangerRestMultiTenantAccessController
 
   @Override
   public void removeUsersFromRole(long roleID,
-                                  Collection<BasicUserPrincipal> usersToRemove) throws IOException {
+      Collection<BasicUserPrincipal> usersToRemove) throws IOException {
     Set<String> usersToRemoveSet = usersToRemove.stream()
         .map(BasicUserPrincipal::getName)
         .collect(Collectors.toSet());
@@ -260,7 +255,8 @@ public class RangerRestMultiTenantAccessController
     setPolicyEnabled(policyID, false);
   }
 
-  private void setPolicyEnabled(long policyID, boolean isEnabled) throws IOException {
+  private void setPolicyEnabled(long policyID, boolean isEnabled)
+      throws IOException {
     // Get current policy from Ranger.
     JsonObject policyJson = getPolicyJson(policyID);
     // Disable the policy.
@@ -296,8 +292,8 @@ public class RangerRestMultiTenantAccessController
   }
 
   private JsonObject getPolicyJson(long policyID) throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
+    String rangerAdminUrl = rangerHttpsAddress +
+        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
     if (!successfulResponseCode(conn.getResponseCode())) {
@@ -310,8 +306,8 @@ public class RangerRestMultiTenantAccessController
 
   private void putPolicyJson(long policyID, JsonObject policyJson)
       throws IOException {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
+    String rangerAdminUrl = rangerHttpsAddress +
+        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
 
     HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl, policyJson);
     if (!successfulResponseCode(conn.getResponseCode())) {
@@ -320,20 +316,18 @@ public class RangerRestMultiTenantAccessController
     }
   }
 
-  private HttpsURLConnection makeHttpsPutCall(String url,
-                                               JsonObject content) throws IOException {
+  private HttpsURLConnection makeHttpsPutCall(String url, JsonObject content)
+      throws IOException {
    return makeHttpsCallWithJsonContent(url, content, "PUT");
   }
 
-  private HttpsURLConnection makeHttpsPostCall(String url,
-                                              JsonObject content) throws IOException {
+  private HttpsURLConnection makeHttpsPostCall(String url, JsonObject content)
+      throws IOException {
     return makeHttpsCallWithJsonContent(url, content, "POST");
   }
 
   private HttpsURLConnection makeHttpsCallWithJsonContent(String urlString,
-                                                          JsonObject content,
-                                                          String method)
-      throws IOException {
+     JsonObject content, String method) throws IOException {
 
     URL url = new URL(urlString);
     HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
@@ -404,7 +398,7 @@ public class RangerRestMultiTenantAccessController
   JsonSerializer<Policy> policySerializer = new JsonSerializer<Policy>() {
     @Override
     public JsonElement serialize(Policy javaPolicy, Type typeOfSrc,
-                                 JsonSerializationContext context) {
+        JsonSerializationContext context) {
       JsonObject jsonPolicy = new JsonObject();
       jsonPolicy.addProperty("name", javaPolicy.getName());
       jsonPolicy.addProperty("service", rangerService);
@@ -450,32 +444,32 @@ public class RangerRestMultiTenantAccessController
 
       jsonPolicy.add("resources", jsonResources);
 
-//      // Add roles and their acls to the policy.
-//      JsonArray jsonPolicyItemArray = new JsonArray();
-//
-//      // Make a new policy item for each role in the map.
-//      Map<String, Collection<Acl>> roleAcls = javaPolicy.getRoleAcls();
-//      for (Map.Entry<String, Collection<Acl>> entry: roleAcls.entrySet()) {
-//        // Add role to the policy item.
-//        String roleName = entry.getKey();
-//        JsonObject jsonPolicyItem = new JsonObject();
-//        JsonArray jsonRoles = new JsonArray();
-//        jsonRoles.add(new JsonPrimitive(roleName));
-//        jsonPolicyItem.add("roles", jsonRoles);
-//
-//        // Add acls to the policy item.
-//        JsonArray jsonAclArray = new JsonArray();
-//        for (Acl acl: entry.getValue()) {
-//          JsonObject jsonAcl  = new JsonObject();
-//          jsonAcl.addProperty("type",
-//              rangerAclStrings.get(acl.getAclType()));
-//          jsonAcl.addProperty("isAllowed", acl.isAllowed());
-//          jsonAclArray.add(jsonAcl);
-//          jsonPolicyItem.add("accesses", jsonAclArray);
-//        }
-//        jsonPolicyItemArray.add(jsonPolicyItem);
-//      }
-//      jsonPolicy.add("policyItems", jsonPolicyItemArray);
+      // Add roles and their acls to the policy.
+      JsonArray jsonPolicyItemArray = new JsonArray();
+
+      // Make a new policy item for each role in the map.
+      Map<String, Collection<Acl>> roleAcls = javaPolicy.getRoleAcls();
+      for (Map.Entry<String, Collection<Acl>> entry: roleAcls.entrySet()) {
+        // Add role to the policy item.
+        String roleName = entry.getKey();
+        JsonObject jsonPolicyItem = new JsonObject();
+        JsonArray jsonRoles = new JsonArray();
+        jsonRoles.add(new JsonPrimitive(roleName));
+        jsonPolicyItem.add("roles", jsonRoles);
+
+        // Add acls to the policy item.
+        JsonArray jsonAclArray = new JsonArray();
+        for (Acl acl: entry.getValue()) {
+          JsonObject jsonAcl  = new JsonObject();
+          jsonAcl.addProperty("type",
+              rangerAclStrings.get(acl.getAclType()));
+          jsonAcl.addProperty("isAllowed", acl.isAllowed());
+          jsonAclArray.add(jsonAcl);
+          jsonPolicyItem.add("accesses", jsonAclArray);
+        }
+        jsonPolicyItemArray.add(jsonPolicyItem);
+      }
+      jsonPolicy.add("policyItems", jsonPolicyItemArray);
 
       System.out.println(jsonPolicy);
       return jsonPolicy;
@@ -485,7 +479,7 @@ public class RangerRestMultiTenantAccessController
   JsonSerializer<Role> roleSerializer = new JsonSerializer<Role>() {
     @Override
     public JsonElement serialize(Role javaRole, Type typeOfSrc,
-                                 JsonSerializationContext context) {
+        JsonSerializationContext context) {
       JsonObject jsonRole = new JsonObject();
       jsonRole.addProperty("name", javaRole.getName());
 
