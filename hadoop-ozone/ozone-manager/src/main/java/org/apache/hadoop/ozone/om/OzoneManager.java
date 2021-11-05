@@ -2050,7 +2050,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public String getBucketOwner(String volume, String bucket, ACLType type,
        ResourceType resType) throws OMException {
     String bucketOwner = null;
-    if ((resType != ResourceType.VOLUME) ||
+    if ((resType != ResourceType.VOLUME) &&
         !(type == ACLType.CREATE && resType == ResourceType.BUCKET)) {
       bucketOwner = getBucketOwner(volume, bucket);
     }
