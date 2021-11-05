@@ -324,56 +324,49 @@ public class RangerRestMultiTenantAccessController
 
   private HttpsURLConnection makeHttpsPutCall(String url, JsonObject content)
       throws IOException {
-    return makeHttpsCallWithJsonContent(url, content, "PUT");
+    HttpsURLConnection connection = makeBaseHttpsURLConnection(url);
+    connection.setRequestMethod("PUT");
+    return addJsonContentToConnection(connection, content);
   }
 
   private HttpsURLConnection makeHttpsPostCall(String url, JsonObject content)
       throws IOException {
-    return makeHttpsCallWithJsonContent(url, content, "POST");
+    HttpsURLConnection connection = makeBaseHttpsURLConnection(url);
+    connection.setRequestMethod("POST");
+    return addJsonContentToConnection(connection, content);
   }
 
-  private HttpsURLConnection makeHttpsCallWithJsonContent(String urlString,
-      JsonObject content, String method) throws IOException {
-
-    URL url = new URL(urlString);
-    HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
-    urlConnection.setRequestMethod(method);
-    urlConnection.setConnectTimeout(connectionTimeout);
-    urlConnection.setReadTimeout(connectionRequestTimeout);
-    urlConnection.setRequestProperty("Accept", "application/json");
-    urlConnection.setRequestProperty("Authorization", authHeaderValue);
-
-    urlConnection.setDoOutput(true);
-    urlConnection.setRequestProperty("Content-Type", "application/json;");
-    try (OutputStream os = urlConnection.getOutputStream()) {
+  private HttpsURLConnection addJsonContentToConnection(
+      HttpsURLConnection connection, JsonObject content) throws IOException {
+    connection.setDoOutput(true);
+    connection.setRequestProperty("Content-Type", "application/json;");
+    try (OutputStream os = connection.getOutputStream()) {
       byte[] input = content.toString().getBytes(StandardCharsets.UTF_8);
       os.write(input, 0, input.length);
       os.flush();
     }
 
-    return urlConnection;
+    return connection;
   }
 
   private HttpsURLConnection makeHttpsGetCall(String urlString)
       throws IOException {
-
-    URL url = new URL(urlString);
-    HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
-    urlConnection.setRequestMethod("GET");
-    urlConnection.setConnectTimeout(connectionTimeout);
-    urlConnection.setReadTimeout(connectionRequestTimeout);
-    urlConnection.setRequestProperty("Accept", "application/json");
-    urlConnection.setRequestProperty("Authorization", authHeaderValue);
-
-    return urlConnection;
+    HttpsURLConnection connection = makeBaseHttpsURLConnection(urlString);
+    connection.setRequestMethod("GET");
+    return connection;
   }
 
   private HttpsURLConnection makeHttpsDeleteCall(String urlString)
       throws IOException {
+    HttpsURLConnection connection = makeBaseHttpsURLConnection(urlString);
+    connection.setRequestMethod("DELETE");
+    return connection;
+  }
 
+  private HttpsURLConnection makeBaseHttpsURLConnection(String urlString)
+      throws IOException {
     URL url = new URL(urlString);
     HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
-    urlConnection.setRequestMethod("DELETE");
     urlConnection.setConnectTimeout(connectionTimeout);
     urlConnection.setReadTimeout(connectionRequestTimeout);
     urlConnection.setRequestProperty("Accept", "application/json");
@@ -480,7 +473,6 @@ public class RangerRestMultiTenantAccessController
       }
       jsonPolicy.add("policyItems", jsonPolicyItemArray);
 
-      System.out.println(jsonPolicy);
       return jsonPolicy;
     }
   };
