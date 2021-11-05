@@ -117,13 +117,11 @@ public class DatanodeInfo extends DatanodeDetails {
    * @param lastIp the last ip
    */
   public void updateLastIpAddress(String lastIp) {
-    if (!lastIp.equalsIgnoreCase(getIpAddress())) {
-      try {
-        lock.writeLock().lock();
-        setIpAddress(lastIp);
-      } finally {
-        lock.writeLock().unlock();
-      }
+    try {
+      lock.writeLock().lock();
+      setIpAddress(lastIp);
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 

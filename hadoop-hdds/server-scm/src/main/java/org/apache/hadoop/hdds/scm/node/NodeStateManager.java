@@ -397,12 +397,15 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public void updateLastKnownIpAddress(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    LOG.info("updateLastKnownIpAddress of {} from {} to {}",
-        datanodeDetails.getUuidString(),
-        nodeStateMap.getNodeInfo(datanodeDetails.getUuid()).getIpAddress(),
-        datanodeDetails.getIpAddress());
-    nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
-        .updateLastIpAddress(datanodeDetails.getIpAddress());
+    if (!nodeStateMap.getNodeInfo(datanodeDetails.getUuid()).getIpAddress()
+        .equalsIgnoreCase(datanodeDetails.getIpAddress())) {
+      nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
+          .updateLastIpAddress(datanodeDetails.getIpAddress());
+      LOG.info("updateLastKnownIpAddress of {} from {} to {}",
+          datanodeDetails.getUuidString(),
+          nodeStateMap.getNodeInfo(datanodeDetails.getUuid()).getIpAddress(),
+          datanodeDetails.getIpAddress());
+    }
   }
 
   /**
