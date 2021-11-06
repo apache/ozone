@@ -1052,6 +1052,9 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public OmMultipartInfo initiateMultipartUpload(OmKeyArgs omKeyArgs) throws
       IOException {
+    if (true) {
+      throw new IOException("bad gbj");
+    }
     Preconditions.checkNotNull(omKeyArgs);
     String uploadID = UUID.randomUUID().toString() + "-" + UniqueId.next();
     return createMultipartInfo(omKeyArgs, uploadID);
