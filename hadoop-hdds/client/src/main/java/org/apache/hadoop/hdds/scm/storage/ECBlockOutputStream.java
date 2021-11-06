@@ -41,6 +41,11 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
  */
 public class ECBlockOutputStream extends BlockOutputStream{
 
+  private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      currentChunkRspFuture = null;
+
+  private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      putBlkRspFuture = null;
   /**
    * Creates a new ECBlockOutputStream.
    *
@@ -63,7 +68,8 @@ public class ECBlockOutputStream extends BlockOutputStream{
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
+    this.currentChunkRspFuture =
+        writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
   }
 
   /**
@@ -113,6 +119,7 @@ public class ECBlockOutputStream extends BlockOutputStream{
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
+    this.putBlkRspFuture = flushFuture;
     return flushFuture;
   }
 
@@ -120,5 +127,21 @@ public class ECBlockOutputStream extends BlockOutputStream{
   public void close() throws IOException {
     super.close();
     cleanup(false);
+  }
+
+  /**
+   * @return The current chunk writer response future.
+   */
+  public CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      getCurrentChunkResponseFuture() {
+    return this.currentChunkRspFuture;
+  }
+
+  /**
+   * @return The current chunk putBlock response future.
+   */
+  public CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+      getCurrentPutBlkResponseFuture() {
+    return this.putBlkRspFuture;
   }
 }
