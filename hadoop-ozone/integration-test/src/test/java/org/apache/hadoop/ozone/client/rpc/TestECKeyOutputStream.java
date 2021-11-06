@@ -69,7 +69,6 @@ public class TestECKeyOutputStream {
   private static String bucketName;
   private static String keyString;
   private static int dataBlocks = 3;
-  private static int parityBlocks = 2;
   private static int inputSize = dataBlocks * chunkSize;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
