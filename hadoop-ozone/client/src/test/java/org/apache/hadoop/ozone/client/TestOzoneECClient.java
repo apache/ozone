@@ -24,14 +24,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
-import org.apache.hadoop.io.erasurecode.CodecUtil;
-import org.apache.hadoop.io.erasurecode.ECSchema;
-import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
-import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
-import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -39,6 +32,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
+import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Assert;
@@ -48,7 +43,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -75,21 +69,17 @@ public class TestOzoneECClient {
   private byte[][] inputChunks = new byte[dataBlocks][chunkSize];
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
-  private MockOmTransport transportStub = null;
-  private ECSchema schema = new ECSchema("rs", dataBlocks, parityBlocks);
-  private ErasureCodecOptions options = new ErasureCodecOptions(schema);
   private OzoneConfiguration conf = new OzoneConfiguration();
-  private RSErasureCodec codec = new RSErasureCodec(conf, options);
-  private final RawErasureEncoder encoder = CodecUtil.createRawEncoder(conf,
-      SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
-      codec.getCoderOptions());
+  private MockOmTransport transportStub = new MockOmTransport(
+      new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks));
+  private final RawErasureEncoder encoder =
+      new RSRawErasureCoderFactory().createEncoder(
+          new ECReplicationConfig(dataBlocks, parityBlocks));
 
   @Before
   public void init() throws IOException {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
         StorageUnit.KB);
-    transportStub = new MockOmTransport(
-        new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks));
 
     client = new OzoneClient(conf, new RpcClient(conf, null) {
 
@@ -525,54 +515,5 @@ public class TestOzoneECClient {
       }
     }
     return bucket;
-  }
-
-  private void updatePipelineToKeepSingleNode(int keepingNodeIndex) {
-    Map<String, Map<String, Map<String, OzoneManagerProtocolProtos.KeyInfo>>>
-        keys = ((MockOmTransport) transportStub).getKeys();
-    Map<String, Map<String, OzoneManagerProtocolProtos.KeyInfo>> vol =
-        keys.get(keys.keySet().iterator().next());
-
-    Map<String, OzoneManagerProtocolProtos.KeyInfo> buck =
-        vol.get(vol.keySet().iterator().next());
-    OzoneManagerProtocolProtos.KeyInfo keyInfo =
-        buck.get(buck.keySet().iterator().next());
-    HddsProtos.Pipeline.Builder builder =
-        HddsProtos.Pipeline.newBuilder().setFactor(keyInfo.getFactor())
-            .setType(keyInfo.getType()).setId(HddsProtos.PipelineID.newBuilder()
-            .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(1L)
-                .setMostSigBits(1L).build()).build());
-
-    // Keeping only the given position node in pipeline.
-    builder.addMembers(HddsProtos.DatanodeDetailsProto.newBuilder().setUuid128(
-        HddsProtos.UUID.newBuilder().setLeastSigBits(keepingNodeIndex)
-            .setMostSigBits(keepingNodeIndex).build()).setHostName("localhost")
-        .setIpAddress("1.2.3.4").addPorts(
-            HddsProtos.Port.newBuilder().setName("EC")
-                .setValue(1234 + keepingNodeIndex).build()).build());
-
-    HddsProtos.Pipeline pipeline = builder.build();
-    List<OzoneManagerProtocolProtos.KeyLocation> results = new ArrayList<>();
-    results.add(OzoneManagerProtocolProtos.KeyLocation.newBuilder()
-        .setPipeline(pipeline).setBlockID(
-            HddsProtos.BlockID.newBuilder().setBlockCommitSequenceId(1L)
-                .setContainerBlockID(
-                    HddsProtos.ContainerBlockID.newBuilder().setContainerID(1L)
-                        .setLocalID(0L).build()).build()).setOffset(0L)
-        .setLength(keyInfo.getDataSize()).build());
-
-    final OzoneManagerProtocolProtos.KeyInfo keyInfo1 =
-        OzoneManagerProtocolProtos.KeyInfo.newBuilder()
-            .setVolumeName(keyInfo.getVolumeName())
-            .setBucketName(keyInfo.getBucketName())
-            .setKeyName(keyInfo.getKeyName())
-            .setCreationTime(keyInfo.getCreationTime())
-            .setModificationTime(keyInfo.getModificationTime())
-            .setType(keyInfo.getType()).setFactor(keyInfo.getFactor())
-            .setDataSize(keyInfo.getDataSize()).setLatestVersion(0L)
-            .addKeyLocationList(
-                OzoneManagerProtocolProtos.KeyLocationList.newBuilder()
-                    .addAllKeyLocations(results)).build();
-    buck.put(keyInfo.getKeyName(), keyInfo1);
   }
 }

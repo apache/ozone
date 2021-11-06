@@ -25,20 +25,13 @@ import java.util.List;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.apache.hadoop.io.erasurecode.CodecUtil;
-import org.apache.hadoop.io.erasurecode.ECSchema;
-import org.apache.hadoop.io.erasurecode.ErasureCodecOptions;
-import org.apache.hadoop.io.erasurecode.codec.RSErasureCodec;
-import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -48,6 +41,8 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ozone.erasurecode.CodecRegistry;
+import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,14 +122,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
             unsafeByteBufferConversion, xceiverClientManager, handler.getId());
 
     this.writeOffset = 0;
-    OzoneConfiguration conf = new OzoneConfiguration();
-    ECSchema schema =
-        new ECSchema(ecCodec.toString(), numDataBlks, numParityBlks);
-    ErasureCodecOptions options = new ErasureCodecOptions(schema);
-    RSErasureCodec codec = new RSErasureCodec(conf, options);
-    this.encoder = CodecUtil.createRawEncoder(conf,
-        SystemErasureCodingPolicies.getPolicies().get(1).getCodecName(),
-        codec.getCoderOptions());
+    this.encoder = CodecRegistry.getInstance()
+        .getCodecFactory(replicationConfig.getCodec().name().toLowerCase())
+        .createEncoder(replicationConfig);
   }
 
   /**
@@ -696,16 +686,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private static class ECChunkBuffers {
     private final ByteBuffer[] dataBuffers;
     private final ByteBuffer[] parityBuffers;
-    private final int dataBlks;
-    private final int parityBlks;
     private int cellSize;
 
     ECChunkBuffers(int cellSize, int numData, int numParity) {
       this.cellSize = cellSize;
-      this.parityBlks = numParity;
-      this.dataBlks = numData;
-      dataBuffers = new ByteBuffer[this.dataBlks];
-      parityBuffers = new ByteBuffer[this.parityBlks];
+      dataBuffers = new ByteBuffer[numData];
+      parityBuffers = new ByteBuffer[numParity];
       allocateBuffers(cellSize, dataBuffers);
     }
 
