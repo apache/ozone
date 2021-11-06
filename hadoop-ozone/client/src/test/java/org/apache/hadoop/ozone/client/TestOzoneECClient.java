@@ -420,6 +420,84 @@ public class TestOzoneECClient {
     }
   }
 
+  @Test
+  public void testWriteShouldFailIfMoreThanParityNodesFail()
+      throws IOException {
+    testNodeFailuresWhileWriting(3, 3);
+  }
+
+  @Test
+  public void testWriteShouldSuccessIfLessThanParityNodesFail()
+      throws IOException {
+    testNodeFailuresWhileWriting(1, 2);
+  }
+
+  @Test
+  public void testWriteShouldSuccessIf4NodesFailed()
+      throws IOException {
+    testNodeFailuresWhileWriting(4, 1);
+  }
+
+  @Test
+  public void testWriteShouldSuccessIfAllNodesFailed()
+      throws IOException {
+    testNodeFailuresWhileWriting(4, 1);
+  }
+
+  public void testNodeFailuresWhileWriting(int numFailureToInject,
+      int numChunksToWriteAfterFailure) throws IOException {
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, 1024 * 3,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      for (int i = 0; i < dataBlocks; i++) {
+        out.write(inputChunks[i]);
+      }
+
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      Map<DatanodeDetails, MockDatanodeStorage> storages =
+          ((MockXceiverClientFactory) factoryStub).getStorages();
+      DatanodeDetails[] dnDetails =
+          storages.keySet().toArray(new DatanodeDetails[storages.size()]);
+      for (int i = 0; i < numFailureToInject; i++) {
+        failedDNs.add(dnDetails[i]);
+      }
+
+      // First let's set storage as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+    final OzoneKeyDetails key = bucket.getKey(keyName);
+    // Data supposed to store in single block group. Since we introduced the
+    // failures after first stripe, the second stripe data should have been
+    // written into new blockgroup. So, we should have 2 block groups. That
+    // means two keyLocations.
+    Assert.assertEquals(2, key.getOzoneKeyLocations().size());
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      for (int i = 0; i < dataBlocks; i++) {
+        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
+        Assert.assertTrue("Expected: " + new String(inputChunks[i],
+                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            Arrays.equals(inputChunks[i], fileContent));
+      }
+      for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
+        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
+        Assert.assertTrue("Expected: " + new String(inputChunks[i],
+                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            Arrays.equals(inputChunks[i], fileContent));
+      }
+    }
+  }
+
+
   private OzoneBucket writeIntoECKey(byte[] data, String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     return writeIntoECKey(new byte[][] {data}, key, defaultReplicationConfig);
