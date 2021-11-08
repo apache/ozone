@@ -58,17 +58,17 @@ public class OMMetadataProtocolClientSideImpl implements
   private static final Logger LOG =
       LoggerFactory.getLogger(OMMetadataProtocolClientSideImpl.class);
 
-  private final String omNodeID;
+  private final OMNodeDetails remoteOmNodeDetails;
   private final OMMetadataProtocolPB rpcProxy;
 
   public OMMetadataProtocolClientSideImpl(ConfigurationSource conf,
-      UserGroupInformation ugi, String omNodeId, InetSocketAddress omAddress)
+      UserGroupInformation ugi, OMNodeDetails omNodeDetails)
       throws IOException {
 
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OMMetadataProtocolPB.class, ProtobufRpcEngine.class);
 
-    this.omNodeID = omNodeId;
+    this.remoteOmNodeDetails = omNodeDetails;
 
     int maxRetries = conf.getInt(
         OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_KEY,
@@ -87,8 +87,9 @@ public class OMMetadataProtocolClientSideImpl implements
 
     OMMetadataProtocolPB proxy = RPC.getProtocolProxy(
         OMMetadataProtocolPB.class,
-        RPC.getProtocolVersion(OMMetadataProtocolPB.class), omAddress, ugi,
-        hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf),
+        RPC.getProtocolVersion(OMMetadataProtocolPB.class),
+        remoteOmNodeDetails.getRpcAddress(), ugi, hadoopConf,
+        NetUtils.getDefaultSocketFactory(hadoopConf),
         (int) OmUtils.getOMClientRpcTimeOut(conf), connectionRetryPolicy)
         .getProxy();
 
@@ -124,7 +125,8 @@ public class OMMetadataProtocolClientSideImpl implements
       }
       return omMedatataBuilder.build();
     } catch (ServiceException e) {
-      LOG.error("Failed to retrieve configuration of OM {}", omNodeID, e);
+      LOG.error("Failed to retrieve configuration of OM {}",
+          remoteOmNodeDetails.getOMPrintInfo(), e);
     }
     return null;
   }

@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos
 
 /**
  * This class is the server-side translator that forwards requests received on
- * {@link OMMetadataProtocolPB} to the OMConfiguration server implementation.
+ * {@link OMMetadataProtocolPB} to the OMMetadataProtocolServer implementation.
  */
 public class OMMetadataProtocolServerSideImpl implements OMMetadataProtocolPB {
 

@@ -70,11 +70,19 @@ public final class OMConfiguration {
     }
   }
 
+  /**
+   * Return list of all current OM peer's nodeIds (does not reload
+   * configuration from disk to find newly configured OMs).
+   */
   public List<String> getCurrentPeerList() {
     return omNodesInMemory.stream().map(NodeDetails::getNodeId)
         .collect(Collectors.toList());
   }
 
+  /**
+   * Reload configuration from disk and return all the OM nodes present in
+   * the new conf under current serviceId.
+   */
   public Map<String, OMNodeDetails> getOmNodesInNewConf() {
     return omNodesInNewConf.stream().collect(Collectors.toMap(
         NodeDetails::getNodeId,

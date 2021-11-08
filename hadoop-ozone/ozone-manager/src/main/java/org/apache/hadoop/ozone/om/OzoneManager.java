@@ -234,7 +234,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
@@ -1473,8 +1472,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OMNodeDetails remoteNodeDetails = entry.getValue();
       try (OMMetadataProtocolClientSideImpl omMetadataProtocolClient =
                new OMMetadataProtocolClientSideImpl(configuration,
-                   getRemoteUser(), remoteNodeId,
-                   remoteNodeDetails.getRpcAddress())) {
+                   getRemoteUser(), entry.getValue())) {
 
         OMConfiguration remoteOMConfiguration =
             omMetadataProtocolClient.getOMConfiguration();
@@ -1505,8 +1503,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (remoteOMConfig.getCurrentPeerList().contains(this.getOMNodeId())) {
       throw new IOException("Remote OM " + remoteNodeId + " already contains " +
-          "bootstrapping OM(" + getOMNodeId() + ") in it's in memory peer " +
-          "list");
+          "bootstrapping OM(" + getOMNodeId() + ") as part of its Raft group " +
+          "peers.");
     }
 
     OMNodeDetails omNodeDetailsInRemoteConfig = remoteOMConfig
@@ -1650,6 +1648,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return false;
   }
 
+  /**
+   * Return list of all current OM peers (does not reload configuration from
+   * disk to find newly configured OMs).
+   */
   public List<OMNodeDetails> getAllOMNodesInMemory() {
     List<OMNodeDetails> peerNodes = getPeerNodes();
     // Add current node also to list
@@ -1657,6 +1659,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return peerNodes;
   }
 
+  /**
+   * Reload configuration from disk and return all the OM nodes present in
+   * the new conf under current serviceId.
+   */
   public List<OMNodeDetails> getAllOMNodesInNewConf() {
     OzoneConfiguration newConf = reloadConfiguration();
     return OmUtils.getAllOMAddresses(newConf, getOMServiceId(), getOMNodeId());
@@ -1779,7 +1785,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Stop service.
    */
   public void stop() {
-    LOG.info("{}: Stopping Ozone Manager", getOMNodeId());
+    LOG.info("{}: Stopping Ozone Manager", omNodeDetails.getOMPrintInfo());
     try {
       omState = State.STOPPED;
       // Cancel the metrics timer and set to null.

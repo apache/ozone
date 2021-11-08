@@ -242,7 +242,7 @@ public class TestOzoneManagerBootstrap {
     }
 
     /***************************************************************************
-     * 2. Force bootstrap without upating config on any OM -> fail
+     * 2. Force bootstrap without updating config on any OM -> fail
      **************************************************************************/
 
     // Force Bootstrap a new node without updating the configs on existing OMs.

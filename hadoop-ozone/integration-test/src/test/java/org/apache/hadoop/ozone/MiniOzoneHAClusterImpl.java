@@ -1029,7 +1029,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         .collect(Collectors.toList());
   }
 
-  private final static class ExitManagerForOM extends ExitManager {
+  private static final class ExitManagerForOM extends ExitManager {
 
     private MiniOzoneHAClusterImpl cluster;
     private String omNodeId;

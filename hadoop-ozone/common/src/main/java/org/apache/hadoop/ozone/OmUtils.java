@@ -756,6 +756,10 @@ public final class OmUtils {
     return omNodesList;
   }
 
+  /**
+   * Return a comma separated list of OM node details
+   * (NodeID[HostAddress:RpcPort]).
+   */
   public static String getOMAddressListPrintString(List<OMNodeDetails> omList) {
     if (omList.size() == 0) {
       return null;
