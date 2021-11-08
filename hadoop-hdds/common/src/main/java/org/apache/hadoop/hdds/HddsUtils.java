@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds;
 
+import com.google.protobuf.ServiceException;
+import java.util.HashMap;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -45,6 +47,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc.RpcException;
+import org.apache.hadoop.ipc.RpcNoSuchMethodException;
+import org.apache.hadoop.ipc.RpcNoSuchProtocolException;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
@@ -65,6 +72,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_D
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
 import org.slf4j.Logger;
@@ -621,5 +630,49 @@ public final class HddsUtils {
    */
   public static int roundupMb(long bytes) {
     return (int)Math.ceil((double) bytes/(double) ONE_MB);
+  }
+
+  /**
+   * Unwrap exception to check if it is some kind of access control problem
+   * ({@link AccessControlException} or {@link SecretManager.InvalidToken})
+   * or a RpcException.
+   */
+  public static Throwable getUnwrappedException(Exception ex) {
+    if (ex instanceof ServiceException) {
+      Throwable t = ex.getCause();
+      if (t instanceof RemoteException) {
+        t = ((RemoteException) t).unwrapRemoteException();
+      }
+      while (t != null) {
+        if (t instanceof RpcException ||
+            t instanceof AccessControlException ||
+            t instanceof SecretManager.InvalidToken) {
+          return t;
+        }
+        t = t.getCause();
+      }
+    }
+    Map<Integer, Integer> map = new HashMap();
+    return null;
+  }
+
+  /**
+   * For some Rpc Exceptions, client should not failover.
+   */
+  public static boolean shouldNotFailoverOnRpcException(Throwable exception) {
+    if (exception instanceof RpcException) {
+      // Should not failover for following exceptions
+      if (exception instanceof RpcNoSuchMethodException ||
+          exception instanceof RpcNoSuchProtocolException ||
+          exception instanceof RPC.VersionMismatch) {
+        return true;
+      }
+      if (exception.getMessage().contains(
+          "RPC response exceeds maximum data length") ||
+          exception.getMessage().contains("RPC response has invalid length")) {
+        return true;
+      }
+    }
+    return false;
   }
 }

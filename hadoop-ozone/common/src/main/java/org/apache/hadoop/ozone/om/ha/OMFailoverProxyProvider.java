@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.Text;
@@ -45,9 +46,6 @@ import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.RpcException;
-import org.apache.hadoop.ipc.RpcNoSuchMethodException;
-import org.apache.hadoop.ipc.RpcNoSuchProtocolException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -60,7 +58,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import org.apache.hadoop.util.OzoneUtils;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -457,7 +454,7 @@ public class OMFailoverProxyProvider<T> implements
   }
 
   private synchronized boolean shouldFailover(Exception ex) {
-    Throwable unwrappedException = OzoneUtils.getUnwrappedException(ex);
+    Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
     if (unwrappedException instanceof AccessControlException) {
       // Retry all available OMs once before failing with
       // AccessControlException.
@@ -470,7 +467,7 @@ public class OMFailoverProxyProvider<T> implements
           return false;
         }
       }
-    } else if (OzoneUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
+    } else if (HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
       return false;
     } else if (ex instanceof StateMachineException) {
       StateMachineException smEx = (StateMachineException) ex;

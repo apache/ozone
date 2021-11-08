@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,10 +34,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.RpcException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.util.OzoneUtils;
 import org.apache.ratis.protocol.exceptions.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -312,11 +311,11 @@ public final class SCMHAUtils {
 
   public static RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
       Exception e, int maxRetryCount, long retryInterval) {
-    Throwable unwrappedException = OzoneUtils.getUnwrappedException(e);
+    Throwable unwrappedException = HddsUtils.getUnwrappedException(e);
     if (unwrappedException instanceof AccessControlException) {
       // For AccessControl Exception where Client is not authenticated.
       return RetryPolicy.RetryAction.FAIL;
-    } else if (OzoneUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
+    } else if (HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
       // For some types of Rpc Exceptions, retrying on different server would
       // not help.
       return RetryPolicy.RetryAction.FAIL;
