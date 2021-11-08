@@ -2995,4 +2995,17 @@
       will create intermediate directories.
     </description>
   </property>
+
+  <property>
+    <name>ozone.client.test.ofs.default.bucket.layout</name>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default bucket layout used by Ozone Manager when buckets are created using Ozone File System.
+      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
+    </description>
+  </property>
 </configuration>
