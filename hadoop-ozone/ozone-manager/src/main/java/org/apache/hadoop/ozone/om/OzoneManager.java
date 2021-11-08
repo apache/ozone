@@ -211,6 +211,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
@@ -2698,6 +2699,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ServiceInfo.Builder omServiceInfoBuilder = ServiceInfo.newBuilder()
         .setNodeType(HddsProtos.NodeType.OM)
         .setHostname(omRpcAddress.getHostName())
+        .setOmClientProtocolVersion(OZONE_OM_CLIENT_PROTOCOL_VERSION)
         .addServicePort(ServicePort.newBuilder()
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
@@ -2738,6 +2740,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
             .setNodeType(HddsProtos.NodeType.OM)
             .setHostname(peerNode.getHostName())
+            // For now assume peer is at the same version.
+            // This field needs to be fetched from peer when rolling upgrades
+            // are implemented.
+            .setOmClientProtocolVersion(OZONE_OM_CLIENT_PROTOCOL_VERSION)
             .addServicePort(ServicePort.newBuilder()
                 .setType(ServicePort.Type.RPC)
                 .setValue(peerNode.getRpcPort())
