@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -113,7 +114,7 @@ public final class ContainerBalancerConfiguration {
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
       "hostnames or ip addresses separated by commas. Only the Datanodes " +
       "specified in this list are balanced. This configuration is empty by " +
-      "default.")
+      "default and is applicable only if it is non-empty.")
   private String includeNodes = "";
 
   @Config(key = "exclude.datanodes", type = ConfigType.STRING, defaultValue =
@@ -309,17 +310,24 @@ public final class ContainerBalancerConfiguration {
   /**
    * Gets a set of datanode hostnames or ip addresses that will be the exclusive
    * participants in balancing.
-   * @return Set of hostname strings
+   * @return Set of hostname or ip address strings, or an empty set if the
+   * configuration is empty
    */
   public Set<String> getIncludeNodes() {
     if (includeNodes.isEmpty()) {
-      return new HashSet<>();
+      return Collections.emptySet();
     }
     return Arrays.stream(includeNodes.split(","))
         .map(String::trim)
         .collect(Collectors.toSet());
   }
 
+  /**
+   * Sets the datanodes that will be the exclusive participants in balancing.
+   * Applicable only if the specified string is non-empty.
+   * @param includeNodes a String of datanode hostnames or ip addresses
+   *                     separated by commas
+   */
   public void setIncludeNodes(String includeNodes) {
     this.includeNodes = includeNodes;
   }
@@ -327,17 +335,23 @@ public final class ContainerBalancerConfiguration {
   /**
    * Gets a set of datanode hostnames or ip addresses that will be excluded
    * from balancing.
-   * @return Set of hostname strings
+   * @return Set of hostname or ip address strings, or an empty set if the
+   * configuration is empty
    */
   public Set<String> getExcludeNodes() {
     if (excludeNodes.isEmpty()) {
-      return new HashSet<>();
+      return Collections.emptySet();
     }
     return Arrays.stream(excludeNodes.split(","))
         .map(String::trim)
         .collect(Collectors.toSet());
   }
 
+  /**
+   * Sets the datanodes that will be excluded from balancing.
+   * @param excludeNodes a String of datanode hostnames or ip addresses
+   *                     separated by commas
+   */
   public void setExcludeNodes(String excludeNodes) {
     this.excludeNodes = excludeNodes;
   }
