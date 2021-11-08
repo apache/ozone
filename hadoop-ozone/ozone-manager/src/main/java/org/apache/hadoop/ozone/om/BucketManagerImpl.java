@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -127,7 +128,7 @@ public class BucketManagerImpl implements BucketManager {
       if (volumeArgs == null) {
         LOG.debug("volume: {} not found ", volumeName);
         throw new OMException("Volume doesn't exist",
-            OMException.ResultCodes.VOLUME_NOT_FOUND);
+            VOLUME_NOT_FOUND);
       }
       //Check if bucket already exists
       if (metadataManager.getBucketTable().get(bucketKey) != null) {
@@ -250,8 +251,14 @@ public class BucketManagerImpl implements BucketManager {
       if (value == null) {
         LOG.debug("bucket: {} not found in volume: {}.", bucketName,
             volumeName);
-        throw new OMException("Bucket not found",
-            BUCKET_NOT_FOUND);
+        // Check volume existence, because we need to throw VOLUME_NOT_FOUND
+        //  if the parent volume doesn't exist.
+        if (metadataManager.getVolumeTable().get(volumeName) == null) {
+          throw new OMException("Volume not found when getting bucket info",
+              VOLUME_NOT_FOUND);
+        } else {
+          throw new OMException("Bucket not found", BUCKET_NOT_FOUND);
+        }
       }
       return value;
     } catch (IOException ex) {
