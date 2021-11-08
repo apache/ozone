@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -80,8 +79,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .BUCKET_NOT_FOUND;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -98,7 +95,6 @@ public class BasicRootedOzoneClientAdapterImpl
 
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
-  private ClientProtocol proxy;
   private ReplicationConfig replicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
@@ -182,7 +178,6 @@ public class BasicRootedOzoneClientAdapterImpl
             OzoneClientFactory.getRpcClient(conf);
       }
       objectStore = ozoneClient.getObjectStore();
-      proxy = objectStore.getClientProxy();
 
       this.configuredDnPort = conf.getInt(
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
@@ -219,48 +214,58 @@ public class BasicRootedOzoneClientAdapterImpl
           "getBucket: Invalid argument: given bucket string is empty.");
     }
 
-    OzoneBucket bucket;
+    OzoneVolume volume = null;
+    OzoneBucket bucket = null;
+
     try {
-      bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+      // either gets the VolumeInfo, or throws PERMISSION_DENIED,
+      // or VOLUME_NOT_FOUND
+      volume = objectStore.getVolume(volumeStr);
+      // either get the BucketInfo or throws PERMISSION_DENIED,
+      // or BUCKET_NOT_FOUND
+      bucket = volume.getBucket(bucketStr);
     } catch (OMException ex) {
       if (createIfNotExist) {
-        // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
-        // doesn't exist and ACL is enabled; it can only throw BUCKET_NOT_FOUND
-        // when ACL is disabled. Both exceptions need to be handled.
-        switch (ex.getResult()) {
-        case VOLUME_NOT_FOUND:
-        case BUCKET_NOT_FOUND:
+        if (volume == null) {
           try {
-            objectStore.createVolume(volumeStr);
-          } catch (OMException newVolEx) {
-            // Ignore the case where another client created the volume
-            if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
-              throw newVolEx;
+            // get the volume again to figure out if we have permission or not
+            volume = objectStore.getVolume(volumeStr);
+          } catch (OMException e) {
+            // if we have permission but the volume does not exist
+            if (e.getResult().equals(VOLUME_NOT_FOUND)) {
+              try {
+                // create it
+                objectStore.createVolume(volumeStr);
+              } catch (OMException volCreateEx) {
+                // if it was created by another client while we get here, ignore
+                if (!volCreateEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
+                  // throw other exceptions like permission denied for create
+                  throw volCreateEx;
+                }
+              }
+              // after creating get the volume info
+              volume = objectStore.getVolume(volumeStr);
+            } else {
+              // throw other exceptions like permission denied for the initial
+              // getVolume
+              throw e;
             }
           }
-
-          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
-          // Create the bucket
-          try {
-            volume.createBucket(bucketStr);
-          } catch (OMException newBucEx) {
-            // Ignore the case where another client created the bucket
-            if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
-              throw newBucEx;
-            }
-          }
-          break;
-        default:
-          // Throw unhandled exception
-          throw ex;
         }
-        // Try get bucket again
-        bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-      } else {
-        throw ex;
+        try {
+          // we have the volume try to create the bucket
+          volume.createBucket(bucketStr);
+        } catch (OMException e) {
+          // if already exists then ignore
+          if (!e.getResult().equals(BUCKET_ALREADY_EXISTS)) {
+            // throw if any other failure happened.
+            throw e;
+          }
+        }
+        // return the bucket info.
+        bucket = volume.getBucket(bucketStr);
       }
     }
-
     return bucket;
   }
 
