@@ -36,8 +36,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.function.Function;
 
 /**
@@ -219,7 +219,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     unPadBuffers(bufs, toRead);
     setPos(getPos() + toRead);
     return toRead;
-  };
+  }
 
   private void validateBuffers(ByteBuffer[] bufs) {
     Preconditions.assertTrue(bufs.length == getRepConfig().getData());
@@ -320,10 +320,12 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         indexes.add(i);
       }
     }
-    Collections.shuffle(indexes);
-    List<Integer> picked = indexes.subList(0, numRequired);
-    Collections.sort(picked);
-    return picked;
+    Preconditions.assertTrue(indexes.size() >= numRequired);
+    Random rand = new Random();
+    while (indexes.size() > numRequired) {
+      indexes.remove(rand.nextInt(indexes.size()));
+    }
+    return indexes;
   }
 
   private ByteBuffer allocateBuffer(ECReplicationConfig repConfig) {
@@ -382,12 +384,12 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   public synchronized boolean hasSufficientLocations() {
     // The number of locations needed is a function of the EC Chunk size. If the
     // block length is <= the chunk size, we should only have one data location.
-    // is greater than the chunk size but less than chunk_size * 2, then we must
-    // have two locations. If it is greater than chunk_size * data_num, then we
-    // must have all data_num locations.
+    // If it is greater than the chunk size but less than chunk_size * 2, then
+    // we must have two locations. If it is greater than chunk_size * data_num,
+    // then we must have all data_num locations.
     // The remaining data locations (for small block lengths) can be assumed to
     // be all zeros.
-    // Then we need a total of dataNum block available across the available
+    // Then we need a total of dataNum blocks available across the available
     // data, parity and padding blocks.
     ECReplicationConfig repConfig = getRepConfig();
     int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);

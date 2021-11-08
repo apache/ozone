@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.IOException;
 
 /**
- * Exception throw by EC Input Streams if there are not enough locations to
+ * Exception thrown by EC Input Streams if there are not enough locations to
  * read the EC data successfully.
  */
 public class InsufficientLocationsException extends IOException {
