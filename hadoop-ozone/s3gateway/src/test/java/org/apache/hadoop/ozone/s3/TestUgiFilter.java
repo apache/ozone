@@ -131,9 +131,13 @@ public class TestUgiFilter {
         headers.get(LENGTH_HEADER));
     Mockito.when(request.getParameterMap()).thenReturn(parameters);
 
-    filter.init(filterConfig);
-    filter.doFilter(request, response, filterChain);
-    filter.destroy();
+    try {
+      filter.init(filterConfig);
+      filter.doFilter(request, response, filterChain);
+      filter.destroy();
+    } catch(Exception e) {
+      Assert.fail("Filter should not generate any exceptions.");
+    }
   }
 
   @Test
