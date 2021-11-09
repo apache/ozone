@@ -58,9 +58,11 @@ public class RangerTestCommand extends GenericCli {
   @Override
   public Void call() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    for (String path: confPaths) {
-      System.out.println("loading conf: " + path);
-      conf.addResource(new Path(path));
+    if (confPaths != null) {
+      for (String path: confPaths) {
+        System.out.println("loading conf: " + path);
+        conf.addResource(new Path(path));
+      }
     }
 
     // SETUP
