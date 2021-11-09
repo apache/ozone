@@ -104,17 +104,6 @@ Here is an  example,
     </property>
 {{< /highlight >}}
 
-* **hdds.datanode.dir** Determines where on the local filesystem HDDS data will be
-stored. Defaults to dfs.datanode.data.dir if not specified.
-
-Here is an  example,
-{{< highlight xml >}}
-    <property>
-       <name>hdds.datanode.dir</name>
-       <value>/data/disk1/data</value>
-    </property>
-{{< /highlight >}}
-
 
 ## Ozone Settings Summary
 
@@ -126,7 +115,7 @@ Here is an  example,
 | ozone.scm.client.address       | SCM server name and port     | Used by client-side                                              |
 | ozone.scm.datanode.address     | SCM server name and port     | Used by datanode to talk to SCM                                  |
 | ozone.om.address               | OM server name               | Used by Ozone handler and Ozone file system.                     |
-| hdds.datanode.dir               | file path                | The HDDS data will be stored here.                     |
+| hdds.datanode.dir               | file path                | HDDS datanodes store data in this directory.           |
 
 
 ## Startup the cluster

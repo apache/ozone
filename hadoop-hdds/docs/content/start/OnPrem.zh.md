@@ -87,18 +87,6 @@ ozone genconf <path>
     </property>
 {{< /highlight >}}
 
-* **hdds.datanode.dir** HDDS数据在datanode本地文件系统中的存储路径，如果路径不存在，ozone会自动创建。
-如果没有指定该选项，ozone会默认使用dfs.datanode.data.dir的值，
-
-示例如下：
-
-{{< highlight xml >}}
-    <property>
-       <name>hdds.datanode.dir</name>
-       <value>/data/disk1/data</value>
-    </property>
-{{< /highlight >}}
-
 
 ## Ozone 参数汇总
 
