@@ -451,7 +451,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (!defaultBucketLayout.equals(
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name()) &&
-        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name())
+        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name()) &&
+        !defaultBucketLayout.equals(BucketLayout.LEGACY.name())
     ) {
       throw new ConfigurationException(
           defaultBucketLayout +
