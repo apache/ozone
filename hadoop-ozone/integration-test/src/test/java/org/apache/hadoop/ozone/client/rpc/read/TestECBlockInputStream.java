@@ -63,7 +63,6 @@ public class TestECBlockInputStream {
   }
 
   @Test
-  // TODO - this test will need changed when we can do recovery reads.
   public void testSufficientLocations() {
     // EC-3-2, 5MB block, so all 3 data locations are needed
     OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 5, 5 * ONEMB);
@@ -87,15 +86,6 @@ public class TestECBlockInputStream {
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertTrue(ecb.hasSufficientLocations());
-    }
-
-    // EC-3-2, 1MB block but only location is in slot 2 (should never happen)
-    dnMap.clear();
-    dnMap.put(MockDatanodeDetails.randomDatanodeDetails(), 2);
-    keyInfo = createKeyInfo(repConfig, ONEMB, dnMap);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
-      Assert.assertFalse(ecb.hasSufficientLocations());
     }
 
     // EC-3-2, 5MB blocks, only 2 locations passed so we do not have sufficient

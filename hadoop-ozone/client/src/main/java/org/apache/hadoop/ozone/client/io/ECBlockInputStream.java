@@ -55,13 +55,49 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final Function<BlockID, Pipeline> refreshFunction;
   private final OmKeyLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
-  private final DatanodeDetails[] parityLocations;
   private final BlockExtendedInputStream[] blockStreams;
   private final int maxLocations;
 
   private long position = 0;
   private boolean closed = false;
   private boolean seeked = false;
+
+  protected OmKeyLocationInfo getBlockInfo() {
+    return blockInfo;
+  }
+
+  protected ECReplicationConfig getRepConfig() {
+    return repConfig;
+  }
+
+  protected DatanodeDetails[] getDataLocations() {
+    return dataLocations;
+  }
+
+  protected long getStripeSize() {
+    return stripeSize;
+  }
+
+  protected int availableDataLocations() {
+    int count = 0;
+    for (int i = 0; i < repConfig.getData(); i++) {
+      if (dataLocations[i] != null) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  protected int availableParityLocations() {
+    int count = 0;
+    for (int i = repConfig.getData();
+         i < repConfig.getData() + repConfig.getParity(); i++) {
+      if (dataLocations[i] != null) {
+        count++;
+      }
+    }
+    return count;
+  }
 
   public ECBlockInputStream(ECReplicationConfig repConfig,
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
@@ -75,33 +111,29 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
     this.maxLocations = repConfig.getData() + repConfig.getParity();
-    this.dataLocations = new DatanodeDetails[repConfig.getData()];
-    this.parityLocations = new DatanodeDetails[repConfig.getParity()];
+    this.dataLocations =
+        new DatanodeDetails[repConfig.getData() + repConfig.getParity()];
     this.blockStreams = new BlockExtendedInputStream[repConfig.getData()];
 
-    stripeSize = ecChunkSize * repConfig.getData();
+    this.stripeSize = (long)ecChunkSize * repConfig.getData();
     setBlockLocations(this.blockInfo.getPipeline());
   }
 
   public synchronized boolean hasSufficientLocations() {
-    // Until we implement "on the fly" recovery, all data location must be
-    // present and we have enough locations if that is the case.
-    //
     // The number of locations needed is a function of the EC Chunk size. If the
     // block length is <= the chunk size, we should only have location 1. If it
     // is greater than the chunk size but less than chunk_size * 2, then we must
     // have two locations. If it is greater than chunk_size * data_num, then we
     // must have all data_num locations.
-    int expectedDataBlocks =
-        (int)Math.min(
-            Math.ceil((double)blockInfo.getLength() / ecChunkSize),
-            repConfig.getData());
-    for (int i=0; i<expectedDataBlocks; i++) {
-      if (dataLocations[i] == null) {
-        return false;
-      }
-    }
-    return true;
+    // We only consider data locations here.
+    int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
+    return expectedDataBlocks == availableDataLocations();
+  }
+
+  protected int calculateExpectedDataBlocks(ECReplicationConfig rConfig) {
+    return (int)Math.min(Math.ceil(
+        (double)getBlockInfo().getLength() / rConfig.getEcChunkSize()),
+        rConfig.getData());
   }
 
   /**
@@ -110,7 +142,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * stream reference. The block group index will be one greater than this.
    * @return
    */
-  private int currentStreamIndex() {
+  protected int currentStreamIndex() {
     return (int)((position / ecChunkSize) % repConfig.getData());
   }
 
@@ -120,9 +152,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * stream if it has not been opened already.
    * @return BlockInput stream to read from.
    */
-  private BlockExtendedInputStream getOrOpenStream() {
-    int ind = currentStreamIndex();
-    BlockExtendedInputStream stream = blockStreams[ind];
+  protected BlockExtendedInputStream getOrOpenStream(
+      int streamIndex, int locationIndex) {
+    BlockExtendedInputStream stream = blockStreams[streamIndex];
     if (stream == null) {
       // To read an EC block, we create a STANDALONE pipeline that contains the
       // single location for the block index we want to read. The EC blocks are
@@ -131,14 +163,14 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       Pipeline pipeline = Pipeline.newBuilder()
           .setReplicationConfig(new StandaloneReplicationConfig(
               HddsProtos.ReplicationFactor.ONE))
-          .setNodes(Arrays.asList(dataLocations[ind]))
+          .setNodes(Arrays.asList(dataLocations[locationIndex]))
           .setId(PipelineID.randomId())
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
       OmKeyLocationInfo blkInfo = new OmKeyLocationInfo.Builder()
           .setBlockID(blockInfo.getBlockID())
-          .setLength(internalBlockLength(ind+1))
+          .setLength(internalBlockLength(locationIndex+1))
           .setPipeline(blockInfo.getPipeline())
           .setToken(blockInfo.getToken())
           .setPartNumber(blockInfo.getPartNumber())
@@ -148,7 +180,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           blkInfo, pipeline,
           blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
           refreshFunction);
-      blockStreams[ind] = stream;
+      blockStreams[streamIndex] = stream;
     }
     return stream;
   }
@@ -160,11 +192,18 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * @param index - Index number of the internal block, starting from 1
    * @return
    */
-  private long internalBlockLength(int index) {
+  protected long internalBlockLength(int index) {
     long lastStripe = blockInfo.getLength() % stripeSize;
     long blockSize = (blockInfo.getLength() - lastStripe) / repConfig.getData();
     long lastCell = lastStripe / ecChunkSize + 1;
     long lastCellLength = lastStripe % ecChunkSize;
+
+    if (index > repConfig.getData()) {
+      // Its a parity block and their size is driven by the size of the
+      // first block of the block group. All parity blocks have the same size
+      // as block_1.
+      index = 1;
+    }
 
     if (index < lastCell) {
       return blockSize + ecChunkSize;
@@ -187,18 +226,14 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       throw new IndexOutOfBoundsException("The index " + index + " is greater "
           + "than the EC Replication Config (" + repConfig + ")");
     }
-    if (index <= repConfig.getData()) {
-      dataLocations[index - 1] = location;
-    } else {
-      parityLocations[index - repConfig.getData() - 1] = location;
-    }
+    dataLocations[index - 1] = location;
   }
 
-  private long blockLength() {
+  protected long blockLength() {
     return blockInfo.getLength();
   }
 
-  private long remaining() {
+  protected long remaining() {
     return blockLength() - position;
   }
 
@@ -222,7 +257,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
     int totalRead = 0;
     while(strategy.getTargetLength() > 0 && remaining() > 0) {
-      BlockExtendedInputStream stream = getOrOpenStream();
+      int currentIndex = currentStreamIndex();
+      BlockExtendedInputStream stream =
+          getOrOpenStream(currentIndex, currentIndex);
       int read = readFromStream(stream, strategy);
       totalRead += read;
       position += read;
@@ -347,6 +384,10 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized long getPos() {
     return position;
+  }
+
+  protected synchronized void setPos(long pos) {
+    position = pos;
   }
 
   @Override
