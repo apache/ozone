@@ -71,6 +71,9 @@ public class S3GetSecretRequest extends OMClientRequest {
         getOmRequest().getGetS3SecretRequest();
 
     // Generate S3 Secret to be used by OM quorum.
+    // Note 1: The proto field kerberosID is effectively accessId already.
+    // It is still named kerberosID because kerberosID == accessId before
+    // multi-tenancy. TODO: Rename the kerberosID field later in master branch.
     String accessId = s3GetSecretRequest.getKerberosID();
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
@@ -102,21 +105,21 @@ public class S3GetSecretRequest extends OMClientRequest {
     // Recompose GetS3SecretRequest just in case createIfNotExist is missing
     final GetS3SecretRequest newGetS3SecretRequest =
             GetS3SecretRequest.newBuilder()
-                    .setKerberosID(accessId)
+                    .setKerberosID(accessId)  // See Note 1 above
                     .setCreateIfNotExist(createIfNotExist)
                     .build();
     omRequest.setGetS3SecretRequest(newGetS3SecretRequest);
 
-    // When createIfNotExist is true, pass UpdateGetS3SecretRequest;
-    // otherwise, just use GetS3SecretRequest.
+    // When createIfNotExist is true, pass UpdateGetS3SecretRequest message;
+    // otherwise, just use GetS3SecretRequest message.
     if (createIfNotExist) {
-      // Generate secret. Used only when doesn't the accessId entry doesn't
-      //  exist in DB, discarded otherwise.
+      // Generate secret here because this will be written to DB only when
+      // createIfNotExist is true and accessId entry doesn't exist in DB.
       String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
 
       final UpdateGetS3SecretRequest updateGetS3SecretRequest =
               UpdateGetS3SecretRequest.newBuilder()
-                      .setKerberosID(accessId)
+                      .setKerberosID(accessId)  // See Note 1 above
                       .setAwsSecret(s3Secret)
                       .build();
 
@@ -145,6 +148,7 @@ public class S3GetSecretRequest extends OMClientRequest {
             getOmRequest().getGetS3SecretRequest();
     assert(getS3SecretRequest.hasCreateIfNotExist());
     final boolean createIfNotExist = getS3SecretRequest.getCreateIfNotExist();
+    // See Note 1 above
     final String accessId = getS3SecretRequest.getKerberosID();
     String awsSecret = null;
     if (createIfNotExist) {
@@ -204,7 +208,8 @@ public class S3GetSecretRequest extends OMClientRequest {
               GetS3SecretResponse.newBuilder().setS3Secret(
                       S3Secret.newBuilder()
                               .setAwsSecret(awsSecret)
-                              .setKerberosID(accessId));
+                              .setKerberosID(accessId)  // See Note 1 above
+              );
       // If entry exists or createIfNotExist is false, assignS3SecretValue
       // will be null, so we won't write or overwrite the entry.
       omClientResponse = new S3GetSecretResponse(assignS3SecretValue,
