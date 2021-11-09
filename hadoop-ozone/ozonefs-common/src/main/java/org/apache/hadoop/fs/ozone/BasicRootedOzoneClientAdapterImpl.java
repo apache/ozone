@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -190,8 +189,8 @@ public class BasicRootedOzoneClientAdapterImpl
 
       // Fetches the bucket layout to be used by OFS.
       this.defaultOFSBucketLayout = BucketLayout.fromString(
-          conf.get(OMConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
-              OMConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
+          conf.get(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
+              OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }

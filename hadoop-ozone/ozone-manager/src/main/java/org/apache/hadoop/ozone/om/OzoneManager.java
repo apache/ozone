@@ -451,13 +451,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (!defaultBucketLayout.equals(
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name()) &&
-        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name())
+        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name()) &&
+        !defaultBucketLayout.equals(BucketLayout.LEGACY.name())
     ) {
       throw new ConfigurationException(
           defaultBucketLayout +
               " is not a valid default bucket layout. Supported values are " +
               BucketLayout.FILE_SYSTEM_OPTIMIZED + ", " +
-              BucketLayout.OBJECT_STORE + ".");
+              BucketLayout.OBJECT_STORE + ", " + BucketLayout.LEGACY + ".");
     }
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();

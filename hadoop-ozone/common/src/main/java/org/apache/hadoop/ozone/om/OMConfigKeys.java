@@ -278,12 +278,6 @@ public final class OMConfigKeys {
   public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
       BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
 
-  public static final String OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT =
-      "ozone.client.test.ofs.default.bucket.layout";
-
-  public static final String OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT =
-      BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
-
   /**
    * Configuration properties for Directory Deleting Service.
    */
