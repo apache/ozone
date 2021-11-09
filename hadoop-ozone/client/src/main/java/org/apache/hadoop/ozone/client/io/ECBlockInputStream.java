@@ -126,11 +126,14 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     // have two locations. If it is greater than chunk_size * data_num, then we
     // must have all data_num locations.
     // We only consider data locations here.
-    int expectedDataBlocks =
-        (int)Math.min(
-            Math.ceil((double)blockInfo.getLength() / ecChunkSize),
-            repConfig.getData());
+    int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
     return expectedDataBlocks == availableDataLocations();
+  }
+
+  protected int calculateExpectedDataBlocks(ECReplicationConfig rConfig) {
+    return (int)Math.min(Math.ceil(
+        (double)getBlockInfo().getLength() / rConfig.getEcChunkSize()),
+        rConfig.getData());
   }
 
   /**

@@ -386,7 +386,7 @@ public class TestECBlockReconstructedStripeInputStream {
       data[i].flip();
     }
     ByteBuffer[] parity = new ByteBuffer[ecConfig.getParity()];
-    for (int i=0; i<ecConfig.getParity(); i++) {
+    for (int i = 0; i < ecConfig.getParity(); i++) {
       parity[i] = ByteBuffer.allocate(cellSize);
     }
     RawErasureEncoder encoder = CodecRegistry.getInstance()
@@ -570,7 +570,7 @@ public class TestECBlockReconstructedStripeInputStream {
         return EOF;
       }
       int toRead = Math.min(buf.remaining(), (int)getRemaining());
-      for (int i=0; i<toRead; i++) {
+      for (int i = 0; i < toRead; i++) {
         buf.put(data.get());
       }
       return toRead;

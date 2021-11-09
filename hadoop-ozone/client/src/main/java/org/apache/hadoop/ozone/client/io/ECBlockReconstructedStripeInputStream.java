@@ -406,12 +406,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
-  private int calculateExpectedDataBlocks(ECReplicationConfig repConfig) {
-    return (int)Math.min(Math.ceil(
-        (double)getBlockInfo().getLength() / repConfig.getEcChunkSize()),
-        repConfig.getData());
-  }
-
   @Override
   protected int readWithStrategy(ByteReaderStrategy strategy) {
     throw new NotImplementedException("readWithStrategy is not implemented. " +
