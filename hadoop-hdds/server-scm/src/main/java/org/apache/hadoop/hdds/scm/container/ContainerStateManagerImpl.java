@@ -416,7 +416,7 @@ public final class ContainerStateManagerImpl
         final ContainerInfo info = containers.getContainerInfo(
             transaction.getKey());
         if (info == null) {
-          LOG.warn("can not find container id {}, transaction id is {}",
+          LOG.warn("Cannot find container {}, transaction id is {}",
               transaction.getKey(), transaction.getValue());
           continue;
         }
