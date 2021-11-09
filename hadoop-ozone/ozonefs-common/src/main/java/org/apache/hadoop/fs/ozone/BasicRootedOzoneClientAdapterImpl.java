@@ -264,6 +264,8 @@ public class BasicRootedOzoneClientAdapterImpl
         }
         // return the bucket info.
         bucket = volume.getBucket(bucketStr);
+      } else {
+        throw ex;
       }
     }
     return bucket;
