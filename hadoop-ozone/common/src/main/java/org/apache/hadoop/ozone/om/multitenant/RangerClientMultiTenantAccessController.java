@@ -19,16 +19,22 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_CLIENT_SSL_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
@@ -51,8 +57,11 @@ public class RangerClientMultiTenantAccessController implements
 
   private final RangerClient client;
   private final String service;
+  private final Map<IAccessAuthorizer.ACLType, String> rangerAclStrings;
 
-  public RangerClientMultiTenantAccessController(Configuration conf) {
+  public RangerClientMultiTenantAccessController(OzoneConfiguration conf) {
+    rangerAclStrings = new EnumMap<>(IAccessAuthorizer.ACLType.class);
+
     // TODO get these from the existing ranger plugin config.
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     System.err.println("Ranger address: " + rangerHttpsAddress);
@@ -61,28 +70,18 @@ public class RangerClientMultiTenantAccessController implements
     service = conf.get(OZONE_RANGER_SERVICE);
     System.err.println("Ranger service name: " + service);
 
+    // Auth using kerberos if using 3.0 snapshot ranger client.
 //    String principal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
 //    String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
 //    client = new RangerClient(rangerHttpsAddress,
 //        "kerberos", principal, keytabPath, clientSslFile);
-    Configuration rangerConf = new Configuration();
 
-    rangerConf.set("xasecure.policymgr.clientssl.truststore", "/var/lib/cloudera-scm-agent/agent-cert/cm-auto-global_truststore.jks");
-    rangerConf.set("xasecure.policymgr.clientssl.truststore.password", "/var/run/cloudera-scm-agent/process/52-ranger-RANGER_TAGSYNC/altscript.sh sec-0-xasecure.policymgr.clientssl.truststore.password");
-    rangerConf.set("",
-        "jceks://file/var/run/cloudera-scm-agent/process/52-ranger" +
-            "-RANGER_TAGSYNC/conf/rangertagsyncssl.jceks");
-//    rangerConf.set("xasecure.policymgr.clientssl.truststore.credential.file",
-//        "jceks://file/var/run/cloudera-scm-agent/process/52-ranger" +
-//            "-RANGER_TAGSYNC/conf/rangertagsyncssl.jceks");
-    rangerConf.set("xasecure.policymgr.clientssl.truststore.credential.file",
-        "localjceks://file//var/run/cloudera-scm-agent/process/29-ozone" +
-            "-OZONE_MANAGER/creds.localjceks");
-    rangerConf.set("xasecure.policymgr.clientssl.truststore.type", "jks");
-
+    // Auth with username/password if using 2.1.0 ranger client.
+    String username = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+    String password = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
     RangerRESTClient restClient = new RangerRESTClient(rangerHttpsAddress,
-        clientSslFile, rangerConf);
-    restClient.setBasicAuthInfo("admin", "admin123");
+        clientSslFile, conf);
+    restClient.setBasicAuthInfo(username, password);
     client = new RangerClient(restClient);
   }
 
@@ -147,7 +146,7 @@ public class RangerClientMultiTenantAccessController implements
 
   @Override
   public void addUsersToRole(long roleID,
-      Collection<BasicUserPrincipal> newUsers) throws RangerServiceException {
+      BasicUserPrincipal... newUsers) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Adding users {} to role ID {} in Ranger.",
           toUserListString(newUsers), roleID);
@@ -159,7 +158,7 @@ public class RangerClientMultiTenantAccessController implements
 
   @Override
   public void removeUsersFromRole(long roleID,
-      Collection<BasicUserPrincipal> users)
+      BasicUserPrincipal... users)
       throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Removing users {} from role ID {} in Ranger.",
@@ -177,6 +176,13 @@ public class RangerClientMultiTenantAccessController implements
             .collect(Collectors.toList());
   }
 
+  private static List<RangerRole.RoleMember> toRangerRoleMembers(
+      BasicUserPrincipal[] users) {
+    return Arrays.stream(users)
+        .map(princ -> new RangerRole.RoleMember(princ.getName(), false))
+        .collect(Collectors.toList());
+  }
+
   private static RangerRole toRangerRole(Role role) {
     RangerRole rangerRole = new RangerRole();
     rangerRole.setName(role.getName());
@@ -192,31 +198,56 @@ public class RangerClientMultiTenantAccessController implements
     rangerPolicy.setName(policy.getName());
 
     Map<String, RangerPolicy.RangerPolicyResource> resource = new HashMap<>();
-    // TODO check if these are correct key strings in Ranger.
-    resource.put("volume",
-        new RangerPolicy.RangerPolicyResource(policy.getVolume()));
-
-    if (policy.getBucket().isPresent()) {
-      resource.put("bucket",
-          new RangerPolicy.RangerPolicyResource(policy.getBucket().get()));
+    for (String volume: policy.getVolumes()) {
+      resource.put("volume",
+          new RangerPolicy.RangerPolicyResource(volume));
     }
-    if (policy.getKey().isPresent()) {
+    for (String bucket: policy.getVolumes()) {
+      resource.put("bucket",
+          new RangerPolicy.RangerPolicyResource(bucket));
+    }
+    for (String key: policy.getVolumes()) {
       resource.put("key",
-          new RangerPolicy.RangerPolicyResource(policy.getKey().get()));
+          new RangerPolicy.RangerPolicyResource(key));
     }
 
     rangerPolicy.setService(service);
     rangerPolicy.setResources(resource);
 
     // Add roles to the policy.
-    RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
-    item.setRoles(policy.getRoles());
-    rangerPolicy.getPolicyItems().add(item);
+    for (Map.Entry<String, Collection<Acl>> roleAcls:
+        policy.getRoleAcls().entrySet()) {
+      RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
+      item.setRoles(Collections.singletonList(roleAcls.getKey()));
+
+      for (Acl acl: roleAcls.getValue()) {
+        RangerPolicy.RangerPolicyItemAccess access =
+            new RangerPolicy.RangerPolicyItemAccess();
+        access.setIsAllowed(acl.isAllowed());
+        access.setType(rangerAclStrings.get(acl.getAclType()));
+        item.getAccesses().add(access);
+      }
+
+      rangerPolicy.getPolicyItems().add(item);
+    }
+
     return rangerPolicy;
   }
 
-  private String toUserListString(Collection<BasicUserPrincipal> users) {
-    return users.stream()
+  private String toUserListString(BasicUserPrincipal[] users) {
+    return Arrays.stream(users)
         .map(Object::toString).collect(Collectors.joining(", "));
+  }
+
+  private void fillRangerAclStrings() {
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.ALL, "All");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.LIST, "List");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ, "Read");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE, "Write");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.CREATE, "Create");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.DELETE, "Delete");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ_ACL, "Read_ACL");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE_ACL, "Write_ACL");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.NONE, "");
   }
 }
