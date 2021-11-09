@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds;
 
 import com.google.protobuf.ServiceException;
-import java.util.HashMap;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -652,7 +651,6 @@ public final class HddsUtils {
         t = t.getCause();
       }
     }
-    Map<Integer, Integer> map = new HashMap();
     return null;
   }
 
