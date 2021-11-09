@@ -154,8 +154,6 @@ public class TestOzoneFileInterfaces {
 
   public void init() throws Exception {
     OzoneConfiguration conf = getOzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
     MiniOzoneCluster newCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();

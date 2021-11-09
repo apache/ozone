@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -86,10 +85,6 @@ public class TestOzoneFSWithObjectStoreCreate {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();

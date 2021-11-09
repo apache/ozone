@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -55,8 +54,7 @@ public class TestOzoneFileSystemMissingParent {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
+
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
 
