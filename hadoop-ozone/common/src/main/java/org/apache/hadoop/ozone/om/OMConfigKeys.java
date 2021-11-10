@@ -275,7 +275,7 @@ public final class OMConfigKeys {
       "ozone.default.bucket.layout";
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
       BucketLayout.OBJECT_STORE.name();
-  public static final String OZONE_DEFAULT_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
+  public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
       BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
 
   /**
