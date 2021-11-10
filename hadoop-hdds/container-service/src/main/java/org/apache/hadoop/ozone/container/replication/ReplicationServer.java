@@ -42,7 +42,7 @@ import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.ServerChannel;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.Epoll;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollEventLoopGroup;
-import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollServerDomainSocketChannel;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollServerSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
@@ -101,10 +101,10 @@ public class ReplicationServer {
     Class<? extends ServerChannel> channelType;
 
     if (Epoll.isAvailable()) {
-      eventLoopGroup = new EpollEventLoopGroup(poolSize * 2);
-      channelType = EpollServerDomainSocketChannel.class;
+      eventLoopGroup = new EpollEventLoopGroup(poolSize / 4);
+      channelType = EpollServerSocketChannel.class;
     } else {
-      eventLoopGroup = new NioEventLoopGroup(poolSize * 2);
+      eventLoopGroup = new NioEventLoopGroup(poolSize / 4);
       channelType = NioServerSocketChannel.class;
     }
 

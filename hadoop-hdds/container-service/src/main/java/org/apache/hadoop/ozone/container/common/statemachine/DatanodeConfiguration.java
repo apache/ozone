@@ -72,7 +72,7 @@ public class DatanodeConfiguration {
    */
   @Config(key = "replication.streams.limit",
       type = ConfigType.INT,
-      defaultValue = "10",
+      defaultValue = "12",
       tags = {DATANODE},
       description = "The maximum number of replication commands a single " +
           "datanode can execute simultaneously"
