@@ -79,6 +79,18 @@ public class DatanodeConfiguration {
   )
   private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
+  /**
+   * Number of threads per volume that Datanode will use for chunk read.
+   */
+  @Config(key = "read.chunk.threads.per.volume",
+      type = ConfigType.INT,
+      defaultValue = "10",
+      tags = {DATANODE},
+      description = "Number of threads per volume that Datanode will use for " +
+          "reading replicated chunks."
+  )
+  private int numReadThreadPerVolume = 10;
+
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
@@ -361,4 +373,11 @@ public class DatanodeConfiguration {
     isChunkDataValidationCheck = writeChunkValidationCheck;
   }
 
+  public void setNumReadThreadPerVolume(int threads) {
+    this.numReadThreadPerVolume = threads;
+  }
+
+  public int getNumReadThreadPerVolume() {
+    return numReadThreadPerVolume;
+  }
 }
