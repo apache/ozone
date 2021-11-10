@@ -54,7 +54,7 @@ public class DatanodeConfiguration {
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
-  static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
+  static final int REPLICATION_MAX_STREAMS_DEFAULT = 12;
 
   static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
