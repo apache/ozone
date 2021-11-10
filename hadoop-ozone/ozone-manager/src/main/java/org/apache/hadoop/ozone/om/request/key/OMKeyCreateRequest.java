@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -72,11 +73,16 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
  */
 
 public class OMKeyCreateRequest extends OMKeyRequest {
+
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateRequest.class);
 
   public OMKeyCreateRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMKeyCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -94,18 +100,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmUtils.validateKeyName(keyArgs.getKeyName());
     }
 
-    String keyPath = keyArgs.getKeyName();
-    if (ozoneManager.getEnableFileSystemPaths()) {
-      // If enabled, disallow keys with trailing /. As in fs semantics
-      // directories end with trailing /.
-      keyPath = validateAndNormalizeKey(
-          ozoneManager.getEnableFileSystemPaths(), keyPath);
-      if (keyPath.endsWith("/")) {
-        throw new OMException("Invalid KeyPath, key names with trailing / " +
-            "are not allowed." + keyPath,
-            OMException.ResultCodes.INVALID_KEY_NAME);
-      }
-    }
+    String keyPath =
+        validateAndNormalizeKey(ozoneManager, keyArgs, getBucketLayout());
 
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with

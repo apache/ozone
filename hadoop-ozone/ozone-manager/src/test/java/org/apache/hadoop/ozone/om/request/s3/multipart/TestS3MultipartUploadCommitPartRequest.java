@@ -100,12 +100,14 @@ public class TestS3MultipartUploadCommitPartRequest
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
     Assert.assertTrue(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey).getPartKeyInfoMap().size() == 1);
-    Assert.assertNotNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+    Assert.assertNotNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
         .get(multipartOpenKey));
 
     String partKey = getOpenKey(volumeName, bucketName, keyName, clientID);
-    Assert.assertNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(partKey));
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
+        .get(partKey));
   }
 
   @Test

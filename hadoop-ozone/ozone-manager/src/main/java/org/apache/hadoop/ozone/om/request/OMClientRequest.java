@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -405,6 +406,34 @@ public abstract class OMClientRequest implements RequestAuditor {
     } else {
       return keyName;
     }
+  }
+
+  protected String validateAndNormalizeKey(OzoneManager ozoneManager,
+      OzoneManagerProtocolProtos.KeyArgs keyArgs, BucketLayout bucketLayout)
+      throws OMException {
+    String keyPath = keyArgs.getKeyName();
+    LOG.debug("Bucket Layout: {}", bucketLayout);
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      keyPath = keyArgs.getKeyName();
+    } else if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      keyPath = validateAndNormalizeKey(true, keyArgs.getKeyName());
+      if (keyPath.endsWith("/")) {
+        throw new OMException(
+            "Invalid KeyPath, key names with trailing / " + "are not allowed."
+                + keyPath, OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    } else {
+      keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+          keyPath);
+      if (ozoneManager.getEnableFileSystemPaths()) {
+        if (keyPath.endsWith("/")) {
+          throw new OMException(
+              "Invalid KeyPath, key names with trailing / " + "are not allowed."
+                  + keyPath, OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+      }
+    }
+    return keyPath;
   }
 
 

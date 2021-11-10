@@ -51,8 +51,9 @@ public class S3MultipartUploadCompleteRequestWithFSO
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
-  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

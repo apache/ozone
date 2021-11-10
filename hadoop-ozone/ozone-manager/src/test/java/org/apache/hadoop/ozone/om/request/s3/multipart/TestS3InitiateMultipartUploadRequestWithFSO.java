@@ -88,7 +88,8 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
             fileName, modifiedRequest.getInitiateMultiPartUploadRequest()
                     .getKeyArgs().getMultipartUploadID());
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+    OmKeyInfo omKeyInfo = omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
     Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
     Assert.assertEquals("FileName mismatches!", fileName,
@@ -141,7 +142,8 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
       OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);
+    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override

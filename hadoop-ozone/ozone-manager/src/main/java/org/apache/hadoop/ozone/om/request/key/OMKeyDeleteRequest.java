@@ -61,8 +61,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyDeleteRequest.class);
 
-  public OMKeyDeleteRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -72,10 +72,11 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
 
+    String keyPath =
+        validateAndNormalizeKey(ozoneManager, keyArgs, getBucketLayout());
+
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(validateAndNormalizeKey(
-                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+        keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()

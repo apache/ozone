@@ -25,6 +25,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -65,8 +66,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMAllocateBlockRequest.class);
 
-  public OMAllocateBlockRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMAllocateBlockRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -78,6 +80,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     Preconditions.checkNotNull(allocateBlockRequest);
 
     KeyArgs keyArgs = allocateBlockRequest.getKeyArgs();
+    String keyPath =
+        validateAndNormalizeKey(ozoneManager, keyArgs, getBucketLayout());
 
     ExcludeList excludeList = new ExcludeList();
     if (allocateBlockRequest.hasExcludeList()) {
@@ -106,10 +110,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());
 
     // Set modification time and normalize key if required.
-    KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
-        .setModificationTime(Time.now())
-        .setKeyName(validateAndNormalizeKey(
-            ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+    KeyArgs.Builder newKeyArgs =
+        keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()

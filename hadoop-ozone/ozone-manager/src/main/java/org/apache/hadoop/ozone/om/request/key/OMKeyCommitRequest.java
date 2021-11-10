@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -70,8 +71,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
-  public OMKeyCommitRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -90,10 +91,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
     }
 
+    String keyPath =
+        validateAndNormalizeKey(ozoneManager, keyArgs, getBucketLayout());
+
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(validateAndNormalizeKey(
-                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+            .setKeyName(keyPath);
 
     return getOmRequest().toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
