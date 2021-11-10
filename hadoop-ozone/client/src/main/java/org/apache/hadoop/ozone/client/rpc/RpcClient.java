@@ -185,15 +185,21 @@ public class RpcClient implements ClientProtocol {
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
     OmTransport omTransport = createOmTransport(omServiceId);
-    this.ozoneManagerClient = TracingUtil.createProxy(
+    OzoneManagerProtocolClientSideTranslatorPB
+        ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
-            clientId.toString()),
-        OzoneManagerClientProtocol.class, conf
-    );
+        clientId.toString());
+    this.ozoneManagerClient = TracingUtil.createProxy(
+        ozoneManagerProtocolClientSideTranslatorPB,
+        OzoneManagerClientProtocol.class, conf);
     dtService = omTransport.getDelegationTokenService();
-    ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     List<X509Certificate> x509Certificates = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
+      // If the client is authenticating using S3 style auth, all future
+      // requests serviced by this client will need S3 Auth set.
+      ozoneManagerProtocolClientSideTranslatorPB.setS3AuthCheck(
+          conf.getBoolean(S3Auth.S3_AUTH_CHECK, false));
       String caCertPem = null;
       List<String> caCertPems = null;
       caCertPem = serviceInfoEx.getCaCertificate();

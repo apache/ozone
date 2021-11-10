@@ -112,6 +112,8 @@ public class OzoneClientProducer {
   @NotNull
   @VisibleForTesting
   OzoneClient createOzoneClient() throws IOException {
+    // S3 Gateway should always set the S3 Auth.
+    ozoneConfiguration.setBoolean(S3Auth.S3_AUTH_CHECK, true);
     if (omServiceID == null) {
       return OzoneClientFactory.getRpcClient(ozoneConfiguration);
     } else {
