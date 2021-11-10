@@ -192,23 +192,51 @@ public class TestBucketManagerImpl {
 
   @Test
   public void testGetBucketInfo() throws Exception {
+    final String volumeName = "sampleVol";
+    final String bucketName = "bucketOne";
     OmMetadataManagerImpl metaMgr = createSampleVol();
 
     BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+    // Check exception thrown when volume does not exist
+    try {
+      bucketManager.getBucketInfo(volumeName, bucketName);
+      Assert.fail("Should have thrown OMException");
+    } catch (OMException omEx) {
+      Assert.assertEquals("getBucketInfo() should have thrown " +
+              "VOLUME_NOT_FOUND as the parent volume is not created!",
+          ResultCodes.VOLUME_NOT_FOUND, omEx.getResult());
+    }
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName("sampleVol")
-        .setBucketName("bucketOne")
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
         .setStorageType(StorageType.DISK)
         .setIsVersionEnabled(false)
         .build();
+    // Note: the helper method createBucket() in this scope won't create the
+    // parent volume DB entry. In order to verify getBucketInfo's behavior, we
+    // need to create the volume entry in DB manually.
+    OmVolumeArgs args = OmVolumeArgs.newBuilder()
+            .setVolume(volumeName)
+            .setAdminName("bilbo")
+            .setOwnerName("bilbo")
+            .build();
+    TestOMRequestUtils.addVolumeToOM(metaMgr, args);
+    // Create bucket
     createBucket(metaMgr, bucketInfo);
-    OmBucketInfo result = bucketManager.getBucketInfo(
-        "sampleVol", "bucketOne");
-    Assert.assertEquals("sampleVol", result.getVolumeName());
-    Assert.assertEquals("bucketOne", result.getBucketName());
-    Assert.assertEquals(StorageType.DISK,
-        result.getStorageType());
-    Assert.assertEquals(false, result.getIsVersionEnabled());
+    // Check exception thrown when bucket does not exist
+    try {
+      bucketManager.getBucketInfo(volumeName, "bucketNotExist");
+      Assert.fail("Should have thrown OMException");
+    } catch (OMException omEx) {
+      Assert.assertEquals("getBucketInfo() should have thrown " +
+              "BUCKET_NOT_FOUND as the parent volume exists but bucket " +
+              "doesn't!", ResultCodes.BUCKET_NOT_FOUND, omEx.getResult());
+    }
+    OmBucketInfo result = bucketManager.getBucketInfo(volumeName, bucketName);
+    Assert.assertEquals(volumeName, result.getVolumeName());
+    Assert.assertEquals(bucketName, result.getBucketName());
+    Assert.assertEquals(StorageType.DISK, result.getStorageType());
+    Assert.assertFalse(result.getIsVersionEnabled());
     metaMgr.getStore().close();
   }
 
