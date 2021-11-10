@@ -24,9 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -75,17 +73,15 @@ public final class ContainerBalancerConfiguration {
       defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can enter a target datanode in each " +
       "iteration while balancing. This is the sum of data from multiple " +
-      "sources. The default value is greater than the configured" +
-      " (or default) ozone.scm.container.size by 1GB.")
-  private long maxSizeEnteringTarget;
+      "sources. by default, we do not limit this value")
+  private long maxSizeEnteringTarget = Long.MAX_VALUE;
 
   @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
       defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can leave a source datanode in each " +
       "iteration while balancing. This is the sum of data moving to multiple " +
-      "targets. The default value is greater than the configured" +
-      " (or default) ozone.scm.container.size by 1GB.")
-  private long maxSizeLeavingSource;
+      "targets. by default, we do not limit this value")
+  private long maxSizeLeavingSource = Long.MAX_VALUE;;
 
   @Config(key = "idle.iterations", type = ConfigType.INT,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
@@ -120,15 +116,6 @@ public final class ContainerBalancerConfiguration {
     Preconditions.checkNotNull(config,
         "OzoneConfiguration should not be null.");
     this.ozoneConfiguration = config;
-
-    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
-    // greater than container size
-    long size = (long) ozoneConfiguration.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.GB) +
-        OzoneConsts.GB;
-    maxSizeEnteringTarget = size;
-    maxSizeLeavingSource = size;
 
     // balancing interval should be greater than DUFactory refresh period
     duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
