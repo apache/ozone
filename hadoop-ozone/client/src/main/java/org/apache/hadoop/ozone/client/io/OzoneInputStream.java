@@ -105,7 +105,7 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer,
   @Override
   public long getPos() throws IOException {
     if (inputStream instanceof Seekable) {
-     return ((Seekable) inputStream).getPos();
+      return ((Seekable) inputStream).getPos();
     } else {
       throw new UnsupportedOperationException("Seek is not supported on the " +
           "underlying inputStream");
