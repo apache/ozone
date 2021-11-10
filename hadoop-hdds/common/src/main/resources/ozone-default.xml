@@ -3001,9 +3001,9 @@
   <property>
     <name>ozone.client.test.ofs.default.bucket.layout</name>
     <value>FILE_SYSTEM_OPTIMIZED</value>
-    <tag>OZONE, MANAGEMENT</tag>
+    <tag>OZONE, CLIENT</tag>
     <description>
-      Default bucket layout used by Ozone Manager when buckets are created using Ozone File System.
+      This configuration is used for testing purposes. Default bucket layout value when buckets are created using OFS.
       Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
