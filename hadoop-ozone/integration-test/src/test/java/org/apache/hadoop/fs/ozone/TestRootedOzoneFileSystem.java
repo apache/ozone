@@ -71,6 +71,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -161,6 +162,12 @@ public class TestRootedOzoneFileSystem {
   private static String rootPath;
   private static BucketLayout bucketLayout;
 
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
+      .createUserForTesting(USER1,  new String[] {"usergroup"});
+  // Non-privileged OFS instance
+  private static RootedOzoneFileSystem userOfs;
+
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -178,6 +185,11 @@ public class TestRootedOzoneFileSystem {
           enabledFileSystemPaths);
     }
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, enableAcl);
+    // Set ACL authorizer class to OzoneNativeAuthorizer. The default
+    // OzoneAccessAuthorizer always returns true for all ACL checks which
+    // doesn't work for the test.
+    conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
+        OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -206,6 +218,10 @@ public class TestRootedOzoneFileSystem {
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+
+    userOfs = UGI_USER1.doAs(
+        (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
+            -> (RootedOzoneFileSystem) FileSystem.get(conf));
   }
 
   @AfterClass
@@ -870,7 +886,7 @@ public class TestRootedOzoneFileSystem {
    * OFS: Test /tmp mount behavior.
    */
   @Test
-  public void testTempMount() throws Exception {
+  public void testTempMount() throws IOException {
     // Prep
     // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
     ClientProtocol proxy = objectStore.getClientProxy();
@@ -1513,4 +1529,64 @@ public class TestRootedOzoneFileSystem {
     }
   }
 
+  @Test
+  public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
+    // This test is only meaningful when ACL is enabled
+    if (!enableAcl) {
+      LOG.info("Skipping this test as ACL is not enabled");
+      return;
+    }
+
+    // This unit test does the correct check. However, the parameterized
+    // test is not initialized correctly since HDDS-4998 (or HDDS-4040).
+
+    // The cluster is started with enableAcl = false, but across different set
+    // of test parameters, the OM is not restarted. So OM is actually stuck with
+    // enableAcl = false. That's why ACL checks are skipped in the tests.
+    // OM should be restarted when enableAcl is changed.
+
+    // For now, in order to properly run this specific test, on line 147,
+    // explicitly assign:
+    //     private static boolean enableAcl = true;
+    // When unset, it defaults to false due to Java primitive defaults.
+
+    // TODO: Fix the parameterized test to properly initialize the cluster.
+    //  When the parameterized test is initialized correctly, the line
+    //  below can be uncommented.
+//    Assert.assertTrue(cluster.getOzoneManager().getAclsEnabled());
+
+    final String volume = "volume-for-test-get-bucket";
+    // Create a volume as admin
+    // Create volume "tmp" with world access. allow non-admin to create buckets
+    ClientProtocol proxy = objectStore.getClientProxy();
+
+    // Get default acl rights for user
+    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
+    ACLType userRights = aclConfig.getUserDefaultRights();
+    // Construct ACL for world access
+    OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
+        userRights, ACCESS);
+    // Construct VolumeArgs, set ACL to world access
+    VolumeArgs volumeArgs = new VolumeArgs.Builder()
+        .setAcls(Collections.singletonList(aclWorldAccess))
+        .build();
+    proxy.createVolume(volume, volumeArgs);
+
+    // Create a bucket as non-admin, should succeed
+    final String bucket = "test-bucket-1";
+    try {
+      final Path myBucketPath = new Path(volume, bucket);
+      // Have to prepend the root to bucket path here.
+      // Otherwise, FS will automatically prepend user home directory path
+      // which is not we want here.
+      Assert.assertTrue(userOfs.mkdirs(new Path("/", myBucketPath)));
+    } catch (IOException e) {
+      Assert.fail("Should not have thrown exception when creating bucket as" +
+          " a regular user here");
+    }
+
+    // Clean up
+    proxy.deleteBucket(volume, bucket);
+    proxy.deleteVolume(volume);
+  }
 }
