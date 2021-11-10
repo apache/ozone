@@ -57,7 +57,6 @@ public class TestBucketOwner {
           .createUserForTesting("user2", new String[] {"test2"});
   private static UserGroupInformation user3 = UserGroupInformation
           .createUserForTesting("user3", new String[] {"test3"});
-  private static OzoneVolume volume;
   private static OzoneClient client;
   private static ObjectStore objectStore;
 
@@ -85,7 +84,7 @@ public class TestBucketOwner {
     UserGroupInformation.setLoginUser(user1);
     client = cluster.getClient();
     objectStore = client.getObjectStore();
-    volume = objectStore.getVolume("volume1");
+    OzoneVolume volume = objectStore.getVolume("volume1");
     BucketArgs omBucketArgs = BucketArgs.newBuilder()
             .setStorageType(StorageType.DISK).setOwner("user1").build();
     volume.createBucket("bucket1", omBucketArgs);
@@ -104,9 +103,8 @@ public class TestBucketOwner {
   public void testBucketOwner() throws Exception {
     // Test Key Operations as Bucket Owner,  Non-Volume Owner
     UserGroupInformation.setLoginUser(user1);
-    client = cluster.getClient();
-    objectStore = client.getObjectStore();
-    volume = objectStore.getVolume("volume1");
+    OzoneVolume volume = cluster.getClient().getObjectStore()
+            .getVolume("volume1");
     OzoneBucket ozoneBucket = volume.getBucket("bucket1");
     //Key Create
     createKey(ozoneBucket, "key1", 10, new byte[10]);
@@ -122,11 +120,10 @@ public class TestBucketOwner {
     // Test Key Operations Non-Bucket Owner, Non-Volume Owner
     //Key Create
     UserGroupInformation.setLoginUser(user3);
-    client = cluster.getClient();
-    objectStore = client.getObjectStore();
     OzoneBucket ozoneBucket;
     try {
-      volume = objectStore.getVolume("volume1");
+      OzoneVolume volume = cluster.getClient().getObjectStore()
+              .getVolume("volume1");
       ozoneBucket = volume.getBucket("bucket1");
       createKey(ozoneBucket, "key3", 10, new byte[10]);
       fail();
@@ -135,7 +132,8 @@ public class TestBucketOwner {
     }
     //Key Delete - should fail
     try {
-      volume = objectStore.getVolume("volume1");
+      OzoneVolume volume = cluster.getClient().getObjectStore()
+              .getVolume("volume1");
       ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.deleteKey("key2");
       fail();
@@ -144,7 +142,8 @@ public class TestBucketOwner {
     }
     //Key Rename - should fail
     try {
-      volume = objectStore.getVolume("volume1");
+      OzoneVolume volume = cluster.getClient().getObjectStore()
+              .getVolume("volume1");
       ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.renameKey("key2", "key4");
       fail();
@@ -157,9 +156,8 @@ public class TestBucketOwner {
   public void testVolumeOwner() throws Exception {
     //Test Key Operations for Volume Owner
     UserGroupInformation.setLoginUser(user2);
-    client = cluster.getClient();
-    objectStore = client.getObjectStore();
-    volume = objectStore.getVolume("volume1");
+    OzoneVolume volume = cluster.getClient().getObjectStore()
+            .getVolume("volume1");
     OzoneBucket ozoneBucket = volume.getBucket("bucket1");
     //Key Create
     createKey(ozoneBucket, "key2", 10, new byte[10]);

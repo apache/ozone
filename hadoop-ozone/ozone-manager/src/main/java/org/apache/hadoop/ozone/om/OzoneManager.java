@@ -2081,8 +2081,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (bucketInfo != null) {
       return bucketInfo.getOwner();
     } else {
-      throw new OMException("Bucket " +  volume + "/" +
-              bucket+ " is not found", ResultCodes.BUCKET_NOT_FOUND);
+      throw new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND);
     }
   }
 
