@@ -243,7 +243,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- the version of Hadoop declared in the version resources; can be overridden
     so that Hadoop 3.x can declare itself a 2.x artifact. -->
     <declared.hadoop.version>${hadoop.version}</declared.hadoop.version>
-    <proto-backwards-compatibility.version>1.0.5</proto-backwards-compatibility.version>
+    <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
     <snakeyaml.version>1.26</snakeyaml.version>
