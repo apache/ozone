@@ -196,7 +196,7 @@ public class RpcClient implements ClientProtocol {
     List<X509Certificate> x509Certificates = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
-      // If the client is authenticating using S3 style aut, all future
+      // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
       ozoneManagerProtocolClientSideTranslatorPB.setS3AuthCheck(
           conf.getBoolean(S3Auth.S3_AUTH_CHECK, false));
