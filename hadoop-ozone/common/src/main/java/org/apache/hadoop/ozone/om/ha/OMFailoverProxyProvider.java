@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.SecretManager;
 
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
@@ -455,7 +456,8 @@ public class OMFailoverProxyProvider<T> implements
 
   private synchronized boolean shouldFailover(Exception ex) {
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
-    if (unwrappedException instanceof AccessControlException) {
+    if (unwrappedException instanceof AccessControlException ||
+        unwrappedException instanceof SecretManager.InvalidToken) {
       // Retry all available OMs once before failing with
       // AccessControlException.
       if (accessControlExceptionOMs.contains(currentProxyOMNodeId)) {
