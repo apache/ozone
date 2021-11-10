@@ -394,8 +394,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param healthyNodes - Set of healthy nodes we can choose from.
    * @return chosen datanodeDetails
    */
-  @Override
-  public DatanodeDetails chooseFirstNode(
+  private DatanodeDetails chooseFirstNode(
       final List<DatanodeDetails> healthyNodes) {
     if (healthyNodes == null || healthyNodes.isEmpty()) {
       return null;

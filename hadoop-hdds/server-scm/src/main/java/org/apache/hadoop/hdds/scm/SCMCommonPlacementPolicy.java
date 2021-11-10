@@ -265,16 +265,6 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       List<DatanodeDetails> healthyNodes);
 
   /**
-   * Choose a datanode according to the policy, this function is implemented
-   * by the actual policy class.
-   *
-   * @param healthyNodes - Set of healthy nodes we can choose from.
-   * @return DatanodeDetails
-   */
-  public abstract DatanodeDetails chooseFirstNode(
-      List<DatanodeDetails> healthyNodes);
-
-  /**
    * Default implementation to return the number of racks containers should span
    * to meet the placement policy. For simple policies that are not rack aware
    * we return 1, from this default implementation.
