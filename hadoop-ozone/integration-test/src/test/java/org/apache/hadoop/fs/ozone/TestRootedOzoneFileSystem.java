@@ -195,7 +195,7 @@ public class TestRootedOzoneFileSystem {
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = cluster.getClient().getObjectStore();
-    
+
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
@@ -1533,7 +1533,8 @@ public class TestRootedOzoneFileSystem {
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
     // This test is only meaningful when ACL is enabled
     if (!enableAcl) {
-      LOG.info("Skipping this test as ACL is not enabled");
+      LOG.info("ACL is not enabled. Skipping this test as it requires ACL to " +
+          " be enabled to be meaningful.");
       return;
     }
 
