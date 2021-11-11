@@ -105,7 +105,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     super(omRequest);
   }
 
-  public OMDirectoryCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+  public OMDirectoryCreateRequest(OMRequest omRequest,
+                                  BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
   }
 

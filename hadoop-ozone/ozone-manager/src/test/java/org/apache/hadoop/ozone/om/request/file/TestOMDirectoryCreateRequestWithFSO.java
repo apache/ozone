@@ -150,7 +150,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq =
         omDirCreateRequestFSO.preExecute(ozoneManager);

@@ -72,7 +72,8 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateRequestWithFSO.class);
 
-  public OMDirectoryCreateRequestWithFSO(OMRequest omRequest, BucketLayout bucketLayout) {
+  public OMDirectoryCreateRequestWithFSO(OMRequest omRequest,
+                                         BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
   }
 
