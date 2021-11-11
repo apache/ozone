@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -107,9 +108,10 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     OMKeyDeleteRequest omKeyDeleteRequest =
             getOmKeyDeleteRequest(modifiedOmRequest);
 
-    OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper, getBucketLayout());
+    OMClientResponse omClientResponse = omKeyDeleteRequest
+        .validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper,
+            omKeyDeleteRequest.getBucketLayout());
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -125,9 +127,10 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
     TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
-    OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper, getBucketLayout());
+    OMClientResponse omClientResponse = omKeyDeleteRequest
+        .validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper,
+            omKeyDeleteRequest.getBucketLayout());
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());
@@ -179,6 +182,6 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
       OMRequest modifiedOmRequest) {
-    return new OMKeyDeleteRequest(modifiedOmRequest);
+    return new OMKeyDeleteRequest(modifiedOmRequest, BucketLayout.DEFAULT);
   }
 }

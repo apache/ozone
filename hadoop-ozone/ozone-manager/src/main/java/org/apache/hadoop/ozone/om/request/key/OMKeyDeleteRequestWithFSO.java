@@ -61,8 +61,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyDeleteRequestWithFSO.class);
 
-  public OMKeyDeleteRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyDeleteRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
@@ -74,14 +75,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         .collect(Collectors.toList());
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
 
     String ozoneKey = addKeyToOpenKeyTable(allocatedLocationList);
 
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -94,11 +96,14 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Entry should be deleted from openKey Table.
     omKeyInfo =
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getOpenKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
     Assert.assertNull(omKeyInfo);
 
     // Now entry should be created in key Table.
-    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
 
@@ -132,14 +137,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             .collect(Collectors.toList());
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
 
     String ozoneKey = addKeyToOpenKeyTable(allocatedLocationList);
 
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -152,11 +158,14 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Entry should be deleted from openKey Table.
     omKeyInfo =
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getOpenKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
     Assert.assertNull(omKeyInfo);
 
     // Now entry should be created in key Table.
-    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
     // DB keyInfo format
@@ -202,7 +211,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -213,7 +223,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
-    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
   }
@@ -234,7 +246,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -245,7 +258,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
-    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
   }
@@ -260,14 +275,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             getOmKeyCommitRequest(modifiedOmRequest);
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
 
     String ozoneKey = getOzonePathKey();
 
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
 
@@ -278,7 +294,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
-    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
   }
@@ -300,8 +318,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     String ozoneKey = getOzonePathKey();
     // Key should be there in key table, as validateAndUpdateCache is called.
-    OmKeyInfo omKeyInfo = omMetadataManager
-        .getKeyTable(getBucketLayout()).get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
     // Previously committed version
@@ -323,7 +342,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             omClientResponse.getOMResponse().getStatus());
 
     // New entry should be created in key Table.
-    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
     Assert.assertEquals(version,
@@ -458,7 +479,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
   @NotNull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
-    return new OMKeyCommitRequest(omRequest);
+    return new OMKeyCommitRequest(omRequest, BucketLayout.DEFAULT);
   }
 
   protected void verifyKeyName(OmKeyInfo omKeyInfo) {

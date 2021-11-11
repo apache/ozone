@@ -42,8 +42,9 @@ import java.util.Iterator;
 public class S3MultipartUploadCommitPartRequestWithFSO
         extends S3MultipartUploadCommitPartRequest {
 
-  public S3MultipartUploadCommitPartRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCommitPartRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
