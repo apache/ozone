@@ -139,12 +139,7 @@ public class TestUgiFilter {
 
     // correct date in authorization header for AuthorizationV4QueryParser
     // date validator
-    headerNames = Collections.enumeration(headers.keySet());
-    Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
-    headers.put(AUTHORIZATION_HEADER, headers.
-        get(AUTHORIZATION_HEADER).replace("20210616", curDate));
-    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
-        headers.get(AUTHORIZATION_HEADER));
+    resetAuthHeader(request, "20210616", curDate);
 
     // Should not generate exception because of corrected date
     try {
@@ -157,13 +152,7 @@ public class TestUgiFilter {
 
     // Should generate exception because aws version unrecognized
     //  by any signature parser
-    headerNames = Collections.enumeration(headers.keySet());
-    Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
-    headers.put(AUTHORIZATION_HEADER, headers.
-        get(AUTHORIZATION_HEADER).replace("AWS4", "AWS3"));
-    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
-        headers.get(AUTHORIZATION_HEADER));
-
+    resetAuthHeader(request, "AWS4", "AWS3");
     try {
       filter.init(filterConfig);
       filter.doFilter(request, response, filterChain);
@@ -175,10 +164,19 @@ public class TestUgiFilter {
 
   }
 
+  private void resetAuthHeader(HttpServletRequest request, String oldStr, String newStr) {
+    Enumeration<String> headerNames = Collections.enumeration(headers.keySet());
+    Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace(oldStr, newStr));
+    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
+        headers.get(AUTHORIZATION_HEADER));
+  }
+
   @Test
   public void testUgiFilterStringToSign() throws OS3Exception, Exception {
     // test to ensure http servlet request is parsed correctly for
-    // aws authenciation - testing creating aws v4 stringToSign
+    // aws authentication - testing creating aws v4 stringToSign
 
     final SignatureInfo signatureInfo =
         new AuthorizationV4HeaderParser(headers.get(AUTHORIZATION_HEADER),
