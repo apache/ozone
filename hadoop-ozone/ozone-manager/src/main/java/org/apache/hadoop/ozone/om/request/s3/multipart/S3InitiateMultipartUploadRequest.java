@@ -78,8 +78,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = multipartInfoInitiateRequest.getKeyArgs();
 
-    String keyPath =
-        validateAndNormalizeKey(ozoneManager, keyArgs, getBucketLayout());
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
             .setMultipartUploadID(UUID.randomUUID().toString() + "-" +

@@ -100,8 +100,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmUtils.validateKeyName(keyArgs.getKeyName());
     }
 
-    String keyPath =
-        validateAndNormalizeKey(ozoneManager, keyArgs, getBucketLayout());
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with

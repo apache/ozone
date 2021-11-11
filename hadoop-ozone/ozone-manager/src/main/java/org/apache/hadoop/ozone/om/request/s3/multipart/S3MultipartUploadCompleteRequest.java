@@ -83,8 +83,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         getOmRequest().getCompleteMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
-    String keyPath =
-        validateAndNormalizeKey(ozoneManager, keyArgs, getBucketLayout());
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
         multipartUploadCompleteRequest.toBuilder().setKeyArgs(

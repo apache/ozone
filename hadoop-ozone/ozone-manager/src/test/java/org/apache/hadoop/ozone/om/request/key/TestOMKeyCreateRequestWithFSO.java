@@ -68,7 +68,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   @Override
   protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
-    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
+    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     // Check intermediate directories created or not.
     Path keyPath = Paths.get(keyName);
     long parentID = checkIntermediatePaths(keyPath);
