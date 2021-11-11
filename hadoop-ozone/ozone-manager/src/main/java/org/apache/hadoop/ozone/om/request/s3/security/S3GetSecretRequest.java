@@ -71,27 +71,20 @@ public class S3GetSecretRequest extends OMClientRequest {
         getOmRequest().getGetS3SecretRequest();
 
     // Generate S3 Secret to be used by OM quorum.
-    String kerberosID = s3GetSecretRequest.getKerberosID();
+    // Note 1: The proto field kerberosID is effectively accessId already.
+    // It is still named kerberosID because kerberosID == accessId before
+    // multi-tenancy. TODO: Rename the kerberosID field later in master branch.
+    String accessId = s3GetSecretRequest.getKerberosID();
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     final String username = ugi.getUserName();
     // Permission check. Users need to be themselves or have admin privilege
-    if (!username.equals(kerberosID) &&
-        !ozoneManager.isAdmin(ugi)) {
-      throw new OMException("Requested user name '" + kerberosID +
+    if (!username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
+      throw new OMException("Requested accessId '" + accessId +
           "' doesn't match current user '" + username +
           "', nor does current user has administrator privilege.",
           OMException.ResultCodes.USER_MISMATCH);
     }
-
-    // Generate secret. Used only when doesn't the kerberosID entry doesn't
-    //  exist in DB, discarded otherwise.
-    String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
-
-    UpdateGetS3SecretRequest updateGetS3SecretRequest =
-        UpdateGetS3SecretRequest.newBuilder()
-            .setAwsSecret(s3Secret)
-            .setKerberosID(kerberosID).build();
 
     // Client issues GetS3Secret request, when received by OM leader
     // it will generate s3Secret. Original GetS3Secret request is
@@ -102,16 +95,42 @@ public class S3GetSecretRequest extends OMClientRequest {
     // client does not need any proto changes.
     OMRequest.Builder omRequest = OMRequest.newBuilder()
         .setUserInfo(getUserInfo())
-        .setUpdateGetS3SecretRequest(updateGetS3SecretRequest)
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId());
+
+    // createIfNotExist defaults to true if not specified.
+    boolean createIfNotExist = !s3GetSecretRequest.hasCreateIfNotExist()
+            || s3GetSecretRequest.getCreateIfNotExist();
+
+    // Recompose GetS3SecretRequest just in case createIfNotExist is missing
+    final GetS3SecretRequest newGetS3SecretRequest =
+            GetS3SecretRequest.newBuilder()
+                    .setKerberosID(accessId)  // See Note 1 above
+                    .setCreateIfNotExist(createIfNotExist)
+                    .build();
+    omRequest.setGetS3SecretRequest(newGetS3SecretRequest);
+
+    // When createIfNotExist is true, pass UpdateGetS3SecretRequest message;
+    // otherwise, just use GetS3SecretRequest message.
+    if (createIfNotExist) {
+      // Generate secret here because this will be written to DB only when
+      // createIfNotExist is true and accessId entry doesn't exist in DB.
+      String s3Secret = DigestUtils.sha256Hex(OmUtils.getSHADigest());
+
+      final UpdateGetS3SecretRequest updateGetS3SecretRequest =
+              UpdateGetS3SecretRequest.newBuilder()
+                      .setKerberosID(accessId)  // See Note 1 above
+                      .setAwsSecret(s3Secret)
+                      .build();
+
+      omRequest.setUpdateGetS3SecretRequest(updateGetS3SecretRequest);
+    }
 
     if (getOmRequest().hasTraceID()) {
       omRequest.setTraceID(getOmRequest().getTraceID());
     }
 
     return omRequest.build();
-
   }
 
   @Override
@@ -124,32 +143,47 @@ public class S3GetSecretRequest extends OMClientRequest {
     boolean acquiredLock = false;
     IOException exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    UpdateGetS3SecretRequest updateGetS3SecretRequest =
-        getOmRequest().getUpdateGetS3SecretRequest();
-    String kerberosID = updateGetS3SecretRequest.getKerberosID();
+
+    final GetS3SecretRequest getS3SecretRequest =
+            getOmRequest().getGetS3SecretRequest();
+    assert(getS3SecretRequest.hasCreateIfNotExist());
+    final boolean createIfNotExist = getS3SecretRequest.getCreateIfNotExist();
+    // See Note 1 above
+    final String accessId = getS3SecretRequest.getKerberosID();
+    String awsSecret = null;
+    if (createIfNotExist) {
+      final UpdateGetS3SecretRequest updateGetS3SecretRequest =
+              getOmRequest().getUpdateGetS3SecretRequest();
+      awsSecret = updateGetS3SecretRequest.getAwsSecret();
+      assert(accessId.equals(updateGetS3SecretRequest.getKerberosID()));
+    }
+
     try {
-      String awsSecret = updateGetS3SecretRequest.getAwsSecret();
       // Note: We use the same S3_SECRET_LOCK for TenantAccessIdTable.
       acquiredLock = omMetadataManager.getLock()
-          .acquireWriteLock(S3_SECRET_LOCK, kerberosID);
+          .acquireWriteLock(S3_SECRET_LOCK, accessId);
 
       // Check multi-tenant table first: tenantAccessIdTable
       final S3SecretValue assignS3SecretValue;
       final OmDBAccessIdInfo omDBAccessIdInfo =
-          omMetadataManager.getTenantAccessIdTable().get(kerberosID);
+          omMetadataManager.getTenantAccessIdTable().get(accessId);
       if (omDBAccessIdInfo == null) {
         // Not found in TenantAccessIdTable. Fallback to S3SecretTable.
         final S3SecretValue s3SecretValue =
-            omMetadataManager.getS3SecretTable().get(kerberosID);
+            omMetadataManager.getS3SecretTable().get(accessId);
 
         if (s3SecretValue == null) {
-          // Still not found in S3SecretTable. Will add new entry in this case.
-          assignS3SecretValue = new S3SecretValue(kerberosID, awsSecret);
-          // Add cache entry first.
-          omMetadataManager.getS3SecretTable().addCacheEntry(
-              new CacheKey<>(kerberosID),
-              new CacheValue<>(
-                  Optional.of(assignS3SecretValue), transactionLogIndex));
+          if (createIfNotExist) {
+            // Still not found in S3SecretTable. Add new entry in this case
+            assignS3SecretValue = new S3SecretValue(accessId, awsSecret);
+            // Add cache entry first.
+            omMetadataManager.getS3SecretTable().addCacheEntry(
+                    new CacheKey<>(accessId),
+                    new CacheValue<>(Optional.of(assignS3SecretValue),
+                            transactionLogIndex));
+          } else {
+            assignS3SecretValue = null;
+          }
         } else {
           // Found in S3SecretTable.
           awsSecret = s3SecretValue.getAwsSecret();
@@ -161,16 +195,25 @@ public class S3GetSecretRequest extends OMClientRequest {
         assignS3SecretValue = null;
       }
 
+      // Throw ACCESSID_NOT_FOUND to the client if accessId doesn't exist
+      //  when createIfNotExist is false.
+      if (awsSecret == null) {
+        assert(!createIfNotExist);
+        throw new OMException("accessId '" + accessId + "' doesn't exist",
+                OMException.ResultCodes.ACCESSID_NOT_FOUND);
+      }
+
       // Compose response
       final GetS3SecretResponse.Builder getS3SecretResponse =
-          GetS3SecretResponse.newBuilder().setS3Secret(
-              S3Secret.newBuilder()
-                  .setAwsSecret(awsSecret)
-                  .setKerberosID(kerberosID));
-      // If entry exists, assignS3SecretValue will be null,
-      // so we won't overwrite the entry.
+              GetS3SecretResponse.newBuilder().setS3Secret(
+                      S3Secret.newBuilder()
+                              .setAwsSecret(awsSecret)
+                              .setKerberosID(accessId)  // See Note 1 above
+              );
+      // If entry exists or createIfNotExist is false, assignS3SecretValue
+      // will be null, so we won't write or overwrite the entry.
       omClientResponse = new S3GetSecretResponse(assignS3SecretValue,
-          omResponse.setGetS3SecretResponse(getS3SecretResponse).build());
+              omResponse.setGetS3SecretResponse(getS3SecretResponse).build());
 
     } catch (IOException ex) {
       exception = ex;
@@ -181,13 +224,12 @@ public class S3GetSecretRequest extends OMClientRequest {
           ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK,
-            kerberosID);
+            accessId);
       }
     }
 
-
     Map<String, String> auditMap = new HashMap<>();
-    auditMap.put(OzoneConsts.S3_GETSECRET_USER, kerberosID);
+    auditMap.put(OzoneConsts.S3_GETSECRET_USER, accessId);
 
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
@@ -195,10 +237,11 @@ public class S3GetSecretRequest extends OMClientRequest {
         exception, getOmRequest().getUserInfo()));
 
     if (exception == null) {
-      LOG.debug("Successfully generated secret for accessKey '{}'", kerberosID);
+      LOG.debug("Success: GetSecret for accessKey '{}', createIfNotExist '{}'",
+              accessId, createIfNotExist);
     } else {
-      LOG.error("Failed to generate secret for accessKey '{}': {}", kerberosID,
-          exception);
+      LOG.error("Failed to GetSecret for accessKey '{}', createIfNotExist " +
+                      "'{}': {}", accessId, createIfNotExist, exception);
     }
     return omClientResponse;
   }

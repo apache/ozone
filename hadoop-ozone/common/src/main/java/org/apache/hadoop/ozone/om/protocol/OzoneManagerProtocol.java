@@ -452,6 +452,16 @@ public interface OzoneManagerProtocol
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
+   * Gets s3Secret for given kerberos user.
+   * @param kerberosID
+   * @param createIfNotExist
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException;
+
+  /**
    * Revokes s3Secret of given kerberos user.
    * @param kerberosID
    * @throws IOException

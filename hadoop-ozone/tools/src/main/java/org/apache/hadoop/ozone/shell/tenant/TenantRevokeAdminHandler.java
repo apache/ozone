@@ -37,9 +37,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
     description = "Revoke admin role from accessIds in a tenant")
 public class TenantRevokeAdminHandler extends TenantHandler {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Parameters(description = "List of accessIds", arity = "1..")
   private List<String> accessIds = new ArrayList<>();
 

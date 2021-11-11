@@ -93,7 +93,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     if (accessIdInfo == null) {
       // Note: This potentially leaks which accessIds exists in OM.
       throw new OMException("accessId '" + accessId + "' doesn't exist",
-          OMException.ResultCodes.TENANT_USER_ACCESSID_NOT_FOUND);
+          OMException.ResultCodes.ACCESSID_NOT_FOUND);
     }
 
     final String tenantName = accessIdInfo.getTenantId();
