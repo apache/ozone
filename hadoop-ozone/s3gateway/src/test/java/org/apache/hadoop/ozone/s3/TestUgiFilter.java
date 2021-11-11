@@ -155,7 +155,8 @@ public class TestUgiFilter {
       Assert.fail("Filter should not generate any exceptions.");
     }
 
-    // Should generate exception because of invalid aws version
+    // Should generate exception because aws version unrecognized
+    //  by any signature parser
     headerNames = Collections.enumeration(headers.keySet());
     Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
     headers.put(AUTHORIZATION_HEADER, headers.
