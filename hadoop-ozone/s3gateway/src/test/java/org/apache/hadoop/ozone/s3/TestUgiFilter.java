@@ -105,10 +105,6 @@ public class TestUgiFilter {
     FilterChain filterChain = Mockito.mock(FilterChain.class);
     FilterConfig filterConfig = Mockito.mock(FilterConfig.class);
 
-    // correct date in autherization header for AuthorizationV4QueryParser
-    // date validator
-    headers.put(AUTHORIZATION_HEADER, headers.
-        get(AUTHORIZATION_HEADER).replace("20210616", curDate));
     Enumeration<String> headerNames = Collections.enumeration(headers.keySet());
 
     Mockito.when(request.getScheme()).thenReturn("http");
@@ -131,6 +127,26 @@ public class TestUgiFilter {
         headers.get(LENGTH_HEADER));
     Mockito.when(request.getParameterMap()).thenReturn(parameters);
 
+    // Should generate exception because of incorrect date
+    try {
+      filter.init(filterConfig);
+      filter.doFilter(request, response, filterChain);
+      filter.destroy();
+      Assert.fail("Filter should generate OS3 exception.");
+    } catch(Exception e) {
+      Assert.assertTrue(e.getCause() instanceof OS3Exception);
+    }
+
+    // correct date in authorization header for AuthorizationV4QueryParser
+    // date validator
+    headerNames = Collections.enumeration(headers.keySet());
+    Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace("20210616", curDate));
+    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
+        headers.get(AUTHORIZATION_HEADER));
+
+    // Should not generate exception because of corrected date
     try {
       filter.init(filterConfig);
       filter.doFilter(request, response, filterChain);
@@ -138,9 +154,14 @@ public class TestUgiFilter {
     } catch(Exception e) {
       Assert.fail("Filter should not generate any exceptions.");
     }
-    // Set incorrect date
+
+    // Should generate exception because of invalid aws version
+    headerNames = Collections.enumeration(headers.keySet());
+    Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
     headers.put(AUTHORIZATION_HEADER, headers.
-                get(AUTHORIZATION_HEADER).replace(curDate, "20210616"));
+        get(AUTHORIZATION_HEADER).replace("AWS4", "AWS3"));
+    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
+        headers.get(AUTHORIZATION_HEADER));
 
     try {
       filter.init(filterConfig);
@@ -150,6 +171,7 @@ public class TestUgiFilter {
     } catch(Exception e) {
       Assert.assertTrue(e.getCause().getCause() instanceof OS3Exception);
     }
+
   }
 
   @Test
