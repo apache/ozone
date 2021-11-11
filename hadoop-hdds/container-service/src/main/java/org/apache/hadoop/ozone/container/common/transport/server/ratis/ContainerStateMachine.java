@@ -23,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 
@@ -150,6 +152,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final AtomicBoolean stateMachineHealthy;
 
   private final Semaphore applyTransactionSemaphore;
+  private final boolean waitOnBothFollowers;
   /**
    * CSM metrics.
    */
@@ -197,6 +200,9 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     this.executor = Executors.newFixedThreadPool(numContainerOpExecutors);
     this.containerTaskQueues = new ConcurrentHashMap<>();
+    this.waitOnBothFollowers = conf.getObject(
+        DatanodeConfiguration .class).waitOnAllFollowers();
+
   }
 
   @Override
@@ -713,6 +719,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastApplied();
+    removeStateMachineDataIfNeeded(index);
   }
 
   private CompletableFuture<ContainerCommandResponseProto> submitTask(
@@ -738,6 +745,27 @@ public class ContainerStateMachine extends BaseStateMachine {
     return f;
   }
 
+  // Removes the stateMachine data from cache once both followers catch up
+  // to the particular index.
+  private void removeStateMachineDataIfNeeded(long index) {
+    if (waitOnBothFollowers) {
+      LOG.info("Removing data corresponding to log index {} from cache",
+          index);
+      try {
+        RaftServer.Division division = ratisServer.getServer().getDivision(gid);
+        if (division.getInfo().isLeader() && Arrays
+            .stream(division.getInfo().getFollowerNextIndices())
+            .allMatch(i -> i >= index)) {
+          LOG.debug("Removing data corresponding to log index {} from cache",
+              index);
+          stateMachineDataCache.remove(index);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
   /*
    * ApplyTransaction calls in Ratis are sequential.
    */
@@ -748,11 +776,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     // if the Resource limit cache is full, leader will push back new requests
     // and waits for a slow follower to catch up.
     try {
-      if (ratisServer.getServer().getDivision(gid).getInfo().isLeader()
-          && Arrays.stream(ratisServer.getServer().getDivision(gid).getInfo()
-          .getFollowerNextIndices()).allMatch(i -> i >= index)) {
-        stateMachineDataCache.remove(index);
-      }
+
+      // Remove the stateMachine data once both followers have caught up. If any
+      // one of the follower is behind, the pending queue will max out as
+      // configurable limit on pending request size and count and then will
+      // block and client wull backoff as a result of that.
+      removeStateMachineDataIfNeeded(index);
       DispatcherContext.Builder builder =
           new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
               .setLogIndex(index);
