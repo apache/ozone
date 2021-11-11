@@ -117,12 +117,13 @@ public class TestS3MultipartUploadCompleteRequest
     String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
             multipartUploadID);
 
-    Assert.assertNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadCompleteRequest.getBucketLayout())
+        .get(multipartKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
     Assert.assertNotNull(omMetadataManager
-        .getKeyTable(getBucketLayout(omMetadataManager, volumeName, bucketName))
+        .getKeyTable(s3MultipartUploadCompleteRequest.getBucketLayout())
         .get(getOzoneDBKey(volumeName, bucketName, keyName)));
   }
 

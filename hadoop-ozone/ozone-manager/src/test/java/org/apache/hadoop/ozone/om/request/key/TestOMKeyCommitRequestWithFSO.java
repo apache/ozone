@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -99,7 +100,8 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
   @NotNull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
-    return new OMKeyCommitRequestWithFSO(omRequest);
+    return new OMKeyCommitRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override

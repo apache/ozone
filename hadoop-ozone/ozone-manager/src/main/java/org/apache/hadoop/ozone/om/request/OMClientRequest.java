@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -407,6 +408,34 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
+  public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
+      String keyPath, BucketLayout bucketLayout) throws OMException {
+    LOG.debug("Bucket Layout: {}", bucketLayout);
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      // If bucket layout is OBJECT_STORE than we don't
+      // need to normalize the key.
+      return keyPath;
+    } else if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      keyPath = validateAndNormalizeKey(true, keyPath);
+      if (keyPath.endsWith("/")) {
+        throw new OMException(
+            "Invalid KeyPath, key names with trailing / " + "are not allowed."
+                + keyPath, OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    } else {
+      // In this case our bucket layout is LEGACY, we will normalize
+      // the key if 'enableFileSystemPaths' flag is true.
+      keyPath = validateAndNormalizeKey(enableFileSystemPaths, keyPath);
+      if (enableFileSystemPaths) {
+        if (keyPath.endsWith("/")) {
+          throw new OMException(
+              "Invalid KeyPath, key names with trailing / " + "are not allowed."
+                  + keyPath, OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+      }
+    }
+    return keyPath;
+  }
 
   public static String validateAndNormalizeKey(String keyName)
       throws OMException {
