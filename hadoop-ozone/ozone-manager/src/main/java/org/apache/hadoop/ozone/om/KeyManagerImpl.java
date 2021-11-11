@@ -649,15 +649,20 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    keyName = OMClientRequest
-        .validateAndNormalizeKey(enableFileSystemPaths, keyName,
-            getBucketLayout(metadataManager, args.getVolumeName(),
-                args.getBucketName()));
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
+
+    BucketLayout bucketLayout =
+        getBucketLayout(metadataManager, args.getVolumeName(),
+            args.getBucketName());
+    keyName = OMClientRequest
+        .validateAndNormalizeKey(enableFileSystemPaths, keyName,
+            bucketLayout);
+
     OmKeyInfo value = null;
     try {
-      if (isBucketFSOptimized(volumeName, bucketName)) {
+      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);

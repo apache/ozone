@@ -228,21 +228,21 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable(getBucketLayout())
+        omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable(getBucketLayout())
+      omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
           .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
       if (addToCache) {
-        omMetadataManager.getKeyTable(getBucketLayout())
+        omMetadataManager.getKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, omKeyInfo);
+      omMetadataManager.getKeyTable(getDefaultBucketLayout()).put(ozoneKey, omKeyInfo);
     }
   }
 
@@ -266,7 +266,7 @@ public final class TestOMRequestUtils {
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor);
 
-    omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+    omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName)), new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
@@ -747,10 +747,10 @@ public final class TestOMRequestUtils {
       throws IOException {
     // Retrieve the keyInfo
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+        omMetadataManager.getKeyTable(getDefaultBucketLayout()).get(ozoneKey);
 
     // Delete key from KeyTable and put in DeletedKeyTable
-    omMetadataManager.getKeyTable(getBucketLayout()).delete(ozoneKey);
+    omMetadataManager.getKeyTable(getDefaultBucketLayout()).delete(ozoneKey);
 
     RepeatedOmKeyInfo repeatedOmKeyInfo =
         omMetadataManager.getDeletedTable().get(ozoneKey);
@@ -896,8 +896,9 @@ public final class TestOMRequestUtils {
     final String dbKey = omMetadataManager.getOzoneKey(
         omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
         omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable(getBucketLayout()).put(dbKey, omKeyInfo);
-    omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+    omMetadataManager.getKeyTable(getDefaultBucketLayout())
+        .put(dbKey, omKeyInfo);
+    omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(dbKey),
         new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
@@ -1075,7 +1076,7 @@ public final class TestOMRequestUtils {
     }
   }
 
-  public static BucketLayout getBucketLayout() {
+  private static BucketLayout getDefaultBucketLayout() {
     return BucketLayout.DEFAULT;
   }
 }

@@ -210,7 +210,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
         cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getBucketLayout());
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -257,7 +257,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
         cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getBucketLayout());
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -331,7 +331,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
         cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getBucketLayout());
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
     Table<String, RepeatedOmKeyInfo> deletedKeyTable =
@@ -403,7 +403,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     Assert.assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
   }
 
-  public BucketLayout getBucketLayout() {
+  private static BucketLayout getFSOBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

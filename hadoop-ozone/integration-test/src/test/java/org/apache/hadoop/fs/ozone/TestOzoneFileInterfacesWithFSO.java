@@ -30,7 +30,7 @@ import java.io.IOException;
  * Test OzoneFileSystem Interfaces - prefix layout.
  *
  * This test will test the various interfaces i.e.
- * create, read,ra write, getFileStatus
+ * create, read, write, getFileStatus
  */
 @RunWith(Parameterized.class)
 public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
