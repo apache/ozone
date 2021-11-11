@@ -282,6 +282,25 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     return blockInfo.getBlockID();
   }
 
+  protected void seekStreamIfNecessary(BlockExtendedInputStream stream,
+      long partialChunkSize) throws IOException {
+    if (seeked) {
+      // Seek on the underlying streams is performed lazily, as there is a
+      // possibility a read after a seek may only read a small amount of data.
+      // Once this block stream has been seeked, we always check the position,
+      // but in the usual case, where there are no seeks at all, we don't need
+      // to do this extra work.
+      long basePosition = (position / stripeSize) * (long)ecChunkSize;
+      long streamPosition = basePosition + partialChunkSize;
+      if (streamPosition != stream.getPos()) {
+        // This ECBlockInputStream has been seeked, so the underlying
+        // block stream is no longer at the correct position. Therefore we need
+        // to seek it too.
+        stream.seek(streamPosition);
+      }
+    }
+  }
+
   /**
    * Read the most allowable amount of data from the current stream. This
    * ensures we don't read past the end of an EC cell or the overall block
@@ -295,21 +314,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       ByteReaderStrategy strategy)
       throws IOException {
     long partialPosition = position % ecChunkSize;
-    if (seeked) {
-      // Seek on the underlying streams is performed lazily, as there is a
-      // possibility a read after a seek may only read a small amount of data.
-      // Once this block stream has been seeked, we always check the position,
-      // but in the usual case, where there are no seeks at all, we don't need
-      // to do this extra work.
-      long basePosition = (position / stripeSize) * (long)ecChunkSize;
-      long streamPosition = basePosition + partialPosition;
-      if (streamPosition != stream.getPos()) {
-        // This ECBlockInputStream has been seeked, so the underlying
-        // block stream is no longer at the correct position. Therefore we need
-        // to seek it too.
-        stream.seek(streamPosition);
-      }
-    }
+    seekStreamIfNecessary(stream, partialPosition);
     long ecLimit = ecChunkSize - partialPosition;
     // Free space in the buffer to read into
     long bufLimit = strategy.getTargetLength();
