@@ -111,9 +111,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
     this.maxLocations = repConfig.getData() + repConfig.getParity();
-    this.dataLocations =
-        new DatanodeDetails[repConfig.getData() + repConfig.getParity()];
-    this.blockStreams = new BlockExtendedInputStream[repConfig.getData()];
+    this.dataLocations = new DatanodeDetails[repConfig.getRequiredNodes()];
+    this.blockStreams =
+        new BlockExtendedInputStream[repConfig.getRequiredNodes()];
 
     this.stripeSize = (long)ecChunkSize * repConfig.getData();
     setBlockLocations(this.blockInfo.getPipeline());
@@ -152,9 +152,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * stream if it has not been opened already.
    * @return BlockInput stream to read from.
    */
-  protected BlockExtendedInputStream getOrOpenStream(
-      int streamIndex, int locationIndex) {
-    BlockExtendedInputStream stream = blockStreams[streamIndex];
+  protected BlockExtendedInputStream getOrOpenStream(int locationIndex) {
+    BlockExtendedInputStream stream = blockStreams[locationIndex];
     if (stream == null) {
       // To read an EC block, we create a STANDALONE pipeline that contains the
       // single location for the block index we want to read. The EC blocks are
@@ -180,7 +179,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           blkInfo, pipeline,
           blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
           refreshFunction);
-      blockStreams[streamIndex] = stream;
+      blockStreams[locationIndex] = stream;
     }
     return stream;
   }
@@ -258,8 +257,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     int totalRead = 0;
     while(strategy.getTargetLength() > 0 && remaining() > 0) {
       int currentIndex = currentStreamIndex();
-      BlockExtendedInputStream stream =
-          getOrOpenStream(currentIndex, currentIndex);
+      BlockExtendedInputStream stream = getOrOpenStream(currentIndex);
       int read = readFromStream(stream, strategy);
       totalRead += read;
       position += read;
@@ -380,10 +378,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           "EOF encountered at pos: " + pos + " for block: "
               + blockInfo.getBlockID());
     }
-    if (position != pos) {
-      position = pos;
-      seeked = true;
-    }
+    position = pos;
+    seeked = true;
   }
 
   @Override

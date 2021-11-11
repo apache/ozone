@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
+import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.erasurecode.CodecRegistry;
@@ -354,8 +355,8 @@ public class TestECBlockReconstructedStripeInputStream {
       try {
         ecb.readStripe(bufs);
         Assert.fail("Read should have thrown an exception");
-      } catch (IOException e) {
-        Assert.assertTrue(e.getMessage().matches("^Expected\\sto\\sread.+"));
+      } catch (InsufficientLocationsException e) {
+        // expected
       }
     }
   }
@@ -459,6 +460,87 @@ public class TestECBlockReconstructedStripeInputStream {
     }
   }
 
+  @Test
+  public void testErrorReadingBlockContinuesReading() throws IOException {
+    // Generate the input data for 3 full stripes and generate the parity.
+    int chunkSize = repConfig.getEcChunkSize();
+    int partialStripeSize = chunkSize * 2 - 1;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(),
+        4 * chunkSize);
+    dataBufs[1].limit(4 * chunkSize - 1);
+    dataBufs[2].limit(3 * chunkSize);
+    for (ByteBuffer b : dataBufs) {
+      randomFill(b);
+    }
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+
+    List<List<Integer>> failLists = new ArrayList<>();
+    failLists.add(indexesToList(0, 1));
+    // These will be the first parity read and then the next parity read as a
+    // replacement
+    failLists.add(indexesToList(2, 3));
+    // First parity and then the data block
+    failLists.add(indexesToList(2, 0));
+
+    for (List<Integer> failList : failLists) {
+      streamFactory = new TestBlockInputStreamFactory();
+      addDataStreamsToFactory(dataBufs, parity);
+
+      // Data block index 3 is missing and needs recovered initially.
+      Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
+      OmKeyLocationInfo keyInfo = createKeyInfo(repConfig,
+          stripeSize() * 3 + partialStripeSize, dnMap);
+      streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+      ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+      try (ECBlockReconstructedStripeInputStream ecb =
+          new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
+                   null, null, streamFactory)) {
+        // After reading the first stripe, make one of the streams error
+        for (int i = 0; i < 3; i++) {
+          int read = ecb.readStripe(bufs);
+          for (int j = 0; j < bufs.length; j++) {
+            validateContents(dataBufs[j], bufs[j], i * chunkSize, chunkSize);
+          }
+          Assert.assertEquals(stripeSize() * (i + 1), ecb.getPos());
+          Assert.assertEquals(stripeSize(), read);
+          clearBuffers(bufs);
+          if (i == 0) {
+            streamFactory.getBlockStreams().get(failList.remove(0))
+                .setShouldError(true);
+          }
+        }
+        // The next read is a partial stripe
+        int read = ecb.readStripe(bufs);
+        Assert.assertEquals(partialStripeSize, read);
+        validateContents(dataBufs[0], bufs[0], 3 * chunkSize, chunkSize);
+        validateContents(dataBufs[1], bufs[1], 3 * chunkSize, chunkSize - 1);
+        Assert.assertEquals(0, bufs[2].remaining());
+        Assert.assertEquals(0, bufs[2].position());
+
+        // seek back to zero, make another block fail. The next read should
+        // error as there are not enough blocks to read.
+        ecb.seek(0);
+        streamFactory.getBlockStreams().get(failList.remove(0))
+            .setShouldError(true);
+        try {
+          clearBuffers(bufs);
+          ecb.readStripe(bufs);
+          Assert.fail("InsufficientLocationsException expected");
+        } catch (InsufficientLocationsException e) {
+          // expected
+        }
+      }
+    }
+  }
+
+  private List<Integer> indexesToList(int... indexes) {
+    List<Integer> list = new ArrayList<>();
+    for (int i : indexes) {
+      list.add(i);
+    }
+    return list;
+  }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {
     List<ByteBuffer> dataStreams = new ArrayList<>();
@@ -655,7 +737,7 @@ public class TestECBlockReconstructedStripeInputStream {
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
-          blockStreamData.get(repInd -1));
+          blockStreamData.get(repInd - 1));
       blockStreams.add(stream);
       return stream;
     }
@@ -667,6 +749,7 @@ public class TestECBlockReconstructedStripeInputStream {
     private boolean closed = false;
     private BlockID blockID;
     private long length;
+    private boolean shouldError = false;
     private static final byte EOF = -1;
 
     TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data) {
@@ -678,6 +761,10 @@ public class TestECBlockReconstructedStripeInputStream {
 
     public boolean isClosed() {
       return closed;
+    }
+
+    public void setShouldError(boolean val) {
+      shouldError = val;
     }
 
     @Override
@@ -703,6 +790,9 @@ public class TestECBlockReconstructedStripeInputStream {
 
     @Override
     public int read(ByteBuffer buf) throws IOException {
+      if (shouldError) {
+        throw new IOException("Simulated error reading block");
+      }
       if (getRemaining() == 0) {
         return EOF;
       }
