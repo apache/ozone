@@ -184,6 +184,9 @@ public abstract class TestOzoneRpcClientAbstract {
    * @throws Exception
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
+    // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
+    //  for testZReadKeyWithUnhealthyContainerReplica.
+    conf.set("ozone.scm.stale.node.interval", "10s");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setTotalPipelineNumLimit(10)
@@ -1529,7 +1532,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
   // Make this executed at last, for it has some side effect to other UTs
   @Test
-  public void testZReadKeyWithUnhealthyContainerReplia() throws Exception {
+  public void testZReadKeyWithUnhealthyContainerReplica() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -1562,7 +1565,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .getContainerID();
 
     // Set container replica to UNHEALTHY
-    Container container = null;
+    Container container;
     int index = 1;
     List<HddsDatanodeService> involvedDNs = new ArrayList<>();
     for (HddsDatanodeService hddsDatanode : cluster.getHddsDatanodes()) {
@@ -1599,7 +1602,6 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
 
-    Thread.currentThread().sleep(5000);
     StorageContainerManager scm = cluster.getStorageContainerManager();
     GenericTestUtils.waitFor(() -> {
       try {
@@ -1610,7 +1612,7 @@ public abstract class TestOzoneRpcClientAbstract {
         fail("Failed to get container info for " + e.getMessage());
         return false;
       }
-    }, 1000, 5000);
+    }, 1000, 10000);
 
     // Try reading keyName2
     try {
