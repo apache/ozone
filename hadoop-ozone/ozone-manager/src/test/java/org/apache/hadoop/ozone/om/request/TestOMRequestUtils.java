@@ -242,7 +242,8 @@ public final class TestOMRequestUtils {
             .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getKeyTable(getDefaultBucketLayout()).put(ozoneKey, omKeyInfo);
+      omMetadataManager.getKeyTable(getDefaultBucketLayout())
+          .put(ozoneKey, omKeyInfo);
     }
   }
 

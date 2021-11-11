@@ -76,6 +76,7 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
 
   }
 
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
