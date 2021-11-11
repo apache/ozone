@@ -962,7 +962,7 @@ public class TestOzoneShellHA {
   public void testClientBucketLayoutValidation() throws Exception {
     String[] args = new String[]{
         "bucket", "create", "o3://" + omServiceId + "/volume7" + "/bucketTest1",
-        "--bucketlayout", "LEGACY"
+        "--layout", "LEGACY"
     };
     try {
       execute(ozoneShell, args);
