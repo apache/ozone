@@ -100,13 +100,14 @@ public class TestObjectStoreWithFSO {
    *
    * @throws IOException
    */
-  @BeforeClass public static void init() throws Exception {
+  @BeforeClass
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
-        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();

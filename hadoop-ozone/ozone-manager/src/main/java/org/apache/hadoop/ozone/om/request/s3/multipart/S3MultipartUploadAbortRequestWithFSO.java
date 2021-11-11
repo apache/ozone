@@ -88,9 +88,4 @@ public class S3MultipartUploadAbortRequestWithFSO
 
     return multipartKey;
   }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }

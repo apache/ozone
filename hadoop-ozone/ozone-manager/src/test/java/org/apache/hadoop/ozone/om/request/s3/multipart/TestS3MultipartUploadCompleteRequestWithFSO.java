@@ -25,13 +25,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -45,17 +43,19 @@ import java.util.UUID;
 public class TestS3MultipartUploadCompleteRequestWithFSO
     extends TestS3MultipartUploadCompleteRequest {
 
-  @BeforeClass
-  public static void init() {
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-  }
-
   @Override
   protected String getKeyName() {
     String parentDir = UUID.randomUUID().toString() + "/a/b/c";
     String fileName = "file1";
     String keyName = parentDir + OzoneConsts.OM_KEY_PREFIX + fileName;
     return keyName;
+  }
+
+  @Override
+  protected void addVolumeAndBucket(String volumeName, String bucketName)
+      throws Exception {
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override

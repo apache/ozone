@@ -105,6 +105,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     super(omRequest);
   }
 
+  public OMDirectoryCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
+  }
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) {
     CreateDirectoryRequest createDirectoryRequest =
@@ -365,9 +369,5 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   static long getMaxNumOfRecursiveDirs() {
     return MAX_NUM_OF_RECURSIVE_DIRS;
-  }
-
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 }

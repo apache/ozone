@@ -85,9 +85,4 @@ public class S3MultipartUploadCommitPartRequestWithFSO
         openKey, multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
         ozoneManager.isRatisEnabled(), omBucketInfo);
   }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }
