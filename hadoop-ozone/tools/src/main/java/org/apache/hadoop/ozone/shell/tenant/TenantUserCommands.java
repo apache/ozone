@@ -40,7 +40,9 @@ import java.util.concurrent.Callable;
         TenantRevokeUserAccessIdHandler.class,
         TenantAssignAdminHandler.class,
         TenantRevokeAdminHandler.class,
-        TenantListUsersHandler.class
+        TenantListUsersHandler.class,
+        TenantGetSecretHandler.class,
+        TenantSetSecretHandler.class
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

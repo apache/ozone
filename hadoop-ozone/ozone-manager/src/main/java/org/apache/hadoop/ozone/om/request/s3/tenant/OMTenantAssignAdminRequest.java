@@ -91,7 +91,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
 
     if (accessIdInfo == null) {
       throw new OMException("accessId '" + accessId + "' not found.",
-          OMException.ResultCodes.TENANT_USER_ACCESSID_NOT_FOUND);
+          OMException.ResultCodes.ACCESSID_NOT_FOUND);
     }
 
     // Check if accessId is assigned to the tenant

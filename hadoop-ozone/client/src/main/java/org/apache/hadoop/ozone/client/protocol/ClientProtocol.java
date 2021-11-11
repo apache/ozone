@@ -547,12 +547,28 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * returns S3 Secret given kerberos user.
+   * Returns S3 Secret given kerberos user.
+   * Will generate a secret access key for the accessId (=kerberosID)
+   * if it doesn't exist.
    * @param kerberosID
    * @return S3SecretValue
    * @throws IOException
    */
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
+
+  /**
+   * Returns S3 Secret given kerberos user.
+   * Optionally generate a secret access key for the accessId (=kerberosID)
+   * if it doesn't exist if createIfNotExist is true.
+   * When createIfNotExist is false and accessId (=kerberosID) doesn't
+   * exist, OM throws OMException with ACCESSID_NOT_FOUND to the client.
+   * @param kerberosID
+   * @param createIfNotExist
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException;
 
   /**
    * Revoke S3 Secret of given kerberos user.

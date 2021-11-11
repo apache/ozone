@@ -173,6 +173,11 @@ public class ObjectStore {
     return proxy.getS3Secret(kerberosID);
   }
 
+  public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException {
+    return proxy.getS3Secret(kerberosID, createIfNotExist);
+  }
+
   public void revokeS3Secret(String kerberosID) throws IOException {
     proxy.revokeS3Secret(kerberosID);
   }
