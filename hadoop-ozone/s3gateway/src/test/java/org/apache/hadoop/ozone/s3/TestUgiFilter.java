@@ -138,6 +138,18 @@ public class TestUgiFilter {
     } catch(Exception e) {
       Assert.fail("Filter should not generate any exceptions.");
     }
+    // Set incorrect date
+    headers.put(AUTHORIZATION_HEADER, headers.
+                get(AUTHORIZATION_HEADER).replace(curDate, "20210616"));
+
+    try {
+      filter.init(filterConfig);
+      filter.doFilter(request, response, filterChain);
+      filter.destroy();
+      Assert.fail("Filter should generate OS3 exception.");
+    } catch(Exception e) {
+      Assert.assertTrue(e.getCause().getCause() instanceof OS3Exception);
+    }
   }
 
   @Test
