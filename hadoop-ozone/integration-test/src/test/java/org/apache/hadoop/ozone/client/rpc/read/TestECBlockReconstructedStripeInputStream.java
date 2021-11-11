@@ -54,7 +54,6 @@ import java.util.function.Function;
  */
 public class TestECBlockReconstructedStripeInputStream {
 
-
   private static final int ONEMB = 1024 * 1024;
 
   private ECReplicationConfig repConfig;
@@ -322,6 +321,144 @@ public class TestECBlockReconstructedStripeInputStream {
       }
     }
   }
+
+  @Test
+  public void testErrorThrownIfBlockNotLongEnough() throws IOException {
+    int blockLength = repConfig.getEcChunkSize() - 1;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 3 * ONEMB);
+    // First buffer has only the blockLength, the other two will have no data.
+    dataBufs[0].limit(blockLength);
+    dataBufs[1].limit(0);
+    dataBufs[2].limit(0);
+    for (ByteBuffer b : dataBufs) {
+      randomFill(b);
+    }
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+    addDataStreamsToFactory(dataBufs, parity);
+
+    // Set the parity buffer limit to be less than the block length
+    parity[0].limit(blockLength - 1);
+    parity[1].limit(blockLength - 1);
+
+    ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+    // We have a length that is less than a single chunk, so blocks 2 and 3
+    // are padding and will not be present. Block 1 is lost and needs recovered
+    // from the parity and padded blocks 2 and 3.
+    Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
+    OmKeyLocationInfo keyInfo =
+        createKeyInfo(repConfig, blockLength, dnMap);
+    streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    try (ECBlockReconstructedStripeInputStream ecb =
+             new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
+                 null, null, streamFactory)) {
+      try {
+        ecb.readStripe(bufs);
+        Assert.fail("Read should have thrown an exception");
+      } catch (IOException e) {
+        Assert.assertTrue(e.getMessage().matches("^Expected\\sto\\sread.+"));
+      }
+    }
+  }
+
+  @Test
+  public void testSeek() throws IOException {
+    // Generate the input data for 3 full stripes and generate the parity
+    // and a partial stripe
+    int chunkSize = repConfig.getEcChunkSize();
+    int partialStripeSize = chunkSize * 2 - 1;
+    int dataLength = stripeSize() * 3 + partialStripeSize;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 4 * chunkSize);
+    dataBufs[1].limit(4 * chunkSize - 1);
+    dataBufs[2].limit(3 * chunkSize);
+    for (ByteBuffer b : dataBufs) {
+      randomFill(b);
+    }
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+
+    List<Map<DatanodeDetails, Integer>> locations = new ArrayList<>();
+    // Two data missing
+    locations.add(createIndexMap(1, 4, 5));
+    // One data missing
+    locations.add(createIndexMap(1, 2, 4, 5));
+    // Two data missing including first
+    locations.add(createIndexMap(2, 4, 5));
+    // One data and one parity missing
+    locations.add(createIndexMap(2, 3, 4));
+
+    for (Map<DatanodeDetails, Integer> dnMap : locations) {
+      streamFactory = new TestBlockInputStreamFactory();
+      addDataStreamsToFactory(dataBufs, parity);
+
+      OmKeyLocationInfo keyInfo = createKeyInfo(repConfig,
+          stripeSize() * 3 + partialStripeSize, dnMap);
+      streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+      ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+      try (ECBlockReconstructedStripeInputStream ecb =
+               new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
+                   true, null, null, streamFactory)) {
+        // Read Stripe 1
+        int read = ecb.readStripe(bufs);
+        for (int j = 0; j < bufs.length; j++) {
+          validateContents(dataBufs[j], bufs[j], 0, chunkSize);
+        }
+        Assert.assertEquals(stripeSize(), read);
+        Assert.assertEquals(dataLength - stripeSize(), ecb.getRemaining());
+
+        // Seek to 0 and read again
+        clearBuffers(bufs);
+        ecb.seek(0);
+        ecb.readStripe(bufs);
+        for (int j = 0; j < bufs.length; j++) {
+          validateContents(dataBufs[j], bufs[j], 0, chunkSize);
+        }
+        Assert.assertEquals(stripeSize(), read);
+        Assert.assertEquals(dataLength - stripeSize(), ecb.getRemaining());
+
+        // Seek to the last stripe
+        // Seek to the last stripe
+        clearBuffers(bufs);
+        ecb.seek(stripeSize() * 3);
+        read = ecb.readStripe(bufs);
+        validateContents(dataBufs[0], bufs[0], 3 * chunkSize, chunkSize);
+        validateContents(dataBufs[1], bufs[1], 3 * chunkSize, chunkSize - 1);
+        Assert.assertEquals(0, bufs[2].remaining());
+        Assert.assertEquals(partialStripeSize, read);
+        Assert.assertEquals(0, ecb.getRemaining());
+
+        // seek to the start of stripe 3
+        clearBuffers(bufs);
+        ecb.seek(stripeSize() * 2);
+        read = ecb.readStripe(bufs);
+        for (int j = 0; j < bufs.length; j++) {
+          validateContents(dataBufs[j], bufs[j], 2 * chunkSize, chunkSize);
+        }
+        Assert.assertEquals(stripeSize(), read);
+        Assert.assertEquals(partialStripeSize, ecb.getRemaining());
+      }
+    }
+  }
+
+  @Test
+  public void testSeekToPartialOffsetFails() {
+    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 4, 5);
+    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig,
+        stripeSize() * 3, dnMap);
+    streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    try (ECBlockReconstructedStripeInputStream ecb =
+             new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
+                 true, null, null, streamFactory)) {
+      try {
+        ecb.seek(10);
+        Assert.fail("Seek should have thrown an exception");
+      } catch (IOException e) {
+        Assert.assertEquals("Requested position 10 does not align " +
+            "with a stripe offset", e.getMessage());
+      }
+    }
+  }
+
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {
     List<ByteBuffer> dataStreams = new ArrayList<>();
@@ -594,6 +731,11 @@ public class TestECBlockReconstructedStripeInputStream {
     @Override
     public long getPos() {
       return data.position();
+    }
+
+    @Override
+    public void seek(long pos) {
+      data.position((int)pos);
     }
 
   }
