@@ -188,6 +188,25 @@ public class TestHddsDispatcher {
           response.getReadChunk().getDataBuffers().getBuffersList());
       Assert.assertEquals(writeChunkRequest.getWriteChunk().getData(),
           responseData);
+      // put block
+      ContainerCommandRequestProto putBlockRequest =
+          getPutBlockRequest(writeChunkRequest);
+      response =  hddsDispatcher.dispatch(putBlockRequest, null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      // send list block request
+      ContainerCommandRequestProto listBlockRequest =
+          getListBlockRequest(writeChunkRequest);
+      response =  hddsDispatcher.dispatch(listBlockRequest, null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assert.assertEquals(1, response.getListBlock().getBlockDataList().size());
+      for (ContainerProtos.BlockData blockData :
+          response.getListBlock().getBlockDataList()) {
+        Assert.assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
+            blockData.getBlockID());
+        Assert.assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
+                .getLen(), blockData.getSize());
+        Assert.assertEquals(1, blockData.getChunksCount());
+      }
     } finally {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
@@ -380,4 +399,31 @@ public class TestHddsDispatcher {
         .build();
   }
 
+  private ContainerCommandRequestProto getPutBlockRequest(
+      ContainerCommandRequestProto writeChunkRequest) {
+    ContainerProtos.BlockData.Builder block =
+        ContainerProtos.BlockData.newBuilder()
+            .setSize(writeChunkRequest.getWriteChunk().getChunkData().getLen())
+            .setBlockID(writeChunkRequest.getWriteChunk().getBlockID())
+            .addChunks(writeChunkRequest.getWriteChunk().getChunkData());
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(writeChunkRequest.getContainerID())
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(block.build())
+            .build())
+        .build();
+  }
+
+  private ContainerCommandRequestProto getListBlockRequest(
+      ContainerCommandRequestProto writeChunkRequest) {
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(writeChunkRequest.getContainerID())
+        .setCmdType(ContainerProtos.Type.ListBlock)
+        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setListBlock(ContainerProtos.ListBlockRequestProto.newBuilder()
+            .setCount(10).build())
+        .build();
+  }
 }
