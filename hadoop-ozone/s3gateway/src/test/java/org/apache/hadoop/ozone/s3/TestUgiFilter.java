@@ -164,7 +164,8 @@ public class TestUgiFilter {
 
   }
 
-  private void resetAuthHeader(HttpServletRequest request, String oldStr, String newStr) {
+  private void resetAuthHeader(HttpServletRequest request,
+      String oldStr, String newStr) {
     Enumeration<String> headerNames = Collections.enumeration(headers.keySet());
     Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
     headers.put(AUTHORIZATION_HEADER, headers.
