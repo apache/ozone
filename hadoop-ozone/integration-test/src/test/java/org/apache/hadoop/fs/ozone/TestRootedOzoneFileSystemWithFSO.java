@@ -94,13 +94,6 @@ public class TestRootedOzoneFileSystemWithFSO
   @Override
   @Test
   @Ignore("HDDS-2939")
-  public void testMkdirNonExistentVolumeBucket() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
   public void testMkdirNonExistentVolume() {
     // ignore as this is not relevant to PREFIX layout changes
   }

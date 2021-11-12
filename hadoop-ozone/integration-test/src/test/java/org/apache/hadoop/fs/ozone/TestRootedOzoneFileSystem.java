@@ -430,7 +430,7 @@ public class TestRootedOzoneFileSystem {
     OzoneBucket ozoneBucket = iterBuc.next();
     Assert.assertNotNull(ozoneBucket);
     Assert.assertEquals(bucketNameLocal, ozoneBucket.getName());
-
+    Assert.assertEquals(bucketLayout, ozoneBucket.getBucketLayout());
     // TODO: Use listStatus to check volume and bucket creation in HDDS-2928.
 
     // Cleanup
