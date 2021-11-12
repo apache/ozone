@@ -264,6 +264,8 @@ public class ContainerBalancer {
     // over utilized nodes have utilization(that is, used / capacity) greater
     // than upper limit
     this.upperLimit = clusterAvgUtilisation + threshold;
+    // under utilized nodes have utilization(that is, used / capacity) less
+    // than lower limit
     this.lowerLimit = clusterAvgUtilisation - threshold;
 
     if (LOG.isDebugEnabled()) {
@@ -499,11 +501,7 @@ public class ContainerBalancer {
         //remove this not found container
         return true;
       }
-      Long totalLeavingSize = sizeLeavingNode.get(source) +
-          cInfo.getUsedBytes();
-      return Double.compare(nodeManager.getUsageInfo(source)
-        .calculateUtilization(totalLeavingSize), lowerLimit) < 0 ||
-          totalLeavingSize > config.getMaxSizeLeavingSource();
+      return !canSizeLeaveSource(source, cInfo.getUsedBytes());
     });
 
     if (LOG.isDebugEnabled()) {
@@ -697,7 +695,32 @@ public class ContainerBalancer {
       // is smaller than or equal to upperLimit
       return sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
            Double.compare(nodeManager.getUsageInfo(target)
-               .calculateUtilization(sizeEnteringAfterMove), upperLimit) < 1;
+               .calculateUtilization(sizeEnteringAfterMove), upperLimit) <= 0;
+    }
+    return false;
+  }
+
+  /**
+   * Checks if specified size can leave a specified target datanode
+   * according to {@link ContainerBalancerConfiguration}
+   * "size.entering.target.max".
+   *
+   * @param source target datanode in which size is entering
+   * @param size   size in bytes
+   * @return true if size can leave, else false
+   */
+  boolean canSizeLeaveSource(DatanodeDetails source, long size) {
+    if (sizeLeavingNode.containsKey(source)) {
+      long sizeLeavingAfterMove = sizeLeavingNode.get(source) + size;
+      //size can be moved out of source datanode only when the following
+      //two condition are met.
+      //1 sizeLeavingAfterMove does not succeed the configured
+      // MaxSizeLeavingTarget
+      //2 after subtracting sizeLeavingAfterMove, the usage is bigger
+      // than or equal to lowerLimit
+      return sizeLeavingAfterMove <= config.getMaxSizeLeavingSource() &&
+          Double.compare(nodeManager.getUsageInfo(source)
+              .calculateUtilization(-sizeLeavingAfterMove), lowerLimit) >= 0;
     }
     return false;
   }

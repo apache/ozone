@@ -44,16 +44,16 @@ public class SourceDataNodeSelectionCriteria {
 
   public DatanodeDetails getNextCandidateSourceDataNode() {
     if (overUtilizedNodes.isEmpty()) {
-      LOG.info("no more candidate data node");
+      LOG.info("no more candidate source data node");
       return null;
     }
     //TODO：use a more quick data structure, which will hava a
     // better performance when changing or deleting one element at once
     overUtilizedNodes.sort((a, b) -> {
       double currentUsageOfA = a.calculateUtilization(
-          sizeLeavingNode.get(a.getDatanodeDetails()));
+          -sizeLeavingNode.get(a.getDatanodeDetails()));
       double currentUsageOfB = b.calculateUtilization(
-          sizeLeavingNode.get(b.getDatanodeDetails()));
+          -sizeLeavingNode.get(b.getDatanodeDetails()));
       //in descending order
       return Double.compare(currentUsageOfB, currentUsageOfA);
     });
