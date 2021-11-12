@@ -92,7 +92,8 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         omClientResponse.getOMResponse().getStatus());
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
-    Assert.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadAbortRequest.getBucketLayout())
         .get(multipartOpenKey));
 
   }

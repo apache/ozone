@@ -42,8 +42,9 @@ import java.util.Iterator;
 public class S3MultipartUploadAbortRequestWithFSO
     extends S3MultipartUploadAbortRequest {
 
-  public S3MultipartUploadAbortRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadAbortRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

@@ -174,6 +174,9 @@ public class TestRootedOzoneFileSystem {
           true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     } else {
       bucketLayout = BucketLayout.LEGACY;
+      // We need the OFS buckets to be in LEGACY layout for this test.
+      conf.set(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.LEGACY.name());
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }

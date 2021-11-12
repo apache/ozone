@@ -143,6 +143,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -271,6 +272,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private static final String OM_DAEMON = "om";
 
+  // This is set for read requests when OMRequest has S3Authentication set,
+  // and it is reset when read request is processed.
+  private static final ThreadLocal<S3Authentication> S3_AUTH =
+      new ThreadLocal<>();
+
   private static boolean securityEnabled = false;
   private OzoneDelegationTokenSecretManager delegationTokenMgr;
   private OzoneBlockTokenSecretManager blockTokenMgr;
@@ -381,6 +387,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private static final int MSECS_PER_MINUTE = 60 * 1000;
 
+  private final boolean isSecurityEnabled;
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -391,6 +399,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OMHANodeDetails omhaNodeDetails =
         OMHANodeDetails.loadOMHAConfig(configuration);
 
+    this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
 
@@ -449,16 +458,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.defaultBucketLayout =
         configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
             OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
-    // Make sure defaultBucketLayout is set to a valid value
+
     if (!defaultBucketLayout.equals(
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name()) &&
-        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name())
+        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name()) &&
+        !defaultBucketLayout.equals(BucketLayout.LEGACY.name())
     ) {
       throw new ConfigurationException(
           defaultBucketLayout +
               " is not a valid default bucket layout. Supported values are " +
-              BucketLayout.FILE_SYSTEM_OPTIMIZED.name() + ", " +
-              BucketLayout.OBJECT_STORE.name() + ".");
+              BucketLayout.FILE_SYSTEM_OPTIMIZED + ", " +
+              BucketLayout.OBJECT_STORE + ", " + BucketLayout.LEGACY + ".");
     }
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
@@ -539,6 +549,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Set the {@link S3Authentication} for the current rpc handler thread.
+   */
+  public static void setS3Auth(S3Authentication val) {
+    S3_AUTH.set(val);
+  }
+
+  /**
+   * Returns the {@link S3Authentication} for the current rpc handler thread.
+   */
+  public static S3Authentication getS3Auth() {
+    return S3_AUTH.get();
+  }
+
+  /**
    * This method is used to set selected instance variables in this class from
    * the passed in config. This allows these variable to be reset when the OM
    * instance is restarted (normally from a test mini-cluster). Note, not all
@@ -601,7 +625,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
-    if (secConfig.isSecurityEnabled()) {
+    if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
       s3SecretManager = new S3SecretManagerImpl(configuration, metadataManager);
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
@@ -697,6 +721,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isGrpcBlockTokenEnabled() {
     return grpcBlockTokenEnabled;
+  }
+
+  /**
+   * Return config value of {@link OzoneConfigKeys#OZONE_SECURITY_ENABLED_KEY}.
+   */
+  public boolean isSecurityEnabled() {
+    return isSecurityEnabled || testSecureOmFlag;
+  }
+
+  public boolean isTestSecureOmFlag() {
+    return testSecureOmFlag;
   }
 
   private KeyProviderCryptoExtension createKeyProviderExt(
@@ -1332,6 +1367,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.setNumKeys(metricsInfo.getNumKeys());
     }
 
+    // FSO(FILE_SYSTEM_OPTIMIZED)
+    metrics.setNumDirs(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
+    metrics.setNumFiles(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getFileTable()));
+
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
         OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
@@ -1395,6 +1436,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());
       metrics.setNumKeys(metricsInfo.getNumKeys());
     }
+
+    // FSO(FILE_SYSTEM_OPTIMIZED)
+    metrics.setNumDirs(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
+    metrics.setNumFiles(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
@@ -1968,7 +2015,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
       throws IOException {
-    UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
+    UserGroupInformation user;
+    if (getS3Auth() != null) {
+      user = UserGroupInformation.createRemoteUser(
+          getS3Auth().getAccessId());
+    } else {
+      user = ProtobufRpcEngine.Server.getRemoteUser();
+    }
+
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     String volumeOwner = getVolumeOwner(vol, acl, resType);
     String bucketOwner = getBucketOwner(vol, bucket, acl, resType);
@@ -2129,16 +2183,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
-        LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
+        String volumeName = obj.getVolumeName() != null?
+                "Volume:" + obj.getVolumeName() + " ": "";
+        String bucketName = obj.getBucketName() != null?
+                "Bucket:" + obj.getBucketName() + " ": "";
+        String keyName = obj.getKeyName() != null?
+                "Key:" + obj.getKeyName() : "";
+        LOG.warn("User {} doesn't have {} permission to access {} {}{}{}",
             context.getClientUgi().getUserName(), context.getAclRights(),
-            obj.getResourceType(), obj.getVolumeName(), obj.getBucketName(),
-            obj.getKeyName());
+            obj.getResourceType(), volumeName, bucketName, keyName);
         throw new OMException("User " + context.getClientUgi().getUserName() +
             " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
-            obj.getVolumeName() + " " + obj.getBucketName() + " " +
-            obj.getKeyName(),
-            ResultCodes.PERMISSION_DENIED);
+            volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
       }
       return false;
     } else {
@@ -3114,7 +3171,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
         .getBucketTable()));
     metrics.setNumKeys(metadataManager.countEstimatedRowsInTable(metadataManager
-        .getKeyTable()));
+        .getKeyTable(getBucketLayout())));
+
+    // FSO(FILE_SYSTEM_OPTIMIZED)
+    metrics.setNumDirs(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
+    metrics.setNumFiles(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
     // Delete the omMetrics file if it exists and save the a new metrics file
     // with new data
@@ -3690,5 +3753,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error(msg.toString());
       throw new IOException(msg.toString());
     }
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

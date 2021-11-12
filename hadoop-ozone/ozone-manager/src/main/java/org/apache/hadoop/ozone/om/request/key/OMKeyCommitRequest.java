@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -70,8 +71,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
-  public OMKeyCommitRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -90,10 +91,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
     }
 
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(validateAndNormalizeKey(
-                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+            .setKeyName(keyPath);
 
     return getOmRequest().toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
@@ -212,7 +216,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omMetadataManager, omBucketInfo.getIsVersionEnabled(), trxnLogIndex,
           ozoneManager.isRatisEnabled());
       OmKeyInfo keyToDelete =
-              omMetadataManager.getKeyTable().get(dbOzoneKey);
+              omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -299,7 +303,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             omMetadataManager.getDeletedTable().get(dbOzoneKey);
     // Current key to be overwritten
     OmKeyInfo keyToDelete =
-            omMetadataManager.getKeyTable().get(dbOzoneKey);
+            omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
 
     if (keyToDelete != null) {
       keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,

@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -66,18 +67,23 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     super(omRequest);
   }
 
+  public S3MultipartUploadAbortRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
+  }
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     KeyArgs keyArgs =
         getOmRequest().getAbortMultiPartUploadRequest().getKeyArgs();
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     return getOmRequest().toBuilder().setAbortMultiPartUploadRequest(
-        getOmRequest().getAbortMultiPartUploadRequest().toBuilder()
-            .setKeyArgs(keyArgs.toBuilder().setModificationTime(Time.now())
-                .setKeyName(validateAndNormalizeKey(
-                    ozoneManager.getEnableFileSystemPaths(),
-                    keyArgs.getKeyName()))))
-        .setUserInfo(getUserInfo()).build();
+        getOmRequest().getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(
+            keyArgs.toBuilder().setModificationTime(Time.now())
+                .setKeyName(keyPath))).setUserInfo(getUserInfo()).build();
 
   }
 

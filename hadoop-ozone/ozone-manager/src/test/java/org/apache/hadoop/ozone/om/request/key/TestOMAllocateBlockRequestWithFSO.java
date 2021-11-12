@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
@@ -47,7 +46,6 @@ public class TestOMAllocateBlockRequestWithFSO
     // metadata layout prefix will be set while invoking OzoneManager#start()
     // and its not invoked in this test. Hence it is explicitly setting
     // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
     return config;
   }
 
@@ -81,8 +79,9 @@ public class TestOMAllocateBlockRequestWithFSO
   @NotNull
   @Override
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
-          OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
-    return new OMAllocateBlockRequestWithFSO(modifiedOmRequest);
+      OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
+    return new OMAllocateBlockRequestWithFSO(modifiedOmRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override

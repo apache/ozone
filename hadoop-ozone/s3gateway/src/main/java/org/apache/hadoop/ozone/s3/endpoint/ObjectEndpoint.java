@@ -119,6 +119,7 @@ public class ObjectEndpoint extends EndpointBase {
   @Context
   private HttpHeaders headers;
 
+
   private List<String> customizableGetHeaders = new ArrayList<>();
   private int bufferSize;
 

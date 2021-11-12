@@ -94,12 +94,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
+  public OMKeyRequest(OMRequest omRequest, BucketLayout bucketLayoutArg) {
+    super(omRequest);
+    this.bucketLayout = bucketLayoutArg;
+  }
+
   public BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+    return bucketLayout;
   }
 
   protected KeyArgs resolveBucketLink(

@@ -66,8 +66,9 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   private static final Logger LOG =
           LoggerFactory.getLogger(OMAllocateBlockRequestWithFSO.class);
 
-  public OMAllocateBlockRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMAllocateBlockRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

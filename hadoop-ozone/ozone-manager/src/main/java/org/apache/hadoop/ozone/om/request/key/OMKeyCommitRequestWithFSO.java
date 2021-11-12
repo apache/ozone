@@ -58,8 +58,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
-  public OMKeyCommitRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCommitRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -124,7 +125,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
       long bucketId = omBucketInfo.getObjectID();
       long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-              keyName, omMetadataManager);
+          keyName, omMetadataManager, "Cannot create file : " + keyName
+              + " as parent directory doesn't exist");
       String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
       dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
               commitKeyRequest.getClientID());
@@ -153,7 +155,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               omMetadataManager, omBucketInfo.getIsVersionEnabled(),
               trxnLogIndex, ozoneManager.isRatisEnabled());
       OmKeyInfo keyToDelete =
-              omMetadataManager.getKeyTable().get(dbFileKey);
+              omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -209,10 +211,5 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             exception, omKeyInfo, result);
 
     return omClientResponse;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

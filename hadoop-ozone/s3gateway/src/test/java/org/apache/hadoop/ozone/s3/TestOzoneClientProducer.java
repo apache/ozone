@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
+import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
@@ -128,7 +128,7 @@ public class TestOzoneClientProducer {
       producer.createClient();
       fail("testGetClientFailure");
     } catch (Exception ex) {
-      Assert.assertTrue(ex instanceof WebApplicationException);
+      Assert.assertTrue(ex instanceof IOException);
     }
   }
 

@@ -43,14 +43,16 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
 
   @Override
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
-          OMRequest omRequest) {
-    return new S3MultipartUploadCommitPartRequestWithFSO(omRequest);
+      OMRequest omRequest) {
+    return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-          OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);
+      OMRequest initiateMPURequest) {
+    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
@@ -94,7 +96,8 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
                     keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-            new S3InitiateMultipartUploadRequestWithFSO(omRequest);
+        new S3InitiateMultipartUploadRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedRequest =
             s3InitiateMultipartUploadRequest.preExecute(ozoneManager);

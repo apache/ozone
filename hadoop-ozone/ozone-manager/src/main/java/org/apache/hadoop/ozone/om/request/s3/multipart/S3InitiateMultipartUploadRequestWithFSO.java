@@ -61,8 +61,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 public class S3InitiateMultipartUploadRequestWithFSO
         extends S3InitiateMultipartUploadRequest {
 
-  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

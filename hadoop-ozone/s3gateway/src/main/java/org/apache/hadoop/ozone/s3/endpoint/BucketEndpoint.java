@@ -602,4 +602,9 @@ public class BucketEndpoint extends EndpointBase {
     keyMetadata.setLastModified(next.getModificationTime());
     response.addKey(keyMetadata);
   }
+
+  @Override
+  public void init() {
+
+  }
 }

@@ -65,7 +65,7 @@ public final class BucketArgs {
   private String owner;
 
   /**
-   * Bucket Type.
+   * Bucket Layout.
    */
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
@@ -177,7 +177,7 @@ public final class BucketArgs {
   }
 
   /**
-   * Returns the Bucket Type.
+   * Returns the Bucket Layout.
    */
   public BucketLayout getBucketLayout() {
     return bucketLayout;
@@ -257,8 +257,8 @@ public final class BucketArgs {
       return this;
     }
 
-    public BucketArgs.Builder setBucketLayout(BucketLayout type) {
-      bucketLayout = type;
+    public BucketArgs.Builder setBucketLayout(BucketLayout buckLayout) {
+      bucketLayout = buckLayout;
       return this;
     }
 

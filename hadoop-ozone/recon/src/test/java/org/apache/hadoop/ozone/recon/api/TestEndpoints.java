@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -631,7 +632,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
+    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenReturn(true)
         .thenReturn(true)
@@ -712,5 +713,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

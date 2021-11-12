@@ -548,14 +548,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.keytab.file</name>
-    <value/>
-    <tag>OM, SECURITY</tag>
-    <description>
-      The keytab file for Kerberos authentication in OM.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.db.cache.size.mb</name>
     <value>128</value>
     <tag>OM, PERFORMANCE</tag>
@@ -2998,6 +2990,21 @@
       bucket layout option. Supported values are OBJECT_STORE and FILE_SYSTEM_OPTIMIZED.
       OBJECT_STORE: This layout allows the bucket to behave as a pure object store and will not allow
       interoperability between S3 and FS APIs.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
+      For testing purposes LEGACY layout is also allowed. LEGACY layout is not recommended and will be removed in the
+      future.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.test.ofs.default.bucket.layout</name>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      This configuration is used for testing purposes. Default bucket layout value when buckets are created using OFS.
+      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.

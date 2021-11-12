@@ -105,8 +105,10 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
@@ -147,7 +149,7 @@ public class RpcClient implements ClientProtocol {
       LoggerFactory.getLogger(RpcClient.class);
 
   private final ConfigurationSource conf;
-  private final OzoneManagerProtocol ozoneManagerClient;
+  private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
   private final int chunkSize;
   private final UserGroupInformation ugi;
@@ -183,16 +185,21 @@ public class RpcClient implements ClientProtocol {
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
     OmTransport omTransport = createOmTransport(omServiceId);
-
-    this.ozoneManagerClient = TracingUtil.createProxy(
+    OzoneManagerProtocolClientSideTranslatorPB
+        ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
-            clientId.toString()),
-        OzoneManagerProtocol.class, conf
-    );
+        clientId.toString());
+    this.ozoneManagerClient = TracingUtil.createProxy(
+        ozoneManagerProtocolClientSideTranslatorPB,
+        OzoneManagerClientProtocol.class, conf);
     dtService = omTransport.getDelegationTokenService();
-    ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     List<X509Certificate> x509Certificates = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
+      // If the client is authenticating using S3 style auth, all future
+      // requests serviced by this client will need S3 Auth set.
+      ozoneManagerProtocolClientSideTranslatorPB.setS3AuthCheck(
+          conf.getBoolean(S3Auth.S3_AUTH_CHECK, false));
       String caCertPem = null;
       List<String> caCertPems = null;
       caCertPem = serviceInfoEx.getCaCertificate();
@@ -546,6 +553,15 @@ public class RpcClient implements ClientProtocol {
    * @return listOfAcls
    * */
   private List<OzoneAcl> getAclList() {
+    if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
+      UserGroupInformation aclUgi =
+          UserGroupInformation.createRemoteUser(
+             ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
+      return OzoneAclUtil.getAclList(
+          aclUgi.getUserName(),
+          aclUgi.getGroupNames(),
+         userRights, groupRights);
+    }
     return OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
         userRights, groupRights);
   }
@@ -788,7 +804,6 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadata(metadata)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation);
-
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try{
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
@@ -1500,5 +1515,21 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig());
 
+  }
+
+  @Override
+  public void setTheadLocalS3Auth(
+      S3Auth ozoneSharedSecretAuth) {
+    ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
+  }
+
+  @Override
+  public S3Auth getThreadLocalS3Auth() {
+    return ozoneManagerClient.getThreadLocalS3Auth();
+  }
+
+  @Override
+  public void clearTheadLocalS3Auth() {
+    ozoneManagerClient.clearThreadLocalS3Auth();
   }
 }
