@@ -20,12 +20,11 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -66,12 +65,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private long currentBlockGroupLen = 0;
-  /**
-   * Defines stream action while calling handleFlushOrClose.
-   */
-  enum StreamAction {
-    FLUSH, CLOSE, FULL
-  }
 
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
@@ -413,22 +406,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   @Override
-  public void flush() throws IOException {
-    checkNotClosed();
-    handleFlushOrClose(StreamAction.FLUSH);
+  public void flush() {
+    throw new NotImplementedException("The flush API is not implemented yet.");
   }
 
-  /**
-   * Close or Flush the latest outputStream depending upon the action.
-   * This function gets called when while write is going on, the current stream
-   * gets full or explicit flush or close request is made by client.
-   *
-   * @param op Flag which decides whether to call close or flush on the
-   *           outputStream.
-   * @throws IOException In case, flush or close fails with exception.
-   */
-  @SuppressWarnings("squid:S1141")
-  private void handleFlushOrClose(StreamAction op) throws IOException {
+  private void closeCurrentStreamEntry()
+      throws IOException {
     if (!blockOutputStreamEntryPool.isEmpty()) {
       while (true) {
         try {
@@ -436,7 +419,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           if (entry != null) {
             try {
-              handleStreamAction(entry, op);
+              entry.close();
             } catch (IOException ioe) {
               handleException(entry, ioe);
               continue;
@@ -448,58 +431,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
           throw e;
         }
       }
-    }
-  }
-
-  private void handleFlushOrCloseAllStreams(StreamAction op)
-      throws IOException {
-    if (!blockOutputStreamEntryPool.isEmpty()) {
-      List<BlockOutputStreamEntry> allStreamEntries =
-          blockOutputStreamEntryPool.getStreamEntries();
-      for (int i = 0; i < allStreamEntries.size(); i++) {
-        while (true) {
-          try {
-            BlockOutputStreamEntry entry = allStreamEntries.get(i);
-            if (entry != null) {
-              try {
-                handleStreamAction(entry, op);
-              } catch (IOException ioe) {
-                handleException(entry, ioe);
-                continue;
-              }
-            }
-            return;
-          } catch (Exception e) {
-            markStreamClosed();
-            throw e;
-          }
-        }
-      }
-    }
-  }
-
-  private void handleStreamAction(BlockOutputStreamEntry entry, StreamAction op)
-      throws IOException {
-    Collection<DatanodeDetails> failedServers = entry.getFailedServers();
-    // failed servers can be null in case there is no data written in
-    // the stream
-    if (!failedServers.isEmpty()) {
-      blockOutputStreamEntryPool.getExcludeList().addDatanodes(failedServers);
-    }
-    switch (op) {
-    case CLOSE:
-      entry.close();
-      break;
-    case FULL:
-      if (entry.getRemaining() == 0) {
-        entry.close();
-      }
-      break;
-    case FLUSH:
-      entry.flush();
-      break;
-    default:
-      throw new IOException("Invalid Operation");
     }
   }
 
@@ -546,7 +477,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         }
       }
 
-      handleFlushOrCloseAllStreams(StreamAction.CLOSE);
+      closeCurrentStreamEntry();
       Preconditions.checkArgument(writeOffset == offset);
       blockOutputStreamEntryPool.getCurrentStreamEntry().close();
       blockOutputStreamEntryPool.commitKey(offset);
