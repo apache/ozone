@@ -169,7 +169,8 @@ public class TestOzoneFileInterfaces {
     OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
+        getBucketLayout());
 
     rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,

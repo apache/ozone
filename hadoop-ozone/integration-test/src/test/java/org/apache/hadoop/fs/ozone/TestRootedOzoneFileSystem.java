@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -170,13 +169,15 @@ public class TestRootedOzoneFileSystem {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
-      TestOMRequestUtils.configureFSOptimizedPaths(conf,
-          true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          bucketLayout.name());
     } else {
       bucketLayout = BucketLayout.LEGACY;
       // We need the OFS buckets to be in LEGACY layout for this test.
       conf.set(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
           BucketLayout.LEGACY.name());
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          bucketLayout.name());
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }

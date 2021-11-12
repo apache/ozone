@@ -250,9 +250,4 @@ public class S3InitiateMultipartUploadRequestWithFSO
               OMException.ResultCodes.NOT_A_FILE);
     }
   }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }

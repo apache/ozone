@@ -1043,9 +1043,4 @@ public class TestOzoneClientMultipartUploadWithFSO {
     Arrays.fill(chars, val);
     return chars;
   }
-
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
-
 }

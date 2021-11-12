@@ -194,7 +194,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
   @Override
   protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
-    return new OMFileCreateRequestWithFSO(omRequest);
+    return new OMFileCreateRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
