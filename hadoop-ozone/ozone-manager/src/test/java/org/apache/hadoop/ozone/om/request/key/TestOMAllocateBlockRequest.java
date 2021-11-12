@@ -57,7 +57,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
   public void testValidateAndUpdateCache() throws Exception {
     // Add volume, bucket, key entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     addKeyToOpenKeyTable(volumeName, bucketName);
 
@@ -176,7 +176,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
     // Add volume, bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, omAllocateBlockRequest.getBucketLayout());
 
 
     OMClientResponse omAllocateBlockResponse =

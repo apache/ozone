@@ -220,9 +220,9 @@ public final class OzoneManagerRatisUtils {
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
       if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-        return new OMKeyRenameRequestWithFSO(omRequest);
+        return new OMKeyRenameRequestWithFSO(omRequest, bucketLayout);
       }
-      return new OMKeyRenameRequest(omRequest);
+      return new OMKeyRenameRequest(omRequest, bucketLayout);
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
@@ -230,21 +230,22 @@ public final class OzoneManagerRatisUtils {
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
       if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-        return new OMDirectoryCreateRequestWithFSO(omRequest);
+        return new OMDirectoryCreateRequestWithFSO(omRequest, bucketLayout);
       }
-      return new OMDirectoryCreateRequest(omRequest);
+      return new OMDirectoryCreateRequest(omRequest, bucketLayout);
     case CreateFile:
       keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
       if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-        return new OMFileCreateRequestWithFSO(omRequest);
+        return new OMFileCreateRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMFileCreateRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
     case PurgePaths:
-      return new OMPathsPurgeRequestWithFSO(omRequest);
+      return new OMPathsPurgeRequestWithFSO(omRequest,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED);
     case InitiateMultiPartUpload:
       keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),

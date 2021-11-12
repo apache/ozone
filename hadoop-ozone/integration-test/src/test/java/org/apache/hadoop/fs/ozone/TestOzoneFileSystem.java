@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -159,8 +158,8 @@ public class TestOzoneFileSystem {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      TestOMRequestUtils.configureFSOptimizedPaths(conf, enabledFileSystemPaths,
-          OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          bucketLayout.name());
     } else {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);

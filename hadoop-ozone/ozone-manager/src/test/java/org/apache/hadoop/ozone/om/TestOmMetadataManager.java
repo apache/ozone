@@ -482,7 +482,7 @@ public class TestOmMetadataManager {
         String key = omMetadataManager.getOzoneKey(volumeNameA,
             ozoneBucket, prefixKeyA + i);
         // Mark as deleted in cache.
-        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+        omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
             new CacheKey<>(key),
             new CacheValue<>(Optional.absent(), 100L));
         deleteKeySet.add(key);
@@ -540,7 +540,7 @@ public class TestOmMetadataManager {
 
   }
 
-  public BucketLayout getBucketLayout() {
+  private static BucketLayout getDefaultBucketLayout() {
     return BucketLayout.DEFAULT;
   }
 
