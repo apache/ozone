@@ -293,15 +293,14 @@ public final class OMConfigKeys {
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
   /**
-   * Configuration properties for OMMetadataProtcol service.
+   * Configuration properties for OMAdminProtcol service.
    */
-  public static final String OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_KEY =
-      "ozone.om.metadata.protocol.max.retries";
-  public static final int OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_DEFAULT = 20;
-  public static final String
-      OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY =
-      "ozone.om.metadata.protocol.wait.between.retries";
-  public static final long
-      OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT = 1000;
+  public static final String OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_KEY =
+      "ozone.om.admin.protocol.max.retries";
+  public static final int OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_DEFAULT = 20;
+  public static final String OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY =
+      "ozone.om.admin.protocol.wait.between.retries";
+  public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
+      = 1000;
 
 }

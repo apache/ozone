@@ -24,13 +24,13 @@
 
 syntax = "proto2";
 option java_package = "org.apache.hadoop.ozone.protocol.proto";
-option java_outer_classname = "OzoneManagerMetadataProtocolProtos";
+option java_outer_classname = "OzoneManagerAdminProtocolProtos";
 option java_generic_services = true;
 option java_generate_equals_and_hash = true;
 package hadoop.ozone;
 
 /**
-This file contains the metadata protocol for Ozone Manager(s). This involves
+This file contains the admin protocol for Ozone Manager(s). This involves
 getting the meta information about an individual OM.
 */
 
@@ -57,7 +57,7 @@ message OMNodeInfo {
 /**
  The service for getting OM metadata.
 */
-service OzoneManagerMetaService {
+service OzoneManagerAdminService {
     // RPC request to OM to return its confugration -  in memory OM nodes list
     // and the anticipated nodes list from the config files (upon reloading).
     rpc getOMConfiguration(OMConfigurationRequest)

@@ -22,20 +22,20 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.om.protocolPB.OMMetadataProtocolPB;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
 
 /**
  * This class is the server-side translator that forwards requests received on
- * {@link OMMetadataProtocolPB} to the OMMetadataProtocolServer implementation.
+ * {@link OMAdminProtocolPB} to the OMAdminProtocolServer implementation.
  */
-public class OMMetadataProtocolServerSideImpl implements OMMetadataProtocolPB {
+public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
 
   private final OzoneManager ozoneManager;
 
-  public OMMetadataProtocolServerSideImpl(OzoneManager om) {
+  public OMAdminProtocolServerSideImpl(OzoneManager om) {
     this.ozoneManager = om;
   }
 

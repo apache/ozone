@@ -35,10 +35,10 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
-import org.apache.hadoop.ozone.om.protocol.OMMetadataProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMConfigurationResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +46,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Protocol implementation for getting OM metadata information.
  */
-public class OMMetadataProtocolClientSideImpl implements
-    OMMetadataProtocol {
+public class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
 
   /**
    * RpcController is not used and hence is set to null.
@@ -55,26 +54,26 @@ public class OMMetadataProtocolClientSideImpl implements
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMMetadataProtocolClientSideImpl.class);
+      LoggerFactory.getLogger(OMAdminProtocolClientSideImpl.class);
 
   private final OMNodeDetails remoteOmNodeDetails;
-  private final OMMetadataProtocolPB rpcProxy;
+  private final OMAdminProtocolPB rpcProxy;
 
-  public OMMetadataProtocolClientSideImpl(ConfigurationSource conf,
+  public OMAdminProtocolClientSideImpl(ConfigurationSource conf,
       UserGroupInformation ugi, OMNodeDetails omNodeDetails)
       throws IOException {
 
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
-        OMMetadataProtocolPB.class, ProtobufRpcEngine.class);
+        OMAdminProtocolPB.class, ProtobufRpcEngine.class);
 
     this.remoteOmNodeDetails = omNodeDetails;
 
     int maxRetries = conf.getInt(
-        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_KEY,
-        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_MAX_RETRIES_DEFAULT);
+        OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_KEY,
+        OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_DEFAULT);
     long waitBetweenRetries = conf.getLong(
-        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY,
-        OMConfigKeys.OZONE_OM_METADATA_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT);
+        OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY,
+        OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT);
 
     // OM metadata is requested from a specific OM and hence there is no need
     // of any failover provider.
@@ -84,9 +83,9 @@ public class OMMetadataProtocolClientSideImpl implements
     Configuration hadoopConf = LegacyHadoopConfigurationSource
         .asHadoopConfiguration(conf);
 
-    OMMetadataProtocolPB proxy = RPC.getProtocolProxy(
-        OMMetadataProtocolPB.class,
-        RPC.getProtocolVersion(OMMetadataProtocolPB.class),
+    OMAdminProtocolPB proxy = RPC.getProtocolProxy(
+        OMAdminProtocolPB.class,
+        RPC.getProtocolVersion(OMAdminProtocolPB.class),
         remoteOmNodeDetails.getRpcAddress(), ugi, hadoopConf,
         NetUtils.getDefaultSocketFactory(hadoopConf),
         (int) OmUtils.getOMClientRpcTimeOut(conf), connectionRetryPolicy)
@@ -95,8 +94,8 @@ public class OMMetadataProtocolClientSideImpl implements
     RetryPolicy retryPolicy = RetryPolicies.retryUpToMaximumCountWithFixedSleep(
         10, 1000, TimeUnit.MILLISECONDS);
 
-    this.rpcProxy = (OMMetadataProtocolPB) RetryProxy.create(
-        OMMetadataProtocolPB.class, proxy, retryPolicy);
+    this.rpcProxy = (OMAdminProtocolPB) RetryProxy.create(
+        OMAdminProtocolPB.class, proxy, retryPolicy);
   }
 
   @Override

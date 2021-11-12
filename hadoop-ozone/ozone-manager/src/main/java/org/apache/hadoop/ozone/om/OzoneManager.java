@@ -129,8 +129,8 @@ import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
-import org.apache.hadoop.ozone.om.protocolPB.OMMetadataProtocolClientSideImpl;
-import org.apache.hadoop.ozone.om.protocolPB.OMMetadataProtocolPB;
+import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
+import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
@@ -141,14 +141,14 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerMetadataProtocolProtos.OzoneManagerMetaService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
-import org.apache.hadoop.ozone.protocolPB.OMMetadataProtocolServerSideImpl;
+import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
@@ -998,14 +998,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneManagerInterService.newReflectiveBlockingService(
             omInterServerProtocol);
 
-    OMMetadataProtocolServerSideImpl omMetadataServerProtocol =
-        new OMMetadataProtocolServerSideImpl(this);
-    BlockingService omMetadataService =
-        OzoneManagerMetaService.newReflectiveBlockingService(
+    OMAdminProtocolServerSideImpl omMetadataServerProtocol =
+        new OMAdminProtocolServerSideImpl(this);
+    BlockingService omAdminService =
+        OzoneManagerAdminService.newReflectiveBlockingService(
             omMetadataServerProtocol);
 
     return startRpcServer(configuration, omNodeRpcAddr, omService,
-        omInterService, omMetadataService, handlerCount);
+        omInterService, omAdminService, handlerCount);
   }
 
   /**
@@ -1038,7 +1038,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
-    HddsServerUtil.addPBProtocol(conf, OMMetadataProtocolPB.class,
+    HddsServerUtil.addPBProtocol(conf, OMAdminProtocolPB.class,
         omMetadataProtocolService, rpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
@@ -1470,8 +1470,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     for (Map.Entry<String, OMNodeDetails> entry : peerNodesMap.entrySet()) {
       String remoteNodeId = entry.getKey();
       OMNodeDetails remoteNodeDetails = entry.getValue();
-      try (OMMetadataProtocolClientSideImpl omMetadataProtocolClient =
-               new OMMetadataProtocolClientSideImpl(configuration,
+      try (OMAdminProtocolClientSideImpl omMetadataProtocolClient =
+               new OMAdminProtocolClientSideImpl(configuration,
                    getRemoteUser(), entry.getValue())) {
 
         OMConfiguration remoteOMConfiguration =

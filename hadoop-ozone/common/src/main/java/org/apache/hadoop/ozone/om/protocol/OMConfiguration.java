@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
  * Class storing the OM configuration information such as the node details in
  * memory and node details when config is reloaded from disk.
  * Note that this class is used as a structure to transfer the OM configuration
- * information through the {@link OMMetadataProtocol} and not for storing the
+ * information through the {@link OMAdminProtocol} and not for storing the
  * configuration information in OzoneManager itself.
  */
 public final class OMConfiguration {
