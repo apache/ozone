@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -153,15 +154,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
 
-    // Check if bucket layout is valid, OFS buckets cannot be in
-    // OBJECT_STORE layout
-    BucketLayout bucketLayout = bucket.getBucketLayout();
-    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-      throw new IllegalArgumentException(bucketLayout + " does not support" +
-          " file system semantics. Bucket Layout must be " +
-          BucketLayout.FILE_SYSTEM_OPTIMIZED + " or "
-          + BucketLayout.LEGACY + ".");
-    }
+    OzoneFSUtils.validateBucketLayout(bucket.getName(),
+        bucket.getBucketLayout());
 
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,

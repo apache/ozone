@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -226,17 +227,8 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-
-      // Check if bucket layout is valid, OFS buckets cannot be in
-      // OBJECT_STORE layout
-      BucketLayout bucketLayout = bucket.getBucketLayout();
-      if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-        throw new IllegalArgumentException(bucketLayout + " does not support" +
-            " file system semantics. Bucket Layout must be " +
-            BucketLayout.FILE_SYSTEM_OPTIMIZED + " or "
-            + BucketLayout.LEGACY + ".");
-      }
-
+      OzoneFSUtils.validateBucketLayout(bucket.getName(),
+          bucket.getBucketLayout());
     } catch (OMException ex) {
       if (createIfNotExist) {
         // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume

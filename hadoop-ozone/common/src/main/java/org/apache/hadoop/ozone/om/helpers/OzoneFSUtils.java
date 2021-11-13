@@ -120,6 +120,23 @@ public final class OzoneFSUtils {
   }
 
   /**
+   * Checks whether the bucket layout is valid for File System operations
+   * otherwise throws IllegalArgumentException.
+   * Allowed bucket layouts are FILE_SYSTEM_OPTIMIZED and LEGACY.
+   */
+  public static void validateBucketLayout(String bucketName,
+                                          BucketLayout bucketLayout) {
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      throw new IllegalArgumentException(
+          "Bucket: " + bucketName + " has layout: " + bucketLayout +
+              ", which does not support" +
+              " file system semantics. Bucket Layout must be " +
+              BucketLayout.FILE_SYSTEM_OPTIMIZED + " or "
+              + BucketLayout.LEGACY + ".");
+    }
+  }
+
+  /**
    * The function returns leaf node name from the given absolute path. For
    * example, the given key path '/a/b/c/d/e/file1' then it returns leaf node
    * name 'file1'.

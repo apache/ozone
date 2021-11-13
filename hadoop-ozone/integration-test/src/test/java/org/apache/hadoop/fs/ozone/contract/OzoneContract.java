@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.Assert;
 
 /**
@@ -91,6 +92,8 @@ class OzoneContract extends AbstractFSContract {
       conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT,
           OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     }
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
