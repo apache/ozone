@@ -64,6 +64,10 @@ public interface MultiTenantAccessController {
 
   void disablePolicy(long policyID) throws Exception;
 
+  Collection<Policy> getPolicies() throws Exception;
+
+  Collection<Role> getRoles() throws Exception;
+
   /**
    * Define a role to be created.
    */

@@ -20,17 +20,20 @@ package org.apache.hadoop.ozone.om.multitenant;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
-import org.apache.commons.net.util.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.auth.BasicUserPrincipal;
+import org.apache.kerby.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +48,9 @@ import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -78,7 +83,8 @@ public class RangerRestMultiTenantAccessController
   private final String rangerHttpsAddress;
   private final Gson jsonConverter;
   private final String rangerService;
-  private final Map<IAccessAuthorizer.ACLType, String> rangerAclStrings;
+  private final Map<IAccessAuthorizer.ACLType, String> aclToString;
+  private final Map<String, IAccessAuthorizer.ACLType> stringToAcl;
 
   public RangerRestMultiTenantAccessController(Configuration configuration)
       throws IOException {
@@ -87,26 +93,39 @@ public class RangerRestMultiTenantAccessController
     rangerService = conf.get(OZONE_RANGER_SERVICE);
 
     GsonBuilder gsonBuilder = new GsonBuilder();
-    gsonBuilder.registerTypeAdapter(Role.class, roleSerializer);
     gsonBuilder.registerTypeAdapter(Policy.class, policySerializer);
+    gsonBuilder.registerTypeAdapter(Policy.class, policyDeserializer);
+    gsonBuilder.registerTypeAdapter(Role.class, roleSerializer);
+    gsonBuilder.registerTypeAdapter(Role.class, roleDeserializer);
     gsonBuilder.registerTypeAdapter(BasicUserPrincipal.class, userSerializer);
     jsonConverter = gsonBuilder.create();
 
-    rangerAclStrings = new HashMap<>();
+    aclToString = new EnumMap<>(IAccessAuthorizer.ACLType.class);
+    stringToAcl = new HashMap<>();
     fillRangerAclStrings();
     initializeRangerConnection();
   }
 
   private void fillRangerAclStrings() {
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.ALL, "All");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.LIST, "List");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ, "Read");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE, "Write");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.CREATE, "Create");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.DELETE, "Delete");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ_ACL, "Read_ACL");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE_ACL, "Write_ACL");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.NONE, "");
+    aclToString.put(IAccessAuthorizer.ACLType.ALL, "all");
+    aclToString.put(IAccessAuthorizer.ACLType.LIST, "list");
+    aclToString.put(IAccessAuthorizer.ACLType.READ, "read");
+    aclToString.put(IAccessAuthorizer.ACLType.WRITE, "write");
+    aclToString.put(IAccessAuthorizer.ACLType.CREATE, "create");
+    aclToString.put(IAccessAuthorizer.ACLType.DELETE, "delete");
+    aclToString.put(IAccessAuthorizer.ACLType.READ_ACL, "read_acl");
+    aclToString.put(IAccessAuthorizer.ACLType.WRITE_ACL, "write_acl");
+    aclToString.put(IAccessAuthorizer.ACLType.NONE, "");
+
+    stringToAcl.put("all", IAccessAuthorizer.ACLType.ALL);
+    stringToAcl.put("list", IAccessAuthorizer.ACLType.LIST);
+    stringToAcl.put("read", IAccessAuthorizer.ACLType.READ);
+    stringToAcl.put("write", IAccessAuthorizer.ACLType.WRITE);
+    stringToAcl.put("create", IAccessAuthorizer.ACLType.CREATE);
+    stringToAcl.put("delete", IAccessAuthorizer.ACLType.DELETE);
+    stringToAcl.put("read_acl", IAccessAuthorizer.ACLType.READ_ACL);
+    stringToAcl.put("write_acl", IAccessAuthorizer.ACLType.WRITE_ACL);
+    stringToAcl.put("", IAccessAuthorizer.ACLType.NONE);
   }
 
   private void initializeRangerConnection() {
@@ -278,11 +297,62 @@ public class RangerRestMultiTenantAccessController
     setPolicyEnabled(policyID, false);
   }
 
+  @Override
+  public Collection<Policy> getPolicies() throws Exception {
+    // This API gets all policies for all services. The
+    // /public/v2/api/policies/{serviceDefName}/for-resource endpoint is
+    // supposed to get policies for only a specified service, but it does not
+    // seem to work. This implementation should be ok for testing purposes as
+    // this class is intended.
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT;
+    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
+    if (!successfulResponseCode(conn.getResponseCode())) {
+      throw new IOException(String.format("Failed to get all policies. " +
+          "Http response code: %d", conn.getResponseCode()));
+    }
+    String allPoliciesString = getResponseData(conn);
+    // Filter out policies not for Ozone service.
+    JsonArray jsonPoliciesArray = new JsonParser().parse(allPoliciesString)
+        .getAsJsonArray();
+    Collection<Policy> policies = new ArrayList<>();
+    for (JsonElement jsonPolicy: jsonPoliciesArray) {
+      String service =
+          jsonPolicy.getAsJsonObject().get("service").getAsString();
+      if (service.equals(rangerService)) {
+        policies.add(jsonConverter.fromJson(jsonPolicy, Policy.class));
+      }
+    }
+
+    return policies;
+  }
+
+  @Override
+  public Collection<Role> getRoles() throws Exception {
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT;
+    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
+    if (!successfulResponseCode(conn.getResponseCode())) {
+      throw new IOException(String.format("Failed to get all roles. " +
+          "Http response code: %d", conn.getResponseCode()));
+    }
+
+    String allRolesString = getResponseData(conn);
+    JsonArray rolesArrayJson =
+        new JsonParser().parse(allRolesString).getAsJsonArray();
+    Collection<Role> roles = new ArrayList<>();
+    for (JsonElement roleJson: rolesArrayJson) {
+      roles.add(jsonConverter.fromJson(roleJson, Role.class));
+    }
+
+    return roles;
+  }
+
   private void setPolicyEnabled(long policyID, boolean isEnabled)
       throws IOException {
     // Get current policy from Ranger.
     JsonObject policyJson = getPolicyJson(policyID);
-    // Disable the policy.
+    // Set policy enabled.
     policyJson.remove("isEnabled");
     policyJson.addProperty("isEnabled", isEnabled);
     // Put modified policy back in Ranger.
@@ -412,6 +482,86 @@ public class RangerRestMultiTenantAccessController
 
   /// SERIALIZATION ///
 
+  private final JsonDeserializer<Policy> policyDeserializer =
+      new JsonDeserializer<Policy>() {
+    @Override
+    public Policy deserialize(JsonElement jsonElement, Type type,
+        JsonDeserializationContext jsonDeserializationContext)
+        throws JsonParseException {
+      JsonObject policyJson = jsonElement.getAsJsonObject();
+      String name = policyJson.get("name").getAsString();
+      Policy policy = new Policy(name);
+      policy.setDescription(policyJson.get("description").getAsString());
+
+      // Read volume, bucket, keys from json.
+      JsonObject resourcesJson = policyJson.get("resources").getAsJsonObject();
+      // All Ozone Ranger policies specify at least a volume.
+      JsonObject jsonVolumeResource =
+          resourcesJson.get("volume").getAsJsonObject();
+      JsonArray volumes = jsonVolumeResource.get("values").getAsJsonArray();
+      volumes.forEach(vol -> policy.addVolumes(vol.getAsString()));
+
+      if (resourcesJson.has("bucket")) {
+        JsonObject jsonBucketResource =
+            resourcesJson.get("bucket").getAsJsonObject();
+        JsonArray buckets = jsonBucketResource.get("values").getAsJsonArray();
+        buckets.forEach(bucket -> policy.addBuckets(bucket.getAsString()));
+      }
+
+      if (resourcesJson.has("key")) {
+        JsonObject jsonKeysResource =
+            resourcesJson.get("key").getAsJsonObject();
+        JsonArray keys = jsonKeysResource.get("values").getAsJsonArray();
+        keys.forEach(key -> policy.addKeys(key.getAsString()));
+      }
+
+      // Read Roles and their ACLs.
+      JsonArray policyItemsJson = policyJson.getAsJsonArray("policyItems");
+      for (JsonElement policyItemElement: policyItemsJson) {
+        JsonObject policyItemJson = policyItemElement.getAsJsonObject();
+        JsonArray jsonRoles = policyItemJson.getAsJsonArray("roles");
+        JsonArray jsonAclArray = policyItemJson.getAsJsonArray("accesses");
+
+        for (JsonElement jsonAclElem: jsonAclArray) {
+          JsonObject jsonAcl = jsonAclElem.getAsJsonObject();
+          String aclType = jsonAcl.get("type").getAsString();
+          Acl acl;
+          if (jsonAcl.get("isAllowed").getAsBoolean()) {
+            acl = Acl.allow(stringToAcl.get(aclType));
+          } else {
+            acl = Acl.deny(stringToAcl.get(aclType));
+          }
+
+          for (JsonElement roleNameJson: jsonRoles) {
+            policy.addRoleAcls(roleNameJson.getAsString(), acl);
+          }
+        }
+      }
+
+      return policy;
+    }
+  };
+
+  private final JsonDeserializer<Role> roleDeserializer =
+      new JsonDeserializer<Role>() {
+    @Override
+    public Role deserialize(JsonElement jsonElement, Type type,
+                            JsonDeserializationContext jsonDeserializationContext)
+        throws JsonParseException {
+      JsonObject roleJson = jsonElement.getAsJsonObject();
+      String name = roleJson.get("name").getAsString();
+      Role role = new Role(name);
+      role.setDescription(roleJson.get("description").getAsString());
+      for (JsonElement jsonUser: roleJson.get("users").getAsJsonArray()) {
+        String userName =
+            jsonUser.getAsJsonObject().get("name").getAsString();
+        role.addUser(new BasicUserPrincipal(userName));
+      }
+
+      return role;
+    }
+  };
+
   private final JsonSerializer<Policy> policySerializer =
       new JsonSerializer<Policy>() {
     @Override
@@ -481,7 +631,7 @@ public class RangerRestMultiTenantAccessController
         for (Acl acl: entry.getValue()) {
           JsonObject jsonAcl  = new JsonObject();
           jsonAcl.addProperty("type",
-              rangerAclStrings.get(acl.getAclType()));
+              aclToString.get(acl.getAclType()));
           jsonAcl.addProperty("isAllowed", acl.isAllowed());
           jsonAclArray.add(jsonAcl);
           jsonPolicyItem.add("accesses", jsonAclArray);
