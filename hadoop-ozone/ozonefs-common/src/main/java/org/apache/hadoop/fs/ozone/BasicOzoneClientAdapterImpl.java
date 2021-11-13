@@ -545,6 +545,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public boolean isFSOptimizedBucket() {
-    return bucket.getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    return bucket.getBucketLayout().isFileSystemOptimized();
   }
 }

@@ -67,18 +67,14 @@ public enum BucketLayout {
 
   public boolean shouldNormalizePaths(boolean enableFileSystemPaths) {
     switch (this) {
-      case OBJECT_STORE:
-        return false;
-      case FILE_SYSTEM_OPTIMIZED:
-        return true;
-      case LEGACY:
-        if (enableFileSystemPaths) {
-          return true;
-        } else {
-          return false;
-        }
-      default:
-        throw new IllegalArgumentException("not right");
+    case OBJECT_STORE:
+      return false;
+    case FILE_SYSTEM_OPTIMIZED:
+      return true;
+    case LEGACY:
+      return enableFileSystemPaths;
+    default:
+      throw new IllegalArgumentException("Invalid Bucket Layout:" + this);
     }
   }
 

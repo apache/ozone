@@ -210,7 +210,7 @@ public final class OzoneFSUtils {
 
 
   public static boolean isFSOptimizedBucket(BucketLayout bucketLayout) {
-    return bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    return bucketLayout.isFileSystemOptimized();
   }
 
   public static String removeTrailingSlashIfNeeded(String key) {
