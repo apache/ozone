@@ -395,7 +395,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isSecurityEnabled;
 
   @SuppressWarnings("methodlength")
-  private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
+  private OzoneManager(OzoneConfiguration conf, StartupOption startupOption, StorageContainerLocationProtocol cc, ScmBlockLocationProtocol bc)
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Preconditions.checkNotNull(conf);
@@ -479,21 +479,29 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
-    scmContainerClient = getScmContainerClient(configuration);
+    if (cc != null) {
+      scmContainerClient = cc;
+    } else {
+      scmContainerClient = getScmContainerClient(configuration);
+    }
     // verifies that the SCM info in the OM Version file is correct.
-    scmBlockClient = getScmBlockClient(configuration);
+    if (bc != null) {
+      scmBlockClient = bc;
+    } else {
+      scmBlockClient = getScmBlockClient(configuration);
+    }
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient);
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
-    if (!testSecureOmFlag) {
-      ScmInfo scmInfo = getScmInfo(configuration);
-      if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
-        logVersionMismatch(conf, scmInfo);
-        throw new OMException("SCM version info mismatch.",
-            ResultCodes.SCM_VERSION_MISMATCH_ERROR);
-      }
-    }
+    // if (!testSecureOmFlag) {
+    //   ScmInfo scmInfo = getScmInfo(configuration);
+    //   if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
+    //     logVersionMismatch(conf, scmInfo);
+    //     throw new OMException("SCM version info mismatch.",
+    //         ResultCodes.SCM_VERSION_MISMATCH_ERROR);
+    //   }
+    // }
 
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
@@ -599,12 +607,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return new OzoneManager(conf, StartupOption.REGUALR);
+    return new OzoneManager(conf, StartupOption.REGUALR, null, null);
   }
 
   public static OzoneManager createOm(OzoneConfiguration conf,
       StartupOption startupOption) throws IOException, AuthenticationException {
-    return new OzoneManager(conf, startupOption);
+    return new OzoneManager(conf, startupOption, null, null);
+  }
+
+  public static OzoneManager createOm(OzoneConfiguration conf,
+                                      StartupOption startupOption,
+                                      StorageContainerLocationProtocol cc, ScmBlockLocationProtocol bc)
+    throws IOException, AuthenticationException {
+    return new OzoneManager(conf, startupOption, cc, bc);
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
