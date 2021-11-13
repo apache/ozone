@@ -122,7 +122,6 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, db);
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
 
     OmMetadataManagerImpl metadataManager =
         new OmMetadataManagerImpl(conf);

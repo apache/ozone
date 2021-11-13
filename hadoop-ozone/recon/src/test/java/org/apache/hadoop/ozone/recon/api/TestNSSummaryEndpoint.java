@@ -229,8 +229,6 @@ public class TestNSSummaryEndpoint {
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
-    // enable FSO mode
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
 
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();

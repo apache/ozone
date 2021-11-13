@@ -181,17 +181,6 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     return dirInfo;
   }
 
-  @NotNull
-  @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata Layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
-  }
-
   @Override
   protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
     return new OMFileCreateRequestWithFSO(omRequest,

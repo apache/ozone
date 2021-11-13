@@ -125,7 +125,6 @@ public class TestNSSummaryTask {
                     .build();
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
   }
 
   @Test

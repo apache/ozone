@@ -3658,7 +3658,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IllegalArgumentException(msg.toString());
     }
 
-    OzoneManagerRatisUtils.setBucketFSOptimized(omMetadataLayoutPrefix);
     String status = omMetadataLayoutPrefix ? "enabled" : "disabled";
     LOG.info("Configured {}={} and {} optimized OM FS operations",
         OZONE_OM_METADATA_LAYOUT, metaLayout, status);

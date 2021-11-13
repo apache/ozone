@@ -71,15 +71,6 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
     return new OMKeySetAclRequestWithFSO(setAclRequest);
   }
 
-  @Override protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
-  }
-
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
