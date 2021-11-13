@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -64,6 +66,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
@@ -97,35 +100,58 @@ public class TestKeyManagerUnit {
   private File testDir;
   private ScmBlockLocationProtocol blockClient;
 
+  private static OzoneManagerProtocol writeClient;
+  private static OzoneManager om;
+  
   @Before
-  public void setup() throws IOException {
+  public void setup() throws Exception {
+    System.out.println("gbj1");
     configuration = new OzoneConfiguration();
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
-    metadataManager = new OmMetadataManagerImpl(configuration);
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
-    keyManager = new KeyManagerImpl(
-        blockClient, containerClient, metadataManager, configuration,
-        "omtest", Mockito.mock(OzoneBlockTokenSecretManager.class));
+    System.out.println("gbj2");
 
+    OMStorage omStorage = new OMStorage(configuration);
+    omStorage.setClusterId("omtest");
+    omStorage.setOmId("omtest");
+    omStorage.initialize();
+    System.out.println("gbj3");
+
+    om = OzoneManager.createOm(configuration, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+    metadataManager = (OmMetadataManagerImpl) HddsWhiteboxTestUtils.getInternalState(
+        om, "metadataManager");
+    System.out.println("gbj4");
+
+    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
+    ScmClient scmClient = new ScmClient(blockClient, containerClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
+    System.out.println("gbj5");
+
+    om.start();
+    writeClient = OzoneClientFactory.getRpcClient(configuration).getObjectStore().getClientProxy().getOzoneManagerClient();
     startDate = Instant.now();
   }
 
   @After
   public void cleanup() throws Exception {
-    metadataManager.stop();
+    om.stop();
     FileUtils.deleteDirectory(testDir);
   }
 
   @Test
   public void listMultipartUploadPartsWithZeroUpload() throws IOException {
     //GIVEN
+    System.out.println("gbj6");
     createBucket(metadataManager, "vol1", "bucket1");
 
     OmMultipartInfo omMultipartInfo =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
+        initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
 
     //WHEN
     OmMultipartUploadListParts omMultipartUploadListParts = keyManager
@@ -143,9 +169,9 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
-    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
-    initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key2");
+    initMultipartUpload(writeClient, "vol1", "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -178,11 +204,11 @@ public class TestKeyManagerUnit {
     // Add few to cache and few to DB.
     addinitMultipartUploadToCache(volume, bucket, "dir/key1");
 
-    initMultipartUpload(keyManager, volume, bucket, "dir/key2");
+    initMultipartUpload(writeClient, volume, bucket, "dir/key2");
 
     addinitMultipartUploadToCache(volume, bucket, "dir/key3");
 
-    initMultipartUpload(keyManager, volume, bucket, "dir/key4");
+    initMultipartUpload(writeClient, volume, bucket, "dir/key4");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -201,12 +227,12 @@ public class TestKeyManagerUnit {
     // Same way add few to cache and few to DB.
     addinitMultipartUploadToCache(volume, bucket, "dir/ozonekey1");
 
-    initMultipartUpload(keyManager, volume, bucket, "dir/ozonekey2");
+    initMultipartUpload(writeClient, volume, bucket, "dir/ozonekey2");
 
     OmMultipartInfo omMultipartInfo3 =addinitMultipartUploadToCache(volume,
         bucket, "dir/ozonekey3");
 
-    OmMultipartInfo omMultipartInfo4 = initMultipartUpload(keyManager,
+    OmMultipartInfo omMultipartInfo4 = initMultipartUpload(writeClient,
         volume, bucket, "dir/ozonekey4");
 
     omMultipartUploadList =
@@ -258,13 +284,13 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    initMultipartUpload(keyManager, "vol1", "bucket1", "dip/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dip/key1");
 
-    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
-    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
-    initMultipartUpload(keyManager, "vol1", "bucket1", "key3");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key2");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "key3");
 
-    initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -290,7 +316,7 @@ public class TestKeyManagerUnit {
     TestOMRequestUtils.addBucketToOM(metadataManager, omBucketInfo);
   }
 
-  private OmMultipartInfo initMultipartUpload(KeyManagerImpl omtest,
+  private OmMultipartInfo initMultipartUpload(OzoneManagerProtocol omtest,
       String volume, String bucket, String key)
       throws IOException {
     OmKeyArgs key1 = new Builder()
@@ -301,7 +327,8 @@ public class TestKeyManagerUnit {
             new RatisReplicationConfig(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .build();
-    return omtest.initiateMultipartUpload(key1);
+    OmMultipartInfo omMultipartInfo = omtest.initiateMultipartUpload(key1);
+    return omMultipartInfo;
   }
 
   private OmMultipartInfo addinitMultipartUploadToCache(
