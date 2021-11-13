@@ -206,13 +206,6 @@ public final class OzoneFSUtils {
     return keyPath.getNameCount();
   }
 
-
-
-
-  public static boolean isFSOptimizedBucket(BucketLayout bucketLayout) {
-    return bucketLayout.isFileSystemOptimized();
-  }
-
   public static String removeTrailingSlashIfNeeded(String key) {
     if (key.endsWith(OZONE_URI_DELIMITER)) {
       java.nio.file.Path keyPath = Paths.get(key);

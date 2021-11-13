@@ -415,8 +415,9 @@ public abstract class OMClientRequest implements RequestAuditor {
       keyPath = validateAndNormalizeKey(true, keyPath);
       if (keyPath.endsWith("/")) {
         throw new OMException(
-                "Invalid KeyPath, key names with trailing / " + "are not allowed."
-                        + keyPath, OMException.ResultCodes.INVALID_KEY_NAME);
+                "Invalid KeyPath, key names with trailing / "
+                        + "are not allowed." + keyPath,
+                OMException.ResultCodes.INVALID_KEY_NAME);
       }
     }
     return keyPath;
