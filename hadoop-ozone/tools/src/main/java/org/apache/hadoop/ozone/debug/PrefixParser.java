@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.*;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
@@ -122,7 +121,6 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, db);
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
 
     OmMetadataManagerImpl metadataManager =
         new OmMetadataManagerImpl(conf);
