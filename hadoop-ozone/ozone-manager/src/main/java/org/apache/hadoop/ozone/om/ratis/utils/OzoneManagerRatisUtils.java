@@ -185,7 +185,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new OMAllocateBlockRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMAllocateBlockRequest(omRequest, bucketLayout);
@@ -193,7 +193,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyCreateRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMKeyCreateRequest(omRequest, bucketLayout);
@@ -201,7 +201,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyCommitRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMKeyCommitRequest(omRequest, bucketLayout);
@@ -209,7 +209,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyDeleteRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMKeyDeleteRequest(omRequest, bucketLayout);
@@ -219,7 +219,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyRenameRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMKeyRenameRequest(omRequest, bucketLayout);
@@ -229,7 +229,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new OMDirectoryCreateRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMDirectoryCreateRequest(omRequest, bucketLayout);
@@ -237,7 +237,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new OMFileCreateRequestWithFSO(omRequest, bucketLayout);
       }
       return new OMFileCreateRequest(omRequest);
@@ -250,7 +250,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new S3InitiateMultipartUploadRequestWithFSO(omRequest,
             bucketLayout);
       }
@@ -259,7 +259,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
             bucketLayout);
       }
@@ -268,7 +268,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new S3MultipartUploadAbortRequestWithFSO(omRequest,
             bucketLayout);
       }
@@ -277,7 +277,7 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
           keyArgs.getBucketName(), ozoneManager);
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         return new S3MultipartUploadCompleteRequestWithFSO(omRequest,
             bucketLayout);
       }
@@ -322,8 +322,7 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.KEY == type) {
         OMKeyAddAclRequest aclReq = new OMKeyAddAclRequest(omRequest);
         BucketLayout bucketLayout = aclReq.getBucketLayout(ozoneManager);
-        if (BucketLayout.FILE_SYSTEM_OPTIMIZED
-            .equals(bucketLayout)) {
+        if (bucketLayout.isFileSystemOptimized()) {
           return new OMKeyAddAclRequestWithFSO(omRequest);
         }
         return aclReq;
@@ -339,8 +338,7 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.KEY == type) {
         OMKeyRemoveAclRequest aclReq = new OMKeyRemoveAclRequest(omRequest);
         BucketLayout bucketLayout = aclReq.getBucketLayout(ozoneManager);
-        if (BucketLayout.FILE_SYSTEM_OPTIMIZED
-            .equals(bucketLayout)) {
+        if (bucketLayout.isFileSystemOptimized()) {
           return new OMKeyRemoveAclRequestWithFSO(omRequest);
         }
         return aclReq;
@@ -356,8 +354,7 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.KEY == type) {
         OMKeySetAclRequest aclReq = new OMKeySetAclRequest(omRequest);
         BucketLayout bucketLayout = aclReq.getBucketLayout(ozoneManager);
-        if (BucketLayout.FILE_SYSTEM_OPTIMIZED
-            .equals(bucketLayout)) {
+        if (bucketLayout.isFileSystemOptimized()) {
           return new OMKeySetAclRequestWithFSO(omRequest);
         }
         return aclReq;
