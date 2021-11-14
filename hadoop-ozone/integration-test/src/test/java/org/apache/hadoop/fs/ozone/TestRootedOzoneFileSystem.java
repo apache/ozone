@@ -38,12 +38,12 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -59,6 +59,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -1532,11 +1533,8 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
     // This test is only meaningful when ACL is enabled
-    if (!enableAcl) {
-      LOG.info("ACL is not enabled. Skipping this test as it requires ACL to " +
-          " be enabled to be meaningful.");
-      return;
-    }
+    Assume.assumeTrue("ACL is not enabled. Skipping this test as it requires " +
+            "ACL to be enabled to be meaningful.", enableAcl);
 
     // This unit test does the correct check. However, the parameterized
     // test is not initialized correctly since HDDS-4998 (or HDDS-4040).
