@@ -45,7 +45,6 @@ import org.mockito.runners.MockitoJUnitRunner;
  * Tests BucketManagerImpl, mocks OMMetadataManager for testing.
  */
 @RunWith(MockitoJUnitRunner.class)
-@Ignore("Bucket Manager does not use cache, Disable it for now.")
 public class TestBucketManagerImpl {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -102,6 +101,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testCreateBucket() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
 
@@ -136,6 +136,7 @@ public class TestBucketManagerImpl {
 
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testCreateEncryptedBucket() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
 
@@ -151,6 +152,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testCreateAlreadyExistingBucket() throws Exception {
     thrown.expectMessage("Bucket already exist");
     OmMetadataManagerImpl metaMgr = createSampleVol();
@@ -173,6 +175,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testGetBucketInfoForInvalidBucket() throws Exception {
     thrown.expectMessage("Bucket not found");
     OmMetadataManagerImpl metaMgr = createSampleVol();
@@ -246,6 +249,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testSetBucketPropertyChangeStorageType() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
 
@@ -274,6 +278,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testSetBucketPropertyChangeVersioning() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
 
@@ -300,6 +305,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testDeleteBucket() throws Exception {
     thrown.expectMessage("Bucket not found");
     OmMetadataManagerImpl metaMgr = createSampleVol();
@@ -334,6 +340,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
+  @Ignore("Bucket Manager does not use cache, Disable it for now.")
   public void testDeleteNonEmptyBucket() throws Exception {
     thrown.expectMessage("Bucket is not empty");
     OmMetadataManagerImpl metaMgr = createSampleVol();
