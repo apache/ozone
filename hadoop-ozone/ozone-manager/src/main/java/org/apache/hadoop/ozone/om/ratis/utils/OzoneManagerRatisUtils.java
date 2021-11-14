@@ -115,25 +115,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DI
  * Utility class used by OzoneManager HA.
  */
 public final class OzoneManagerRatisUtils {
-
-  // TODO: Temporary workaround for OM upgrade path and will be replaced once
-  //  upgrade HDDS-3698 story reaches consensus.
-  private static boolean isBucketFSOptimized = false;
-
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
 
   private OzoneManagerRatisUtils() {
-  }
-
-  /**
-   * Sets enabled/disabled file system optimized path property. A true value
-   * represents enabled, false represents disabled.
-   *
-   * @param enabledFSO enabled/disabled file system optimized
-   */
-  public static void setBucketFSOptimized(boolean enabledFSO) {
-    OzoneManagerRatisUtils.isBucketFSOptimized = enabledFSO;
   }
 
   /**
@@ -415,16 +400,6 @@ public final class OzoneManagerRatisUtils {
     return HAUtils
         .verifyTransactionInfo(transactionInfo, lastAppliedIndex, leaderId,
             newDBlocation, OzoneManager.LOG);
-  }
-
-  /**
-   * Returns enabled/disabled file system optimized path property. A true value
-   * represents FSO path is enabled, false represents disabled.
-   *
-   * @return true or false.
-   */
-  public static boolean isBucketFSOptimized() {
-    return isBucketFSOptimized;
   }
 
   /**
