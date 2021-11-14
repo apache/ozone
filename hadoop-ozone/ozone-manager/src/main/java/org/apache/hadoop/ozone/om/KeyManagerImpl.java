@@ -662,7 +662,7 @@ public class KeyManagerImpl implements KeyManager {
 
     OmKeyInfo value = null;
     try {
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
@@ -3274,8 +3274,7 @@ public class KeyManagerImpl implements KeyManager {
     OmBucketInfo buckInfo =
         ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
     if (buckInfo != null) {
-      return buckInfo.getBucketLayout()
-          .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      return buckInfo.getBucketLayout().isFileSystemOptimized();
     }
     return false;
   }

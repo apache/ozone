@@ -279,7 +279,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout) {
-    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+    if (bucketLayout.isFileSystemOptimized()) {
       return fileTable;
     }
     return keyTable;
@@ -302,7 +302,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table getOpenKeyTable(BucketLayout bucketLayout) {
-    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+    if (bucketLayout.isFileSystemOptimized()) {
       return openFileTable;
     }
     return openKeyTable;
