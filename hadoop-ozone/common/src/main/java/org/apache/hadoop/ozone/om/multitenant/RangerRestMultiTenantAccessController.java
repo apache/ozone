@@ -195,7 +195,6 @@ public class RangerRestMultiTenantAccessController
   public long createPolicy(Policy policy) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT;
-
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
         jsonConverter.toJsonTree(policy).getAsJsonObject());
     if (!successfulResponseCode(conn.getResponseCode())) {
@@ -491,7 +490,10 @@ public class RangerRestMultiTenantAccessController
       JsonObject policyJson = jsonElement.getAsJsonObject();
       String name = policyJson.get("name").getAsString();
       Policy policy = new Policy(name);
-      policy.setDescription(policyJson.get("description").getAsString());
+      if (policyJson.has("description")) {
+        policy.setDescription(policyJson.get("description").getAsString());
+      }
+      policy.setEnabled(policyJson.get("isEnabled").getAsBoolean());
 
       // Read volume, bucket, keys from json.
       JsonObject resourcesJson = policyJson.get("resources").getAsJsonObject();
@@ -570,6 +572,7 @@ public class RangerRestMultiTenantAccessController
       JsonObject jsonPolicy = new JsonObject();
       jsonPolicy.addProperty("name", javaPolicy.getName());
       jsonPolicy.addProperty("service", rangerService);
+      jsonPolicy.addProperty("isEnabled", javaPolicy.isEnabled());
       if (javaPolicy.getDescription().isPresent()) {
         jsonPolicy.addProperty("description",
             javaPolicy.getDescription().get());
@@ -578,38 +581,43 @@ public class RangerRestMultiTenantAccessController
       // All resources under this policy are added to this object.
       JsonObject jsonResources = new JsonObject();
 
-      // Add volumes.
-      JsonObject jsonVolumeResource = new JsonObject();
+      // Add volumes. Ranger requires at least one volume to be specified.
       JsonArray jsonVolumeNameArray = new JsonArray();
       for (String volumeName: javaPolicy.getVolumes()) {
         jsonVolumeNameArray.add(new JsonPrimitive(volumeName));
       }
+      JsonObject jsonVolumeResource = new JsonObject();
       jsonVolumeResource.add("values", jsonVolumeNameArray);
       jsonVolumeResource.addProperty("isRecursive", false);
       jsonVolumeResource.addProperty("isExcludes", false);
       jsonResources.add("volume", jsonVolumeResource);
 
       // Add buckets.
-      JsonObject jsonBucketResource = new JsonObject();
       JsonArray jsonBucketNameArray = new JsonArray();
       for (String bucketName: javaPolicy.getBuckets()) {
         jsonBucketNameArray.add(new JsonPrimitive(bucketName));
       }
-      jsonBucketResource.add("values", jsonBucketNameArray);
-      jsonBucketResource.addProperty("isRecursive", false);
-      jsonBucketResource.addProperty("isExcludes", false);
-      jsonResources.add("bucket", jsonBucketResource);
+
+      if (jsonBucketNameArray.size() > 0) {
+        JsonObject jsonBucketResource = new JsonObject();
+        jsonBucketResource.add("values", jsonBucketNameArray);
+        jsonBucketResource.addProperty("isRecursive", false);
+        jsonBucketResource.addProperty("isExcludes", false);
+        jsonResources.add("bucket", jsonBucketResource);
+      }
 
       // Add keys.
-      JsonObject jsonKeyResource = new JsonObject();
       JsonArray jsonKeyNameArray = new JsonArray();
       for (String keyName: javaPolicy.getKeys()) {
         jsonKeyNameArray.add(new JsonPrimitive(keyName));
       }
-      jsonKeyResource.add("values", jsonKeyNameArray);
-      jsonKeyResource.addProperty("isRecursive", false);
-      jsonKeyResource.addProperty("isExcludes", false);
-      jsonResources.add("key", jsonKeyResource);
+      if (jsonKeyNameArray.size() > 0) {
+        JsonObject jsonKeyResource = new JsonObject();
+        jsonKeyResource.add("values", jsonKeyNameArray);
+        jsonKeyResource.addProperty("isRecursive", false);
+        jsonKeyResource.addProperty("isExcludes", false);
+        jsonResources.add("key", jsonKeyResource);
+      }
 
       jsonPolicy.add("resources", jsonResources);
 

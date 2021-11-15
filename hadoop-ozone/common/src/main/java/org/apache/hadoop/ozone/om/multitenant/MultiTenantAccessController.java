@@ -141,6 +141,7 @@ public interface MultiTenantAccessController {
     private final Collection<String> keys;
     private String description;
     private final Map<String, Collection<Acl>> roleAcls;
+    private boolean isEnabled;
 
     public Policy(String policyName, String... volumeName) {
       this.name = policyName;
@@ -149,6 +150,15 @@ public interface MultiTenantAccessController {
       this.buckets = new ArrayList<>();
       this.keys = new ArrayList<>();
       this.roleAcls = new HashMap<>();
+      this.isEnabled = true;
+    }
+
+    public void setEnabled(boolean isEnabled) {
+      this.isEnabled = isEnabled;
+    }
+
+    public boolean isEnabled() {
+      return isEnabled;
     }
 
     public Collection<String> getVolumes() {
