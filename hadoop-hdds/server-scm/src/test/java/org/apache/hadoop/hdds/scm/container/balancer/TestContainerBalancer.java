@@ -573,9 +573,8 @@ public class TestContainerBalancer {
             nodesInCluster.get(secondExcludeIndex).getDatanodeDetails()
                 .getHostName();
     // create a file to test specifying config using a file
-    File excludeNodesFile = null;
     try {
-      excludeNodesFile = tempFolder.newFile("excludeNodesFile");
+      File excludeNodesFile = tempFolder.newFile("excludeNodesFile");
       Files.write(excludeNodesFile.toPath(),
           excludeNodes.getBytes(StandardCharsets.UTF_8),
           StandardOpenOption.WRITE);

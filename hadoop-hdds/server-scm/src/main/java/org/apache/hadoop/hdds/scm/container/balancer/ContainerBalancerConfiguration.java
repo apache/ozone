@@ -344,12 +344,11 @@ public final class ContainerBalancerConfiguration {
    * @throws IOException if an I/O error occurs when opening the file
    */
   public void setIncludeNodes(File includeNodes) throws IOException {
-    try (Stream<String> strings = Files.lines(includeNodes.toPath(),
-        StandardCharsets.UTF_8)) {
-      this.includeNodes = strings.collect(Collectors.joining(","));
+    try {
+      this.includeNodes = readFile(includeNodes);
     } catch (IOException e) {
-      LOG.debug("Could not read the specified includeNodes file.");
-      throw new IOException(e);
+      LOG.info("Could not read includeNodes file: {}.", includeNodes.getPath());
+      throw e;
     }
   }
 
@@ -383,12 +382,11 @@ public final class ContainerBalancerConfiguration {
    * @throws IOException if an I/O error occurs when opening the file
    */
   public void setExcludeNodes(File excludeNodes) throws IOException {
-    try (Stream<String> strings = Files.lines(excludeNodes.toPath(),
-        StandardCharsets.UTF_8)) {
-      this.excludeNodes = strings.collect(Collectors.joining(","));
+    try {
+      this.excludeNodes = readFile(excludeNodes);
     } catch (IOException e) {
-      LOG.debug("Could not read the specified excludeNodes file.");
-      throw new IOException(e);
+      LOG.info("Could not read excludeNodes file: {}.", excludeNodes.getPath());
+      throw e;
     }
   }
 
@@ -399,6 +397,13 @@ public final class ContainerBalancerConfiguration {
    */
   public OzoneConfiguration getOzoneConfiguration() {
     return this.ozoneConfiguration;
+  }
+
+  private String readFile(File file) throws IOException {
+    try (Stream<String> strings = Files.lines(file.toPath(),
+        StandardCharsets.UTF_8)) {
+      return strings.collect(Collectors.joining(","));
+    }
   }
 
   @Override
