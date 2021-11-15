@@ -31,6 +31,8 @@ import java.util.Optional;
 
 /**
  * Defines the operations needed for multi-tenant access control.
+ * Each implemented method should be atomic. A failure partway through any
+ * one method call should not leave any state behind.
  */
 public interface MultiTenantAccessController {
   /**
@@ -45,6 +47,12 @@ public interface MultiTenantAccessController {
 
   void deletePolicy(long policyID) throws Exception;
 
+  Policy getPolicy(long policyID) throws Exception;
+
+  void updatePolicy(long policyID, Policy policy) throws Exception;
+
+  Map<Long, Policy> getPolicies() throws Exception;
+
   /**
    * This operation will fail if a role with the same name already exists.
    *
@@ -52,21 +60,13 @@ public interface MultiTenantAccessController {
    */
   long createRole(Role role) throws Exception;
 
-  void addUsersToRole(long roleID, BasicUserPrincipal... newUsers)
-      throws Exception;
-
-  void removeUsersFromRole(long roleID, BasicUserPrincipal... users)
-      throws Exception;
-
   void deleteRole(long roleID) throws Exception;
 
-  void enablePolicy(long policyID) throws Exception;
+  Role getRole(long roleID) throws Exception;
 
-  void disablePolicy(long policyID) throws Exception;
+  void updateRole(long roleID, Role role) throws Exception;
 
-  Collection<Policy> getPolicies() throws Exception;
-
-  Collection<Role> getRoles() throws Exception;
+  Map<Long, Role> getRoles() throws Exception;
 
   /**
    * Define a role to be created.
@@ -87,6 +87,10 @@ public interface MultiTenantAccessController {
 
     public void addUser(BasicUserPrincipal user) {
       users.add(user);
+    }
+
+    public boolean removeUser(BasicUserPrincipal user) {
+      return users.remove(user);
     }
 
     public Collection<BasicUserPrincipal> getUsers() {

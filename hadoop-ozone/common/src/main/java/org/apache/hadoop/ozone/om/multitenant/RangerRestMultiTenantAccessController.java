@@ -221,6 +221,65 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
+  public Map<Long, Policy> getPolicies() throws Exception {
+    // This API gets all policies for all services. The
+    // /public/v2/api/policies/{serviceDefName}/for-resource endpoint is
+    // supposed to get policies for only a specified service, but it does not
+    // seem to work. This implementation should be ok for testing purposes as
+    // this class is intended.
+    String rangerAdminUrl =
+        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT;
+    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
+    if (!successfulResponseCode(conn.getResponseCode())) {
+      throw new IOException(String.format("Failed to get all policies. " +
+          "Http response code: %d", conn.getResponseCode()));
+    }
+    String allPoliciesString = getResponseData(conn);
+    // Filter out policies not for Ozone service.
+    JsonArray jsonPoliciesArray = new JsonParser().parse(allPoliciesString)
+        .getAsJsonArray();
+    Map<Long, Policy> policies = new HashMap<>();
+    for (JsonElement jsonPolicy: jsonPoliciesArray) {
+      JsonObject jsonPolicyObject = jsonPolicy.getAsJsonObject();
+      String service = jsonPolicyObject.get("service").getAsString();
+      if (service.equals(rangerService)) {
+        long id = jsonPolicyObject.get("id").getAsLong();
+        policies.put(id, jsonConverter.fromJson(jsonPolicyObject,
+            Policy.class));
+      }
+    }
+
+    return policies;
+  }
+
+  @Override
+  public Policy getPolicy(long policyID) throws IOException {
+    String rangerAdminUrl = rangerHttpsAddress +
+        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
+
+    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
+    if (!successfulResponseCode(conn.getResponseCode())) {
+      throw new IOException(String.format("Failed to get policy %d. " +
+          "Http response code: %d", policyID, conn.getResponseCode()));
+    }
+    String policyInfo = getResponseData(conn);
+    return jsonConverter.fromJson(policyInfo, Policy.class);
+  }
+
+  @Override
+  public void updatePolicy(long policyID, Policy policy) throws IOException {
+    String rangerAdminUrl = rangerHttpsAddress +
+        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
+
+    HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl,
+        jsonConverter.toJsonTree(policy));
+    if (!successfulResponseCode(conn.getResponseCode())) {
+      throw new IOException(String.format("Failed to update policy %d. " +
+          "Http response code: %d", policyID, conn.getResponseCode()));
+    }
+  }
+
+  @Override
   public long createRole(Role role) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT;
@@ -238,43 +297,6 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public void addUsersToRole(long roleID,
-      BasicUserPrincipal... newUsers) throws IOException {
-    // Get current role from Ranger.
-    JsonObject roleJson = getRoleJson(roleID);
-    // Add users to role.
-    JsonArray jsonUsers = roleJson.getAsJsonArray("users");
-    for (BasicUserPrincipal user: newUsers) {
-      jsonUsers.add(jsonConverter.toJsonTree(user));
-    }
-    // Put modified role back in Ranger.
-    putRoleJson(roleID, roleJson);
-  }
-
-  @Override
-  public void removeUsersFromRole(long roleID,
-      BasicUserPrincipal... usersToRemove) throws IOException {
-    Set<String> usersToRemoveSet = Stream.of(usersToRemove)
-        .map(BasicUserPrincipal::getName)
-        .collect(Collectors.toSet());
-    // Get current role from Ranger.
-    JsonObject roleJson = getRoleJson(roleID);
-    // Remove users from role.
-    // Json array does not support removal, so we must make a new one.
-    JsonArray currentUsers = roleJson.getAsJsonArray("users");
-    JsonArray newUsers = new JsonArray();
-    for (JsonElement user: currentUsers) {
-      String userName = user.getAsJsonObject().get("name").getAsString();
-      if (!usersToRemoveSet.contains(userName)) {
-        newUsers.add(user);
-      }
-    }
-    roleJson.add("users", newUsers);
-    // Put modified role back in Ranger.
-    putRoleJson(roleID, roleJson);
-  }
-
-  @Override
   public void deleteRole(long roleID) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT
@@ -287,47 +309,7 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public void enablePolicy(long policyID) throws Exception {
-    setPolicyEnabled(policyID, true);
-  }
-
-  @Override
-  public void disablePolicy(long policyID) throws Exception {
-    setPolicyEnabled(policyID, false);
-  }
-
-  @Override
-  public Collection<Policy> getPolicies() throws Exception {
-    // This API gets all policies for all services. The
-    // /public/v2/api/policies/{serviceDefName}/for-resource endpoint is
-    // supposed to get policies for only a specified service, but it does not
-    // seem to work. This implementation should be ok for testing purposes as
-    // this class is intended.
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT;
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
-    if (!successfulResponseCode(conn.getResponseCode())) {
-      throw new IOException(String.format("Failed to get all policies. " +
-          "Http response code: %d", conn.getResponseCode()));
-    }
-    String allPoliciesString = getResponseData(conn);
-    // Filter out policies not for Ozone service.
-    JsonArray jsonPoliciesArray = new JsonParser().parse(allPoliciesString)
-        .getAsJsonArray();
-    Collection<Policy> policies = new ArrayList<>();
-    for (JsonElement jsonPolicy: jsonPoliciesArray) {
-      String service =
-          jsonPolicy.getAsJsonObject().get("service").getAsString();
-      if (service.equals(rangerService)) {
-        policies.add(jsonConverter.fromJson(jsonPolicy, Policy.class));
-      }
-    }
-
-    return policies;
-  }
-
-  @Override
-  public Collection<Role> getRoles() throws Exception {
+  public Map<Long, Role> getRoles() throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT;
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
@@ -339,26 +321,17 @@ public class RangerRestMultiTenantAccessController
     String allRolesString = getResponseData(conn);
     JsonArray rolesArrayJson =
         new JsonParser().parse(allRolesString).getAsJsonArray();
-    Collection<Role> roles = new ArrayList<>();
+    Map<Long, Role> roles = new HashMap<>();
     for (JsonElement roleJson: rolesArrayJson) {
-      roles.add(jsonConverter.fromJson(roleJson, Role.class));
+      long id = roleJson.getAsJsonObject().get("id").getAsLong();
+      roles.put(id, jsonConverter.fromJson(roleJson, Role.class));
     }
 
     return roles;
   }
 
-  private void setPolicyEnabled(long policyID, boolean isEnabled)
-      throws IOException {
-    // Get current policy from Ranger.
-    JsonObject policyJson = getPolicyJson(policyID);
-    // Set policy enabled.
-    policyJson.remove("isEnabled");
-    policyJson.addProperty("isEnabled", isEnabled);
-    // Put modified policy back in Ranger.
-    putPolicyJson(policyID, policyJson);
-  }
-
-  private JsonObject getRoleJson(long roleID) throws IOException {
+  @Override
+  public Role getRole(long roleID) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT + roleID;
 
@@ -368,54 +341,30 @@ public class RangerRestMultiTenantAccessController
           "Http response code: %d", roleID, conn.getResponseCode()));
     }
     String roleInfo = getResponseData(conn);
-    return new JsonParser().parse(roleInfo).getAsJsonObject();
+    return jsonConverter.fromJson(roleInfo, Role.class);
   }
 
-  private void putRoleJson(long roleID, JsonObject roleJson)
-      throws IOException {
+  @Override
+  public void updateRole(long roleID, Role role) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_ROLE_HTTP_ENDPOINT + roleID;
 
-    HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl, roleJson);
+    HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl,
+        jsonConverter.toJsonTree(role));
     if (!successfulResponseCode(conn.getResponseCode())){
       throw new IOException(String.format("Failed to update role %d. " +
           "Http response code: %d", roleID, conn.getResponseCode()));
     }
   }
 
-  private JsonObject getPolicyJson(long policyID) throws IOException {
-    String rangerAdminUrl = rangerHttpsAddress +
-        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
-
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl);
-    if (!successfulResponseCode(conn.getResponseCode())) {
-      throw new IOException(String.format("Failed to get policy %d. " +
-          "Http response code: %d", policyID, conn.getResponseCode()));
-    }
-    String policyInfo = getResponseData(conn);
-    return new JsonParser().parse(policyInfo).getAsJsonObject();
-  }
-
-  private void putPolicyJson(long policyID, JsonObject policyJson)
-      throws IOException {
-    String rangerAdminUrl = rangerHttpsAddress +
-        OZONE_OM_RANGER_ADMIN_POLICY_HTTP_ENDPOINT + policyID;
-
-    HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl, policyJson);
-    if (!successfulResponseCode(conn.getResponseCode())) {
-      throw new IOException(String.format("Failed to update policy %d. " +
-          "Http response code: %d", policyID, conn.getResponseCode()));
-    }
-  }
-
-  private HttpsURLConnection makeHttpsPutCall(String url, JsonObject content)
+  private HttpsURLConnection makeHttpsPutCall(String url, JsonElement content)
       throws IOException {
     HttpsURLConnection connection = makeBaseHttpsURLConnection(url);
     connection.setRequestMethod("PUT");
     return addJsonContentToConnection(connection, content);
   }
 
-  private HttpsURLConnection makeHttpsPostCall(String url, JsonObject content)
+  private HttpsURLConnection makeHttpsPostCall(String url, JsonElement content)
       throws IOException {
     HttpsURLConnection connection = makeBaseHttpsURLConnection(url);
     connection.setRequestMethod("POST");
@@ -423,7 +372,7 @@ public class RangerRestMultiTenantAccessController
   }
 
   private HttpsURLConnection addJsonContentToConnection(
-      HttpsURLConnection connection, JsonObject content) throws IOException {
+      HttpsURLConnection connection, JsonElement content) throws IOException {
     connection.setDoOutput(true);
     connection.setRequestProperty("Content-Type", "application/json;");
     try (OutputStream os = connection.getOutputStream()) {
@@ -553,7 +502,9 @@ public class RangerRestMultiTenantAccessController
       JsonObject roleJson = jsonElement.getAsJsonObject();
       String name = roleJson.get("name").getAsString();
       Role role = new Role(name);
-      role.setDescription(roleJson.get("description").getAsString());
+      if (roleJson.has("description")) {
+        role.setDescription(roleJson.get("description").getAsString());
+      }
       for (JsonElement jsonUser: roleJson.get("users").getAsJsonArray()) {
         String userName =
             jsonUser.getAsJsonObject().get("name").getAsString();
