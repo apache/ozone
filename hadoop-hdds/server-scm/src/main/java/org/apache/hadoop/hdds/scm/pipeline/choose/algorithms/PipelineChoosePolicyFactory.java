@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +46,18 @@ public final class PipelineChoosePolicyFactory {
   }
 
   public static PipelineChoosePolicy getPolicy(
+      ConfigurationSource conf, NodeStateManager nodeStateManager)
+      throws SCMException {
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    if (scmConfig.getPipelineChoosePolicyName()
+        .equals(CapacityPipelineChoosePolicy.class.getName())) {
+      return new CapacityPipelineChoosePolicy(nodeStateManager);
+    } else {
+      return getPolicy(conf);
+    }
+  }
+
+  private static PipelineChoosePolicy getPolicy(
       ConfigurationSource conf) throws SCMException {
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     Class<? extends PipelineChoosePolicy> policyClass = getClass(

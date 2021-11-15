@@ -52,7 +52,7 @@ public class TestPipelineChoosePolicyFactory {
   @Test
   public void testDefaultPolicy() throws IOException {
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory
-        .getPolicy(conf);
+        .getPolicy(conf, null);
     Assert.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
@@ -77,7 +77,8 @@ public class TestPipelineChoosePolicyFactory {
   public void testConstuctorNotFound() throws SCMException {
     // set a policy class which does't have the right constructor implemented
     scmConfig.setPipelineChoosePolicyName(DummyImpl.class.getName());
-    PipelineChoosePolicy policy = PipelineChoosePolicyFactory.getPolicy(conf);
+    PipelineChoosePolicy policy =
+        PipelineChoosePolicyFactory.getPolicy(conf, null);
     Assert.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
@@ -87,7 +88,8 @@ public class TestPipelineChoosePolicyFactory {
     // set a placement class not implemented
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         "org.apache.hadoop.hdds.scm.pipeline.choose.policy.HelloWorld");
-    PipelineChoosePolicy policy = PipelineChoosePolicyFactory.getPolicy(conf);
+    PipelineChoosePolicy policy =
+        PipelineChoosePolicyFactory.getPolicy(conf, null);
     Assert.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }

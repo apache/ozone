@@ -590,7 +590,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           sequenceIdGen, pipelineManager, scmMetadataStore.getContainerTable());
     }
 
-    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
+    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf,
+        ((SCMNodeManager) scmNodeManager).getNodeStateManager());
     if (configurator.getWritableContainerFactory() != null) {
       writableContainerFactory = configurator.getWritableContainerFactory();
     } else {

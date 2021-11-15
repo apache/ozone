@@ -177,7 +177,7 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  protected NodeStateManager getNodeStateManager() {
+  public NodeStateManager getNodeStateManager() {
     return nodeStateManager;
   }
 

@@ -163,6 +163,8 @@ public class NodeStateManager implements Runnable, Closeable {
   private Predicate<LayoutVersionProto> layoutMatchCondition;
   private Predicate<LayoutVersionProto> layoutMisMatchCondition;
 
+  private final ConfigurationSource configuration;
+
   /**
    * Constructs a NodeStateManager instance with the given configuration.
    *
@@ -173,6 +175,7 @@ public class NodeStateManager implements Runnable, Closeable {
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
                           LayoutVersionManager layoutManager) {
+    this.configuration = conf;
     this.layoutVersionManager = layoutManager;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
@@ -883,6 +886,10 @@ public class NodeStateManager implements Runnable, Closeable {
               " Current state: {}, life cycle event: {}",
           node, status, lifeCycleEvent);
     }
+  }
+
+  public ConfigurationSource getConfiguration() {
+    return configuration;
   }
 
   @Override
