@@ -148,6 +148,14 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
       return;
     }
 
+    BucketLayout bucketLayout = info.getBucketLayout();
+    if (!bucketLayout.isFileSystemOptimized()) {
+      System.out.println("Prefix tool only works for FileSystem Optimized" +
+              "bucket. Bucket Layout is:" + bucketLayout);
+      metadataManager.stop();
+      return;
+    }
+
     long lastObjectId = info.getObjectID();
     WithParentObjectId objectBucketId = new WithParentObjectId();
     objectBucketId.setObjectID(lastObjectId);
