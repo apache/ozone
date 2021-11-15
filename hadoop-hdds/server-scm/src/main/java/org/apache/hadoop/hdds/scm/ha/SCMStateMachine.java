@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.hadoop.util.Time;
@@ -173,6 +174,14 @@ public class SCMStateMachine extends BaseStateMachine {
       final Exception targetEx = (Exception) e.getTargetException();
       throw targetEx != null ? targetEx : e;
     }
+  }
+
+  @Override
+  public void notifyLogFailed(Throwable ex,
+                              RaftProtos.LogEntryProto failedEntry) {
+    // Should we add retry here?
+    LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
+    ExitUtil.terminate(1, ex);
   }
 
   @Override
