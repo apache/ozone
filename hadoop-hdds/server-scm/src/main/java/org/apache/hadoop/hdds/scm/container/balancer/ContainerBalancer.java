@@ -129,10 +129,11 @@ public class ContainerBalancer {
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
+    this.sizeEnteringNode = new HashMap<>();
 
     this.lock = new ReentrantLock();
-    findTargetStrategy =
-        new FindTargetGreedy(containerManager, placementPolicy);
+    findTargetStrategy = new FindTargetGreedy(
+        containerManager, placementPolicy, sizeEnteringNode);
   }
 
   /**
@@ -345,7 +346,7 @@ public class ContainerBalancer {
     overUtilizedNodes.forEach(datanodeUsageInfo -> sizeLeavingNode
         .put(datanodeUsageInfo.getDatanodeDetails(), 0L));
 
-    sizeEnteringNode = new HashMap<>(underUtilizedNodes.size());
+    sizeEnteringNode.clear();
     underUtilizedNodes.forEach(datanodeUsageInfo -> sizeEnteringNode
         .put(datanodeUsageInfo.getDatanodeDetails(), 0L));
 
@@ -357,7 +358,7 @@ public class ContainerBalancer {
   private IterationResult doIteration() {
     // note that potential and selected targets are updated in the following
     // loop
-    List<DatanodeDetails> potentialTargets = getPotentialTargets();
+    List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
     Set<DatanodeDetails> selectedTargets =
         new HashSet<>(potentialTargets.size());
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
@@ -476,7 +477,7 @@ public class ContainerBalancer {
    * @return ContainerMoveSelection containing the selected target and container
    */
   private ContainerMoveSelection matchSourceWithTarget(
-      DatanodeDetails source, Collection<DatanodeDetails> potentialTargets) {
+      DatanodeDetails source, List<DatanodeUsageInfo> potentialTargets) {
     NavigableSet<ContainerID> candidateContainers =
         selectionCriteria.getCandidateContainers(source);
 
@@ -615,8 +616,8 @@ public class ContainerBalancer {
    * @param source           the source datanode
    * @return List of updated potential targets
    */
-  private List<DatanodeDetails> updateTargetsAndSelectionCriteria(
-      Collection<DatanodeDetails> potentialTargets,
+  private List<DatanodeUsageInfo> updateTargetsAndSelectionCriteria(
+      Collection<DatanodeUsageInfo> potentialTargets,
       Set<DatanodeDetails> selectedTargets,
       ContainerMoveSelection moveSelection, DatanodeDetails source) {
     // count source if it has not been involved in move earlier
@@ -635,7 +636,7 @@ public class ContainerBalancer {
     selectionCriteria.setSelectedContainers(selectedContainers);
 
     return potentialTargets.stream()
-        .filter(node -> sizeEnteringNode.get(node) <
+        .filter(node -> sizeEnteringNode.get(node.getDatanodeDetails()) <
             config.getMaxSizeEnteringTarget()).collect(Collectors.toList());
   }
 
@@ -729,14 +730,10 @@ public class ContainerBalancer {
    * Get potential targets for container move. Potential targets are under
    * utilized and within threshold utilized nodes.
    *
-   * @return A list of potential target DatanodeDetails.
+   * @return A list of potential target DatanodeUsageInfo.
    */
-  private List<DatanodeDetails> getPotentialTargets() {
-    List<DatanodeDetails> potentialTargets =
-        new ArrayList<>(underUtilizedNodes.size());
-    underUtilizedNodes.forEach(
-        node -> potentialTargets.add(node.getDatanodeDetails()));
-    return potentialTargets;
+  private List<DatanodeUsageInfo> getPotentialTargets() {
+    return underUtilizedNodes;
   }
 
   /**

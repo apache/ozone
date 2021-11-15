@@ -26,11 +26,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
@@ -44,12 +45,15 @@ public class FindTargetGreedy implements FindTargetStrategy {
 
   private ContainerManager containerManager;
   private PlacementPolicy placementPolicy;
+  private Map<DatanodeDetails, Long> sizeEnteringNode;
 
   public FindTargetGreedy(
       ContainerManager containerManager,
-      PlacementPolicy placementPolicy) {
+      PlacementPolicy placementPolicy,
+      Map<DatanodeDetails, Long> sizeEnteringNode) {
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;
+    this.sizeEnteringNode = sizeEnteringNode;
   }
 
   /**
@@ -67,14 +71,22 @@ public class FindTargetGreedy implements FindTargetStrategy {
    */
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
-      DatanodeDetails source, Collection<DatanodeDetails> potentialTargets,
+      DatanodeDetails source, List<DatanodeUsageInfo> potentialTargets,
       Set<ContainerID> candidateContainers,
       BiFunction<DatanodeDetails, Long, Boolean> canSizeEnterTarget) {
-    for (DatanodeDetails target : potentialTargets) {
+    potentialTargets.sort((a, b) -> {
+      double currentUsageOfA = a.calculateUtilization(
+          sizeEnteringNode.get(a.getDatanodeDetails()));
+      double currentUsageOfB = b.calculateUtilization(
+          sizeEnteringNode.get(b.getDatanodeDetails()));
+      return Double.compare(currentUsageOfA, currentUsageOfB);
+    });
+
+    for (DatanodeUsageInfo targetInfo : potentialTargets) {
+      DatanodeDetails target = targetInfo.getDatanodeDetails();
       for (ContainerID container : candidateContainers) {
         Set<ContainerReplica> replicas;
         ContainerInfo containerInfo;
-
         try {
           replicas = containerManager.getContainerReplicas(container);
           containerInfo = containerManager.getContainer(container);

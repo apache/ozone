@@ -21,8 +21,9 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
 
@@ -50,7 +51,7 @@ public interface FindTargetStrategy {
    * selected container
    */
   ContainerMoveSelection findTargetForContainerMove(
-      DatanodeDetails source, Collection<DatanodeDetails> potentialTargets,
+      DatanodeDetails source, List<DatanodeUsageInfo> potentialTargets,
       Set<ContainerID> candidateContainers,
       BiFunction<DatanodeDetails, Long, Boolean> canSizeEnterTarget);
 
