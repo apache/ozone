@@ -46,6 +46,7 @@ import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.datastream.SupportedDataStreamType;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -256,7 +257,8 @@ public final class RatisHelper {
     Map<String, String> ratisClientConf =
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisClientConf.forEach((key, val) -> {
-      if (isClientConfig(key) || isGrpcClientConfig(key)) {
+      if (isClientConfig(key) || isGrpcClientConfig(key)
+              || isNettyStreamConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -272,6 +274,11 @@ public final class RatisHelper {
         !key.startsWith(GrpcConfigKeys.Admin.PREFIX) &&
         !key.startsWith(GrpcConfigKeys.Server.PREFIX);
   }
+
+  private static boolean isNettyStreamConfig(String key) {
+    return key.startsWith(NettyConfigKeys.DataStream.PREFIX);
+  }
+
   /**
    * Set all server properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
