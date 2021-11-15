@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -149,7 +150,8 @@ public abstract class XceiverClientSpi implements Closeable {
 
   private IOException getIOExceptionForSendCommand(
       ContainerCommandRequestProto request, Exception e) {
-    return new IOException("Failed to execute command " + request, e);
+    return new IOException("Failed to execute command "
+        + HddsUtils.processForDebug(request), e);
   }
   /**
    * Sends a given command to server gets a waitable future back.
