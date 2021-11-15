@@ -44,12 +44,19 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -87,6 +94,9 @@ public class TestContainerBalancer {
   private Map<DatanodeUsageInfo, Set<ContainerID>> datanodeToContainersMap =
       new HashMap<>();
   private static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
+
+  @Rule
+  public TemporaryFolder tempFolder = new TemporaryFolder();
 
   /**
    * Sets up configuration values and creates a mock cluster.
@@ -540,8 +550,8 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0);
 
-    // only these nodes should be included, except the ones also specified in
-    // excludeNodes
+    // only these nodes should be included
+    // the ones also specified in excludeNodes should be excluded
     int firstIncludeIndex = 0, secondIncludeIndex = 1;
     int thirdIncludeIndex = nodesInCluster.size() - 2;
     int fourthIncludeIndex = nodesInCluster.size() - 1;
@@ -562,8 +572,21 @@ public class TestContainerBalancer {
             .getIpAddress() + ", " +
             nodesInCluster.get(secondExcludeIndex).getDatanodeDetails()
                 .getHostName();
+    // create a file to test specifying config using a file
+    File excludeNodesFile = null;
+    try {
+      excludeNodesFile = tempFolder.newFile("excludeNodesFile");
+      Files.write(excludeNodesFile.toPath(),
+          excludeNodes.getBytes(StandardCharsets.UTF_8),
+          StandardOpenOption.WRITE);
+      balancerConfiguration.setExcludeNodes(excludeNodesFile);
+    } catch (IOException e) {
+      LOG.info("Could not create a file for specifying excludeNodes while " +
+          "testing ContainerBalancer. Using a String instead.");
+      balancerConfiguration.setExcludeNodes(excludeNodes);
+    }
+
     balancerConfiguration.setIncludeNodes(includeNodes);
-    balancerConfiguration.setExcludeNodes(excludeNodes);
     containerBalancer.start(balancerConfiguration);
     sleepWhileBalancing(500);
     containerBalancer.stop();
