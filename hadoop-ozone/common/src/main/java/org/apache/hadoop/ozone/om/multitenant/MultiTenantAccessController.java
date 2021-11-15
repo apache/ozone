@@ -157,8 +157,8 @@ public interface MultiTenantAccessController {
       this.isEnabled = true;
     }
 
-    public void setEnabled(boolean isEnabled) {
-      this.isEnabled = isEnabled;
+    public void setEnabled(boolean enabled) {
+      isEnabled = enabled;
     }
 
     public boolean isEnabled() {

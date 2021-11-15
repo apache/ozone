@@ -48,15 +48,11 @@ import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.*;
 
@@ -497,7 +493,7 @@ public class RangerRestMultiTenantAccessController
       new JsonDeserializer<Role>() {
     @Override
     public Role deserialize(JsonElement jsonElement, Type type,
-                            JsonDeserializationContext jsonDeserializationContext)
+        JsonDeserializationContext jsonDeserializationContext)
         throws JsonParseException {
       JsonObject roleJson = jsonElement.getAsJsonObject();
       String name = roleJson.get("name").getAsString();
