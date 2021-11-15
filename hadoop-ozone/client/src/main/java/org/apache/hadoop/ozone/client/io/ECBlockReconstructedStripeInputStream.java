@@ -473,8 +473,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         >= repConfig.getData()) {
       return true;
     } else {
-      LOG.error("There are insufficient locations. {} available; {} padded; {}" +
-          " failed; {} expected;", availableLocations, paddedLocations,
+      LOG.error("There are insufficient locations. {} available; {} padded;" +
+          " {} failed; {} expected;", availableLocations, paddedLocations,
           failedLocations, expectedDataBlocks);
       return false;
     }
