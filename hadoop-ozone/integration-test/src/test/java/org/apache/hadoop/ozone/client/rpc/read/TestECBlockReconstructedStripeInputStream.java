@@ -17,25 +17,16 @@
  */
 package org.apache.hadoop.ozone.client.rpc.read;
 
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
+import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputStreamFactory;
+import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.erasurecode.CodecRegistry;
-import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,12 +34,13 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Function;
+import java.util.Random;
+import java.util.SplittableRandom;
+
+import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateParity;
 
 /**
  * Test for the ECBlockReconstructedStripeInputStream.
@@ -58,19 +50,25 @@ public class TestECBlockReconstructedStripeInputStream {
   private static final int ONEMB = 1024 * 1024;
 
   private ECReplicationConfig repConfig;
-  private TestBlockInputStreamFactory streamFactory;
+  private ECStreamTestUtil.TestBlockInputStreamFactory streamFactory;
+  private long randomSeed;
+  private SplittableRandom dataGen;
 
   @Before
   public void setup() {
     repConfig = new ECReplicationConfig(3, 2,
         ECReplicationConfig.EcCodec.RS, ONEMB);
-    streamFactory = new TestBlockInputStreamFactory();
+    streamFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();
+
+    randomSeed = new Random().nextLong();
+    dataGen = new SplittableRandom(randomSeed);
   }
 
   @Test
   public void testSufficientLocations() {
     // One chunk, only 1 location.
-    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig, 1, ONEMB);
+    OmKeyLocationInfo keyInfo = ECStreamTestUtil
+        .createKeyInfo(repConfig, 1, ONEMB);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
@@ -81,16 +79,17 @@ public class TestECBlockReconstructedStripeInputStream {
 
     // Two Chunks, but missing data block 2.
     dnMap = createIndexMap(1, 4, 5);
-    keyInfo = createKeyInfo(repConfig, ONEMB * 2, dnMap);
+    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 2, dnMap);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
-        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
+        keyInfo, true, null, null,
+            new ECStreamTestUtil.TestBlockInputStreamFactory())) {
       Assert.assertTrue(ecb.hasSufficientLocations());
     }
 
     // Three Chunks, but missing data block 2 and 3.
     dnMap = createIndexMap(1, 4, 5);
-    keyInfo = createKeyInfo(repConfig, ONEMB * 3, dnMap);
+    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
@@ -99,7 +98,7 @@ public class TestECBlockReconstructedStripeInputStream {
 
     // Three Chunks, but missing data block 2 and 3 and parity 1.
     dnMap = createIndexMap(1, 4);
-    keyInfo = createKeyInfo(repConfig, ONEMB * 3, dnMap);
+    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
@@ -112,12 +111,10 @@ public class TestECBlockReconstructedStripeInputStream {
     // Generate the input data for 3 full stripes and generate the parity.
     int chunkSize = repConfig.getEcChunkSize();
     int partialStripeSize = chunkSize * 2 - 1;
+    int blockLength = chunkSize * repConfig.getData() * 3 + partialStripeSize;
     ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 4 * chunkSize);
-    dataBufs[1].limit(4 * chunkSize - 1);
-    dataBufs[2].limit(3 * chunkSize);
-    for (ByteBuffer b : dataBufs) {
-      randomFill(b);
-    }
+    ECStreamTestUtil.randomFill(dataBufs, chunkSize, dataGen, blockLength);
+
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
 
     List<Map<DatanodeDetails, Integer>> locations = new ArrayList<>();
@@ -134,11 +131,12 @@ public class TestECBlockReconstructedStripeInputStream {
       streamFactory = new TestBlockInputStreamFactory();
       addDataStreamsToFactory(dataBufs, parity);
 
-      OmKeyLocationInfo keyInfo = createKeyInfo(repConfig,
+      OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
           stripeSize() * 3 + partialStripeSize, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
       ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+      dataGen = new SplittableRandom(randomSeed);
       try (ECBlockReconstructedStripeInputStream ecb =
           new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
               null, null, streamFactory)) {
@@ -146,7 +144,7 @@ public class TestECBlockReconstructedStripeInputStream {
         for (int i = 0; i < 3; i++) {
           int read = ecb.readStripe(bufs);
           for (int j = 0; j < bufs.length; j++) {
-            validateContents(dataBufs[j], bufs[j], i * chunkSize, chunkSize);
+            ECStreamTestUtil.assertBufferMatches(bufs[j], dataGen);
           }
           Assert.assertEquals(stripeSize(), read);
 
@@ -161,8 +159,8 @@ public class TestECBlockReconstructedStripeInputStream {
         // The next read is a partial stripe
         int read = ecb.readStripe(bufs);
         Assert.assertEquals(partialStripeSize, read);
-        validateContents(dataBufs[0], bufs[0], 3 * chunkSize, chunkSize);
-        validateContents(dataBufs[1], bufs[1], 3 * chunkSize, chunkSize - 1);
+        ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
+        ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
         Assert.assertEquals(0, bufs[2].remaining());
         Assert.assertEquals(0, bufs[2].position());
 
@@ -178,13 +176,8 @@ public class TestECBlockReconstructedStripeInputStream {
   public void testReadPartialStripe() throws IOException {
     int blockLength = repConfig.getEcChunkSize() - 1;
     ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 3 * ONEMB);
-    // First buffer has only the blockLength, the other two will have no data.
-    dataBufs[0].limit(blockLength);
-    dataBufs[1].limit(0);
-    dataBufs[2].limit(0);
-    for (ByteBuffer b : dataBufs) {
-      randomFill(b);
-    }
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
@@ -194,14 +187,15 @@ public class TestECBlockReconstructedStripeInputStream {
     // from the parity and padded blocks 2 and 3.
     Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
     OmKeyLocationInfo keyInfo =
-        createKeyInfo(repConfig, blockLength, dnMap);
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    dataGen = new SplittableRandom(randomSeed);
     try (ECBlockReconstructedStripeInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
             null, null, streamFactory)) {
       int read = ecb.readStripe(bufs);
       Assert.assertEquals(blockLength, read);
-      validateContents(dataBufs[0], bufs[0], 0, blockLength);
+      ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
       Assert.assertEquals(0, bufs[1].remaining());
       Assert.assertEquals(0, bufs[1].position());
       Assert.assertEquals(0, bufs[2].remaining());
@@ -224,13 +218,8 @@ public class TestECBlockReconstructedStripeInputStream {
     int blockLength = chunkSize * 2 - 1;
 
     ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 3 * ONEMB);
-    // First buffer has only the blockLength, the other two will have no data.
-    dataBufs[0].limit(chunkSize);
-    dataBufs[1].limit(chunkSize - 1);
-    dataBufs[2].limit(0);
-    for (ByteBuffer b : dataBufs) {
-      randomFill(b);
-    }
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
@@ -240,15 +229,16 @@ public class TestECBlockReconstructedStripeInputStream {
     // from the parity and padded blocks 2 and 3.
     Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
     OmKeyLocationInfo keyInfo =
-        createKeyInfo(repConfig, blockLength, dnMap);
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    dataGen = new SplittableRandom(randomSeed);
     try (ECBlockReconstructedStripeInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
             null, null, streamFactory)) {
       int read = ecb.readStripe(bufs);
       Assert.assertEquals(blockLength, read);
-      validateContents(dataBufs[0], bufs[0], 0, chunkSize);
-      validateContents(dataBufs[1], bufs[1], 0, chunkSize - 1);
+      ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
+      ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
       Assert.assertEquals(0, bufs[2].remaining());
       Assert.assertEquals(0, bufs[2].position());
       // Check the underlying streams have been advanced by 1 chunk:
@@ -269,13 +259,8 @@ public class TestECBlockReconstructedStripeInputStream {
     int blockLength = chunkSize * 3 - 1;
 
     ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 3 * ONEMB);
-    // First buffer has only the blockLength, the other two will have no data.
-    dataBufs[0].limit(chunkSize);
-    dataBufs[1].limit(chunkSize);
-    dataBufs[2].limit(chunkSize - 1);
-    for (ByteBuffer b : dataBufs) {
-      randomFill(b);
-    }
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
 
     // We have a length that is less than a stripe, so chunks 1 and 2 are full.
@@ -300,16 +285,17 @@ public class TestECBlockReconstructedStripeInputStream {
       ByteBuffer[] bufs = allocateByteBuffers(repConfig);
 
       OmKeyLocationInfo keyInfo =
-          createKeyInfo(repConfig, blockLength, dnMap);
+          ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+      dataGen = new SplittableRandom(randomSeed);
       try (ECBlockReconstructedStripeInputStream ecb =
           new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
               null, null, streamFactory)) {
         int read = ecb.readStripe(bufs);
         Assert.assertEquals(blockLength, read);
-        validateContents(dataBufs[0], bufs[0], 0, chunkSize);
-        validateContents(dataBufs[1], bufs[1], 0, chunkSize);
-        validateContents(dataBufs[2], bufs[2], 0, chunkSize - 1);
+        ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
+        ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
+        ECStreamTestUtil.assertBufferMatches(bufs[2], dataGen);
         // Check the underlying streams have been advanced by 1 chunk:
         for (TestBlockInputStream bis : streamFactory.getBlockStreams()) {
           Assert.assertEquals(0, bis.getRemaining());
@@ -327,13 +313,8 @@ public class TestECBlockReconstructedStripeInputStream {
   public void testErrorThrownIfBlockNotLongEnough() throws IOException {
     int blockLength = repConfig.getEcChunkSize() - 1;
     ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 3 * ONEMB);
-    // First buffer has only the blockLength, the other two will have no data.
-    dataBufs[0].limit(blockLength);
-    dataBufs[1].limit(0);
-    dataBufs[2].limit(0);
-    for (ByteBuffer b : dataBufs) {
-      randomFill(b);
-    }
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
@@ -347,7 +328,7 @@ public class TestECBlockReconstructedStripeInputStream {
     // from the parity and padded blocks 2 and 3.
     Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
     OmKeyLocationInfo keyInfo =
-        createKeyInfo(repConfig, blockLength, dnMap);
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
     try (ECBlockReconstructedStripeInputStream ecb =
              new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
@@ -369,11 +350,8 @@ public class TestECBlockReconstructedStripeInputStream {
     int partialStripeSize = chunkSize * 2 - 1;
     int dataLength = stripeSize() * 3 + partialStripeSize;
     ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 4 * chunkSize);
-    dataBufs[1].limit(4 * chunkSize - 1);
-    dataBufs[2].limit(3 * chunkSize);
-    for (ByteBuffer b : dataBufs) {
-      randomFill(b);
-    }
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, dataLength);
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
 
     List<Map<DatanodeDetails, Integer>> locations = new ArrayList<>();
@@ -390,7 +368,7 @@ public class TestECBlockReconstructedStripeInputStream {
       streamFactory = new TestBlockInputStreamFactory();
       addDataStreamsToFactory(dataBufs, parity);
 
-      OmKeyLocationInfo keyInfo = createKeyInfo(repConfig,
+      OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
           stripeSize() * 3 + partialStripeSize, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -429,7 +407,7 @@ public class TestECBlockReconstructedStripeInputStream {
 
         // seek to the start of stripe 3
         clearBuffers(bufs);
-        ecb.seek(stripeSize() * 2);
+        ecb.seek(stripeSize() * (long)2);
         read = ecb.readStripe(bufs);
         for (int j = 0; j < bufs.length; j++) {
           validateContents(dataBufs[j], bufs[j], 2 * chunkSize, chunkSize);
@@ -443,7 +421,7 @@ public class TestECBlockReconstructedStripeInputStream {
   @Test
   public void testSeekToPartialOffsetFails() {
     Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 4, 5);
-    OmKeyLocationInfo keyInfo = createKeyInfo(repConfig,
+    OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
         stripeSize() * 3, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -465,13 +443,12 @@ public class TestECBlockReconstructedStripeInputStream {
     // Generate the input data for 3 full stripes and generate the parity.
     int chunkSize = repConfig.getEcChunkSize();
     int partialStripeSize = chunkSize * 2 - 1;
+    int blockLength = repConfig.getEcChunkSize() * repConfig.getData() * 3
+        + partialStripeSize;
     ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(),
         4 * chunkSize);
-    dataBufs[1].limit(4 * chunkSize - 1);
-    dataBufs[2].limit(3 * chunkSize);
-    for (ByteBuffer b : dataBufs) {
-      randomFill(b);
-    }
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
 
     List<List<Integer>> failLists = new ArrayList<>();
@@ -488,7 +465,7 @@ public class TestECBlockReconstructedStripeInputStream {
 
       // Data block index 3 is missing and needs recovered initially.
       Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
-      OmKeyLocationInfo keyInfo = createKeyInfo(repConfig,
+      OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
           stripeSize() * 3 + partialStripeSize, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -586,63 +563,6 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   /**
-   * Given a set of data buffers, generate the parity data for the inputs.
-   * @param data A set of data buffers
-   * @param ecConfig The ECReplicationConfig representing the scheme
-   * @return
-   * @throws IOException
-   */
-  private ByteBuffer[] generateParity(ByteBuffer[] data,
-      ECReplicationConfig ecConfig) throws IOException {
-    // First data buffer dictates the size
-    int cellSize = data[0].limit();
-    // Store the positions of the remaining data buffers so we can restore them
-    int[] dataLimits = new int[data.length];
-    for (int i=1; i<data.length; i++) {
-      dataLimits[i] = data[i].limit();
-      data[i].limit(cellSize);
-      zeroFill(data[i]);
-      data[i].flip();
-    }
-    ByteBuffer[] parity = new ByteBuffer[ecConfig.getParity()];
-    for (int i = 0; i < ecConfig.getParity(); i++) {
-      parity[i] = ByteBuffer.allocate(cellSize);
-    }
-    RawErasureEncoder encoder = CodecRegistry.getInstance()
-        .getCodecFactory(repConfig.getCodec().toString())
-        .createEncoder(repConfig);
-    encoder.encode(data, parity);
-
-    data[0].flip();
-    for (int i = 1; i < data.length; i++) {
-      data[i].limit(dataLimits[i]);
-      data[i].position(0);
-    }
-    return parity;
-  }
-
-  /**
-   * Fill the remaining space in a buffer random bytes.
-   * @param buf
-   */
-  private void randomFill(ByteBuffer buf) {
-    while (buf.hasRemaining()) {
-      buf.put((byte)ThreadLocalRandom.current().nextInt(255));
-    }
-    buf.flip();
-  }
-
-  /**
-   * Fill / Pad the remaining space in a buffer with zeros.
-   * @param buf
-   */
-  private void zeroFill(ByteBuffer buf) {
-    byte[] a = buf.array();
-    Arrays.fill(a, buf.position(), buf.limit(), (byte)0);
-    buf.position(buf.limit());
-  }
-
-  /**
    * Return a list of num ByteBuffers of the given size.
    * @param num Number of buffers to create
    * @param size The size of each buffer
@@ -676,158 +596,6 @@ public class TestECBlockReconstructedStripeInputStream {
       bufs[i] = ByteBuffer.allocate(rConfig.getEcChunkSize());
     }
     return bufs;
-  }
-
-  private OmKeyLocationInfo createKeyInfo(ReplicationConfig repConf,
-      long blockLength, Map<DatanodeDetails, Integer> dnMap) {
-
-    Pipeline pipeline = Pipeline.newBuilder()
-        .setState(Pipeline.PipelineState.CLOSED)
-        .setId(PipelineID.randomId())
-        .setNodes(new ArrayList<>(dnMap.keySet()))
-        .setReplicaIndexes(dnMap)
-        .setReplicationConfig(repConf)
-        .build();
-
-    OmKeyLocationInfo keyInfo = new OmKeyLocationInfo.Builder()
-        .setBlockID(new BlockID(1, 1))
-        .setLength(blockLength)
-        .setOffset(0)
-        .setPipeline(pipeline)
-        .setPartNumber(0)
-        .build();
-    return keyInfo;
-  }
-
-  private OmKeyLocationInfo createKeyInfo(ReplicationConfig repConf,
-      int nodeCount, long blockLength) {
-    Map<DatanodeDetails, Integer> datanodes = new HashMap<>();
-    for (int i = 0; i < nodeCount; i++) {
-      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i + 1);
-    }
-    return createKeyInfo(repConf, blockLength, datanodes);
-  }
-
-  private static class TestBlockInputStreamFactory implements
-      BlockInputStreamFactory {
-
-    private List<TestBlockInputStream> blockStreams = new ArrayList<>();
-    private List<ByteBuffer> blockStreamData;
-
-    private Pipeline currentPipeline;
-
-    public List<TestBlockInputStream> getBlockStreams() {
-      return blockStreams;
-    }
-
-    public void setBlockStreamData(List<ByteBuffer> bufs) {
-      this.blockStreamData = bufs;
-    }
-
-    public void setCurrentPipeline(Pipeline pipeline) {
-      this.currentPipeline = pipeline;
-    }
-
-    public BlockExtendedInputStream create(ReplicationConfig repConfig,
-        OmKeyLocationInfo blockInfo, Pipeline pipeline,
-        Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
-        XceiverClientFactory xceiverFactory,
-        Function<BlockID, Pipeline> refreshFunction) {
-
-      int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
-      TestBlockInputStream stream = new TestBlockInputStream(
-          blockInfo.getBlockID(), blockInfo.getLength(),
-          blockStreamData.get(repInd - 1));
-      blockStreams.add(stream);
-      return stream;
-    }
-  }
-
-  private static class TestBlockInputStream extends BlockExtendedInputStream {
-
-    private ByteBuffer data;
-    private boolean closed = false;
-    private BlockID blockID;
-    private long length;
-    private boolean shouldError = false;
-    private static final byte EOF = -1;
-
-    TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data) {
-      this.blockID = blockId;
-      this.length = blockLen;
-      this.data = data;
-      data.position(0);
-    }
-
-    public boolean isClosed() {
-      return closed;
-    }
-
-    public void setShouldError(boolean val) {
-      shouldError = val;
-    }
-
-    @Override
-    public BlockID getBlockID() {
-      return blockID;
-    }
-
-    @Override
-    public long getLength() {
-      return length;
-    }
-
-    @Override
-    public long getRemaining() {
-      return data.remaining();
-    }
-
-    @Override
-    public int read(byte[] b, int off, int len)
-        throws IOException {
-      return read(ByteBuffer.wrap(b, off, len));
-    }
-
-    @Override
-    public int read(ByteBuffer buf) throws IOException {
-      if (shouldError) {
-        throw new IOException("Simulated error reading block");
-      }
-      if (getRemaining() == 0) {
-        return EOF;
-      }
-      int toRead = Math.min(buf.remaining(), (int)getRemaining());
-      for (int i = 0; i < toRead; i++) {
-        buf.put(data.get());
-      }
-      return toRead;
-    };
-
-    @Override
-    protected int readWithStrategy(ByteReaderStrategy strategy) throws
-        IOException {
-      throw new IOException("Should not be called");
-    }
-
-    @Override
-    public void close() {
-      closed = true;
-    }
-
-    @Override
-    public void unbuffer() {
-    }
-
-    @Override
-    public long getPos() {
-      return data.position();
-    }
-
-    @Override
-    public void seek(long pos) {
-      data.position((int)pos);
-    }
-
   }
 
 }
