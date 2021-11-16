@@ -25,6 +25,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
@@ -37,13 +39,13 @@ public final class JsonUtils {
   // ObjectMapper is thread safe as long as we always configure instance
   // before use.
   private static final ObjectMapper MAPPER;
-  private static final ObjectWriter WRITTER;
+  private static final ObjectWriter WRITER;
   static {
     MAPPER = new ObjectMapper()
         .setSerializationInclusion(JsonInclude.Include.NON_NULL)
         .registerModule(new JavaTimeModule())
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    WRITTER = MAPPER.writerWithDefaultPrettyPrinter();
+    WRITER = MAPPER.writerWithDefaultPrettyPrinter();
   }
 
   private JsonUtils() {
@@ -52,11 +54,19 @@ public final class JsonUtils {
 
   public static String toJsonStringWithDefaultPrettyPrinter(Object obj)
       throws IOException {
-    return WRITTER.writeValueAsString(obj);
+    return WRITER.writeValueAsString(obj);
   }
 
   public static String toJsonString(Object obj) throws IOException {
     return MAPPER.writeValueAsString(obj);
+  }
+
+  public static ArrayNode createArrayNode() {
+    return MAPPER.createArrayNode();
+  }
+
+  public static ObjectNode createObjectNode(Object next) {
+    return MAPPER.valueToTree(next);
   }
 
   /**

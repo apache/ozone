@@ -278,7 +278,7 @@ public class OzoneManagerServiceProviderImpl
     return omLeaderUrl;
   }
 
-  private boolean isOmSpengoEnabled() {
+  private boolean isOmSpnegoEnabled() {
     return configuration.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
   }
@@ -297,7 +297,7 @@ public class OzoneManagerServiceProviderImpl
       SecurityUtil.doAsLoginUser(() -> {
         try (InputStream inputStream = reconUtils.makeHttpCall(
             connectionFactory, getOzoneManagerSnapshotUrl(),
-            isOmSpengoEnabled()).getInputStream()) {
+            isOmSpnegoEnabled()).getInputStream()) {
           FileUtils.copyInputStreamToFile(inputStream, targetFile);
         }
         return null;

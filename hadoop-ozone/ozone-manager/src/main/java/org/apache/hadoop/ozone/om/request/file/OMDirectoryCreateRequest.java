@@ -30,10 +30,11 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -102,6 +103,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   public OMDirectoryCreateRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMDirectoryCreateRequest(OMRequest omRequest,
+                                  BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -281,7 +287,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
-      omMetadataManager.getKeyTable().addCacheEntry(
+      omMetadataManager.getKeyTable(BucketLayout.DEFAULT).addCacheEntry(
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
               bucketName, parentKeyInfo.getKeyName())),
           new CacheValue<>(Optional.of(parentKeyInfo),

@@ -58,16 +58,20 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneToKey));
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
+    Assert.assertFalse(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
 
     omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneToKey));
+    Assert.assertFalse(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
   }
 
   @Test
@@ -97,8 +101,10 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneToKey));
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
+    Assert.assertFalse(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
 
     omKeyRenameResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -106,8 +112,10 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse has error, it is a no-op. So, no changes should happen.
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneToKey));
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
+    Assert.assertFalse(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
 
   }
 
@@ -135,14 +143,16 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
 
     omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
+    Assert.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
 
   }
 }

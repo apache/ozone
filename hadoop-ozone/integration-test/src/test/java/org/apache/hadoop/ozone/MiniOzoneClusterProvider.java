@@ -158,6 +158,9 @@ public class MiniOzoneClusterProvider {
           + "in the constructor");
     }
     MiniOzoneCluster cluster = clusters.poll(100, SECONDS);
+    if (cluster == null) {
+      throw new IOException("Failed to obtain available cluster in time");
+    }
     createdClusters.add(cluster);
     consumedClusterCount++;
     return cluster;

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -50,8 +51,9 @@ public class S3MultipartUploadCompleteRequestWithFSO
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
-  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

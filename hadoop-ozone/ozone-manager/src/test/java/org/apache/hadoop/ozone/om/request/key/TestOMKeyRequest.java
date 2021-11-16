@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -49,7 +50,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -103,6 +103,7 @@ public class TestOMKeyRequest {
   protected long dataSize;
   protected Random random;
   protected long txnLogId = 100000L;
+  protected long version = 0L;
 
   // Just setting ozoneManagerDoubleBuffer which does nothing.
   protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
@@ -171,10 +172,8 @@ public class TestOMKeyRequest {
 
     allocatedBlocks.add(allocatedBlock);
 
-    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
-        any(HddsProtos.ReplicationType.class),
-        any(HddsProtos.ReplicationFactor.class),
-        anyString(), any(ExcludeList.class))).thenReturn(allocatedBlocks);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any())).thenReturn(allocatedBlocks);
 
 
     volumeName = UUID.randomUUID().toString();
@@ -185,6 +184,7 @@ public class TestOMKeyRequest {
     clientID = Time.now();
     dataSize = 1000L;
     random = new Random();
+    version = 0L;
 
     Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
@@ -216,11 +216,16 @@ public class TestOMKeyRequest {
           throws Exception {
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
             key, id);
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (doAssert) {
       Assert.assertNotNull("Failed to find key in OpenKeyTable", omKeyInfo);
     }
     return omKeyInfo;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   @After

@@ -21,7 +21,12 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersions;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -38,12 +43,14 @@ public final class MockPipelineManager implements PipelineManager {
 
   private PipelineStateManager stateManager;
 
-  public static PipelineManager getInstance() {
-    return new MockPipelineManager();
-  }
-
-  private MockPipelineManager() {
-    this.stateManager = new PipelineStateManager();
+  public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager,
+                             NodeManager nodeManager) throws IOException {
+    stateManager = PipelineStateManagerImpl
+        .newBuilder().setNodeManager(nodeManager)
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
   }
 
   @Override
@@ -59,7 +66,9 @@ public final class MockPipelineManager implements PipelineManager {
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
-    stateManager.addPipeline(pipeline);
+
+    stateManager.addPipeline(pipeline.getProtobufMessage(
+        ClientVersions.CURRENT_VERSION));
     return pipeline;
   }
 
@@ -124,6 +133,12 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public void addContainerToPipelineSCMStart(
+          PipelineID pipelineID, ContainerID containerID) throws IOException {
+    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+  }
+
+  @Override
   public void removeContainerFromPipeline(final PipelineID pipelineID,
                                           final ContainerID containerID)
       throws IOException {
@@ -145,13 +160,11 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public void openPipeline(final PipelineID pipelineId)
       throws IOException {
-    stateManager.openPipeline(pipelineId);
   }
 
   @Override
   public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
       throws IOException {
-    stateManager.finalizePipeline(pipeline.getId());
   }
 
   @Override
@@ -188,13 +201,11 @@ public final class MockPipelineManager implements PipelineManager {
   @Override
   public void activatePipeline(final PipelineID pipelineID)
       throws IOException {
-
   }
 
   @Override
   public void deactivatePipeline(final PipelineID pipelineID)
       throws IOException {
-    stateManager.deactivatePipeline(pipelineID);
   }
 
   @Override

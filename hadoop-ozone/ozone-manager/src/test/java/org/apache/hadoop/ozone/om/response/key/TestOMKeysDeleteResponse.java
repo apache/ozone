@@ -60,7 +60,8 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
       TestOMRequestUtils.addKeyToTable(false, volumeName,
           bucketName, keyName, 0L, RATIS, THREE, omMetadataManager);
       ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
-      omKeyInfoList.add(omMetadataManager.getKeyTable().get(ozoneKey));
+      omKeyInfoList
+          .add(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
       ozoneKeys.add(ozoneKey);
     }
   }
@@ -87,7 +88,8 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     for (String ozKey : ozoneKeys) {
-      Assert.assertNull(omMetadataManager.getKeyTable().get(ozKey));
+      Assert.assertNull(
+          omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
 
       // ozKey had no block information associated with it, so it should have
       // been removed from the key table but not added to the delete table.
@@ -118,7 +120,8 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     for (String ozKey : ozoneKeys) {
-      Assert.assertNotNull(omMetadataManager.getKeyTable().get(ozKey));
+      Assert.assertNotNull(
+          omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);

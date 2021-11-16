@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -65,8 +66,9 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   private static final Logger LOG =
           LoggerFactory.getLogger(OMAllocateBlockRequestWithFSO.class);
 
-  public OMAllocateBlockRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMAllocateBlockRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

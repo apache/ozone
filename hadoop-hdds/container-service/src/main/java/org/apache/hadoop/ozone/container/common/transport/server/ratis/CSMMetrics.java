@@ -59,6 +59,8 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numReadStateMachineMissCount;
   private @Metric MutableCounterLong numStartTransactionVerifyFailures;
   private @Metric MutableCounterLong numContainerNotOpenVerifyFailures;
+  private @Metric MutableCounterLong numDataCacheMiss;
+  private @Metric MutableCounterLong numDataCacheHit;
 
   private @Metric MutableRate applyTransaction;
   private @Metric MutableRate writeStateMachineData;
@@ -213,6 +215,14 @@ public class CSMMetrics {
 
   public void recordWriteStateMachineCompletion(long latencyNanos) {
     writeStateMachineData.add(latencyNanos);
+  }
+
+  public void incNumDataCacheMiss() {
+    numDataCacheMiss.incr();
+  }
+
+  public void incNumDataCacheHit() {
+    numDataCacheHit.incr();
   }
 
   public void unRegister() {

@@ -38,19 +38,18 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -59,6 +58,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -71,6 +71,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -108,6 +109,8 @@ public class TestRootedOzoneFileSystem {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRootedOzoneFileSystem.class);
+
+  private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -159,30 +162,45 @@ public class TestRootedOzoneFileSystem {
   private static String rootPath;
   private static BucketLayout bucketLayout;
 
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
+      .createUserForTesting(USER1,  new String[] {"usergroup"});
+  // Non-privileged OFS instance
+  private static RootedOzoneFileSystem userOfs;
+
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, (float) 0.15);
-    // Trash with 9 second deletes and 6 seconds checkpoints
-    conf.setFloat(FS_TRASH_INTERVAL_KEY, (float) 0.15); // 9 seconds
-    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
+    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL/2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
-      TestOMRequestUtils.configureFSOptimizedPaths(conf,
-          true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          bucketLayout.name());
     } else {
       bucketLayout = BucketLayout.LEGACY;
+      // We need the OFS buckets to be in LEGACY layout for this test.
+      conf.set(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.LEGACY.name());
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          bucketLayout.name());
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, enableAcl);
+    // Set ACL authorizer class to OzoneNativeAuthorizer. The default
+    // OzoneAccessAuthorizer always returns true for all ACL checks which
+    // doesn't work for the test.
+    conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
+        OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = cluster.getClient().getObjectStore();
-    
+
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
@@ -205,6 +223,10 @@ public class TestRootedOzoneFileSystem {
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+
+    userOfs = UGI_USER1.doAs(
+        (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
+            -> (RootedOzoneFileSystem) FileSystem.get(conf));
   }
 
   @AfterClass
@@ -425,7 +447,7 @@ public class TestRootedOzoneFileSystem {
     OzoneBucket ozoneBucket = iterBuc.next();
     Assert.assertNotNull(ozoneBucket);
     Assert.assertEquals(bucketNameLocal, ozoneBucket.getName());
-
+    Assert.assertEquals(bucketLayout, ozoneBucket.getBucketLayout());
     // TODO: Use listStatus to check volume and bucket creation in HDDS-2928.
 
     // Cleanup
@@ -869,7 +891,7 @@ public class TestRootedOzoneFileSystem {
    * OFS: Test /tmp mount behavior.
    */
   @Test
-  public void testTempMount() throws Exception {
+  public void testTempMount() throws IOException {
     // Prep
     // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
     ClientProtocol proxy = objectStore.getClientProxy();
@@ -1512,4 +1534,62 @@ public class TestRootedOzoneFileSystem {
     }
   }
 
+  @Test
+  public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
+    // This test is only meaningful when ACL is enabled
+    Assume.assumeTrue("ACL is not enabled. Skipping this test as it requires " +
+            "ACL to be enabled to be meaningful.", enableAcl);
+
+    // This unit test does the correct check. However, the parameterized
+    // test is not initialized correctly since HDDS-4998 (or HDDS-4040).
+
+    // The cluster is started with enableAcl = false, but across different set
+    // of test parameters, the OM is not restarted. So OM is actually stuck with
+    // enableAcl = false. That's why ACL checks are skipped in the tests.
+    // OM should be restarted when enableAcl is changed.
+
+    // For now, in order to properly run this specific test, on line 147,
+    // explicitly assign:
+    //     private static boolean enableAcl = true;
+    // When unset, it defaults to false due to Java primitive defaults.
+
+    // TODO: Fix the parameterized test to properly initialize the cluster.
+    //  When the parameterized test is initialized correctly, the line
+    //  below can be uncommented.
+//    Assert.assertTrue(cluster.getOzoneManager().getAclsEnabled());
+
+    final String volume = "volume-for-test-get-bucket";
+    // Create a volume as admin
+    // Create volume "tmp" with world access. allow non-admin to create buckets
+    ClientProtocol proxy = objectStore.getClientProxy();
+
+    // Get default acl rights for user
+    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
+    ACLType userRights = aclConfig.getUserDefaultRights();
+    // Construct ACL for world access
+    OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
+        userRights, ACCESS);
+    // Construct VolumeArgs, set ACL to world access
+    VolumeArgs volumeArgs = new VolumeArgs.Builder()
+        .setAcls(Collections.singletonList(aclWorldAccess))
+        .build();
+    proxy.createVolume(volume, volumeArgs);
+
+    // Create a bucket as non-admin, should succeed
+    final String bucket = "test-bucket-1";
+    try {
+      final Path myBucketPath = new Path(volume, bucket);
+      // Have to prepend the root to bucket path here.
+      // Otherwise, FS will automatically prepend user home directory path
+      // which is not we want here.
+      Assert.assertTrue(userOfs.mkdirs(new Path("/", myBucketPath)));
+    } catch (IOException e) {
+      Assert.fail("Should not have thrown exception when creating bucket as" +
+          " a regular user here");
+    }
+
+    // Clean up
+    proxy.deleteBucket(volume, bucket);
+    proxy.deleteVolume(volume);
+  }
 }

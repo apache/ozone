@@ -490,11 +490,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
     count = request.getCount();
     HddsProtos.LifeCycleState state = null;
+    HddsProtos.ReplicationFactor factor = null;
     if (request.hasState()) {
       state = request.getState();
     }
+    if (request.hasFactor()) {
+      factor = request.getFactor();
+    }
     List<ContainerInfo> containerList =
-        impl.listContainer(startContainerID, count, state);
+        impl.listContainer(startContainerID, count, state, factor);
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
     for (ContainerInfo container : containerList) {
@@ -709,6 +713,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Integer> idleiterations = Optional.empty();
     Optional<Double> maxDatanodesRatioToInvolvePerIteration = Optional.empty();
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
+    Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
+    Optional<Long> maxSizeLeavingSourceInGB = Optional.empty();
 
     if(request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -724,11 +730,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       maxSizeToMovePerIterationInGB =
           Optional.of(request.getMaxSizeToMovePerIterationInGB());
     }
+    if(request.hasMaxSizeEnteringTargetInGB()) {
+      maxSizeEnteringTargetInGB =
+          Optional.of(request.getMaxSizeEnteringTargetInGB());
+    }
+    if(request.hasMaxSizeLeavingSourceInGB()) {
+      maxSizeLeavingSourceInGB =
+          Optional.of(request.getMaxSizeLeavingSourceInGB());
+    }
+
+
 
     return StartContainerBalancerResponseProto.newBuilder().
         setStart(impl.startContainerBalancer(threshold,
             idleiterations, maxDatanodesRatioToInvolvePerIteration,
-            maxSizeToMovePerIterationInGB)).build();
+            maxSizeToMovePerIterationInGB,
+            maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB)).build();
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(

@@ -148,6 +148,10 @@ public abstract class StorageVolume
     return this.storageDir;
   }
 
+  public void refreshVolumeInfo() {
+    volumeInfo.refreshNow();
+  }
+
   public VolumeInfo getVolumeInfo() {
     return this.volumeInfo;
   }

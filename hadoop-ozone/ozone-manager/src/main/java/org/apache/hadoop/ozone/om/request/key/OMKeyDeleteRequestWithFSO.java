@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -60,8 +61,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyDeleteRequestWithFSO.class);
 
-  public OMKeyDeleteRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyDeleteRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -142,7 +144,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
                 new CacheValue<>(Optional.absent(), trxnLogIndex));
       } else {
         // Update table cache.
-        omMetadataManager.getKeyTable().addCacheEntry(
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
                 new CacheKey<>(ozonePathKey),
                 new CacheValue<>(Optional.absent(), trxnLogIndex));
       }

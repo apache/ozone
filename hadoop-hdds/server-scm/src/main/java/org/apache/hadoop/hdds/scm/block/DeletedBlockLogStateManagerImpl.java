@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -56,15 +56,15 @@ public class DeletedBlockLogStateManagerImpl
       LoggerFactory.getLogger(DeletedBlockLogStateManagerImpl.class);
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private final DBTransactionBuffer transactionBuffer;
   private final int maxRetry;
   private final Set<Long> deletingTxIDs;
   private final Set<Long> skippingRetryTxIDs;
 
   public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
-      Table<Long, DeletedBlocksTransaction> deletedTable,
-      ContainerManagerV2 containerManager, DBTransactionBuffer txBuffer) {
+             Table<Long, DeletedBlocksTransaction> deletedTable,
+             ContainerManager containerManager, DBTransactionBuffer txBuffer) {
     this.maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.deletedTable = deletedTable;
@@ -150,16 +150,6 @@ public class DeletedBlockLogStateManagerImpl
       public TypedTable.KeyValue<Long, DeletedBlocksTransaction> seek(
           Long key) throws IOException {
         throw new UnsupportedOperationException("seek");
-      }
-
-      @Override
-      public Long key() throws IOException {
-        throw new UnsupportedOperationException("key");
-      }
-
-      @Override
-      public TypedTable.KeyValue<Long, DeletedBlocksTransaction> value() {
-        throw new UnsupportedOperationException("value");
       }
 
       @Override
@@ -252,7 +242,7 @@ public class DeletedBlockLogStateManagerImpl
     private SCMRatisServer scmRatisServer;
     private Table<Long, DeletedBlocksTransaction> table;
     private DBTransactionBuffer transactionBuffer;
-    private ContainerManagerV2 containerManager;
+    private ContainerManager containerManager;
 
     public Builder setConfiguration(final ConfigurationSource config) {
       conf = config;
@@ -275,7 +265,7 @@ public class DeletedBlockLogStateManagerImpl
       return this;
     }
 
-    public Builder setContainerManager(ContainerManagerV2 contManager) {
+    public Builder setContainerManager(ContainerManager contManager) {
       this.containerManager = contManager;
       return this;
     }
