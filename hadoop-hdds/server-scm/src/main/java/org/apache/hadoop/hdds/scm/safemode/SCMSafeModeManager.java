@@ -28,7 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
@@ -110,10 +110,10 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final SafeModeMetrics safeModeMetrics;
 
   public SCMSafeModeManager(ConfigurationSource conf,
-      List<ContainerInfo> allContainers,
-      ContainerManagerV2 containerManager, PipelineManager pipelineManager,
-      EventQueue eventQueue, SCMServiceManager serviceManager,
-      SCMContext scmContext) {
+             List<ContainerInfo> allContainers,
+             ContainerManager containerManager, PipelineManager pipelineManager,
+             EventQueue eventQueue, SCMServiceManager serviceManager,
+             SCMContext scmContext) {
     this.config = conf;
     this.pipelineManager = pipelineManager;
     this.eventPublisher = eventQueue;

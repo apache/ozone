@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -93,8 +94,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMKeyRequest(OMRequest omRequest, BucketLayout bucketLayoutArg) {
+    super(omRequest);
+    this.bucketLayout = bucketLayoutArg;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
   }
 
   protected KeyArgs resolveBucketLink(
@@ -127,9 +139,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationType,
-              replicationFactor, omID, excludeList);
+      allocatedBlocks = scmClient.getBlockClient().allocateBlock(scmBlockSize,
+          numBlocks, ReplicationConfig.fromTypeAndFactor(replicationType,
+              replicationFactor),
+          omID, excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
@@ -451,23 +464,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
       acquireLock = omMetadataManager.getLock().acquireReadLock(
           BUCKET_LOCK, volumeName, bucketName);
       try {
-
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
-        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(
-            omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
-                resolvedBucket.realBucket(), keyArgs.getKeyName(),
-                keyArgs.getMultipartUploadID()));
-
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(getBucketLayout()).get(
+                omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
+                    resolvedBucket.realBucket(), keyArgs.getKeyName(),
+                    keyArgs.getMultipartUploadID()));
         if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
         }
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock().releaseReadLock(
-              BUCKET_LOCK, volumeName, bucketName);
+          omMetadataManager.getLock()
+              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
         }
       }
     }
@@ -537,7 +548,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected boolean checkDirectoryAlreadyExists(String volumeName,
       String bucketName, String keyName, OMMetadataManager omMetadataManager)
       throws IOException {
-    if (omMetadataManager.getKeyTable().isExist(
+    if (omMetadataManager.getKeyTable(getBucketLayout()).isExist(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName,
             keyName))) {
       return true;
@@ -551,11 +562,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-    OmKeyLocationInfoGroup keyLocationGroup =
-        omKeyInfo.getLatestVersionLocations();
 
-    for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()) {
-      bytesUsed += locationInfo.getLength() * keyFactor;
+    for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
+        bytesUsed += locationInfo.getLength() * keyFactor;
+      }
     }
 
     return bytesUsed;
@@ -563,11 +574,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Return bucket info for the specified bucket.
-   * @param omMetadataManager
-   * @param volume
-   * @param bucket
-   * @return OmVolumeArgs
-   * @throws IOException
    */
   protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
       String volume, String bucket) {
@@ -621,13 +627,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
       //TODO args.getMetadata
     }
     if (dbKeyInfo != null) {
-      // TODO: Need to be fixed, as when key already exists, we are
-      //  appending new blocks to existing key.
-      // The key already exist, the new blocks will be added as new version
-      // when locations.size = 0, the new version will have identical blocks
-      // as its previous version
-      dbKeyInfo.addNewVersion(locations, false);
-      dbKeyInfo.setDataSize(size + dbKeyInfo.getDataSize());
+      // The key already exist, the new blocks will replace old ones
+      // as new versions unless the bucket does not have versioning
+      // turned on.
+      dbKeyInfo.addNewVersion(locations, false,
+              omBucketInfo.getIsVersionEnabled());
+      long newSize = size;
+      if (omBucketInfo.getIsVersionEnabled()) {
+        newSize += dbKeyInfo.getDataSize();
+      }
+      dbKeyInfo.setDataSize(newSize);
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
@@ -720,8 +729,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
               .getMultipartKey(args.getVolumeName(), args.getBucketName(),
                       args.getKeyName(), uploadID);
     }
-    OmKeyInfo partKeyInfo = omMetadataManager.getOpenKeyTable().get(
-            multipartKey);
+    OmKeyInfo partKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey);
     if (partKeyInfo == null) {
       throw new OMException("No such Multipart upload is with specified " +
               "uploadId " + uploadID,

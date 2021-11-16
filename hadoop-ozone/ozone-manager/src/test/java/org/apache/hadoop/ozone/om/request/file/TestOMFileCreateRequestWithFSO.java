@@ -18,16 +18,14 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -60,8 +58,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
     String dbFileD = omMetadataManager.getOzonePathKey(
             dirPathC.getObjectID(), fileNameD);
-    omMetadataManager.getKeyTable().delete(dbFileD);
-    omMetadataManager.getKeyTable().delete(dirPathC.getPath());
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dbFileD);
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dirPathC.getPath());
 
     // can create non-recursive because parents already exist.
     testNonRecursivePath("a/b/e", false, false, false);
@@ -138,7 +136,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
       if (indx == pathComponents.length - 1) {
         String dbOpenFileName = omMetadataManager.getOpenFileName(
                 parentId, pathElement, id);
-        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
           Assert.assertNotNull("Invalid key!", omKeyInfo);
@@ -179,19 +178,14 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     return dirInfo;
   }
 
-  @NotNull
   @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata Layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
+    return new OMFileCreateRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
-  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
-    return new OMFileCreateRequestWithFSO(omRequest);
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

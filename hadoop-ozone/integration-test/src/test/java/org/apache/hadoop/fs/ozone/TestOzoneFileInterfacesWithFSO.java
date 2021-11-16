@@ -18,18 +18,13 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.jetbrains.annotations.NotNull;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 
 /**
  * Test OzoneFileSystem Interfaces - prefix layout.
@@ -40,23 +35,10 @@ import java.util.Collection;
 @RunWith(Parameterized.class)
 public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
 
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {{false, true, true}});
-  }
-
   public TestOzoneFileInterfacesWithFSO(boolean setDefaultFs,
-      boolean useAbsolutePath, boolean enabledFileSystemPaths) {
+      boolean useAbsolutePath, boolean enabledFileSystemPaths)
+      throws Exception {
     super(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
-  }
-
-  @NotNull
-  @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, enableFileSystemPaths,
-        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
-    return conf;
   }
 
   @Override
@@ -92,5 +74,10 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
   @Ignore("TODO:HDDS-2939")
   public void testOzFsReadWrite() {
 
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

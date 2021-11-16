@@ -75,7 +75,7 @@ start_k8s_env() {
    kubectl delete pvc --all
    kubectl delete pv --all
 
-   print_phase "Applying k8s resources from $1"
+   print_phase "Applying k8s resources from $(basename $(pwd))"
    kubectl apply -f .
    wait_for_startup
 }

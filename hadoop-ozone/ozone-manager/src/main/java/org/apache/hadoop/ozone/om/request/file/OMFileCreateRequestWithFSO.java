@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -59,8 +60,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileCreateRequestWithFSO.class);
-  public OMFileCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+
+  public OMFileCreateRequestWithFSO(OMRequest omRequest,
+                                    BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -249,7 +252,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("File create failed. Volume:{}, Bucket:{}, Key{}.",
+      LOG.error("File create failed. Volume:{}, Bucket:{}, Key:{}.",
           volumeName, bucketName, keyName, exception);
       break;
     default:

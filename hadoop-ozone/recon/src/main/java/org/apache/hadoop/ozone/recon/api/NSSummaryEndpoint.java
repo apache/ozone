@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -70,6 +70,7 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
  */
 @Path("/namespace")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class NSSummaryEndpoint {
 
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -80,7 +81,7 @@ public class NSSummaryEndpoint {
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
 
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,

@@ -23,9 +23,9 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
@@ -46,7 +46,6 @@ public class TestOMAllocateBlockRequestWithFSO
     // metadata layout prefix will be set while invoking OzoneManager#start()
     // and its not invoked in this test. Hence it is explicitly setting
     // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
     return config;
   }
 
@@ -80,8 +79,14 @@ public class TestOMAllocateBlockRequestWithFSO
   @NotNull
   @Override
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
-          OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
-    return new OMAllocateBlockRequestWithFSO(modifiedOmRequest);
+      OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
+    return new OMAllocateBlockRequestWithFSO(modifiedOmRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   @Override
@@ -95,9 +100,10 @@ public class TestOMAllocateBlockRequestWithFSO
       String pathElement = pathComponents[indx];
       // Reached last component, which is file name
       if (indx == pathComponents.length - 1) {
-        String dbOpenFileName = omMetadataManager.getOpenFileName(
-                parentId, pathElement, id);
-        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
+        String dbOpenFileName =
+            omMetadataManager.getOpenFileName(parentId, pathElement, id);
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
           Assert.assertNotNull("Invalid key!", omKeyInfo);
@@ -105,10 +111,9 @@ public class TestOMAllocateBlockRequestWithFSO
         return omKeyInfo;
       } else {
         // directory
-        String dbKey = omMetadataManager.getOzonePathKey(parentId,
-                pathElement);
+        String dbKey = omMetadataManager.getOzonePathKey(parentId, pathElement);
         OmDirectoryInfo dirInfo =
-                omMetadataManager.getDirectoryTable().get(dbKey);
+            omMetadataManager.getDirectoryTable().get(dbKey);
         parentId = dirInfo.getObjectID();
       }
     }

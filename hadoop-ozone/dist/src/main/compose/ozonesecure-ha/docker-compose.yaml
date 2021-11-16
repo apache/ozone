@@ -288,6 +288,8 @@ services:
     hostname: recon
     volumes:
       - ../..:/opt/hadoop
+      - ../_keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9888:9888
     env_file:

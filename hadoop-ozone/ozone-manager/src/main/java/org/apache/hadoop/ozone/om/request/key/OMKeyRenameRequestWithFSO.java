@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -65,8 +66,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   private static final Logger LOG =
           LoggerFactory.getLogger(OMKeyRenameRequestWithFSO.class);
 
-  public OMKeyRenameRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyRenameRequestWithFSO(OMRequest omRequest,
+                                   BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -275,7 +277,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
               new CacheValue<>(Optional.of(OMFileRequest.
                               getDirectoryInfo(fromKeyValue)), trxnLogIndex));
     } else {
-      Table<String, OmKeyInfo> keyTable = metadataMgr.getKeyTable();
+      Table<String, OmKeyInfo> keyTable =
+          metadataMgr.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(dbFromKey),
               new CacheValue<>(Optional.absent(), trxnLogIndex));

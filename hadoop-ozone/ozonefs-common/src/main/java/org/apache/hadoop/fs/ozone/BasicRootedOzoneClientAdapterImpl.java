@@ -51,6 +51,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -78,10 +80,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .BUCKET_NOT_FOUND;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -102,6 +100,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private ReplicationConfig replicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
+  private BucketLayout defaultOFSBucketLayout;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -187,6 +186,11 @@ public class BasicRootedOzoneClientAdapterImpl
       this.configuredDnPort = conf.getInt(
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+
+      // Fetches the bucket layout to be used by OFS.
+      this.defaultOFSBucketLayout = BucketLayout.fromString(
+          conf.get(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
+              OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
@@ -229,7 +233,7 @@ public class BasicRootedOzoneClientAdapterImpl
         // when ACL is disabled. Both exceptions need to be handled.
         switch (ex.getResult()) {
         case VOLUME_NOT_FOUND:
-        case BUCKET_NOT_FOUND:
+          // Create the volume first when the volume doesn't exist
           try {
             objectStore.createVolume(volumeStr);
           } catch (OMException newVolEx) {
@@ -238,11 +242,18 @@ public class BasicRootedOzoneClientAdapterImpl
               throw newVolEx;
             }
           }
-
+          // No break here. Proceed to create the bucket
+        case BUCKET_NOT_FOUND:
+          // When BUCKET_NOT_FOUND is thrown, we expect the parent volume
+          // exists, so that we don't call create volume and incur
+          // unnecessary ACL checks which could lead to unwanted behavior.
           OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {
-            volume.createBucket(bucketStr);
+            // Buckets created by OFS should be in FSO layout
+            volume.createBucket(bucketStr,
+                BucketArgs.newBuilder().setBucketLayout(
+                    this.defaultOFSBucketLayout).build());
           } catch (OMException newBucEx) {
             // Ignore the case where another client created the bucket
             if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
