@@ -85,12 +85,12 @@ public interface MultiTenantAccessController {
       return name;
     }
 
-    public void addUser(BasicUserPrincipal user) {
-      users.add(user);
+    public void addUsers(BasicUserPrincipal... newUsers) {
+      users.addAll(Arrays.asList(newUsers));
     }
 
-    public boolean removeUser(BasicUserPrincipal user) {
-      return users.remove(user);
+    public boolean removeUsers(BasicUserPrincipal... newUsers) {
+      return users.removeAll(Arrays.asList(newUsers));
     }
 
     public Collection<BasicUserPrincipal> getUsers() {
