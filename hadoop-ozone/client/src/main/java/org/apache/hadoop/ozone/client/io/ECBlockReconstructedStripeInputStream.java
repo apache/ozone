@@ -36,8 +36,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -94,6 +97,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private int[] missingIndexes;
   // The blockLocation indexes to use to read data into the dataBuffers.
   private List<Integer> dataIndexes = new ArrayList<>();
+  // Data Indexes we have tried to read from, and failed for some reason
+  private Set<Integer> failedDataIndexes = new HashSet<>();
 
   private final RawErasureDecoder decoder;
 
@@ -109,19 +114,19 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     decoder = CodecRegistry.getInstance()
         .getCodecFactory(repConfig.getCodec().toString())
         .createDecoder(repConfig);
+
+    // The EC decoder needs an array data+parity long, with missing or not
+    // needed indexes set to null.
+    decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
   }
 
   protected void init() throws InsufficientLocationsException {
     if (!hasSufficientLocations()) {
-      throw new InsufficientLocationsException("There are not enough " +
+      throw new InsufficientLocationsException("There are insufficient " +
           "datanodes to read the EC block");
     }
-
+    dataIndexes.clear();
     ECReplicationConfig repConfig = getRepConfig();
-    // The EC decoder needs an array data+parity long, with missing or not
-    // needed indexes set to null.
-    decoderInputBuffers = new ByteBuffer[
-        getRepConfig().getData() + getRepConfig().getParity()];
     DatanodeDetails[] locations = getDataLocations();
     setMissingIndexesAndDataLocations(locations);
     List<Integer> parityIndexes =
@@ -130,9 +135,16 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     dataIndexes.addAll(parityIndexes);
     // The decoder inputs originally start as all nulls. Then we populate the
     // pieces we have data for. The parity buffers are reused for the block
-    // so we can allocated them now.
-    for (Integer i : parityIndexes) {
-      decoderInputBuffers[i] = allocateBuffer(repConfig);
+    // so we can allocated them now. On re-init, we reuse any parity buffers
+    // already allocated.
+    for (int i = repConfig.getData(); i < repConfig.getRequiredNodes(); i++) {
+      if (parityIndexes.contains(i)) {
+        if (decoderInputBuffers[i] == null) {
+          decoderInputBuffers[i] = allocateBuffer(repConfig);
+        }
+      } else {
+        decoderInputBuffers[i] = null;
+      }
     }
     decoderOutputBuffers = new ByteBuffer[missingIndexes.length];
     initialized = true;
@@ -150,9 +162,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
     List<Integer> missingInd = new ArrayList<>();
     for (int i = 0; i < repConfig.getData(); i++) {
-      if (locations[i] == null && i < expectedDataBlocks) {
+      if ((locations[i] == null || failedDataIndexes.contains(i))
+          && i < expectedDataBlocks) {
         missingInd.add(i);
-      } else if (locations[i] != null) {
+      } else if (locations[i] != null && !failedDataIndexes.contains(i)) {
         dataIndexes.add(i);
       }
     }
@@ -171,6 +184,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     for (int i = 0; i < repConfig.getData(); i++) {
       if (isMissingIndex(i)) {
         decoderOutputBuffers[recoveryIndex++] = bufs[i];
+        decoderInputBuffers[i] = null;
       } else {
         decoderInputBuffers[i] = bufs[i];
       }
@@ -210,12 +224,28 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       return EOF;
     }
     validateBuffers(bufs);
-    assignBuffers(bufs);
-    clearParityBuffers();
-    // Set the read limits on the buffers so we do not read any garbage data
-    // from the end of the block that is unexpected.
-    setBufferReadLimits(bufs, toRead);
-    loadDataBuffersFromStream();
+    while(true) {
+      try {
+        assignBuffers(bufs);
+        clearParityBuffers();
+        // Set the read limits on the buffers so we do not read any garbage data
+        // from the end of the block that is unexpected.
+        setBufferReadLimits(bufs, toRead);
+        loadDataBuffersFromStream();
+        break;
+      } catch (IOException e) {
+        // Re-init now the bad block has been excluded. If we have ran out of
+        // locations, init will throw an InsufficientLocations exception.
+        init();
+        // seek to the current position so it rewinds any blocks we read
+        // already.
+        seek(getPos());
+        // Reset the input positions back to zero
+        for (ByteBuffer b : bufs) {
+          b.position(0);
+        }
+      }
+    }
     padBuffers(toRead);
     flipInputs();
     decodeStripe();
@@ -277,7 +307,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       return;
     }
 
-    if (fullChunks == 0){
+    if (fullChunks == 0) {
       bufs[0].limit(toRead);
       // All buffers except the first contain no data.
       for (int i = 1; i < bufs.length; i++) {
@@ -319,8 +349,9 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   /**
-   * Take the parity indexes which are available, shuffle them and truncate the
-   * list to the number of required parity chunks.
+   * Take the parity indexes which are already used, and the others which are
+   * available, and select random indexes to meet numRequired. The resulting
+   * list is sorted in ascending order of the indexes.
    * @param locations The list of locations for all blocks in the block group/
    * @param numRequired The number of parity chunks needed for reconstruction
    * @return A list of indexes indicating which parity locations to read.
@@ -328,19 +359,27 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private List<Integer> selectParityIndexes(
       DatanodeDetails[] locations, int numRequired) {
     List<Integer> indexes = new ArrayList<>();
+    List<Integer> selected = new ArrayList<>();
     ECReplicationConfig repConfig = getRepConfig();
-    for (int i = repConfig.getData();
-         i < repConfig.getParity() + repConfig.getData(); i++) {
-      if (locations[i] != null) {
+    for (int i = repConfig.getData(); i < repConfig.getRequiredNodes(); i++) {
+      if (locations[i] != null && !failedDataIndexes.contains(i)
+          && decoderInputBuffers[i] == null) {
         indexes.add(i);
       }
+      // If we are re-initializing, we want to make sure we are re-using any
+      // previously selected good parity indexes, as the block stream is already
+      // opened.
+      if (decoderInputBuffers[i] != null && !failedDataIndexes.contains(i)) {
+        selected.add(i);
+      }
     }
-    Preconditions.assertTrue(indexes.size() >= numRequired);
+    Preconditions.assertTrue(indexes.size() + selected.size() >= numRequired);
     Random rand = new Random();
-    while (indexes.size() > numRequired) {
-      indexes.remove(rand.nextInt(indexes.size()));
+    while (selected.size() < numRequired) {
+      selected.add(indexes.remove(rand.nextInt(indexes.size())));
     }
-    return indexes;
+    Collections.sort(selected);
+    return selected;
   }
 
   private ByteBuffer allocateBuffer(ECReplicationConfig repConfig) {
@@ -366,26 +405,32 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   protected void loadDataBuffersFromStream() throws IOException {
-    for (int i = 0; i < dataIndexes.size(); i++) {
-      BlockExtendedInputStream stream =
-          getOrOpenStream(i, dataIndexes.get(i));
-      seekStreamIfNecessary(stream, 0);
-      ByteBuffer b = decoderInputBuffers[dataIndexes.get(i)];
-      while (b.hasRemaining()) {
-        int read = stream.read(b);
-        if (read == EOF) {
-          // We should not reach EOF, as the block should have enough data to
-          // fill the buffer. If the block does not, then it indicates the block
-          // is not as long as it should be, based on the block length stored in
-          // OM. Therefore if there is any remaining space in the buffer, we
-          // should throw an exception.
-          if (b.hasRemaining()) {
-            throw new IOException("Expected to read " + b.remaining() +
-                " bytes from block " + getBlockID() + " EC index " + (i + 1) +
-                " but reached EOF");
+    for (int i : dataIndexes) {
+      try {
+        BlockExtendedInputStream stream = getOrOpenStream(i);
+        seekStreamIfNecessary(stream, 0);
+        ByteBuffer b = decoderInputBuffers[i];
+        while (b.hasRemaining()) {
+          int read = stream.read(b);
+          if (read == EOF) {
+            // We should not reach EOF, as the block should have enough data to
+            // fill the buffer. If the block does not, then it indicates the
+            // block is not as long as it should be, based on the block length
+            // stored in OM. Therefore if there is any remaining space in the
+            // buffer, we should throw an exception.
+            if (b.hasRemaining()) {
+              throw new IOException("Expected to read " + b.remaining() +
+                  " bytes from block " + getBlockID() + " EC index " + (i + 1) +
+                  " but reached EOF");
+            }
+            break;
           }
-          break;
         }
+      } catch (IOException e) {
+        LOG.warn("Failed to read from block {} EC index {}. Excluding the " +
+                "block", getBlockID(), i + 1, e);
+        failedDataIndexes.add(i);
+        throw e;
       }
     }
   }
@@ -422,12 +467,15 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     int availableLocations =
         availableDataLocations() + availableParityLocations();
     int paddedLocations = repConfig.getData() - expectedDataBlocks;
+    int failedLocations = failedDataIndexes.size();
 
-    if (availableLocations + paddedLocations >= repConfig.getData()) {
+    if (availableLocations + paddedLocations - failedLocations
+        >= repConfig.getData()) {
       return true;
     } else {
-      LOG.warn("There are insufficient locations. {} available {} padded {} " +
-          "expected", availableLocations, paddedLocations, expectedDataBlocks);
+      LOG.error("There are insufficient locations. {} available; {} padded;" +
+          " {} failed; {} expected;", availableLocations, paddedLocations,
+          failedLocations, expectedDataBlocks);
       return false;
     }
   }
