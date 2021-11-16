@@ -504,7 +504,7 @@ public class RangerRestMultiTenantAccessController
       for (JsonElement jsonUser: roleJson.get("users").getAsJsonArray()) {
         String userName =
             jsonUser.getAsJsonObject().get("name").getAsString();
-        role.addUser(new BasicUserPrincipal(userName));
+        role.addUsers(new BasicUserPrincipal(userName));
       }
 
       return role;
