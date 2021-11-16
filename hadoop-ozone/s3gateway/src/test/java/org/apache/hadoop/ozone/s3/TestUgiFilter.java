@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,13 +21,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Enumeration;
 import java.util.Collections;
-import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.s3.signature.*;
@@ -48,7 +45,6 @@ import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMA
 public class TestUgiFilter {
 
   private OzoneConfiguration conf;
-  private String s3HttpAddr;
   private Text omService;
   private String curDate;
   private Map<String, String> headers;
@@ -61,11 +57,12 @@ public class TestUgiFilter {
   private static final String ENCRYPT_TYPE_HEADER = "X-Amz-Content-SHA256";
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String LENGTH_HEADER = "Content-Length";
+  private static final String USER_STRING = "AKIAIIIE56NH5ZHKLTWQ";
 
   @Before
   public void setup() {
     conf = new OzoneConfiguration();
-    s3HttpAddr = "localhost:9878";
+    String s3HttpAddr = "localhost:9878";
     conf.set(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY, s3HttpAddr);
     s3HttpAddr = s3HttpAddr.substring(0, s3HttpAddr.lastIndexOf(":"));
     conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, s3HttpAddr);
@@ -86,7 +83,7 @@ public class TestUgiFilter {
     headers.put(ENCRYPT_TYPE_HEADER,
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     headers.put(AUTHORIZATION_HEADER, "AWS4-HMAC-SHA256 "+
-        "Credential=AKIAIIIE56NH5ZHKLTWQ/20210616/us-east-1/s3/aws4_request, "+
+        "Credential=" + USER_STRING + "/20210616/us-east-1/s3/aws4_request, "+
         "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "+
         "Signature=c29b4c46e825d5df56cdde12a61adfa65560a54"+
         "7c8973b9809621086727a2f2e");
@@ -95,7 +92,7 @@ public class TestUgiFilter {
   }
 
   @Test
-  public void testUgiFilterDoFilter() throws IOException, ServletException {
+  public void testUgiFilterDoFilter() {
     UgiFilter filter = new UgiFilter();
     filter.setOzoneConfiguration(this.conf);
     filter.setOmService(this.omService);
@@ -105,12 +102,11 @@ public class TestUgiFilter {
     FilterChain filterChain = Mockito.mock(FilterChain.class);
     FilterConfig filterConfig = Mockito.mock(FilterConfig.class);
 
-    Enumeration<String> headerNames = Collections.enumeration(headers.keySet());
-
     Mockito.when(request.getScheme()).thenReturn("http");
     Mockito.when(request.getMethod()).thenReturn("PUT");
     Mockito.when(request.getPathInfo()).thenReturn("/bucket1");
-    Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
+    Mockito.when(request.getHeaderNames()).thenAnswer(
+        invocation -> Collections.enumeration(headers.keySet()));
     Mockito.when(request.getHeader(HOST_HEADER)).thenReturn(
         headers.get(HOST_HEADER));
     Mockito.when(request.getHeader(ENCODE_HEADER)).thenReturn(
@@ -121,8 +117,8 @@ public class TestUgiFilter {
         headers.get(DATE_HEADER));
     Mockito.when(request.getHeader(ENCRYPT_TYPE_HEADER)).thenReturn(
         headers.get(ENCRYPT_TYPE_HEADER));
-    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
-        headers.get(AUTHORIZATION_HEADER));
+    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenAnswer(
+        invocation -> headers.get(AUTHORIZATION_HEADER));
     Mockito.when(request.getHeader(LENGTH_HEADER)).thenReturn(
         headers.get(LENGTH_HEADER));
     Mockito.when(request.getParameterMap()).thenReturn(parameters);
@@ -139,7 +135,9 @@ public class TestUgiFilter {
 
     // correct date in authorization header for AuthorizationV4QueryParser
     // date validator
-    resetAuthHeader(request, "20210616", curDate);
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace("20210616", curDate));
+
 
     // Should not generate exception because of corrected date
     try {
@@ -152,7 +150,8 @@ public class TestUgiFilter {
 
     // Should generate exception because aws version unrecognized
     //  by any signature parser
-    resetAuthHeader(request, "AWS4", "AWS3");
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace("AWS4", "AWS3"));
     try {
       filter.init(filterConfig);
       filter.doFilter(request, response, filterChain);
@@ -162,20 +161,26 @@ public class TestUgiFilter {
       Assert.assertTrue(e.getCause().getCause() instanceof OS3Exception);
     }
 
-  }
-
-  private void resetAuthHeader(HttpServletRequest request,
-      String oldStr, String newStr) {
-    Enumeration<String> headerNames = Collections.enumeration(headers.keySet());
-    Mockito.when(request.getHeaderNames()).thenReturn(headerNames);
+    //Restore aws version
     headers.put(AUTHORIZATION_HEADER, headers.
-        get(AUTHORIZATION_HEADER).replace(oldStr, newStr));
-    Mockito.when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(
-        headers.get(AUTHORIZATION_HEADER));
+        get(AUTHORIZATION_HEADER).replace("AWS3", "AWS4"));
+
+    // Should generate exception because user is empty
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace(USER_STRING, ""));
+    try {
+      filter.init(filterConfig);
+      filter.doFilter(request, response, filterChain);
+      filter.destroy();
+      Assert.fail("Filter should generate OS3 exception.");
+    } catch(Exception e) {
+      Assert.assertTrue(e.getCause() instanceof OS3Exception);
+    }
+
   }
 
   @Test
-  public void testUgiFilterStringToSign() throws OS3Exception, Exception {
+  public void testUgiFilterStringToSign() throws Exception {
     // test to ensure http servlet request is parsed correctly for
     // aws authentication - testing creating aws v4 stringToSign
 
@@ -183,8 +188,7 @@ public class TestUgiFilter {
         new AuthorizationV4HeaderParser(headers.get(AUTHORIZATION_HEADER),
             headers.get(DATE_HEADER)) {
           @Override
-          public void validateDateRange(Credential credentialObj)
-              throws OS3Exception {
+          public void validateDateRange(Credential credentialObj) {
             //NOOP
           }
         }.parseSignature();
