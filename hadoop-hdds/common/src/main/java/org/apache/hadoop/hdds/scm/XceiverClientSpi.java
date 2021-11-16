@@ -148,7 +148,7 @@ public abstract class XceiverClientSpi implements Closeable {
     }
   }
 
-  private IOException getIOExceptionForSendCommand(
+  public static IOException getIOExceptionForSendCommand(
       ContainerCommandRequestProto request, Exception e) {
     return new IOException("Failed to execute command "
         + HddsUtils.processForDebug(request), e);
