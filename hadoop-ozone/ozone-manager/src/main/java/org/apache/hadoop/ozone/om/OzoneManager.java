@@ -3200,10 +3200,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               accessId);
           throw new NullPointerException("accessIdInfo is null");
         }
-        assert(accessIdInfo.getKerberosPrincipal().equals(userPrincipal));
+        assert(accessIdInfo.getUserPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
-            .setTenantName(accessIdInfo.getTenantId())
+            .setTenantName(accessIdInfo.getTenantName())
             .setIsAdmin(accessIdInfo.getIsAdmin())
             .setIsDelegatedAdmin(accessIdInfo.getIsDelegatedAdmin())
             .build());
@@ -3287,9 +3287,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  /**
-   * {@inheritDoc}
-   */
+  public S3SecretValue setSecret(String accessId, String secretKey) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+            "this to be implemented. As write requests use a new approach");
+  }
+
+  @Override
   public void revokeS3Secret(String kerberosID) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
             "this to be implemented. As write requests use a new approach");
@@ -4210,7 +4213,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       for (final String accessId : principalInfo.getAccessIds()) {
         final OmDBAccessIdInfo accessIdInfo =
             getMetadataManager().getTenantAccessIdTable().get(accessId);
-        if (tenantName.equals(accessIdInfo.getTenantId())) {
+        if (tenantName.equals(accessIdInfo.getTenantName())) {
           if (!delegated) {
             return accessIdInfo.getIsAdmin();
           } else {

@@ -43,7 +43,7 @@ public class TenantGetSecretHandler extends TenantHandler {
   @CommandLine.Parameters(description = "List of accessIds", arity = "1..")
   private List<String> accessIds = new ArrayList<>();
 
-  @CommandLine.Option(names = "-e",
+  @CommandLine.Option(names = {"-e", "--export"},
       description = "Print out variables together with 'export' prefix")
   private boolean export;
 
@@ -55,15 +55,15 @@ public class TenantGetSecretHandler extends TenantHandler {
     for (final String accessId : accessIds) {
 
       try {
-        final S3SecretValue secret =
+        final S3SecretValue accessIdSecretKeyPair =
             objectStore.getS3Secret(accessId, false);
         if (export) {
           out().println("export AWS_ACCESS_KEY_ID='" +
-              secret.getAwsAccessKey() + "'");
+              accessIdSecretKeyPair.getAwsAccessKey() + "'");
           out().println("export AWS_SECRET_ACCESS_KEY='" +
-              secret.getAwsSecret() + "'");
+              accessIdSecretKeyPair.getAwsSecret() + "'");
         } else {
-          out().println(secret);
+          out().println(accessIdSecretKeyPair);
         }
       } catch (OMException omEx) {
         if (omEx.getResult().equals(ACCESSID_NOT_FOUND)) {

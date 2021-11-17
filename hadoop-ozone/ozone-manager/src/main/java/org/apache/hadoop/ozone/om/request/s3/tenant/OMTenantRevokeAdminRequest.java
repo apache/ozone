@@ -77,7 +77,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     // If tenantName is not provided, figure it out from the table
     if (StringUtils.isEmpty(tenantName)) {
       tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
-          ozoneManager.getMetadataManager(), accessId);
+          ozoneManager.getMetadataManager(), accessId, true);
     }
 
     // Caller should be an Ozone admin or this tenant's delegated admin
@@ -94,7 +94,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     }
 
     // Check if accessId is assigned to the tenant
-    if (!accessIdInfo.getTenantId().equals(tenantName)) {
+    if (!accessIdInfo.getTenantName().equals(tenantName)) {
       throw new OMException("accessId '" + accessId +
           "' must be assigned to tenant '" + tenantName + "' first.",
           OMException.ResultCodes.INVALID_TENANT_NAME);
@@ -106,7 +106,13 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
-        .setTenantRevokeAdminRequest(request)
+        .setTenantRevokeAdminRequest(
+                // Regenerate request just in case tenantName is not provided
+                //  by the client
+                TenantRevokeAdminRequest.newBuilder()
+                        .setTenantName(tenantName)
+                        .setAccessId(request.getAccessId())
+                        .build())
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId());
 
@@ -153,14 +159,14 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantId().equals(tenantName));
+      assert(oldAccessIdInfo.getTenantName().equals(tenantName));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-          .setTenantId(oldAccessIdInfo.getTenantId())
-          .setKerberosPrincipal(oldAccessIdInfo.getKerberosPrincipal())
-          .setSharedSecret(oldAccessIdInfo.getSharedSecret())
+          .setTenantId(oldAccessIdInfo.getTenantName())
+          .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
+          .setSharedSecret(oldAccessIdInfo.getSecretKey())
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
           .build();

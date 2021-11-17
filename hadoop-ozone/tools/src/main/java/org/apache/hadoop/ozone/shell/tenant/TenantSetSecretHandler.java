@@ -17,9 +17,16 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
+
+import java.io.IOException;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESSID_NOT_FOUND;
 
 /**
  * ozone tenant user set-secret.
@@ -32,9 +39,39 @@ public class TenantSetSecretHandler extends TenantHandler {
   @CommandLine.Parameters(description = "AccessId", arity = "1")
   private String accessId;
 
+  @CommandLine.Option(names = {"-s", "--secret"},
+          description = "Secret", required = true)
+  private String secret;
+
+  @CommandLine.Option(names = {"-e", "--export"},
+          description = "Print out variables together with 'export' prefix")
+  private boolean export;
+
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-//    final ObjectStore objectStore = client.getObjectStore();
+  protected void execute(OzoneClient client, OzoneAddress address)
+          throws IOException {
+
+    final ObjectStore objectStore = client.getObjectStore();
+
+    try {
+      final S3SecretValue accessIdSecretKeyPair =
+              objectStore.setSecret(accessId, secret);
+      if (export) {
+        out().println("export AWS_ACCESS_KEY_ID='" +
+                accessIdSecretKeyPair.getAwsAccessKey() + "'");
+        out().println("export AWS_SECRET_ACCESS_KEY='" +
+                accessIdSecretKeyPair.getAwsSecret() + "'");
+      } else {
+        out().println(accessIdSecretKeyPair);
+      }
+    } catch (OMException omEx) {
+      if (omEx.getResult().equals(ACCESSID_NOT_FOUND)) {
+        // Print to stderr here in order not to contaminate stdout just in
+        // case -e is specified.
+        err().println("AccessId '" + accessId + "' doesn't exist");
+      } else {
+        throw omEx;
+      }
+    }
   }
 }
-

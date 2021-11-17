@@ -301,13 +301,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       if (omDBAccessIdInfo == null) {
         throw new OMException(INVALID_ACCESSID);
       }
-      String tenantName = omDBAccessIdInfo.getTenantId();
+      String tenantName = omDBAccessIdInfo.getTenantName();
       if (tenantName == null) {
         LOG.error("Tenant doesn't exist");
         return;
       }
       tenantCache.get(tenantName).getTenantUsers()
-          .remove(new ImmutablePair<>(omDBAccessIdInfo.getKerberosPrincipal(),
+          .remove(new ImmutablePair<>(omDBAccessIdInfo.getUserPrincipal(),
               accessID));
       // TODO: Determine how to replace this code.
 //      final String userID = authorizer.getUserId(userPrincipal);
@@ -327,7 +327,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
       if (omDBAccessIdInfo != null) {
-        String userName = omDBAccessIdInfo.getKerberosPrincipal();
+        String userName = omDBAccessIdInfo.getUserPrincipal();
         LOG.debug("Username for accessId {} = {}", accessId, userName);
         return userName;
       }
@@ -398,7 +398,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     if (omDBAccessIdInfo == null) {
       throw new OMException(INVALID_ACCESSID);
     }
-    return omDBAccessIdInfo.getTenantId();
+    return omDBAccessIdInfo.getTenantName();
   }
 
   public List<String> listAllAccessIDs(String tenantID)
@@ -598,8 +598,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         KeyValue<String, OmDBAccessIdInfo> next = iterator.next();
         String accessId = next.getKey();
         OmDBAccessIdInfo value = next.getValue();
-        String tenantId = value.getTenantId();
-        String user = value.getKerberosPrincipal();
+        String tenantId = value.getTenantName();
+        String user = value.getUserPrincipal();
 
         CachedTenantInfo cachedTenantInfo = tenantCache
             .computeIfAbsent(tenantId, k -> new CachedTenantInfo(tenantId));

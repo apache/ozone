@@ -77,7 +77,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     // If tenantName is not provided, figure it out from the table
     if (StringUtils.isEmpty(tenantName)) {
       tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
-          ozoneManager.getMetadataManager(), accessId);
+          ozoneManager.getMetadataManager(), accessId, true);
       assert(tenantName != null);
     }
 
@@ -95,7 +95,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     }
 
     // Check if accessId is assigned to the tenant
-    if (!accessIdInfo.getTenantId().equals(tenantName)) {
+    if (!accessIdInfo.getTenantName().equals(tenantName)) {
       throw new OMException("accessId '" + accessId +
           "' must be assigned to tenant '" + tenantName + "' first.",
           OMException.ResultCodes.INVALID_TENANT_NAME);
@@ -179,14 +179,14 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantId().equals(tenantName));
+      assert(oldAccessIdInfo.getTenantName().equals(tenantName));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-          .setTenantId(oldAccessIdInfo.getTenantId())
-          .setKerberosPrincipal(oldAccessIdInfo.getKerberosPrincipal())
-          .setSharedSecret(oldAccessIdInfo.getSharedSecret())
+          .setTenantId(oldAccessIdInfo.getTenantName())
+          .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
+          .setSharedSecret(oldAccessIdInfo.getSecretKey())
           .setIsAdmin(true)
           .setIsDelegatedAdmin(delegated)
           .build();

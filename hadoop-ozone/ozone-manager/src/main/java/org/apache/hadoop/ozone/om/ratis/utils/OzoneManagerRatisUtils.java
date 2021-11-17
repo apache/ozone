@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPa
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
@@ -257,6 +258,8 @@ public final class OzoneManagerRatisUtils {
       return new OMPrepareRequest(omRequest);
     case CancelPrepare:
       return new OMCancelPrepareRequest(omRequest);
+    case SetSecret:
+      return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
     case CreateTenant:

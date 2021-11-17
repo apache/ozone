@@ -644,6 +644,18 @@ public class RpcClient implements ClientProtocol {
   /**
    * {@inheritDoc}
    */
+  public S3SecretValue setSecret(String accessId, String secretKey)
+          throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(accessId),
+            "accessId cannot be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(secretKey),
+            "secret cannot be null or empty.");
+    return ozoneManagerClient.setSecret(accessId, secretKey);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void revokeS3Secret(String kerberosID) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(kerberosID),

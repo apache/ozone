@@ -99,6 +99,7 @@ enum Type {
   ListTrash = 91;
   RecoverTrash = 92;
 
+  SetSecret = 106;   // TODO: Renumber this when rebasing?
   RevokeS3Secret = 93;
 
   PurgePaths = 94;
@@ -196,6 +197,7 @@ message OMRequest {
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 
+  optional SetSecretRequest                 SetSecretRequest               = 106;
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
@@ -213,7 +215,7 @@ message OMRequest {
   optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 102;
 
   optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
-  optional TenantListUserRequest            tenantListUserRequest         = 105;
+  optional TenantListUserRequest            tenantListUserRequest          = 105;
 }
 
 message OMResponse {
@@ -282,6 +284,8 @@ message OMResponse {
   optional RemoveAclResponse                 removeAclResponse             = 76;
   optional SetAclResponse                   setAclResponse                 = 77;
   optional GetAclResponse                    getAclResponse                = 78;
+
+  optional SetSecretResponse                 SetSecretResponse               = 106;
 
   optional PurgeKeysResponse                  purgeKeysResponse            = 81;
 
@@ -1385,11 +1389,12 @@ message GetS3SecretResponse {
 
 message SetSecretRequest {
     optional string accessId = 1;
-    optional string secret = 2;
+    optional string secretKey = 2;
 }
 
 message SetSecretResponse {
-    optional bool success = 1;
+    optional string accessId = 1;
+    optional string secretKey = 2;
 }
 
 message TenantInfo {

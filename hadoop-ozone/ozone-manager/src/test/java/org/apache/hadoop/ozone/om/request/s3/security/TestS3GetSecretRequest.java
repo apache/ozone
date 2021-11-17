@@ -419,6 +419,6 @@ public class TestS3GetSecretRequest {
     final S3Secret s3Secret = getS3SecretResponse.getS3Secret();
     Assert.assertEquals(ACCESS_ID_BOB, s3Secret.getKerberosID());
     Assert.assertEquals(
-        omDBAccessIdInfo.getSharedSecret(), s3Secret.getAwsSecret());
+        omDBAccessIdInfo.getSecretKey(), s3Secret.getAwsSecret());
   }
 }

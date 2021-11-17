@@ -895,6 +895,29 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public S3SecretValue setSecret(String accessId, String secretKey)
+          throws IOException {
+    SetSecretRequest request = SetSecretRequest.newBuilder()
+            .setAccessId(accessId)
+            .setSecretKey(secretKey)
+            .build();
+    OMRequest omRequest = createOMRequest(Type.SetSecret)
+            .setSetSecretRequest(request)
+            .build();
+    final SetSecretResponse resp = handleError(submitRequest(omRequest))
+            .getSetSecretResponse();
+
+    // Because for now the response in SetSecretResponse happens to contain
+    // what S3Secret/Value is suited for, we just re-use it.
+    final S3Secret accessIdSecretKeyPair = S3Secret.newBuilder()
+            .setKerberosID(resp.getAccessId())
+            .setAwsSecret(resp.getSecretKey())
+            .build();
+
+    return S3SecretValue.fromProtobuf(accessIdSecretKeyPair);
+  }
+
+  @Override
   public void revokeS3Secret(String kerberosID) throws IOException {
     RevokeS3SecretRequest request = RevokeS3SecretRequest.newBuilder()
             .setKerberosID(kerberosID)
