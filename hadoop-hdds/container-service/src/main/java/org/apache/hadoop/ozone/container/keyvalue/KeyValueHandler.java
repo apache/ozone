@@ -112,6 +112,7 @@ import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkV
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
 
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -183,6 +184,17 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public VolumeChoosingPolicy getVolumeChoosingPolicyForTesting() {
     return volumeChoosingPolicy;
+  }
+
+  @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+          Container container, ContainerCommandRequestProto msg)
+          throws StorageContainerException {
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
+    checkContainerOpen(kvContainer);
+    BlockID blockID = BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+    return chunkManager.getStreamDataChannel(kvContainer,
+            blockID, metrics);
   }
 
   @Override
