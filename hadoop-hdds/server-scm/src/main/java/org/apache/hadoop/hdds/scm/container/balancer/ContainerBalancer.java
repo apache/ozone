@@ -338,7 +338,7 @@ public class ContainerBalancer {
         overUtilizedNodes.size(), underUtilizedNodes.size());
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
-        nodeManager, replicationManager, containerManager);
+        nodeManager, replicationManager, containerManager, findSourceStrategy);
     sourceToTargetMap = new HashMap<>(overUtilizedNodes.size() +
         withinThresholdUtilizedNodes.size());
     return true;
@@ -475,23 +475,6 @@ public class ContainerBalancer {
       }
       return null;
     }
-
-    //if the utilization of the source data node becomes lower than lowerLimit
-    //after the container is moved out , then the container can not be
-    // a candidate one, and we should remove it from the candidateContainers.
-    candidateContainers.removeIf(c -> {
-      ContainerInfo cInfo;
-      try {
-        cInfo = containerManager.getContainer(c);
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Could not find container {} when " +
-            "be matched with a move target", c);
-        //remove this not found container
-        return true;
-      }
-      return !findSourceStrategy.canSizeLeaveSource(
-          source, cInfo.getUsedBytes());
-    });
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("ContainerBalancer is finding suitable target for source " +

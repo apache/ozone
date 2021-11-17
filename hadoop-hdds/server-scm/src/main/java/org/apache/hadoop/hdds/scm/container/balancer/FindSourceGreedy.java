@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 
 /**
  * The selection criteria for selecting source datanodes , the containers of
@@ -35,13 +36,21 @@ public class FindSourceGreedy implements FindSourceStrategy{
   private static final Logger LOG =
       LoggerFactory.getLogger(FindSourceGreedy.class);
   private Map<DatanodeDetails, Long> sizeLeavingNode;
-  private List<DatanodeUsageInfo> potentialSources;
+  private PriorityQueue<DatanodeUsageInfo> potentialSources;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double lowerLimit;
 
   FindSourceGreedy(NodeManager nodeManager) {
     sizeLeavingNode = new HashMap<>();
+    potentialSources = new PriorityQueue<>((a, b) -> {
+      double currentUsageOfA = a.calculateUtilization(
+          -sizeLeavingNode.get(a.getDatanodeDetails()));
+      double currentUsageOfB = b.calculateUtilization(
+          -sizeLeavingNode.get(b.getDatanodeDetails()));
+      //in descending order
+      return Double.compare(currentUsageOfB, currentUsageOfA);
+    });
     this.nodeManager = nodeManager;
   }
 
@@ -50,11 +59,12 @@ public class FindSourceGreedy implements FindSourceStrategy{
   }
 
   private void setPotentialSources(
-      List<DatanodeUsageInfo> potentialSources) {
-    this.potentialSources = potentialSources;
+      List<DatanodeUsageInfo> potentialSourceDataNodes) {
+    potentialSources.clear();
     sizeLeavingNode.clear();
-    potentialSources.forEach(
+    potentialSourceDataNodes.forEach(
         c -> sizeLeavingNode.put(c.getDatanodeDetails(), 0L));
+    potentialSources.addAll(potentialSourceDataNodes);
   }
 
   private void setConfiguration(ContainerBalancerConfiguration conf) {
@@ -69,6 +79,8 @@ public class FindSourceGreedy implements FindSourceStrategy{
     Long currentSize = sizeLeavingNode.get(dui);
     if(currentSize != null) {
       sizeLeavingNode.put(dui, currentSize + size);
+      //reorder according to the latest sizeLeavingNode
+      potentialSources.add(nodeManager.getUsageInfo(dui));
       return;
     }
     LOG.warn("Cannot find datanode {} in candidate source datanodes",
@@ -87,18 +99,7 @@ public class FindSourceGreedy implements FindSourceStrategy{
       LOG.info("no more candidate source data node");
       return null;
     }
-    //TODO：use a more quick data structure, which will hava a
-    // better performance when changing or deleting one element at once
-    potentialSources.sort((a, b) -> {
-      double currentUsageOfA = a.calculateUtilization(
-          -sizeLeavingNode.get(a.getDatanodeDetails()));
-      double currentUsageOfB = b.calculateUtilization(
-          -sizeLeavingNode.get(b.getDatanodeDetails()));
-      //in descending order
-      return Double.compare(currentUsageOfB, currentUsageOfA);
-    });
-
-    return potentialSources.get(0).getDatanodeDetails();
+    return potentialSources.poll().getDatanodeDetails();
   }
 
   /**
