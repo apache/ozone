@@ -88,6 +88,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
           count);
     }
 
+    System.out.printf("Usage Information (%d Datanodes)%n%n", infoList.size());
     infoList.forEach(this::printInfo);
   }
 
@@ -106,26 +107,27 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     percentFormat.setMinimumFractionDigits(2);
     percentFormat.setMaximumFractionDigits(2);
 
-    System.out.printf("Usage info for datanode with UUID %s:%n",
-        info.getNode().getUuid());
+    System.out.printf("%-13s: %s %n", "UUID", info.getNode().getUuid());
+    System.out.printf("%-13s: %s (%s) %n", "IP Address",
+        info.getNode().getIpAddress(), info.getNode().getHostName());
     // print capacity in a readable format
-    System.out.printf("%-13s: %-21s (%s) %n", "Capacity", capacity + " B",
+    System.out.printf("%-13s: %s (%s) %n", "Capacity", capacity + " B",
         StringUtils.byteDesc(capacity));
 
     // print total used space and its percentage in a readable format
-    System.out.printf("%-13s: %-21s (%s) %n", "Total Used", totalUsed + " B",
+    System.out.printf("%-13s: %s (%s) %n", "Total Used", totalUsed + " B",
         StringUtils.byteDesc(totalUsed));
     System.out.printf("%-13s: %s %n", "Total Used %",
         percentFormat.format(1 - remainingRatio));
 
     // print space used by ozone and its percentage in a readable format
-    System.out.printf("%-13s: %-21s (%s) %n", "Ozone Used", used + " B",
+    System.out.printf("%-13s: %s (%s) %n", "Ozone Used", used + " B",
         StringUtils.byteDesc(used));
     System.out.printf("%-13s: %s %n", "Ozone Used %",
         percentFormat.format(usedRatio));
 
     // print total remaining space and its percentage in a readable format
-    System.out.printf("%-13s: %-21s (%s) %n", "Remaining", remaining + " B",
+    System.out.printf("%-13s: %s (%s) %n", "Remaining", remaining + " B",
         StringUtils.byteDesc(remaining));
     System.out.printf("%-13s: %s %n%n", "Remaining %",
         percentFormat.format(remainingRatio));
