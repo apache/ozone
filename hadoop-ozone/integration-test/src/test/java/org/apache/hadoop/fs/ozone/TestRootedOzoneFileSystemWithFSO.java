@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.assertTrue;
 
@@ -58,9 +59,9 @@ public class TestRootedOzoneFileSystemWithFSO
   }
 
   @BeforeClass
-  public static void init() throws Exception {
+  public static void init()
+      throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
-    TestRootedOzoneFileSystem.init();
   }
 
   @Override
