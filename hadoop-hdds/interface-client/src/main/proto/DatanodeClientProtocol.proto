@@ -102,6 +102,7 @@ enum Type {
   GetCommittedBlockLength = 18;
 
   StreamInit = 19;
+  StreamWrite = 20;
 }
 
 
