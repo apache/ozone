@@ -44,7 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Protocol implementation for getting OM metadata information.
+ * Protocol implementation for OM admin operations.
  */
 public class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
 

@@ -55,7 +55,7 @@ message OMNodeInfo {
 }
 
 /**
- The service for getting OM metadata.
+ The service for OM admin operations.
 */
 service OzoneManagerAdminService {
     // RPC request to OM to return its confugration -  in memory OM nodes list
