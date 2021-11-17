@@ -1189,7 +1189,9 @@ public class RpcClient implements ClientProtocol {
     if (feInfo != null) {
       // todo: need to support file encrypt,
       //  https://issues.apache.org/jira/browse/HDDS-5892
-      return null;
+      throw new UnsupportedOperationException(
+          "FileEncryptionInfo is not yet supported in " +
+              "createMultipartStreamKey");
     } else {
       return new OzoneDataStreamOutput(keyOutputStream);
     }

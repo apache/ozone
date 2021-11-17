@@ -2516,10 +2516,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
-        OZONE_SCM_BLOCK_SIZE,
-        OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-    String sampleData = Arrays.toString(generateData(blockSize + 100,
+
+    String sampleData = Arrays.toString(generateData(1024 * 8,
         (byte) RandomUtils.nextLong()));
     int valueLength = sampleData.getBytes(UTF_8).length;
 
