@@ -341,6 +341,9 @@ public class PipelineManagerImpl implements PipelineManager {
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
     PipelineID pipelineID = pipeline.getId();
+    // close containers.
+    closeContainersForPipeline(pipelineID);
+    LOG.info("Containers closed for pipeline={}", pipeline);
     acquireWriteLock();
     try {
       if (!pipeline.isClosed()) {
@@ -352,8 +355,6 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
-    // close containers.
-    closeContainersForPipeline(pipelineID);
     if (!onTimeout) {
       // close pipeline right away.
       removePipeline(pipeline);

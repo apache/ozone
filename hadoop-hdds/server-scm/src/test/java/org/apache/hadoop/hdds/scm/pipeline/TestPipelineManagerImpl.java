@@ -650,6 +650,30 @@ public class TestPipelineManagerImpl {
             pipelineID + " in closed state"));
   }
 
+  @Test
+  public void testPipelineCloseFlow() throws IOException {
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+            .captureLogs(LoggerFactory.getLogger(PipelineManagerImpl.class));
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    Pipeline pipeline = pipelineManager.createPipeline(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+    PipelineID pipelineID = pipeline.getId();
+    pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
+    pipelineManager.closePipeline(pipeline, false);
+
+    String containerExpectedOutput =
+        "Containers closed for pipeline=" + pipeline;
+    String pipelineExpectedOutput =
+        "Pipeline " + pipeline + " moved to CLOSED state";
+    String logOutput = logCapturer.getOutput();
+    assertTrue(logOutput.contains(containerExpectedOutput));
+    assertTrue(logOutput.contains(pipelineExpectedOutput));
+
+    int containerLogIdx = logOutput.indexOf(containerExpectedOutput);
+    int pipelineLogIdx = logOutput.indexOf(pipelineExpectedOutput);
+    assertTrue(containerLogIdx < pipelineLogIdx);
+  }
+
   private void sendPipelineReport(
       DatanodeDetails dn, Pipeline pipeline,
       PipelineReportHandler pipelineReportHandler,
