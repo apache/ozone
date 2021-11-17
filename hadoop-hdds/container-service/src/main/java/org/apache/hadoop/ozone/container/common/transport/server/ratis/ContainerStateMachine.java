@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collection;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -81,6 +80,7 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
@@ -508,6 +508,19 @@ public class ContainerStateMachine extends BaseStateMachine {
     return raftFuture;
   }
 
+  private StateMachine.DataChannel getStreamDataChannel(
+          ContainerCommandRequestProto requestProto,
+          DispatcherContext context) throws StorageContainerException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("{}: getStreamDataChannel {} containerID={} pipelineID={} " +
+                      "traceID={}", gid, requestProto.getCmdType(),
+              requestProto.getContainerID(), requestProto.getPipelineID(),
+              requestProto.getTraceID());
+    }
+    runCommand(requestProto, context);  // stream init
+    return dispatcher.getStreamDataChannel(requestProto);
+  }
+
   @Override
   public CompletableFuture<DataStream> stream(RaftClientRequest request) {
     return CompletableFuture.supplyAsync(() -> {
@@ -519,11 +532,7 @@ public class ContainerStateMachine extends BaseStateMachine {
                 .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
                 .setContainer2BCSIDMap(container2BCSIDMap)
                 .build();
-
-        ContainerCommandResponseProto response = runCommand(
-            requestProto, context);
-        final StreamDataChannel channel = new StreamDataChannel(
-            Paths.get(response.getMessage()));
+        DataChannel channel = getStreamDataChannel(requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
         return new LocalStream(channel, chunkExecutor);
