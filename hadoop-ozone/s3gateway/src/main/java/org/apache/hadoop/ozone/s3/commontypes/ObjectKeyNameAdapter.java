@@ -48,7 +48,7 @@ public class ObjectKeyNameAdapter extends XmlAdapter<String, String> {
   private static String urlEncode(String str) {
     try {
       return URLEncoder.encode(str, UTF_8.name())
-          .replaceAll("\\+", "%20");
+          .replaceAll("%2F", "/");
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
