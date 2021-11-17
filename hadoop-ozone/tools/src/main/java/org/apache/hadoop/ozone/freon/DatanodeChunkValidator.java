@@ -68,7 +68,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
           defaultValue = "1024")
   private int chunkSize;
 
-  private XceiverClientSpi xceiverClientSpi;
+  private XceiverClientSpi xceiverClient;
 
   private Timer timer;
 
@@ -116,7 +116,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
       try (XceiverClientManager xceiverClientManager =
                    new XceiverClientManager(ozoneConf)) {
-        xceiverClientSpi = xceiverClientManager.acquireClientForReadData(pipeline);
+        xceiverClient = xceiverClientManager.acquireClientForReadData(pipeline);
 
         checksumProtobuf = ContainerProtos.ChecksumData.newBuilder()
             .setBytesPerChecksum(4)
@@ -129,12 +129,12 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
         runTests(this::validateChunk);
 
-        xceiverClientManager.releaseClientForReadData(xceiverClientSpi, true);
+        xceiverClientManager.releaseClientForReadData(xceiverClient, true);
       }
 
     } finally {
-      if (xceiverClientSpi != null) {
-        xceiverClientSpi.close();
+      if (xceiverClient != null) {
+        xceiverClient.close();
       }
     }
     return null;
@@ -147,7 +147,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
   private void readReference() throws IOException {
     ContainerCommandRequestProto request = createReadChunkRequest(0);
     ContainerCommandResponseProto response =
-        xceiverClientSpi.sendCommand(request);
+        xceiverClient.sendCommand(request);
 
     checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, chunkSize);
     checksumReference = computeChecksum(response);
@@ -160,7 +160,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
     timer.time(() -> {
       try {
         ContainerCommandResponseProto response =
-            xceiverClientSpi.sendCommand(request);
+            xceiverClient.sendCommand(request);
 
         ChecksumData checksumOfChunk = computeChecksum(response);
 
@@ -199,7 +199,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
             .setBlockID(blockId)
             .setChunkData(chunkInfo);
 
-    String id = xceiverClientSpi.getPipeline().getFirstNode().getUuidString();
+    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder builder =
             ContainerCommandRequestProto
