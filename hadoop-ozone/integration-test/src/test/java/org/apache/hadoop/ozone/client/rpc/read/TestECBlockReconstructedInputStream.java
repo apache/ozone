@@ -27,8 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -36,8 +34,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.SplittableRandom;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateParity;
 
@@ -46,12 +44,10 @@ import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateP
  */
 public class TestECBlockReconstructedInputStream {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(TestECBlockReconstructedInputStream.class);
-
   private ECReplicationConfig repConfig;
   private ECStreamTestUtil.TestBlockInputStreamFactory streamFactory;
   private long randomSeed;
+  private ThreadLocalRandom random = ThreadLocalRandom.current();
   private SplittableRandom dataGenerator;
 
   @Before
@@ -59,7 +55,7 @@ public class TestECBlockReconstructedInputStream {
     repConfig = new ECReplicationConfig(3, 2);
     streamFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();
 
-    randomSeed = new Random().nextLong();
+    randomSeed = random.nextLong();
     dataGenerator = new SplittableRandom(randomSeed);
   }
 
@@ -98,7 +94,7 @@ public class TestECBlockReconstructedInputStream {
 
   @Test
   public void testReadDataByteBufferMultipleStripes() throws IOException {
-    int readBufferSize = new Random().nextInt(4096);
+    int readBufferSize = random.nextInt(4096);
     // 3 stripes and a partial chunk
     int blockLength = repConfig.getEcChunkSize() * repConfig.getData() * 3
         + repConfig.getEcChunkSize() - 1;
@@ -252,14 +248,13 @@ public class TestECBlockReconstructedInputStream {
         ByteBuffer b = ByteBuffer.allocate(readBufferSize);
 
         int seekPosition = 0;
-        Random seekGen = new Random();
         for (int i = 0; i < 100; i++) {
           resetAndAdvanceDataGenerator(seekPosition);
           long expectedRead = Math.min(stream.getRemaining(), readBufferSize);
           long read = stream.read(b);
           Assert.assertEquals(expectedRead, read);
           ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
-          seekPosition = seekGen.nextInt(blockLength);
+          seekPosition = random.nextInt(blockLength);
           stream.seek(seekPosition);
           b.clear();
         }

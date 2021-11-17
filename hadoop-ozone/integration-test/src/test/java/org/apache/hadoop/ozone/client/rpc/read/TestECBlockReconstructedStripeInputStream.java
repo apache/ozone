@@ -37,8 +37,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.SplittableRandom;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateParity;
 
@@ -52,6 +52,7 @@ public class TestECBlockReconstructedStripeInputStream {
   private ECReplicationConfig repConfig;
   private ECStreamTestUtil.TestBlockInputStreamFactory streamFactory;
   private long randomSeed;
+  private ThreadLocalRandom random = ThreadLocalRandom.current();
   private SplittableRandom dataGen;
 
   @Before
@@ -60,7 +61,7 @@ public class TestECBlockReconstructedStripeInputStream {
         ECReplicationConfig.EcCodec.RS, ONEMB);
     streamFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();
 
-    randomSeed = new Random().nextLong();
+    randomSeed = random.nextLong();
     dataGen = new SplittableRandom(randomSeed);
   }
 
