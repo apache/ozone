@@ -747,9 +747,19 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(1, fileStatusVolume.length);
     Assert.assertEquals(ownerShort, fileStatusVolume[0].getOwner());
     Assert.assertEquals(group, fileStatusVolume[0].getGroup());
+
     // listStatus("/")
     Path root = new Path(OZONE_URI_DELIMITER);
     FileStatus[] fileStatusRoot = ofs.listStatus(root);
+
+    // When ACL is enabled, listStatus root will see a 4th volume created by
+    //  userXXXXX as the result of createVolumeAndBucket in initClusterAndEnv.
+    // This is due to the difference in behavior in listVolumesByUser depending
+    //  on whether ACL is enabled or not:
+    // 1. when ACL is disabled, listVolumesByUser would only return volumes
+    //  OWNED by the current user (volume owner is the current user);
+    // 2. when ACL is enabled, it would return all the volumes that the current
+    //  user has LIST permission to, regardless of the volume owner field.
 
     if (!enableAcl) {
       // When ACL is disabled, ofs.listStatus(root) will see 2+1 = 3 volumes,
@@ -759,15 +769,9 @@ public class TestRootedOzoneFileSystem {
         Assert.assertEquals(ownerShort, fileStatus.getOwner());
         Assert.assertEquals(group, fileStatus.getGroup());
       }
+    } else {
+      Assert.assertEquals(2 + 1 + 1, fileStatusRoot.length);
     }
-    // When ACL is enabled, this test will see a 4th volume created by
-    //  userXXXXX as the result of createVolumeAndBucket in initClusterAndEnv.
-    // This is due to the difference in behavior in listVolumesByUser depending
-    //  on whether ACL is enabled or not:
-    // 1. when ACL is disabled, listVolumesByUser would only return volumes
-    //  OWNED by the current user (volume owner is the current user);
-    // 2. when ACL is enabled, it would return all the volumes that the current
-    //  user has LIST permission to, regardless of the volume owner field.
 
     // Cleanup
     teardownVolumeBucketWithDir(bucketPath2);
