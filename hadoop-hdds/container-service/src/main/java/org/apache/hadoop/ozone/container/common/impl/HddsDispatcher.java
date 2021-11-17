@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -700,4 +701,21 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     default: return false;
     }
   }
+
+  @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+          ContainerCommandRequestProto msg)
+          throws StorageContainerException {
+    long containerID = msg.getContainerID();
+    Container container = getContainer(containerID);
+    if (container != null) {
+      Handler handler = getHandler(getContainerType(container));
+      return handler.getStreamDataChannel(container, msg);
+    } else {
+      throw new StorageContainerException(
+              "ContainerID " + containerID + " does not exist",
+              ContainerProtos.Result.CONTAINER_NOT_FOUND);
+    }
+  }
+
 }

@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.ratis.statemachine.StateMachine;
 
 /**
  * Dispatcher sends ContainerCommandRequests to Handler. Each Container Type
@@ -80,6 +81,10 @@ public abstract class Handler {
           containerType + "doesn't exist.");
     }
   }
+
+  public abstract StateMachine.DataChannel getStreamDataChannel(
+          Container container, ContainerCommandRequestProto msg)
+          throws StorageContainerException;
 
   /**
    * Returns the Id of this datanode.
