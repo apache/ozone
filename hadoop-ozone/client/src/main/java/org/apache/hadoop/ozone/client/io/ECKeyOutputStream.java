@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -276,13 +277,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // TODO: we should alter the put block calls to share CRC to each stream.
     ECBlockOutputStreamEntry streamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
+    List<ECBlockOutputStream> failedStreams =
+        streamEntry.getFailedStreams(false);
     // Since writes are async, let's check the failures once.
-    if(streamEntry.checkStreamFailures(false)){
+    if (failedStreams.size() > 0) {
+      addToExcludeNodesList(failedStreams);
       return StripeWriteStatus.FAILED;
     }
     streamEntry.executePutBlock();
+
+    failedStreams = streamEntry.getFailedStreams(true);
     // Since putBlock also async, let's check the failures again.
-    if(streamEntry.checkStreamFailures(true)){
+    if (failedStreams.size() > 0) {
+      addToExcludeNodesList(failedStreams);
       return StripeWriteStatus.FAILED;
     }
     ecChunkBufferCache.clear(parityCellSize);
@@ -297,6 +304,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
     currentBlockGroupLen = 0;
     return StripeWriteStatus.SUCCESS;
+  }
+
+  private void addToExcludeNodesList(List<ECBlockOutputStream> failedStreams) {
+    for (ECBlockOutputStream failedStream : failedStreams) {
+      blockOutputStreamEntryPool.getExcludeList()
+          .addDatanode(failedStream.getDatanodeDetails());
+    }
   }
 
   void writeParityCells(int parityCellSize) throws IOException {
@@ -377,7 +391,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       // the buffers
       Preconditions.checkState(len <= config.getStreamBufferMaxSize());
       int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
-      writeLen = dataWritten;
+      //writeLen = dataWritten;
 
       if (!isParity) {
         offset += writeLen;
@@ -392,6 +406,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
+    boolean containerExclusionException = checkIfContainerToExclude(t);
+    if(containerExclusionException) {
+      blockOutputStreamEntryPool.getExcludeList()
+          .addPipeline(streamEntry.getPipeline().getId());
+    }
     // In EC, we will just close the current stream.
     markStreamAsFailed(exception);
   }

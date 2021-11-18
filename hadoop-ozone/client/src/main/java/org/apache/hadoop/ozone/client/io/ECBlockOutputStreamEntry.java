@@ -36,6 +36,7 @@ import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -216,6 +217,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
    * In EC entries the parity writes does not count into this, as the written
    * data length represents the attempts of the classes using the entry, and
    * not the attempts of the entry itself.
+   *
    * @return 0 if the stream is not initialized, the amount of data bytes that
    *    were attempted to be written to the entry.
    */
@@ -267,7 +269,11 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       if (stream == null) {
         continue;
       }
-      stream.executePutBlock(false, true);
+      try {
+        stream.executePutBlock(false, true);
+      } catch (Exception e) {
+        stream.setIoException(e);
+      }
     }
   }
 
@@ -291,8 +297,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
    *                   futures if false.
    * @return
    */
-  public boolean checkStreamFailures(boolean forPutBlock) {
+  public List<ECBlockOutputStream> getFailedStreams(boolean forPutBlock) {
     final Iterator<ECBlockOutputStream> iter = blockStreams().iterator();
+    List<ECBlockOutputStream> failedStream = new ArrayList<>();
     while (iter.hasNext()) {
       final ECBlockOutputStream stream = iter.next();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
@@ -305,10 +312,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
             stream != null ? stream.getCurrentChunkResponseFuture() : null;
       }
       if (isFailed(stream, responseFuture)) {
-        return true;
+        failedStream.add(stream);
       }
     }
-    return false;
+    return failedStream;
   }
 
   private boolean isFailed(
@@ -397,12 +404,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       return this;
     }
 
-
     public ECBlockOutputStreamEntry.Builder setLength(long len) {
       this.length = len;
       return this;
     }
-
 
     public ECBlockOutputStreamEntry.Builder setBufferPool(BufferPool pool) {
       this.bufferPool = pool;

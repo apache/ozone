@@ -113,8 +113,13 @@ public class BlockOutputStreamEntry extends OutputStream {
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
     checkStream();
-    getOutputStream().write(b, off, len);
-    incCurrentPosition(len);
+    try {
+      getOutputStream().write(b, off, len);
+    }finally {
+      //Even though actual write failed we will move the position and when
+      // processing this failure, position will be updated back.
+      incCurrentPosition(len);
+    }
   }
 
   void writeOnRetry(long len) throws IOException {
