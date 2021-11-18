@@ -2511,15 +2511,16 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
-  @Test
+  @Test(timeout = 300000)
   public void testMultiPartUploadWithStream() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
-    String sampleData = Arrays.toString(generateData(1024 * 8,
-        (byte) RandomUtils.nextLong()));
-    int valueLength = sampleData.getBytes(UTF_8).length;
+    byte[] sampleData = generateData(1024 * 8,
+        (byte) RandomUtils.nextLong());
+
+    int valueLength = sampleData.length;
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -2542,13 +2543,13 @@ public abstract class TestOzoneRpcClientAbstract {
     assertNotNull(multipartInfo.getUploadID());
 
     OzoneDataStreamOutput ozoneStreamOutput = bucket.createMultipartStreamKey(
-        keyName, sampleData.length(), 2, uploadID);
-    ozoneStreamOutput.write(ByteBuffer.wrap(string2Bytes(sampleData)), 0,
-        sampleData.length());
+        keyName, valueLength, 1, uploadID);
+    ozoneStreamOutput.write(ByteBuffer.wrap(sampleData), 0,
+        valueLength);
     ozoneStreamOutput.close();
 
     OzoneMultipartUploadPartListParts parts =
-        bucket.listParts(keyName, uploadID, 1, 100);
+        bucket.listParts(keyName, uploadID, 0, 1);
 
     Assert.assertEquals(parts.getPartInfoList().size(), 1);
 
