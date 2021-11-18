@@ -246,12 +246,19 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         }
       }
     }
-    padBuffers(toRead);
-    flipInputs();
-    decodeStripe();
-    // Reset the buffer positions after padding to the read limits so the client
-    // reads the correct amount of data.
-    setBufferReadLimits(bufs, toRead);
+    if (missingIndexes.length > 0) {
+      padBuffers(toRead);
+      flipInputs();
+      decodeStripe();
+      // Reset the buffer positions and limits to remove any padding added
+      // before EC Decode.
+      setBufferReadLimits(bufs, toRead);
+    } else {
+      // If we have no missing indexes, then we the buffers will be at their
+      // limits after reading so we need to flip them to ensure they are ready
+      // to read by the caller.
+      flipInputs();
+    }
     setPos(getPos() + toRead);
     return toRead;
   }
