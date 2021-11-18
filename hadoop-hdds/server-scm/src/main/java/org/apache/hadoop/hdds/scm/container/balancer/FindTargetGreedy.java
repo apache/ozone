@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -50,7 +51,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double upperLimit;
-  private List<DatanodeUsageInfo> potentialTargets;
+  private TreeSet<DatanodeUsageInfo> potentialTargets;
 
   public FindTargetGreedy(
       ContainerManager containerManager,
@@ -60,17 +61,27 @@ public class FindTargetGreedy implements FindTargetStrategy {
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;
     this.nodeManager = nodeManager;
+
+    potentialTargets = new TreeSet<>((a, b) -> {
+      double currentUsageOfA = a.calculateUtilization(
+          sizeEnteringNode.get(a.getDatanodeDetails()));
+      double currentUsageOfB = b.calculateUtilization(
+          sizeEnteringNode.get(b.getDatanodeDetails()));
+      return Double.compare(currentUsageOfA, currentUsageOfB);
+    });
   }
 
   private void setUpperLimit(Double upperLimit){
     this.upperLimit = upperLimit;
   }
 
-  private void setPotentialTargets(List<DatanodeUsageInfo> potentialTargets) {
-    this.potentialTargets = potentialTargets;
+  private void setPotentialTargets(
+      List<DatanodeUsageInfo> potentialTargetDataNodes) {
     sizeEnteringNode.clear();
-    potentialTargets.forEach(
+    potentialTargetDataNodes.forEach(
         p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
+    potentialTargets.clear();
+    potentialTargets.addAll(potentialTargetDataNodes);
   }
 
   private void setConfiguration(ContainerBalancerConfiguration conf) {
@@ -91,14 +102,6 @@ public class FindTargetGreedy implements FindTargetStrategy {
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
       DatanodeDetails source, Set<ContainerID> candidateContainers) {
-    potentialTargets.sort((a, b) -> {
-      double currentUsageOfA = a.calculateUtilization(
-          sizeEnteringNode.get(a.getDatanodeDetails()));
-      double currentUsageOfB = b.calculateUtilization(
-          sizeEnteringNode.get(b.getDatanodeDetails()));
-      return Double.compare(currentUsageOfA, currentUsageOfB);
-    });
-
     for (DatanodeUsageInfo targetInfo : potentialTargets) {
       DatanodeDetails target = targetInfo.getDatanodeDetails();
       for (ContainerID container : candidateContainers) {
@@ -194,9 +197,11 @@ public class FindTargetGreedy implements FindTargetStrategy {
     if(sizeEnteringNode.containsKey(target)) {
       long totalEnteringSize = sizeEnteringNode.get(target) + size;
       sizeEnteringNode.put(target, totalEnteringSize);
-      if(totalEnteringSize >= config.getMaxSizeEnteringTarget()) {
-        potentialTargets.removeIf(
-            c -> c.getDatanodeDetails().equals(target));
+      potentialTargets.removeIf(
+          c -> c.getDatanodeDetails().equals(target));
+      if(totalEnteringSize < config.getMaxSizeEnteringTarget()) {
+        //reorder
+        potentialTargets.add(nodeManager.getUsageInfo(target));
       }
       return;
     }
