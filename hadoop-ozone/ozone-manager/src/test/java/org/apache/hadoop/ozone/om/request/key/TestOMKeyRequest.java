@@ -106,6 +106,7 @@ public class TestOMKeyRequest {
   protected long dataSize;
   protected Random random;
   protected long txnLogId = 100000L;
+  protected long version = 0L;
 
   // Just setting ozoneManagerDoubleBuffer which does nothing.
   protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
@@ -189,6 +190,7 @@ public class TestOMKeyRequest {
     clientID = Time.now();
     dataSize = 1000L;
     random = new Random();
+    version = 0L;
 
     Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),

@@ -62,13 +62,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileCreateRequestWithFSO.class);
-  public OMFileCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
-  }
 
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  public OMFileCreateRequestWithFSO(OMRequest omRequest,
+                                    BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

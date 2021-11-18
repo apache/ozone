@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
@@ -70,12 +69,8 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
     return new OMKeySetAclRequestWithFSO(setAclRequest);
   }
 
-  @Override protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

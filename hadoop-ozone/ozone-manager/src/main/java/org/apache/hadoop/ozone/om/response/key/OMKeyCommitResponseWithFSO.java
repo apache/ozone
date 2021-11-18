@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -33,19 +34,21 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 
 /**
  * Response for CommitKey request - prefix layout1.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE, DELETED_TABLE})
 public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
 
   public OMKeyCommitResponseWithFSO(@Nonnull OMResponse omResponse,
                                @Nonnull OmKeyInfo omKeyInfo,
                                String ozoneKeyName, String openKeyName,
-                               @Nonnull OmBucketInfo omBucketInfo) {
+                               @Nonnull OmBucketInfo omBucketInfo,
+                               RepeatedOmKeyInfo deleteKeys) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-            omBucketInfo);
+            omBucketInfo, deleteKeys);
   }
 
   /**
@@ -67,6 +70,8 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
             getOmKeyInfo());
+
+    updateDeletedTable(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

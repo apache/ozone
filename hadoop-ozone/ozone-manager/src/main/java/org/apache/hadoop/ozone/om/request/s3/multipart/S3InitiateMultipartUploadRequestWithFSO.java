@@ -63,8 +63,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 public class S3InitiateMultipartUploadRequestWithFSO
         extends S3InitiateMultipartUploadRequest {
 
-  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -255,10 +256,5 @@ public class S3InitiateMultipartUploadRequestWithFSO
       throw new OMException("Can not write to directory: " + keyName,
               OMException.ResultCodes.NOT_A_FILE);
     }
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

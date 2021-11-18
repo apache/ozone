@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.BlockNotCommittedException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -104,10 +103,6 @@ public final class ContainerProtocolCalls  {
     ContainerCommandRequestProto request = builder.build();
     ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request, getValidatorList());
-    if (ContainerProtos.Result.CONTAINER_NOT_FOUND.equals(
-        response.getResult())) {
-      throw new ContainerNotFoundException(response.getMessage());
-    }
     return response.getGetBlock();
   }
 

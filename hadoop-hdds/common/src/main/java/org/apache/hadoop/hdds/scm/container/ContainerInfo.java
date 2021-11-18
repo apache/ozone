@@ -158,6 +158,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return replicationConfig.getReplicationType();
   }
 
+  public HddsProtos.ReplicationFactor getReplicationFactor() {
+    return ReplicationConfig.getLegacyFactor(replicationConfig);
+  }
+
   public PipelineID getPipelineID() {
     return pipelineID;
   }

@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -179,10 +180,12 @@ public class TestReconWithOzoneManager {
     // check if OM metadata has vol0/bucket0/key0 info
     String ozoneKey = metadataManager.getOzoneKey(
         "vol0", "bucket0", "key0");
-    OmKeyInfo keyInfo1 = metadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo keyInfo1 =
+        metadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
+        omKeyValueTableIterator =
+        metadataManager.getKeyTable(getBucketLayout()).iterator();
 
     long omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
@@ -224,7 +227,8 @@ public class TestReconWithOzoneManager {
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
-    omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
+    omKeyValueTableIterator =
+        metadataManager.getKeyTable(getBucketLayout()).iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
     // update the next snapshot from om to verify delta updates
@@ -269,7 +273,8 @@ public class TestReconWithOzoneManager {
 
     //add 5 more keys to OM
     addKeys(5, 10);
-    omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
+    omKeyValueTableIterator =
+        metadataManager.getKeyTable(getBucketLayout()).iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
     // get the next snapshot from om
@@ -385,7 +390,7 @@ public class TestReconWithOzoneManager {
     String omKey = metadataManager.getOzoneKey(volume,
         bucket, key);
 
-    metadataManager.getKeyTable().put(omKey,
+    metadataManager.getKeyTable(getBucketLayout()).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucket)
             .setVolumeName(volume)
@@ -394,5 +399,9 @@ public class TestReconWithOzoneManager {
                 HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
+  }
+
+  private static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

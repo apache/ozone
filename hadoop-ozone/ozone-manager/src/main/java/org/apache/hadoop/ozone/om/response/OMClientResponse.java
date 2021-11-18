@@ -24,10 +24,13 @@ import java.util.concurrent.CompletableFuture;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Interface for OM Responses, each OM response should implement this interface.
@@ -37,12 +40,30 @@ public abstract class OMClientResponse {
   private OMResponse omResponse;
   private CompletableFuture<Void> flushFuture = null;
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMClientResponse.class);
+
   public OMClientResponse(OMResponse omResponse) {
     Preconditions.checkNotNull(omResponse);
     this.omResponse = omResponse;
   }
 
   public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
+  protected BucketLayout getBucketLayout(OMMetadataManager omMetadataManager,
+      String volName, String buckName) {
+    if (omMetadataManager == null) {
+      return BucketLayout.DEFAULT;
+    }
+    String buckKey = omMetadataManager.getBucketKey(volName, buckName);
+    try {
+      OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
+      return buckInfo.getBucketLayout();
+    } catch (IOException e) {
+      LOG.error("Cannot find the key: " + buckKey, e);
+    }
     return BucketLayout.DEFAULT;
   }
 

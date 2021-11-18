@@ -17,33 +17,14 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OzoneAclInfo;
 
 import java.io.IOException;
 import java.util.List;
 
 /**
- * OM volume manager interface.
+ * OM volume manager interface for read operations on a volume.
  */
 public interface VolumeManager extends IOzoneAcl {
-
-  /**
-   * Create a new volume.
-   * @param args - Volume args to create a volume
-   */
-  void createVolume(OmVolumeArgs args)
-      throws IOException;
-
-  /**
-   * Changes the owner of a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param owner - Name of the owner.
-   * @throws IOException
-   */
-  void setOwner(String volume, String owner)
-      throws IOException;
 
   /**
    * Gets the volume information.
@@ -52,25 +33,6 @@ public interface VolumeManager extends IOzoneAcl {
    * @throws IOException
    */
   OmVolumeArgs getVolumeInfo(String volume) throws IOException;
-
-  /**
-   * Deletes an existing empty volume.
-   *
-   * @param volume - Name of the volume.
-   * @throws IOException
-   */
-  void deleteVolume(String volume) throws IOException;
-
-  /**
-   * Checks if the specified user with a role can access this volume.
-   *
-   * @param volume - volume
-   * @param userAcl - user acl which needs to be checked for access
-   * @return true if the user has access for the volume, false otherwise
-   * @throws IOException
-   */
-  boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
-      throws IOException;
 
   /**
    * Returns a list of volumes owned by a given user; if user is null,

@@ -93,12 +93,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
+  public OMKeyRequest(OMRequest omRequest, BucketLayout bucketLayoutArg) {
+    super(omRequest);
+    this.bucketLayout = bucketLayoutArg;
+  }
+
   public BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+    return bucketLayout;
   }
 
   protected KeyArgs resolveBucketLink(
@@ -536,7 +543,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected boolean checkDirectoryAlreadyExists(String volumeName,
       String bucketName, String keyName, OMMetadataManager omMetadataManager)
       throws IOException {
-    if (omMetadataManager.getKeyTable().isExist(
+    if (omMetadataManager.getKeyTable(getBucketLayout()).isExist(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName,
             keyName))) {
       return true;
@@ -562,11 +569,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Return bucket info for the specified bucket.
-   * @param omMetadataManager
-   * @param volume
-   * @param bucket
-   * @return OmVolumeArgs
-   * @throws IOException
    */
   protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
       String volume, String bucket) {
@@ -621,13 +623,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
       //TODO args.getMetadata
     }
     if (dbKeyInfo != null) {
-      // TODO: Need to be fixed, as when key already exists, we are
-      //  appending new blocks to existing key.
-      // The key already exist, the new blocks will be added as new version
-      // when locations.size = 0, the new version will have identical blocks
-      // as its previous version
-      dbKeyInfo.addNewVersion(locations, false);
-      dbKeyInfo.setDataSize(size + dbKeyInfo.getDataSize());
+      // The key already exist, the new blocks will replace old ones
+      // as new versions unless the bucket does not have versioning
+      // turned on.
+      dbKeyInfo.addNewVersion(locations, false,
+              omBucketInfo.getIsVersionEnabled());
+      long newSize = size;
+      if (omBucketInfo.getIsVersionEnabled()) {
+        newSize += dbKeyInfo.getDataSize();
+      }
+      dbKeyInfo.setDataSize(newSize);
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());

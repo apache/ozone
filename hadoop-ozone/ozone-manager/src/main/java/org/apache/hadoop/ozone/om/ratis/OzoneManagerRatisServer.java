@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 
@@ -281,7 +282,10 @@ public final class OzoneManagerRatisServer {
     try {
       return server.submitClientRequestAsync(raftClientRequest)
           .get();
-    } catch (Exception ex) {
+    } catch (ExecutionException | IOException ex) {
+      throw new ServiceException(ex.getMessage(), ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
       throw new ServiceException(ex.getMessage(), ex);
     }
   }
@@ -380,8 +384,10 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
-    Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
-    Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
+      Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
+    }
     return RaftClientRequest.newBuilder()
         .setClientId(
             ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))

@@ -86,7 +86,7 @@ public class OMKeyCreateResponse extends OMClientResponse {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
               parentKeyInfo);
         }
-        omMetadataManager.getKeyTable()
+        omMetadataManager.getKeyTable(getBucketLayout())
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
     }

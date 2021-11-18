@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -69,6 +70,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   public OMKeyRenameRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -156,7 +161,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           fromKeyName);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
-      OmKeyInfo toKeyValue = omMetadataManager.getKeyTable().get(toKey);
+      OmKeyInfo toKeyValue =
+          omMetadataManager.getKeyTable(getBucketLayout()).get(toKey);
 
       if (toKeyValue != null) {
         throw new OMException("Key already exists " + toKeyName,
@@ -164,7 +170,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       }
 
       // fromKeyName should exist
-      fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
+      fromKeyValue =
+          omMetadataManager.getKeyTable(getBucketLayout()).get(fromKey);
       if (fromKeyValue == null) {
           // TODO: Add support for renaming open key
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
@@ -180,7 +187,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       // Add to cache.
       // fromKey should be deleted, toKey should be added with newly updated
       // omKeyInfo.
-      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+      Table<String, OmKeyInfo> keyTable =
+          omMetadataManager.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(fromKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));

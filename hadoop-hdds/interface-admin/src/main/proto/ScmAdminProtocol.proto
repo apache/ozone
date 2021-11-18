@@ -246,6 +246,7 @@ message SCMListContainerRequestProto {
   optional uint64 startContainerID = 2;
   optional string traceID = 3;
   optional LifeCycleState state = 4;
+  optional ReplicationFactor factor = 5;
 }
 
 message SCMListContainerResponseProto {

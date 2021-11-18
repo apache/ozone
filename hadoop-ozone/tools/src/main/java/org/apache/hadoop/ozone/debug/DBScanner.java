@@ -75,6 +75,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "File to dump table scan data")
   private static String fileName;
 
+  @CommandLine.Option(names = {"--dnSchema", "-d"},
+      description = "Datanode DB Schema Version : V1/V2",
+      defaultValue = "V2")
+  private static String dnDBSchemaVersion;
+
   @CommandLine.ParentCommand
   private RDBParser parent;
 
@@ -209,6 +214,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                   " number is -1 which is to dump entire table");
     }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
+    DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
     this.constructColumnFamilyMap(DBDefinitionFactory.
             getDefinition(Paths.get(dbPath)));
     if (this.columnFamilyMap !=null) {

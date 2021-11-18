@@ -72,7 +72,6 @@ import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.io.S3WrapperInputStream;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
@@ -118,6 +117,7 @@ public class ObjectEndpoint extends EndpointBase {
 
   @Context
   private HttpHeaders headers;
+
 
   private List<String> customizableGetHeaders = new ArrayList<>();
   private int bufferSize;
@@ -290,7 +290,6 @@ public class ObjectEndpoint extends EndpointBase {
             .header(CONTENT_LENGTH, keyDetails.getDataSize());
 
       } else {
-        OzoneInputStream key = bucket.readKey(keyPath);
 
         long startOffset = rangeHeader.getStartOffset();
         long endOffset = rangeHeader.getEndOffset();
@@ -298,11 +297,9 @@ public class ObjectEndpoint extends EndpointBase {
         // byte from start offset
         long copyLength = endOffset - startOffset + 1;
         StreamingOutput output = dest -> {
-          try (S3WrapperInputStream s3WrapperInputStream =
-              new S3WrapperInputStream(
-                  key.getInputStream())) {
-            s3WrapperInputStream.seek(startOffset);
-            IOUtils.copyLarge(s3WrapperInputStream, dest, 0,
+          try (OzoneInputStream ozoneInputStream = bucket.readKey(keyPath)) {
+            ozoneInputStream.seek(startOffset);
+            IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
           }
         };
