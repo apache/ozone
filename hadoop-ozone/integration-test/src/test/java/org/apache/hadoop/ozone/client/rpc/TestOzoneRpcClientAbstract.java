@@ -2511,7 +2511,7 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
-  @Test(timeout = 300000)
+  @Test(timeout = 3000000)
   public void testMultiPartUploadWithStream() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
