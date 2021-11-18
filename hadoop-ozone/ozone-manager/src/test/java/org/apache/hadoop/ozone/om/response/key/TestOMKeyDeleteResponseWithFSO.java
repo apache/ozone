@@ -18,15 +18,12 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
 /**
@@ -70,17 +67,6 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
             replicationFactor,
             getOmBucketInfo().getObjectID() + 1,
             getOmBucketInfo().getObjectID(), 100, Time.now());
-  }
-
-  @NotNull
-  @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
   }
 
   @Override

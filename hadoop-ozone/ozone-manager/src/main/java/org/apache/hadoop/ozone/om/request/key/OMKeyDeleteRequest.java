@@ -61,8 +61,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyDeleteRequest.class);
 
-  public OMKeyDeleteRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -72,10 +72,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
 
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(validateAndNormalizeKey(
-                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+        keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
@@ -138,7 +140,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
+      OmKeyInfo omKeyInfo =
+          omMetadataManager.getKeyTable(bucketLayout).get(objectKey);
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
@@ -147,7 +150,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Update table cache.
-      omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(
+      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+          new CacheKey<>(
               omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 

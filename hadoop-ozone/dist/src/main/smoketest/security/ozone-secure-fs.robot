@@ -64,7 +64,7 @@ Create volume bucket with credentials
                         # Authenticate testuser
     Run Keyword         Kinit test user     testuser     testuser.keytab
     Run Keyword         Setup volume names
-    Execute             ozone sh volume create o3://om/${volume1} 
+    Execute             ozone sh volume create o3://om/${volume1}
     Execute             ozone sh volume create o3://om/${volume2}
     Execute             ozone sh bucket create o3://om/${volume1}/bucket1
     Execute             ozone sh bucket create o3://om/${volume1}/bucket2

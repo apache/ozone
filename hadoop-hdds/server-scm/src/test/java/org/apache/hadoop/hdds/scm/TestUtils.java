@@ -92,6 +92,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class TestUtils {
 
   private static ThreadLocalRandom random = ThreadLocalRandom.current();
+  private static PipelineID randomPipelineID = PipelineID.randomId();
 
   private TestUtils() {
   }
@@ -621,7 +622,7 @@ public final class TestUtils {
     return StorageContainerManager.createSCM(conf, configurator);
   }
 
-  public static ContainerInfo getContainer(
+  private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
         .setContainerID(RandomUtils.nextLong())
@@ -629,7 +630,20 @@ public final class TestUtils {
             new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(state)
         .setSequenceId(10000L)
-        .setOwner("TEST")
+        .setOwner("TEST");
+  }
+
+  public static ContainerInfo getContainer(
+      final HddsProtos.LifeCycleState state) {
+    return getDefaultContainerInfoBuilder(state)
+        .setPipelineID(randomPipelineID)
+        .build();
+  }
+
+  public static ContainerInfo getContainer(
+      final HddsProtos.LifeCycleState state, PipelineID pipelineID) {
+    return getDefaultContainerInfoBuilder(state)
+        .setPipelineID(pipelineID)
         .build();
   }
 

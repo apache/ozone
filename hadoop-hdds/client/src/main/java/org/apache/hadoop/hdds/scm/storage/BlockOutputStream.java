@@ -503,6 +503,10 @@ public class BlockOutputStream extends OutputStream {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
+      } catch (Throwable e) {
+        String msg = "Failed to flush. error: " + e.getMessage();
+        LOG.error(msg, e);
+        throw new RuntimeException(msg, e);
       }
     }
   }
@@ -565,6 +569,10 @@ public class BlockOutputStream extends OutputStream {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
+      } catch (Throwable e) {
+        String msg = "Failed to flush. error: " + e.getMessage();
+        LOG.error(msg, e);
+        throw new RuntimeException(msg, e);
       } finally {
         cleanup(false);
       }

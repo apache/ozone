@@ -72,7 +72,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>2.1.0-03f3b68-SNAPSHOT</ratis.version>
+    <ratis.version>2.2.0</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>0.7.0</ratis.thirdparty.version>
@@ -107,7 +107,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-cli.version>1.2</commons-cli.version>
     <commons-codec.version>1.11</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
-    <commons-compress.version>1.20</commons-compress.version>
+    <commons-compress.version>1.21</commons-compress.version>
     <commons-configuration2.version>2.1.1</commons-configuration2.version>
     <commons-csv.version>1.0</commons-csv.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
@@ -237,13 +237,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-site-plugin.version>3.9.1</maven-site-plugin.version>
     <checkstyle.version>8.29</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
-    <aws-java-sdk.version>1.11.901</aws-java-sdk.version>
+    <aws-java-sdk.version>1.11.1034</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
     <frontend-maven-plugin.version>1.12.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
     so that Hadoop 3.x can declare itself a 2.x artifact. -->
     <declared.hadoop.version>${hadoop.version}</declared.hadoop.version>
-    <proto-backwards-compatibility.version>1.0.5</proto-backwards-compatibility.version>
+    <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
     <snakeyaml.version>1.26</snakeyaml.version>
@@ -1121,16 +1121,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${aws-java-sdk.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.mina</groupId>
-        <artifactId>mina-core</artifactId>
-        <version>2.0.16</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.sshd</groupId>
-        <artifactId>sshd-core</artifactId>
-        <version>1.6.0</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.ftpserver</groupId>
         <artifactId>ftplet-api</artifactId>
         <version>1.0.0</version>
@@ -1540,7 +1530,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           -->
         <groupId>net.minidev</groupId>
         <artifactId>json-smart</artifactId>
-        <version>2.3</version>
+        <version>2.3.1</version>
       </dependency>
       <dependency>
         <groupId>org.skyscreamer</groupId>
@@ -1624,7 +1614,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
-        <version>6.20.3</version>
+        <version>6.25.3</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>

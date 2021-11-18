@@ -100,13 +100,14 @@ public class TestObjectStoreWithFSO {
    *
    * @throws IOException
    */
-  @BeforeClass public static void init() throws Exception {
+  @BeforeClass
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
-        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
@@ -196,7 +197,8 @@ public class TestObjectStoreWithFSO {
     ozoneOutputStream.close();
 
     Table<String, OmKeyInfo> fileTable =
-            cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
     // After closing the file. File entry should be removed from openFileTable
     // and it should be added to fileTable.
     verifyKeyInFileTable(fileTable, file, dirPathC.getObjectID(), false);
@@ -264,7 +266,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(key, keyDetails.getName());
 
     Table<String, OmKeyInfo> fileTable =
-            cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
 
     // When closing the key, entry should be removed from openFileTable
     // and it should be added to fileTable.
@@ -649,7 +652,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(sampleBucketName, bucket.getName());
     Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
 
-    // Case 3: Bucket layout: Empty and OM Metadata layout: PREFIX
+    // Case 3: Bucket layout: Empty and
+    // OM default bucket layout: FILE_SYSTEM_OPTIMIZED
     builder = BucketArgs.newBuilder();
     sampleBucketName = UUID.randomUUID().toString();
     volume.createBucket(sampleBucketName, builder.build());

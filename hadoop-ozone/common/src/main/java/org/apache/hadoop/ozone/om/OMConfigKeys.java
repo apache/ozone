@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
 /**
@@ -67,8 +68,6 @@ public final class OMConfigKeys {
       "ozone.om.http-address";
   public static final String OZONE_OM_HTTPS_ADDRESS_KEY =
       "ozone.om.https-address";
-  public static final String OZONE_OM_KEYTAB_FILE =
-      "ozone.om.keytab.file";
   public static final String OZONE_OM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
@@ -281,6 +280,15 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "SIMPLE";
 
   public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
+
+  // Default bucket layout used by Ozone Manager during bucket creation
+  // when a client does not specify the bucket layout option.
+  public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
+      "ozone.default.bucket.layout";
+  public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
+      BucketLayout.OBJECT_STORE.name();
+  public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
+      BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
 
   /**
    * Configuration properties for Directory Deleting Service.

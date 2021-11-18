@@ -64,7 +64,7 @@ public class TestContainerStateManagerIntegration {
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
   private ContainerManager containerManager;
-  private ContainerStateManagerV2 containerStateManager;
+  private ContainerStateManager containerStateManager;
   private int numContainerPerOwnerInPipeline;
   private  Set<ContainerID> excludedContainerIDS;
 

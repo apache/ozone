@@ -57,13 +57,11 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
-  // TODO: LEGACY should be removed and should not be exposed to the end user
-  // we will revisit during the client side defaulting behaviour
-  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
+  enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
 
-  @Option(names = { "--type", "-t" },
-      description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
-      defaultValue = "LEGACY")
+  @Option(names = { "--layout", "-l" },
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
+      defaultValue = "OBJECT_STORE")
   private AllowedBucketLayouts allowedBucketLayout;
 
   @Option(names = {"--replication", "-r"},

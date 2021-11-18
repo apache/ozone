@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -103,6 +104,7 @@ public class TestBlockDeletion {
   private MiniOzoneCluster cluster = null;
   private StorageContainerManager scm = null;
   private OzoneManager om = null;
+  private OzoneManagerProtocol writeClient;
   private Set<Long> containerIdsWithDeletedBlocks;
   private long maxTransactionId = 0;
   private File baseDir;
@@ -156,6 +158,8 @@ public class TestBlockDeletion {
     cluster.waitForClusterToBeReady();
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
     om = cluster.getOzoneManager();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
     scm = cluster.getStorageContainerManager();
     containerIdsWithDeletedBlocks = new HashSet<>();
     metrics = scm.getScmBlockManager().getSCMBlockDeletingService()
@@ -218,7 +222,7 @@ public class TestBlockDeletion {
     matchContainerTransactionIds();
 
     Assert.assertEquals(0L, metrics.getNumBlockDeletionTransactionCreated());
-    om.deleteKey(keyArgs);
+    writeClient.deleteKey(keyArgs);
     Thread.sleep(5000);
     // The blocks should not be deleted in the DN as the container is open
     try {
@@ -334,7 +338,7 @@ public class TestBlockDeletion {
               .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
     });
 
-    om.deleteKey(keyArgs);
+    writeClient.deleteKey(keyArgs);
     // Wait for blocks to be deleted and container reports to be processed
     Thread.sleep(5000);
     containerInfos = scm.getContainerManager().getContainers();
@@ -505,7 +509,7 @@ public class TestBlockDeletion {
               new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
           .setRefreshPipeline(true)
           .build();
-      om.deleteKey(keyArgs);
+      writeClient.deleteKey(keyArgs);
     }
 
     // Wait for block delete command sent from OM

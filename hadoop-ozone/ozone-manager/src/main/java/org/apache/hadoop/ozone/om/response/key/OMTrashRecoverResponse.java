@@ -62,7 +62,7 @@ public class OMTrashRecoverResponse extends OMClientResponse {
     omMetadataManager.getDeletedTable()
         .deleteWithBatch(batchOperation, omKeyInfo.getKeyName());
     /* TODO: trashKey should be updated to destinationBucket. */
-    omMetadataManager.getKeyTable()
+    omMetadataManager.getKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, trashKey, omKeyInfo);
   }
 

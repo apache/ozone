@@ -312,6 +312,7 @@ message SCMCommandProto {
     closePipelineCommand = 7;
     setNodeOperationalStateCommand = 8;
     finalizeNewLayoutVersionCommand = 9;
+    refreshVolumeUsageInfo = 10;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;

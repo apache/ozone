@@ -49,6 +49,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,6 +64,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCA
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -628,6 +630,30 @@ public class TestPipelineManagerImpl {
     Assert.assertFalse(pipelineManager.getSafeModeStatus());
     Assert.assertTrue(pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
+  }
+
+  @Test
+  public void testAddContainerWithClosedPipeline() throws Exception {
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
+            captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
+    SCMHADBTransactionBuffer buffer = new MockSCMHADBTransactionBuffer(dbStore);
+    PipelineManagerImpl pipelineManager =
+            createPipelineManager(true, buffer);
+    Table<PipelineID, Pipeline> pipelineStore =
+            SCMDBDefinition.PIPELINES.getTable(dbStore);
+    Pipeline pipeline = pipelineManager.createPipeline(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+    PipelineID pipelineID = pipeline.getId();
+    pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
+    pipelineManager.getStateManager().updatePipelineState(
+            pipelineID.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
+    buffer.flush();
+    Assert.assertTrue(pipelineStore.get(pipelineID).isClosed());
+    pipelineManager.addContainerToPipelineSCMStart(pipelineID,
+            ContainerID.valueOf(2));
+    assertTrue(logCapturer.getOutput().contains("Container " +
+            ContainerID.valueOf(2) + " in open state for pipeline=" +
+            pipelineID + " in closed state"));
   }
 
   private void sendPipelineReport(

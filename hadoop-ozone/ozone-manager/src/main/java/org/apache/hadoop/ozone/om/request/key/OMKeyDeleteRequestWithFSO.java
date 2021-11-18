@@ -61,8 +61,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyDeleteRequestWithFSO.class);
 
-  public OMKeyDeleteRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyDeleteRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -143,7 +144,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
                 new CacheValue<>(Optional.absent(), trxnLogIndex));
       } else {
         // Update table cache.
-        omMetadataManager.getKeyTable().addCacheEntry(
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
                 new CacheKey<>(ozonePathKey),
                 new CacheValue<>(Optional.absent(), trxnLogIndex));
       }
@@ -202,10 +203,5 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     }
 
     return omClientResponse;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

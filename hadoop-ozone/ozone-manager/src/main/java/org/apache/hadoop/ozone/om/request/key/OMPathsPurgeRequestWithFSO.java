@@ -35,8 +35,9 @@ import java.util.List;
  */
 public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
 
-  public OMPathsPurgeRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMPathsPurgeRequestWithFSO(OMRequest omRequest,
+                                    BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -61,10 +62,5 @@ public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
         omDoubleBufferHelper);
 
     return omClientResponse;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
