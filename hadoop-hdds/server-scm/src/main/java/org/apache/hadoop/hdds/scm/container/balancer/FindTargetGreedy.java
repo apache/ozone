@@ -67,7 +67,11 @@ public class FindTargetGreedy implements FindTargetStrategy {
           sizeEnteringNode.get(a.getDatanodeDetails()));
       double currentUsageOfB = b.calculateUtilization(
           sizeEnteringNode.get(b.getDatanodeDetails()));
-      return Double.compare(currentUsageOfA, currentUsageOfB);
+      int ret = Double.compare(currentUsageOfA, currentUsageOfB);
+      if (ret != 0) {
+        return ret;
+      }
+      return a.hashCode() - b.hashCode();
     });
   }
 

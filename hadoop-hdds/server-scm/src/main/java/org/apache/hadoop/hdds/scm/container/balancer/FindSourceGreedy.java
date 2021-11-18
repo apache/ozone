@@ -49,7 +49,11 @@ public class FindSourceGreedy implements FindSourceStrategy{
       double currentUsageOfB = b.calculateUtilization(
           -sizeLeavingNode.get(b.getDatanodeDetails()));
       //in descending order
-      return Double.compare(currentUsageOfB, currentUsageOfA);
+      int ret = Double.compare(currentUsageOfB, currentUsageOfA);
+      if (ret != 0) {
+        return ret;
+      }
+      return a.hashCode() - b.hashCode();
     });
     this.nodeManager = nodeManager;
   }
