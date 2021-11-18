@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -73,7 +72,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -2509,54 +2507,6 @@ public abstract class TestOzoneRpcClientAbstract {
       assertEquals(ResultCodes.PERMISSION_DENIED,
           ((OMException) e).getResult());
     }
-  }
-
-  @Test(timeout = 3000000)
-  public void testMultiPartUploadWithStream() throws IOException {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    byte[] sampleData = generateData(1024 * 8,
-        (byte) RandomUtils.nextLong());
-
-    int valueLength = sampleData.length;
-
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-
-    ReplicationConfig replicationConfig =
-        ReplicationConfig.fromTypeAndString(
-            ReplicationType.RATIS,
-            THREE.name());
-
-    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        replicationConfig);
-
-    assertNotNull(multipartInfo);
-    String uploadID = multipartInfo.getUploadID();
-    Assert.assertEquals(volumeName, multipartInfo.getVolumeName());
-    Assert.assertEquals(bucketName, multipartInfo.getBucketName());
-    Assert.assertEquals(keyName, multipartInfo.getKeyName());
-    assertNotNull(multipartInfo.getUploadID());
-
-    OzoneDataStreamOutput ozoneStreamOutput = bucket.createMultipartStreamKey(
-        keyName, valueLength, 1, uploadID);
-    ozoneStreamOutput.write(ByteBuffer.wrap(sampleData), 0,
-        valueLength);
-    ozoneStreamOutput.close();
-
-    OzoneMultipartUploadPartListParts parts =
-        bucket.listParts(keyName, uploadID, 0, 1);
-
-    Assert.assertEquals(parts.getPartInfoList().size(), 1);
-
-    OzoneMultipartUploadPartListParts.PartInfo partInfo =
-        parts.getPartInfoList().get(0);
-    Assert.assertEquals(valueLength, partInfo.getSize());
-
   }
 
   @Test
