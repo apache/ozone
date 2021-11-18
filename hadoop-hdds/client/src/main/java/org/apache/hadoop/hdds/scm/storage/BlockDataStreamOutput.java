@@ -125,6 +125,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   private final long syncSize = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
+  // the effective length of ack data before commit
+  private long totalAckLengthBeforeCommit;
 
   /**
    * Creates a new BlockDataStreamOutput.
@@ -261,7 +263,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     final StreamBuffer buf = new StreamBuffer(b, off, len);
     bufferList.add(buf);
 
-    writeChunkToContainer(buf.duplicate());
+    writeChunkToContainer(buf);
 
     writtenDataLength += len;
   }
@@ -296,7 +298,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       if (writeLen != buf.length()) {
         duplicated.limit(Math.toIntExact(len));
       }
-      writeChunkToContainer(duplicated);
+      writeChunkToContainer(buf);
       len -= writeLen;
       count++;
       writtenDataLength += writeLen;
@@ -390,6 +392,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           // for standalone protocol, logIndex will always be 0.
           commitWatcher
               .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
+          totalAckLengthBeforeCommit = 0;
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -416,6 +419,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
     } catch (Exception e) {
+      e.printStackTrace();
       LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
     }
@@ -550,13 +554,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * Writes buffered data as a new chunk to the container and saves chunk
    * information to be used later in putKey call.
    *
-   * @param buf chunk data to write, from position to limit
+   * @param streamBuf chunk data to write, from position to limit
    * @throws IOException if there is an I/O error while performing the call
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
    */
-  private void writeChunkToContainer(ByteBuffer buf)
+  private void writeChunkToContainer(StreamBuffer streamBuf)
       throws IOException {
+    ByteBuffer buf = streamBuf.duplicate();
     final int effectiveChunkSize = buf.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     ChecksumData checksumData = checksum.computeChecksum(
@@ -585,10 +590,18 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
                 String msg =
                     "Failed to write chunk " + chunkInfo.getChunkName() +
                         " " + "into block " + blockID;
-                LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+                LOG.warn("{}, exception: {}", msg, e.getLocalizedMessage());
                 CompletionException ce = new CompletionException(msg, e);
                 setIoException(ce);
                 throw ce;
+              } else {
+                if (bufferList.size() > 0) {
+
+                  totalAckLengthBeforeCommit += streamBuf.length();
+                  bufferList.remove(streamBuf);
+                  commitWatcher
+                      .updateTotalAckDataLength(totalAckLengthBeforeCommit);
+                }
               }
             }, responseExecutor);
 

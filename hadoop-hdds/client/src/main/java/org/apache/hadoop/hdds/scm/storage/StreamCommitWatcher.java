@@ -183,12 +183,7 @@ public class StreamCommitWatcher {
       // clear the future object from the future Map
       final CompletableFuture<ContainerCommandResponseProto> remove =
           futureMap.remove(totalAckDataLength);
-      if (remove == null) {
-        LOG.error("Couldn't find required future for " + totalAckDataLength);
-        for (Long key : futureMap.keySet()) {
-          LOG.error("Existing acknowledged data: " + key);
-        }
-      }
+
       for (StreamBuffer byteBuffer : buffers) {
         bufferList.remove(byteBuffer);
       }
@@ -223,5 +218,8 @@ public class StreamCommitWatcher {
       futureMap.clear();
     }
     commitIndexMap = null;
+  }
+  public void updateTotalAckDataLength(long ackDataLength) {
+    this.totalAckDataLength = ackDataLength;
   }
 }
