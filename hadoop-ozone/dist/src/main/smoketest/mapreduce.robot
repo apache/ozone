@@ -36,7 +36,7 @@ Find example jar
 Execute PI calculation
                     ${exampleJar}    Find example jar
     ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
-                    ${output} =      Execute                 yarn jar ${exampleJar} pi -D fs.defaultFS=${root} -D ozone.fs.datastream.enable=false 3 3
+                    ${output} =      Execute                 yarn jar ${exampleJar} pi -D fs.defaultFS=${root} 3 3
                     Should Contain   ${output}               completed successfully
 
 Execute WordCount
@@ -45,6 +45,6 @@ Execute WordCount
     ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
     ${dir} =        Format FS URL    ${SCHEME}    ${volume}    ${bucket}   input/
     ${result} =     Format FS URL    ${SCHEME}    ${volume}    ${bucket}   wordcount-${random}.txt
-    ${output} =     Execute          yarn jar ${exampleJar} wordcount -D fs.defaultFS=${root} -D ozone.fs.datastream.enable=false ${dir} ${result}
+    ${output} =     Execute          yarn jar ${exampleJar} wordcount -D fs.defaultFS=${root} ${dir} ${result}
                     Should Contain   ${output}               map tasks=3
                     Should Contain   ${output}               completed successfully
