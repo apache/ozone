@@ -412,6 +412,9 @@ public class SCMClientProtocolServer implements
         if (factor != null) {
           return scm.getContainerManager().getContainers(state).stream()
               .filter(info -> info.containerID().getId() >= startContainerID)
+              //Filtering EC replication type as EC will not have factor.
+              .filter(info -> info
+                  .getReplicationType() != HddsProtos.ReplicationType.EC)
               .filter(info -> (info.getReplicationFactor() == factor))
               .sorted().limit(count).collect(Collectors.toList());
         } else {
@@ -423,6 +426,9 @@ public class SCMClientProtocolServer implements
         if (factor != null) {
           return scm.getContainerManager().getContainers().stream()
               .filter(info -> info.containerID().getId() >= startContainerID)
+              //Filtering EC replication type as EC will not have factor.
+              .filter(info -> info
+                  .getReplicationType() != HddsProtos.ReplicationType.EC)
               .filter(info -> info.getReplicationFactor() == factor)
               .sorted().limit(count).collect(Collectors.toList());
         } else {
