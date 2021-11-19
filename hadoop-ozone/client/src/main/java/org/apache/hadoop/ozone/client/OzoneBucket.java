@@ -955,6 +955,14 @@ public class OzoneBucket extends WithMetadata {
             overWrite, recursive);
   }
 
+  public OzoneDataStreamOutput createStreamFile(String keyName, long size,
+      ReplicationConfig replicationConfig, boolean overWrite,
+      boolean recursive) throws IOException {
+    return proxy
+        .createStreamFile(volumeName, name, keyName, size, replicationConfig,
+            overWrite, recursive);
+  }
+
   /**
    * List the status for a file or a directory and its contents.
    *
