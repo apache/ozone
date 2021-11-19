@@ -64,14 +64,12 @@ public interface ReplicationConfig {
   }
 
   static ReplicationConfig getDefault(ConfigurationSource config) {
-    String replication = config.get(OzoneConfigKeys.OZONE_REPLICATION);
-    String replType = config.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE);
-    ReplicationConfig replicationConfig = null;
-    if (replication != null && replType != null) {
-      replicationConfig = ReplicationConfig
-          .fromTypeAndString(ReplicationType.valueOf(replType), replication);
-    }
-    return replicationConfig;
+    String replication = config.get(OzoneConfigKeys.OZONE_REPLICATION,
+        OzoneConfigKeys.OZONE_REPLICATION_DEFAULT);
+    String replType = config.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT);
+    return ReplicationConfig
+        .fromTypeAndString(ReplicationType.valueOf(replType), replication);
   }
 
   /**
