@@ -648,13 +648,21 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(args);
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
-    String keyName = OMClientRequest.validateAndNormalizeKey(
-        enableFileSystemPaths, args.getKeyName());
+    String keyName = args.getKeyName();
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
+
+    BucketLayout bucketLayout =
+        getBucketLayout(metadataManager, args.getVolumeName(),
+            args.getBucketName());
+    keyName = OMClientRequest
+        .validateAndNormalizeKey(enableFileSystemPaths, keyName,
+            bucketLayout);
+
     OmKeyInfo value = null;
     try {
-      if (isBucketFSOptimized(volumeName, bucketName)) {
+      if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
@@ -3266,8 +3274,7 @@ public class KeyManagerImpl implements KeyManager {
     OmBucketInfo buckInfo =
         ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
     if (buckInfo != null) {
-      return buckInfo.getBucketLayout()
-          .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      return buckInfo.getBucketLayout().isFileSystemOptimized();
     }
     return false;
   }

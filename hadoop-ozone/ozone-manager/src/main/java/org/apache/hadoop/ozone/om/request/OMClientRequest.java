@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -407,6 +408,20 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
+  public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
+      String keyPath, BucketLayout bucketLayout) throws OMException {
+    LOG.debug("Bucket Layout: {}", bucketLayout);
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+      keyPath = validateAndNormalizeKey(true, keyPath);
+      if (keyPath.endsWith("/")) {
+        throw new OMException(
+                "Invalid KeyPath, key names with trailing / "
+                        + "are not allowed." + keyPath,
+                OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    }
+    return keyPath;
+  }
 
   public static String validateAndNormalizeKey(String keyName)
       throws OMException {

@@ -53,8 +53,8 @@ public class CreateBucketHandler extends BucketHandler {
 
   enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
 
-  @Option(names = { "--type", "-t" },
-      description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
+  @Option(names = { "--layout", "-l" },
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
       defaultValue = "OBJECT_STORE")
   private AllowedBucketLayouts allowedBucketLayout;
 

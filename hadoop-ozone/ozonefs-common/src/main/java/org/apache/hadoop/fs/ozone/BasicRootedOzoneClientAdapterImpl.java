@@ -233,7 +233,7 @@ public class BasicRootedOzoneClientAdapterImpl
         // when ACL is disabled. Both exceptions need to be handled.
         switch (ex.getResult()) {
         case VOLUME_NOT_FOUND:
-        case BUCKET_NOT_FOUND:
+          // Create the volume first when the volume doesn't exist
           try {
             objectStore.createVolume(volumeStr);
           } catch (OMException newVolEx) {
@@ -242,7 +242,11 @@ public class BasicRootedOzoneClientAdapterImpl
               throw newVolEx;
             }
           }
-
+          // No break here. Proceed to create the bucket
+        case BUCKET_NOT_FOUND:
+          // When BUCKET_NOT_FOUND is thrown, we expect the parent volume
+          // exists, so that we don't call create volume and incur
+          // unnecessary ACL checks which could lead to unwanted behavior.
           OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {

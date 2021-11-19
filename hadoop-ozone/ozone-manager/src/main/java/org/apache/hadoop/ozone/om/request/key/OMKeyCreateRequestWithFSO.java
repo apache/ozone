@@ -59,8 +59,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
  */
 public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
-  public OMKeyCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCreateRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -230,10 +231,5 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             numKeysCreated);
 
     return omClientResponse;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

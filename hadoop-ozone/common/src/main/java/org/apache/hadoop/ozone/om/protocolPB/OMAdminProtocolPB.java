@@ -15,32 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.protocol;
+package org.apache.hadoop.ozone.om.protocolPB;
+
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
+import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * S3Auth wraps the data needed for S3 Authentication.
+ * Protocol used for communication between OMs.
  */
-public class S3Auth {
-  private String stringToSign;
-  private String signature;
-  private String accessID;
-  public static final String S3_AUTH_CHECK = "ozone.s3.auth.check";
-
-  public S3Auth(final String stringToSign,
-                final String signature, final String accessID) {
-    this.accessID = accessID;
-    this.stringToSign = stringToSign;
-    this.signature = signature;
-  }
-  public String getStringTosSign() {
-    return stringToSign;
-  }
-
-  public String getSignature() {
-    return signature;
-  }
-
-  public String getAccessID() {
-    return accessID;
-  }
+@ProtocolInfo(protocolName =
+    "org.apache.hadoop.ozone.om.protocol.OzoneManagerMetadataProtocol",
+    protocolVersion = 1)
+@KerberosInfo(
+    serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
+@InterfaceAudience.Private
+public interface OMAdminProtocolPB
+    extends OzoneManagerAdminService.BlockingInterface {
 }
