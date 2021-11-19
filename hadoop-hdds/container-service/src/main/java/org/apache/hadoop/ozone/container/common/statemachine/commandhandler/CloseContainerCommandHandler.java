@@ -62,14 +62,13 @@ public class CloseContainerCommandHandler implements CommandHandler {
    * Handles a given SCM command.
    *
    * @param command           - SCM Command
-   * @param ozoneContainer         - Ozone Container.
+   * @param ozoneContainer    - Ozone Container.
    * @param context           - Current Context.
    * @param connectionManager - The SCMs that we are talking to.
    */
   @Override
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    LOG.debug("Processing Close Container command.");
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
     final DatanodeDetails datanodeDetails = context.getParent()
@@ -78,6 +77,10 @@ public class CloseContainerCommandHandler implements CommandHandler {
         ((CloseContainerCommand)command).getProto();
     final ContainerController controller = ozoneContainer.getController();
     final long containerId = closeCommand.getContainerID();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processing Close Container command containerID={}",
+          containerId);
+    }
     try {
       final Container container = controller.getContainer(containerId);
 
@@ -103,10 +106,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
           ozoneContainer.getWriteChannel()
               .submitRequest(request, closeCommand.getPipelineID());
         } else {
-          // Container should not exist in CLOSING state without a pipeline
-          controller.markContainerUnhealthy(containerId);
-          LOG.info("Marking UNHEALTHY as Container should not be in " +
-              "CLOSING state without pipeline, ContainerID: {}", containerId);
+          controller.quasiCloseContainer(containerId);
+          LOG.info("Marking Container {} quasi closed", containerId);
         }
         break;
       case QUASI_CLOSED:
@@ -127,7 +128,9 @@ public class CloseContainerCommandHandler implements CommandHandler {
         break;
       }
     } catch (NotLeaderException e) {
-      LOG.debug("Follower cannot close container #{}.", containerId);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Follower cannot close container #{}.", containerId);
+      }
     } catch (IOException e) {
       LOG.error("Can't close container #{}", containerId, e);
     } finally {

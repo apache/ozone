@@ -141,7 +141,7 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .markContainerUnhealthy(container);
+        .quasiCloseContainer(container);
   }
 
   @Test
