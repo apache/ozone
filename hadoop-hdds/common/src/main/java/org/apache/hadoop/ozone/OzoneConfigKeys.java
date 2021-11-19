@@ -98,6 +98,13 @@ public final class OzoneConfigKeys {
       = 9855;
 
   /**
+   * Flag to enable ratis streaming on filesystem writes.
+   */
+  public static final String OZONE_FS_DATASTREAM_ENABLE =
+      "ozone.fs.datastream.enable";
+  public static final boolean OZONE_FS_DATASTREAM_ENABLE_DEFAULT = false;
+
+  /**
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
    */
