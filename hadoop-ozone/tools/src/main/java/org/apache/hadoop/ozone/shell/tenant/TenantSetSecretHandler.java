@@ -40,8 +40,8 @@ public class TenantSetSecretHandler extends TenantHandler {
   private String accessId;
 
   @CommandLine.Option(names = {"-s", "--secret"},
-          description = "Secret", required = true)
-  private String secret;
+          description = "Secret key", required = true)
+  private String secretKey;
 
   @CommandLine.Option(names = {"-e", "--export"},
           description = "Print out variables together with 'export' prefix")
@@ -55,7 +55,7 @@ public class TenantSetSecretHandler extends TenantHandler {
 
     try {
       final S3SecretValue accessIdSecretKeyPair =
-              objectStore.setSecret(accessId, secret);
+              objectStore.setSecret(accessId, secretKey);
       if (export) {
         out().println("export AWS_ACCESS_KEY_ID='" +
                 accessIdSecretKeyPair.getAwsAccessKey() + "'");

@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -60,25 +61,30 @@ public class OMSetSecretRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMMetadataManager omMetadataManager =
+        ozoneManager.getMetadataManager();
+
     final SetSecretRequest setSecretRequest =
         getOmRequest().getSetSecretRequest();
 
     final String accessId = setSecretRequest.getAccessId();
 
     // First check accessId existence
-    final OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
-            .getTenantAccessIdTable().get(accessId);
-    // TODO: Support old `ozone s3 getsecret` S3SecretTable?
+    final OmDBAccessIdInfo accessIdInfo = omMetadataManager
+        .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
-      throw new OMException("accessId '" + accessId + "' not found.",
-              OMException.ResultCodes.ACCESSID_NOT_FOUND);
+      // Check (old) S3SecretTable
+      if (omMetadataManager.getS3SecretTable().get(accessId) == null) {
+        throw new OMException("accessId '" + accessId + "' not found.",
+            OMException.ResultCodes.ACCESSID_NOT_FOUND);
+      }
     }
 
     // Secret should not be empty
     final String secretKey = setSecretRequest.getSecretKey();
     if (StringUtils.isEmpty(secretKey)) {
-      throw new OMException("Secret should not be empty",
+      throw new OMException("Secret key should not be empty",
               OMException.ResultCodes.INVALID_REQUEST);
     }
 
@@ -129,44 +135,68 @@ public class OMSetSecretRequest extends OMClientRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(
               S3_SECRET_LOCK, accessId);
 
+      // Intentionally set to final so they can only be set once.
+      final S3SecretValue newS3SecretValue;
+      final OmDBAccessIdInfo newDBAccessIdInfo;
+
       // Get accessId entry from multi-tenant TenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
 
-      // Double check accessId existence
+      // Check accessId existence in TenantAccessIdTable
       if (omDBAccessIdInfo == null) {
-        throw new OMException("accessId '" + accessId + "' not found.",
-                OMException.ResultCodes.ACCESSID_NOT_FOUND);
+        // accessId doesn't exist in TenantAccessIdTable, check S3SecretTable
+        if (omMetadataManager.getS3SecretTable().get(accessId) == null) {
+          throw new OMException("accessId '" + accessId + "' not found.",
+              OMException.ResultCodes.ACCESSID_NOT_FOUND);
+        }
+
+        // accessId found in S3SecretTable. Update S3SecretTable
+        LOG.debug("Updating S3SecretTable cache entry");
+        // Update S3SecretTable cache entry in this case
+        newS3SecretValue = new S3SecretValue(accessId, secretKey);
+        newDBAccessIdInfo = null;
+
+        omMetadataManager.getS3SecretTable().addCacheEntry(
+            new CacheKey<>(accessId),
+            new CacheValue<>(Optional.of(newS3SecretValue),
+                transactionLogIndex));
+
+      } else {
+
+        // Update TenantAccessIdTable
+        // Build new OmDBAccessIdInfo with updated secret
+        LOG.debug("Updating TenantAccessIdTable cache entry");
+        newS3SecretValue = null;
+        newDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
+            .setTenantId(omDBAccessIdInfo.getTenantName())
+            .setKerberosPrincipal(omDBAccessIdInfo.getUserPrincipal())
+            .setSharedSecret(secretKey)
+            .setIsAdmin(omDBAccessIdInfo.getIsAdmin())
+            .setIsDelegatedAdmin(omDBAccessIdInfo.getIsDelegatedAdmin())
+            .build();
+
+        // Update TenantAccessIdTable cache entry
+        omMetadataManager.getTenantAccessIdTable().addCacheEntry(
+            new CacheKey<>(accessId),
+            new CacheValue<>(Optional.of(newDBAccessIdInfo),
+                transactionLogIndex));
       }
-
-      // Build new OmDBAccessIdInfo with updated secret
-      final OmDBAccessIdInfo newDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
-              .setTenantId(omDBAccessIdInfo.getTenantName())
-              .setKerberosPrincipal(omDBAccessIdInfo.getUserPrincipal())
-              .setSharedSecret(secretKey)
-              .setIsAdmin(omDBAccessIdInfo.getIsAdmin())
-              .setIsDelegatedAdmin(omDBAccessIdInfo.getIsDelegatedAdmin())
-              .build();
-
-      // Update cache entry
-      omMetadataManager.getTenantAccessIdTable().addCacheEntry(
-              new CacheKey<>(accessId),
-              new CacheValue<>(Optional.of(newDBAccessIdInfo),
-                      transactionLogIndex));
 
       // Compose response
       final SetSecretResponse.Builder setSecretResponse =
-              SetSecretResponse.newBuilder()
-                      .setAccessId(accessId)
-                      .setSecretKey(secretKey);
+          SetSecretResponse.newBuilder()
+              .setAccessId(accessId)
+              .setSecretKey(secretKey);
 
-      omClientResponse = new OMSetSecretResponse(accessId, newDBAccessIdInfo,
-              omResponse.setSetSecretResponse(setSecretResponse).build());
+      omClientResponse = new OMSetSecretResponse(accessId,
+          newDBAccessIdInfo, newS3SecretValue,
+          omResponse.setSetSecretResponse(setSecretResponse).build());
 
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMSetSecretResponse(
-              createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
@@ -176,12 +206,12 @@ public class OMSetSecretRequest extends OMClientRequest {
       }
     }
 
-    Map<String, String> auditMap = new HashMap<>();
-    auditMap.put(OzoneConsts.S3_GETSECRET_USER, accessId);
+    final Map<String, String> auditMap = new HashMap<>();
+    auditMap.put(OzoneConsts.S3_SETSECRET_USER, accessId);
 
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.GET_S3_SECRET, auditMap,
+        OMAction.SET_S3_SECRET, auditMap,
         exception, getOmRequest().getUserInfo()));
 
     if (exception == null) {
