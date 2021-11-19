@@ -900,4 +900,9 @@ public class ObjectEndpoint extends EndpointBase {
     return (copySourceIfModifiedSince <= lastModificationTime) &&
         (lastModificationTime <= copySourceIfUnmodifiedSince);
   }
+
+  @VisibleForTesting
+  public void setOzoneConfiguration(OzoneConfiguration config) {
+    this.ozoneConfiguration = config;
+  }
 }
