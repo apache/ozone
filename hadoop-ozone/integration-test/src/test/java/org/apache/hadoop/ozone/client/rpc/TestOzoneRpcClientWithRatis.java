@@ -19,10 +19,12 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -31,12 +33,15 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -44,6 +49,7 @@ import org.junit.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 /**
@@ -154,5 +160,52 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         fail("Read file should succeed");
       }
     }
+  }
+
+  @Test(timeout = 3000000)
+  public void testMultiPartUploadWithStream() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    byte[] sampleData = new byte[1024 * 8];
+
+    int valueLength = sampleData.length;
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromTypeAndFactor(
+            ReplicationType.RATIS,
+            THREE);
+
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+        replicationConfig);
+
+    assertNotNull(multipartInfo);
+    String uploadID = multipartInfo.getUploadID();
+    Assert.assertEquals(volumeName, multipartInfo.getVolumeName());
+    Assert.assertEquals(bucketName, multipartInfo.getBucketName());
+    Assert.assertEquals(keyName, multipartInfo.getKeyName());
+    assertNotNull(multipartInfo.getUploadID());
+
+    OzoneDataStreamOutput ozoneStreamOutput = bucket.createMultipartStreamKey(
+        keyName, valueLength, 1, uploadID);
+    ozoneStreamOutput.write(ByteBuffer.wrap(sampleData), 0,
+        valueLength);
+    ozoneStreamOutput.close();
+
+    OzoneMultipartUploadPartListParts parts =
+        bucket.listParts(keyName, uploadID, 0, 1);
+
+    Assert.assertEquals(parts.getPartInfoList().size(), 1);
+
+    OzoneMultipartUploadPartListParts.PartInfo partInfo =
+        parts.getPartInfoList().get(0);
+    Assert.assertEquals(valueLength, partInfo.getSize());
+
   }
 }
