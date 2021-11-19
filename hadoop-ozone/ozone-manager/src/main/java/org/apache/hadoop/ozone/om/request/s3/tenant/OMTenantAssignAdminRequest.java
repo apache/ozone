@@ -77,7 +77,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     // If tenantName is not provided, figure it out from the table
     if (StringUtils.isEmpty(tenantName)) {
       tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
-          ozoneManager.getMetadataManager(), accessId, true);
+          ozoneManager.getMetadataManager(), accessId);
       assert(tenantName != null);
     }
 

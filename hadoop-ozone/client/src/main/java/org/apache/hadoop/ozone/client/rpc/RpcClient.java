@@ -649,7 +649,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
             "accessId cannot be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(secretKey),
-            "secret cannot be null or empty.");
+            "secretKey cannot be null or empty.");
     return ozoneManagerClient.setSecret(accessId, secretKey);
   }
 

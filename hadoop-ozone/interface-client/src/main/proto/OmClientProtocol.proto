@@ -99,7 +99,6 @@ enum Type {
   ListTrash = 91;
   RecoverTrash = 92;
 
-  SetSecret = 106;   // TODO: Renumber this when rebasing?
   RevokeS3Secret = 93;
 
   PurgePaths = 94;
@@ -118,6 +117,8 @@ enum Type {
 
   GetS3Volume = 104;
   TenantListUser = 105;
+
+  SetSecret = 106;
 }
 
 message OMRequest {
@@ -197,7 +198,6 @@ message OMRequest {
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 
-  optional SetSecretRequest                 SetSecretRequest               = 106;
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
@@ -216,6 +216,8 @@ message OMRequest {
 
   optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
   optional TenantListUserRequest            tenantListUserRequest          = 105;
+
+  optional SetSecretRequest                 SetSecretRequest               = 106;
 }
 
 message OMResponse {
@@ -285,8 +287,6 @@ message OMResponse {
   optional SetAclResponse                   setAclResponse                 = 77;
   optional GetAclResponse                    getAclResponse                = 78;
 
-  optional SetSecretResponse                 SetSecretResponse               = 106;
-
   optional PurgeKeysResponse                  purgeKeysResponse            = 81;
 
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
@@ -310,6 +310,8 @@ message OMResponse {
 
   optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
   optional TenantListUserResponse            tenantListUserResponse        = 105;
+
+  optional SetSecretResponse                 SetSecretResponse               = 106;
 }
 
 enum Status {

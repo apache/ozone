@@ -375,6 +375,8 @@ public final class OzoneConsts {
   public static final int S3_BUCKET_MIN_LENGTH = 3;
   public static final int S3_BUCKET_MAX_LENGTH = 64;
 
+  public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
+
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";
   public static final String GDPR_ALGORITHM_NAME = "AES";

@@ -72,16 +72,16 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         getOmRequest().getTenantRevokeAdminRequest();
 
     final String accessId = request.getAccessId();
-    String tenantName = request.getTenantName();
+    String tenantId = request.getTenantName();
 
-    // If tenantName is not provided, figure it out from the table
-    if (StringUtils.isEmpty(tenantName)) {
-      tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
-          ozoneManager.getMetadataManager(), accessId, true);
+    // If tenant name is not specified, try figuring it out from accessId.
+    if (StringUtils.isEmpty(tenantId)) {
+      tenantId = OMTenantRequestHelper.getTenantNameFromAccessId(
+          ozoneManager.getMetadataManager(), accessId);
     }
 
     // Caller should be an Ozone admin or this tenant's delegated admin
-    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantName);
+    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantId);
 
     // TODO: Check tenant existence?
 
@@ -94,9 +94,9 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     }
 
     // Check if accessId is assigned to the tenant
-    if (!accessIdInfo.getTenantId().equals(tenantName)) {
+    if (!accessIdInfo.getTenantId().equals(tenantId)) {
       throw new OMException("accessId '" + accessId +
-          "' must be assigned to tenant '" + tenantName + "' first.",
+          "' must be assigned to tenant '" + tenantId + "' first.",
           OMException.ResultCodes.INVALID_TENANT_NAME);
     }
 
@@ -107,10 +107,10 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
         .setTenantRevokeAdminRequest(
-                // Regenerate request just in case tenantName is not provided
+                // Regenerate request just in case tenantId is not provided
                 //  by the client
                 TenantRevokeAdminRequest.newBuilder()
-                        .setTenantName(tenantName)
+                        .setTenantName(tenantId)
                         .setAccessId(request.getAccessId())
                         .build())
         .setCmdType(getOmRequest().getCmdType())

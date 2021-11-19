@@ -120,30 +120,21 @@ public final class OMTenantRequestHelper {
   }
 
   public static String getTenantNameFromAccessId(
-          OMMetadataManager omMetadataManager, String accessId,
-          boolean throwOnError) throws IOException {
+      OMMetadataManager omMetadataManager, String accessId) throws IOException {
 
     final OmDBAccessIdInfo accessIdInfo = omMetadataManager
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
-      if (throwOnError) {
-        throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
-                accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
-      } else {
-        return null;
-      }
+      throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
+          accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
     }
 
     final String tenantId = accessIdInfo.getTenantId();
 
     if (StringUtils.isEmpty(tenantId)) {
-      if (throwOnError) {
-        throw new OMException("tenantId field is null or empty for accessId '" +
-                accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
-      } else {
-        return null;
-      }
+      throw new OMException("tenantId field is null or empty for accessId '" +
+          accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
     }
 
     return tenantId;

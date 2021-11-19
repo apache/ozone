@@ -88,6 +88,14 @@ public class OMSetSecretRequest extends OMClientRequest {
               OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    if (secretKey.length() < OzoneConsts.S3_SECRET_KEY_MIN_LENGTH) {
+      throw new OMException("Secret key length should be at least " +
+          OzoneConsts.S3_SECRET_KEY_MIN_LENGTH + " characters",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    // TODO: Check if secretKey matches other requirements? e.g. combination
+
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     final String username = ugi.getUserName();
 

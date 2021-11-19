@@ -45,7 +45,19 @@ Secure Tenant GetUserInfo Success
                         Should contain   ${output}         Tenant 'tenantone' with accessId 'tenantone$bob'
 
 Secure Tenant SetSecret Success with Cluster Admin
-    ${output} =         Execute          ozone tenant user set-secret 'tenantone$bob' --secret=somesecret1 --export
+    ${output} =         Execute          ozone tenant user setsecret 'tenantone$bob' --secret=somesecret1 --export
+                        Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
+
+Secure Tenant SetSecret Failure For Invalid Secret Input 1
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$bob' --secret='' --export
+                        Should contain   ${output}         Secret key should not be empty
+
+Secure Tenant SetSecret Failure For Invalid Secret Input 2
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$bob' --secret=short --export
+                        Should contain   ${output}         Secret key length should be at least 8 characters
+
+Secure Tenant GetSecret Success
+    ${output} =         Execute          ozone tenant user getsecret 'tenantone$bob' --export
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
 
 Secure Tenant Assign User Failure

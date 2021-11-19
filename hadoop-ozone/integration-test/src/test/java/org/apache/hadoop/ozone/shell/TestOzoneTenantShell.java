@@ -621,10 +621,25 @@ public class TestOzoneTenantShell {
 
     // Set secret as OM admin should succeed
     executeHA(tenantShell, new String[] {
-        "user", "set-secret", tenantName + "$alice",
+        "user", "setsecret", tenantName + "$alice",
         "--secret=somesecret1", "--export"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
         "export AWS_SECRET_ACCESS_KEY='somesecret1'\n", true);
+    checkOutput(err, "", true);
+
+    // Set empty secret key should fail
+    executeHA(tenantShell, new String[] {
+        "user", "setsecret", tenantName + "$alice",
+        "--secret=short", "--export"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
+    // Note: Exception thrown from OM to the client stderr is somehow not
+    //  captured in err, but is printed to the console output.
+
+    // Get secret should still give the previous secret key
+    executeHA(tenantShell, new String[] {
+        "user", "getsecret", tenantName + "$alice"});
+    checkOutput(out, "somesecret1", false);
     checkOutput(err, "", true);
 
     // Set secret as alice should succeed
@@ -633,7 +648,7 @@ public class TestOzoneTenantShell {
 
     ugiAlice.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
-          "user", "set-secret", tenantName + "$alice",
+          "user", "setsecret", tenantName + "$alice",
           "--secret=somesecret2", "--export"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
@@ -654,13 +669,12 @@ public class TestOzoneTenantShell {
 
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
-          "user", "set-secret", tenantName + "$alice",
+          "user", "setsecret", tenantName + "$alice",
           "--secret=somesecret2", "--export"});
       checkOutput(out, "", true);
       checkOutput(err, "", true);
-      // Note: Exception thrown from OM to the client which is not caught by CLI
-      //  handler is somehow not captured in err above, but is printed to the
-      //  console.
+      // Note: Exception thrown from OM to the client stderr is somehow not
+      //  captured in err, but is printed to the console output.
       return null;
     });
 
@@ -673,7 +687,7 @@ public class TestOzoneTenantShell {
 
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
-          "user", "set-secret", tenantName + "$alice",
+          "user", "setsecret", tenantName + "$alice",
           "--secret=somesecret2", "--export"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
