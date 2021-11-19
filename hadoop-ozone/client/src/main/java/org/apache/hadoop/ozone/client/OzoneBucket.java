@@ -811,6 +811,21 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Create a part key for a multipart upload key.
+   * @param key
+   * @param size
+   * @param partNumber
+   * @param uploadID
+   * @return OzoneDataStreamOutput
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createMultipartStreamKey(String key,
+      long size, int partNumber, String uploadID) throws IOException {
+    return proxy.createMultipartStreamKey(volumeName, name,
+            key, size, partNumber, uploadID);
+  }
+
+  /**
    * Complete Multipart upload. This will combine all the parts and make the
    * key visible in ozone.
    * @param key
