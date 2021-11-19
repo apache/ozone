@@ -177,8 +177,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyLogFailed(Throwable ex,
-                              RaftProtos.LogEntryProto failedEntry) {
-    // Should we add retry here?
+      RaftProtos.LogEntryProto failedEntry) {
     LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
     ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
   }
