@@ -89,6 +89,10 @@ public class TestECKeyOutputStream {
     conf.setFromObject(clientConfig);
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
+    // If SCM detects dead node too quickly, then container would be moved to
+    // closed state and all in progress writes will get exception. To avoid
+    // that, we are just keeping higher timeout and none of the tests depending
+    // on deadnode detection timeout currently.
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 300, TimeUnit.SECONDS);
     conf.setTimeDuration("hdds.ratis.raft.server.rpc.slowness.timeout", 300,
         TimeUnit.SECONDS);
@@ -287,7 +291,8 @@ public class TestECKeyOutputStream {
 
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         // TODO: this skip can be removed once read handles online recovery.
-        is.skip(inputData.length);
+        long skip = is.skip(inputData.length);
+        Assert.assertTrue(skip == inputData.length);
         // All nodes available in second block group. So, lets assert.
         byte[] fileContent = new byte[inputData.length];
         Assert.assertEquals(inputData.length, is.read(fileContent));

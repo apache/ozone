@@ -299,7 +299,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
    */
   public List<ECBlockOutputStream> getFailedStreams(boolean forPutBlock) {
     final Iterator<ECBlockOutputStream> iter = blockStreams().iterator();
-    List<ECBlockOutputStream> failedStream = new ArrayList<>();
+    List<ECBlockOutputStream> failedStreams = new ArrayList<>();
     while (iter.hasNext()) {
       final ECBlockOutputStream stream = iter.next();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
@@ -312,10 +312,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
             stream != null ? stream.getCurrentChunkResponseFuture() : null;
       }
       if (isFailed(stream, responseFuture)) {
-        failedStream.add(stream);
+        failedStreams.add(stream);
       }
     }
-    return failedStream;
+    return failedStreams;
   }
 
   private boolean isFailed(

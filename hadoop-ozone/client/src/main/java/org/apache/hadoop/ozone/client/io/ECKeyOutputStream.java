@@ -58,7 +58,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private final int numParityBlks;
   private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
   private final RawErasureEncoder encoder;
-  private final ECReplicationConfig.EcCodec ecCodec;
 
   private enum StripeWriteStatus {
     SUCCESS,
@@ -101,7 +100,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.config = config;
     // For EC, cell/chunk size and buffer size can be same for now.
     ecChunkSize = replicationConfig.getEcChunkSize();
-    this.ecCodec = replicationConfig.getCodec();
     this.config.setStreamBufferMaxSize(ecChunkSize);
     this.config.setStreamBufferFlushSize(ecChunkSize);
     this.config.setStreamBufferSize(ecChunkSize);
@@ -365,8 +363,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       try {
         // Since it's a fullcell, let's write all content from buffer.
         writeToOutputStream(current, len, bytesToWrite.array(),
-            bytesToWrite.array().length, 0, current.getWrittenDataLength(),
-            isParity);
+            bytesToWrite.array().length, 0, isParity);
       } catch (Exception e) {
         markStreamAsFailed(e);
       }
@@ -374,7 +371,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private int writeToOutputStream(BlockOutputStreamEntry current, long len,
-      byte[] b, int writeLen, int off, long currentPos, boolean isParity)
+      byte[] b, int writeLen, int off, boolean isParity)
       throws IOException {
     try {
       current.write(b, off, writeLen);
@@ -382,21 +379,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
         offset += writeLen;
       }
     } catch (IOException ioe) {
-      // for the current iteration, totalDataWritten - currentPos gives the
-      // amount of data already written to the buffer
-
-      // In the retryPath, the total data to be written will always be equal
-      // to or less than the max length of the buffer allocated.
-      // The len specified here is the combined sum of the data length of
-      // the buffers
-      Preconditions.checkState(len <= config.getStreamBufferMaxSize());
-      int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
-      //writeLen = dataWritten;
-
       if (!isParity) {
         offset += writeLen;
       }
-      LOG.debug("writeLen {}, total len {}", writeLen, len);
+      LOG.debug("Exception:: writeLen: " + writeLen + ", total len:" + len,
+          ioe);
       handleException(current, ioe);
     }
     return writeLen;
@@ -407,7 +394,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
     boolean containerExclusionException = checkIfContainerToExclude(t);
-    if(containerExclusionException) {
+    if (containerExclusionException) {
       blockOutputStreamEntryPool.getExcludeList()
           .addPipeline(streamEntry.getPipeline().getId());
     }
@@ -477,8 +464,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
           try {
             byte[] array = bytesToWrite.array();
             writeToOutputStream(current, bytesToWrite.position(), array,
-                bytesToWrite.position(), 0, current.getWrittenDataLength(),
-                false);
+                bytesToWrite.position(), 0, false);
           } catch (Exception e) {
             markStreamAsFailed(e);
           }
