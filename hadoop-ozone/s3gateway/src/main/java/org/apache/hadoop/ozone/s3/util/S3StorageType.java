@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.s3.util;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 /**
  * Maps S3 storage class values to Ozone replication values.
@@ -48,8 +50,17 @@ public enum S3StorageType {
     return type;
   }
 
-  public static S3StorageType getDefault() {
-    return STANDARD;
+  public static S3StorageType getDefault(ConfigurationSource config) {
+    String replicationString = config.get(OzoneConfigKeys.OZONE_REPLICATION);
+    ReplicationFactor configFactor;
+    try {
+      configFactor = ReplicationFactor.valueOf(
+          Integer.parseInt(replicationString));
+    } catch (NumberFormatException ex) {
+      return STANDARD;
+    }
+    return configFactor == ReplicationFactor.ONE
+        ? REDUCED_REDUNDANCY : STANDARD;
   }
 
   public static S3StorageType fromReplicationType(
