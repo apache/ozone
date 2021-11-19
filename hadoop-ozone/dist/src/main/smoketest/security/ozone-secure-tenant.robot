@@ -50,7 +50,7 @@ Secure Tenant SetSecret Success with Cluster Admin
 
 Secure Tenant SetSecret Failure For Invalid Secret Input 1
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$bob' --secret='' --export
-                        Should contain   ${output}         Secret key should not be empty
+                        Should contain   ${output}         secretKey cannot be null or empty.
 
 Secure Tenant SetSecret Failure For Invalid Secret Input 2
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$bob' --secret=short --export
@@ -67,7 +67,7 @@ Secure Tenant Assign User Failure
 Secure Tenant Create Tenant Failure with Regular (non-admin) user
     Run Keyword   Kinit test user     testuser2    testuser2.keytab
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant create tenanttwo
-                        Should contain   ${output}         Failed to create tenant 'tenanttwo': User 'testuser2' is not an Ozone admin.
+                        Should contain   ${output}         Failed to create tenant 'tenanttwo': User 'testuser2/scm@EXAMPLE.COM' is not an Ozone admin.
 
 Secure Tenant SetSecret Failure with Regular (non-admin) user
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$bob' --secret=somesecret2 --export
