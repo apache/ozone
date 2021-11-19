@@ -1181,6 +1181,70 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OzoneDataStreamOutput createMultipartStreamKey(
+      String volumeName,
+      String bucketName,
+      String keyName,
+      long size,
+      int partNumber,
+      String uploadID)
+      throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    if (checkKeyNameEnabled) {
+      HddsClientUtils.verifyKeyName(keyName);
+    }
+    HddsClientUtils.checkNotNull(keyName, uploadID);
+    Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000, "Part " +
+        "number should be greater than zero and less than or equal to 10000");
+    Preconditions.checkArgument(size >= 0, "size should be greater than or " +
+        "equal to zero");
+    String requestId = UUID.randomUUID().toString();
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setIsMultipartKey(true)
+        .setMultipartUploadID(uploadID)
+        .setMultipartUploadPartNumber(partNumber)
+        .setAcls(getAclList())
+        .build();
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
+
+    KeyDataStreamOutput keyOutputStream =
+        new KeyDataStreamOutput.Builder()
+            .setHandler(openKey)
+            .setXceiverClientManager(xceiverClientManager)
+            .setOmClient(ozoneManagerClient)
+            .setRequestID(requestId)
+            .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
+            .setMultipartNumber(partNumber)
+            .setMultipartUploadID(uploadID)
+            .setIsMultipartKey(true)
+            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+            .setConfig(clientConfig)
+            .build();
+    keyOutputStream
+        .addPreallocateBlocks(
+            openKey.getKeyInfo().getLatestVersionLocations(),
+            openKey.getOpenVersion());
+
+    FileEncryptionInfo feInfo = openKey.getKeyInfo().getFileEncryptionInfo();
+    if (feInfo != null) {
+      // todo: need to support file encrypt,
+      //  https://issues.apache.org/jira/browse/HDDS-5892
+      throw new UnsupportedOperationException(
+          "FileEncryptionInfo is not yet supported in " +
+              "createMultipartStreamKey");
+    } else {
+      return new OzoneDataStreamOutput(keyOutputStream);
+    }
+  }
+
+  @Override
   public OmMultipartUploadCompleteInfo completeMultipartUpload(
       String volumeName, String bucketName, String keyName, String uploadID,
       Map<Integer, String> partsMap) throws IOException {
