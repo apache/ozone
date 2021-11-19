@@ -96,7 +96,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           OMException.ResultCodes.ACCESSID_NOT_FOUND);
     }
 
-    final String tenantName = accessIdInfo.getTenantName();
+    final String tenantName = accessIdInfo.getTenantId();
     assert(tenantName != null);
     assert(tenantName.length() > 0);
 

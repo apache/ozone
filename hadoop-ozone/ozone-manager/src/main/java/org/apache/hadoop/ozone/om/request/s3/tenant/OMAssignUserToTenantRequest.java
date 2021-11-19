@@ -259,7 +259,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
                 + "Ignoring.", existingAccId);
             throw new NullPointerException("accessIdInfo is null");
           }
-          if (tenantName.equals(accessIdInfo.getTenantName())) {
+          if (tenantName.equals(accessIdInfo.getTenantId())) {
             throw new OMException("The same user is not allowed to be assigned "
                 + "to the same tenant more than once. User '" + principal
                 + "' is already assigned to tenant '" + tenantName + "' with "

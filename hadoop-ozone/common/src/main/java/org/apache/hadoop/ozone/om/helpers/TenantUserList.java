@@ -30,19 +30,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantU
  */
 public class TenantUserList {
 
-  private final String tenantName;
+  private final String tenantId;
 
   private final List<TenantUserAccessId> userAccessIds;
-
-
-  public TenantUserList(String tenantName,
+  
+  public TenantUserList(String tenantId,
                         List<TenantUserAccessId> userAccessIds) {
-    this.tenantName = tenantName;
+    this.tenantId = tenantId;
     this.userAccessIds = userAccessIds;
   }
 
-  public String getTenantName() {
-    return tenantName;
+  public String getTenantId() {
+    return tenantId;
   }
 
   public List<TenantUserAccessId> getUserAccessIds() {
@@ -56,7 +55,7 @@ public class TenantUserList {
 
   @Override
   public String toString() {
-    return "tenantName=" + tenantName +
+    return "tenantId=" + tenantId +
         "\nuserAccessIds=" + userAccessIds;
   }
 
@@ -69,12 +68,12 @@ public class TenantUserList {
       return false;
     }
     TenantUserList that = (TenantUserList) o;
-    return tenantName.equals(that.tenantName) &&
+    return tenantId.equals(that.tenantId) &&
         userAccessIds.equals(that.userAccessIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tenantName, userAccessIds);
+    return Objects.hash(tenantId, userAccessIds);
   }
 }

@@ -301,7 +301,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       if (omDBAccessIdInfo == null) {
         throw new OMException(INVALID_ACCESSID);
       }
-      String tenantName = omDBAccessIdInfo.getTenantName();
+      String tenantName = omDBAccessIdInfo.getTenantId();
       if (tenantName == null) {
         LOG.error("Tenant doesn't exist");
         return;
@@ -398,7 +398,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     if (omDBAccessIdInfo == null) {
       throw new OMException(INVALID_ACCESSID);
     }
-    return omDBAccessIdInfo.getTenantName();
+    return omDBAccessIdInfo.getTenantId();
   }
 
   public List<String> listAllAccessIDs(String tenantID)
@@ -598,7 +598,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         KeyValue<String, OmDBAccessIdInfo> next = iterator.next();
         String accessId = next.getKey();
         OmDBAccessIdInfo value = next.getValue();
-        String tenantId = value.getTenantName();
+        String tenantId = value.getTenantId();
         String user = value.getUserPrincipal();
 
         CachedTenantInfo cachedTenantInfo = tenantCache

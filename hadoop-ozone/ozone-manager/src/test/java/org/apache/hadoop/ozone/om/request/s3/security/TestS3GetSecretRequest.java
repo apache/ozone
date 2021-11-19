@@ -348,7 +348,7 @@ public class TestS3GetSecretRequest {
     // Check response
     Assert.assertTrue(omTenantCreateResponse.getOMResponse().getSuccess());
     Assert.assertEquals(TENANT_NAME,
-        omTenantCreateResponse.getOmDBTenantInfo().getTenantName());
+        omTenantCreateResponse.getOmDBTenantInfo().getTenantId());
 
 
     // 2. AssignUserToTenantRequest: Assign "bob@EXAMPLE.COM" to "finance".

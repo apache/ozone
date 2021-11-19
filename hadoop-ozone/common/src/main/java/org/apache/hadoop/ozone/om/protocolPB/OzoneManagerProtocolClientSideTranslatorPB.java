@@ -953,12 +953,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public S3SecretValue tenantAssignUserAccessId(
-      String username, String tenantName, String accessId) throws IOException {
+      String username, String tenantId, String accessId) throws IOException {
 
     final TenantAssignUserAccessIdRequest request =
         TenantAssignUserAccessIdRequest.newBuilder()
         .setTenantUsername(username)
-        .setTenantName(tenantName)
+        .setTenantName(tenantId)
         .setAccessId(accessId)
         .build();
     final OMRequest omRequest = createOMRequest(Type.TenantAssignUserAccessId)

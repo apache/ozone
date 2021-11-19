@@ -94,7 +94,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     }
 
     // Check if accessId is assigned to the tenant
-    if (!accessIdInfo.getTenantName().equals(tenantName)) {
+    if (!accessIdInfo.getTenantId().equals(tenantName)) {
       throw new OMException("accessId '" + accessId +
           "' must be assigned to tenant '" + tenantName + "' first.",
           OMException.ResultCodes.INVALID_TENANT_NAME);
@@ -159,12 +159,12 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantName().equals(tenantName));
+      assert(oldAccessIdInfo.getTenantId().equals(tenantName));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-          .setTenantId(oldAccessIdInfo.getTenantName())
+          .setTenantId(oldAccessIdInfo.getTenantId())
           .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
           .setSharedSecret(oldAccessIdInfo.getSecretKey())
           .setIsAdmin(false)

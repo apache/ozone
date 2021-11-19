@@ -3150,9 +3150,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     while (iterator.hasNext()) {
       final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
       final OmDBTenantInfo omDBTenantInfo = dbEntry.getValue();
-      assert(dbEntry.getKey().equals(omDBTenantInfo.getTenantName()));
+      assert(dbEntry.getKey().equals(omDBTenantInfo.getTenantId()));
       tenantInfoList.add(TenantInfo.newBuilder()
-          .setTenantName(omDBTenantInfo.getTenantName())
+          .setTenantName(omDBTenantInfo.getTenantId())
           .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
           .setAccountNamespaceName(omDBTenantInfo.getAccountNamespaceName())
           .setUserPolicyGroupName(omDBTenantInfo.getUserPolicyGroupName())
@@ -3203,7 +3203,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         assert(accessIdInfo.getUserPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
-            .setTenantName(accessIdInfo.getTenantName())
+            .setTenantName(accessIdInfo.getTenantId())
             .setIsAdmin(accessIdInfo.getIsAdmin())
             .setIsDelegatedAdmin(accessIdInfo.getIsDelegatedAdmin())
             .build());
@@ -3258,16 +3258,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmVolumeArgs getS3Volume(String accessID) throws IOException {
 
-    String tenantName;
+    String tenantId;
     try {
-      tenantName = multiTenantManagr.getTenantForAccessID(accessID);
+      tenantId = multiTenantManagr.getTenantForAccessID(accessID);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Get S3 volume request for access ID {} belonging to tenant" +
-                " {} is directed to the volume {}.", accessID, tenantName,
-            tenantName);
+                " {} is directed to the volume {}.", accessID, tenantId,
+            tenantId);  // TODO: Get volume name from DB. Do not assume the same
       }
       // This call performs acl checks and checks volume existence.
-      return getVolumeInfo(tenantName);
+      return getVolumeInfo(tenantId);
 
     } catch (OMException ex) {
       if (ex.getResult().equals(INVALID_ACCESSID)) {
@@ -4213,7 +4213,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       for (final String accessId : principalInfo.getAccessIds()) {
         final OmDBAccessIdInfo accessIdInfo =
             getMetadataManager().getTenantAccessIdTable().get(accessId);
-        if (tenantName.equals(accessIdInfo.getTenantName())) {
+        if (tenantName.equals(accessIdInfo.getTenantId())) {
           if (!delegated) {
             return accessIdInfo.getIsAdmin();
           } else {

@@ -135,9 +135,9 @@ public final class OMTenantRequestHelper {
       }
     }
 
-    final String tenantName = accessIdInfo.getTenantName();
+    final String tenantId = accessIdInfo.getTenantId();
 
-    if (StringUtils.isEmpty(tenantName)) {
+    if (StringUtils.isEmpty(tenantId)) {
       if (throwOnError) {
         throw new OMException("tenantId field is null or empty for accessId '" +
                 accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
@@ -146,7 +146,7 @@ public final class OMTenantRequestHelper {
       }
     }
 
-    return tenantName;
+    return tenantId;
   }
 
   public static boolean isUserAccessIdPrincipalOrTenantAdmin(
@@ -162,7 +162,7 @@ public final class OMTenantRequestHelper {
       return false;
     }
 
-    final String tenantName = accessIdInfo.getTenantName();
+    final String tenantName = accessIdInfo.getTenantId();
     // Sanity check
     if (tenantName == null) {
       throw new OMException("Unexpected error: OmDBAccessIdInfo " +

@@ -42,7 +42,7 @@ public class TenantRevokeAdminHandler extends TenantHandler {
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
-  private String tenantName;
+  private String tenantId;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
@@ -51,12 +51,12 @@ public class TenantRevokeAdminHandler extends TenantHandler {
     for (final String accessId : accessIds) {
       try {
         // TODO: Make tenantRevokeAdmin return accessId, tenantName, user later.
-        objStore.tenantRevokeAdmin(accessId, tenantName);
+        objStore.tenantRevokeAdmin(accessId, tenantId);
         err().println("Revoked admin role of '" + accessId +
-            (tenantName != null ? "' from tenant '" + tenantName + "'" : ""));
+            (tenantId != null ? "' from tenant '" + tenantId + "'" : ""));
       } catch (IOException e) {
         err().println("Failed to revoke admin role of '" + accessId +
-            (tenantName != null ? "' from tenant '" + tenantName + "'" : "") +
+            (tenantId != null ? "' from tenant '" + tenantId + "'" : "") +
             ": " + e.getMessage());
         if (e instanceof OMException) {
           final OMException omEx = (OMException) e;

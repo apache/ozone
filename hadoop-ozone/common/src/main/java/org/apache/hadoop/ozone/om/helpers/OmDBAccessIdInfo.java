@@ -27,7 +27,7 @@ public final class OmDBAccessIdInfo {
   /**
    * Name of the tenant.
    */
-  private final String tenantName;
+  private final String tenantId;
   /**
    * User principal this accessId belongs to.
    */
@@ -49,10 +49,10 @@ public final class OmDBAccessIdInfo {
   // This implies above String fields should NOT contain the split key.
   public static final String SERIALIZATION_SPLIT_KEY = ";";
 
-  public OmDBAccessIdInfo(String tenantName,
+  public OmDBAccessIdInfo(String tenantId,
                           String userPrincipal, String secretKey,
                           boolean isAdmin, boolean isDelegatedAdmin) {
-    this.tenantName = tenantName;
+    this.tenantId = tenantId;
     this.userPrincipal = userPrincipal;
     this.secretKey = secretKey;
     this.isAdmin = isAdmin;
@@ -64,7 +64,7 @@ public final class OmDBAccessIdInfo {
     Preconditions.checkState(tInfo.length == 3 || tInfo.length == 5,
         "Incorrect accessIdInfoString");
 
-    tenantName = tInfo[0];
+    tenantId = tInfo[0];
     userPrincipal = tInfo[1];
     secretKey = tInfo[2];
     if (tInfo.length == 5) {
@@ -76,13 +76,13 @@ public final class OmDBAccessIdInfo {
     }
   }
 
-  public String getTenantName() {
-    return tenantName;
+  public String getTenantId() {
+    return tenantId;
   }
 
   private String serialize() {
     final StringBuilder sb = new StringBuilder();
-    sb.append(tenantName);
+    sb.append(tenantId);
     sb.append(SERIALIZATION_SPLIT_KEY).append(userPrincipal);
     sb.append(SERIALIZATION_SPLIT_KEY).append(secretKey);
     sb.append(SERIALIZATION_SPLIT_KEY).append(isAdmin);

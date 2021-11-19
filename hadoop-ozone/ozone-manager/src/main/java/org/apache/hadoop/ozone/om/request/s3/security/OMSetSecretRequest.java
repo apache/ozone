@@ -169,7 +169,7 @@ public class OMSetSecretRequest extends OMClientRequest {
         LOG.debug("Updating TenantAccessIdTable cache entry");
         newS3SecretValue = null;
         newDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
-            .setTenantId(omDBAccessIdInfo.getTenantName())
+            .setTenantId(omDBAccessIdInfo.getTenantId())
             .setKerberosPrincipal(omDBAccessIdInfo.getUserPrincipal())
             .setSharedSecret(secretKey)
             .setIsAdmin(omDBAccessIdInfo.getIsAdmin())
