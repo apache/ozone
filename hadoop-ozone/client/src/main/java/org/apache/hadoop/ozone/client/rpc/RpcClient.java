@@ -1387,6 +1387,26 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OzoneDataStreamOutput createStreamFile(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, boolean overWrite, boolean recursive)
+      throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setAcls(getAclList())
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .build();
+    OpenKeySession keySession =
+        ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
+    return createDataStreamOutput(keySession, UUID.randomUUID().toString(),
+        replicationConfig);
+  }
+
+  @Override
   public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
       String keyName, boolean recursive, String startKey, long numEntries)
       throws IOException {
