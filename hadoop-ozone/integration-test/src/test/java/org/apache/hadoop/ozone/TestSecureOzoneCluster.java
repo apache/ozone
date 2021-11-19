@@ -647,10 +647,10 @@ public final class TestSecureOzoneCluster {
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
 
-      // Setsecret should fail since the accessId is revoked
+      // Set secret should fail since the accessId is revoked
       final String secretKeySet = "somesecret1";
       try {
-        omClient.setSecret(username, secretKeySet);
+        omClient.setS3Secret(username, secretKeySet);
       } catch (OMException omEx) {
         assertEquals(OMException.ResultCodes.ACCESSID_NOT_FOUND,
             omEx.getResult());
@@ -666,7 +666,7 @@ public final class TestSecureOzoneCluster {
       assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
 
       // Admin can set secret for any user
-      omClient.setSecret(username, secretKeySet);
+      omClient.setS3Secret(username, secretKeySet);
       assertEquals(secretKeySet, omClient.getS3Secret(username).getAwsSecret());
       // Clean up
       omClient.revokeS3Secret(username);

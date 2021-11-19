@@ -55,7 +55,7 @@ public class TenantSetSecretHandler extends TenantHandler {
 
     try {
       final S3SecretValue accessIdSecretKeyPair =
-              objectStore.setSecret(accessId, secretKey);
+              objectStore.setS3Secret(accessId, secretKey);
       if (export) {
         out().println("export AWS_ACCESS_KEY_ID='" +
                 accessIdSecretKeyPair.getAwsAccessKey() + "'");

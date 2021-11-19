@@ -462,13 +462,14 @@ public interface OzoneManagerProtocol
           throws IOException;
 
   /**
-   * Set secretKey for accessId.
+   * Set secret key for accessId.
    * @param accessId
    * @param secretKey
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue setSecret(String accessId, String secretKey) throws IOException;
+  S3SecretValue setS3Secret(String accessId, String secretKey)
+      throws IOException;
 
   /**
    * Revokes s3Secret of given kerberos user.

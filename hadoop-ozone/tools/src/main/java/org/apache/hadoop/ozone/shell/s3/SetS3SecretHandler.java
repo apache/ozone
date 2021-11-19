@@ -61,7 +61,7 @@ public class SetS3SecretHandler extends S3Handler {
     }
 
     final S3SecretValue accessIdSecretKeyPair =
-        client.getObjectStore().setSecret(username, secretKey);
+        client.getObjectStore().setS3Secret(username, secretKey);
     if (export) {
       out().println("export AWS_ACCESS_KEY_ID='" +
           accessIdSecretKeyPair.getAwsAccessKey() + "'");

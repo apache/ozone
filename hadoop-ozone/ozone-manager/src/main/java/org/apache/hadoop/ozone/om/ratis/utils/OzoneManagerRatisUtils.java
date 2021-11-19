@@ -258,7 +258,7 @@ public final class OzoneManagerRatisUtils {
       return new OMPrepareRequest(omRequest);
     case CancelPrepare:
       return new OMCancelPrepareRequest(omRequest);
-    case SetSecret:
+    case SetS3Secret:
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);

@@ -185,9 +185,9 @@ public class ObjectStore {
    * @return S3SecretValue <accessId, secretKey> pair
    * @throws IOException
    */
-  public S3SecretValue setSecret(String accessId, String secretKey)
+  public S3SecretValue setS3Secret(String accessId, String secretKey)
           throws IOException {
-    return proxy.setSecret(accessId, secretKey);
+    return proxy.setS3Secret(accessId, secretKey);
   }
 
   public void revokeS3Secret(String kerberosID) throws IOException {

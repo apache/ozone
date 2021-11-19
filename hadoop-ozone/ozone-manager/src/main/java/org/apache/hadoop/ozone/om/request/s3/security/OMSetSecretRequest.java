@@ -64,10 +64,10 @@ public class OMSetSecretRequest extends OMClientRequest {
     final OMMetadataManager omMetadataManager =
         ozoneManager.getMetadataManager();
 
-    final SetSecretRequest setSecretRequest =
-        getOmRequest().getSetSecretRequest();
+    final SetS3SecretRequest request =
+        getOmRequest().getSetS3SecretRequest();
 
-    final String accessId = setSecretRequest.getAccessId();
+    final String accessId = request.getAccessId();
 
     // First check accessId existence
     final OmDBAccessIdInfo accessIdInfo = omMetadataManager
@@ -82,7 +82,7 @@ public class OMSetSecretRequest extends OMClientRequest {
     }
 
     // Secret should not be empty
-    final String secretKey = setSecretRequest.getSecretKey();
+    final String secretKey = request.getSecretKey();
     if (StringUtils.isEmpty(secretKey)) {
       throw new OMException("Secret key should not be empty",
               OMException.ResultCodes.INVALID_REQUEST);
@@ -134,14 +134,13 @@ public class OMSetSecretRequest extends OMClientRequest {
     IOException exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-    final SetSecretRequest setSecretRequest =
-            getOmRequest().getSetSecretRequest();
-    final String accessId = setSecretRequest.getAccessId();
-    final String secretKey = setSecretRequest.getSecretKey();
+    final SetS3SecretRequest request = getOmRequest().getSetS3SecretRequest();
+    final String accessId = request.getAccessId();
+    final String secretKey = request.getSecretKey();
 
     try {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(
-              S3_SECRET_LOCK, accessId);
+          S3_SECRET_LOCK, accessId);
 
       // Intentionally set to final so they can only be set once.
       final S3SecretValue newS3SecretValue;
@@ -192,14 +191,14 @@ public class OMSetSecretRequest extends OMClientRequest {
       }
 
       // Compose response
-      final SetSecretResponse.Builder setSecretResponse =
-          SetSecretResponse.newBuilder()
+      final SetS3SecretResponse.Builder setSecretResponse =
+          SetS3SecretResponse.newBuilder()
               .setAccessId(accessId)
               .setSecretKey(secretKey);
 
       omClientResponse = new OMSetSecretResponse(accessId,
           newDBAccessIdInfo, newS3SecretValue,
-          omResponse.setSetSecretResponse(setSecretResponse).build());
+          omResponse.setSetS3SecretResponse(setSecretResponse).build());
 
     } catch (IOException ex) {
       exception = ex;

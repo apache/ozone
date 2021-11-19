@@ -571,13 +571,14 @@ public interface ClientProtocol {
           throws IOException;
 
   /**
-   * Set secretKey of a given accessId.
+   * Set secret key of a given accessId.
    * @param accessId
    * @param secretKey
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue setSecret(String accessId, String secretKey) throws IOException;
+  S3SecretValue setS3Secret(String accessId, String secretKey)
+      throws IOException;
 
   /**
    * Revoke S3 Secret of given kerberos user.

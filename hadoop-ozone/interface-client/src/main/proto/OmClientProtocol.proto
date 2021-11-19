@@ -118,7 +118,7 @@ enum Type {
   GetS3Volume = 104;
   TenantListUser = 105;
 
-  SetSecret = 106;
+  SetS3Secret = 106;
 }
 
 message OMRequest {
@@ -217,7 +217,7 @@ message OMRequest {
   optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
   optional TenantListUserRequest            tenantListUserRequest          = 105;
 
-  optional SetSecretRequest                 SetSecretRequest               = 106;
+  optional SetS3SecretRequest               SetS3SecretRequest             = 106;
 }
 
 message OMResponse {
@@ -311,7 +311,7 @@ message OMResponse {
   optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
   optional TenantListUserResponse            tenantListUserResponse        = 105;
 
-  optional SetSecretResponse                 SetSecretResponse               = 106;
+  optional SetS3SecretResponse               SetS3SecretResponse           = 106;
 }
 
 enum Status {
@@ -1389,12 +1389,12 @@ message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
 }
 
-message SetSecretRequest {
+message SetS3SecretRequest {
     optional string accessId = 1;
     optional string secretKey = 2;
 }
 
-message SetSecretResponse {
+message SetS3SecretResponse {
     optional string accessId = 1;
     optional string secretKey = 2;
 }

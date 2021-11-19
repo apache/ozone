@@ -3287,7 +3287,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public S3SecretValue setSecret(String accessId, String secretKey) {
+  public S3SecretValue setS3Secret(String accessId, String secretKey) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
             "this to be implemented. As write requests use a new approach");
   }
