@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -264,6 +265,38 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           clock.millis() + bucketRepConfigRefreshPeriodMS;
     }
     return this.bucketReplicationConfig;
+  }
+
+  @Override
+  public OzoneFSDataStreamOutput createStreamFile(String key, short replication,
+      boolean overWrite, boolean recursive) throws IOException {
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
+    try {
+      OzoneDataStreamOutput ozoneDataStreamOutput = null;
+      if (replication == ReplicationFactor.ONE.getValue()
+          || replication == ReplicationFactor.THREE.getValue()) {
+
+        ReplicationConfig customReplicationConfig =
+            ReplicationConfig.adjustReplication(bucketReplicationConfig,
+                replication, config);
+        ozoneDataStreamOutput = bucket
+            .createStreamFile(key, 0, customReplicationConfig, overWrite,
+                recursive);
+      } else {
+        ozoneDataStreamOutput = bucket.createStreamFile(
+            key, 0, bucketReplicationConfig, overWrite, recursive);
+      }
+      return new OzoneFSDataStreamOutput(
+          ozoneDataStreamOutput.getByteBufStreamOutput());
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
+          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
+        throw new FileAlreadyExistsException(
+            ex.getResult().name() + ": " + ex.getMessage());
+      } else {
+        throw ex;
+      }
+    }
   }
 
   @Override
