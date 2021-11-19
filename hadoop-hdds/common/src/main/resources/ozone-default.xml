@@ -3272,4 +3272,12 @@
       If the timeout has been reached, a warning message will be logged.
     </description>
   </property>
+
+  <property>
+    <name>ozone.fs.datastream.enable</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE</tag>
+    <description> To enable/disable filesystem write via ratis streaming.
+    </description>
+  </property>
 </configuration>
