@@ -56,10 +56,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -83,6 +81,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -125,9 +124,28 @@ public class TestRootedOzoneFileSystem {
 
   public TestRootedOzoneFileSystem(boolean setDefaultFs,
       boolean enableOMRatis, boolean isAclEnabled) {
+    // Ignored. Actual init done in initParam().
+    // This empty constructor is still required to avoid argument exception.
+  }
+
+  @Parameterized.BeforeParam
+  public static void initParam(boolean setDefaultFs,
+                               boolean enableOMRatis, boolean isAclEnabled)
+      throws IOException, InterruptedException, TimeoutException {
+    // Initialize the cluster before EACH set of parameters
     enabledFileSystemPaths = setDefaultFs;
     omRatisEnabled = enableOMRatis;
     enableAcl = isAclEnabled;
+    initClusterAndEnv();
+  }
+
+  @Parameterized.AfterParam
+  public static void teardownParam() {
+    // Tear down the cluster after EACH set of parameters
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+    IOUtils.closeQuietly(fs);
   }
 
   public static FileSystem getFs() {
@@ -168,8 +186,8 @@ public class TestRootedOzoneFileSystem {
   // Non-privileged OFS instance
   private static RootedOzoneFileSystem userOfs;
 
-  @BeforeClass
-  public static void init() throws Exception {
+  public static void initClusterAndEnv() throws IOException,
+      InterruptedException, TimeoutException {
     conf = new OzoneConfiguration();
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
@@ -229,14 +247,6 @@ public class TestRootedOzoneFileSystem {
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
   }
 
-  @AfterClass
-  public static void teardown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-    IOUtils.closeQuietly(fs);
-  }
-
   private OMMetrics getOMMetrics() {
     return cluster.getOzoneManager().getMetrics();
   }
@@ -287,6 +297,11 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testDeleteCreatesFakeParentDir() throws Exception {
+    // TODO: Request for comment.
+    //  If possible, improve this to test when FS Path is enabled.
+    Assume.assumeTrue("FS Path is enabled. Skipping this test as it is not " +
+            "tuned for FS Path yet", !enabledFileSystemPaths);
+
     Path grandparent = new Path(bucketPath,
         "testDeleteCreatesFakeParentDir");
     Path parent = new Path(grandparent, "parent");
@@ -385,6 +400,11 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testMkdirOnNonExistentVolumeBucketDir() throws Exception {
+    // TODO: Request for comment.
+    //  If possible, improve this to test when FS Path is enabled.
+    Assume.assumeTrue("FS Path is enabled. Skipping this test as it is not " +
+            "tuned for FS Path yet", !enabledFileSystemPaths);
+
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
     Path root = new Path("/" + volumeNameLocal + "/" + bucketNameLocal);
@@ -727,15 +747,32 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(1, fileStatusVolume.length);
     Assert.assertEquals(ownerShort, fileStatusVolume[0].getOwner());
     Assert.assertEquals(group, fileStatusVolume[0].getGroup());
+
     // listStatus("/")
     Path root = new Path(OZONE_URI_DELIMITER);
     FileStatus[] fileStatusRoot = ofs.listStatus(root);
-    // Default volume "s3v" is created by OM during start up.
-    Assert.assertEquals(2 + 1, fileStatusRoot.length);
-    for (FileStatus fileStatus : fileStatusRoot) {
-      Assert.assertEquals(ownerShort, fileStatus.getOwner());
-      Assert.assertEquals(group, fileStatus.getGroup());
+
+    // When ACL is enabled, listStatus root will see a 4th volume created by
+    //  userXXXXX as the result of createVolumeAndBucket in initClusterAndEnv.
+    // This is due to the difference in behavior in listVolumesByUser depending
+    //  on whether ACL is enabled or not:
+    // 1. when ACL is disabled, listVolumesByUser would only return volumes
+    //  OWNED by the current user (volume owner is the current user);
+    // 2. when ACL is enabled, it would return all the volumes that the current
+    //  user has LIST permission to, regardless of the volume owner field.
+
+    if (!enableAcl) {
+      // When ACL is disabled, ofs.listStatus(root) will see 2+1 = 3 volumes,
+      // the +1 is the default volume "s3v" created by OM during start up.
+      Assert.assertEquals(2 + 1, fileStatusRoot.length);
+      for (FileStatus fileStatus : fileStatusRoot) {
+        Assert.assertEquals(ownerShort, fileStatus.getOwner());
+        Assert.assertEquals(group, fileStatus.getGroup());
+      }
+    } else {
+      Assert.assertEquals(2 + 1 + 1, fileStatusRoot.length);
     }
+
     // Cleanup
     teardownVolumeBucketWithDir(bucketPath2);
     teardownVolumeBucketWithDir(bucketPath1);
@@ -845,6 +882,11 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testListStatusRootAndVolumeContinuation() throws IOException {
+    // TODO: Request for comment.
+    //  If possible, improve this to test when FS Path is enabled.
+    Assume.assumeTrue("FS Path is enabled. Skipping this test as it is not " +
+            "tuned for FS Path yet", !enabledFileSystemPaths);
+
     Path[] paths = new Path[5];
     for (int i = 0; i < paths.length; i++) {
       paths[i] = createRandomVolumeBucketWithDirs();
@@ -1540,23 +1582,8 @@ public class TestRootedOzoneFileSystem {
     Assume.assumeTrue("ACL is not enabled. Skipping this test as it requires " +
             "ACL to be enabled to be meaningful.", enableAcl);
 
-    // This unit test does the correct check. However, the parameterized
-    // test is not initialized correctly since HDDS-4998 (or HDDS-4040).
-
-    // The cluster is started with enableAcl = false, but across different set
-    // of test parameters, the OM is not restarted. So OM is actually stuck with
-    // enableAcl = false. That's why ACL checks are skipped in the tests.
-    // OM should be restarted when enableAcl is changed.
-
-    // For now, in order to properly run this specific test, on line 147,
-    // explicitly assign:
-    //     private static boolean enableAcl = true;
-    // When unset, it defaults to false due to Java primitive defaults.
-
-    // TODO: Fix the parameterized test to properly initialize the cluster.
-    //  When the parameterized test is initialized correctly, the line
-    //  below can be uncommented.
-//    Assert.assertTrue(cluster.getOzoneManager().getAclsEnabled());
+    // Sanity check
+    Assert.assertTrue(cluster.getOzoneManager().getAclsEnabled());
 
     final String volume = "volume-for-test-get-bucket";
     // Create a volume as admin

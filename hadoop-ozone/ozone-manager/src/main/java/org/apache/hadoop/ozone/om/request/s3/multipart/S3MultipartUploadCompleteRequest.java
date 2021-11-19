@@ -348,10 +348,21 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       updatePrefixFSOInfo(dbOpenKeyInfo, builder);
       omKeyInfo = builder.build();
     } else {
+      OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
+          keyName, omMetadataManager);
+
       // Already a version exists, so we should add it as a new version.
       // But now as versioning is not supported, just following the commit
       // key approach. When versioning support comes, then we can uncomment
       // below code keyInfo.addNewVersion(locations);
+
+      // As right now versioning is not supported, we can set encryption info
+      // at KeyInfo level, but once we start supporting versioning,
+      // encryption info needs to be set at KeyLocation level, as each version
+      // will have it's own file encryption info.
+      if (dbOpenKeyInfo.getFileEncryptionInfo() != null) {
+        omKeyInfo.setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo());
+      }
       omKeyInfo.updateLocationInfoList(partLocationInfos, true, true);
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
