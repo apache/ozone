@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -71,7 +72,9 @@ public class FindTargetGreedy implements FindTargetStrategy {
       if (ret != 0) {
         return ret;
       }
-      return a.hashCode() - b.hashCode();
+      UUID uuidA = a.getDatanodeDetails().getUuid();
+      UUID uuidB = b.getDatanodeDetails().getUuid();
+      return uuidA.compareTo(uuidB);
     });
   }
 

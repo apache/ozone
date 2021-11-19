@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.UUID;
 
 /**
  * The selection criteria for selecting source datanodes , the containers of
@@ -53,7 +54,9 @@ public class FindSourceGreedy implements FindSourceStrategy{
       if (ret != 0) {
         return ret;
       }
-      return a.hashCode() - b.hashCode();
+      UUID uuidA = a.getDatanodeDetails().getUuid();
+      UUID uuidB = b.getDatanodeDetails().getUuid();
+      return uuidA.compareTo(uuidB);
     });
     this.nodeManager = nodeManager;
   }
