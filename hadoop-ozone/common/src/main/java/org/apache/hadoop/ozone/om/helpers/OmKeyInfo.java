@@ -701,6 +701,14 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.encInfo = null;
   }
 
+  /**
+   * Set the file encryption info.
+   * @param fileEncryptionInfo
+   */
+  public void setFileEncryptionInfo(FileEncryptionInfo fileEncryptionInfo) {
+    this.encInfo = fileEncryptionInfo;
+  }
+
   public String getPath() {
     if (StringUtils.isBlank(getFileName())) {
       return getKeyName();
