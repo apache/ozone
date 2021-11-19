@@ -698,6 +698,11 @@ public interface ClientProtocol {
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException;
 
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneDataStreamOutput createStreamFile(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      boolean overWrite, boolean recursive) throws IOException;
+
 
   /**
    * List the status for a file or a directory and its contents.
