@@ -96,6 +96,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -401,7 +402,8 @@ public class RpcClient implements ClientProtocol {
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAcls(),
-        volume.getMetadata());
+        volume.getMetadata(),
+        volume.getRefCount());
   }
 
   @Override
@@ -672,6 +674,28 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(Strings.isNotBlank(tenantName),
         "tenantName cannot be null or empty.");
     ozoneManagerClient.createTenant(tenantName);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void createTenant(String tenantName, OmTenantArgs omTenantArgs)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
+        "tenantName cannot be null or empty.");
+    Preconditions.checkNotNull(omTenantArgs);
+    // Pre-check on the client to avoid unnecessary RPC calls
+    verifyVolumeName(omTenantArgs.getVolumeName());
+
+    ozoneManagerClient.createTenant(tenantName, omTenantArgs);
+  }
+
+  @Override
+  public void deleteTenant(String tenantName) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
+        "tenantName cannot be null or empty.");
+    ozoneManagerClient.deleteTenant(tenantName);
   }
 
   /**

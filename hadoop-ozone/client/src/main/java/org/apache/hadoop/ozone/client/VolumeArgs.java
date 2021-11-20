@@ -38,6 +38,7 @@ public final class VolumeArgs {
   private final long quotaInNamespace;
   private final List<OzoneAcl> acls;
   private Map<String, String> metadata;
+  private long refCount;
 
   /**
    * Private constructor, constructed via builder.

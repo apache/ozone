@@ -50,7 +50,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -131,6 +130,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -3081,16 +3081,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
           throws IOException {
-    throw new NotImplementedException(
-            "non-Ratis getS3Secret(String, boolean) is not implemented");
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
    * Create tenant.
    */
-  public void createTenant(String tenantName) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis createTenant() is not implemented");
+  public void createTenant(String tenantName) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
+  @Override
+  public void createTenant(String tenantName, OmTenantArgs omTenantArgs) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
+  @Override
+  public void deleteTenant(String tenantName) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
@@ -3098,34 +3110,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public S3SecretValue tenantAssignUserAccessId(
       String username, String tenantName, String accessId) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantAssignUserAccessId() is not implemented");
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
    * Revoke user accessId to tenant.
    */
   public void tenantRevokeUserAccessId(String accessId) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantRevokeUserAccessId() is not implemented");
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
-   * Assign admin role to an accessId in a tenant.
+   * Assign admin role to a user by an accessId in a tenant.
    */
   public void tenantAssignAdmin(String accessId, String tenantName,
-      boolean delegated) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantAssignAdmin() is not implemented");
+      boolean delegated) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
    * Revoke admin role of an accessId from a tenant.
    */
-  public void tenantRevokeAdmin(String accessId, String tenantName)
-      throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantRevokeAdmin() is not implemented");
+  public void tenantRevokeAdmin(String accessId, String tenantName) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**

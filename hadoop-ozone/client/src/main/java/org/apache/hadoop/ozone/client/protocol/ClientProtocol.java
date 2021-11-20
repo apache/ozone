@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -594,6 +595,15 @@ public interface ClientProtocol {
    */
   void createTenant(String tenantName) throws IOException;
 
+  /**
+   * Create tenant with args.
+   * @param tenantName tenant name.
+   * @param omTenantArgs various arguments for tenant creation. e.g. volume name
+   * @throws IOException
+   */
+  void createTenant(String tenantName, OmTenantArgs omTenantArgs)
+      throws IOException;
+
   // TODO
 //  /**
 //   * Modify tenant.
@@ -601,13 +611,13 @@ public interface ClientProtocol {
 //   * @throws IOException
 //   */
 //  void modifyTenant(String tenantName) throws IOException;
-//
-//  /**
-//   * Delete tenant.
-//   * @param tenantName tenant name.
-//   * @throws IOException
-//   */
-//  void deleteTenant(String tenantName) throws IOException;
+
+  /**
+   * Delete tenant.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  void deleteTenant(String tenantName) throws IOException;
 
   /**
    * Assign user to tenant.

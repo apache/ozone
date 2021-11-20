@@ -93,6 +93,19 @@ public class OzoneVolume extends WithMetadata {
   private int listCacheSize;
 
   private OzoneObj ozoneObj;
+  /**
+   * Reference count on this Ozone volume.
+   *
+   * When reference count is larger than zero, it indicates that at least one
+   * "lock" is held on the volume by some Ozone feature (e.g. multi-tenancy).
+   * Volume delete operation will be denied in this case, and user should be
+   * prompted to release the lock first via the interface provided by that
+   * feature.
+   *
+   * Volumes created using CLI, ObjectStore API or upgraded from older OM DB
+   * will have reference count set to zero by default.
+   */
+  private long refCount;
 
   /**
    * Constructs OzoneVolume instance.
@@ -131,6 +144,20 @@ public class OzoneVolume extends WithMetadata {
         .setVolumeName(name)
         .setResType(OzoneObj.ResourceType.VOLUME)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
+  }
+
+  /**
+   * @param refCount volume reference count.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
+      String name, String admin, String owner, long quotaInBytes,
+      long quotaInNamespace, long usedNamespace, long creationTime,
+      long modificationTime, List<OzoneAcl> acls,
+      Map<String, String> metadata, long refCount) {
+    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInNamespace,
+        usedNamespace, creationTime, modificationTime, acls, metadata);
+    this.refCount = refCount;
   }
 
   /**

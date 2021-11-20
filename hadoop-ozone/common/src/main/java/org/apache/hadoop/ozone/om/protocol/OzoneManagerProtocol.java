@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -479,16 +480,30 @@ public interface OzoneManagerProtocol
   void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
-   * Create tenant.
+   * Create a tenant.
    * @param tenantName tenant name.
    * @throws IOException
    */
   void createTenant(String tenantName) throws IOException;
 
-  // TODO: modify, delete
+  /**
+   * Create a tenant with extra arguments.
+   * @param tenantName tenant name.
+   * @param omTenantArgs OmTenantArgs
+   * @throws IOException
+   */
+  void createTenant(String tenantName, OmTenantArgs omTenantArgs)
+      throws IOException;
 
   /**
-   * Assign user to tenant.
+   * Delete a tenant.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  void deleteTenant(String tenantName) throws IOException;
+
+  /**
+   * Assign user to a tenant.
    * @param username user name to be assigned.
    * @param tenantName tenant name.
    * @param accessId access ID.
@@ -501,7 +516,7 @@ public interface OzoneManagerProtocol
 
   // TODO: modify, delete
   /**
-   * Revoke user accessId to tenant.
+   * Revoke user accessId to a tenant.
    * @param accessId accessId to be revoked.
    * @throws IOException
    */
@@ -518,7 +533,7 @@ public interface OzoneManagerProtocol
       boolean delegated) throws IOException;
 
   /**
-   * Revoke admin role of an accessId from a tenant.
+   * Revoke admin role of an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantName tenant name.
    * @throws IOException

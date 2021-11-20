@@ -48,6 +48,19 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private long quotaInNamespace;
   private long usedNamespace;
   private List<OzoneAcl> acls;
+  /**
+   * Reference count on this Ozone volume.
+   *
+   * When reference count is larger than zero, it indicates that at least one
+   * "lock" is held on the volume by some Ozone feature (e.g. multi-tenancy).
+   * Volume delete operation will be denied in this case, and user should be
+   * prompted to release the lock first via the interface provided by that
+   * feature.
+   *
+   * Volumes created using CLI, ObjectStore API or upgraded from older OM DB
+   * will have reference count set to zero by default.
+   */
+  private long refCount;
 
   /**
    * Private constructor, constructed via builder.
@@ -84,6 +97,14 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     this.updateID = updateID;
   }
 
+  public long getRefCount() {
+    assert (refCount >= 0);
+    return refCount;
+  }
+
+  public void setRefCount(long refCount) {
+    this.refCount = refCount;
+  }
 
   public void setOwnerName(String newOwner) {
     this.ownerName = newOwner;

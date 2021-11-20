@@ -141,7 +141,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // A caveat is that this assumes OM's auth_to_local is the same as
     //  the client's. Maybe move this logic to the client and pass VolumeArgs?
     final String owner = ugi.getShortUserName();
-    final String volumeName = tenantId;  // TODO: Configurable
+    // Volume name defaults to tenant name if unspecified in the request
+    final String volumeName =
+        request.hasTenantName() ? request.getTenantName() : tenantId;
     // Validate volume name
     OmUtils.validateVolumeName(volumeName);
     // TODO: Refactor this and OMVolumeCreateRequest to improve maintainability.
@@ -150,8 +152,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .setAdminName(owner)
         .setOwnerName(owner)
         .build();
-    // Verify volume name
-    OmUtils.validateVolumeName(volumeInfo.getVolume());
 
     // TODO: Shall we check volume existence here as well?
 
@@ -287,6 +287,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           ozoneManager.getObjectIdFromTxId(transactionLogIndex));
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
+      // Set volume reference count to 1
+      omVolumeArgs.setRefCount(1L);
       // Audit
       auditMap = omVolumeArgs.toAuditMap();
 

@@ -463,6 +463,7 @@ message VolumeInfo {
     optional uint64 modificationTime = 10;
     optional int64 quotaInNamespace = 11 [default = -2];
     optional uint64 usedNamespace = 12;
+    optional int64 refCount = 13;
 }
 
 /**
@@ -1468,6 +1469,7 @@ message RevokeS3SecretRequest {
 message CreateTenantRequest {
     optional string tenantName = 1;
     optional string tenantDefaultPolicyName = 2;
+    optional string volumeName = 3;
 }
 
 message ModifyTenantRequest {

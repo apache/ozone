@@ -33,6 +33,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -195,7 +196,7 @@ public class ObjectStore {
   }
 
   /**
-   * Create tenant.
+   * Create a tenant.
    * @param tenantName tenant name.
    * @throws IOException
    */
@@ -203,17 +204,25 @@ public class ObjectStore {
     proxy.createTenant(tenantName);
   }
 
-  // TODO: createTenant with tenantArgs
-//  /**
-//   * Create tenant.
-//   * @param tenantName tenant name.
-//   * @param tenantArgs tenant arguments.
-//   * @throws IOException
-//   */
-//  public void createTenant(String tenantName, OmTenantArgs tenantArgs)
-//      throws IOException {
-//    proxy.createTenant(tenantName, tenantArgs);
-//  }
+  /**
+   * Create a tenant.
+   * @param tenantName tenant name.
+   * @param tenantArgs extra tenant arguments.
+   * @throws IOException
+   */
+  public void createTenant(String tenantName, OmTenantArgs tenantArgs)
+      throws IOException {
+    proxy.createTenant(tenantName, tenantArgs);
+  }
+
+  /**
+   * Delete a tenant.
+   * @param tenantName tenant name.
+   * @throws IOException
+   */
+  public void deleteTenant(String tenantName) throws IOException {
+    proxy.deleteTenant(tenantName);
+  }
 
   /**
    * Assign user accessId to tenant.

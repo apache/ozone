@@ -100,6 +100,14 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
+      // Check reference count
+      if (omVolumeArgs.getRefCount() != 0L) {
+        LOG.debug("volume: {} has non-zero ref count. won't delete", volume);
+        throw new OMException("Volume is being used. Use " +
+            "`ozone tenant delete` CLI to delete the volume instead.",
+            OMException.ResultCodes.VOLUME_IN_USE);
+      }
+
       owner = omVolumeArgs.getOwnerName();
       acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
           owner);

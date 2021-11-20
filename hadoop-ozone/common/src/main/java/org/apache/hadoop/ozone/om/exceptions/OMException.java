@@ -111,6 +111,8 @@ public class OMException extends IOException {
 
     VOLUME_NOT_EMPTY,
 
+    VOLUME_IN_USE,
+
     VOLUME_ALREADY_EXISTS,
 
     USER_NOT_FOUND,
