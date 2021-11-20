@@ -178,6 +178,18 @@ public class ObjectStore {
     return proxy.getS3Secret(kerberosID, createIfNotExist);
   }
 
+  /**
+   * Set secretKey for accessId.
+   * @param accessId
+   * @param secretKey
+   * @return S3SecretValue <accessId, secretKey> pair
+   * @throws IOException
+   */
+  public S3SecretValue setS3Secret(String accessId, String secretKey)
+          throws IOException {
+    return proxy.setS3Secret(accessId, secretKey);
+  }
+
   public void revokeS3Secret(String kerberosID) throws IOException {
     proxy.revokeS3Secret(kerberosID);
   }

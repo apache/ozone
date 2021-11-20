@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerP
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -52,6 +53,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -586,6 +588,126 @@ public class TestOzoneTenantShell {
     // Clean up
     executeHA(tenantShell, new String[] {
         "user", "revoke", "tenant1$alice"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
+  }
+
+  @Test
+  public void testTenantSetSecret() throws IOException, InterruptedException {
+
+    final String tenantName = "tenant-test-set-secret";
+
+    // Create test tenant
+    executeHA(tenantShell, new String[] {"create", tenantName});
+    checkOutput(out, "Created tenant '" + tenantName + "'.\n", true);
+    checkOutput(err, "", true);
+
+    // Set secret for non-existent accessId. Expect failure
+    executeHA(tenantShell, new String[] {
+        "user", "set-secret", tenantName + "$alice", "--secret=somesecret0"});
+    checkOutput(out, "", true);
+    checkOutput(err, "AccessId '" + tenantName + "$alice' doesn't exist\n",
+        true);
+
+    // Assign a user to the tenant so that we have an accessId entry
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "alice", "--tenant=" + tenantName});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
+        "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'alice' to '" + tenantName + "'" +
+        " with accessId '" + tenantName + "$alice'.\n", true);
+
+    // Set secret as OM admin should succeed
+    executeHA(tenantShell, new String[] {
+        "user", "setsecret", tenantName + "$alice",
+        "--secret=somesecret1", "--export"});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
+        "export AWS_SECRET_ACCESS_KEY='somesecret1'\n", true);
+    checkOutput(err, "", true);
+
+    // Set empty secret key should fail
+    executeHA(tenantShell, new String[] {
+        "user", "setsecret", tenantName + "$alice",
+        "--secret=short", "--export"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
+    // Note: Exception thrown from OM to the client stderr is somehow not
+    //  captured in err, but is printed to the console output.
+
+    // Get secret should still give the previous secret key
+    executeHA(tenantShell, new String[] {
+        "user", "getsecret", tenantName + "$alice"});
+    checkOutput(out, "somesecret1", false);
+    checkOutput(err, "", true);
+
+    // Set secret as alice should succeed
+    final UserGroupInformation ugiAlice = UserGroupInformation
+        .createUserForTesting("alice",  new String[] {"usergroup"});
+
+    ugiAlice.doAs((PrivilegedExceptionAction<Void>) () -> {
+      executeHA(tenantShell, new String[] {
+          "user", "setsecret", tenantName + "$alice",
+          "--secret=somesecret2", "--export"});
+      checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
+          "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
+      checkOutput(err, "", true);
+      return null;
+    });
+
+    // Set secret as bob should fail
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob", "--tenant=" + tenantName});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$bob'\n" +
+        "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'bob' to '" + tenantName + "'" +
+        " with accessId '" + tenantName + "$bob'.\n", true);
+
+    final UserGroupInformation ugiBob = UserGroupInformation
+        .createUserForTesting("bob",  new String[] {"usergroup"});
+
+    ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
+      executeHA(tenantShell, new String[] {
+          "user", "setsecret", tenantName + "$alice",
+          "--secret=somesecret2", "--export"});
+      checkOutput(out, "", true);
+      checkOutput(err, "", true);
+      // Note: Exception thrown from OM to the client stderr is somehow not
+      //  captured in err, but is printed to the console output.
+      return null;
+    });
+
+    // Once we make bob an admin of this tenant, set secret should succeed
+    executeHA(tenantShell, new String[] {"user", "assign-admin",
+        tenantName + "$" + ugiBob.getShortUserName(),
+        "--tenant=" + tenantName, "--delegated=true"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Assigned admin", false);
+
+    ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
+      executeHA(tenantShell, new String[] {
+          "user", "setsecret", tenantName + "$alice",
+          "--secret=somesecret2", "--export"});
+      checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
+          "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
+      checkOutput(err, "", true);
+      return null;
+    });
+
+    // Clean up
+    executeHA(tenantShell, new String[] {"user", "revoke-admin",
+        tenantName + "$" + ugiBob.getShortUserName()});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked admin", false);
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", tenantName + "$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", tenantName + "$alice"});
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 

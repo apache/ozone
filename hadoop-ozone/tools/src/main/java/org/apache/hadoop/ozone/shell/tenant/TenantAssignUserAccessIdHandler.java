@@ -47,7 +47,7 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name", required = true)
-  private String tenantName;
+  private String tenantId;
 
   @CommandLine.Option(names = {"-a", "--access-id", "--accessId"},
       description = "(Optional) Specify the accessId for user in this tenant. "
@@ -59,8 +59,8 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   //  `s3 getsecret` and leak the secret if an admin isn't careful.
   private String accessId;
 
-  private String getDefaultAccessId(String principal) {
-    return tenantName + TENANT_NAME_USER_NAME_DELIMITER + principal;
+  private String getDefaultAccessId(String userPrincipal) {
+    return tenantId + TENANT_NAME_USER_NAME_DELIMITER + userPrincipal;
   }
 
   @Override
@@ -83,8 +83,8 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
           accessId = getDefaultAccessId(principal);
         }
         final S3SecretValue resp =
-            objStore.tenantAssignUserAccessId(principal, tenantName, accessId);
-        err().println("Assigned '" + principal + "' to '" + tenantName +
+            objStore.tenantAssignUserAccessId(principal, tenantId, accessId);
+        err().println("Assigned '" + principal + "' to '" + tenantId +
             "' with accessId '" + accessId + "'.");
         out().println("export AWS_ACCESS_KEY_ID='" +
             resp.getAwsAccessKey() + "'");
@@ -92,7 +92,7 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
             resp.getAwsSecret() + "'");
       } catch (IOException e) {
         err().println("Failed to assign '" + principal + "' to '" +
-            tenantName + "': " + e.getMessage());
+            tenantId + "': " + e.getMessage());
         if (e instanceof OMException) {
           final OMException omException = (OMException) e;
           if (omException.getResult().equals(

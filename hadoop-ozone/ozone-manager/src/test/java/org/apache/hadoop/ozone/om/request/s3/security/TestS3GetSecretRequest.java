@@ -348,7 +348,7 @@ public class TestS3GetSecretRequest {
     // Check response
     Assert.assertTrue(omTenantCreateResponse.getOMResponse().getSuccess());
     Assert.assertEquals(TENANT_NAME,
-        omTenantCreateResponse.getOmDBTenantInfo().getTenantName());
+        omTenantCreateResponse.getOmDBTenantInfo().getTenantId());
 
 
     // 2. AssignUserToTenantRequest: Assign "bob@EXAMPLE.COM" to "finance".
@@ -419,6 +419,6 @@ public class TestS3GetSecretRequest {
     final S3Secret s3Secret = getS3SecretResponse.getS3Secret();
     Assert.assertEquals(ACCESS_ID_BOB, s3Secret.getKerberosID());
     Assert.assertEquals(
-        omDBAccessIdInfo.getSharedSecret(), s3Secret.getAwsSecret());
+        omDBAccessIdInfo.getSecretKey(), s3Secret.getAwsSecret());
   }
 }

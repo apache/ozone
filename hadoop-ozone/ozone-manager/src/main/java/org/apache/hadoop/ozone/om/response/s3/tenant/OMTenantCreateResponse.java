@@ -79,7 +79,7 @@ public class OMTenantCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    final String tenantName = omTenantInfo.getTenantName();
+    final String tenantName = omTenantInfo.getTenantId();
     omMetadataManager.getTenantStateTable().putWithBatch(
         batchOperation, tenantName, omTenantInfo);
 

@@ -181,6 +181,8 @@ public class S3GetSecretRequest extends OMClientRequest {
                     new CacheKey<>(accessId),
                     new CacheValue<>(Optional.of(assignS3SecretValue),
                             transactionLogIndex));
+            // TODO: Put accessId entry straight to TenantAccessIdTable
+            //  later when we deprecate the S3SecretTable.
           } else {
             assignS3SecretValue = null;
           }
@@ -191,7 +193,7 @@ public class S3GetSecretRequest extends OMClientRequest {
         }
       } else {
         // Found in TenantAccessIdTable.
-        awsSecret = omDBAccessIdInfo.getSharedSecret();
+        awsSecret = omDBAccessIdInfo.getSecretKey();
         assignS3SecretValue = null;
       }
 

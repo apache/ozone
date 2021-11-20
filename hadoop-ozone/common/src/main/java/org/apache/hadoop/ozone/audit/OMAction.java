@@ -71,6 +71,7 @@ public enum OMAction implements AuditAction {
   LIST_STATUS,
 
   GET_S3_SECRET,
+  SET_S3_SECRET,
   REVOKE_S3_SECRET,
 
   CREATE_TENANT,

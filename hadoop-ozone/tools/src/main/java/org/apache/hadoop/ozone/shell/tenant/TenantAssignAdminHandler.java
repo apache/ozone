@@ -47,7 +47,7 @@ public class TenantAssignAdminHandler extends TenantHandler {
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
-  private String tenantName;
+  private String tenantId;
 
   @CommandLine.Option(names = {"-d", "--delegated"}, defaultValue = "true",
       description = "Make delegated admin")
@@ -59,13 +59,13 @@ public class TenantAssignAdminHandler extends TenantHandler {
 
     for (final String accessId : accessIds) {
       try {
-        objStore.tenantAssignAdmin(accessId, tenantName, delegated);
+        objStore.tenantAssignAdmin(accessId, tenantId, delegated);
         // TODO: Make tenantAssignAdmin return accessId, tenantName, user later.
         err().println("Assigned admin to '" + accessId +
-            (tenantName != null ? "' in tenant '" + tenantName + "'" : ""));
+            (tenantId != null ? "' in tenant '" + tenantId + "'" : ""));
       } catch (IOException e) {
         err().println("Failed to assign admin to '" + accessId +
-            (tenantName != null ? "' in tenant '" + tenantName + "'" : "") +
+            (tenantId != null ? "' in tenant '" + tenantId + "'" : "") +
             ": " + e.getMessage());
         if (e instanceof OMException) {
           final OMException omEx = (OMException) e;

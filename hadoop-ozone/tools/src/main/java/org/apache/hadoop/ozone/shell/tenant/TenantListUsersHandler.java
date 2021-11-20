@@ -42,7 +42,7 @@ public class TenantListUsersHandler extends S3Handler {
 
   @CommandLine.Option(names = {"-t", "--tenant"},
       description = "Tenant name")
-  private String tenantName;
+  private String tenantId;
 
   @CommandLine.Option(names = {"-p", "--prefix"},
       description = "Filter users with this prefix.")
@@ -52,19 +52,19 @@ public class TenantListUsersHandler extends S3Handler {
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
 
-    if (StringUtils.isEmpty(tenantName)) {
+    if (StringUtils.isEmpty(tenantId)) {
       err().println("Please specify a tenant name with -t.");
       return;
     }
     try {
       TenantUserList usersInTenant =
-          objStore.listUsersInTenant(tenantName, prefix);
+          objStore.listUsersInTenant(tenantId, prefix);
       for (TenantUserAccessId accessIdInfo : usersInTenant.getUserAccessIds()) {
         out().println("- User '" + accessIdInfo.getUser() +
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
       }
     } catch (IOException e) {
-      err().println("Failed to Get Users in tenant '" + tenantName
+      err().println("Failed to Get Users in tenant '" + tenantId
           + "': " + e.getMessage());
     }
   }

@@ -17,30 +17,35 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-import java.io.IOException;
-
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.security.UserGroupInformation;
-
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.IOException;
+
 /**
- * Executes getsecret calls.
+ * ozone s3 setsecret.
  */
-@Command(name = "getsecret", aliases = "get-secret",
-    description = "Returns S3 secret for a user")
-public class GetS3SecretHandler extends S3Handler {
+@Command(name = "setsecret", aliases = "set-secret",
+    description = "Set s3 secret for current user")
+public class SetS3SecretHandler extends S3Handler {
 
   @Option(names = "-u",
-      description = "Specify the user (accessId). Requires admin privilege'")
+      description = "Specify the user to perform the operation on "
+          + "(Admins only)'")
   private String username;
+
+  @CommandLine.Option(names = {"-s", "--secret", "--secretKey"},
+      description = "Secret key", required = true)
+  private String secretKey;
 
   @Option(names = "-e",
       description = "Print out variables together with 'export' prefix, to "
-          + "use it from 'eval $(ozone s3 getsecret)'")
+          + "use it from 'eval $(ozone s3 setsecret)'")
   private boolean export;
 
   @Override
@@ -55,14 +60,15 @@ public class GetS3SecretHandler extends S3Handler {
       username = UserGroupInformation.getCurrentUser().getUserName();
     }
 
-    final S3SecretValue secret = client.getObjectStore().getS3Secret(username);
+    final S3SecretValue accessIdSecretKeyPair =
+        client.getObjectStore().setS3Secret(username, secretKey);
     if (export) {
       out().println("export AWS_ACCESS_KEY_ID='" +
-          secret.getAwsAccessKey() + "'");
+          accessIdSecretKeyPair.getAwsAccessKey() + "'");
       out().println("export AWS_SECRET_ACCESS_KEY='" +
-          secret.getAwsSecret() + "'");
+          accessIdSecretKeyPair.getAwsSecret() + "'");
     } else {
-      out().println(secret);
+      out().println(accessIdSecretKeyPair);
     }
   }
 

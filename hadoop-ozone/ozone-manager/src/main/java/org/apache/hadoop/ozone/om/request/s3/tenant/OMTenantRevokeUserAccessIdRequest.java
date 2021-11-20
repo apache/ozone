@@ -173,7 +173,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
       assert(omDBAccessIdInfo != null);
-      userPrincipal = omDBAccessIdInfo.getKerberosPrincipal();
+      userPrincipal = omDBAccessIdInfo.getUserPrincipal();
       assert(userPrincipal != null);
       OmDBKerberosPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);

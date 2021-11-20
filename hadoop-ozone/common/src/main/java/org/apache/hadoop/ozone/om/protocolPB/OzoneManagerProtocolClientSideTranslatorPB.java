@@ -895,6 +895,27 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public S3SecretValue setS3Secret(String accessId, String secretKey)
+          throws IOException {
+    final SetS3SecretRequest request = SetS3SecretRequest.newBuilder()
+        .setAccessId(accessId)
+        .setSecretKey(secretKey)
+        .build();
+    OMRequest omRequest = createOMRequest(Type.SetS3Secret)
+        .setSetS3SecretRequest(request)
+        .build();
+    final SetS3SecretResponse resp = handleError(submitRequest(omRequest))
+        .getSetS3SecretResponse();
+
+    final S3Secret accessIdSecretKeyPair = S3Secret.newBuilder()
+        .setKerberosID(resp.getAccessId())
+        .setAwsSecret(resp.getSecretKey())
+        .build();
+
+    return S3SecretValue.fromProtobuf(accessIdSecretKeyPair);
+  }
+
+  @Override
   public void revokeS3Secret(String kerberosID) throws IOException {
     RevokeS3SecretRequest request = RevokeS3SecretRequest.newBuilder()
             .setKerberosID(kerberosID)
@@ -930,12 +951,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public S3SecretValue tenantAssignUserAccessId(
-      String username, String tenantName, String accessId) throws IOException {
+      String username, String tenantId, String accessId) throws IOException {
 
     final TenantAssignUserAccessIdRequest request =
         TenantAssignUserAccessIdRequest.newBuilder()
         .setTenantUsername(username)
-        .setTenantName(tenantName)
+        .setTenantName(tenantId)
         .setAccessId(accessId)
         .build();
     final OMRequest omRequest = createOMRequest(Type.TenantAssignUserAccessId)
