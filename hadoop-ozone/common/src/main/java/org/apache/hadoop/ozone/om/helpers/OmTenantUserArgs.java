@@ -19,22 +19,22 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 /**
- * This class is used for storing tenant user arguments.
+ * This class is used for storing tenant user arguments. Unused for now.
  */
 public class OmTenantUserArgs {
   private final String tenantUsername;
-  private final String tenantName;
+  private final String tenantId;
 
-  public OmTenantUserArgs(String tenantUsername, String tenantName) {
+  public OmTenantUserArgs(String tenantUsername, String tenantId) {
     this.tenantUsername = tenantUsername;
-    this.tenantName = tenantName;
+    this.tenantId = tenantId;
   }
 
   public String getTenantUsername() {
     return tenantUsername;
   }
 
-  public String getTenantName() {
-    return tenantName;
+  public String getTenantId() {
+    return tenantId;
   }
 }

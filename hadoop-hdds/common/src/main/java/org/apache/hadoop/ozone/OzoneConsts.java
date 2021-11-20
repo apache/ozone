@@ -323,6 +323,7 @@ public final class OzoneConsts {
   public static final String MAX_PARTS = "maxParts";
   public static final String S3_BUCKET = "s3Bucket";
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
+  public static final String S3_SETSECRET_USER = "S3SetSecretUser";
   public static final String S3_REVOKESECRET_USER = "S3RevokeSecretUser";
   public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
   public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
@@ -373,6 +374,8 @@ public final class OzoneConsts {
 
   public static final int S3_BUCKET_MIN_LENGTH = 3;
   public static final int S3_BUCKET_MAX_LENGTH = 64;
+
+  public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";

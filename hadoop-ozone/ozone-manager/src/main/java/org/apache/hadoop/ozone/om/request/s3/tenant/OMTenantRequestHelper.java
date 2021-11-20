@@ -119,25 +119,67 @@ public final class OMTenantRequestHelper {
     return volumeName;
   }
 
-  static String getTenantNameFromAccessId(OMMetadataManager omMetadataManager,
-      String accessId) throws IOException {
+  public static String getTenantNameFromAccessId(
+      OMMetadataManager omMetadataManager, String accessId) throws IOException {
 
     final OmDBAccessIdInfo accessIdInfo = omMetadataManager
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
-      throw new OMException("OmDBAccessIdInfo entry is missing for accessId '" +
-          accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
+      throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
+          accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
     }
 
-    final String tenantName = accessIdInfo.getTenantId();
+    final String tenantId = accessIdInfo.getTenantId();
 
-    if (StringUtils.isEmpty(tenantName)) {
+    if (StringUtils.isEmpty(tenantId)) {
       throw new OMException("tenantId field is null or empty for accessId '" +
           accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
     }
 
-    return tenantName;
+    return tenantId;
+  }
+
+  public static boolean isUserAccessIdPrincipalOrTenantAdmin(
+          OzoneManager ozoneManager, String accessId,
+          UserGroupInformation ugi) throws IOException {
+
+    final OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
+            .getTenantAccessIdTable().get(accessId);
+
+    if (accessIdInfo == null) {
+      // Doesn't have the accessId entry in TenantAccessIdTable.
+      // Probably came from `ozone s3 getsecret` with older OM.
+      return false;
+    }
+
+    final String tenantName = accessIdInfo.getTenantId();
+    // Sanity check
+    if (tenantName == null) {
+      throw new OMException("Unexpected error: OmDBAccessIdInfo " +
+              "tenantId field should not have been null",
+              OMException.ResultCodes.METADATA_ERROR);
+    }
+
+    final String accessIdPrincipal = accessIdInfo.getUserPrincipal();
+    // Sanity check
+    if (accessIdPrincipal == null) {
+      throw new OMException("Unexpected error: OmDBAccessIdInfo " +
+              "kerberosPrincipal field should not have been null",
+              OMException.ResultCodes.METADATA_ERROR);
+    }
+
+    // Check if ugi matches the holder of the accessId
+    if (ugi.getShortUserName().equals(accessIdPrincipal)) {
+      return true;
+    }
+
+    // Check if ugi is an admin of this tenant
+    if (ozoneManager.isTenantAdmin(ugi, tenantName, true)) {
+      return true;
+    }
+
+    return false;
   }
 
 }
