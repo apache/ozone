@@ -149,7 +149,27 @@ public class RpcClientTest {
         OZONE_OM_CLIENT_PROTOCOL_VERSION,
         "1.0.1",
         "1.0.1",
-        false);;
+        false),
+    VALID_EXPECTED_TWO_OM_ONE_LOWER_VERSION(
+        OZONE_OM_CLIENT_PROTOCOL_VERSION,
+        "1.0.1",
+        "2.0.1",
+        false),
+    VALID_EXPECTED_TWO_OM_SECOND_EMPTY(
+        OZONE_OM_CLIENT_PROTOCOL_VERSION,
+        "1.0.1",
+        "",
+        false),
+    VALID_EXPECTED_TWO_OM_FIRST_EMPTY(
+        OZONE_OM_CLIENT_PROTOCOL_VERSION,
+        "",
+        "1.0.1",
+        false),
+    VALID_EXPECTED_TWO_OM_BOTH_EMPTY(
+        OZONE_OM_CLIENT_PROTOCOL_VERSION,
+        "",
+        "",
+        false),;
 
     private static final List<ValidateOmVersionTestCases>
         TEST_CASES = new LinkedList<>();
