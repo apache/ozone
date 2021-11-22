@@ -258,7 +258,8 @@ public class HttpFSServer {
                       @QueryParam(OperationParam.NAME) OperationParam op,
                       @Context Parameters params,
                       @Context HttpServletRequest request)
-      throws IOException, FileSystemAccessException, UnsupportedOperationException {
+      throws IOException, FileSystemAccessException,
+      UnsupportedOperationException {
     // Restrict access to only GETFILESTATUS and LISTSTATUS in write-only mode
     if((op.value() != HttpFSConstants.Operation.GETFILESTATUS) &&
             (op.value() != HttpFSConstants.Operation.LISTSTATUS) &&
