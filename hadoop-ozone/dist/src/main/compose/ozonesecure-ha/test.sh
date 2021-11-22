@@ -31,8 +31,6 @@ start_docker_env
 
 execute_robot_test ${SCM} kinit.robot
 
-execute_robot_test ${SCM} -v SECURITY_ENABLED:${SECURITY_ENABLED} -v USERNAME:httpfs httpfs
-
 execute_robot_test ${SCM} freon
 
 execute_robot_test ${SCM} basic/links.robot
@@ -40,6 +38,8 @@ execute_robot_test ${SCM} basic/links.robot
 execute_robot_test ${SCM} s3
 
 execute_robot_test ${SCM} admincli
+
+execute_robot_test ${SCM} -v SECURITY_ENABLED:${SECURITY_ENABLED} httpfs
 
 export SCM=scm2.org
 execute_robot_test ${SCM} admincli
