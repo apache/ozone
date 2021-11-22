@@ -248,6 +248,7 @@ public class OMException extends IOException {
 
     TENANT_NOT_FOUND,
     TENANT_ALREADY_EXISTS,
+    TENANT_NOT_EMPTY,
     INVALID_TENANT_NAME,
 
     ACCESSID_NOT_FOUND,

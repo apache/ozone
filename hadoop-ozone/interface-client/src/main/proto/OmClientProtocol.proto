@@ -410,6 +410,7 @@ enum Status {
     TENANT_NOT_FOUND = 75;
     TENANT_ALREADY_EXISTS = 76;
     INVALID_TENANT_NAME = 77;
+    TENANT_NOT_EMPTY = 83;  // TODO: Renumber this when rebasing
 
     ACCESSID_NOT_FOUND = 78;
     TENANT_USER_ACCESSID_ALREADY_EXISTS = 79;  // TODO: Remove if not used

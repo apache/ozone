@@ -369,7 +369,6 @@ public class TestOzoneTenantShell {
       checkOutput(err, "Revoked accessId", false);
     }
 
-    // TODO: delete tenant is not implemented yet
     executeHA(tenantShell, new String[] {"delete", tenantName});
   }
 

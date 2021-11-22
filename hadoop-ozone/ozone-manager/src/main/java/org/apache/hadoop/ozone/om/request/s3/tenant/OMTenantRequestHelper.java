@@ -21,13 +21,16 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Utility class that contains helper methods for OM tenant requests.
@@ -182,4 +185,18 @@ public final class OMTenantRequestHelper {
     return false;
   }
 
+  /**
+   * Return true is the tenant doesn't have any accessIds assigned to it,
+   * false otherwise.
+   * @param tenantManager
+   * @param tenantId
+   * @return
+   * @throws IOException
+   */
+  static boolean isTenantEmpty(OMMultiTenantManager tenantManager,
+                               String tenantId) throws IOException {
+    final List<TenantUserAccessId> tenantUserAccessIdsList =
+        tenantManager.listUsersInTenant(tenantId, "").getUserAccessIds();
+    return tenantUserAccessIdsList.size() == 0;
+  }
 }
