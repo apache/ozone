@@ -19,7 +19,6 @@ Library             Process
 Library             String
 Library             BuiltIn
 Resource            operations.robot
-Resource            ../kinit.robot
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
 Suite Setup         Generate volume
@@ -35,21 +34,23 @@ Generate volume
 Kinit admin
     Wait Until Keyword Succeeds      2min       10sec      Execute      kinit -k httpfs/httpfs@EXAMPLE.COM -t /etc/security/keytabs/httpfs.keytab
 
-
 *** Test Cases ***
 Kinit admin user
-    Run Keyword If      '${SECURITY_ENABLED}'=='true'       Kinit admin
+    Pass Execution If       '${SECURITY_ENABLED}'=='false'       This is for secured environment
+    Kinit admin
 
 Create volume
     ${vol} =     Execute curl command    ${volume}    MKDIRS      -X PUT
     Should contain  ${vol.stdout}   true
 
 Set owner of volume
+    Pass Execution If       '${SECURITY_ENABLED}'=='false'       This is for secured environment
     ${rc} =                             Run And Return Rc       ozone sh volume update --user=testuser /${volume}
     Should Be Equal As Integers         ${rc}       0
 
-Kinit
-   Kinit test user     testuser     testuser.keytab
+Kinit testuser
+    Pass Execution If       '${SECURITY_ENABLED}'=='false'       This is for secured environment
+    Kinit test user     testuser     testuser.keytab
 
 Create first bucket
     ${bucket} =     Execute curl command    ${volume}/buck1          MKDIRS      -X PUT
@@ -106,12 +107,12 @@ Get quota usage of directory
 
 Get home directory
     ${home} =       Execute curl command    ${EMPTY}          GETHOMEDIRECTORY      ${EMPTY}
-    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   root    ${USERNAME}
+    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   testuser    ${USERNAME}
     Should contain  ${home.stdout}     "Path":"\\/user\\/${user}"
 
 Get trash root
     ${trash} =      Execute curl command    ${volume}/buck1/testfile          GETTRASHROOT      ${EMPTY}
-    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   root    ${USERNAME}
+    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   testuser    ${USERNAME}
     Should contain  ${trash.stdout}    "Path":"\\/${volume}\\/buck1\\/.Trash\\/${user}"
 
 # Missing functionality, not working yet.
