@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.rpc.read;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedInputStream;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -31,7 +30,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -70,7 +68,8 @@ public class TestECBlockReconstructedInputStream {
 
   @Test
   public void testBlockLengthReturned() throws IOException {
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(4, 5);
     try(ECBlockReconstructedStripeInputStream stripeStream
         = createStripeInputStream(dnMap, 12345L)) {
       try (ECBlockReconstructedInputStream stream =
@@ -82,7 +81,8 @@ public class TestECBlockReconstructedInputStream {
 
   @Test
   public void testBlockIDReturned() throws IOException {
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 4, 5);
     try(ECBlockReconstructedStripeInputStream stripeStream
             = createStripeInputStream(dnMap, 12345L)) {
       try (ECBlockReconstructedInputStream stream =
@@ -105,7 +105,8 @@ public class TestECBlockReconstructedInputStream {
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
     try(ECBlockReconstructedStripeInputStream stripeStream
             = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
@@ -141,7 +142,8 @@ public class TestECBlockReconstructedInputStream {
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
     try(ECBlockReconstructedStripeInputStream stripeStream
             = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
@@ -171,7 +173,8 @@ public class TestECBlockReconstructedInputStream {
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
     try(ECBlockReconstructedStripeInputStream stripeStream
             = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
@@ -204,7 +207,8 @@ public class TestECBlockReconstructedInputStream {
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
     byte[] buf = new byte[1024];
     try(ECBlockReconstructedStripeInputStream stripeStream
             = createStripeInputStream(dnMap, blockLength)) {
@@ -240,7 +244,8 @@ public class TestECBlockReconstructedInputStream {
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
     addDataStreamsToFactory(dataBufs, parity);
 
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap
+        = ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
     try(ECBlockReconstructedStripeInputStream stripeStream
             = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
@@ -276,19 +281,7 @@ public class TestECBlockReconstructedInputStream {
     }
   }
 
-  /**
-   * Returns a new map containing a random DatanodeDetails for each index in
-   * inputs.
-   * @param idxs A list of indexes to add to the map
-   * @return A map of DatanodeDetails to index.
-   */
-  private Map<DatanodeDetails, Integer> createIndexMap(int... idxs) {
-    Map<DatanodeDetails, Integer> map = new HashMap<>();
-    for (int i : idxs) {
-      map.put(MockDatanodeDetails.randomDatanodeDetails(), i);
-    }
-    return map;
-  }
+
 
   /**
    * Return a list of num ByteBuffers of the given size.

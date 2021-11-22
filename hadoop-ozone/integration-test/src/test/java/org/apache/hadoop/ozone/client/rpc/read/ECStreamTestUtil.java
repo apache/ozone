@@ -191,6 +191,20 @@ public final class ECStreamTestUtil {
     return parity;
   }
 
+  /**
+   * Returns a new map containing a random DatanodeDetails for each index in
+   * inputs.
+   * @param idxs A list of indexes to add to the map
+   * @return A map of DatanodeDetails to index.
+   */
+  public static Map<DatanodeDetails, Integer> createIndexMap(int... idxs) {
+    Map<DatanodeDetails, Integer> map = new HashMap<>();
+    for (int i : idxs) {
+      map.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+    }
+    return map;
+  }
+
 
   /**
    * A stream factory which can be used in tests to provide TestBlockStream

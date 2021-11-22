@@ -86,7 +86,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
       totalRead += read;
     }
     return totalRead;
-  };
+  }
 
   private void ensureNotClosed() throws IOException {
     if (closed) {

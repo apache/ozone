@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
@@ -79,7 +78,7 @@ public class TestECBlockReconstructedStripeInputStream {
     Map<DatanodeDetails, Integer> dnMap = new HashMap<>();
 
     // Two Chunks, but missing data block 2.
-    dnMap = createIndexMap(1, 4, 5);
+    dnMap = ECStreamTestUtil.createIndexMap(1, 4, 5);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 2, dnMap);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
@@ -89,7 +88,7 @@ public class TestECBlockReconstructedStripeInputStream {
     }
 
     // Three Chunks, but missing data block 2 and 3.
-    dnMap = createIndexMap(1, 4, 5);
+    dnMap = ECStreamTestUtil.createIndexMap(1, 4, 5);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
@@ -98,7 +97,7 @@ public class TestECBlockReconstructedStripeInputStream {
     }
 
     // Three Chunks, but missing data block 2 and 3 and parity 1.
-    dnMap = createIndexMap(1, 4);
+    dnMap = ECStreamTestUtil.createIndexMap(1, 4);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
@@ -120,13 +119,13 @@ public class TestECBlockReconstructedStripeInputStream {
 
     List<Map<DatanodeDetails, Integer>> locations = new ArrayList<>();
     // Two data missing
-    locations.add(createIndexMap(1, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(1, 4, 5));
     // One data missing
-    locations.add(createIndexMap(1, 2, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 4, 5));
     // Two data missing including first
-    locations.add(createIndexMap(2, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(2, 4, 5));
     // One data and one parity missing
-    locations.add(createIndexMap(2, 3, 4));
+    locations.add(ECStreamTestUtil.createIndexMap(2, 3, 4));
 
     for (Map<DatanodeDetails, Integer> dnMap : locations) {
       streamFactory = new TestBlockInputStreamFactory();
@@ -186,7 +185,8 @@ public class TestECBlockReconstructedStripeInputStream {
     // We have a length that is less than a single chunk, so blocks 2 and 3
     // are padding and will not be present. Block 1 is lost and needs recovered
     // from the parity and padded blocks 2 and 3.
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(4, 5);
     OmKeyLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
@@ -228,7 +228,8 @@ public class TestECBlockReconstructedStripeInputStream {
     // We have a length that is less than a single chunk, so blocks 2 and 3
     // are padding and will not be present. Block 1 is lost and needs recovered
     // from the parity and padded blocks 2 and 3.
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(4, 5);
     OmKeyLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
@@ -270,15 +271,15 @@ public class TestECBlockReconstructedStripeInputStream {
 
     List<Map<DatanodeDetails, Integer>> locations = new ArrayList<>();
     // Two data missing
-    locations.add(createIndexMap(3, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(3, 4, 5));
     // Two data missing
-    locations.add(createIndexMap(1, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(1, 4, 5));
     // One data missing - the last one
-    locations.add(createIndexMap(1, 2, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 5));
     // One data and one parity missing
-    locations.add(createIndexMap(2, 3, 4));
+    locations.add(ECStreamTestUtil.createIndexMap(2, 3, 4));
     // One data and one parity missing
-    locations.add(createIndexMap(1, 2, 4));
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 4));
 
     for (Map<DatanodeDetails, Integer> dnMap : locations) {
       streamFactory = new TestBlockInputStreamFactory();
@@ -327,7 +328,8 @@ public class TestECBlockReconstructedStripeInputStream {
     // We have a length that is less than a single chunk, so blocks 2 and 3
     // are padding and will not be present. Block 1 is lost and needs recovered
     // from the parity and padded blocks 2 and 3.
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(4, 5);
     OmKeyLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
@@ -357,13 +359,13 @@ public class TestECBlockReconstructedStripeInputStream {
 
     List<Map<DatanodeDetails, Integer>> locations = new ArrayList<>();
     // Two data missing
-    locations.add(createIndexMap(1, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(1, 4, 5));
     // One data missing
-    locations.add(createIndexMap(1, 2, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 4, 5));
     // Two data missing including first
-    locations.add(createIndexMap(2, 4, 5));
+    locations.add(ECStreamTestUtil.createIndexMap(2, 4, 5));
     // One data and one parity missing
-    locations.add(createIndexMap(2, 3, 4));
+    locations.add(ECStreamTestUtil.createIndexMap(2, 3, 4));
 
     for (Map<DatanodeDetails, Integer> dnMap : locations) {
       streamFactory = new TestBlockInputStreamFactory();
@@ -421,7 +423,8 @@ public class TestECBlockReconstructedStripeInputStream {
 
   @Test
   public void testSeekToPartialOffsetFails() {
-    Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 4, 5);
     OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
         stripeSize() * 3, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
@@ -465,7 +468,8 @@ public class TestECBlockReconstructedStripeInputStream {
       addDataStreamsToFactory(dataBufs, parity);
 
       // Data block index 3 is missing and needs recovered initially.
-      Map<DatanodeDetails, Integer> dnMap = createIndexMap(1, 2, 4, 5);
+      Map<DatanodeDetails, Integer> dnMap =
+          ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
       OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
           stripeSize() * 3 + partialStripeSize, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
@@ -547,20 +551,6 @@ public class TestECBlockReconstructedStripeInputStream {
       Assert.assertEquals("Element " + i, srcArray[i], data.get());
     }
     data.flip();
-  }
-
-  /**
-   * Returns a new map containing a random DatanodeDetails for each index in
-   * inputs.
-   * @param idxs A list of indexes to add to the map
-   * @return A map of DatanodeDetails to index.
-   */
-  private Map<DatanodeDetails, Integer> createIndexMap(int... idxs) {
-    Map<DatanodeDetails, Integer> map = new HashMap<>();
-    for (int i : idxs) {
-      map.put(MockDatanodeDetails.randomDatanodeDetails(), i);
-    }
-    return map;
   }
 
   /**
