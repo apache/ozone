@@ -1477,7 +1477,7 @@ message ModifyTenantRequest {
 }
 
 message DeleteTenantRequest {
-    optional string tenantName = 1;
+    optional string tenantId = 1;
 }
 
 message TenantAssignUserAccessIdRequest {

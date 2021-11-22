@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
@@ -33,26 +32,19 @@ import java.util.List;
     description = "Create one or more tenants")
 public class TenantCreateHandler extends TenantHandler {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.Parameters(description = "List of tenant names")
+  @CommandLine.Parameters(description = "List of tenant names", arity = "1..")
   private List<String> tenants = new ArrayList<>();
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    if (tenants.size() > 0) {
-      for (String tenantName : tenants) {
-        try {
-          client.getObjectStore().createTenant(tenantName);
-          out().println("Created tenant '" + tenantName + "'.");
-        } catch (IOException e) {
-          err().println("Failed to create tenant '" + tenantName + "': " +
-              e.getMessage());
-        }
+    for (String tenantId : tenants) {
+      try {
+        client.getObjectStore().createTenant(tenantId);
+        out().println("Created tenant '" + tenantId + "'.");
+      } catch (IOException e) {
+        err().println("Failed to create tenant '" + tenantId + "': " +
+            e.getMessage());
       }
-    } else {
-      GenericCli.missingSubcommand(spec);
     }
   }
 }

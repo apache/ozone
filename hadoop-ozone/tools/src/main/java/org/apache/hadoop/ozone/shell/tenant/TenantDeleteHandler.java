@@ -21,15 +21,30 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * ozone tenant delete.
  */
-@CommandLine.Command(name = "delete",
-    description = "Delete a tenant")
+@CommandLine.Command(name = "delete", aliases = "remove",
+    description = "Delete one or more empty tenants")
 public class TenantDeleteHandler extends TenantHandler {
+
+  @CommandLine.Parameters(description = "List of tenant names", arity = "1..")
+  private final List<String> tenants = new ArrayList<>();
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    err().println("Not Implemented.");
+    for (final String tenantId : tenants) {
+      try {
+        client.getObjectStore().deleteTenant(tenantId);
+        out().println("Deleted tenant '" + tenantId + "'.");
+      } catch (IOException e) {
+        err().println("Failed to delete tenant '" + tenantId + "': " +
+            e.getMessage());
+      }
+    }
   }
 }

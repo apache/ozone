@@ -589,48 +589,48 @@ public interface ClientProtocol {
   void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
-   * Create tenant.
-   * @param tenantName tenant name.
+   * Create a tenant.
+   * @param tenantId tenant name.
    * @throws IOException
    */
-  void createTenant(String tenantName) throws IOException;
+  void createTenant(String tenantId) throws IOException;
 
   /**
-   * Create tenant with args.
-   * @param tenantName tenant name.
+   * Create a tenant with args.
+   * @param tenantId tenant name.
    * @param omTenantArgs various arguments for tenant creation. e.g. volume name
    * @throws IOException
    */
-  void createTenant(String tenantName, OmTenantArgs omTenantArgs)
+  void createTenant(String tenantId, OmTenantArgs omTenantArgs)
       throws IOException;
 
-  // TODO
-//  /**
-//   * Modify tenant.
-//   * @param tenantName tenant name.
-//   * @throws IOException
-//   */
-//  void modifyTenant(String tenantName) throws IOException;
-
   /**
-   * Delete tenant.
-   * @param tenantName tenant name.
+   * Update a tenant.
+   * @param tenantId tenant name.
    * @throws IOException
    */
-  void deleteTenant(String tenantName) throws IOException;
+  void updateTenant(String tenantId, OmTenantArgs omTenantArgs)
+      throws IOException;
 
   /**
-   * Assign user to tenant.
+   * Delete a tenant.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  void deleteTenant(String tenantId) throws IOException;
+
+  /**
+   * Assign a user to a tenant.
    * @param username user name to be assigned.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param accessId access ID.
    * @throws IOException
    */
-  S3SecretValue tenantAssignUserAccessId(String username, String tenantName,
+  S3SecretValue tenantAssignUserAccessId(String username, String tenantId,
       String accessId) throws IOException;
 
   /**
-   * Revoke user accessId to tenant.
+   * Revoke a user accessId previously assign to a tenant.
    * @param accessId accessId to be revoked.
    * @throws IOException
    */
@@ -639,20 +639,20 @@ public interface ClientProtocol {
   /**
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param delegated true if making delegated admin.
    * @throws IOException
    */
-  void tenantAssignAdmin(String accessId, String tenantName,
-      boolean delegated) throws IOException;
+  void tenantAssignAdmin(String accessId, String tenantId, boolean delegated)
+      throws IOException;
 
   /**
    * Revoke admin role of an accessId from a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
-  void tenantRevokeAdmin(String accessId, String tenantName) throws IOException;
+  void tenantRevokeAdmin(String accessId, String tenantId) throws IOException;
 
   /**
    * Get tenant info for a user.
@@ -665,12 +665,12 @@ public interface ClientProtocol {
 
   /**
    * Get List of users in a tenant.
-   * @param tenantName tenant name
+   * @param tenantId tenant name
    * @param prefix optional prefix
    * @return List of username, accessIds in tenant.
    * @throws IOException on server error.
    */
-  TenantUserList listUsersInTenant(String tenantName, String prefix)
+  TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException;
 
   /**

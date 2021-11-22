@@ -946,10 +946,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void createTenant(String tenantName, OmTenantArgs omTenantArgs)
+  public void createTenant(String tenantId, OmTenantArgs omTenantArgs)
       throws IOException {
     final CreateTenantRequest request = CreateTenantRequest.newBuilder()
-        .setTenantName(tenantName)
+        .setTenantName(tenantId)
         .setVolumeName(omTenantArgs.getVolumeName())
         // TODO: Add more args like default policy names, etc.
         .build();
@@ -961,9 +961,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void deleteTenant(String tenantName) throws IOException {
+  public void updateTenant(String tenantId, OmTenantArgs omTenantArgs)
+      throws IOException {
+    // TODO: UpdateTenantRequest
+  }
+
+  @Override
+  public void deleteTenant(String tenantId) throws IOException {
     final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
-        .setTenantName(tenantName)
+        .setTenantId(tenantId)
         .build();
     final OMRequest omRequest = createOMRequest(Type.DeleteTenant)
         .setDeleteTenantRequest(request)

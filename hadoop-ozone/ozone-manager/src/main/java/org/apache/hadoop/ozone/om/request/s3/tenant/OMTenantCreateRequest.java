@@ -76,7 +76,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
   - tenantStateTable: New entry
     - Key: tenant name. e.g. finance
     - Value: new OmDBTenantInfo for the tenant
-      - tenantName: finance
+      - tenantId: finance
       - bucketNamespaceName: finance
       - accountNamespaceName: finance
       - userPolicyGroupName: finance-users

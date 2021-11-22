@@ -670,51 +670,63 @@ public class RpcClient implements ClientProtocol {
    * {@inheritDoc}
    */
   @Override
-  public void createTenant(String tenantName) throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
+  public void createTenant(String tenantId) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
         "tenantName cannot be null or empty.");
-    ozoneManagerClient.createTenant(tenantName);
+    ozoneManagerClient.createTenant(tenantId);
   }
 
   /**
    * {@inheritDoc}
    */
   @Override
-  public void createTenant(String tenantName, OmTenantArgs omTenantArgs)
+  public void createTenant(String tenantId, OmTenantArgs omTenantArgs)
       throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName cannot be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
     Preconditions.checkNotNull(omTenantArgs);
     // Pre-check on the client to avoid unnecessary RPC calls
     verifyVolumeName(omTenantArgs.getVolumeName());
 
-    ozoneManagerClient.createTenant(tenantName, omTenantArgs);
+    ozoneManagerClient.createTenant(tenantId, omTenantArgs);
   }
 
   @Override
-  public void deleteTenant(String tenantName) throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName cannot be null or empty.");
-    ozoneManagerClient.deleteTenant(tenantName);
+  public void updateTenant(String tenantId, OmTenantArgs omTenantArgs)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
+    Preconditions.checkNotNull(omTenantArgs);
+    // Pre-check on the client to avoid unnecessary RPC calls
+    verifyVolumeName(omTenantArgs.getVolumeName());
+
+    ozoneManagerClient.updateTenant(tenantId, omTenantArgs);
+  }
+
+  @Override
+  public void deleteTenant(String tenantId) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
+    ozoneManagerClient.deleteTenant(tenantId);
   }
 
   /**
    * Assign user to tenant.
    * @param username user name to be assigned.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
   @Override
   public S3SecretValue tenantAssignUserAccessId(
-      String username, String tenantName, String accessId) throws IOException {
+      String username, String tenantId, String accessId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(username),
         "username can't be null or empty.");
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
     return ozoneManagerClient.tenantAssignUserAccessId(
-        username, tenantName, accessId);
+        username, tenantId, accessId);
   }
 
   /**
@@ -732,33 +744,33 @@ public class RpcClient implements ClientProtocol {
   /**
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param delegated true if making delegated admin.
    * @throws IOException
    */
   @Override
-  public void tenantAssignAdmin(String accessId, String tenantName,
+  public void tenantAssignAdmin(String accessId, String tenantId,
       boolean delegated)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
-    // tenantName can be empty
-    ozoneManagerClient.tenantAssignAdmin(accessId, tenantName, delegated);
+    // tenantId can be empty
+    ozoneManagerClient.tenantAssignAdmin(accessId, tenantId, delegated);
   }
 
   /**
    * Revoke admin role of an accessId from a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
   @Override
-  public void tenantRevokeAdmin(String accessId, String tenantName)
+  public void tenantRevokeAdmin(String accessId, String tenantId)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
-    // tenantName can be empty
-    ozoneManagerClient.tenantRevokeAdmin(accessId, tenantName);
+    // tenantId can be empty
+    ozoneManagerClient.tenantRevokeAdmin(accessId, tenantId);
   }
 
   /**
@@ -786,9 +798,9 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+  public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
-    return ozoneManagerClient.listUsersInTenant(tenantName, prefix);
+    return ozoneManagerClient.listUsersInTenant(tenantId, prefix);
   }
 
   @Override

@@ -197,44 +197,54 @@ public class ObjectStore {
 
   /**
    * Create a tenant.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
-  public void createTenant(String tenantName) throws IOException {
-    proxy.createTenant(tenantName);
+  public void createTenant(String tenantId) throws IOException {
+    proxy.createTenant(tenantId);
   }
 
   /**
    * Create a tenant.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param tenantArgs extra tenant arguments.
    * @throws IOException
    */
-  public void createTenant(String tenantName, OmTenantArgs tenantArgs)
+  public void createTenant(String tenantId, OmTenantArgs tenantArgs)
       throws IOException {
-    proxy.createTenant(tenantName, tenantArgs);
+    proxy.createTenant(tenantId, tenantArgs);
+  }
+
+  /**
+   * Update a tenant.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  public void updateTenant(String tenantId, OmTenantArgs tenantArgs)
+      throws IOException {
+    proxy.updateTenant(tenantId, tenantArgs);
   }
 
   /**
    * Delete a tenant.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
-  public void deleteTenant(String tenantName) throws IOException {
-    proxy.deleteTenant(tenantName);
+  public void deleteTenant(String tenantId) throws IOException {
+    proxy.deleteTenant(tenantId);
   }
 
   /**
    * Assign user accessId to tenant.
    * @param username user name to be assigned.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param accessId Specified accessId.
    * @throws IOException
    */
   // TODO: Rename this to tenantAssignUserAccessId ?
   public S3SecretValue tenantAssignUserAccessId(
-      String username, String tenantName, String accessId) throws IOException {
-    return proxy.tenantAssignUserAccessId(username, tenantName, accessId);
+      String username, String tenantId, String accessId) throws IOException {
+    return proxy.tenantAssignUserAccessId(username, tenantId, accessId);
   }
 
   /**
@@ -249,29 +259,29 @@ public class ObjectStore {
   /**
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param delegated true if making delegated admin.
    * @throws IOException
    */
-  public void tenantAssignAdmin(String accessId, String tenantName,
-      boolean delegated) throws IOException {
-    proxy.tenantAssignAdmin(accessId, tenantName, delegated);
+  public void tenantAssignAdmin(String accessId, String tenantId,
+                                boolean delegated) throws IOException {
+    proxy.tenantAssignAdmin(accessId, tenantId, delegated);
   }
 
   /**
    * Revoke admin role of an accessId from a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
-  public void tenantRevokeAdmin(String accessId, String tenantName)
+  public void tenantRevokeAdmin(String accessId, String tenantId)
       throws IOException {
-    proxy.tenantRevokeAdmin(accessId, tenantName);
+    proxy.tenantRevokeAdmin(accessId, tenantId);
   }
 
-  public TenantUserList listUsersInTenant(String tenantName, String userPrefix)
+  public TenantUserList listUsersInTenant(String tenantId, String userPrefix)
       throws IOException {
-    return proxy.listUsersInTenant(tenantName, userPrefix);
+    return proxy.listUsersInTenant(tenantId, userPrefix);
   }
 
   /**

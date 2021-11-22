@@ -3088,19 +3088,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Create tenant.
    */
-  public void createTenant(String tenantName) {
+  public void createTenant(String tenantId) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
 
   @Override
-  public void createTenant(String tenantName, OmTenantArgs omTenantArgs) {
+  public void createTenant(String tenantId, OmTenantArgs omTenantArgs) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
 
   @Override
-  public void deleteTenant(String tenantName) {
+  public void updateTenant(String tenantId, OmTenantArgs omTenantArgs) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
+  @Override
+  public void deleteTenant(String tenantId) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
@@ -3109,7 +3115,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Assign user accessId to tenant.
    */
   public S3SecretValue tenantAssignUserAccessId(
-      String username, String tenantName, String accessId) throws IOException {
+      String username, String tenantId, String accessId) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
@@ -3125,8 +3131,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Assign admin role to a user by an accessId in a tenant.
    */
-  public void tenantAssignAdmin(String accessId, String tenantName,
-      boolean delegated) {
+  public void tenantAssignAdmin(String accessId, String tenantId,
+                                boolean delegated) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
@@ -3134,7 +3140,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Revoke admin role of an accessId from a tenant.
    */
-  public void tenantRevokeAdmin(String accessId, String tenantName) {
+  public void tenantRevokeAdmin(String accessId, String tenantId) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
@@ -3236,26 +3242,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+  public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
 
-    if (StringUtils.isEmpty(tenantName)) {
+    if (StringUtils.isEmpty(tenantId)) {
       return null;
     }
 
     final Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
     try {
       String userName = getRemoteUser().getUserName();
-      if (!multiTenantManagr.isTenantAdmin(userName, tenantName)
+      if (!multiTenantManagr.isTenantAdmin(userName, tenantId)
           && !omAdminUsernames.contains(userName)) {
         throw new IOException("Only tenant and ozone admins can access this " +
             "API. '" + userName + "' is not an admin.");
       }
 
       final TenantUserList userList =
-          multiTenantManagr.listUsersInTenant(tenantName, prefix);
+          multiTenantManagr.listUsersInTenant(tenantId, prefix);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           OMAction.TENANT_LIST_USER, auditMap));
       return userList;
@@ -4190,24 +4196,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public boolean isTenantAdmin(UserGroupInformation callerUgi,
-      String tenantName, Boolean delegated) {
+                               String tenantId, Boolean delegated) {
     if (callerUgi == null) {
       return false;
     } else {
-      return isTenantAdmin(callerUgi.getShortUserName(), tenantName, delegated)
-          || isTenantAdmin(callerUgi.getUserName(), tenantName, delegated);
+      return isTenantAdmin(callerUgi.getShortUserName(), tenantId, delegated)
+          || isTenantAdmin(callerUgi.getUserName(), tenantId, delegated);
     }
   }
 
   /**
    * Returns true if user is a tenant's admin, false otherwise.
    * @param username User name string.
-   * @param tenantName Tenant name string.
+   * @param tenantId Tenant name string.
    * @param delegated True if operation requires delegated admin permission.
    */
   public boolean isTenantAdmin(String username,
-      String tenantName, Boolean delegated) {
-    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantName)) {
+      String tenantId, Boolean delegated) {
+    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantId)) {
       return false;
     }
 
@@ -4224,7 +4230,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       for (final String accessId : principalInfo.getAccessIds()) {
         final OmDBAccessIdInfo accessIdInfo =
             getMetadataManager().getTenantAccessIdTable().get(accessId);
-        if (tenantName.equals(accessIdInfo.getTenantId())) {
+        if (tenantId.equals(accessIdInfo.getTenantId())) {
           if (!delegated) {
             return accessIdInfo.getIsAdmin();
           } else {
