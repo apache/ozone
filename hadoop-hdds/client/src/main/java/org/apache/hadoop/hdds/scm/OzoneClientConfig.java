@@ -54,6 +54,22 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int streamBufferSize = 4 * 1024 * 1024;
 
+  @Config(key = "datastream.max.buffer.size",
+      defaultValue = "4MB",
+      type = ConfigType.SIZE,
+      description = "The maximum size of the ByteBuffer "
+          + "(used via ratis streaming)",
+      tags = ConfigTag.CLIENT)
+  private int dataStreamMaxBufferSize = 4 * 1024 * 1024;
+
+  @Config(key = "datastream.buffer.flush.size",
+      defaultValue = "32MB",
+      type = ConfigType.SIZE,
+      description = "The maximum size of the ByteBuffer "
+          + "(used via ratis streaming)",
+      tags = ConfigTag.CLIENT)
+  private long dataStreamBufferFlushSize = 32 * 1024 * 1024;
+
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
       type = ConfigType.SIZE,
@@ -168,6 +184,14 @@ public class OzoneClientConfig {
     this.streamBufferSize = streamBufferSize;
   }
 
+  public int getDataStreamMaxBufferSize() {
+    return dataStreamMaxBufferSize;
+  }
+
+  public void setDataStreamMaxBufferSize(int dataStreamMaxBufferSize) {
+    this.dataStreamMaxBufferSize = dataStreamMaxBufferSize;
+  }
+
   public boolean isStreamBufferFlushDelay() {
     return streamBufferFlushDelay;
   }
@@ -226,5 +250,13 @@ public class OzoneClientConfig {
 
   public int getBufferIncrement() {
     return bufferIncrement;
+  }
+
+  public long getDataStreamBufferFlushSize() {
+    return dataStreamBufferFlushSize;
+  }
+
+  public void setDataStreamBufferFlushSize(long dataStreamBufferFlushSize) {
+    this.dataStreamBufferFlushSize = dataStreamBufferFlushSize;
   }
 }
