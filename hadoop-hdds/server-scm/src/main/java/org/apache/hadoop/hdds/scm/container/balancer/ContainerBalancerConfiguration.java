@@ -32,10 +32,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,7 +39,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * This class contains configuration values for the ContainerBalancer.
@@ -338,21 +333,6 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Sets the datanodes that will be the exclusive participants in balancing.
-   * Applicable only if the specified file is non-empty.
-   * @param includeNodes a File of datanode hostnames or ip addresses
-   * @throws IOException if an I/O error occurs when opening the file
-   */
-  public void setIncludeNodes(File includeNodes) throws IOException {
-    try {
-      this.includeNodes = readFile(includeNodes);
-    } catch (IOException e) {
-      LOG.info("Could not read includeNodes file: {}.", includeNodes.getPath());
-      throw e;
-    }
-  }
-
-  /**
    * Gets a set of datanode hostnames or ip addresses that will be excluded
    * from balancing.
    * @return Set of hostname or ip address strings, or an empty set if the
@@ -377,33 +357,12 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Sets the datanodes that will be excluded from balancing.
-   * @param excludeNodes a File of datanode hostnames or ip addresses
-   * @throws IOException if an I/O error occurs when opening the file
-   */
-  public void setExcludeNodes(File excludeNodes) throws IOException {
-    try {
-      this.excludeNodes = readFile(excludeNodes);
-    } catch (IOException e) {
-      LOG.info("Could not read excludeNodes file: {}.", excludeNodes.getPath());
-      throw e;
-    }
-  }
-
-  /**
    * Gets the {@link OzoneConfiguration} using which this configuration was
    * constructed.
    * @return the {@link OzoneConfiguration} being used by this configuration
    */
   public OzoneConfiguration getOzoneConfiguration() {
     return this.ozoneConfiguration;
-  }
-
-  private String readFile(File file) throws IOException {
-    try (Stream<String> strings = Files.lines(file.toPath(),
-        StandardCharsets.UTF_8)) {
-      return strings.collect(Collectors.joining(","));
-    }
   }
 
   @Override

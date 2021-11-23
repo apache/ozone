@@ -52,11 +52,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -572,19 +567,8 @@ public class TestContainerBalancer {
             .getIpAddress() + ", " +
             nodesInCluster.get(secondExcludeIndex).getDatanodeDetails()
                 .getHostName();
-    // create a file to test specifying config using a file
-    try {
-      File excludeNodesFile = tempFolder.newFile("excludeNodesFile");
-      Files.write(excludeNodesFile.toPath(),
-          excludeNodes.getBytes(StandardCharsets.UTF_8),
-          StandardOpenOption.WRITE);
-      balancerConfiguration.setExcludeNodes(excludeNodesFile);
-    } catch (IOException e) {
-      LOG.info("Could not create a file for specifying excludeNodes while " +
-          "testing ContainerBalancer. Using a String instead.");
-      balancerConfiguration.setExcludeNodes(excludeNodes);
-    }
 
+    balancerConfiguration.setExcludeNodes(excludeNodes);
     balancerConfiguration.setIncludeNodes(includeNodes);
     containerBalancer.start(balancerConfiguration);
     sleepWhileBalancing(500);
