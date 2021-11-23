@@ -307,9 +307,16 @@ public final class ContainerBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
-            "%-50s %dB%n", "Key", "Value", "Threshold",
+            "%-50s %dGB%n"+
+            "%-50s %dGB%n"+
+            "%-50s %dGB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Involve per Iteration(ratio)",
         maxDatanodesRatioToInvolvePerIteration,
-        "Max Size to Move per Iteration", maxSizeToMovePerIteration);
+        "Max Size to Move per Iteration",
+        maxSizeToMovePerIteration / OzoneConsts.GB,
+        "Max Size Entering Target per Iteration",
+        maxSizeEnteringTarget / OzoneConsts.GB,
+        "Max Size Leaving Source per Iteration",
+        maxSizeLeavingSource / OzoneConsts.GB);
   }
 }
