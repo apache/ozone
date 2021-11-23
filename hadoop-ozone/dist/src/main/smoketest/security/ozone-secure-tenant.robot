@@ -68,10 +68,6 @@ Secure Tenant Revoke User AccessId Success
     ${output} =         Execute          ozone tenant user revoke 'tenantone$bob'
                         Should contain   ${output}         Revoked accessId 'tenantone$bob'.
 
-Secure Tenant Delete Tenant Success
-    ${output} =         Execute          ozone tenant delete tenantone
-                        Should contain   ${output}         Deleted tenant 'tenantone'.
-
 Secure Tenant Assign User Failure
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user assign bob --tenant=thistenantdoesnotexist
                         Should contain   ${output}         Tenant 'thistenantdoesnotexist' doesn't exist
@@ -84,3 +80,8 @@ Secure Tenant Create Tenant Failure with Regular (non-admin) user
 Secure Tenant SetSecret Failure with Regular (non-admin) user
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$bob' --secret=somesecret2 --export
                         Should contain   ${output}         Permission denied. Requested accessId
+
+Secure Tenant Delete Tenant Success
+    Run Keyword   Kinit test user     testuser     testuser.keytab
+    ${output} =         Execute          ozone tenant delete tenantone
+                        Should contain   ${output}         Deleted tenant 'tenantone'.
