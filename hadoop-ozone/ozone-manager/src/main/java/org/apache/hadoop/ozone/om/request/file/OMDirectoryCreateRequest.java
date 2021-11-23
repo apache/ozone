@@ -28,7 +28,8 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -201,9 +202,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
 
-        dirKeyInfo = createDirectoryKeyInfoWithACL(keyName,
-            keyArgs, baseObjId,
-            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex);
+        dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
+            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex,
+            ozoneManager.getDefaultReplicationConfig());
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
             missingParents, inheritAcls, trxnLogIndex);
@@ -283,8 +284,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
       LOG.debug("missing parent {} getting added to KeyTable", missingKey);
       // what about keyArgs for parent directories? TODO
-      OmKeyInfo parentKeyInfo = createDirectoryKeyInfoWithACL(
-          missingKey, keyArgs, nextObjId, inheritAcls, trxnLogIndex);
+      OmKeyInfo parentKeyInfo =
+          createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
+              inheritAcls, trxnLogIndex,
+              ozoneManager.getDefaultReplicationConfig());
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
@@ -341,32 +344,47 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param keyArgs
    * @param objectId
    * @param transactionIndex
+   * @param serverDefaultReplConfig
    * @return the OmKeyInfo structure
    */
-  public static OmKeyInfo createDirectoryKeyInfoWithACL(
-      String keyName, KeyArgs keyArgs, long objectId,
-      List<OzoneAcl> inheritAcls, long transactionIndex) {
-    return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId)
-        .setAcls(inheritAcls).setUpdateID(transactionIndex).build();
+  public static OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
+      KeyArgs keyArgs, long objectId, List<OzoneAcl> inheritAcls,
+      long transactionIndex, ReplicationConfig serverDefaultReplConfig) {
+    return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
+        serverDefaultReplConfig).setAcls(inheritAcls)
+        .setUpdateID(transactionIndex).build();
   }
 
   private static OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName,
-      KeyArgs keyArgs, long objectId) {
+      KeyArgs keyArgs, long objectId,
+      ReplicationConfig serverDefaultReplConfig) {
     String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
-    return new OmKeyInfo.Builder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(dirName)
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setDataSize(0)
-        .setReplicationConfig(new StandaloneReplicationConfig(
-            HddsProtos.ReplicationFactor.ONE))
-        .setObjectID(objectId)
+    OmKeyInfo.Builder keyInfoBuilder =
+        new OmKeyInfo.Builder().setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName()).setKeyName(dirName)
+            .setOmKeyLocationInfos(Collections.singletonList(
+                new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            .setCreationTime(keyArgs.getModificationTime())
+            .setModificationTime(keyArgs.getModificationTime()).setDataSize(0);
+    if (keyArgs.getFactor() != null && keyArgs
+        .getFactor() != HddsProtos.ReplicationFactor.ZERO && keyArgs
+        .getType() != HddsProtos.ReplicationType.EC) {
+      // Factor available and not an EC replication config.
+      keyInfoBuilder.setReplicationConfig(ReplicationConfig
+          .fromTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()));
+    } else if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
+      // Found EC type
+      keyInfoBuilder.setReplicationConfig(
+          new ECReplicationConfig(keyArgs.getEcReplicationConfig()));
+    } else {
+      // default type
+      keyInfoBuilder.setReplicationConfig(serverDefaultReplConfig);
+    }
+
+    keyInfoBuilder.setObjectID(objectId)
         .setUpdateID(objectId);
+    return keyInfoBuilder;
   }
 
   static long getMaxNumOfRecursiveDirs() {
