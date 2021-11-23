@@ -60,6 +60,18 @@ Secure Tenant GetSecret Success
     ${output} =         Execute          ozone tenant user getsecret 'tenantone$bob' --export
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
 
+Secure Tenant Delete Tenant Failure Tenant Not Empty
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant delete tenantone
+                        Should contain   ${output}         Failed to delete tenant 'tenantone': Tenant 'tenantone' is not empty
+
+Secure Tenant Revoke User AccessId Success
+    ${output} =         Execute          ozone tenant user revoke 'tenantone$bob'
+                        Should contain   ${output}         Revoked accessId 'tenantone$bob'.
+
+Secure Tenant Delete Tenant Success
+    ${output} =         Execute          ozone tenant delete tenantone
+                        Should contain   ${output}         Deleted tenant 'tenantone'.
+
 Secure Tenant Assign User Failure
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user assign bob --tenant=thistenantdoesnotexist
                         Should contain   ${output}         Tenant 'thistenantdoesnotexist' doesn't exist

@@ -120,7 +120,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     // Caller should be an Ozone admin or tenant delegated admin
     checkTenantAdmin(ozoneManager, tenantName);
 
-    // Note: Tenant username _is_ the Kerberos principal of the user
+    // Note: Tenant username _is_ the user principal (short name)
     final String tenantUsername = request.getTenantUsername();
     final String accessId = request.getAccessId();
 
@@ -186,6 +186,9 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
   public void handleRequestFailure(OzoneManager ozoneManager) {
     final TenantAssignUserAccessIdRequest request =
         getOmRequest().getTenantAssignUserAccessIdRequest();
+    final String userPrincipal = request.getTenantUsername();
+    final String tenantName = request.getTenantName();
+    final String accessId = request.getAccessId();
 
     try {
       // Undo Authorizer states established in preExecute
@@ -193,6 +196,10 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           request.getAccessId());
     } catch (Exception e) {
       // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
+      // TODO: Temporary solution for remnant tenantCache entry. Might becomes
+      //  useless with Ranger thread impl. Can remove.
+      ozoneManager.getMultiTenantManager().removeUserAccessIdFromCache(
+          accessId, userPrincipal, tenantName);
     }
   }
 

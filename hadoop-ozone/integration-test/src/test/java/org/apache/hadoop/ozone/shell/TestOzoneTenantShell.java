@@ -344,7 +344,7 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     // Loop assign-revoke 3 times
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 1; i++) {
       executeHA(tenantShell, new String[] {
           "user", "assign", userName, "--tenant=" + tenantName});
       checkOutput(out, "export AWS_ACCESS_KEY_ID=", false);
@@ -369,7 +369,10 @@ public class TestOzoneTenantShell {
       checkOutput(err, "Revoked accessId", false);
     }
 
+    // Clean up
     executeHA(tenantShell, new String[] {"delete", tenantName});
+    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", true);
+    checkOutput(err, "", true);
   }
 
   /**
@@ -407,7 +410,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "", true);
     checkOutput(err, "Failed to create tenant 'finance':"
-        + " Tenant already exists\n", true);
+        + " Tenant 'finance' already exists\n", true);
 
     executeHA(tenantShell, new String[] {"create", "research"});
     checkOutput(out, "Created tenant 'research'.\n", true);
@@ -544,7 +547,36 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
-    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
+    executeHA(tenantShell, new String[] {"delete", "research"});
+    checkOutput(out, "Deleted tenant 'research'.\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "finance$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {"delete", "finance"});
+    checkOutput(out, "Deleted tenant 'finance'.\n", true);
+    checkOutput(err, "", true);
+
+    // Attempt to delete tenant with accessIds still assigned to it, should fail
+    executeHA(tenantShell, new String[] {"delete", "dev"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Failed to delete tenant 'dev': Tenant 'dev' is not " +
+        "empty. All accessIds associated to this tenant must be revoked " +
+        "before the tenant can be deleted.\n", true);
+
+    // Revoke accessId first
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "dev$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    // Then delete tenant, should succeed
+    executeHA(tenantShell, new String[] {"delete", "dev"});
+    checkOutput(out, "Deleted tenant 'dev'.\n", true);
+    checkOutput(err, "", true);
   }
 
   @Test
@@ -590,7 +622,14 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
-    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "tenant1$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {"delete", "tenant1"});
+    checkOutput(out, "Deleted tenant 'tenant1'.\n", true);
+    checkOutput(err, "", true);
   }
 
   @Test
@@ -710,6 +749,8 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
-    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
+    executeHA(tenantShell, new String[] {"delete", tenantName});
+    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", true);
+    checkOutput(err, "", true);
   }
 }
