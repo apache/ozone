@@ -273,8 +273,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private void doFlushIfNeeded() throws IOException {
-    if (bufferList.size() % (config.getDataStreamBufferFlushSize() / config
-        .getDataStreamMaxBufferSize()) == 0) {
+    Preconditions.checkArgument(config.getDataStreamBufferFlushSize() > config
+        .getDataStreamMaxBufferSize());
+    long boundary = config.getDataStreamBufferFlushSize() / config
+        .getDataStreamMaxBufferSize();
+    if (bufferList.size() % boundary == 0) {
       executePutBlock(false, false);
     }
   }

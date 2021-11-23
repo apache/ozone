@@ -680,8 +680,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           streamBufferSizeUnit.get().toBytes(streamBufferMaxSize.get())));
       clientConfig.setStreamBufferFlushSize(Math.round(
           streamBufferSizeUnit.get().toBytes(streamBufferFlushSize.get())));
-      clientConfig
-          .setDataStreamBufferFlushSize(dataStreamBufferFlushSize.get());
+      clientConfig.setDataStreamBufferFlushSize(Math.round(
+          streamBufferSizeUnit.get().toBytes(dataStreamBufferFlushSize.get())));
       clientConfig.setDataStreamMaxBufferSize((int) Math.round(
           streamBufferSizeUnit.get()
               .toBytes(dataStreamMaxBufferSize.getAsInt())));
