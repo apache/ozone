@@ -107,6 +107,7 @@ public final class VolumeArgs {
   public List<OzoneAcl> getAcls() {
     return acls;
   }
+
   /**
    * Returns new builder class that builds a OmVolumeArgs.
    *
@@ -114,6 +115,10 @@ public final class VolumeArgs {
    */
   public static VolumeArgs.Builder newBuilder() {
     return new VolumeArgs.Builder();
+  }
+
+  public long getRefCount() {
+    return refCount;
   }
 
   /**

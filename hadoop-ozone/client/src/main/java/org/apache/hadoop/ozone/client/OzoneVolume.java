@@ -471,6 +471,14 @@ public class OzoneVolume extends WithMetadata {
     proxy.deleteBucket(name, bucketName);
   }
 
+  public long getRefCount() {
+    return refCount;
+  }
+
+  public void setRefCount(long refCount) {
+    this.refCount = refCount;
+  }
+
 
   /**
    * An Iterator to iterate over {@link OzoneBucket} list.
