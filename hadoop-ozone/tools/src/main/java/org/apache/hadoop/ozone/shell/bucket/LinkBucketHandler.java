@@ -69,7 +69,7 @@ public class LinkBucketHandler extends Handler {
     } catch (OMException e) {
       LOG.warn(
           "Failed to fetch bucket layout for source bucket " +
-              source.getBucketName() + " due to exception: " + e);
+              source.getBucketName() + " due to exception: ", e);
     }
 
     BucketArgs.Builder bb = new BucketArgs.Builder()
