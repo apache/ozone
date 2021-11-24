@@ -227,6 +227,12 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+
+      if (bucket.isLink()) {
+        bucket = proxy.getBucketDetails(bucket.getSourceVolume(),
+            bucket.getSourceBucket());
+      }
+
       OzoneFSUtils.validateBucketLayout(bucket.getName(),
           bucket.getBucketLayout());
     } catch (OMException ex) {

@@ -154,8 +154,14 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
 
-    OzoneFSUtils.validateBucketLayout(bucket.getName(),
-        bucket.getBucketLayout());
+    OzoneBucket resolvedBucket = bucket;
+    if (bucket.isLink()) {
+      resolvedBucket = objectStore.getVolume(bucket.getSourceVolume())
+          .getBucket(bucket.getSourceBucket());
+    }
+
+    OzoneFSUtils.validateBucketLayout(resolvedBucket.getName(),
+        resolvedBucket.getBucketLayout());
 
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
