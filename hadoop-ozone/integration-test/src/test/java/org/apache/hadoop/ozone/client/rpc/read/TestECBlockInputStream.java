@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.client.io.BadDataLocationException;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -348,6 +349,34 @@ public class TestECBlockInputStream {
     }
   }
 
+  @Test
+  public void testErrorReadingBlockReportsBadLocation() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        ONEMB);
+    OmKeyLocationInfo keyInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+      // Read a full stripe to ensure all streams are created in the stream
+      // factory
+      ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
+      int read = ecb.read(buf);
+      Assert.assertEquals(3 * ONEMB, read);
+      // Now make replication index 2 error on the next read
+      streamFactory.getBlockStreams().get(1).setThrowException(true);
+      buf.clear();
+      try {
+        ecb.read(buf);
+        Assert.fail("Exception should be thrown");
+      } catch (IOException e) {
+        Assert.assertTrue(e instanceof BadDataLocationException);
+        Assert.assertEquals(2,
+            keyInfo.getPipeline().getReplicaIndex(
+                ((BadDataLocationException) e).getFailedLocation()));
+      }
+    }
+  }
+
   private void validateBufferContents(ByteBuffer buf, int from, int to,
       byte val) {
     for (int i=from; i<to; i++){
@@ -384,6 +413,7 @@ public class TestECBlockInputStream {
     private byte dataVal = 1;
     private BlockID blockID;
     private long length;
+    private boolean throwException = false;
     private static final byte EOF = -1;
 
     @SuppressWarnings("checkstyle:parameternumber")
@@ -395,6 +425,10 @@ public class TestECBlockInputStream {
 
     public boolean isClosed() {
       return closed;
+    }
+
+    public void setThrowException(boolean shouldThrow) {
+      this.throwException = shouldThrow;
     }
 
     @Override
@@ -419,9 +453,13 @@ public class TestECBlockInputStream {
     }
 
     @Override
-    public int read(ByteBuffer buf) {
+    public int read(ByteBuffer buf) throws IOException {
       if (getRemaining() == 0) {
         return EOF;
+      }
+
+      if (throwException) {
+        throw new IOException("Simulated exception");
       }
 
       int toRead = Math.min(buf.remaining(), (int)getRemaining());
