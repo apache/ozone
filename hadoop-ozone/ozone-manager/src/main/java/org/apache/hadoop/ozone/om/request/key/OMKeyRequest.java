@@ -466,10 +466,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-        BucketLayout sourceBucketLayout = omMetadataManager.getBucketTable()
-            .getIfExist(resolvedBucket.realBucket()).getBucketLayout();
+        bucketLayout = getBucketLayout();
+        try {
+          bucketLayout = omMetadataManager.getBucketTable()
+              .getIfExist(resolvedBucket.realBucket()).getBucketLayout();
+        } catch (OMException oe) {
+          LOG.warn("Failed to fetch bucket layout for source bucket: " +
+              resolvedBucket.realBucket(), oe);
+        }
         OmKeyInfo omKeyInfo =
-            omMetadataManager.getOpenKeyTable(sourceBucketLayout).get(
+            omMetadataManager.getOpenKeyTable(bucketLayout).get(
                 omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
                     resolvedBucket.realBucket(), keyArgs.getKeyName(),
                     keyArgs.getMultipartUploadID()));
