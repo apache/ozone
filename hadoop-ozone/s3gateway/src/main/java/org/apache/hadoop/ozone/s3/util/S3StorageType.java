@@ -50,6 +50,12 @@ public enum S3StorageType {
     return type;
   }
 
+  /**
+   * Get default S3StorageType for a new key to be uploaded.
+   * This should align to the ozone cluster configuration.
+   * @param config OzoneConfiguration
+   * @return S3StorageType which wraps ozone replication type and factor
+   */
   public static S3StorageType getDefault(ConfigurationSource config) {
     String replicationString = config.get(OzoneConfigKeys.OZONE_REPLICATION);
     ReplicationFactor configFactor;
@@ -57,6 +63,7 @@ public enum S3StorageType {
       configFactor = ReplicationFactor.valueOf(
           Integer.parseInt(replicationString));
     } catch (NumberFormatException ex) {
+      // conservatively defaults to STANDARD on wrong config value
       return STANDARD;
     }
     return configFactor == ReplicationFactor.ONE
