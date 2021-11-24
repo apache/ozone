@@ -115,6 +115,22 @@ public class OMBucketCreateRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    // If this is a Link Bucket, we make sure that its layout matches the
+    //  source bucket. This prevents inconsistencies during list operations.
+    if (hasSourceBucket) {
+      try {
+        newBucketInfo.setBucketLayout(
+            ozoneManager.getBucketInfo(
+                    bucketInfo.getSourceVolume(),
+                    bucketInfo.getSourceBucket())
+                .getBucketLayout().toProto());
+      } catch (OMException e) {
+        // If source bucket does not exist.
+        LOG.warn("Couldn't fetch bucket layout from source bucket: " +
+            bucketInfo.getSourceBucket(), e);
+      }
+    }
+
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())

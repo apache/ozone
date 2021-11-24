@@ -100,4 +100,53 @@ public class TestObjectStore {
     Assert.assertEquals(sampleBucketName, bucket.getName());
     Assert.assertNotEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
   }
+
+  /**
+   * Ensure Link Buckets have same BucketLayout as source buckets.
+   * @throws Exception
+   */
+  @Test
+  public void testCreateLinkBucketWithBucketLayout() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+
+    String sourceBucket1Name = UUID.randomUUID().toString();
+    BucketLayout sourceBucket1Layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
+
+    String sourceBucket2Name = UUID.randomUUID().toString();
+    BucketLayout sourceBucket2Layout = BucketLayout.OBJECT_STORE;
+
+    String linkBucket1Name = UUID.randomUUID().toString();
+    String linkBucket2Name = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    // Create source buckets
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setBucketLayout(sourceBucket1Layout);
+    volume.createBucket(sourceBucket1Name, builder.build());
+    builder.setBucketLayout(sourceBucket2Layout);
+    volume.createBucket(sourceBucket2Name, builder.build());
+
+    // Create link buckets
+    builder.setBucketLayout(BucketLayout.DEFAULT)
+        .setSourceVolume(volumeName)
+        .setSourceBucket(sourceBucket1Name);
+    volume.createBucket(linkBucket1Name, builder.build());
+    builder.setBucketLayout(BucketLayout.DEFAULT)
+        .setSourceVolume(volumeName)
+        .setSourceBucket(sourceBucket2Name);
+    volume.createBucket(linkBucket2Name, builder.build());
+
+    // Check that Link Buckets' layouts match source bucket layouts
+    OzoneBucket bucket = volume.getBucket(linkBucket1Name);
+    Assert.assertEquals(bucket.getBucketLayout(), sourceBucket1Layout);
+
+    bucket = volume.getBucket(linkBucket2Name);
+    Assert.assertEquals(bucket.getBucketLayout(), sourceBucket2Layout);
+  }
 }
