@@ -79,8 +79,8 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
       ByteBuffer b = selectNextBuffer();
       if (b == null) {
         // This should not happen, so if it does abort.
-        throw new IOException(getRemaining()+" bytes remaining but unable to " +
-            "select a buffer with data");
+        throw new IOException(getRemaining() + " bytes remaining but unable " +
+            "to select a buffer with data");
       }
       long read = readBufferToDest(b, buf);
       totalRead += read;
