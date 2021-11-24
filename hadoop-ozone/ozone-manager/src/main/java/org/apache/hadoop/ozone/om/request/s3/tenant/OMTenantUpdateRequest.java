@@ -27,11 +27,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import java.io.IOException;
 
 /**
- * Handles OMTenantModify request.
+ * Handles TenantUpdate request.
  */
-public class OMTenantModifyRequest extends OMVolumeRequest {
+public class OMTenantUpdateRequest extends OMVolumeRequest {
 
-  public OMTenantModifyRequest(OMRequest omRequest) {
+  public OMTenantUpdateRequest(OMRequest omRequest) {
     super(omRequest);
   }
 

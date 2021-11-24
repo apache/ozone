@@ -44,7 +44,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
 
 /*
   Execution flow
@@ -139,17 +139,17 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     final TenantRevokeAdminRequest request =
         getOmRequest().getTenantRevokeAdminRequest();
     final String accessId = request.getAccessId();
-    final String tenantName = request.getTenantName();
+    final String tenantId = request.getTenantName();
 
-    boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
+    boolean acquiredTenantLock = false;  // TODO: use tenant lock instead, maybe
     IOException exception = null;
 
     final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
-        omMetadataManager, tenantName);
+        omMetadataManager, tenantId);
 
     try {
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volumeName);
+      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
+          TENANT_LOCK, tenantId);
 
       final OmDBAccessIdInfo oldAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
@@ -159,7 +159,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantId().equals(tenantName));
+      assert(oldAccessIdInfo.getTenantId().equals(tenantId));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
@@ -202,24 +202,24 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }
-      if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+      if (acquiredTenantLock) {
+        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
       }
     }
 
     // Audit
-    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.TENANT, tenantId);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_REVOKE_ADMIN, auditMap, exception,
         getOmRequest().getUserInfo()));
 
     if (exception == null) {
       LOG.info("Revoked admin of accessId '{}' from tenant '{}'",
-          accessId, tenantName);
+          accessId, tenantId);
       // TODO: omMetrics.incNumTenantRevokeAdmin()
     } else {
       LOG.error("Failed to revoke admin of accessId '{}' from tenant '{}': {}",
-          accessId, tenantName, exception.getMessage());
+          accessId, tenantId, exception.getMessage());
       // TODO: omMetrics.incNumTenantRevokeAdminFails()
     }
     return omClientResponse;

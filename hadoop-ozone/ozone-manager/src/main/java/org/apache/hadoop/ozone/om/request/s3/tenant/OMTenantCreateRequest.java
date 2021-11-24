@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -217,7 +218,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OmVolumeArgs omVolumeArgs;
-    boolean acquiredVolumeLock = false, acquiredUserLock = false;
+    boolean acquiredVolumeLock = false;
+    boolean acquiredUserLock = false;
+    boolean acquiredTenantLock = false;
     final String owner = getOmRequest().getUserInfo().getUserName();
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -242,41 +245,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
+
       // Check volume existence
       if (omMetadataManager.getVolumeTable().isExist(volumeName)) {
         LOG.debug("volume: '{}' already exists", volumeName);
         throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
       }
-      // Check tenant existence in tenantStateTable
-      if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
-        LOG.debug("tenant: '{}' already exists", tenantId);
-        throw new OMException("Tenant already exists", TENANT_ALREADY_EXISTS);
-      }
-
-      // Add to tenantStateTable. Redundant assignment for clarity
-      final String bucketNamespaceName = volumeName;
-      final String accountNamespaceName = tenantId;  // TODO: Double check
-      final String userPolicyGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
-      final String bucketPolicyGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
-      final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
-          tenantId, bucketNamespaceName, accountNamespaceName,
-          userPolicyGroupName, bucketPolicyGroupName);
-      omMetadataManager.getTenantStateTable().addCacheEntry(
-          new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
-
-      // Add to tenantPolicyTable
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(userPolicyGroupName),
-          new CacheValue<>(Optional.of(tenantDefaultPolicies),
-              transactionLogIndex));
-      final String bucketPolicyId =
-          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(bucketPolicyGroupName),
-          new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex));
 
       // Create volume
       acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
@@ -301,6 +275,41 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       createVolume(omMetadataManager, omVolumeArgs, volumeList, dbVolumeKey,
           dbUserKey, transactionLogIndex);
       LOG.debug("volume: '{}' successfully created", dbVolumeKey);
+
+      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
+          TENANT_LOCK, tenantId);
+
+      // Check tenant existence in tenantStateTable
+      if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
+        LOG.debug("tenant: '{}' already exists", tenantId);
+        throw new OMException("Tenant already exists", TENANT_ALREADY_EXISTS);
+      }
+
+      // Create tenant
+      // Add to tenantStateTable. Redundant assignment for clarity
+      final String bucketNamespaceName = volumeName;
+      final String accountNamespaceName = tenantId;  // TODO: Double check
+      final String userPolicyGroupName =
+          tenantId + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
+      final String bucketPolicyGroupName =
+          tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
+      final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
+          tenantId, bucketNamespaceName, accountNamespaceName,
+          userPolicyGroupName, bucketPolicyGroupName);
+      omMetadataManager.getTenantStateTable().addCacheEntry(
+          new CacheKey<>(tenantId),
+          new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
+
+      // Add to tenantPolicyTable
+      omMetadataManager.getTenantPolicyTable().addCacheEntry(
+          new CacheKey<>(userPolicyGroupName),
+          new CacheValue<>(Optional.of(tenantDefaultPolicies),
+              transactionLogIndex));
+      final String bucketPolicyId =
+          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
+      omMetadataManager.getTenantPolicyTable().addCacheEntry(
+          new CacheKey<>(bucketPolicyGroupName),
+          new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex));
 
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder().setSuccess(true).build()
@@ -336,6 +345,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
+      }
+      if (acquiredTenantLock) {
+        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
       }
       if (acquiredUserLock) {
         omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);

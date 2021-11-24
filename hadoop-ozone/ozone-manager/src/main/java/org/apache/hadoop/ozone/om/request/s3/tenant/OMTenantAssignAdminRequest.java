@@ -44,7 +44,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
 
 /*
   Execution flow
@@ -158,18 +158,15 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     final TenantAssignAdminRequest request =
         getOmRequest().getTenantAssignAdminRequest();
     final String accessId = request.getAccessId();
-    final String tenantName = request.getTenantName();
+    final String tenantId = request.getTenantName();
     final boolean delegated = request.getDelegated();
 
-    boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
+    boolean acquiredTenantLock = false;
     IOException exception = null;
 
-    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
-        omMetadataManager, tenantName);
-
     try {
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volumeName);
+      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
+          TENANT_LOCK, tenantId);
 
       final OmDBAccessIdInfo oldAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
@@ -179,7 +176,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantId().equals(tenantName));
+      assert(oldAccessIdInfo.getTenantId().equals(tenantId));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
@@ -195,7 +192,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
 
-      // Update tenantRoleTable?
+      // TODO: Update tenantRoleTable?
 //      final String roleName = "role_admin";
 //      omMetadataManager.getTenantRoleTable().addCacheEntry(
 //          new CacheKey<>(accessId),
@@ -220,25 +217,25 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }
-      if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+      if (acquiredTenantLock) {
+        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
       }
     }
 
     // Audit
-    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.TENANT, tenantId);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_ASSIGN_ADMIN, auditMap, exception,
         getOmRequest().getUserInfo()));
 
     if (exception == null) {
       LOG.info("Assigned admin to accessId '{}' in tenant '{}', "
-              + "delegated: {}", accessId, tenantName, delegated);
+              + "delegated: {}", accessId, tenantId, delegated);
       // TODO: omMetrics.incNumTenantAssignAdmin()
     } else {
       LOG.error("Failed to assign admin to accessId '{}' in tenant '{}', "
               + "delegated: {}: {}",
-          accessId, tenantName, delegated, exception.getMessage());
+          accessId, tenantId, delegated, exception.getMessage());
       // TODO: omMetrics.incNumTenantAssignAdminFails()
     }
     return omClientResponse;

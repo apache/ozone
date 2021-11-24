@@ -53,6 +53,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_IS_REFERENCED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -123,7 +124,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     final OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    boolean acquiredVolumeLock = false, acquiredUserLock = false;
+    boolean acquiredVolumeLock = false;
+    boolean acquiredUserLock = false;
+    boolean acquiredTenantLock = false;
     final Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     final DeleteTenantRequest request = getOmRequest().getDeleteTenantRequest();
@@ -140,9 +143,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     OzoneManagerStorageProtos.PersistedUserVolumeInfo newVolumeList = null;
 
     try {
-      // TODO: Should hold some lock here.
-//      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
-//          TENANT_LOCK, tenantId);
 
       if (deleteVolume) {
         // Csheck Acl
@@ -204,6 +204,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         // TODO: Set response dbVolumeKey?
       }
 
+      // Hold tenant lock
+      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
+          TENANT_LOCK, tenantId);
+
       // Invalidate cache entries for tenant
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
@@ -232,9 +236,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
-//      if (acquiredTenantLock) {
-//        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
-//      }
+      if (acquiredTenantLock) {
+        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
+      }
       if (acquiredUserLock) {
         omMetadataManager.getLock().releaseWriteLock(USER_LOCK, volumeOwner);
       }

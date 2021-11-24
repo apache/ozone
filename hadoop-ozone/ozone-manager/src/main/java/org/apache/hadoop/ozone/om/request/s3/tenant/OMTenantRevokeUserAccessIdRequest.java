@@ -45,7 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
 
 /*
   Execution flow
@@ -145,29 +145,17 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     final TenantRevokeUserAccessIdRequest request =
         getOmRequest().getTenantRevokeUserAccessIdRequest();
     final String accessId = request.getAccessId();
-    final String tenantName = request.getTenantName();
+    final String tenantId = request.getTenantName();
 
-    boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
+    boolean acquiredTenantLock = false;
     IOException exception = null;
 
-    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
-        omMetadataManager, tenantName);
     String userPrincipal = null;
 
     try {
-      acquiredVolumeLock =
-          omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volumeName);
-
-      // Remove from S3SecretTable. TODO: Remove later.
-      acquiredS3SecretLock = omMetadataManager.getLock()
-          .acquireWriteLock(S3_SECRET_LOCK, accessId);
-      omMetadataManager.getS3SecretTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK,
-          accessId);
-      acquiredS3SecretLock = false;
+      acquiredTenantLock =
+          omMetadataManager.getLock().acquireWriteLock(TENANT_LOCK, tenantId);
 
       // Remove accessId from principalToAccessIdsTable
       OmDBAccessIdInfo omDBAccessIdInfo =
@@ -201,6 +189,21 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
+      omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
+      acquiredTenantLock = false;
+
+      // Remove from S3SecretTable.
+      // Note: S3SecretTable will be deprecated in the future.
+      acquiredS3SecretLock = omMetadataManager.getLock()
+          .acquireWriteLock(S3_SECRET_LOCK, accessId);
+
+      omMetadataManager.getS3SecretTable().addCacheEntry(
+          new CacheKey<>(accessId),
+          new CacheValue<>(Optional.absent(), transactionLogIndex));
+
+      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
+      acquiredS3SecretLock = false;
+
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(
           TenantRevokeUserAccessIdResponse.newBuilder().setSuccess(true).build()
@@ -221,29 +224,29 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }
+      if (acquiredTenantLock) {
+        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
+      }
       if (acquiredS3SecretLock) {
         omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
-      }
-      if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }
 
     // Audit
-    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put("accessId", accessId);
-    auditMap.put("user", userPrincipal);
+    auditMap.put("userPrincipal", userPrincipal);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_REVOKE_USER_ACCESSID, auditMap, exception,
         getOmRequest().getUserInfo()));
 
     if (exception == null) {
       LOG.info("Revoked user '{}' accessId '{}' to tenant '{}'",
-          userPrincipal, accessId, tenantName);
+          userPrincipal, accessId, tenantId);
       // TODO: omMetrics.incNumTenantRevokeUser()
     } else {
       LOG.error("Failed to revoke user '{}' accessId '{}' to tenant '{}': {}",
-          userPrincipal, accessId, tenantName, exception.getMessage());
+          userPrincipal, accessId, tenantId, exception.getMessage());
       // TODO: omMetrics.incNumTenantRevokeUserFails()
     }
     return omClientResponse;

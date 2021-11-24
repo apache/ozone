@@ -54,7 +54,7 @@ import java.util.TreeSet;
 
 import static org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo.SERIALIZATION_SPLIT_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
 import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
 import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 
@@ -221,30 +221,27 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     final String accessId = updateGetS3SecretRequest.getKerberosID();
     final String awsSecret = updateGetS3SecretRequest.getAwsSecret();
 
-    boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
+    boolean acquiredTenantLock = false;
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     final TenantAssignUserAccessIdRequest request =
         getOmRequest().getTenantAssignUserAccessIdRequest();
-    final String tenantName = request.getTenantName();
+    final String tenantId = request.getTenantName();
     final String principal = request.getTenantUsername();
 
     assert(accessId.equals(request.getAccessId()));
     IOException exception = null;
 
-    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
-        omMetadataManager, tenantName);
-
     try {
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volumeName);
+      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
+          TENANT_LOCK, tenantId);
 
       // Expect tenant existence in tenantStateTable
-      if (!omMetadataManager.getTenantStateTable().isExist(tenantName)) {
-        LOG.error("tenant {} doesn't exist", tenantName);
-        throw new OMException("tenant '" + tenantName + "' doesn't exist",
+      if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
+        LOG.error("tenant {} doesn't exist", tenantId);
+        throw new OMException("tenant '" + tenantId + "' doesn't exist",
             OMException.ResultCodes.TENANT_NOT_FOUND);
       }
 
@@ -269,42 +266,22 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
                 + "Ignoring.", existingAccId);
             throw new NullPointerException("accessIdInfo is null");
           }
-          if (tenantName.equals(accessIdInfo.getTenantId())) {
+          if (tenantId.equals(accessIdInfo.getTenantId())) {
             throw new OMException("The same user is not allowed to be assigned "
                 + "to the same tenant more than once. User '" + principal
-                + "' is already assigned to tenant '" + tenantName + "' with "
+                + "' is already assigned to tenant '" + tenantId + "' with "
                 + "accessId '" + existingAccId + "'.",
                 OMException.ResultCodes.TENANT_USER_ACCESSID_ALREADY_EXISTS);
           }
         }
       }
 
-      // Add to S3SecretTable. TODO: Remove later.
-      acquiredS3SecretLock = omMetadataManager.getLock()
-          .acquireWriteLock(S3_SECRET_LOCK, accessId);
-
-      // Expect accessId absence from S3SecretTable
-      // TODO: This table might be merged with tenantAccessIdTable later.
-      if (omMetadataManager.getS3SecretTable().isExist(accessId)) {
-        LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
-        throw new OMException("accessId '" + accessId +
-            "' already exists in S3SecretTable",
-            OMException.ResultCodes.INVALID_REQUEST);
-      }
-
       final S3SecretValue s3SecretValue =
           new S3SecretValue(accessId, awsSecret);
-      // Add S3SecretTable cache entry
-      omMetadataManager.getS3SecretTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));
-
-      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
-      acquiredS3SecretLock = false;
 
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
-          .setTenantId(tenantName)
+          .setTenantId(tenantId)
           .setKerberosPrincipal(principal)
           .setSharedSecret(s3SecretValue.getAwsSecret())
           .setIsAdmin(false)
@@ -330,7 +307,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       // Add to tenantGroupTable
       // TODO: DOUBLE CHECK GROUP NAME USAGE
       final String defaultGroupName =
-          tenantName + OzoneConsts.DEFAULT_TENANT_USER_GROUP_SUFFIX;
+          tenantId + OzoneConsts.DEFAULT_TENANT_USER_GROUP_SUFFIX;
       omMetadataManager.getTenantGroupTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(defaultGroupName), transactionLogIndex));
@@ -341,6 +318,31 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       omMetadataManager.getTenantRoleTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(roleName), transactionLogIndex));
+
+      omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
+      acquiredTenantLock = false;
+
+      // Add to S3SecretTable.
+      // Note: S3SecretTable will be deprecated in the future.
+      acquiredS3SecretLock = omMetadataManager.getLock()
+          .acquireWriteLock(S3_SECRET_LOCK, accessId);
+
+      // Expect accessId absence from S3SecretTable
+      // TODO: This table might be merged with tenantAccessIdTable later.
+      if (omMetadataManager.getS3SecretTable().isExist(accessId)) {
+        LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
+        throw new OMException("accessId '" + accessId +
+            "' already exists in S3SecretTable",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+
+      // Add S3SecretTable cache entry
+      omMetadataManager.getS3SecretTable().addCacheEntry(
+          new CacheKey<>(accessId),
+          new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));
+
+      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
+      acquiredS3SecretLock = false;
 
       // Generate response
       omResponse.setTenantAssignUserAccessIdResponse(
@@ -365,16 +367,16 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }
+      if (acquiredTenantLock) {
+        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
+      }
       if (acquiredS3SecretLock) {
         omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
-      }
-      if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }
 
     // Audit
-    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put("user", principal);
     auditMap.put("accessId", accessId);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
@@ -383,11 +385,11 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
 
     if (exception == null) {
       LOG.info("Assigned user '{}' to tenant '{}' with accessId '{}'",
-          principal, tenantName, accessId);
+          principal, tenantId, accessId);
       // TODO: omMetrics.incNumTenantAssignUser()
     } else {
       LOG.error("Failed to assign '{}' to tenant '{}' with accessId '{}': {}",
-          principal, tenantName, accessId, exception.getMessage());
+          principal, tenantId, accessId, exception.getMessage());
       // TODO: Check if the exception message is sufficient.
       // TODO: omMetrics.incNumTenantAssignUserFails()
     }
