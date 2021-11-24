@@ -82,28 +82,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
-import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
@@ -755,6 +734,20 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
+
+    BucketLayout bucketLayout = bucketInfo.getBucketLayout();
+    // If this is a link bucket, return layout of the source bucket.
+    if (bucketInfo.isLink()) {
+      try {
+        bucketLayout =
+            ozoneManagerClient.getBucketInfo(bucketInfo.getSourceVolume(),
+                bucketInfo.getSourceBucket()).getBucketLayout();
+      } catch (OMException oe) {
+        LOG.warn("Failed to fetch bucket layout for source bucket: " +
+            bucketInfo.getSourceBucket(), oe);
+      }
+    }
+
     return new OzoneBucket(
         conf,
         this,
@@ -773,7 +766,7 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInNamespace(),
-        bucketInfo.getBucketLayout()
+        bucketLayout
     );
   }
 
@@ -784,26 +777,41 @@ public class RpcClient implements ClientProtocol {
     List<OmBucketInfo> buckets = ozoneManagerClient.listBuckets(
         volumeName, prevBucket, bucketPrefix, maxListResult);
 
-    return buckets.stream().map(bucket -> new OzoneBucket(
-        conf,
-        this,
-        bucket.getVolumeName(),
-        bucket.getBucketName(),
-        bucket.getStorageType(),
-        bucket.getIsVersionEnabled(),
-        bucket.getCreationTime(),
-        bucket.getModificationTime(),
-        bucket.getMetadata(),
-        bucket.getEncryptionKeyInfo() != null ? bucket
-            .getEncryptionKeyInfo().getKeyName() : null,
-        bucket.getSourceVolume(),
-        bucket.getSourceBucket(),
-        bucket.getUsedBytes(),
-        bucket.getUsedNamespace(),
-        bucket.getQuotaInBytes(),
-        bucket.getQuotaInNamespace(),
-        bucket.getBucketLayout()))
-        .collect(Collectors.toList());
+    return buckets.stream().map(bucket -> {
+      BucketLayout bucketLayout = bucket.getBucketLayout();
+      // If this is a link bucket, return layout of the source bucket.
+      if (bucket.isLink()) {
+        try {
+          bucketLayout =
+              ozoneManagerClient.getBucketInfo(bucket.getSourceVolume(),
+                  bucket.getSourceBucket()).getBucketLayout();
+        } catch (IOException e) {
+          LOG.warn("Failed to fetch bucket layout for source bucket: " +
+              bucket.getSourceBucket(), e);
+        }
+      }
+
+      return new OzoneBucket(
+          conf,
+          this,
+          bucket.getVolumeName(),
+          bucket.getBucketName(),
+          bucket.getStorageType(),
+          bucket.getIsVersionEnabled(),
+          bucket.getCreationTime(),
+          bucket.getModificationTime(),
+          bucket.getMetadata(),
+          bucket.getEncryptionKeyInfo() != null ? bucket
+              .getEncryptionKeyInfo().getKeyName() : null,
+          bucket.getSourceVolume(),
+          bucket.getSourceBucket(),
+          bucket.getUsedBytes(),
+          bucket.getUsedNamespace(),
+          bucket.getQuotaInBytes(),
+          bucket.getQuotaInNamespace(),
+          bucketLayout);
+    })
+    .collect(Collectors.toList());
   }
 
   @Override

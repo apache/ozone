@@ -1216,7 +1216,7 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIteratorFactory {
     KeyIterator getKeyIterator(String keyPrefix, String prevKey,
         BucketLayout bType) throws IOException {
-      if (bType.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bType.isFileSystemOptimized()) {
         return new KeyIteratorWithFSO(keyPrefix, prevKey);
       } else {
         return new KeyIterator(keyPrefix, prevKey);

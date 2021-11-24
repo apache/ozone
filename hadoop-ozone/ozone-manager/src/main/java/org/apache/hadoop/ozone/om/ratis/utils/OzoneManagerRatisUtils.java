@@ -502,14 +502,13 @@ public final class OzoneManagerRatisUtils {
       String buckName, OzoneManager ozoneManager) {
     OmBucketInfo buckInfo = getOmBucketInfo(ozoneManager, volName, buckName);
 
-    // If this is a link bucket, we fetch the BucketLayout from the
-    // source bucket.
-    if(buckInfo.isLink()) {
-      buckInfo = getOmBucketInfo(ozoneManager, buckInfo.getSourceVolume(),
-          buckInfo.getSourceBucket());
-    }
-
     if (buckInfo != null) {
+      // If this is a link bucket, we fetch the BucketLayout from the
+      // source bucket.
+      if (buckInfo.isLink()) {
+        buckInfo = getOmBucketInfo(ozoneManager, buckInfo.getSourceVolume(),
+            buckInfo.getSourceBucket());
+      }
       return buckInfo.getBucketLayout();
     } else {
       LOG.error("Bucket not found: {}/{} ", volName, buckName);

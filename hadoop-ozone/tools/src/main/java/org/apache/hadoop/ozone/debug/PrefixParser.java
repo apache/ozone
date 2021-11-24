@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.*;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -149,6 +150,17 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     }
 
     BucketLayout bucketLayout = info.getBucketLayout();
+
+    if(info.isLink()) {
+      try {
+        bucketLayout =
+            metadataManager.getBucketTable().getIfExist(info.getSourceBucket())
+                .getBucketLayout();
+      } catch (OMException oe) {
+        System.out.println("Failed to fetch bucket layout for source bucket: " +
+            info.getSourceBucket());
+      }
+    }
     if (!bucketLayout.isFileSystemOptimized()) {
       System.out.println("Prefix tool only works for FileSystem Optimized" +
               "bucket. Bucket Layout is:" + bucketLayout);

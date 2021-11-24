@@ -144,9 +144,9 @@ public class TestObjectStore {
 
     // Check that Link Buckets' layouts match source bucket layouts
     OzoneBucket bucket = volume.getBucket(linkBucket1Name);
-    Assert.assertEquals(bucket.getBucketLayout(), sourceBucket1Layout);
+    Assert.assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
 
     bucket = volume.getBucket(linkBucket2Name);
-    Assert.assertEquals(bucket.getBucketLayout(), sourceBucket2Layout);
+    Assert.assertEquals(sourceBucket2Layout, bucket.getBucketLayout());
   }
 }
