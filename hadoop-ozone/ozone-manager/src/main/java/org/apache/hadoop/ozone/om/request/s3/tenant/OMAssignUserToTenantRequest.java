@@ -188,20 +188,21 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
   public void handleRequestFailure(OzoneManager ozoneManager) {
     final TenantAssignUserAccessIdRequest request =
         getOmRequest().getTenantAssignUserAccessIdRequest();
-    final String userPrincipal = request.getTenantUsername();
-    final String tenantName = request.getTenantName();
-    final String accessId = request.getAccessId();
 
     try {
       // Undo Authorizer states established in preExecute
       ozoneManager.getMultiTenantManager().revokeUserAccessId(
           request.getAccessId());
+    } catch (IOException ioEx) {
+      final String userPrincipal = request.getTenantUsername();
+      final String tenantName = request.getTenantName();
+      final String accessId = request.getAccessId();
+      ozoneManager.getMultiTenantManager().removeUserAccessIdFromCache(
+          accessId, userPrincipal, tenantName);
     } catch (Exception e) {
       // TODO: Ignore for now. See OMTenantCreateRequest#handleRequestFailure
       // TODO: Temporary solution for remnant tenantCache entry. Might becomes
       //  useless with Ranger thread impl. Can remove.
-      ozoneManager.getMultiTenantManager().removeUserAccessIdFromCache(
-          accessId, userPrincipal, tenantName);
     }
   }
 
