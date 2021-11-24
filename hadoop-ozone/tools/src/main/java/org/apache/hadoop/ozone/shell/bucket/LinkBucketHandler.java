@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -60,17 +59,10 @@ public class LinkBucketHandler extends Handler {
   @Override
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    BucketLayout sourceBucketLayout = BucketLayout.DEFAULT;
-    try {
-      sourceBucketLayout = client.getObjectStore()
-          .getVolume(source.getVolumeName())
-          .getBucket(source.getBucketName())
-          .getBucketLayout();
-    } catch (OMException e) {
-      LOG.warn(
-          "Failed to fetch bucket layout for source bucket " +
-              source.getBucketName() + " due to exception: " + e);
-    }
+    BucketLayout sourceBucketLayout = client.getObjectStore()
+        .getVolume(source.getVolumeName())
+        .getBucket(source.getBucketName())
+        .getBucketLayout();
 
     BucketArgs.Builder bb = new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
