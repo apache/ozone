@@ -125,6 +125,12 @@ public final class ECStreamTestUtil {
     }
   }
 
+  public static void randomFill(ByteBuffer buf, SplittableRandom rand) {
+    while (buf.remaining() > 0) {
+      buf.put((byte) rand.nextInt(255));
+    }
+  }
+
   private static int totalSpaceAvailable(ByteBuffer[] bufs) {
     int space = 0;
     for (ByteBuffer b : bufs) {
@@ -256,6 +262,8 @@ public final class ECStreamTestUtil {
     private BlockID blockID;
     private long length;
     private boolean shouldError = false;
+    private int shouldErrorPosition = 0;
+    private IOException errorToThrow = null;
     private static final byte EOF = -1;
 
     TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data) {
@@ -271,6 +279,14 @@ public final class ECStreamTestUtil {
 
     public void setShouldError(boolean val) {
       shouldError = val;
+      shouldErrorPosition = 0;
+    }
+
+    public void setShouldError(boolean val, int position,
+        IOException errorThrowable) {
+      this.shouldError = val;
+      this.shouldErrorPosition = position;
+      this.errorToThrow = errorThrowable;
     }
 
     @Override
@@ -296,18 +312,29 @@ public final class ECStreamTestUtil {
 
     @Override
     public int read(ByteBuffer buf) throws IOException {
-      if (shouldError) {
-        throw new IOException("Simulated error reading block");
+      if (shouldError && data.position() >= shouldErrorPosition) {
+        throwError();
       }
       if (getRemaining() == 0) {
         return EOF;
       }
       int toRead = Math.min(buf.remaining(), (int)getRemaining());
       for (int i = 0; i < toRead; i++) {
+        if (shouldError && data.position() >= shouldErrorPosition) {
+          throwError();
+        }
         buf.put(data.get());
       }
       return toRead;
     };
+
+    private void throwError() throws IOException {
+      if (errorToThrow != null) {
+        throw errorToThrow;
+      } else {
+        throw new IOException("Simulated error reading block");
+      }
+    }
 
     @Override
     protected int readWithStrategy(ByteReaderStrategy strategy) throws
