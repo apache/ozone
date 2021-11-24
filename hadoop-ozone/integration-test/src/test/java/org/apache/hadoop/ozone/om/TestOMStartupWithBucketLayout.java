@@ -1,19 +1,18 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
  */
 package org.apache.hadoop.ozone.om;
 
@@ -42,28 +41,21 @@ public class TestOMStartupWithBucketLayout {
 
   private static MiniOzoneCluster cluster;
 
-  public static void startClusterWithSimpleLayout() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  public static void startCluster(OzoneConfiguration conf)
+      throws Exception {
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String omId = UUID.randomUUID().toString();
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.OBJECT_STORE.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+        .setScmId(scmId).setOmId(omId).withoutDatanodes().build();
     cluster.waitForClusterToBeReady();
   }
 
-  public static void startClusterWithPrefixLayout() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
-    cluster.waitForClusterToBeReady();
+  public static void restartCluster()
+      throws Exception {
+    // restart om
+    cluster.stop();
+    cluster.getOzoneManager().restart();
   }
 
   public static void teardown() {
@@ -73,78 +65,96 @@ public class TestOMStartupWithBucketLayout {
   }
 
   @Test
-  public void testRestartWithPrefixLayout() throws Exception {
-    startClusterWithPrefixLayout();
+  public void testRestartWithFSOLayout() throws Exception {
     try {
-      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster,
+      // 1. build cluster with default bucket layout FSO
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      startCluster(conf);
+
+      // 2. create bucket with FSO bucket layout and verify
+      OzoneBucket bucket1 = TestDataUtil.createVolumeAndBucket(cluster,
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      verifyBucketLayout(bucket, BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
+      verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-      cluster.stop();
-      cluster.getOzoneManager().restart();
-
-      bucket = TestDataUtil.createVolumeAndBucket(cluster,
+      // 3. verify OM default behavior with LEGACY
+      restartCluster();
+      OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(cluster,
           BucketLayout.LEGACY);
-      verifyBucketLayout(bucket, BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
+      verifyBucketLayout(bucket2, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-      cluster.stop();
-      cluster.getOzoneManager().restart();
-
-      bucket = TestDataUtil.createVolumeAndBucket(cluster,
+      // 4. create bucket with OBS bucket layout and verify
+      restartCluster();
+      OzoneBucket bucket3 = TestDataUtil.createVolumeAndBucket(cluster,
           BucketLayout.OBJECT_STORE);
-      verifyBucketLayout(bucket, BucketLayout.OBJECT_STORE, false);
+      verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
 
-      cluster.stop();
-      cluster.getOzoneManager().restart();
+      // 5. verify all bucket
+      restartCluster();
+      verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      verifyBucketLayout(bucket2, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
 
-      bucket = TestDataUtil.createVolumeAndBucket(cluster,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      verifyBucketLayout(bucket, BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
-
+      // 6. verify after update default bucket layout
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.OBJECT_STORE.name());
+      restartCluster();
+      verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      verifyBucketLayout(bucket2, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
     } finally {
       teardown();
     }
   }
 
   @Test
-  public void testRestartWithSimpleLayout() throws Exception {
-    startClusterWithSimpleLayout();
+  public void testRestartWithOBSLayout() throws Exception {
     try {
-      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster,
+      // 1. build cluster with default bucket layout OBS
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.OBJECT_STORE.name());
+      startCluster(conf);
+
+      // 2. create bucket with FSO bucket layout and verify
+      OzoneBucket bucket1 = TestDataUtil.createVolumeAndBucket(cluster,
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      verifyBucketLayout(bucket, BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
+      verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-      cluster.stop();
-      cluster.getOzoneManager().restart();
-
-      bucket = TestDataUtil.createVolumeAndBucket(cluster,
+      // 3. verify OM default behavior with LEGACY
+      restartCluster();
+      OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(cluster,
           BucketLayout.LEGACY);
-      verifyBucketLayout(bucket, BucketLayout.OBJECT_STORE, false);
+      verifyBucketLayout(bucket2, BucketLayout.OBJECT_STORE);
 
-      cluster.stop();
-      cluster.getOzoneManager().restart();
-
-      bucket = TestDataUtil.createVolumeAndBucket(cluster,
+      // 4. create bucket with OBS bucket layout and verify
+      restartCluster();
+      OzoneBucket bucket3 = TestDataUtil.createVolumeAndBucket(cluster,
           BucketLayout.OBJECT_STORE);
-      verifyBucketLayout(bucket, BucketLayout.OBJECT_STORE, false);
+      verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
 
-      cluster.stop();
-      cluster.getOzoneManager().restart();
+      // 5. verify all bucket
+      restartCluster();
+      verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      verifyBucketLayout(bucket2, BucketLayout.OBJECT_STORE);
+      verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
 
-      bucket = TestDataUtil.createVolumeAndBucket(cluster,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      verifyBucketLayout(bucket, BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
-
+      // 6. verify after update default bucket layout
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      restartCluster();
+      verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      verifyBucketLayout(bucket2, BucketLayout.OBJECT_STORE);
+      verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
     } finally {
       teardown();
     }
   }
 
   private void verifyBucketLayout(OzoneBucket bucket,
-      BucketLayout metadataLayout, boolean isFSOBucket) {
+      BucketLayout metadataLayout) {
     Assert.assertNotNull(bucket);
-    Assert.assertEquals(isFSOBucket,
-        bucket.getBucketLayout().isFileSystemOptimized());
     Assert.assertEquals(metadataLayout, bucket.getBucketLayout());
   }
 
