@@ -101,6 +101,12 @@ public final class OmDBTenantInfo {
     return new OmDBTenantInfo(tInfo);
   }
 
+  /**
+   * Returns the bucket namespace name. a.k.a. volume name.
+   *
+   * Note: This returns an empty string ("") if the tenant is somehow not
+   * associated with a volume. Should never return null.
+   */
   public String getBucketNamespaceName() {
     return bucketNamespaceName;
   }
@@ -115,13 +121,6 @@ public final class OmDBTenantInfo {
 
   public String getBucketPolicyGroupName() {
     return bucketPolicyGroupName;
-  }
-
-  // NOTE: Should return an empty string "" if somehow the tenant is not
-  // associated with a volume. Never return null.
-  public String getAssociatedVolumeName() {
-    // TODO: Should this return accountNamespaceName ? Double check.
-    return bucketNamespaceName;
   }
 
   /**

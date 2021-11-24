@@ -205,14 +205,13 @@ public class ObjectStore {
   }
 
   /**
-   * Create a tenant.
-   * @param tenantId tenant name.
-   * @param tenantArgs extra tenant arguments.
+   * Create a tenant with extra arguments.
+   * @param tenantArgs extra tenant arguments like volume name.
    * @throws IOException
    */
-  public void createTenant(String tenantId, OmTenantArgs tenantArgs)
+  public void createTenant(OmTenantArgs tenantArgs)
       throws IOException {
-    proxy.createTenant(tenantId, tenantArgs);
+    proxy.createTenant(tenantArgs);
   }
 
   /**

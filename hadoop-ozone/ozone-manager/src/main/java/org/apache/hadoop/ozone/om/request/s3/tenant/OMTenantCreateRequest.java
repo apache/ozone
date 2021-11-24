@@ -143,8 +143,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     //  the client's. Maybe move this logic to the client and pass VolumeArgs?
     final String owner = ugi.getShortUserName();
     // Volume name defaults to tenant name if unspecified in the request
-    final String volumeName =
-        request.hasTenantName() ? request.getTenantName() : tenantId;
+    final String volumeName = request.getVolumeName();
     // Validate volume name
     OmUtils.validateVolumeName(volumeName);
     // TODO: Refactor this and OMVolumeCreateRequest to improve maintainability.

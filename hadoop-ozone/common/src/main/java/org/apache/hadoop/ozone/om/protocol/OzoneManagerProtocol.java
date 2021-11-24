@@ -481,19 +481,10 @@ public interface OzoneManagerProtocol
 
   /**
    * Create a tenant.
-   * @param tenantName tenant name.
-   * @throws IOException
-   */
-  void createTenant(String tenantName) throws IOException;
-
-  /**
-   * Create a tenant with extra arguments.
-   * @param tenantId tenant name.
    * @param omTenantArgs OmTenantArgs
    * @throws IOException
    */
-  void createTenant(String tenantId, OmTenantArgs omTenantArgs)
-      throws IOException;
+  void createTenant(OmTenantArgs omTenantArgs) throws IOException;
 
   /**
    * Update a tenant with extra arguments.

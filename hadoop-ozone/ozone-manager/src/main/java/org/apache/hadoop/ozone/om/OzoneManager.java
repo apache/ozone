@@ -3085,16 +3085,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "this to be implemented. As write requests use a new approach");
   }
 
-  /**
-   * Create tenant.
-   */
-  public void createTenant(String tenantId) {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
-  }
-
   @Override
-  public void createTenant(String tenantId, OmTenantArgs omTenantArgs) {
+  public void createTenant(OmTenantArgs omTenantArgs) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }

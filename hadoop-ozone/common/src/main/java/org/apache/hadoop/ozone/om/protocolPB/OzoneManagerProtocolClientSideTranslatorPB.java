@@ -929,29 +929,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   /**
    * {@inheritDoc}
-   *
-   * TODO: Add a variant that uses OmTenantArgs?
    */
   @Override
-  public void createTenant(String tenantArgs)
-      throws IOException {
+  public void createTenant(OmTenantArgs omTenantArgs) throws IOException {
     final CreateTenantRequest request = CreateTenantRequest.newBuilder()
-        .setTenantName(tenantArgs)
-        .build();
-    final OMRequest omRequest = createOMRequest(Type.CreateTenant)
-        .setCreateTenantRequest(request)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
-  }
-
-  @Override
-  public void createTenant(String tenantId, OmTenantArgs omTenantArgs)
-      throws IOException {
-    final CreateTenantRequest request = CreateTenantRequest.newBuilder()
-        .setTenantName(tenantId)
+        .setTenantName(omTenantArgs.getTenantId())
         .setVolumeName(omTenantArgs.getVolumeName())
-        // TODO: Add more args like default policy names, etc.
+        // TODO: Add more args like policy names later
         .build();
     final OMRequest omRequest = createOMRequest(Type.CreateTenant)
         .setCreateTenantRequest(request)

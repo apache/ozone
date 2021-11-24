@@ -124,7 +124,9 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     final String tenantUsername = request.getTenantUsername();
     final String accessId = request.getAccessId();
 
-    // Check tenantUsername (user's Kerberos principal) validity. TODO: Check
+    // Check tenantUsername (user principal) validity.
+    // TODO: Rename tenantUsername to userPrincipal,
+    //  INVALID_TENANT_USER_NAME to INVALID_TENANT_USER_PRINCIPAL, ...
     if (tenantUsername.contains(OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER)) {
       throw new OMException("Invalid tenant username '" + tenantUsername +
           "'. Tenant username shouldn't contain delimiter.",

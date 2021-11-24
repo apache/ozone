@@ -343,8 +343,8 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Created tenant", false);
     checkOutput(err, "", true);
 
-    // Loop assign-revoke 3 times
-    for (int i = 0; i < 1; i++) {
+    // Loop assign-revoke 4 times
+    for (int i = 0; i < 4; i++) {
       executeHA(tenantShell, new String[] {
           "user", "assign", userName, "--tenant=" + tenantName});
       checkOutput(out, "export AWS_ACCESS_KEY_ID=", false);
@@ -373,6 +373,11 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {"delete", tenantName});
     checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", true);
     checkOutput(err, "", true);
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
   }
 
   /**
@@ -396,8 +401,12 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Created tenant 'finance'.\n", true);
     checkOutput(err, "", true);
 
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "finance\n", true);
+    checkOutput(err, "", true);
+
 //    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
-    // FIXME: The check below is unstable.
+    // TODO: FIXME: The check below is unstable.
     //  Occasionally lines.size() == 0 leads to ArrayIndexOutOfBoundsException
     //  Likely due to audit log not flushed in time at time of check.
 //    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
@@ -577,6 +586,11 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {"delete", "dev"});
     checkOutput(out, "Deleted tenant 'dev'.\n", true);
     checkOutput(err, "", true);
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
   }
 
   @Test
@@ -629,6 +643,11 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {"delete", "tenant1"});
     checkOutput(out, "Deleted tenant 'tenant1'.\n", true);
+    checkOutput(err, "", true);
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
   }
 
@@ -751,6 +770,11 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {"delete", tenantName});
     checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", true);
+    checkOutput(err, "", true);
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
     checkOutput(err, "", true);
   }
 }

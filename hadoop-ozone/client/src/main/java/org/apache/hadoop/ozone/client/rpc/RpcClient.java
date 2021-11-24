@@ -672,25 +672,25 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createTenant(String tenantId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantId),
-        "tenantName cannot be null or empty.");
-    ozoneManagerClient.createTenant(tenantId);
+        "tenantId cannot be null or empty.");
+    createTenant(new OmTenantArgs(tenantId));
   }
 
   /**
    * {@inheritDoc}
    */
   @Override
-  public void createTenant(String tenantId, OmTenantArgs omTenantArgs)
-      throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
-        "tenantId cannot be null or empty.");
+  public void createTenant(OmTenantArgs omTenantArgs) throws IOException {
     Preconditions.checkNotNull(omTenantArgs);
     // Pre-check on the client to avoid unnecessary RPC calls
     verifyVolumeName(omTenantArgs.getVolumeName());
 
-    ozoneManagerClient.createTenant(tenantId, omTenantArgs);
+    ozoneManagerClient.createTenant(omTenantArgs);
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void updateTenant(String tenantId, OmTenantArgs omTenantArgs)
       throws IOException {
@@ -703,6 +703,9 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.updateTenant(tenantId, omTenantArgs);
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void deleteTenant(String tenantId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantId),

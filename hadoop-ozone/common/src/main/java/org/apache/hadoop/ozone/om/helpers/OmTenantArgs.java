@@ -32,6 +32,11 @@ public class OmTenantArgs {
    */
   private final String volumeName;
 
+  public OmTenantArgs(String tenantId) {
+    this.tenantId = tenantId;
+    this.volumeName = tenantId;
+  }
+
   public OmTenantArgs(String tenantId, String volumeName) {
     this.tenantId = tenantId;
     this.volumeName = volumeName;

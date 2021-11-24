@@ -38,7 +38,6 @@ public final class VolumeArgs {
   private final long quotaInNamespace;
   private final List<OzoneAcl> acls;
   private Map<String, String> metadata;
-  private long refCount;
 
   /**
    * Private constructor, constructed via builder.
@@ -115,10 +114,6 @@ public final class VolumeArgs {
    */
   public static VolumeArgs.Builder newBuilder() {
     return new VolumeArgs.Builder();
-  }
-
-  public long getRefCount() {
-    return refCount;
   }
 
   /**

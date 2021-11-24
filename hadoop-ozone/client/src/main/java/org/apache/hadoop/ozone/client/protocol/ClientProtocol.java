@@ -597,12 +597,10 @@ public interface ClientProtocol {
 
   /**
    * Create a tenant with args.
-   * @param tenantId tenant name.
-   * @param omTenantArgs various arguments for tenant creation. e.g. volume name
+   * @param omTenantArgs various arguments for tenant creation like volume name
    * @throws IOException
    */
-  void createTenant(String tenantId, OmTenantArgs omTenantArgs)
-      throws IOException;
+  void createTenant(OmTenantArgs omTenantArgs) throws IOException;
 
   /**
    * Update a tenant.

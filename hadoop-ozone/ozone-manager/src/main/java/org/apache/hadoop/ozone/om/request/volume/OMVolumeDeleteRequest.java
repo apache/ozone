@@ -101,11 +101,12 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
       // Check reference count
-      if (omVolumeArgs.getRefCount() != 0L) {
-        LOG.debug("volume: {} has non-zero ref count. won't delete", volume);
-        throw new OMException("Volume is being used. Use " +
-            "`ozone tenant delete` CLI to delete the volume instead.",
-            OMException.ResultCodes.VOLUME_IN_USE);
+      final long volRefCount = omVolumeArgs.getRefCount();
+      if (volRefCount != 0L) {
+        LOG.debug("volume: {} has a non-zero ref count. won't delete", volume);
+        throw new OMException("Volume reference count is not zero (" +
+            volRefCount + "). Try `ozone tenant delete <tenantId>` instead.",
+            OMException.ResultCodes.VOLUME_IS_REFERENCED);
       }
 
       owner = omVolumeArgs.getOwnerName();

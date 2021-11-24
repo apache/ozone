@@ -254,7 +254,7 @@ public class OMException extends IOException {
     INVALID_ACCESSID,
     TENANT_AUTHORIZER_ERROR,
 
-    VOLUME_IN_USE,
+    VOLUME_IS_REFERENCED,
     TENANT_NOT_EMPTY
   }
 }
