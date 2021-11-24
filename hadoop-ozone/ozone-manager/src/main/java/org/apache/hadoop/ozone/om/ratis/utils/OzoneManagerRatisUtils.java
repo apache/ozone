@@ -501,6 +501,14 @@ public final class OzoneManagerRatisUtils {
   private static BucketLayout getBucketLayout(String volName,
       String buckName, OzoneManager ozoneManager) {
     OmBucketInfo buckInfo = getOmBucketInfo(ozoneManager, volName, buckName);
+
+    // If this is a link bucket, we fetch the BucketLayout from the
+    // source bucket.
+    if(buckInfo.isLink()) {
+      buckInfo = getOmBucketInfo(ozoneManager, buckInfo.getSourceVolume(),
+          buckInfo.getSourceBucket());
+    }
+
     if (buckInfo != null) {
       return buckInfo.getBucketLayout();
     } else {

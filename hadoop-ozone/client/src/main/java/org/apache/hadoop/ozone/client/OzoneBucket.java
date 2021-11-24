@@ -604,6 +604,14 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Checks if the bucket is a Link Bucket.
+   * @return True if bucket is a link, False otherwise.
+   */
+  public boolean isLink() {
+    return sourceVolume != null && sourceBucket != null;
+  }
+
+  /**
    * Deletes key from the bucket.
    * @param key Name of the key to be deleted.
    * @throws IOException
