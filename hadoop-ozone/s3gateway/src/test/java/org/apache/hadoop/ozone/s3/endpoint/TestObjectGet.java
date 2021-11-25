@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -60,6 +61,7 @@ public class TestObjectGet {
 
     ObjectEndpoint rest = new ObjectEndpoint();
     rest.setClient(client);
+    rest.setOzoneConfiguration(new OzoneConfiguration());
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     rest.setHeaders(headers);
     ByteArrayInputStream body =
