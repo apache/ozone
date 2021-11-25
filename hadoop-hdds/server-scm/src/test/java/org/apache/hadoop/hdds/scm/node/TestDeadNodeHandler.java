@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
@@ -86,6 +87,7 @@ public class TestDeadNodeHandler {
   private EventPublisher publisher;
   private EventQueue eventQueue;
   private String storageDir;
+  private SCMContext scmContext;
 
   @Before
   public void setup() throws IOException, AuthenticationException {
@@ -101,8 +103,12 @@ public class TestDeadNodeHandler {
     eventQueue = new EventQueue();
     scm = TestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
+    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+        .setLeader(true).setIsPreCheckComplete(true)
+        .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
+    pipelineManager.setScmContext(scmContext);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);

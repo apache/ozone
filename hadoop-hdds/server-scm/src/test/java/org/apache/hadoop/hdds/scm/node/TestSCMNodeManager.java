@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -130,6 +131,7 @@ public class TestSCMNodeManager {
 
   private File testDir;
   private StorageContainerManager scm;
+  private SCMContext scmContext;
 
   private static final int MAX_LV = HDDSLayoutVersionManager.maxLayoutVersion();
   private static final LayoutVersionProto LARGER_SLV_LAYOUT_PROTO =
@@ -194,6 +196,12 @@ public class TestSCMNodeManager {
   SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
     scm = TestUtils.getScm(config);
+    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+        .setLeader(true).setIsPreCheckComplete(true)
+        .setSCM(scm).build();
+    PipelineManagerImpl pipelineManager =
+        (PipelineManagerImpl) scm.getPipelineManager();
+    pipelineManager.setScmContext(scmContext);
     return (SCMNodeManager) scm.getScmNodeManager();
   }
 

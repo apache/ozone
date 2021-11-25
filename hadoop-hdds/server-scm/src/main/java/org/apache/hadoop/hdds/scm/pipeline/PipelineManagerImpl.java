@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -79,7 +81,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private final SCMPipelineMetrics metrics;
   private final long pipelineWaitDefaultTimeout;
   private final SCMHAManager scmhaManager;
-  private final SCMContext scmContext;
+  private SCMContext scmContext;
   private final NodeManager nodeManager;
   // This allows for freezing/resuming the new pipeline creation while the
   // SCM is already out of SafeMode.
@@ -326,8 +328,20 @@ public class PipelineManagerImpl implements PipelineManager {
   protected void closeContainersForPipeline(final PipelineID pipelineId)
       throws IOException {
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
+    ContainerManager containerManager = scmContext.getScm()
+        .getContainerManager();
     for (ContainerID containerID : containerIDs) {
+      if (containerManager.getContainer(containerID).getState()
+            == HddsProtos.LifeCycleState.OPEN) {
+        try {
+          containerManager.updateContainerState(containerID,
+              HddsProtos.LifeCycleEvent.FINALIZE);
+        } catch (InvalidStateTransitionException ex) {
+          throw new IOException(ex);
+        }
+      }
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
   }
 
@@ -343,7 +357,6 @@ public class PipelineManagerImpl implements PipelineManager {
     PipelineID pipelineID = pipeline.getId();
     // close containers.
     closeContainersForPipeline(pipelineID);
-    LOG.info("Containers closed for pipeline={}", pipeline);
     acquireWriteLock();
     try {
       if (!pipeline.isClosed()) {
@@ -599,6 +612,11 @@ public class PipelineManagerImpl implements PipelineManager {
   @VisibleForTesting
   public PipelineFactory getPipelineFactory() {
     return pipelineFactory;
+  }
+
+  @VisibleForTesting
+  public void setScmContext(SCMContext context) {
+    this.scmContext = context;
   }
 
   private void recordMetricsForPipeline(Pipeline pipeline) {
