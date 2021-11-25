@@ -799,41 +799,26 @@ public class RpcClient implements ClientProtocol {
     List<OmBucketInfo> buckets = ozoneManagerClient.listBuckets(
         volumeName, prevBucket, bucketPrefix, maxListResult);
 
-    return buckets.stream().map(bucket -> {
-      BucketLayout bucketLayout = bucket.getBucketLayout();
-      // If this is a link bucket, return layout of the source bucket.
-      if (bucket.isLink()) {
-        try {
-          bucketLayout =
-              ozoneManagerClient.getBucketInfo(bucket.getSourceVolume(),
-                  bucket.getSourceBucket()).getBucketLayout();
-        } catch (IOException e) {
-          LOG.warn("Failed to fetch bucket layout for source bucket: " +
-              bucket.getSourceBucket(), e);
-        }
-      }
-
-      return new OzoneBucket(
-          conf,
-          this,
-          bucket.getVolumeName(),
-          bucket.getBucketName(),
-          bucket.getStorageType(),
-          bucket.getIsVersionEnabled(),
-          bucket.getCreationTime(),
-          bucket.getModificationTime(),
-          bucket.getMetadata(),
-          bucket.getEncryptionKeyInfo() != null ? bucket
-              .getEncryptionKeyInfo().getKeyName() : null,
-          bucket.getSourceVolume(),
-          bucket.getSourceBucket(),
-          bucket.getUsedBytes(),
-          bucket.getUsedNamespace(),
-          bucket.getQuotaInBytes(),
-          bucket.getQuotaInNamespace(),
-          bucketLayout);
-    })
-    .collect(Collectors.toList());
+    return buckets.stream().map(bucket -> new OzoneBucket(
+            conf,
+            this,
+            bucket.getVolumeName(),
+            bucket.getBucketName(),
+            bucket.getStorageType(),
+            bucket.getIsVersionEnabled(),
+            bucket.getCreationTime(),
+            bucket.getModificationTime(),
+            bucket.getMetadata(),
+            bucket.getEncryptionKeyInfo() != null ? bucket
+                .getEncryptionKeyInfo().getKeyName() : null,
+            bucket.getSourceVolume(),
+            bucket.getSourceBucket(),
+            bucket.getUsedBytes(),
+            bucket.getUsedNamespace(),
+            bucket.getQuotaInBytes(),
+            bucket.getQuotaInNamespace(),
+            bucket.getBucketLayout()))
+        .collect(Collectors.toList());
   }
 
   @Override
