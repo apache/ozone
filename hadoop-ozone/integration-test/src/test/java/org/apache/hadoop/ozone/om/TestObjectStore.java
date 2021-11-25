@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.*;
 import org.junit.rules.Timeout;
@@ -180,6 +181,34 @@ public class TestObjectStore {
             conf.get(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT)),
         bucket.getBucketLayout());
     Assert.assertEquals(sourceBucketName, bucket.getSourceBucket());
+  }
+
+  @Test
+  public void testLoopInLinkBuckets() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    String linkBucket1Name = UUID.randomUUID().toString();
+    String linkBucket2Name = UUID.randomUUID().toString();
+    String linkBucket3Name = UUID.randomUUID().toString();
+
+    // Create a loop in the link buckets
+    createLinkBucket(volume, linkBucket1Name, linkBucket2Name);
+    createLinkBucket(volume, linkBucket2Name, linkBucket3Name);
+    createLinkBucket(volume, linkBucket3Name, linkBucket1Name);
+
+    try {
+      volume.getBucket(linkBucket1Name);
+      Assert.fail("Should throw Exception due to loop in Link Buckets");
+    } catch (OMException oe) {
+      // Expected exception
+    }
   }
 
   /**

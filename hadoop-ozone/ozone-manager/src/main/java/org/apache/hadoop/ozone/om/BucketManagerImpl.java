@@ -17,9 +17,12 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -45,6 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -269,7 +273,7 @@ public class BucketManagerImpl implements BucketManager {
         }
       }
 
-      value = resolveLinkBucketLayout(value);
+      value = resolveLinkBucketLayout(value, new HashSet<>());
 
       return value;
     } catch (IOException ex) {
@@ -291,10 +295,19 @@ public class BucketManagerImpl implements BucketManager {
    * @return {@code OmBucketInfo} with
    * @throws IOException
    */
-  private OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo)
+  private OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo,
+                                               Set<Pair<String,
+                                                   String>> visited)
       throws IOException {
 
     if (bucketInfo.isLink()) {
+      if (!visited.add(Pair.of(bucketInfo.getVolumeName(),
+          bucketInfo.getBucketName()))) {
+        throw new OMException("Detected loop in bucket links. Bucket name: " +
+            bucketInfo.getBucketName() + ", Volume name: " +
+            bucketInfo.getVolumeName(),
+            DETECTED_LOOP_IN_BUCKET_LINKS);
+      }
       String sourceBucketKey = metadataManager
           .getBucketKey(bucketInfo.getSourceVolume(),
               bucketInfo.getSourceBucket());
@@ -315,7 +328,7 @@ public class BucketManagerImpl implements BucketManager {
          * bucket layout.
          */
         if (sourceBucketInfo.isLink()) {
-          sourceBucketInfo = resolveLinkBucketLayout(sourceBucketInfo);
+          sourceBucketInfo = resolveLinkBucketLayout(sourceBucketInfo, visited);
         }
 
         OmBucketInfo.Builder buckInfoBuilder = bucketInfo.toBuilder();
