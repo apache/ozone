@@ -117,6 +117,8 @@ public class TestObjectStore {
 
     String linkBucket1Name = UUID.randomUUID().toString();
     String linkBucket2Name = UUID.randomUUID().toString();
+    // Chained link bucket
+    String linkBucket3Name = UUID.randomUUID().toString();
 
     OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
@@ -133,14 +135,10 @@ public class TestObjectStore {
     volume.createBucket(sourceBucket2Name, builder.build());
 
     // Create link buckets
-    builder.setBucketLayout(BucketLayout.DEFAULT)
-        .setSourceVolume(volumeName)
-        .setSourceBucket(sourceBucket1Name);
-    volume.createBucket(linkBucket1Name, builder.build());
-    builder.setBucketLayout(BucketLayout.DEFAULT)
-        .setSourceVolume(volumeName)
-        .setSourceBucket(sourceBucket2Name);
-    volume.createBucket(linkBucket2Name, builder.build());
+    createLinkBucket(volume, sourceBucket1Name, linkBucket1Name);
+    createLinkBucket(volume, sourceBucket2Name, linkBucket2Name);
+    // linkBucket3 is chained onto linkBucket1
+    createLinkBucket(volume, linkBucket1Name, linkBucket3Name);
 
     // Check that Link Buckets' layouts match source bucket layouts
     OzoneBucket bucket = volume.getBucket(linkBucket1Name);
@@ -148,5 +146,56 @@ public class TestObjectStore {
 
     bucket = volume.getBucket(linkBucket2Name);
     Assert.assertEquals(sourceBucket2Layout, bucket.getBucketLayout());
+
+    // linkBucket3 is chained onto linkBucket1, hence its bucket layout matches
+    // linkBucket1's source bucket.
+    bucket = volume.getBucket(linkBucket3Name);
+    Assert.assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
+    Assert.assertEquals(linkBucket1Name, bucket.getSourceBucket());
+  }
+
+  @Test
+  public void testCreateDanglingLinkBucket() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    // Does not exist
+    String sourceBucketName = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    // Dangling link bucket
+    String danglingLinkBucketName = UUID.randomUUID().toString();
+
+    // linkBucket4 is a dangling link over a source bucket that doesn't exist.
+    createLinkBucket(volume, sourceBucketName, danglingLinkBucketName);
+
+    // since sourceBucket3 does not exist, layout depends on
+    // OZONE_DEFAULT_BUCKET_LAYOUT config.
+    OzoneBucket bucket = volume.getBucket(danglingLinkBucketName);
+    Assert.assertEquals(BucketLayout.fromString(
+            conf.get(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT)),
+        bucket.getBucketLayout());
+    Assert.assertEquals(sourceBucketName, bucket.getSourceBucket());
+  }
+
+  /**
+   * Helper method to create Link Buckets.
+   *
+   * @param sourceVolume Name of source volume for Link Bucket.
+   * @param sourceBucket Name of source bucket for Link Bucket.
+   * @param linkBucket   Name of Link Bucket
+   * @throws IOException
+   */
+  private void createLinkBucket(OzoneVolume sourceVolume, String sourceBucket,
+                                String linkBucket) throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setBucketLayout(BucketLayout.DEFAULT)
+        .setSourceVolume(sourceVolume.getName())
+        .setSourceBucket(sourceBucket);
+    sourceVolume.createBucket(linkBucket, builder.build());
   }
 }

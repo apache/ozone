@@ -104,7 +104,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
@@ -757,19 +756,6 @@ public class RpcClient implements ClientProtocol {
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
 
-    BucketLayout bucketLayout = bucketInfo.getBucketLayout();
-    // If this is a link bucket, return layout of the source bucket.
-    if (bucketInfo.isLink()) {
-      try {
-        bucketLayout =
-            ozoneManagerClient.getBucketInfo(bucketInfo.getSourceVolume(),
-                bucketInfo.getSourceBucket()).getBucketLayout();
-      } catch (OMException oe) {
-        LOG.warn("Failed to fetch bucket layout for source bucket: " +
-            bucketInfo.getSourceBucket(), oe);
-      }
-    }
-
     return new OzoneBucket(
         conf,
         this,
@@ -788,7 +774,7 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInNamespace(),
-        bucketLayout
+        bucketInfo.getBucketLayout()
     );
   }
 

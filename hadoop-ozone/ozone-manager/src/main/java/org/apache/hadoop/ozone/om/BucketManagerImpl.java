@@ -268,6 +268,9 @@ public class BucketManagerImpl implements BucketManager {
           throw new OMException("Bucket not found", BUCKET_NOT_FOUND);
         }
       }
+
+      value = resolveLinkBucketLayout(value);
+
       return value;
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
@@ -279,6 +282,48 @@ public class BucketManagerImpl implements BucketManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
+  }
+
+  /**
+   * Get the source bucket layout for a link bucket.
+   *
+   * @param bucketInfo
+   * @return {@code OmBucketInfo} with
+   * @throws IOException
+   */
+  private OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo)
+      throws IOException {
+
+    if (bucketInfo.isLink()) {
+      String sourceBucketKey = metadataManager
+          .getBucketKey(bucketInfo.getSourceVolume(),
+              bucketInfo.getSourceBucket());
+      OmBucketInfo sourceBucketInfo =
+          metadataManager.getBucketTable().get(sourceBucketKey);
+
+      // If the Link Bucket's source bucket exists, we get its layout.
+      if (sourceBucketInfo != null) {
+
+        /** If the source bucket is again a link, we recursively resolve the
+         * link bucket.
+         *
+         * For example:
+         * buck-link1 -> buck-link2 -> buck-link3 -> buck-src
+         * buck-src has the actual BucketLayout that will be used by the links.
+         *
+         * Finally - we return buck-link1's OmBucketInfo, with buck-src's
+         * bucket layout.
+         */
+        if (sourceBucketInfo.isLink()) {
+          sourceBucketInfo = resolveLinkBucketLayout(sourceBucketInfo);
+        }
+
+        OmBucketInfo.Builder buckInfoBuilder = bucketInfo.toBuilder();
+        buckInfoBuilder.setBucketLayout(sourceBucketInfo.getBucketLayout());
+        bucketInfo = buckInfoBuilder.build();
+      }
+    }
+    return bucketInfo;
   }
 
   /**
