@@ -171,7 +171,7 @@ public class ObjectEndpoint extends EndpointBase {
       S3StorageType s3StorageType;
       boolean storageTypeDefault;
       if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault();
+        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
         storageTypeDefault = true;
       } else {
         s3StorageType = toS3StorageType(storageType);
@@ -473,7 +473,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       S3StorageType s3StorageType;
       if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault();
+        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
       } else {
         s3StorageType = toS3StorageType(storageType);
       }
@@ -899,5 +899,10 @@ public class ObjectEndpoint extends EndpointBase {
     }
     return (copySourceIfModifiedSince <= lastModificationTime) &&
         (lastModificationTime <= copySourceIfUnmodifiedSince);
+  }
+
+  @VisibleForTesting
+  public void setOzoneConfiguration(OzoneConfiguration config) {
+    this.ozoneConfiguration = config;
   }
 }
