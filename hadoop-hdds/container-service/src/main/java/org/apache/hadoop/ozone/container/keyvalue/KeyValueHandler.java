@@ -475,6 +475,7 @@ public class KeyValueHandler extends Handler {
 
   /**
    * Handle Put Block operation. Calls BlockManager to process the request.
+   * We allow handlePutBlock to close containers.
    */
   ContainerCommandResponseProto handlePutBlock(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
@@ -490,8 +491,6 @@ public class KeyValueHandler extends Handler {
 
     final ContainerProtos.BlockData blockDataProto;
     try {
-      checkContainerOpen(kvContainer);
-
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);

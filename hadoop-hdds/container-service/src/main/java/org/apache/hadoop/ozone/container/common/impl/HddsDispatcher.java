@@ -477,6 +477,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // If the container is unhealthy, closeContainer will be rejected
         // while execution. Nothing to validate here.
         break;
+      case PutBlock:
+      case StreamInit:
+        // We allow putBlock and StreamInit to closed container, So that we can
+        // commit the acknowledged chunk when an exception happens.
+        break;
       default:
         // if the container is not open, no updates can happen. Just throw
         // an exception

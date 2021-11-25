@@ -125,6 +125,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   private final long syncSize = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
+
   // the effective length of ack data before commit
   private long totalAckLengthBeforeCommit;
 
@@ -343,6 +344,68 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
+  public CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> executePutCurrentBlock(boolean close,
+      boolean force) throws IOException {
+    long flushPos = totalAckLengthBeforeCommit;
+
+    CompletableFuture<ContainerProtos.
+        ContainerCommandResponseProto> flushFuture = null;
+    try {
+      BlockData blockData = containerBlockData.build();
+      this.xceiverClient =
+          (XceiverClientRatis)this.getXceiverClient();
+      XceiverClientReply asyncReply =
+          putBlockAsync(xceiverClient, blockData, close, token);
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
+          asyncReply.getResponse();
+      flushFuture = future.thenApplyAsync(e -> {
+        try {
+          validateResponse(e);
+        } catch (IOException sce) {
+          throw new CompletionException(sce);
+        }
+        // if the ioException is not set, putBlock is successful
+        if (getIoException() == null && !force) {
+          BlockID responseBlockID = BlockID.getFromProtobuf(
+              e.getPutBlock().getCommittedBlockLength().getBlockID());
+          Preconditions.checkState(blockID.get().getContainerBlockID()
+              .equals(responseBlockID.getContainerBlockID()));
+          // updates the bcsId of the block
+          blockID.set(responseBlockID);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(
+                "Adding index " + asyncReply.getLogIndex() + " commitMap size "
+                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                    + flushPos + " blockID " + blockID);
+          }
+          totalAckLengthBeforeCommit = 0;
+        }
+        return e;
+      }, responseExecutor).exceptionally(e -> {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("putBlock failed for blockID {} with exception {}",
+              blockID, e.getLocalizedMessage());
+        }
+        CompletionException ce = new CompletionException(e);
+        setIoException(ce);
+        throw ce;
+      });
+      flushFuture.get();
+    } catch (IOException | ExecutionException e) {
+      throw new IOException(EXCEPTION_MSG + e.toString(), e);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      handleInterruptedException(ex, false);
+    }
+    return flushFuture;
+  }
+
+  /**
+   * @param close whether putBlock is happening as part of closing the stream
+   * @param force true if no data was written since most recent putBlock and
+   *            stream is being closed
+   */
   private CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force) throws IOException {
@@ -456,15 +519,22 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   @Override
   public void close() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null) {
+      Exception exception = null;
       try {
         handleFlush(true);
         dataStreamCloseReply.get();
       } catch (ExecutionException e) {
+        exception = e;
         handleExecutionException(e);
       } catch (InterruptedException ex) {
+        exception = ex;
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
-      } finally {
+      }
+      finally {
+        if(exception != null) {
+          executePutCurrentBlock(true,true);
+        }
         cleanup(false);
       }
 
@@ -602,11 +672,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
                   commitWatcher
                       .updateTotalAckDataLength(totalAckLengthBeforeCommit);
                 }
+                containerBlockData.addChunks(chunkInfo);
               }
             }, responseExecutor);
 
     futures.add(future);
-    containerBlockData.addChunks(chunkInfo);
+
   }
 
   @VisibleForTesting
