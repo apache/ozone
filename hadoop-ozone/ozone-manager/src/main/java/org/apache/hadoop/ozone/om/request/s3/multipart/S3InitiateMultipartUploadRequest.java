@@ -170,7 +170,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // initiate MPU.
 
       final ReplicationConfig replicationConfig =
-          ReplicationConfig.fromTypeAndFactor(
+          ReplicationConfig.fromProtoTypeAndFactor(
               keyArgs.getType(), keyArgs.getFactor());
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()

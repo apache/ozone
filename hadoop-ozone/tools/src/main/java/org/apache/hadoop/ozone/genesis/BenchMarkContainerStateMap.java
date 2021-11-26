@@ -193,7 +193,7 @@ public class BenchMarkContainerStateMap {
     }
     bh.consume(state.stateMap
         .getMatchingContainerIDs(OPEN, OzoneConsts.OZONE,
-            ReplicationConfig.fromTypeAndFactor(
+            ReplicationConfig.fromProtoTypeAndFactor(
                 ReplicationType.STAND_ALONE, ReplicationFactor.ONE)));
   }
 }

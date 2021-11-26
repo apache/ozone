@@ -101,6 +101,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private boolean securityEnabled;
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
+  private OzoneConfiguration config;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -191,6 +192,7 @@ public class BasicRootedOzoneClientAdapterImpl
       this.defaultOFSBucketLayout = BucketLayout.fromString(
           conf.get(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
               OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
+      config = conf;
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
@@ -325,7 +327,8 @@ public class BasicRootedOzoneClientAdapterImpl
           || replication == ReplicationFactor.THREE.getValue()) {
 
         ozoneOutputStream = bucket.createFile(key, 0,
-            ReplicationConfig.adjustReplication(replicationConfig, replication),
+            ReplicationConfig.adjustReplication(
+                replicationConfig, replication, config),
             overWrite, recursive);
       } else {
         ozoneOutputStream =

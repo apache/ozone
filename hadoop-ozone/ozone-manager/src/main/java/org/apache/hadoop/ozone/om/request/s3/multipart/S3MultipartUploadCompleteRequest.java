@@ -331,7 +331,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           new OmKeyInfo.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
           .setReplicationConfig(
-              ReplicationConfig.fromTypeAndFactor(type, factor))
+              ReplicationConfig.fromProtoTypeAndFactor(type, factor))
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setDataSize(dataSize)
