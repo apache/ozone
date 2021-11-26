@@ -54,9 +54,9 @@ Secure Tenant GetUserInfo Success
 Secure Tenant Create Bucket 1 Success via S3 API
                         Execute          aws configure set aws_access_key_id ${accessId}
                         Execute          aws configure set aws_secret_access_key ${secretKey}
-    ${output} =         Execute          aws s3api --endpoint-url ${ENDPOINT_URL} create-bucket --bucket bucket-test1
+    ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test1
                         Should contain   ${output}         bucket-test1
-    ${output} =         Execute          aws s3api --endpoint-url ${ENDPOINT_URL} list-buckets
+    ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-buckets
                         Should contain   ${output}         bucket-test1
 
 Secure Tenant SetSecret Success with Cluster Admin
@@ -77,12 +77,12 @@ Secure Tenant GetSecret Success
 #    ${secretKey} =      Get Regexp Matches   ${output}     (?<=export AWS_SECRET_ACCESS_KEY=).*
 
 Secure Tenant Delete Bucket 1 Failure With Old SecretKey via S3 API
-    ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${ENDPOINT_URL} delete-bucket --bucket bucket-test1
+    ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test1
                         Should Be True	${rc} > 0
 
 Secure Tenant Delete Bucket 1 Success With Newly Set SecretKey via S3 API
                         Execute          aws configure set aws_secret_access_key 'somesecret1'
-    ${output} =         Execute          aws s3api --endpoint-url ${ENDPOINT_URL} delete-bucket --bucket bucket-test1
+    ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test1
                         Should contain   ${output}         bucket-test1
 
 Secure Tenant Delete Tenant Failure Tenant Not Empty
@@ -99,17 +99,17 @@ Secure Tenant SetSecret Failure with Regular User
                         Should contain   ${output}         Permission denied. Requested accessId
 
 Secure Tenant Create Bucket 2 Success with somesecret1 via S3 API
-    ${output} =         Execute          aws s3api --endpoint-url ${ENDPOINT_URL} create-bucket --bucket bucket-test2
+    ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test2
                         Should contain   ${output}         bucket-test2
 
 Secure Tenant Delete Bucket 2 Failure with somesecret2 via S3 API
                         Execute          aws configure set aws_secret_access_key 'somesecret2'
-    ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${ENDPOINT_URL} delete-bucket --bucket bucket-test2
+    ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test2
                         Should Be True	${rc} > 0
 
 Secure Tenant Delete Bucket 2 Success with somesecret1 via S3 API
                         Execute          aws configure set aws_secret_access_key 'somesecret1'
-    ${output} =         Execute          aws s3api --endpoint-url ${ENDPOINT_URL} delete-bucket --bucket bucket-test2
+    ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test2
                         Should contain   ${output}         bucket-test2
 
 Secure Tenant Revoke User AccessId Success with Cluster Admin
@@ -118,7 +118,7 @@ Secure Tenant Revoke User AccessId Success with Cluster Admin
                         Should contain   ${output}         Revoked accessId 'tenantone$bob'.
 
 Secure Tenant Create Bucket 3 Failure with Revoked AccessId via S3 API
-    ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${ENDPOINT_URL} create-bucket --bucket bucket-test3
+    ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test3
                         Should Be True	${rc} > 0
 
 Secure Tenant Delete Tenant Success with Cluster Admin
