@@ -22,6 +22,8 @@ import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.nio.file.Paths;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -104,12 +106,16 @@ import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 
 /**
  * Utility class used by OzoneManager HA.
@@ -129,7 +135,7 @@ public final class OzoneManagerRatisUtils {
    */
   @SuppressWarnings("checkstyle:methodlength")
   public static OMClientRequest createClientRequest(OMRequest omRequest,
-      OzoneManager ozoneManager) {
+      OzoneManager ozoneManager) throws IOException {
 
     // Handling of exception by createClientRequest(OMRequest, OzoneManger):
     // Either the code will take FSO or non FSO path, both classes has a
@@ -169,7 +175,7 @@ public final class OzoneManagerRatisUtils {
     case AllocateBlock:
       keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new OMAllocateBlockRequestWithFSO(omRequest, bucketLayout);
       }
@@ -177,7 +183,7 @@ public final class OzoneManagerRatisUtils {
     case CreateKey:
       keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyCreateRequestWithFSO(omRequest, bucketLayout);
       }
@@ -185,7 +191,7 @@ public final class OzoneManagerRatisUtils {
     case CommitKey:
       keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyCommitRequestWithFSO(omRequest, bucketLayout);
       }
@@ -193,7 +199,7 @@ public final class OzoneManagerRatisUtils {
     case DeleteKey:
       keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyDeleteRequestWithFSO(omRequest, bucketLayout);
       }
@@ -203,7 +209,7 @@ public final class OzoneManagerRatisUtils {
     case RenameKey:
       keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new OMKeyRenameRequestWithFSO(omRequest, bucketLayout);
       }
@@ -213,7 +219,7 @@ public final class OzoneManagerRatisUtils {
     case CreateDirectory:
       keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new OMDirectoryCreateRequestWithFSO(omRequest, bucketLayout);
       }
@@ -221,7 +227,7 @@ public final class OzoneManagerRatisUtils {
     case CreateFile:
       keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new OMFileCreateRequestWithFSO(omRequest, bucketLayout);
       }
@@ -234,7 +240,7 @@ public final class OzoneManagerRatisUtils {
     case InitiateMultiPartUpload:
       keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new S3InitiateMultipartUploadRequestWithFSO(omRequest,
             bucketLayout);
@@ -243,7 +249,7 @@ public final class OzoneManagerRatisUtils {
     case CommitMultiPartUpload:
       keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
             bucketLayout);
@@ -252,7 +258,7 @@ public final class OzoneManagerRatisUtils {
     case AbortMultiPartUpload:
       keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new S3MultipartUploadAbortRequestWithFSO(omRequest,
             bucketLayout);
@@ -261,7 +267,7 @@ public final class OzoneManagerRatisUtils {
     case CompleteMultiPartUpload:
       keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
       bucketLayout = getBucketLayout(keyArgs.getVolumeName(),
-          keyArgs.getBucketName(), ozoneManager);
+          keyArgs.getBucketName(), ozoneManager, new HashSet<>());
       if (bucketLayout.isFileSystemOptimized()) {
         return new S3MultipartUploadCompleteRequestWithFSO(omRequest,
             bucketLayout);
@@ -499,17 +505,36 @@ public final class OzoneManagerRatisUtils {
   }
 
   private static BucketLayout getBucketLayout(String volName,
-      String buckName, OzoneManager ozoneManager) {
+      String buckName, OzoneManager ozoneManager, Set<Pair<String,
+      String>> visited) throws IOException {
     OmBucketInfo buckInfo = getOmBucketInfo(ozoneManager, volName, buckName);
 
     if (buckInfo != null) {
       // If this is a link bucket, we fetch the BucketLayout from the
       // source bucket.
       if (buckInfo.isLink()) {
+        // Check if this bucket was already visited - to avoid loops
+        if (!visited.add(Pair.of(volName, buckName))) {
+          throw new OMException("Detected loop in bucket links. Bucket name: " +
+              buckName + ", Volume name: " + volName,
+              DETECTED_LOOP_IN_BUCKET_LINKS);
+        }
         OmBucketInfo sourceBuckInfo =
             getOmBucketInfo(ozoneManager, buckInfo.getSourceVolume(),
                 buckInfo.getSourceBucket());
         if (sourceBuckInfo != null) {
+          /** If the source bucket is again a link, we recursively resolve the
+           * link bucket.
+           *
+           * For example:
+           * buck-link1 -> buck-link2 -> buck-link3 -> buck-src
+           * buck-src has the actual BucketLayout that will be used by the
+           * links.
+           */
+          if (sourceBuckInfo.isLink()) {
+            return getBucketLayout(sourceBuckInfo.getVolumeName(),
+                sourceBuckInfo.getBucketName(), ozoneManager, visited);
+          }
           return sourceBuckInfo.getBucketLayout();
         }
       }
@@ -518,6 +543,6 @@ public final class OzoneManagerRatisUtils {
       LOG.error("Bucket not found: {}/{} ", volName, buckName);
       // TODO: Handle bucket validation
     }
-    return BucketLayout.LEGACY;
+    return BucketLayout.DEFAULT;
   }
 }
