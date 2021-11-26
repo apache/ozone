@@ -85,7 +85,8 @@ public class TestBlockDataStreamOutput {
     blockSize = 2 * maxFlushSize;
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferFlushDelay(false);
+    // enable chunk merge and set to 8.
+    clientConfig.setChunkMergeSize(8);
     conf.setFromObject(clientConfig);
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);

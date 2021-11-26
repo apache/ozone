@@ -124,11 +124,24 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean checksumVerify = true;
 
+  @Config(key = "streaming.chunk.merge.size",
+      defaultValue = "0",
+      description = "The chunk size of the streaming is usually smaller than "
+          + "4MB, we suggest set to 512KB. In this case, files of the same "
+          + "size will generate more chunkInfo than async write, which "
+          + "increases the size of container DB. So we recommend add merge on "
+          + "the client side. The default value is 0, means merge is not "
+          + "enabled. If the value is 8, it means that every 8 chunkInfo will "
+          + "be merged to one.",
+      tags = ConfigTag.CLIENT)
+  private int chunkMergeSize = 0;
+
   @PostConstruct
   private void validate() {
     Preconditions.checkState(streamBufferSize > 0);
     Preconditions.checkState(streamBufferFlushSize > 0);
     Preconditions.checkState(streamBufferMaxSize > 0);
+    Preconditions.checkState(chunkMergeSize >= 0);
 
     Preconditions.checkArgument(bufferIncrement < streamBufferSize,
         "Buffer increment should be smaller than the size of the stream "
@@ -226,5 +239,13 @@ public class OzoneClientConfig {
 
   public int getBufferIncrement() {
     return bufferIncrement;
+  }
+
+  public int getChunkMergeSize() {
+    return chunkMergeSize;
+  }
+
+  public void setChunkMergeSize(int chunkMergeSize) {
+    this.chunkMergeSize = chunkMergeSize;
   }
 }

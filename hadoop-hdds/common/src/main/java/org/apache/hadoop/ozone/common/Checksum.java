@@ -181,6 +181,14 @@ public class Checksum {
     return new ChecksumData(checksumType, bytesPerChecksum, checksumList);
   }
 
+  public ChecksumData mergeChecksum(List<ByteString> checksumList) {
+    if (checksumType == ChecksumType.NONE) {
+      // Since type is set to NONE, we do not need to compute the checksums
+      return new ChecksumData(checksumType, bytesPerChecksum);
+    }
+    return new ChecksumData(checksumType, bytesPerChecksum, checksumList);
+  }
+
   /**
    * Compute checksum using the algorithm for the data upto the max length.
    * @param data input data

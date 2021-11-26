@@ -43,6 +43,7 @@ import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RoutingTable;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +58,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
@@ -125,6 +128,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   private final long syncSize = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
+  private int chunkMergeSize;
 
   /**
    * Creates a new BlockDataStreamOutput.
@@ -172,6 +176,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+    chunkMergeSize = config.getChunkMergeSize();
   }
 
   private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
@@ -362,7 +367,13 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     CompletableFuture<ContainerProtos.
         ContainerCommandResponseProto> flushFuture = null;
     try {
-      BlockData blockData = containerBlockData.build();
+      BlockData blockData = null;
+      if (chunkMergeSize > 0) {
+        blockData = mergeChunkInfos().build();
+      } else {
+        blockData = containerBlockData.build();
+      }
+
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, token);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
@@ -594,6 +605,43 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     futures.add(future);
     containerBlockData.addChunks(chunkInfo);
+  }
+
+  private BlockData.Builder mergeChunkInfos() {
+    List<ChunkInfo> newChunkInfoList = new ArrayList<>();
+    List<ChunkInfo.Builder> chunkList =
+        containerBlockData.getChunksBuilderList();
+    List<List<ChunkInfo.Builder>> mglist = new ArrayList<>();
+    Stream.iterate(0, n -> n + 1).limit(chunkList.size()).forEach(i -> {
+      mglist.add(chunkList.stream().skip(i * chunkMergeSize)
+          .limit(chunkMergeSize).collect(Collectors.toList()));
+    });
+
+    long mergeIndex =
+        chunkIndex - containerBlockData.getChunksBuilderList().size();
+    for(List<ChunkInfo.Builder>  subChunkInfoList: mglist) {
+      ChunkInfo.Builder newInfo = ChunkInfo.newBuilder();
+      newInfo.setChunkName(
+          blockID.get().getLocalID() + "_chunk_" + ++mergeIndex);
+      List<ByteString> checksumList = new ArrayList<>();
+      long mergeLen = 0;
+      long mergeOffset = 0;
+      for(int i = 0; i< subChunkInfoList.size(); i++) {
+        ChunkInfo.Builder chunkInfo = subChunkInfoList.get(i);
+        if (i == 0) {
+          mergeOffset = chunkInfo.getOffset();
+          continue;
+        }
+        checksumList.addAll(chunkInfo.getChecksumData().getChecksumsList());
+        mergeLen +=  chunkInfo.getLen();
+      }
+      newInfo.setOffset(mergeOffset);
+      newInfo.setLen(mergeLen);
+      newInfo.setChecksumData(
+          checksum.mergeChecksum(checksumList).getProtoBufMessage());
+      newChunkInfoList.add(newInfo.build());
+    }
+    return containerBlockData;
   }
 
   @VisibleForTesting
