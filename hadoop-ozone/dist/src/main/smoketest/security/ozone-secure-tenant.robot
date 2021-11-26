@@ -42,6 +42,8 @@ Secure Tenant Assign User Success with Cluster Admin
                         Should contain   ${output}         Assigned 'bob' to 'tenantone'
     ${accessId} =       Get Regexp Matches   ${output}     (?<=export AWS_ACCESS_KEY_ID=).*
     ${secretKey} =      Get Regexp Matches   ${output}     (?<=export AWS_SECRET_ACCESS_KEY=).*
+                        Set Global Variable  ${ACCESS_ID}   ${accessId}
+                        Set Global Variable  ${SECRET_KEY}  ${secretKey}
 
 Secure Tenant Assign User Failure to Non-existent Tenant
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user assign bob --tenant=thistenantdoesnotexist
@@ -52,8 +54,8 @@ Secure Tenant GetUserInfo Success
                         Should contain   ${output}         Tenant 'tenantone' with accessId 'tenantone$bob'
 
 Secure Tenant Create Bucket 1 Success via S3 API
-                        Execute          aws configure set aws_access_key_id ${accessId}
-                        Execute          aws configure set aws_secret_access_key ${secretKey}
+                        Execute          aws configure set aws_access_key_id ${ACCESS_ID}
+                        Execute          aws configure set aws_secret_access_key ${SECRET_KEY}
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test1
                         Should contain   ${output}         bucket-test1
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-buckets
@@ -74,7 +76,6 @@ Secure Tenant SetSecret Failure For Invalid Secret 2
 Secure Tenant GetSecret Success
     ${output} =         Execute          ozone tenant user getsecret 'tenantone$bob' --export
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
-#    ${secretKey} =      Get Regexp Matches   ${output}     (?<=export AWS_SECRET_ACCESS_KEY=).*
 
 Secure Tenant Delete Bucket 1 Failure With Old SecretKey via S3 API
     ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test1
