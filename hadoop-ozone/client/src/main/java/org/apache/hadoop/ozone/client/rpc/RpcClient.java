@@ -755,7 +755,6 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
-
     return new OzoneBucket(
         conf,
         this,
@@ -786,24 +785,24 @@ public class RpcClient implements ClientProtocol {
         volumeName, prevBucket, bucketPrefix, maxListResult);
 
     return buckets.stream().map(bucket -> new OzoneBucket(
-            conf,
-            this,
-            bucket.getVolumeName(),
-            bucket.getBucketName(),
-            bucket.getStorageType(),
-            bucket.getIsVersionEnabled(),
-            bucket.getCreationTime(),
-            bucket.getModificationTime(),
-            bucket.getMetadata(),
-            bucket.getEncryptionKeyInfo() != null ? bucket
-                .getEncryptionKeyInfo().getKeyName() : null,
-            bucket.getSourceVolume(),
-            bucket.getSourceBucket(),
-            bucket.getUsedBytes(),
-            bucket.getUsedNamespace(),
-            bucket.getQuotaInBytes(),
-            bucket.getQuotaInNamespace(),
-            bucket.getBucketLayout()))
+        conf,
+        this,
+        bucket.getVolumeName(),
+        bucket.getBucketName(),
+        bucket.getStorageType(),
+        bucket.getIsVersionEnabled(),
+        bucket.getCreationTime(),
+        bucket.getModificationTime(),
+        bucket.getMetadata(),
+        bucket.getEncryptionKeyInfo() != null ? bucket
+            .getEncryptionKeyInfo().getKeyName() : null,
+        bucket.getSourceVolume(),
+        bucket.getSourceBucket(),
+        bucket.getUsedBytes(),
+        bucket.getUsedNamespace(),
+        bucket.getQuotaInBytes(),
+        bucket.getQuotaInNamespace(),
+        bucket.getBucketLayout()))
         .collect(Collectors.toList());
   }
 
