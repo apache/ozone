@@ -295,7 +295,7 @@ public class BucketManagerImpl implements BucketManager {
    * @return {@code OmBucketInfo} with
    * @throws IOException
    */
-  private OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo,
+  public OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo,
                                                Set<Pair<String,
                                                    String>> visited)
       throws IOException {

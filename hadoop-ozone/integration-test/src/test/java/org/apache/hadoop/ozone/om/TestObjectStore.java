@@ -171,10 +171,11 @@ public class TestObjectStore {
     // Dangling link bucket
     String danglingLinkBucketName = UUID.randomUUID().toString();
 
-    // linkBucket4 is a dangling link over a source bucket that doesn't exist.
+    // danglingLinkBucket is a dangling link over a source bucket that doesn't
+    // exist.
     createLinkBucket(volume, sourceBucketName, danglingLinkBucketName);
 
-    // since sourceBucket3 does not exist, layout depends on
+    // since sourceBucket does not exist, layout depends on
     // OZONE_DEFAULT_BUCKET_LAYOUT config.
     OzoneBucket bucket = volume.getBucket(danglingLinkBucketName);
     Assert.assertEquals(BucketLayout.fromString(
