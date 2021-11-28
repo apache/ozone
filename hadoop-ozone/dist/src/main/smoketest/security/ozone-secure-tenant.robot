@@ -42,6 +42,8 @@ Secure Tenant Assign User Success with Cluster Admin
                         Should contain   ${output}         Assigned 'bob' to 'tenantone'
     ${accessId} =       Get Regexp Matches   ${output}     (?<=export AWS_ACCESS_KEY_ID=).*
     ${secretKey} =      Get Regexp Matches   ${output}     (?<=export AWS_SECRET_ACCESS_KEY=).*
+    ${accessId} =       Set Variable         ${accessId[0]}
+    ${secretKey} =      Set Variable         ${secretKey[0]}
                         Set Global Variable  ${ACCESS_ID}   ${accessId}
                         Set Global Variable  ${SECRET_KEY}  ${secretKey}
 
@@ -54,6 +56,7 @@ Secure Tenant GetUserInfo Success
                         Should contain   ${output}         Tenant 'tenantone' with accessId 'tenantone$bob'
 
 Secure Tenant Create Bucket 1 Success via S3 API
+#    Run Keyword         Setup s3 tests
                         Execute          aws configure set aws_access_key_id ${ACCESS_ID}
                         Execute          aws configure set aws_secret_access_key ${SECRET_KEY}
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test1
