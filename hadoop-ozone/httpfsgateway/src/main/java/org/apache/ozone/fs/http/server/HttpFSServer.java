@@ -258,7 +258,8 @@ public class HttpFSServer {
                       @QueryParam(OperationParam.NAME) OperationParam op,
                       @Context Parameters params,
                       @Context HttpServletRequest request)
-      throws IOException, FileSystemAccessException {
+      throws IOException, FileSystemAccessException,
+      UnsupportedOperationException {
     // Restrict access to only GETFILESTATUS and LISTSTATUS in write-only mode
     if((op.value() != HttpFSConstants.Operation.GETFILESTATUS) &&
             (op.value() != HttpFSConstants.Operation.LISTSTATUS) &&
@@ -293,8 +294,10 @@ public class HttpFSServer {
       response = handleGetQuotaUsage(path, user);
       break;
     case GETFILECHECKSUM:
-      response = handleGetFileCheckSum(path, uriInfo, params, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support GETFILECHECKSUM");
+      // response = handleGetFileCheckSum(path, uriInfo, params, user);
+      // break;
     case GETFILEBLOCKLOCATIONS:
       response = Response.status(Response.Status.BAD_REQUEST).build();
       break;
@@ -308,8 +311,10 @@ public class HttpFSServer {
       response = handleListXAttrs(path, user);
       break;
     case LISTSTATUS_BATCH:
-      response = handleListStatusBatch(path, params, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support LISTSTATUS_BATCH");
+      //response = handleListStatusBatch(path, params, user);
+      //break;
     case GETTRASHROOT:
       response = handleGetTrashRoot(path, user);
       break;
@@ -1004,17 +1009,25 @@ public class HttpFSServer {
       response = handleRename(path, params, user);
       break;
     case SETOWNER:
-      response = handleSetOwner(path, params, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support SETOWNER");
+      //response = handleSetOwner(path, params, user);
+      //break;
     case SETPERMISSION:
-      response = handleSetPermission(path, params, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support SETPERMISSION");
+      //response = handleSetPermission(path, params, user);
+      //break;
     case SETREPLICATION:
-      response = handleSetReplication(path, params, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support SETREPLICATION");
+      //response = handleSetReplication(path, params, user);
+      //break;
     case SETTIMES:
-      response = handleSetTimes(path, params, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support SETTIMES");
+      //response = handleSetTimes(path, params, user);
+      //break;
     case SETACL:
       response = handleSetACL(path, params, user);
       break;
