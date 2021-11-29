@@ -898,7 +898,7 @@ public class TestOzoneShellHA {
     final String volumeName = "volume100";
     getVolume(volumeName);
     String[] args =
-        new String[] {"bucket", "create", "/volume100/bucket0", "-rt", "EC",
+        new String[] {"bucket", "create", "/volume100/bucket0", "-t", "EC",
             "-r", "rs-3-2-1024k"};
     execute(ozoneShell, args);
 
@@ -915,7 +915,7 @@ public class TestOzoneShellHA {
     final String volumeName = "volume101";
     getVolume(volumeName);
     String[] args =
-        new String[] {"bucket", "create", "/volume101/bucket1", "-rt", "RATIS",
+        new String[] {"bucket", "create", "/volume101/bucket1", "-t", "RATIS",
             "-r", "3"};
     execute(ozoneShell, args);
 
@@ -932,7 +932,7 @@ public class TestOzoneShellHA {
   public void testCreateBucketWithECReplicationConfigWithoutReplicationParam() {
     getVolume("volume102");
     String[] args =
-        new String[] {"bucket", "create", "/volume102/bucket2", "-rt", "EC"};
+        new String[] {"bucket", "create", "/volume102/bucket2", "-t", "EC"};
     try {
       execute(ozoneShell, args);
       Assert.fail("Must throw Exception when missing replication param");
