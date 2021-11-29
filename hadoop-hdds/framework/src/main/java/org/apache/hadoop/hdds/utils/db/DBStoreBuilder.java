@@ -156,7 +156,7 @@ public final class DBStoreBuilder {
     for (DBColumnFamilyDefinition columnFamily :
         definition.getColumnFamilies()) {
 
-      addTable(columnFamily.getName());
+      addTable(columnFamily.getName(), columnFamily.getCfOptions());
       addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
       addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
     }
