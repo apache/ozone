@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -75,6 +76,8 @@ import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import static org.hamcrest.core.Is.is;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import static org.junit.Assert.assertThat;
@@ -531,9 +534,14 @@ public class TestContainerStateMachineFailures {
     };
     Runnable r2 = () -> {
       try {
-        xceiverClient.sendCommand(ContainerTestHelper
-                .getWriteChunkRequest(pipeline, omKeyLocationInfo.getBlockID(),
-                        1024, random.nextInt(), null));
+        ByteString data = ByteString.copyFromUtf8("hello");
+        ContainerProtos.ContainerCommandRequestProto.Builder writeChunkRequest =
+            ContainerTestHelper.newWriteChunkRequestBuilder(pipeline,
+                omKeyLocationInfo.getBlockID(), data.size(), random.nextInt()
+            );
+        writeChunkRequest.setWriteChunk(writeChunkRequest.getWriteChunkBuilder()
+                .setData(data));
+        xceiverClient.sendCommand(writeChunkRequest.build());
         latch.countDown();
       } catch (IOException e) {
         latch.countDown();
@@ -541,6 +549,11 @@ public class TestContainerStateMachineFailures {
                 .checkForException(e) instanceof ContainerNotOpenException)) {
           failCount.incrementAndGet();
         }
+        String message = e.getMessage();
+        Assert.assertFalse(message,
+            message.contains("hello"));
+        Assert.assertTrue(message,
+            message.contains(HddsUtils.REDACTED.toStringUtf8()));
       }
     };
 
@@ -579,5 +592,6 @@ public class TestContainerStateMachineFailures {
     FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
     Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
 
+    r2.run();
   }
 }
