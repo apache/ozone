@@ -757,7 +757,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             .allMatch(i -> i >= index)) {
           LOG.debug("Removing data corresponding to log index {} from cache",
               index);
-          stateMachineDataCache.remove(index);
+          stateMachineDataCache.removeIf(k -> k >= index);
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -765,7 +765,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // if waitOnBothFollower is false, remove the entry from the cache
       // as soon as its applied and such entry exists in the cache.
     } else {
-      stateMachineDataCache.remove(index);
+      stateMachineDataCache.removeIf(k -> k >= index);
     }
   }
 
@@ -779,7 +779,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // Remove the stateMachine data once both followers have caught up. If any
       // one of the follower is behind, the pending queue will max out as
       // configurable limit on pending request size and count and then will
-      // block and client wull backoff as a result of that.
+      // block and client will backoff as a result of that.
       removeStateMachineDataIfNeeded(index);
       DispatcherContext.Builder builder =
           new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
