@@ -39,6 +39,7 @@ public class ContainerHealthStatus {
   private int replicaDelta;
   private Set<ContainerReplica> replicas;
   private ContainerPlacementStatus placementStatus;
+  private int numReplicas;
 
   ContainerHealthStatus(ContainerInfo container,
       Set<ContainerReplica> replicas, PlacementPolicy placementPolicy) {
@@ -51,6 +52,7 @@ public class ContainerHealthStatus {
         .collect(Collectors.toSet());
     this.replicaDelta = repFactor - this.replicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);
+    this.numReplicas = replicas.size();
   }
 
   public long getContainerID() {
@@ -111,7 +113,7 @@ public class ContainerHealthStatus {
   }
 
   public boolean isMissing() {
-    return replicas.size() == 0;
+    return numReplicas == 0;
   }
 
   private ContainerPlacementStatus getPlacementStatus(

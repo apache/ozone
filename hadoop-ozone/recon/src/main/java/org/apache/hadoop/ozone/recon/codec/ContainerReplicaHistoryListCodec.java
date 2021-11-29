@@ -39,7 +39,7 @@ public class ContainerReplicaHistoryListCodec
     implements Codec<ContainerReplicaHistoryList> {
 
   // UUID takes 2 long to store. Each timestamp takes 1 long to store.
-  static final int SIZE_PER_ENTRY = 4 * Long.BYTES;
+  static final int SIZE_PER_ENTRY = 5 * Long.BYTES;
   private final Codec<Long> lc = new LongCodec();
 
   @Override
@@ -55,6 +55,7 @@ public class ContainerReplicaHistoryListCodec
       out.write(lc.toPersistedFormat(ts.getUuid().getLeastSignificantBits()));
       out.write(lc.toPersistedFormat(ts.getFirstSeenTime()));
       out.write(lc.toPersistedFormat(ts.getLastSeenTime()));
+      out.write(lc.toPersistedFormat(ts.getBcsId()));
     }
     return out.toByteArray();
   }
@@ -71,8 +72,10 @@ public class ContainerReplicaHistoryListCodec
       final long uuidLsb = in.readLong();
       final long firstSeenTime = in.readLong();
       final long lastSeenTime = in.readLong();
+      final long lastBcsId = in.readLong();
       final UUID id = new UUID(uuidMsb, uuidLsb);
-      lst.add(new ContainerReplicaHistory(id, firstSeenTime, lastSeenTime));
+      lst.add(new ContainerReplicaHistory(id, firstSeenTime, lastSeenTime,
+          lastBcsId));
     }
     in.close();
     return new ContainerReplicaHistoryList(lst);

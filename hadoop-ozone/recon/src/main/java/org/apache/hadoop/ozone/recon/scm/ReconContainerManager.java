@@ -292,7 +292,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
       // putIfAbsent to avoid TOCTOU
       replicaHistoryMap.putIfAbsent(id,
           new ConcurrentHashMap<UUID, ContainerReplicaHistory>() {{
-            put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime));
+            put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime,
+                replica.getSequenceId()));
           }});
       flushToDB = true;
     } else {
@@ -301,16 +302,18 @@ public class ReconContainerManager extends ContainerManagerImpl {
       if (ts == null) {
         // New Datanode
         replicaLastSeenMap.put(uuid,
-            new ContainerReplicaHistory(uuid, currTime, currTime));
+            new ContainerReplicaHistory(uuid, currTime, currTime,
+                replica.getSequenceId()));
         flushToDB = true;
       } else {
         // if the object exists, only update the last seen time field
         ts.setLastSeenTime(currTime);
+        ts.setBcsId(replica.getSequenceId());
       }
     }
 
     if (flushToDB) {
-      upsertContainerHistory(id, uuid, currTime);
+      upsertContainerHistory(id, uuid, currTime, replica.getSequenceId());
     }
   }
 
@@ -333,7 +336,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       final ContainerReplicaHistory ts = replicaLastSeenMap.get(uuid);
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
-        upsertContainerHistory(id, uuid, ts.getLastSeenTime());
+        upsertContainerHistory(id, uuid, ts.getLastSeenTime(), ts.getBcsId());
         replicaLastSeenMap.remove(uuid);
       }
     }
@@ -390,8 +393,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
       }
       final long firstSeenTime = entry.getValue().getFirstSeenTime();
       final long lastSeenTime = entry.getValue().getLastSeenTime();
+      long bcsId = entry.getValue().getBcsId();
       resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
-          firstSeenTime, lastSeenTime));
+          firstSeenTime, lastSeenTime, bcsId));
     }
     return resList;
   }
@@ -425,14 +429,15 @@ public class ReconContainerManager extends ContainerManagerImpl {
     }
   }
 
-  public void upsertContainerHistory(long containerID, UUID uuid, long time) {
+  public void upsertContainerHistory(long containerID, UUID uuid, long time,
+                                     long bcsId) {
     Map<UUID, ContainerReplicaHistory> tsMap;
     try {
       tsMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
       ContainerReplicaHistory ts = tsMap.get(uuid);
       if (ts == null) {
         // New entry
-        tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time));
+        tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time, bcsId));
       } else {
         // Entry exists, update last seen time and put it back to DB.
         ts.setLastSeenTime(time);
