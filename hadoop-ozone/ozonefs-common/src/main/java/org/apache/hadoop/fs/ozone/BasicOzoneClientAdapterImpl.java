@@ -24,6 +24,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.HashSet;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -154,14 +156,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
 
-    OzoneBucket resolvedBucket = bucket;
-    if (bucket.isLink()) {
-      resolvedBucket = objectStore.getVolume(bucket.getSourceVolume())
-          .getBucket(bucket.getSourceBucket());
-    }
+    // resolve the bucket layout in case of Link Bucket
+    BucketLayout resolvedBucketLayout =
+        OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+            new HashSet<>());
 
-    OzoneFSUtils.validateBucketLayout(resolvedBucket.getName(),
-        resolvedBucket.getBucketLayout());
+    OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
 
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
