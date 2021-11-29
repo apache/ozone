@@ -67,6 +67,10 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
     // This property is tested in TestHttpServer2 instead
     xmlPropsToSkipCompare.add(HttpServer2.HTTP_IDLE_TIMEOUT_MS_KEY);
+
+    // TODO: Remove this once ranger configs are finalized in HDDS-5836
+    configurationPrefixToSkipCompare.add("ozone.om.ranger");
+
     addPropertiesNotInXml();
   }
 
