@@ -200,7 +200,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.executor = Executors.newFixedThreadPool(numContainerOpExecutors);
     this.containerTaskQueues = new ConcurrentHashMap<>();
     this.waitOnBothFollowers = conf.getObject(
-        DatanodeConfiguration .class).waitOnAllFollowers();
+        DatanodeConfiguration.class).waitOnAllFollowers();
 
   }
 
@@ -762,6 +762,10 @@ public class ContainerStateMachine extends BaseStateMachine {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
+      // if waitOnBothFollower is false, remove the entry from the cache
+      // as soon as its applied and such entry exists in the cache.
+    } else {
+      stateMachineDataCache.remove(index);
     }
   }
 
@@ -771,11 +775,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     long index = trx.getLogEntry().getIndex();
-   // once both the followers catch up, remove the entry from the cache.
-    // if the Resource limit cache is full, leader will push back new requests
-    // and waits for a slow follower to catch up.
     try {
-
       // Remove the stateMachine data once both followers have caught up. If any
       // one of the follower is behind, the pending queue will max out as
       // configurable limit on pending request size and count and then will
