@@ -254,7 +254,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       // before EC Decode.
       setBufferReadLimits(bufs, toRead);
     } else {
-      // If we have no missing indexes, then we the buffers will be at their
+      // If we have no missing indexes, then the buffers will be at their
       // limits after reading so we need to flip them to ensure they are ready
       // to read by the caller.
       flipInputs();
