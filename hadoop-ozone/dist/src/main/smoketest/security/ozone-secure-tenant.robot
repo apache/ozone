@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Resource            ../s3/commonawslib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
