@@ -220,7 +220,7 @@ public class TestOzoneFileSystemWithLinks {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     try {
-      fs = FileSystem.get(conf);
+      FileSystem.get(conf);
       Assert.fail("Should throw Exception due to loop in Link Buckets");
     } catch (OMException oe) {
       // Expected exception
