@@ -167,10 +167,5 @@ public class S3MultipartUploadCompleteRequestWithFSO
     return OMFileRequest
         .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
   }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }
 

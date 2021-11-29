@@ -183,8 +183,6 @@ public class OMHANodeDetails {
         } else {
           // This OMNode belongs to same OM service as the current OMNode.
           // Add it to peerNodes list.
-          // This OMNode belongs to same OM service as the current OMNode.
-          // Add it to peerNodes list.
           peerNodesList.add(getHAOMNodeDetails(conf, serviceId,
               nodeId, addr, ratisPort));
         }
@@ -219,7 +217,7 @@ public class OMHANodeDetails {
       LOG.info("Configuration does not have {} set. Falling back to the " +
           "default OM address {}", OZONE_OM_ADDRESS_KEY, omAddress);
 
-      return new OMHANodeDetails(getOMNodeDetails(conf, null,
+      return new OMHANodeDetails(getOMNodeDetailsForNonHA(conf, null,
           null, omAddress, ratisPort), new ArrayList<>());
 
     } else {
@@ -237,7 +235,7 @@ public class OMHANodeDetails {
    * @param ratisPort - Ratis port of the OM.
    * @return OMNodeDetails
    */
-  public static OMNodeDetails getOMNodeDetails(OzoneConfiguration conf,
+  public static OMNodeDetails getOMNodeDetailsForNonHA(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort) {
 

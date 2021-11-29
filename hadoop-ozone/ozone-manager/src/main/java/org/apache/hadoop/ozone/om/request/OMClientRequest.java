@@ -244,12 +244,12 @@ public abstract class OMClientRequest implements RequestAuditor {
 
       boolean isVolOwner = isOwner(currentUser, volumeOwner);
       IAccessAuthorizer.ACLType parentAclRight = aclType;
-      if(isVolOwner) {
+      if (isVolOwner) {
         contextBuilder.setOwnerName(volumeOwner);
       } else {
         contextBuilder.setOwnerName(bucketOwner);
       }
-      if(ozoneManager.isNativeAuthorizerEnabled()) {
+      if (ozoneManager.isNativeAuthorizerEnabled()) {
         if (aclType == IAccessAuthorizer.ACLType.CREATE ||
                 aclType == IAccessAuthorizer.ACLType.DELETE ||
                 aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
@@ -259,7 +259,7 @@ public abstract class OMClientRequest implements RequestAuditor {
           parentAclRight = IAccessAuthorizer.ACLType.READ;
         }
       } else {
-        parentAclRight =  IAccessAuthorizer.ACLType.READ;
+        parentAclRight = IAccessAuthorizer.ACLType.READ;
 
       }
       OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
@@ -287,7 +287,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       return false;
     }
     if (callerUgi.getUserName().equals(ownerName) ||
-            callerUgi.getShortUserName().equals(ownerName)) {
+        callerUgi.getShortUserName().equals(ownerName)) {
       return true;
     }
     return false;
@@ -487,27 +487,13 @@ public abstract class OMClientRequest implements RequestAuditor {
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyPath, BucketLayout bucketLayout) throws OMException {
     LOG.debug("Bucket Layout: {}", bucketLayout);
-    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
-      // If bucket layout is OBJECT_STORE than we don't
-      // need to normalize the key.
-      return keyPath;
-    } else if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
       keyPath = validateAndNormalizeKey(true, keyPath);
       if (keyPath.endsWith("/")) {
         throw new OMException(
-            "Invalid KeyPath, key names with trailing / " + "are not allowed."
-                + keyPath, OMException.ResultCodes.INVALID_KEY_NAME);
-      }
-    } else {
-      // In this case our bucket layout is LEGACY, we will normalize
-      // the key if 'enableFileSystemPaths' flag is true.
-      keyPath = validateAndNormalizeKey(enableFileSystemPaths, keyPath);
-      if (enableFileSystemPaths) {
-        if (keyPath.endsWith("/")) {
-          throw new OMException(
-              "Invalid KeyPath, key names with trailing / " + "are not allowed."
-                  + keyPath, OMException.ResultCodes.INVALID_KEY_NAME);
-        }
+                "Invalid KeyPath, key names with trailing / "
+                        + "are not allowed." + keyPath,
+                OMException.ResultCodes.INVALID_KEY_NAME);
       }
     }
     return keyPath;

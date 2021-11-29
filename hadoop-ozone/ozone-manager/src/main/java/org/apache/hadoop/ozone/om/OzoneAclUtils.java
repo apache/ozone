@@ -36,7 +36,7 @@ public final class OzoneAclUtils {
   }
 
   /**
-   * Check Acls of ozone object with volOwner given.
+   * Check Acls of ozone object with volume owner and bucket owner.
    * @param ozoneManager
    * @param resType
    * @param storeType
@@ -60,6 +60,9 @@ public final class OzoneAclUtils {
 
     IAccessAuthorizer.ACLType parentAclRight = aclType;
 
+    //OzoneNativeAuthorizer differs from Ranger Authorizer as Ranger requires
+    // only READ access on parent level access. OzoneNativeAuthorizer has
+    // different parent level access based on the child level access type
     if(ozoneManager.isNativeAuthorizerEnabled()) {
       if (aclType == IAccessAuthorizer.ACLType.CREATE ||
           aclType == IAccessAuthorizer.ACLType.DELETE ||
@@ -75,6 +78,8 @@ public final class OzoneAclUtils {
     }
 
     switch (resType) {
+    //For Volume level access we only need to check {OWNER} equal
+    // to Volume Owner.
     case VOLUME:
       ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
           user, remoteAddress, hostName, true,
@@ -82,12 +87,16 @@ public final class OzoneAclUtils {
       break;
     case BUCKET:
     case KEY:
+    //For Bucket/Key/Prefix level access, first we need to check {OWNER} equal
+    // to volume owner on parent volume. Then we need to check {OWNER} equals
+    // volume owner if current ugi user is volume owner else we need check
+    //{OWNER} equals bucket owner for bucket/key/prefix.
     case PREFIX:
       ozoneManager.checkAcls(OzoneObj.ResourceType.VOLUME, storeType,
           parentAclRight, vol, bucket, key, user,
           remoteAddress, hostName, true,
           volOwner);
-      if(isVolOwner){
+      if (isVolOwner) {
         ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,
             volOwner);
@@ -109,7 +118,7 @@ public final class OzoneAclUtils {
       return false;
     }
     if (callerUgi.getUserName().equals(ownerName) ||
-            callerUgi.getShortUserName().equals(ownerName)) {
+        callerUgi.getShortUserName().equals(ownerName)) {
       return true;
     }
     return false;

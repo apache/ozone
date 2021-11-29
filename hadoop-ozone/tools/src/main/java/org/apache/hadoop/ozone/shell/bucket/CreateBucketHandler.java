@@ -53,7 +53,8 @@ public class CreateBucketHandler extends BucketHandler {
   private Boolean isGdprEnforced;
 
   @Option(names = {"--user", "-u"},
-          description = "Owner of the bucket")
+          description = "Owner of the bucket. Defaults to current" +
+              " user if not specified")
   private String ownerName;
 
   enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}

@@ -204,9 +204,4 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
     return omClientResponse;
   }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }

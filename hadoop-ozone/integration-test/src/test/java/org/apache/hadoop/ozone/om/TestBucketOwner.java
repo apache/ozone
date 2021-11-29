@@ -126,7 +126,7 @@ public class TestBucketOwner {
               .getVolume("volume1");
       ozoneBucket = volume.getBucket("bucket1");
       createKey(ozoneBucket, "key3", 10, new byte[10]);
-      fail();
+      fail("Create key as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
@@ -136,7 +136,7 @@ public class TestBucketOwner {
               .getVolume("volume1");
       ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.deleteKey("key2");
-      fail();
+      fail("Delete key as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
@@ -146,7 +146,7 @@ public class TestBucketOwner {
               .getVolume("volume1");
       ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.renameKey("key2", "key4");
-      fail();
+      fail("Rename key as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }

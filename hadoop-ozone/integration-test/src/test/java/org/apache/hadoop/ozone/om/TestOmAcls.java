@@ -148,7 +148,7 @@ public class TestOmAcls {
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
     assertTrue(logCapturer.getOutput().contains("doesn't have READ " +
-            "permission to access volume"));
+        "permission to access volume"));
   }
 
   /**

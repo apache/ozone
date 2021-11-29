@@ -83,7 +83,7 @@ public class KeyValueContainerCheck {
    * @return true : integrity checks pass, false : otherwise.
    */
   public boolean fastCheck() {
-    LOG.info("Running basic checks for container {};", containerID);
+    LOG.debug("Running basic checks for container {};", containerID);
     boolean valid = false;
     try {
       loadContainerData();

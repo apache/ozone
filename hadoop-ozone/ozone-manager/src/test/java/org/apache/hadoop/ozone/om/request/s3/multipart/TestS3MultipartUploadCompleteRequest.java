@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -60,13 +59,7 @@ public class TestS3MultipartUploadCompleteRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    BucketLayout bucketLayout = BucketLayout.DEFAULT;
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
-      bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
-    }
-
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, bucketLayout);
+    addVolumeAndBucket(volumeName, bucketName);
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
@@ -125,6 +118,12 @@ public class TestS3MultipartUploadCompleteRequest
     Assert.assertNotNull(omMetadataManager
         .getKeyTable(s3MultipartUploadCompleteRequest.getBucketLayout())
         .get(getOzoneDBKey(volumeName, bucketName, keyName)));
+  }
+
+  protected void addVolumeAndBucket(String volumeName, String bucketName)
+      throws Exception {
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.DEFAULT);
   }
 
   @Test
