@@ -77,6 +77,8 @@ public class ContainerBalancer {
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
   private List<DatanodeUsageInfo> withinThresholdUtilizedNodes;
+  private Set<String> excludeNodes;
+  private Set<String> includeNodes;
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
   private long clusterCapacity;
@@ -242,6 +244,11 @@ public class ContainerBalancer {
       }
       return false;
     }
+    this.excludeNodes = config.getExcludeNodes();
+    this.includeNodes = config.getIncludeNodes();
+    // include/exclude nodes from balancing according to configs
+    datanodeUsageInfos.removeIf(datanodeUsageInfo -> shouldExcludeDatanode(
+        datanodeUsageInfo.getDatanodeDetails()));
 
     this.totalNodesInCluster = datanodeUsageInfos.size();
     this.clusterCapacity = 0L;
@@ -665,6 +672,24 @@ public class ContainerBalancer {
     //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
     // source and target
     return overUtilizedNodes;
+  }
+
+  /**
+   * Consults the configurations {@link ContainerBalancer#includeNodes} and
+   * {@link ContainerBalancer#excludeNodes} to check if the specified
+   * Datanode should be excluded from balancing.
+   * @param datanode DatanodeDetails to check
+   * @return true if Datanode should be excluded, else false
+   */
+  boolean shouldExcludeDatanode(DatanodeDetails datanode) {
+    if (excludeNodes.contains(datanode.getHostName()) ||
+        excludeNodes.contains(datanode.getIpAddress())) {
+      return true;
+    } else if (!includeNodes.isEmpty()) {
+      return !includeNodes.contains(datanode.getHostName()) &&
+          !includeNodes.contains(datanode.getIpAddress());
+    }
+    return false;
   }
 
   /**
