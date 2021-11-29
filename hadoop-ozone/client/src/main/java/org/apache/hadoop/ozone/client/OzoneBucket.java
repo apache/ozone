@@ -604,6 +604,14 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Checks if the bucket is a Link Bucket.
+   * @return True if bucket is a link, False otherwise.
+   */
+  public boolean isLink() {
+    return sourceVolume != null && sourceBucket != null;
+  }
+
+  /**
    * Deletes key from the bucket.
    * @param key Name of the key to be deleted.
    * @throws IOException
@@ -1208,7 +1216,7 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIteratorFactory {
     KeyIterator getKeyIterator(String keyPrefix, String prevKey,
         BucketLayout bType) throws IOException {
-      if (bType.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bType.isFileSystemOptimized()) {
         return new KeyIteratorWithFSO(keyPrefix, prevKey);
       } else {
         return new KeyIterator(keyPrefix, prevKey);
