@@ -148,10 +148,10 @@ public class TestSCMContainerPlacementCapacity {
 
     }
 
-    //datanode 4 has less space. Should be selected less times.
-    Assert.assertTrue(selectedCount.get(datanodes.get(3)) > selectedCount
+    //datanode 6 has more space than datanode 3 and datanode 4.
+    Assert.assertTrue(selectedCount.get(datanodes.get(3)) < selectedCount
         .get(datanodes.get(6)));
-    Assert.assertTrue(selectedCount.get(datanodes.get(4)) > selectedCount
+    Assert.assertTrue(selectedCount.get(datanodes.get(4)) < selectedCount
         .get(datanodes.get(6)));
   }
 }
