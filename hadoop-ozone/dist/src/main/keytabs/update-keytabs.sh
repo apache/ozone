@@ -36,6 +36,7 @@ if [ "$1" == "internal" ]; then
 
    export_keytab testuser/scm testuser
    export_keytab testuser/s3g testuser
+   export_keytab testuser/httpfs testuser
    export_keytab testuser/om testuser
 
    export_keytab testuser2/scm testuser2
@@ -47,6 +48,10 @@ if [ "$1" == "internal" ]; then
    export_keytab HTTP/s3g s3g
    export_keytab testuser/s3g s3g
 
+   export_keytab httpfs/httpfs httpfs
+   export_keytab HTTP/httpfs httpfs
+   export_keytab testuser/httpfs httpfs
+
    export_keytab recon/recon recon
    export_keytab HTTP/recon recon
 
@@ -55,6 +60,7 @@ if [ "$1" == "internal" ]; then
 
    export_keytab HTTP/scm HTTP
    export_keytab HTTP/s3g HTTP
+   export_keytab HTTP/httpfs HTTP
    export_keytab HTTP/ozone HTTP
 
    export_keytab hadoop/rm hadoop
