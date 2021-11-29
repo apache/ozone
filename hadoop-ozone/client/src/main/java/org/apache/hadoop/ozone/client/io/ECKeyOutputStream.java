@@ -374,14 +374,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
       byte[] b, int writeLen, int off, boolean isParity)
       throws IOException {
     try {
+      if (!isParity) {
+        // In case if exception while writing, this length will be updated back
+        // as part of handleStripeFailure.
+        offset += writeLen;
+      }
       current.write(b, off, writeLen);
-      if (!isParity) {
-        offset += writeLen;
-      }
     } catch (IOException ioe) {
-      if (!isParity) {
-        offset += writeLen;
-      }
       LOG.debug("Exception:: writeLen: " + writeLen + ", total len:" + len,
           ioe);
       handleException(current, ioe);
