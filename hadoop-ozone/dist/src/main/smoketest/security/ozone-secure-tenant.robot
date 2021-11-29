@@ -39,8 +39,9 @@ Secure Tenant Create Tenant Success with Cluster Admin
                         Should contain   ${output}         Created tenant 'tenantone'
 
 Secure Tenant Assign User Success with Cluster Admin
-    ${output} =         Execute          ozone tenant user assign bob --tenant=tenantone
-                        Should contain   ${output}         Assigned 'bob' to 'tenantone'
+    ${testuser} =       Set Variable     testuser
+    ${output} =         Execute          ozone tenant user assign ${testuser} --tenant=tenantone
+                        Should contain   ${output}         Assigned '${testuser}' to 'tenantone'
     ${accessId} =       Get Regexp Matches   ${output}     (?<=export AWS_ACCESS_KEY_ID=).*
     ${secretKey} =      Get Regexp Matches   ${output}     (?<=export AWS_SECRET_ACCESS_KEY=).*
     ${accessId} =       Set Variable         ${accessId[0]}
@@ -49,12 +50,12 @@ Secure Tenant Assign User Success with Cluster Admin
                         Set Global Variable  ${SECRET_KEY}  ${secretKey}
 
 Secure Tenant Assign User Failure to Non-existent Tenant
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user assign bob --tenant=thistenantdoesnotexist
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user assign ${testuser} --tenant=thistenantdoesnotexist
                         Should contain   ${output}         Tenant 'thistenantdoesnotexist' doesn't exist
 
 Secure Tenant GetUserInfo Success
-    ${output} =         Execute          ozone tenant user info bob
-                        Should contain   ${output}         Tenant 'tenantone' with accessId 'tenantone$bob'
+    ${output} =         Execute          ozone tenant user info ${testuser}
+                        Should contain   ${output}         Tenant 'tenantone' with accessId 'tenantone$${testuser}'
 
 Secure Tenant Create Bucket 1 Success via S3 API
     Run Keyword         Setup s3 tests
@@ -66,19 +67,19 @@ Secure Tenant Create Bucket 1 Success via S3 API
                         Should contain   ${output}         bucket-test1
 
 Secure Tenant SetSecret Success with Cluster Admin
-    ${output} =         Execute          ozone tenant user setsecret 'tenantone$bob' --secret=somesecret1 --export
+    ${output} =         Execute          ozone tenant user setsecret 'tenantone$${testuser}' --secret=somesecret1 --export
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
 
 Secure Tenant SetSecret Failure For Invalid Secret 1
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$bob' --secret='' --export
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$${testuser}' --secret='' --export
                         Should contain   ${output}         secretKey cannot be null or empty.
 
 Secure Tenant SetSecret Failure For Invalid Secret 2
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$bob' --secret=short --export
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$${testuser}' --secret=short --export
                         Should contain   ${output}         Secret key length should be at least 8 characters
 
 Secure Tenant GetSecret Success
-    ${output} =         Execute          ozone tenant user getsecret 'tenantone$bob' --export
+    ${output} =         Execute          ozone tenant user getsecret 'tenantone$${testuser}' --export
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
 
 Secure Tenant Delete Bucket 1 Failure With Old SecretKey via S3 API
@@ -100,7 +101,7 @@ Secure Tenant Create Tenant Failure with Regular User
                         Should contain   ${output}         Failed to create tenant 'tenanttwo': User 'testuser2/scm@EXAMPLE.COM' is not an Ozone admin.
 
 Secure Tenant SetSecret Failure with Regular User
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$bob' --secret=somesecret2 --export
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$${testuser}' --secret=somesecret2 --export
                         Should contain   ${output}         Permission denied. Requested accessId
 
 Secure Tenant Create Bucket 2 Success with somesecret1 via S3 API
@@ -119,8 +120,8 @@ Secure Tenant Delete Bucket 2 Success with somesecret1 via S3 API
 
 Secure Tenant Revoke User AccessId Success with Cluster Admin
     Run Keyword         Kinit test user     testuser     testuser.keytab
-    ${output} =         Execute          ozone tenant user revoke 'tenantone$bob'
-                        Should contain   ${output}         Revoked accessId 'tenantone$bob'.
+    ${output} =         Execute          ozone tenant user revoke 'tenantone$${testuser}'
+                        Should contain   ${output}         Revoked accessId 'tenantone$${testuser}'.
 
 Secure Tenant Create Bucket 3 Failure with Revoked AccessId via S3 API
     ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test3
