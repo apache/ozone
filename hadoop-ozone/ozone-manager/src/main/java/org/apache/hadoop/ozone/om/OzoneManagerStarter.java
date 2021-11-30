@@ -185,18 +185,15 @@ public class OzoneManagerStarter extends GenericCli {
         AuthenticationException {
       try (OzoneManager om = OzoneManager.createOm(conf)) {
         om.start();
-      } catch (Exception e) {
-        LOG.error("Error during start OzoneManager.", e);
+        ShutdownHookManager.get().addShutdownHook(() -> {
+          try {
+            om.stop();
+            om.join();
+          } catch (Exception e) {
+            LOG.error("Error during stop OzoneManager.", e);
+          }
+        }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
       }
-
-      ShutdownHookManager.get().addShutdownHook(() -> {
-        try (OzoneManager om = OzoneManager.createOm(conf)) {
-          om.stop();
-          om.join();
-        } catch (Exception e) {
-          LOG.error("Error during stop OzoneManager.", e);
-        }
-      }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     }
 
     @Override
@@ -220,11 +217,9 @@ public class OzoneManagerStarter extends GenericCli {
         startupOption = OzoneManager.StartupOption.BOOTSTRAP;
       }
       // Bootstrap the OM
-      try (OzoneManager om = OzoneManager.createOm(conf, startupOption)){
+      try (OzoneManager om = OzoneManager.createOm(conf, startupOption)) {
         om.start();
         om.join();
-      } catch (Exception e) {
-        LOG.error("Error during start OzoneManager.", e);
       }
     }
 
@@ -235,8 +230,6 @@ public class OzoneManagerStarter extends GenericCli {
         om.getPrepareState().cancelPrepare();
         om.start();
         om.join();
-      } catch (Exception e) {
-        LOG.error("Error during start OzoneManager.", e);
       }
     }
   }
