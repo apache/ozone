@@ -183,17 +183,16 @@ public class OzoneManagerStarter extends GenericCli {
     @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
-      try (OzoneManager om = OzoneManager.createOm(conf)) {
-        om.start();
-        ShutdownHookManager.get().addShutdownHook(() -> {
-          try {
-            om.stop();
-            om.join();
-          } catch (Exception e) {
-            LOG.error("Error during stop OzoneManager.", e);
-          }
-        }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
-      }
+      OzoneManager om = OzoneManager.createOm(conf);
+      om.start();
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          om.stop();
+          om.join();
+        } catch (Exception e) {
+          LOG.error("Error during stop OzoneManager.", e);
+        }
+      }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     }
 
     @Override
