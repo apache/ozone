@@ -278,6 +278,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     long boundary = config.getDataStreamBufferFlushSize() / config
         .getDataStreamMaxBufferSize();
     if (bufferList.size() % boundary == 0) {
+      updateFlushLength();
       executePutBlock(false, false);
     }
   }
