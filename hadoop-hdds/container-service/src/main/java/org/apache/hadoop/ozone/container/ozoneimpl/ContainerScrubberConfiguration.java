@@ -17,10 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
 
 /**
  * This class defines configuration parameters for container scrubber.
@@ -28,44 +34,83 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.container.scrub")
 public class ContainerScrubberConfiguration {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerScrubberConfiguration.class);
+
   // only for log
   public static final String HDDS_CONTAINER_SCRUB_ENABLED =
       "hdds.container.scrub.enabled";
+  static final String METADATA_SCAN_INTERVAL_KEY =
+      "hdds.container.scrub.metadata.scan.interval";
+  static final String DATA_SCAN_INTERVAL_KEY =
+      "hdds.container.scrub.data.scan.interval";
+  static final String VOLUME_BYTES_PER_SECOND_KEY =
+      "hdds.container.scrub.volume.bytes.per.second";
+
+  static final long METADATA_SCAN_INTERVAL_DEFAULT =
+      Duration.ofHours(3).toMillis();
+  static final long DATA_SCAN_INTERVAL_DEFAULT =
+      Duration.ofDays(1).toMillis();
+  static final long BANDWIDTH_PER_VOLUME_DEFAULT =
+      (long) StorageUnit.MB.toBytes(1);
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to enable container scrubber.")
-  private boolean enabled;
+  private boolean enabled = false;
 
   @Config(key = "metadata.scan.interval",
       type = ConfigType.TIME,
       defaultValue = "3h",
       tags = {ConfigTag.STORAGE},
-      description = "Config parameter define time interval in milliseconds" +
-          " between two metadata scans by container scrubber.")
-  private long metadataScanInterval;
+      description = "Config parameter define time interval" +
+          " between two metadata scans by container scrubber." +
+          " Unit could be defined with postfix (ns,ms,s,m,h,d).")
+  private long metadataScanInterval = METADATA_SCAN_INTERVAL_DEFAULT;
 
   @Config(key = "data.scan.interval",
       type = ConfigType.TIME,
-      defaultValue = "1m",
+      defaultValue = "1d",
       tags = {ConfigTag.STORAGE},
       description = "Minimum time interval between two iterations of container"
           + " data scanning.  If an iteration takes less time than this, the"
-          + " scanner will wait before starting the next iteration."
-  )
-  private long dataScanInterval;
+          + " scanner will wait before starting the next iteration." +
+          " Unit could be defined with postfix (ns,ms,s,m,h,d).")
+  private long dataScanInterval = DATA_SCAN_INTERVAL_DEFAULT;
 
   @Config(key = "volume.bytes.per.second",
-      type = ConfigType.LONG,
-      defaultValue = "1048576",
+      type = ConfigType.SIZE,
+      defaultValue = "1MB",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to throttle I/O bandwidth used"
           + " by scrubber per volume.")
+  private long bandwidthPerVolume = BANDWIDTH_PER_VOLUME_DEFAULT;
 
-  private long bandwidthPerVolume;
+  @PostConstruct
+  public void validate() {
+    if (metadataScanInterval < 0) {
+      LOG.warn(METADATA_SCAN_INTERVAL_KEY +
+              " must be >= 0 and was set to {}. Defaulting to {}",
+          metadataScanInterval, METADATA_SCAN_INTERVAL_DEFAULT);
+      metadataScanInterval = METADATA_SCAN_INTERVAL_DEFAULT;
+    }
 
+    if (dataScanInterval < 0) {
+      LOG.warn(DATA_SCAN_INTERVAL_KEY +
+              " must be >= 0 and was set to {}. Defaulting to {}",
+          dataScanInterval, DATA_SCAN_INTERVAL_DEFAULT);
+      dataScanInterval = DATA_SCAN_INTERVAL_DEFAULT;
+    }
+
+    if (bandwidthPerVolume < 0) {
+      LOG.warn(VOLUME_BYTES_PER_SECOND_KEY +
+              " must be >= 0 and was set to {}. Defaulting to {}",
+          bandwidthPerVolume, BANDWIDTH_PER_VOLUME_DEFAULT);
+      bandwidthPerVolume = BANDWIDTH_PER_VOLUME_DEFAULT;
+    }
+  }
 
   public void setEnabled(boolean enabled) {
     this.enabled = enabled;
