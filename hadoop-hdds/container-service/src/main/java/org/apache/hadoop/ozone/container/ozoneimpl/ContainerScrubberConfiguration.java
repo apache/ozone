@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -51,8 +50,7 @@ public class ContainerScrubberConfiguration {
       Duration.ofHours(3).toMillis();
   static final long DATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofDays(1).toMillis();
-  static final long BANDWIDTH_PER_VOLUME_DEFAULT =
-      (long) StorageUnit.MB.toBytes(1);
+  static final long BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;   // 1MB
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
@@ -81,8 +79,8 @@ public class ContainerScrubberConfiguration {
   private long dataScanInterval = DATA_SCAN_INTERVAL_DEFAULT;
 
   @Config(key = "volume.bytes.per.second",
-      type = ConfigType.SIZE,
-      defaultValue = "1MB",
+      type = ConfigType.LONG,
+      defaultValue = "1048576",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to throttle I/O bandwidth used"
           + " by scrubber per volume.")
