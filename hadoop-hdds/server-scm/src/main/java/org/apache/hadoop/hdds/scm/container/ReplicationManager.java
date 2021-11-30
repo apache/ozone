@@ -1497,7 +1497,7 @@ public class ReplicationManager implements SCMService {
   }
 
   private String getContainerToken(ContainerID containerID) {
-    StorageContainerManager scm = scmContext.getScm();
+    StorageContainerManager scm = (StorageContainerManager) scmContext.getScm();
     return scm != null
         ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
         : ""; // unit test

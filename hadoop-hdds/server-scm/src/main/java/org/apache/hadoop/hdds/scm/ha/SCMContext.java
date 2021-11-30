@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -66,11 +67,12 @@ public final class SCMContext {
    */
   private SafeModeStatus safeModeStatus;
 
-  private final StorageContainerManager scm;
+  private final OzoneStorageContainerManager scm;
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
   private SCMContext(boolean isLeader, long term,
-      final SafeModeStatus safeModeStatus, final StorageContainerManager scm) {
+      final SafeModeStatus safeModeStatus,
+      final OzoneStorageContainerManager scm) {
     this.isLeader = isLeader;
     this.term = term;
     this.safeModeStatus = safeModeStatus;
@@ -186,7 +188,9 @@ public final class SCMContext {
 
       if (!isLeader) {
         LOG.warn("getTerm is invoked when not leader.");
-        throw scm.getScmHAManager()
+        StorageContainerManager storageContainerManager =
+            (StorageContainerManager) scm;
+        throw storageContainerManager.getScmHAManager()
             .getRatisServer()
             .triggerNotLeaderException();
       }
@@ -230,7 +234,7 @@ public final class SCMContext {
   /**
    * @return StorageContainerManager
    */
-  public StorageContainerManager getScm() {
+  public OzoneStorageContainerManager getScm() {
     return scm;
   }
 
@@ -246,7 +250,7 @@ public final class SCMContext {
     private long term = INVALID_TERM;
     private boolean isInSafeMode = false;
     private boolean isPreCheckComplete = true;
-    private StorageContainerManager scm = null;
+    private OzoneStorageContainerManager scm = null;
 
     public Builder setLeader(boolean leader) {
       this.isLeader = leader;
@@ -268,7 +272,8 @@ public final class SCMContext {
       return this;
     }
 
-    public Builder setSCM(StorageContainerManager storageContainerManager) {
+    public Builder setSCM(
+        OzoneStorageContainerManager storageContainerManager) {
       this.scm = storageContainerManager;
       return this;
     }
