@@ -146,35 +146,41 @@ public class OMSetSecretRequest extends OMClientRequest {
       final S3SecretValue newS3SecretValue;
       final OmDBAccessIdInfo newDBAccessIdInfo;
 
+      // Update legacy S3SecretTable, if the accessId entry exists
+      if (omMetadataManager.getS3SecretTable().get(accessId) == null) {
+        // S3SecretTable will be deprecated.
+        // It is acceptable to not have an accessId entry in it.
+        LOG.debug("accessId '{}' not found in S3SecretTable", accessId);
+        newS3SecretValue = null;
+
+      } else {
+        // accessId found in S3SecretTable. Update S3SecretTable
+        LOG.debug("Updating S3SecretTable cache entry");
+        // Update S3SecretTable cache entry in this case
+        newS3SecretValue = new S3SecretValue(accessId, secretKey);
+
+        omMetadataManager.getS3SecretTable().addCacheEntry(
+            new CacheKey<>(accessId),
+            new CacheValue<>(Optional.of(newS3SecretValue),
+                transactionLogIndex));
+      }
+
       // Get accessId entry from multi-tenant TenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
 
       // Check accessId existence in TenantAccessIdTable
       if (omDBAccessIdInfo == null) {
-        // accessId doesn't exist in TenantAccessIdTable, check S3SecretTable
-        if (omMetadataManager.getS3SecretTable().get(accessId) == null) {
-          throw new OMException("accessId '" + accessId + "' not found.",
-              OMException.ResultCodes.ACCESSID_NOT_FOUND);
-        }
-
-        // accessId found in S3SecretTable. Update S3SecretTable
-        LOG.debug("Updating S3SecretTable cache entry");
-        // Update S3SecretTable cache entry in this case
-        newS3SecretValue = new S3SecretValue(accessId, secretKey);
+        // At some point we need to migrate entries from S3SecretTable
+        //  to TenantAccessIdTable, and S3SecretTable should eventually become
+        //  empty.
+        LOG.warn("accessId '{}' not found in TenantAccessIdTable", accessId);
         newDBAccessIdInfo = null;
 
-        omMetadataManager.getS3SecretTable().addCacheEntry(
-            new CacheKey<>(accessId),
-            new CacheValue<>(Optional.of(newS3SecretValue),
-                transactionLogIndex));
-
       } else {
-
         // Update TenantAccessIdTable
         // Build new OmDBAccessIdInfo with updated secret
         LOG.debug("Updating TenantAccessIdTable cache entry");
-        newS3SecretValue = null;
         newDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
             .setTenantId(omDBAccessIdInfo.getTenantId())
             .setKerberosPrincipal(omDBAccessIdInfo.getUserPrincipal())
@@ -188,6 +194,13 @@ public class OMSetSecretRequest extends OMClientRequest {
             new CacheKey<>(accessId),
             new CacheValue<>(Optional.of(newDBAccessIdInfo),
                 transactionLogIndex));
+      }
+
+      // If neither S3SecretTable nor TenantAccessIdTable is updated, throw
+      //  ACCESSID_NOT_FOUND exception.
+      if (newS3SecretValue == null && newDBAccessIdInfo == null) {
+        throw new OMException("accessId '" + accessId + "' not found.",
+            OMException.ResultCodes.ACCESSID_NOT_FOUND);
       }
 
       // Compose response
