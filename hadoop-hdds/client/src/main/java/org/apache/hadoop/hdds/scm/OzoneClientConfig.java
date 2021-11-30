@@ -63,11 +63,11 @@ public class OzoneClientConfig {
   private int dataStreamMaxBufferSize = 4 * 1024 * 1024;
 
   @Config(key = "datastream.buffer.flush.size",
-      defaultValue = "32MB",
+      defaultValue = "16MB",
       type = ConfigType.SIZE,
       description = "The boundary at which putBlock is executed",
       tags = ConfigTag.CLIENT)
-  private long dataStreamBufferFlushSize = 32 * 1024 * 1024;
+  private long dataStreamBufferFlushSize = 16 * 1024 * 1024;
 
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
