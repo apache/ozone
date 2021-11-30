@@ -88,7 +88,6 @@ Secure Tenant Delete Bucket 1 Failure With Old SecretKey via S3 API
 Secure Tenant Delete Bucket 1 Success With Newly Set SecretKey via S3 API
                         Execute          aws configure set aws_secret_access_key 'somesecret1'
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test1
-                        Should contain   ${output}         bucket-test1
 
 Secure Tenant Delete Tenant Failure Tenant Not Empty
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant delete tenantone
@@ -115,7 +114,6 @@ Secure Tenant Delete Bucket 2 Failure with somesecret2 via S3 API
 Secure Tenant Delete Bucket 2 Success with somesecret1 via S3 API
                         Execute          aws configure set aws_secret_access_key 'somesecret1'
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test2
-                        Should contain   ${output}         bucket-test2
 
 Secure Tenant Revoke User AccessId Success with Cluster Admin
     Run Keyword         Kinit test user     testuser     testuser.keytab
