@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -511,10 +512,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Fail to create Key Provider");
     }
     if (secConfig.isSecurityEnabled()) {
-      omComponent = OM_DAEMON + "-" + omId;
-      if (omStorage.getOmCertSerialId() == null) {
-        throw new RuntimeException("OzoneManager started in secure mode but " +
-            "doesn't have SCM signed certificate.");
+      if (!secConfig.isCustomCAEnabled()) {
+        omComponent = OM_DAEMON + "-" + omId;
+        if (omStorage.getOmCertSerialId() == null) {
+          throw new RuntimeException("OzoneManager started in secure mode " +
+              "but doesn't have SCM signed certificate.");
+        }
       }
       certClient = new OMCertificateClient(new SecurityConfig(conf),
           omStorage.getOmCertSerialId());
@@ -879,7 +882,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private OzoneBlockTokenSecretManager createBlockTokenSecretManager(
-      OzoneConfiguration conf) {
+      OzoneConfiguration conf) throws SCMSecurityException {
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
@@ -890,8 +893,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return new OzoneBlockTokenSecretManager(secConfig, expiryTime, "1");
     }
     Objects.requireNonNull(certClient);
-    return new OzoneBlockTokenSecretManager(secConfig, expiryTime,
-        certClient.getCertificate().getSerialNumber().toString());
+    OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager = null;
+    try {
+      ozoneBlockTokenSecretManager = new OzoneBlockTokenSecretManager(secConfig,
+          expiryTime, certClient.getCertificate().getSerialNumber().toString());
+    } catch (Exception ex) {
+      throw new SCMSecurityException("Error while getting Certificate of " +
+          "Ozone Manager. Cannot create OzoneBlockTokenSecretManager.", ex);
+    }
+    return ozoneBlockTokenSecretManager;
   }
 
   private void stopSecretManager() {
@@ -1181,7 +1191,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     CertificateClient certClient =
         new OMCertificateClient(new SecurityConfig(conf),
             omStore.getOmCertSerialId());
-    CertificateClient.InitResponse response = certClient.init();
+    CertificateClient.InitResponse response;
+    try {
+      response = certClient.init();
+    } catch (Exception ex) {
+      throw new RuntimeException("OM security initialization failed.", ex);
+    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:
@@ -1390,8 +1405,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Perform this to make it work with old clients.
     if (certClient != null) {
-      caCertPem =
-          CertificateCodec.getPEMEncodedString(certClient.getCACertificate());
+      // When custom CA is enabled, there is no need to get just CA
+      // certificate. This is intended for SCM root CA.
+      if (!secConfig.isCustomCAEnabled()) {
+        caCertPem =
+            CertificateCodec.getPEMEncodedString(certClient.getCACertificate());
+      }
       caCertPemList = HAUtils.buildCAList(certClient, configuration);
     }
 

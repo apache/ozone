@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 
+import java.io.IOException;
+
 /**
  * Certificate client for DataNodes.
  */
@@ -37,11 +39,11 @@ public class DNCertificateClient extends DefaultCertificateClient {
   public static final String COMPONENT_NAME = "dn";
 
   public DNCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
+      String certSerialId) throws IOException {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
   }
 
-  public DNCertificateClient(SecurityConfig securityConfig) {
+  public DNCertificateClient(SecurityConfig securityConfig) throws IOException {
     super(securityConfig, LOG, null, COMPONENT_NAME);
   }
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -34,15 +34,17 @@ import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -57,10 +59,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
@@ -362,7 +367,17 @@ public final class HAUtils {
     long waitDuration =
         configuration.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    if (certClient != null) {
+    SecurityConfig securityConfig = new SecurityConfig(configuration);
+
+    if (securityConfig.isCustomCAEnabled()) {
+      List<String> caCertsPem = new ArrayList<>();
+      List<X509Certificate> caCerts = buildCAX509List(certClient,
+          configuration);
+      for (X509Certificate cert: caCerts) {
+        caCertsPem.add(CertificateCodec.getPEMEncodedString(cert));
+      }
+      return caCertsPem;
+    } else if (certClient != null) {
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
         return generateCAList(certClient);
       } else {
@@ -474,11 +489,32 @@ public final class HAUtils {
   public static List<X509Certificate> buildCAX509List(
       CertificateClient certClient,
       ConfigurationSource conf) throws IOException {
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    List<X509Certificate> x509Certificates = new ArrayList<>();
+    if (securityConfig.isCustomCAEnabled()) {
+      // Build CA list from trust store
+      try {
+        KeyStore truststore = SecurityUtil.getCustomTruststore(securityConfig);
+        for (Enumeration<String> e = truststore.aliases();
+             e.hasMoreElements();) {
+          String alias = e.nextElement();
+          if (truststore.isCertificateEntry(alias)) {
+            Certificate cert = truststore.getCertificate(alias);
+            if (cert instanceof X509Certificate) {
+              x509Certificates.add((X509Certificate)cert);
+            }
+          }
+        }
+        return x509Certificates;
+      } catch (Exception ex) {
+        throw new SCMSecurityException("Error while getting Truststore in " +
+            securityConfig.getTruststoreFilePath(), ex);
+      }
+    }
     if (certClient != null) {
       // Do this here to avoid extra conversion of X509 to pem and again to
       // X509 by buildCAList.
       if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-        List<X509Certificate> x509Certificates = new ArrayList<>();
         if (certClient.getRootCACertificate() != null) {
           x509Certificates.add(certClient.getRootCACertificate());
         }
@@ -489,5 +525,4 @@ public final class HAUtils {
     List<String> pemEncodedCerts = HAUtils.buildCAList(certClient, conf);
     return OzoneSecurityUtil.convertToX509(pemEncodedCerts);
   }
-
 }

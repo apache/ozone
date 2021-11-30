@@ -35,6 +35,8 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
@@ -47,6 +49,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -54,6 +57,7 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRe
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 import com.google.common.base.Preconditions;
@@ -104,7 +108,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private final Lock lock;
 
   DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
-      String certSerialId, String component) {
+      String certSerialId, String component) throws IOException {
     Objects.requireNonNull(securityConfig);
     this.securityConfig = securityConfig;
     keyCodec = new KeyCodec(securityConfig, component);
@@ -117,71 +121,134 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     loadAllCertificates();
   }
 
+  private enum CertType {
+    X509_CERT, CA_CERT, ROOT_CA_CERT
+  }
+
+  private void cacheCertificate(File certFile, CertType certType) {
+    if (certFile.isFile() && certFile.exists()) {
+      try {
+        X509CertificateHolder x509CertificateHolder = CertificateCodec
+            .readCertificate(certFile);
+        X509Certificate cert =
+            CertificateCodec.getX509Certificate(x509CertificateHolder);
+        if (cert != null && cert.getSerialNumber() != null) {
+          switch (certType) {
+          case X509_CERT:
+            x509Certificate = cert;
+          case CA_CERT:
+            caCertId = cert.getSerialNumber().toString();
+          case ROOT_CA_CERT:
+            rootCaCertId = cert.getSerialNumber().toString();
+          default:
+            break;
+          }
+          certificateMap.putIfAbsent(cert.getSerialNumber().toString(),
+              cert);
+          getLogger().info("Added certificate from file:{}.",
+              certFile.getAbsolutePath());
+        } else {
+          getLogger().error("Error reading certificate from file:{}.",
+              certFile.getAbsolutePath());
+        }
+      } catch (java.security.cert.CertificateException | IOException e) {
+        getLogger().error("Error reading certificate from file:{}.",
+            certFile.getAbsolutePath(), e);
+      }
+    } else {
+      getLogger().error("Error reading certificate from file:{}. Check if the" +
+              " certificate file exists in this path.",
+          certFile.getAbsolutePath());
+    }
+  }
+
   /**
    * Load all certificates from configured location.
    * */
-  private void loadAllCertificates() {
-    // See if certs directory exists in file system.
-    Path certPath = securityConfig.getCertificateLocation(component);
-    if (Files.exists(certPath) && Files.isDirectory(certPath)) {
-      getLogger().info("Loading certificate from location:{}.",
-          certPath);
-      File[] certFiles = certPath.toFile().listFiles();
+  private void loadAllCertificates() throws IOException {
+    CertificateCodec certificateCodec =
+        new CertificateCodec(securityConfig, component);
+    if (securityConfig.isCustomCAEnabled()) {
 
-      if (certFiles != null) {
-        CertificateCodec certificateCodec =
-            new CertificateCodec(securityConfig, component);
-        long latestCaCertSerailId = -1L;
-        long latestRootCaCertSerialId = -1L;
-        for (File file : certFiles) {
-          if (file.isFile()) {
-            try {
-              X509CertificateHolder x509CertificateHolder = certificateCodec
-                  .readCertificate(certPath, file.getName());
-              X509Certificate cert =
-                  CertificateCodec.getX509Certificate(x509CertificateHolder);
-              if (cert != null && cert.getSerialNumber() != null) {
-                if (cert.getSerialNumber().toString().equals(certSerialId)) {
-                  x509Certificate = cert;
-                }
-                certificateMap.putIfAbsent(cert.getSerialNumber().toString(),
-                    cert);
-                if (file.getName().startsWith(CA_CERT_PREFIX)) {
-                  String certFileName = FilenameUtils.getBaseName(
-                      file.getName());
-                  long tmpCaCertSerailId = NumberUtils.toLong(
-                      certFileName.substring(CA_CERT_PREFIX_LEN));
-                  if (tmpCaCertSerailId > latestCaCertSerailId) {
-                    latestCaCertSerailId = tmpCaCertSerailId;
-                  }
-                }
+      Certificate cert = SecurityUtil.getCustomCertificate(securityConfig);
+      // String caCertsPath = securityConfig.getCaCertsPath();
+      if (cert != null) {
+        CertificateFactory cf = null;
+        try {
+          cf = CertificateFactory.getInstance("X.509");
+          ByteArrayInputStream bais =
+              new ByteArrayInputStream(cert.getEncoded());
+          x509Certificate = (X509Certificate) cf.generateCertificate(bais);
+        } catch (java.security.cert.CertificateException e) {
+          throw new SCMSecurityException("Error while getting " +
+              "the Certificate from Key Store.", e);
+        }
+      } else {
+        throw new SCMSecurityException("Error while getting " +
+            "the Certificate from Key Store.");
+      }
+    } else {
+      // See if certs directory exists in file system.
+      Path certPath = securityConfig.getCertificateLocation(component);
+      if (Files.exists(certPath) && Files.isDirectory(certPath)) {
+        getLogger().info("Loading certificates from location:{}.",
+            certPath);
+        File[] certFiles = certPath.toFile().listFiles();
 
-                if (file.getName().startsWith(ROOT_CA_CERT_PREFIX)) {
-                  String certFileName = FilenameUtils.getBaseName(
-                      file.getName());
-                  long tmpRootCaCertSerailId = NumberUtils.toLong(
-                      certFileName.substring(ROOT_CA_PREFIX_LEN));
-                  if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
-                    latestRootCaCertSerialId = tmpRootCaCertSerailId;
+        if (certFiles != null) {
+          long latestCaCertSerialId = -1L;
+          long latestRootCaCertSerialId = -1L;
+          for (File file : certFiles) {
+            if (file.isFile()) {
+              try {
+                X509CertificateHolder x509CertificateHolder = certificateCodec
+                    .readCertificate(certPath, file.getName());
+                X509Certificate cert =
+                    CertificateCodec.getX509Certificate(x509CertificateHolder);
+                if (cert != null && cert.getSerialNumber() != null) {
+                  if (cert.getSerialNumber().toString().equals(certSerialId)) {
+                    x509Certificate = cert;
                   }
+                  certificateMap.putIfAbsent(cert.getSerialNumber().toString(),
+                      cert);
+                  if (file.getName().startsWith(CA_CERT_PREFIX)) {
+                    String certFileName = FilenameUtils.getBaseName(
+                        file.getName());
+                    long tmpCaCertSerialId = NumberUtils.toLong(
+                        certFileName.substring(CA_CERT_PREFIX_LEN));
+                    if (tmpCaCertSerialId > latestCaCertSerialId) {
+                      latestCaCertSerialId = tmpCaCertSerialId;
+                    }
+                  }
+
+                  if (file.getName().startsWith(ROOT_CA_CERT_PREFIX)) {
+                    String certFileName = FilenameUtils.getBaseName(
+                        file.getName());
+                    long tmpRootCaCertSerailId = NumberUtils.toLong(
+                        certFileName.substring(ROOT_CA_PREFIX_LEN));
+                    if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
+                      latestRootCaCertSerialId = tmpRootCaCertSerailId;
+                    }
+                  }
+                  getLogger().info("Added certificate from file:{}.",
+                      file.getAbsolutePath());
+                } else {
+                  getLogger().error("Error reading certificate from file:{}",
+                      file);
                 }
-                getLogger().info("Added certificate from file:{}.",
-                    file.getAbsolutePath());
-              } else {
-                getLogger().error("Error reading certificate from file:{}",
-                    file);
+              } catch (java.security.cert.CertificateException |
+                  IOException e) {
+                getLogger().error("Error reading certificate from file:{}.",
+                    file.getAbsolutePath(), e);
               }
-            } catch (java.security.cert.CertificateException | IOException e) {
-              getLogger().error("Error reading certificate from file:{}.",
-                  file.getAbsolutePath(), e);
             }
           }
-        }
-        if (latestCaCertSerailId != -1) {
-          caCertId = Long.toString(latestCaCertSerailId);
-        }
-        if (latestRootCaCertSerialId != -1) {
-          rootCaCertId = Long.toString(latestRootCaCertSerialId);
+          if (latestCaCertSerialId != -1) {
+            caCertId = Long.toString(latestCaCertSerialId);
+          }
+          if (latestRootCaCertSerialId != -1) {
+            rootCaCertId = Long.toString(latestRootCaCertSerialId);
+          }
         }
       }
     }
@@ -194,19 +261,30 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return private key or Null if there is no data.
    */
   @Override
-  public PrivateKey getPrivateKey() {
+  public PrivateKey getPrivateKey() throws SCMSecurityException {
     if (privateKey != null) {
       return privateKey;
     }
 
-    Path keyPath = securityConfig.getKeyLocation(component);
-    if (OzoneSecurityUtil.checkIfFileExist(keyPath,
-        securityConfig.getPrivateKeyFileName())) {
+    if (securityConfig.isCustomCAEnabled()) {
+      KeyPair customKeyPair = null;
       try {
-        privateKey = keyCodec.readPrivateKey();
-      } catch (InvalidKeySpecException | NoSuchAlgorithmException
-          | IOException e) {
+        customKeyPair = SecurityUtil.getCustomKeyPair(securityConfig);
+        privateKey = customKeyPair.getPrivate();
+        return privateKey;
+      } catch (Exception e) {
         getLogger().error("Error while getting private key.", e);
+      }
+    } else {
+      Path keyPath = securityConfig.getKeyLocation(component);
+      if (OzoneSecurityUtil.checkIfFileExist(keyPath,
+          securityConfig.getPrivateKeyFileName())) {
+        try {
+          privateKey = keyCodec.readPrivateKey();
+        } catch (InvalidKeySpecException | NoSuchAlgorithmException
+            | IOException e) {
+          getLogger().error("Error while getting private key.", e);
+        }
       }
     }
     return privateKey;
@@ -218,19 +296,30 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return public key or Null if there is no data.
    */
   @Override
-  public PublicKey getPublicKey() {
+  public PublicKey getPublicKey() throws SCMSecurityException {
     if (publicKey != null) {
       return publicKey;
     }
 
-    Path keyPath = securityConfig.getKeyLocation(component);
-    if (OzoneSecurityUtil.checkIfFileExist(keyPath,
-        securityConfig.getPublicKeyFileName())) {
+    if (securityConfig.isCustomCAEnabled()) {
+      KeyPair customKeyPair = null;
       try {
-        publicKey = keyCodec.readPublicKey();
-      } catch (InvalidKeySpecException | NoSuchAlgorithmException
-          | IOException e) {
+        customKeyPair = SecurityUtil.getCustomKeyPair(securityConfig);
+        publicKey = customKeyPair.getPublic();
+        return publicKey;
+      } catch (Exception e) {
         getLogger().error("Error while getting public key.", e);
+      }
+    } else {
+      Path keyPath = securityConfig.getKeyLocation(component);
+      if (OzoneSecurityUtil.checkIfFileExist(keyPath,
+          securityConfig.getPublicKeyFileName())) {
+        try {
+          publicKey = keyCodec.readPublicKey();
+        } catch (InvalidKeySpecException | NoSuchAlgorithmException
+            | IOException e) {
+          getLogger().error("Error while getting public key.", e);
+        }
       }
     }
     return publicKey;
@@ -242,20 +331,23 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return certificate or Null if there is no data.
    */
   @Override
-  public X509Certificate getCertificate() {
+  public X509Certificate getCertificate() throws IOException {
     if (x509Certificate != null) {
       return x509Certificate;
     }
 
-    if (certSerialId == null) {
-      getLogger().error("Default certificate serial id is not set. Can't " +
-          "locate the default certificate for this client.");
-      return null;
-    }
     // Refresh the cache from file system.
     loadAllCertificates();
-    if (certificateMap.containsKey(certSerialId)) {
-      x509Certificate = certificateMap.get(certSerialId);
+    if (!securityConfig.isCustomCAEnabled()) {
+      if (certSerialId == null) {
+        getLogger().error("Default certificate serial id is not set. Can't " +
+            "locate the default certificate for this client.");
+        return null;
+      }
+
+      if (certificateMap.containsKey(certSerialId)) {
+        x509Certificate = certificateMap.get(certSerialId);
+      }
     }
     return x509Certificate;
   }
@@ -275,7 +367,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   /**
    * Returns the certificate  with the specified certificate serial id if it
    * exists else try to get it from SCM.
-   * @param  certId
+   * @param certId Certificate Serial ID
    *
    * @return certificate or Null if there is no data.
    */
@@ -286,8 +378,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (certificateMap.containsKey(certId)) {
       return certificateMap.get(certId);
     }
-    // Try to get it from SCM.
-    return this.getCertificateFromScm(certId);
+
+    if (!securityConfig.isCustomCAEnabled()) {
+      // Try to get it from SCM.
+      if (getLogger().isDebugEnabled()) {
+        getLogger().debug("Certificate {} not found in cache. Getting it " +
+            "from SCM.", certId);
+      }
+      return this.getCertificateFromScm(certId);
+    }
+    throw new CertificateException(String.format("Certificate for serial id " +
+        "%s not found in cache.", certId));
   }
 
   @Override
@@ -404,7 +505,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
       return sign.sign();
     } catch (NoSuchAlgorithmException | NoSuchProviderException
-        | InvalidKeyException | SignatureException e) {
+        | InvalidKeyException | SignatureException | SCMSecurityException e) {
       getLogger().error("Error while signing the stream", e);
       throw new CertificateException("Error while signing the stream", e,
           CRYPTO_SIGN_ERROR);
@@ -686,7 +787,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *
    */
   @Override
-  public synchronized InitResponse init() throws CertificateException {
+  public synchronized InitResponse init() throws IOException {
     int initCase = 0;
     PrivateKey pvtKey= getPrivateKey();
     PublicKey pubKey = getPublicKey();
@@ -711,62 +812,92 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   /**
    * Default handling of each {@link InitCase}.
    * */
-  protected InitResponse handleCase(InitCase init)
-      throws CertificateException {
-    switch (init) {
-    case NONE:
-      getLogger().info("Creating keypair for client as keypair and " +
-          "certificate not found.");
-      bootstrapClientKeys();
-      return GETCERT;
-    case CERT:
-      getLogger().error("Private key not found, while certificate is still" +
-          " present. Delete keypair and try again.");
-      return FAILURE;
-    case PUBLIC_KEY:
-      getLogger().error("Found public key but private key and certificate " +
-          "missing.");
-      return FAILURE;
-    case PRIVATE_KEY:
-      getLogger().info("Found private key but public key and certificate " +
-          "is missing.");
-      // TODO: Recovering public key from private might be possible in some
-      //  cases.
-      return FAILURE;
-    case PUBLICKEY_CERT:
-      getLogger().error("Found public key and certificate but private " +
-          "key is missing.");
-      return FAILURE;
-    case PRIVATEKEY_CERT:
-      getLogger().info("Found private key and certificate but public key" +
-          " missing.");
-      if (recoverPublicKey()) {
-        return SUCCESS;
-      } else {
-        getLogger().error("Public key recovery failed.");
-        return FAILURE;
-      }
-    case PUBLICKEY_PRIVATEKEY:
-      getLogger().info("Found private and public key but certificate is" +
-          " missing.");
-      if (validateKeyPair(getPublicKey())) {
-        return GETCERT;
-      } else {
-        getLogger().info("Keypair validation failed.");
-        return FAILURE;
-      }
-    case ALL:
-      getLogger().info("Found certificate file along with KeyPair.");
-      if (validateKeyPairAndCertificate()) {
-        return SUCCESS;
-      } else {
-        return FAILURE;
-      }
-    default:
-      getLogger().error("Unexpected case: {} (private/public/cert)",
-          Integer.toBinaryString(init.ordinal()));
+  protected InitResponse handleCase(InitCase init) throws IOException {
+    if (securityConfig.isCustomCAEnabled()) {
+      // For customCA, we can only handle the case when
+      // private key and certificate is available, but public key is missing.
+      // For all other cases, we cannot recover and should fail.
+      switch (init) {
+      case PRIVATEKEY_CERT:
+        getLogger().info("Found private key and certificate but public key" +
+            " missing.");
+        if (recoverPublicKey()) {
+          getLogger().info("Successfully recovered the Public Key.");
+          return SUCCESS;
+        } else {
+          getLogger().error("Public key recovery failed.");
+          return FAILURE;
+        }
+      case ALL:
+        getLogger().info("Found certificate file along with KeyPair.");
+        if (validateKeyPairAndCertificate()) {
+          return SUCCESS;
+        } else {
+          return FAILURE;
+        }
+      default:
+        getLogger().error("Private key or Certificate is missing. Cannot " +
+            "recover from this state when custom CA is enabled.");
 
-      return FAILURE;
+        return FAILURE;
+      }
+
+    } else {
+      switch (init) {
+      case NONE:
+        getLogger().info("Creating keypair for client as keypair and " +
+            "certificate not found.");
+        bootstrapClientKeys();
+        return GETCERT;
+      case CERT:
+        getLogger().error("Private key not found, while certificate is still" +
+            " present. Delete keypair and try again.");
+        return FAILURE;
+      case PUBLIC_KEY:
+        getLogger().error("Found public key but private key and certificate " +
+            "missing.");
+        return FAILURE;
+      case PRIVATE_KEY:
+        getLogger().info("Found private key but public key and certificate " +
+            "is missing.");
+        // TODO: Recovering public key from private might be possible in some
+        //  cases.
+        return FAILURE;
+      case PUBLICKEY_CERT:
+        getLogger().error("Found public key and certificate but private " +
+            "key is missing.");
+        return FAILURE;
+      case PRIVATEKEY_CERT:
+        getLogger().info("Found private key and certificate but public key" +
+            " missing.");
+        if (recoverPublicKey()) {
+          return SUCCESS;
+        } else {
+          getLogger().error("Public key recovery failed.");
+          return FAILURE;
+        }
+      case PUBLICKEY_PRIVATEKEY:
+        getLogger().info("Found private and public key but certificate is" +
+            " missing.");
+        if (validateKeyPair(getPublicKey())) {
+          return GETCERT;
+        } else {
+          getLogger().info("Keypair validation failed.");
+          return FAILURE;
+        }
+      case ALL:
+        getLogger().info("Found certificate file along with KeyPair.");
+        if (validateKeyPairAndCertificate()) {
+          return SUCCESS;
+        } else {
+          return FAILURE;
+        }
+      default:
+        getLogger().error("Unexpected case: {} (private/public/cert)",
+            Integer.toBinaryString(init.ordinal()));
+
+        return FAILURE;
+      }
     }
   }
 
@@ -774,7 +905,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Validate keypair and certificate.
    * */
   protected boolean validateKeyPairAndCertificate() throws
-      CertificateException {
+      IOException {
     if (validateKeyPair(getPublicKey())) {
       getLogger().info("Keypair validated.");
       // TODO: Certificates cryptographic validity can be checked as well.
@@ -796,7 +927,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Tries to recover public key from certificate. Also validates recovered
    * public key.
    * */
-  protected boolean recoverPublicKey() throws CertificateException {
+  protected boolean recoverPublicKey() throws IOException {
     PublicKey pubKey = getCertificate().getPublicKey();
     try {
 

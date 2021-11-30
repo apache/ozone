@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Paths;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
@@ -47,22 +48,23 @@ public class SCMCertificateClient extends DefaultCertificateClient {
           OzoneConsts.SCM_SUB_CA_PATH).toString();
 
   public SCMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
+      String certSerialId) throws IOException {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
   }
 
-  public SCMCertificateClient(SecurityConfig securityConfig) {
+  public SCMCertificateClient(SecurityConfig securityConfig)
+      throws IOException {
     super(securityConfig, LOG, null, COMPONENT_NAME);
   }
 
   public SCMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId, String component) {
+      String certSerialId, String component) throws IOException {
     super(securityConfig, LOG, certSerialId, component);
   }
 
   @Override
   protected InitResponse handleCase(InitCase init)
-      throws CertificateException {
+      throws IOException {
     // This is similar to OM.
     switch (init) {
     case NONE:

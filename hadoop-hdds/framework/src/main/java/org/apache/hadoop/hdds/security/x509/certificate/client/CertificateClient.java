@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
@@ -47,7 +48,7 @@ public interface CertificateClient {
    *
    * @return private key or Null if there is no data.
    */
-  PrivateKey getPrivateKey();
+  PrivateKey getPrivateKey() throws SCMSecurityException;
 
   /**
    * Returns the public key of the specified component if it exists on the local
@@ -55,7 +56,7 @@ public interface CertificateClient {
    *
    * @return public key or Null if there is no data.
    */
-  PublicKey getPublicKey();
+  PublicKey getPublicKey() throws SCMSecurityException;
 
   /**
    * Returns the certificate  of the specified component if it exists on the
@@ -73,7 +74,7 @@ public interface CertificateClient {
    *
    * @return certificate or Null if there is no data.
    */
-  X509Certificate getCertificate();
+  X509Certificate getCertificate() throws IOException;
 
   /**
    * Return the latest CA certificate known to the client.
@@ -188,7 +189,7 @@ public interface CertificateClient {
    * Initialize certificate client.
    *
    * */
-  InitResponse init() throws CertificateException;
+  InitResponse init() throws IOException;
 
   /**
    * Represents initialization response of client.

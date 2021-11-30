@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
@@ -62,7 +63,7 @@ public class ReplicationServer {
       ReplicationConfig replicationConfig,
       SecurityConfig secConf,
       CertificateClient caClient
-  ) {
+  ) throws SCMSecurityException {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
@@ -70,7 +71,7 @@ public class ReplicationServer {
     init();
   }
 
-  public void init() {
+  public void init() throws SCMSecurityException {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(new GrpcReplicationService(
@@ -93,7 +94,7 @@ public class ReplicationServer {
       } catch (IOException ex) {
         throw new IllegalArgumentException(
             "Unable to setup TLS for secure datanode replication GRPC "
-                + "endpoint.", ex);
+                + "endpoint. Error while getting Certificate.", ex);
       }
     }
 

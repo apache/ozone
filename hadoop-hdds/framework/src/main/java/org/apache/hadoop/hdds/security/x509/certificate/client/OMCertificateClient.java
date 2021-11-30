@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 
+import java.io.IOException;
+
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
@@ -42,24 +44,23 @@ public class OMCertificateClient extends DefaultCertificateClient {
   public static final String COMPONENT_NAME = "om";
 
   public OMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId, String localCrlId) {
+      String certSerialId, String localCrlId) throws IOException {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
     this.setLocalCrlId(localCrlId!=null ?
         Long.parseLong(localCrlId): 0);
   }
 
   public OMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
+      String certSerialId) throws IOException{
     this(securityConfig, certSerialId, null);
   }
 
-  public OMCertificateClient(SecurityConfig securityConfig) {
+  public OMCertificateClient(SecurityConfig securityConfig) throws IOException {
     this(securityConfig, null, null);
   }
 
   @Override
-  protected InitResponse handleCase(InitCase init) throws
-      CertificateException {
+  protected InitResponse handleCase(InitCase init) throws IOException {
     switch (init) {
     case NONE:
       LOG.info("Creating keypair for client as keypair and certificate not " +
