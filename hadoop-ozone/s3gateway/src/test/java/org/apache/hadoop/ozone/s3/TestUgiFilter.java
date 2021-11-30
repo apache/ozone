@@ -49,6 +49,11 @@ public class TestUgiFilter {
   private String curDate;
   private Map<String, String> headers;
   private Map<String, String[]> parameters;
+  private UgiFilter filter;
+  private HttpServletRequest request;
+  private HttpServletResponse response;
+  private FilterChain filterChain;
+  private FilterConfig filterConfig;
 
   private static final String HOST_HEADER = "Host";
   private static final String ENCODE_HEADER = "Accept-Encoding";
@@ -88,19 +93,17 @@ public class TestUgiFilter {
         "Signature=c29b4c46e825d5df56cdde12a61adfa65560a54"+
         "7c8973b9809621086727a2f2e");
     headers.put(LENGTH_HEADER, "0");
-
   }
 
-  @Test
-  public void testUgiFilterDoFilter() {
-    UgiFilter filter = new UgiFilter();
+  private void createMocks() {
+    filter = new UgiFilter();
     filter.setOzoneConfiguration(this.conf);
     filter.setOmService(this.omService);
 
-    HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
-    HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
-    FilterChain filterChain = Mockito.mock(FilterChain.class);
-    FilterConfig filterConfig = Mockito.mock(FilterConfig.class);
+    request = Mockito.mock(HttpServletRequest.class);
+    response = Mockito.mock(HttpServletResponse.class);
+    filterChain = Mockito.mock(FilterChain.class);
+    filterConfig = Mockito.mock(FilterConfig.class);
 
     Mockito.when(request.getScheme()).thenReturn("http");
     Mockito.when(request.getMethod()).thenReturn("PUT");
@@ -123,6 +126,20 @@ public class TestUgiFilter {
         headers.get(LENGTH_HEADER));
     Mockito.when(request.getParameterMap()).thenReturn(parameters);
 
+    // correct date in authorization header for AuthorizationV4QueryParser
+    // date validator
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace("20210616", curDate));
+
+  }
+
+  @Test
+  public void testUgiFilterDoFilterBadDate() {
+    createMocks();
+    // set incorrect date in authorization header
+    headers.put(AUTHORIZATION_HEADER, headers.
+        get(AUTHORIZATION_HEADER).replace(curDate, "20210616"));
+
     // Should generate exception because of incorrect date
     try {
       filter.init(filterConfig);
@@ -132,22 +149,28 @@ public class TestUgiFilter {
     } catch(Exception e) {
       Assert.assertTrue(e.getCause() instanceof OS3Exception);
     }
+  }
 
-    // correct date in authorization header for AuthorizationV4QueryParser
-    // date validator
-    headers.put(AUTHORIZATION_HEADER, headers.
-        get(AUTHORIZATION_HEADER).replace("20210616", curDate));
-
-
-    // Should not generate exception because of corrected date
+  @Test
+  public void testUgiFilterDoFilterGoodDate() {
+    createMocks();
+    // Should not generate exception
     try {
       filter.init(filterConfig);
       filter.doFilter(request, response, filterChain);
       filter.destroy();
+      // keep Findbugs happy
+      //http://findbugs.sourceforge.net/bugDescriptions.html#REC_CATCH_EXCEPTION
+    } catch(RuntimeException e) {
+      Assert.fail("Filter should not generate any exceptions.");
     } catch(Exception e) {
       Assert.fail("Filter should not generate any exceptions.");
     }
+  }
 
+  @Test
+  public void testUgiFilterDoFilterBadAwsVersion() {
+    createMocks();
     // Should generate exception because aws version unrecognized
     //  by any signature parser
     headers.put(AUTHORIZATION_HEADER, headers.
@@ -160,11 +183,11 @@ public class TestUgiFilter {
     } catch(Exception e) {
       Assert.assertTrue(e.getCause().getCause() instanceof OS3Exception);
     }
+  }
 
-    //Restore aws version
-    headers.put(AUTHORIZATION_HEADER, headers.
-        get(AUTHORIZATION_HEADER).replace("AWS3", "AWS4"));
-
+  @Test
+  public void testUgiFilterDoFilterEmptyUser() {
+    createMocks();
     // Should generate exception because user is empty
     headers.put(AUTHORIZATION_HEADER, headers.
         get(AUTHORIZATION_HEADER).replace(USER_STRING, ""));
