@@ -183,10 +183,14 @@ public class OzoneManagerStarter extends GenericCli {
     @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
-      OzoneManager om = OzoneManager.createOm(conf);
-      om.start();
+      try (OzoneManager om = OzoneManager.createOm(conf)) {
+        om.start();
+      } catch (Exception e) {
+        LOG.error("Error during start OzoneManager.", e);
+      }
+
       ShutdownHookManager.get().addShutdownHook(() -> {
-        try {
+        try (OzoneManager om = OzoneManager.createOm(conf)) {
           om.stop();
           om.join();
         } catch (Exception e) {
@@ -216,18 +220,24 @@ public class OzoneManagerStarter extends GenericCli {
         startupOption = OzoneManager.StartupOption.BOOTSTRAP;
       }
       // Bootstrap the OM
-      OzoneManager om = OzoneManager.createOm(conf, startupOption);
-      om.start();
-      om.join();
+      try (OzoneManager om = OzoneManager.createOm(conf, startupOption)){
+        om.start();
+        om.join();
+      } catch (Exception e) {
+        LOG.error("Error during start OzoneManager.", e);
+      }
     }
 
     @Override
     public void startAndCancelPrepare(OzoneConfiguration conf)
         throws IOException, AuthenticationException {
-      OzoneManager om = OzoneManager.createOm(conf);
-      om.getPrepareState().cancelPrepare();
-      om.start();
-      om.join();
+      try (OzoneManager om = OzoneManager.createOm(conf)) {
+        om.getPrepareState().cancelPrepare();
+        om.start();
+        om.join();
+      } catch (Exception e) {
+        LOG.error("Error during start OzoneManager.", e);
+      }
     }
   }
 }
