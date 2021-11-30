@@ -35,9 +35,8 @@ import java.util.List;
  */
 public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
 
-  public OMPathsPurgeRequestWithFSO(OMRequest omRequest,
-                                    BucketLayout bucketLayout) {
-    super(omRequest, bucketLayout);
+  public OMPathsPurgeRequestWithFSO(OMRequest omRequest) {
+    super(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
