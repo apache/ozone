@@ -44,7 +44,7 @@ public class ContainerScrubberConfiguration {
       "hdds.container.scrub.metadata.scan.interval";
   static final String DATA_SCAN_INTERVAL_KEY =
       "hdds.container.scrub.data.scan.interval";
-  static final String VOLUME_BYTES_PER_SECOND_KEY =
+  public static final String VOLUME_BYTES_PER_SECOND_KEY =
       "hdds.container.scrub.volume.bytes.per.second";
 
   static final long METADATA_SCAN_INTERVAL_DEFAULT =
