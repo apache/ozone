@@ -70,7 +70,7 @@ public class CreateBucketHandler extends BucketHandler {
           " 6-3, 10-4")
   private String replication;
 
-  @Option(names = {"--replicationtype", "-rt"},
+  @Option(names = {"--type", "-t"},
       description = "Replication type. Supported types are RATIS, STANDALONE,"
           + " EC")
   private String replicationType;
