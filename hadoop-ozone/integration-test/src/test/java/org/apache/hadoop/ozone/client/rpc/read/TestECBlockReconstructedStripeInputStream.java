@@ -126,6 +126,8 @@ public class TestECBlockReconstructedStripeInputStream {
     locations.add(ECStreamTestUtil.createIndexMap(2, 4, 5));
     // One data and one parity missing
     locations.add(ECStreamTestUtil.createIndexMap(2, 3, 4));
+    // No missing indexes
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
 
     for (Map<DatanodeDetails, Integer> dnMap : locations) {
       streamFactory = new TestBlockInputStreamFactory();
@@ -280,6 +282,8 @@ public class TestECBlockReconstructedStripeInputStream {
     locations.add(ECStreamTestUtil.createIndexMap(2, 3, 4));
     // One data and one parity missing
     locations.add(ECStreamTestUtil.createIndexMap(1, 2, 4));
+    // No indexes missing
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
 
     for (Map<DatanodeDetails, Integer> dnMap : locations) {
       streamFactory = new TestBlockInputStreamFactory();
@@ -366,6 +370,8 @@ public class TestECBlockReconstructedStripeInputStream {
     locations.add(ECStreamTestUtil.createIndexMap(2, 4, 5));
     // One data and one parity missing
     locations.add(ECStreamTestUtil.createIndexMap(2, 3, 4));
+    // No locations missing
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
 
     for (Map<DatanodeDetails, Integer> dnMap : locations) {
       streamFactory = new TestBlockInputStreamFactory();
