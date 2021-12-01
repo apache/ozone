@@ -78,8 +78,8 @@ public interface ReplicationConfig {
 
   static HddsProtos.ReplicationFactor getLegacyFactor(
       ReplicationConfig replicationConfig) {
-    if (replicationConfig instanceof CopyingReplicationConfig) {
-      return ((CopyingReplicationConfig) replicationConfig)
+    if (replicationConfig instanceof ReplicatedReplicationConfig) {
+      return ((ReplicatedReplicationConfig) replicationConfig)
           .getReplicationFactor();
     }
     throw new UnsupportedOperationException(

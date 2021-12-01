@@ -27,7 +27,7 @@ import java.util.Objects;
 /**
  * Replication configuration for EC replication.
  */
-public class RatisReplicationConfig implements CopyingReplicationConfig {
+public class RatisReplicationConfig implements ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
   private static final ReplicationType REPLICATION_TYPE = ReplicationType.RATIS;

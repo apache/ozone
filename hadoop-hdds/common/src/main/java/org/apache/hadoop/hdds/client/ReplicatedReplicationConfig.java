@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  * copying the data replicationFactor times, like RATIS or STANDALONE
  * replications.
  */
-public interface CopyingReplicationConfig extends ReplicationConfig {
+public interface ReplicatedReplicationConfig extends ReplicationConfig {
 
   /**
    * Returns the associated replication factor of this ReplicationConfig.

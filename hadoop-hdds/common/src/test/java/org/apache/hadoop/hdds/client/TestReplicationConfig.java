@@ -229,7 +229,7 @@ public class TestReplicationConfig {
         expectedFactor.getValue(), replicationConfig.getRequiredNodes());
     assertEquals(
         expectedFactor.name(),
-        ((CopyingReplicationConfig) replicationConfig)
+        ((ReplicatedReplicationConfig) replicationConfig)
             .getReplicationFactor().name());
   }
 }

@@ -27,7 +27,8 @@ import java.util.Objects;
 /**
  * Replication configuration for STANDALONE replication.
  */
-public class StandaloneReplicationConfig implements CopyingReplicationConfig {
+public class StandaloneReplicationConfig implements
+    ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
   private static final String REPLICATION_TYPE = "STANDALONE";
