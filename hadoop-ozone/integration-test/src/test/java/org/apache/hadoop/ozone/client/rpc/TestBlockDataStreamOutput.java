@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.client.rpc;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -101,6 +104,8 @@ public class TestBlockDataStreamOutput {
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
+        .setDataStreamBufferFlushize(maxFlushSize)
+        .setDataStreamBufferMaxSize(chunkSize)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .build();
     cluster.waitForClusterToBeReady();
@@ -185,6 +190,35 @@ public class TestBlockDataStreamOutput {
     String dataString = new String(data, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
+
+  @Test
+  public void testPutBlockAtBoundary() throws Exception {
+    int dataLength = 500;
+    XceiverClientMetrics metrics =
+        XceiverClientManager.getXceiverClientMetrics();
+    long putBlockCount = metrics.getContainerOpCountMetrics(
+        ContainerProtos.Type.PutBlock);
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(
+        ContainerProtos.Type.PutBlock);
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(
+        keyName, ReplicationType.RATIS, 0);
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+            .getBytes(UTF_8);
+    key.write(ByteBuffer.wrap(data));
+    Assert.assertTrue(
+        metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
+            <= pendingPutBlockCount + 1);
+    key.close();
+    // Since data length is 500 , first putBlock will be at 400(flush boundary)
+    // and the other at 500
+    Assert.assertTrue(
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
+            == putBlockCount + 2);
+    validateData(keyName, data);
+  }
+
 
   private OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
       long size) throws Exception {
