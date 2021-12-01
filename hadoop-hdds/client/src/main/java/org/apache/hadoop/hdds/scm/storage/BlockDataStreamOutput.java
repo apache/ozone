@@ -257,13 +257,30 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (len == 0) {
       return;
     }
+    int curLen = len;
+    // set limit on the number of bytes that a ByteBuffer(StreamBuffer) can hold
+    int maxBufferLen = config.getDataStreamMaxBufferSize();
+    while (curLen > 0) {
+      int writeLen = Math.min(curLen, maxBufferLen);
+      final StreamBuffer buf = new StreamBuffer(b, off, writeLen);
+      off += writeLen;
+      bufferList.add(buf);
+      writeChunkToContainer(buf.duplicate());
+      curLen -= writeLen;
+      writtenDataLength += writeLen;
+      doFlushIfNeeded();
+    }
+  }
 
-    final StreamBuffer buf = new StreamBuffer(b, off, len);
-    bufferList.add(buf);
-
-    writeChunkToContainer(buf.duplicate());
-
-    writtenDataLength += len;
+  private void doFlushIfNeeded() throws IOException {
+    Preconditions.checkArgument(config.getDataStreamBufferFlushSize() > config
+        .getDataStreamMaxBufferSize());
+    long boundary = config.getDataStreamBufferFlushSize() / config
+        .getDataStreamMaxBufferSize();
+    if (bufferList.size() % boundary == 0) {
+      updateFlushLength();
+      executePutBlock(false, false);
+    }
   }
 
   private void updateFlushLength() {
