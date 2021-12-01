@@ -19,18 +19,11 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryListProto;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Codec for ContainerReplicaHistoryList.
@@ -38,47 +31,16 @@ import java.util.UUID;
 public class ContainerReplicaHistoryListCodec
     implements Codec<ContainerReplicaHistoryList> {
 
-  // UUID takes 2 long to store. Each timestamp takes 1 long to store.
-  static final int SIZE_PER_ENTRY = 5 * Long.BYTES;
-  private final Codec<Long> lc = new LongCodec();
-
   @Override
-  public byte[] toPersistedFormat(ContainerReplicaHistoryList obj)
-      throws IOException {
-
-    List<ContainerReplicaHistory> lst = obj.getList();
-    final int sizeOfRes = SIZE_PER_ENTRY * lst.size();
-    // ByteArrayOutputStream constructor has a sanity check on size.
-    ByteArrayOutputStream out = new ByteArrayOutputStream(sizeOfRes);
-    for (ContainerReplicaHistory ts : lst) {
-      out.write(lc.toPersistedFormat(ts.getUuid().getMostSignificantBits()));
-      out.write(lc.toPersistedFormat(ts.getUuid().getLeastSignificantBits()));
-      out.write(lc.toPersistedFormat(ts.getFirstSeenTime()));
-      out.write(lc.toPersistedFormat(ts.getLastSeenTime()));
-      out.write(lc.toPersistedFormat(ts.getBcsId()));
-    }
-    return out.toByteArray();
+  public byte[] toPersistedFormat(ContainerReplicaHistoryList obj) {
+    return obj.toProto().toByteArray();
   }
 
   @Override
   public ContainerReplicaHistoryList fromPersistedFormat(byte[] rawData)
       throws IOException {
-
-    assert(rawData.length % SIZE_PER_ENTRY == 0);
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(rawData));
-    List<ContainerReplicaHistory> lst = new ArrayList<>();
-    while (in.available() > 0) {
-      final long uuidMsb = in.readLong();
-      final long uuidLsb = in.readLong();
-      final long firstSeenTime = in.readLong();
-      final long lastSeenTime = in.readLong();
-      final long lastBcsId = in.readLong();
-      final UUID id = new UUID(uuidMsb, uuidLsb);
-      lst.add(new ContainerReplicaHistory(id, firstSeenTime, lastSeenTime,
-          lastBcsId));
-    }
-    in.close();
-    return new ContainerReplicaHistoryList(lst);
+    return ContainerReplicaHistoryList.fromProto(
+        ContainerReplicaHistoryListProto.parseFrom(rawData));
   }
 
   @Override
