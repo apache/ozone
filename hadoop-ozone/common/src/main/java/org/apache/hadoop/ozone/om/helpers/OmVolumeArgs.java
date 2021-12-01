@@ -98,7 +98,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   }
 
   public long getRefCount() {
-    Preconditions.checkState(refCount >= 0, "refCount should not be negative");
+    Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
     return refCount;
   }
 
@@ -108,6 +108,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * Use incRefCount or decRefCount instead of this method in usual cases.
    */
   public void setRefCount(long refCount) {
+    Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
     this.refCount = refCount;
   }
 
@@ -122,6 +123,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * Decrease refCount by 1.
    */
   public void decRefCount() {
+    Preconditions.checkState(this.refCount > 0L,
+        "refCount should not become negative");
     this.refCount--;
   }
 
@@ -394,6 +397,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     }
 
     public void setRefCount(long refCount) {
+      Preconditions.checkState(refCount >= 0L,
+          "refCount should not be negative");
       this.refCount = refCount;
     }
 
