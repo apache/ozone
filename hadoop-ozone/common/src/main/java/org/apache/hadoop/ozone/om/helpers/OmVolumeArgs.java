@@ -103,16 +103,6 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   }
 
   /**
-   * Set refCount to the given value.
-   * Should only be used for special operations or debugging commands.
-   * Use incRefCount or decRefCount instead of this method in usual cases.
-   */
-  public void setRefCount(long refCount) {
-    Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
-    this.refCount = refCount;
-  }
-
-  /**
    * Increase refCount by 1.
    */
   public void incRefCount() {

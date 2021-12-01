@@ -34,7 +34,7 @@ public class OmTenantArgs {
 
   public OmTenantArgs(String tenantId) {
     this.tenantId = tenantId;
-    this.volumeName = tenantId;
+    this.volumeName = this.tenantId;
   }
 
   public OmTenantArgs(String tenantId, String volumeName) {

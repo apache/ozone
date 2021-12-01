@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -263,7 +264,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
       // Set volume reference count to 1
-      omVolumeArgs.setRefCount(1L);
+      omVolumeArgs.incRefCount();
+      Preconditions.checkState(omVolumeArgs.getRefCount() == 1,
+          "refCount should have been set to 1");
       // Audit
       auditMap = omVolumeArgs.toAuditMap();
 
