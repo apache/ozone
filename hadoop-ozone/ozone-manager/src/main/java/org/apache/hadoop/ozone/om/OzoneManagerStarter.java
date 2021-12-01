@@ -216,18 +216,20 @@ public class OzoneManagerStarter extends GenericCli {
         startupOption = OzoneManager.StartupOption.BOOTSTRAP;
       }
       // Bootstrap the OM
-      OzoneManager om = OzoneManager.createOm(conf, startupOption);
-      om.start();
-      om.join();
+      try (OzoneManager om = OzoneManager.createOm(conf, startupOption)) {
+        om.start();
+        om.join();
+      }
     }
 
     @Override
     public void startAndCancelPrepare(OzoneConfiguration conf)
         throws IOException, AuthenticationException {
-      OzoneManager om = OzoneManager.createOm(conf);
-      om.getPrepareState().cancelPrepare();
-      om.start();
-      om.join();
+      try (OzoneManager om = OzoneManager.createOm(conf)) {
+        om.getPrepareState().cancelPrepare();
+        om.start();
+        om.join();
+      }
     }
   }
 }
