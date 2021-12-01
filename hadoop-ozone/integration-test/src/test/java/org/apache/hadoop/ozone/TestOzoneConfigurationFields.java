@@ -81,6 +81,12 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_KEY_ALGORITHM,
         HddsConfigKeys.HDDS_SECURITY_PROVIDER,
         HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
+        HddsConfigKeys.HDDS_CUSTOM_KEYSTORE_FILE_PASSWORD,
+        HddsConfigKeys.HDDS_CUSTOM_KEYSTORE_FILE_PATH,
+        HddsConfigKeys.HDDS_CUSTOM_ROOT_CA_ENABLED,
+        HddsConfigKeys.HDDS_CUSTOM_KEYSTORE_KEY_PASSWORD,
+        HddsConfigKeys.HDDS_CUSTOM_TRUSTSTORE_PASSWORD,
+        HddsConfigKeys.HDDS_CUSTOM_TRUSTSTORE_FILE_PATH,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
