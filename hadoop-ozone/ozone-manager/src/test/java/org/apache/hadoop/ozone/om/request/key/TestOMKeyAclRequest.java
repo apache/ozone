@@ -60,7 +60,8 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
     // Create KeyAddAcl request
     OMRequest originalRequest = createAddAclkeyRequest(acl);
-    OMKeyAclRequest omKeyAddAclRequest = getOmKeyAddAclRequest(originalRequest);
+    OMKeyAclRequest omKeyAddAclRequest =
+        getOmKeyAddAclRequest(originalRequest);
     OMRequest preExecuteRequest = omKeyAddAclRequest.preExecute(ozoneManager);
 
     // When preExecute() of adding acl,
@@ -256,16 +257,15 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   }
 
   protected OMKeyAclRequest getOmKeyAddAclRequest(OMRequest originalRequest) {
-    return new OMKeyAddAclRequest(
-        originalRequest);
+    return new OMKeyAddAclRequest(originalRequest, ozoneManager);
   }
 
   protected OMKeyAclRequest getOmKeyRemoveAclRequest(
       OMRequest removeAclRequest) {
-    return new OMKeyRemoveAclRequest(removeAclRequest);
+    return new OMKeyRemoveAclRequest(removeAclRequest, ozoneManager);
   }
 
   protected OMKeyAclRequest getOmKeySetAclRequest(OMRequest setAclRequest) {
-    return new OMKeySetAclRequest(setAclRequest);
+    return new OMKeySetAclRequest(setAclRequest, ozoneManager);
   }
 }

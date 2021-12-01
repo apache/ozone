@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -48,8 +49,10 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
-  public OMKeyAclRequestWithFSO(OzoneManagerProtocolProtos.OMRequest omReq) {
+  public OMKeyAclRequestWithFSO(OzoneManagerProtocolProtos.OMRequest omReq,
+                                BucketLayout bucketLayout) {
     super(omReq);
+    setBucketLayout(bucketLayout);
   }
 
   @Override
@@ -118,7 +121,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
             new CacheValue<>(Optional.of(OMFileRequest.
                 getDirectoryInfo(omKeyInfo)), trxnLogIndex));
       } else {
-        omMetadataManager.getKeyTable(getBucketLayout(ozoneManager))
+        omMetadataManager.getKeyTable(getBucketLayout())
             .addCacheEntry(new CacheKey<>(dbKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
