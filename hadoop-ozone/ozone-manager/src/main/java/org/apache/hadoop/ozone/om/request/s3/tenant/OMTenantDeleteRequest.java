@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -129,7 +128,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       deleteVolume = volumeName.length() > 0;
 
       // Check if there are any accessIds in the tenant
-      if (!OMTenantRequestHelper.isTenantEmpty(tenantManager, tenantId)) {
+      if (!OMTenantRequestHelper.isTenantEmpty(omMetadataManager, tenantId)) {
         LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
             tenantId);
         throw new OMException("Tenant '" + tenantId + "' is not empty. " +

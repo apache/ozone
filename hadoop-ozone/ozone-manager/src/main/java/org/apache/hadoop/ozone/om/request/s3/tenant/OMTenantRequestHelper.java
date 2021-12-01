@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
@@ -186,8 +188,36 @@ public final class OMTenantRequestHelper {
   }
 
   /**
-   * Return true is the tenant doesn't have any accessIds assigned to it,
-   * false otherwise.
+   * Scans (Slow!) TenantAccessIdTable for the given tenantId.
+   * Returns true if the tenant doesn't have any accessIds assigned to it
+   * (i.e. the tenantId is not found in this table for any existing accessIds);
+   * Returns false otherwise.
+   * @param metadataManager
+   * @param tenantId
+   * @return
+   * @throws IOException
+   */
+  static boolean isTenantEmpty(OMMetadataManager metadataManager,
+                               String tenantId) throws IOException {
+
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, OmDBAccessIdInfo>> iter =
+             metadataManager.getTenantAccessIdTable().iterator()) {
+      while (iter.hasNext()) {
+        final OmDBAccessIdInfo accessIdInfo = iter.next().getValue();
+        if (accessIdInfo.getTenantId().equals(tenantId)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Return true if the tenant doesn't have any accessIds assigned to it,
+   * false otherwise. Uses in-memory mapping tenantCache which can be seen as
+   * a reverse-mapping of tenantAccessIdTable (Fast).
    * @param tenantManager
    * @param tenantId
    * @return
@@ -195,6 +225,11 @@ public final class OMTenantRequestHelper {
    */
   static boolean isTenantEmpty(OMMultiTenantManager tenantManager,
                                String tenantId) throws IOException {
+    // TODO: OMMultiTenantManager#listUsersInTenant relies on the tenantCache
+    //  mapping which I believe is only updated on leader node in preExecute
+    //  (apart from it being populated on OM startup) right now.
+    //  So unless tenantCache is updated on follower nodes later as well,
+    //  we can't use listUsersInTenant to check tenant emptiness in followers.
     final List<TenantUserAccessId> tenantUserAccessIdsList =
         tenantManager.listUsersInTenant(tenantId, "").getUserAccessIds();
     return tenantUserAccessIdsList.size() == 0;
