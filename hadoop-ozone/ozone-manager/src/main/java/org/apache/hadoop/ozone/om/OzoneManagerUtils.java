@@ -49,7 +49,10 @@ public final class OzoneManagerUtils {
    * OzoneManagerStateMachine#runCommand ->
    * OzoneManagerRequestHandler#handleWriteRequest ->
    * OzoneManagerRatisUtils#createClientRequest ->
-   * OzoneManagerRatisUtils#getOmBucketInfo ->
+   * OMKeyRequestFactory#createRequest ->
+   * ...
+   * OzoneManagerUtils#getBucketLayout ->
+   * OzoneManagerUtils#getOmBucketInfo ->
    * omMetadataManager().getBucketTable().get(buckKey)
    */
 

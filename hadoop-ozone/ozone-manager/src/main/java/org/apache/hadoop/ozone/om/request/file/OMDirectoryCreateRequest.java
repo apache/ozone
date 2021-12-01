@@ -375,9 +375,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   public static OMDirectoryCreateRequest getInstance(
-      OzoneManagerProtocolProtos.KeyArgs keyArgs,
-      OMRequest omRequest,
-      OzoneManager ozoneManager)
+      KeyArgs keyArgs, OMRequest omRequest, OzoneManager ozoneManager)
       throws IOException {
 
     BucketLayout bucketLayout =

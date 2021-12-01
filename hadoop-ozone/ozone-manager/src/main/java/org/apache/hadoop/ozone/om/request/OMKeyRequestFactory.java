@@ -64,15 +64,25 @@ public final class OMKeyRequestFactory {
     OMKeyRequest omKeyRequest = null;
 
     switch (cmdType) {
-    case AllocateBlock:
-      keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
-      omKeyRequest = OMAllocateBlockRequest
+    case CreateDirectory:
+      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
+      omKeyRequest = OMDirectoryCreateRequest
           .getInstance(keyArgs, omRequest, ozoneManager);
+      break;
+    case CreateFile:
+      keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
+      omKeyRequest =
+          OMFileCreateRequest.getInstance(keyArgs, omRequest, ozoneManager);
       break;
     case CreateKey:
       keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
       omKeyRequest =
           OMKeyCreateRequest.getInstance(keyArgs, omRequest, ozoneManager);
+      break;
+    case AllocateBlock:
+      keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
+      omKeyRequest = OMAllocateBlockRequest
+          .getInstance(keyArgs, omRequest, ozoneManager);
       break;
     case CommitKey:
       keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
@@ -93,16 +103,6 @@ public final class OMKeyRequestFactory {
       break;
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
-    case CreateDirectory:
-      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
-      omKeyRequest = OMDirectoryCreateRequest
-          .getInstance(keyArgs, omRequest, ozoneManager);
-      break;
-    case CreateFile:
-      keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
-      omKeyRequest =
-          OMFileCreateRequest.getInstance(keyArgs, omRequest, ozoneManager);
-      break;
     case PurgeKeys:
       omKeyRequest = new OMKeyPurgeRequest(omRequest);
       break;

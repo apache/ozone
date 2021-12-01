@@ -396,9 +396,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
   }
 
   public static OMFileCreateRequest getInstance(KeyArgs keyArgs,
-                                                OMRequest omRequest,
-                                                OzoneManager ozoneManager)
-      throws IOException {
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
 
     BucketLayout bucketLayout =
         OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
