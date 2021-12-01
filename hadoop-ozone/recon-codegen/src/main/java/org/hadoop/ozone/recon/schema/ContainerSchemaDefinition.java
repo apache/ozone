@@ -49,7 +49,8 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     MISSING,
     UNDER_REPLICATED,
     OVER_REPLICATED,
-    MIS_REPLICATED
+    MIS_REPLICATED,
+    UNHEALTHY
   }
 
   private static final String CONTAINER_ID = "container_id";

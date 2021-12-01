@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static junit.framework.TestCase.assertEquals;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNHEALTHY;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -63,6 +64,8 @@ import org.junit.Test;
  * Class to test a single run of the Container Health Task.
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
+
+  @SuppressWarnings("checkstyle:methodlength")
   @Test
   public void testRun() throws Exception {
     UnhealthyContainersDao unHealthyContainersTableHandle =
@@ -98,7 +101,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.UNHEALTHY));
 
-    // return one UNHEALTHY replica for container ID 2 -> Missing
+    // return all UNHEALTHY replicas for container ID 2 -> UNDER_REPLICATED
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L, State.UNHEALTHY));
 
@@ -145,8 +148,17 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(2, rec.getReplicaDelta().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(2L).get(0);
-    assertEquals("MISSING", rec.getContainerState());
+    assertEquals("UNDER_REPLICATED", rec.getContainerState());
     assertEquals(3, rec.getReplicaDelta().intValue());
+
+    List<UnhealthyContainers> unhealthyContainers =
+        containerHealthSchemaManager.getUnhealthyContainers(UNHEALTHY, 0,
+            Integer.MAX_VALUE);
+    assertEquals(1, unhealthyContainers.size());
+    assertEquals(2L,
+        unhealthyContainers.get(0).getContainerId().longValue());
+    assertEquals(0,
+        unhealthyContainers.get(0).getActualReplicaCount().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(3L).get(0);
     assertEquals("MISSING", rec.getContainerState());

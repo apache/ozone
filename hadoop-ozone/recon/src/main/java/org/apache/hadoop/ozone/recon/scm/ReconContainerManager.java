@@ -286,6 +286,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
         replicaHistoryMap.get(id);
 
     boolean flushToDB = false;
+    long bcsId = replica.getSequenceId() != null ? replica.getSequenceId() : -1;
 
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
@@ -293,7 +294,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       replicaHistoryMap.putIfAbsent(id,
           new ConcurrentHashMap<UUID, ContainerReplicaHistory>() {{
             put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime,
-                replica.getSequenceId()));
+                bcsId));
           }});
       flushToDB = true;
     } else {
@@ -302,18 +303,17 @@ public class ReconContainerManager extends ContainerManagerImpl {
       if (ts == null) {
         // New Datanode
         replicaLastSeenMap.put(uuid,
-            new ContainerReplicaHistory(uuid, currTime, currTime,
-                replica.getSequenceId()));
+            new ContainerReplicaHistory(uuid, currTime, currTime, bcsId));
         flushToDB = true;
       } else {
-        // if the object exists, only update the last seen time field
+        // if the object exists, only update the last seen time & bcsId fields
         ts.setLastSeenTime(currTime);
-        ts.setBcsId(replica.getSequenceId());
+        ts.setBcsId(bcsId);
       }
     }
 
     if (flushToDB) {
-      upsertContainerHistory(id, uuid, currTime, replica.getSequenceId());
+      upsertContainerHistory(id, uuid, currTime, bcsId);
     }
   }
 
