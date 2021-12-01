@@ -752,12 +752,12 @@ public class ContainerStateMachine extends BaseStateMachine {
           index);
       try {
         RaftServer.Division division = ratisServer.getServer().getDivision(gid);
-        if (division.getInfo().isLeader() && Arrays
-            .stream(division.getInfo().getFollowerNextIndices())
-            .allMatch(i -> i >= index)) {
-          LOG.debug("Removing data corresponding to log index {} from cache",
-              index);
-          stateMachineDataCache.removeIf(k -> k >= index);
+        if (division.getInfo().isLeader()) {
+          long minIndex = Arrays.stream(division.getInfo()
+              .getFollowerNextIndices()).min().getAsLong();
+          LOG.debug("Removing data corresponding to log index {} min index {} "
+                  + "from cache", index, minIndex);
+          stateMachineDataCache.removeIf(k -> k >= (Math.min(minIndex, index)));
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
