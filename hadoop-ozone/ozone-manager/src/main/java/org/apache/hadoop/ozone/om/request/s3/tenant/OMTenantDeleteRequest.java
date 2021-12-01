@@ -95,11 +95,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         .setDeleteTenantRequest(DeleteTenantRequest.newBuilder()
             .setTenantId(tenantId))
         .setDeleteVolumeRequest(DeleteVolumeRequest.newBuilder()
-            .setVolumeName(volumeName))
-        // TODO: Can the three lines below be removed?
-        .setUserInfo(getUserInfo())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
+            .setVolumeName(volumeName));
 
     return omRequestBuilder.build();
   }
