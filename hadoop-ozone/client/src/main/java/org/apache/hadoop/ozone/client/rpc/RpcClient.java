@@ -130,8 +130,10 @@ import com.google.common.cache.RemovalNotification;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
+import org.apache.hadoop.util.ComparableVersion;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
 import org.jetbrains.annotations.NotNull;
@@ -198,8 +200,23 @@ public class RpcClient implements ClientProtocol {
       ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
-      ozoneManagerProtocolClientSideTranslatorPB.setS3AuthCheck(
-          conf.getBoolean(S3Auth.S3_AUTH_CHECK, false));
+      boolean isS3 = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false);
+      ozoneManagerProtocolClientSideTranslatorPB.setS3AuthCheck(isS3);
+      if (isS3) {
+        // S3 Auth works differently and needs OM version to be at 2.0.0
+        String omVersion = conf.get(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY);
+        if (!validateOmVersion(omVersion, serviceInfoEx.getServiceInfoList())) {
+          if (LOG.isDebugEnabled()) {
+            for (ServiceInfo s : serviceInfoEx.getServiceInfoList()) {
+              LOG.debug("Node {} version {}", s.getHostname(),
+                  s.getProtobuf().getOMProtocolVersion());
+            }
+          }
+          throw new RuntimeException("OmVersion expected "
+              + omVersion
+              + ", not found in ServiceList");
+        }
+      }
       String caCertPem = null;
       List<String> caCertPems = null;
       caCertPem = serviceInfoEx.getCaCertificate();
@@ -261,6 +278,29 @@ public class RpcClient implements ClientProtocol {
             }
           }
         }).build();
+  }
+
+  static boolean validateOmVersion(String expectedVersion,
+                                   List<ServiceInfo> serviceInfoList) {
+    if (expectedVersion == null || expectedVersion.isEmpty()) {
+      // Empty strings assumes client is fine with any OM version.
+      return true;
+    }
+    boolean found = false; // At min one OM should be present.
+    for (ServiceInfo s: serviceInfoList) {
+      if (s.getNodeType() == HddsProtos.NodeType.OM) {
+        ComparableVersion comparableExpectedVersion =
+            new ComparableVersion(expectedVersion);
+        ComparableVersion comparableOMVersion =
+            new ComparableVersion(s.getProtobuf().getOMProtocolVersion());
+        if (comparableOMVersion.compareTo(comparableExpectedVersion) < 0) {
+          return false;
+        } else {
+          found = true;
+        }
+      }
+    }
+    return found;
   }
 
   @NotNull

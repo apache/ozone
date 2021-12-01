@@ -48,18 +48,21 @@ public class ContainerBalancerSelectionCriteria {
   private ContainerManager containerManager;
   private Set<ContainerID> selectedContainers;
   private Set<ContainerID> excludeContainers;
+  private FindSourceStrategy findSourceStrategy;
 
   public ContainerBalancerSelectionCriteria(
       ContainerBalancerConfiguration balancerConfiguration,
       NodeManager nodeManager,
       ReplicationManager replicationManager,
-      ContainerManager containerManager) {
+      ContainerManager containerManager,
+      FindSourceStrategy findSourceStrategy) {
     this.balancerConfiguration = balancerConfiguration;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     selectedContainers = new HashSet<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
+    this.findSourceStrategy = findSourceStrategy;
   }
 
   /**
@@ -113,6 +116,23 @@ public class ContainerBalancerSelectionCriteria {
             "container.", containerID.toString(), e);
         return true;
       }
+    });
+
+    //if the utilization of the source data node becomes lower than lowerLimit
+    //after the container is moved out , then the container can not be
+    // a candidate one, and we should remove it from the candidateContainers.
+    containerIDSet.removeIf(c -> {
+      ContainerInfo cInfo;
+      try {
+        cInfo = containerManager.getContainer(c);
+      } catch (ContainerNotFoundException e) {
+        LOG.warn("Could not find container {} when " +
+            "be matched with a move target", c);
+        //remove this not found container
+        return true;
+      }
+      return !findSourceStrategy.canSizeLeaveSource(
+          node, cInfo.getUsedBytes());
     });
 
     containerIDSet.removeIf(this::isContainerReplicatingOrDeleting);
