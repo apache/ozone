@@ -109,9 +109,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
           TENANT_LOCK, tenantId);
 
-      final OMMultiTenantManager tenantManager =
-          ozoneManager.getMultiTenantManager();
-
       // Check tenant existence in tenantStateTable
       if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
         LOG.debug("tenant: {} does not exist", tenantId);

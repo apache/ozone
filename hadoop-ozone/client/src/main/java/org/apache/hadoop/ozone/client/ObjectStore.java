@@ -33,7 +33,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -206,12 +205,14 @@ public class ObjectStore {
 
   /**
    * Create a tenant with extra arguments.
+   *
+   * @param tenantId tenant name.
    * @param tenantArgs extra tenant arguments like volume name.
    * @throws IOException
    */
-  public void createTenant(OmTenantArgs tenantArgs)
+  public void createTenant(String tenantId, TenantArgs tenantArgs)
       throws IOException {
-    proxy.createTenant(tenantArgs);
+    proxy.createTenant(tenantId, tenantArgs);
   }
 
   /**
@@ -219,7 +220,7 @@ public class ObjectStore {
    * @param tenantId tenant name.
    * @throws IOException
    */
-  public void updateTenant(String tenantId, OmTenantArgs tenantArgs)
+  public void updateTenant(String tenantId, TenantArgs tenantArgs)
       throws IOException {
     proxy.updateTenant(tenantId, tenantArgs);
   }

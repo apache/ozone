@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
@@ -671,36 +672,57 @@ public class RpcClient implements ClientProtocol {
    */
   @Override
   public void createTenant(String tenantId) throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
-        "tenantId cannot be null or empty.");
-    createTenant(new OmTenantArgs(tenantId));
+    createTenant(tenantId, TenantArgs.newBuilder()
+        .setVolumeName(tenantId).build());
   }
 
   /**
    * {@inheritDoc}
    */
   @Override
-  public void createTenant(OmTenantArgs omTenantArgs) throws IOException {
-    Preconditions.checkNotNull(omTenantArgs);
-    // Pre-check on the client to avoid unnecessary RPC calls
-    verifyVolumeName(omTenantArgs.getVolumeName());
-
-    ozoneManagerClient.createTenant(omTenantArgs);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void updateTenant(String tenantId, OmTenantArgs omTenantArgs)
+  public void createTenant(String tenantId, TenantArgs tenantArgs)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantId),
         "tenantId cannot be null or empty.");
-    Preconditions.checkNotNull(omTenantArgs);
-    // Pre-check on the client to avoid unnecessary RPC calls
-    verifyVolumeName(omTenantArgs.getVolumeName());
+    Preconditions.checkNotNull(tenantArgs);
 
-    ozoneManagerClient.updateTenant(tenantId, omTenantArgs);
+    final String volumeName = tenantArgs.getVolumeName();
+    verifyVolumeName(volumeName);
+
+    OmTenantArgs.Builder builder = OmTenantArgs.newBuilder();
+    builder.setTenantId(tenantId);
+    builder.setVolumeName(volumeName);
+    // TODO: Add more fields
+    // TODO: Include OmVolumeArgs in (Om)TenantArgs as well for volume creation?
+
+    LOG.info("Creating Tenant: '{}', with new volume: '{}'",
+        tenantId, volumeName);
+
+    ozoneManagerClient.createTenant(builder.build());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void updateTenant(String tenantId, TenantArgs tenantArgs)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
+    Preconditions.checkNotNull(tenantArgs);
+
+    final String volumeName = tenantArgs.getVolumeName();
+    verifyVolumeName(volumeName);
+
+    OmTenantArgs.Builder builder = OmTenantArgs.newBuilder();
+    builder.setTenantId(tenantId);
+    builder.setVolumeName(volumeName);
+    // TODO: Add more fields
+
+    LOG.info("Updating Tenant: '{}', with volume: '{}'",
+        tenantId, volumeName);
+
+    ozoneManagerClient.updateTenant(tenantId, builder.build());
   }
 
   /**

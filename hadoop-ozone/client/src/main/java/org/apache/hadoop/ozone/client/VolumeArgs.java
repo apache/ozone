@@ -119,6 +119,7 @@ public final class VolumeArgs {
   /**
    * Builder for OmVolumeArgs.
    */
+  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private String adminName;
     private String ownerName;

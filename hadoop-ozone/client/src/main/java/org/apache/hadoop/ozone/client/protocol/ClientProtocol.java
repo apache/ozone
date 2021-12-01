@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -44,7 +45,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -597,18 +597,20 @@ public interface ClientProtocol {
 
   /**
    * Create a tenant with args.
-   * @param omTenantArgs various arguments for tenant creation like volume name
+   *
+   * @param tenantId
+   * @param tenantArgs extra arguments e.g. volume name
    * @throws IOException
    */
-  void createTenant(OmTenantArgs omTenantArgs) throws IOException;
+  void createTenant(String tenantId, TenantArgs tenantArgs) throws IOException;
 
   /**
    * Update a tenant.
    * @param tenantId tenant name.
+   * @param tenantArgs tenant arguments.
    * @throws IOException
    */
-  void updateTenant(String tenantId, OmTenantArgs omTenantArgs)
-      throws IOException;
+  void updateTenant(String tenantId, TenantArgs tenantArgs) throws IOException;
 
   /**
    * Delete a tenant.
