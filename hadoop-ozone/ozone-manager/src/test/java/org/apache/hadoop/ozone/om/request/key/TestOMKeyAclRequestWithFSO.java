@@ -54,19 +54,23 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
     return omKeyInfo.getPath();
   }
 
-  @Override protected OMKeyAclRequest getOmKeyAddAclRequest(
+  @Override
+  protected OMKeyAclRequest getOmKeyAddAclRequest(
       OzoneManagerProtocolProtos.OMRequest originalRequest) {
-    return new OMKeyAddAclRequestWithFSO(originalRequest);
+    return new OMKeyAddAclRequestWithFSO(originalRequest, getBucketLayout());
   }
 
-  @Override protected OMKeyAclRequest getOmKeyRemoveAclRequest(
+  @Override
+  protected OMKeyAclRequest getOmKeyRemoveAclRequest(
       OzoneManagerProtocolProtos.OMRequest removeAclRequest) {
-    return new OMKeyRemoveAclRequestWithFSO(removeAclRequest);
+    return new OMKeyRemoveAclRequestWithFSO(removeAclRequest,
+        getBucketLayout());
   }
 
-  @Override protected OMKeyAclRequest getOmKeySetAclRequest(
+  @Override
+  protected OMKeyAclRequest getOmKeySetAclRequest(
       OzoneManagerProtocolProtos.OMRequest setAclRequest) {
-    return new OMKeySetAclRequestWithFSO(setAclRequest);
+    return new OMKeySetAclRequestWithFSO(setAclRequest, getBucketLayout());
   }
 
   @Override
