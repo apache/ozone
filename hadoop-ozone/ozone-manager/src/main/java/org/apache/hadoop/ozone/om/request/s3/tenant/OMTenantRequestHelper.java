@@ -41,8 +41,8 @@ public final class OMTenantRequestHelper {
   }
 
   /**
-   * Passes check only when caller is an Ozone admin,
-   * throws OMException otherwise.
+   * Passes check only when caller is an Ozone (cluster) admin, throws
+   * OMException otherwise.
    * @throws OMException PERMISSION_DENIED
    */
   static void checkAdmin(OzoneManager ozoneManager) throws OMException {
