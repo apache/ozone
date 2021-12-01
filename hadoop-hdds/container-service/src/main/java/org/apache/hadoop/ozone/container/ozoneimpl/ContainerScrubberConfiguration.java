@@ -39,18 +39,18 @@ public class ContainerScrubberConfiguration {
   // only for log
   public static final String HDDS_CONTAINER_SCRUB_ENABLED =
       "hdds.container.scrub.enabled";
-  static final String METADATA_SCAN_INTERVAL_KEY =
+  public static final String METADATA_SCAN_INTERVAL_KEY =
       "hdds.container.scrub.metadata.scan.interval";
-  static final String DATA_SCAN_INTERVAL_KEY =
+  public static final String DATA_SCAN_INTERVAL_KEY =
       "hdds.container.scrub.data.scan.interval";
   public static final String VOLUME_BYTES_PER_SECOND_KEY =
       "hdds.container.scrub.volume.bytes.per.second";
 
-  static final long METADATA_SCAN_INTERVAL_DEFAULT =
+  public static final long METADATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofHours(3).toMillis();
-  static final long DATA_SCAN_INTERVAL_DEFAULT =
+  public static final long DATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofDays(1).toMillis();
-  static final long BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;   // 1MB
+  public static final long BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;   // 1MB
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
