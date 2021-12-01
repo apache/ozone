@@ -85,17 +85,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
           TENANT_NOT_FOUND);
     }
 
-    final OMMultiTenantManager tenantManager =
-        ozoneManager.getMultiTenantManager();
-    // Check if there are any accessIds in the tenant
-    if (!OMTenantRequestHelper.isTenantEmpty(tenantManager, tenantId)) {
-      LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
-          tenantId);
-      throw new OMException("Tenant '" + tenantId + "' is not empty. " +
-          "All accessIds associated to this tenant must be revoked before " +
-          "the tenant can be deleted.", TENANT_NOT_EMPTY);
-    }
-
     // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
 
     // Regenerate request with the volumeName
@@ -145,7 +134,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     try {
 
       if (deleteVolume) {
-        // Csheck Acl
+        // Check Acl
         if (ozoneManager.getAclsEnabled()) {
           checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
               OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
@@ -207,6 +196,17 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       // Hold tenant lock
       acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
           TENANT_LOCK, tenantId);
+
+      final OMMultiTenantManager tenantManager =
+          ozoneManager.getMultiTenantManager();
+      // Check if there are any accessIds in the tenant
+      if (!OMTenantRequestHelper.isTenantEmpty(tenantManager, tenantId)) {
+        LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
+            tenantId);
+        throw new OMException("Tenant '" + tenantId + "' is not empty. " +
+            "All accessIds associated to this tenant must be revoked before " +
+            "the tenant can be deleted.", TENANT_NOT_EMPTY);
+      }
 
       // Invalidate cache entries for tenant
       omMetadataManager.getTenantStateTable().addCacheEntry(
