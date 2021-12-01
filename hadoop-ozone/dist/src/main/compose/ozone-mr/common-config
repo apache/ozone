@@ -27,7 +27,6 @@ OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.scm.safemode.min.datanode=3
-OZONE-SITE.XML_ozone.client.test.ofs.default.bucket.layout=LEGACY
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019

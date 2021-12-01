@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -226,6 +228,13 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+
+      // resolve the bucket layout in case of Link Bucket
+      BucketLayout resolvedBucketLayout =
+          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+              new HashSet<>());
+
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
     } catch (OMException ex) {
       if (createIfNotExist) {
         // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume

@@ -209,6 +209,8 @@ public class TestObjectStore {
       Assert.fail("Should throw Exception due to loop in Link Buckets");
     } catch (OMException oe) {
       // Expected exception
+      Assert.assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+          oe.getResult());
     }
   }
 

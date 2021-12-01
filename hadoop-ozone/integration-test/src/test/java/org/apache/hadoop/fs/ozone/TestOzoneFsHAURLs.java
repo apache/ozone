@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ratis.util.LifeCycle;
@@ -100,6 +101,10 @@ public class TestOzoneFsHAURLs {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
+
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId(clusterId);
