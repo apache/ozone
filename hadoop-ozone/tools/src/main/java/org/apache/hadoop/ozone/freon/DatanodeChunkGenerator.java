@@ -202,7 +202,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     DatanodeBlockID blockId = DatanodeBlockID.newBuilder()
         .setContainerID(1L)
         .setLocalID(stepNo % 20)
-        .setBlockCommitSequenceId(stepNo)
         .build();
 
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
