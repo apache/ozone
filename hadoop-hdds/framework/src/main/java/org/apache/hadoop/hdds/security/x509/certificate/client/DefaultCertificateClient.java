@@ -136,10 +136,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           switch (certType) {
           case X509_CERT:
             x509Certificate = cert;
+            break;
           case CA_CERT:
             caCertId = cert.getSerialNumber().toString();
+            break;
           case ROOT_CA_CERT:
             rootCaCertId = cert.getSerialNumber().toString();
+            break;
           default:
             break;
           }

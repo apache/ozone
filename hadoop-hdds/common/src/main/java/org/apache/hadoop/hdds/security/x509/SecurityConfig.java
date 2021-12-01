@@ -455,11 +455,11 @@ public class SecurityConfig {
   }
 
   public char[] getKeystoreFilePassword() {
-    return keystoreFilePassword;
+    return keystoreFilePassword.clone();
   }
 
   public char[] getKeystoreKeyPassword() {
-    return keystoreKeyPassword;
+    return keystoreKeyPassword.clone();
   }
 
   public String getTruststoreFilePath() {
@@ -467,6 +467,6 @@ public class SecurityConfig {
   }
 
   public char[] getTruststorePassword() {
-    return truststorePassword;
+    return truststorePassword.clone();
   }
 }

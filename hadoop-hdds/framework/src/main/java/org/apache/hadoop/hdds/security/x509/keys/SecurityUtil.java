@@ -150,10 +150,12 @@ public final class SecurityUtil {
       NoSuchAlgorithmException {
     String keystorePath = securityConfig.getKeystoreFilePath();
     char[] keystoreFilePassword = securityConfig.getKeystoreFilePassword();
-    FileInputStream is = new FileInputStream(keystorePath);
 
-    KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
-    keystore.load(is, keystoreFilePassword);
+    KeyStore keystore;
+    try (FileInputStream is = new FileInputStream(keystorePath)) {
+      keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keystore.load(is, keystoreFilePassword);
+    }
     return keystore;
   }
 
@@ -162,10 +164,12 @@ public final class SecurityUtil {
       java.security.cert.CertificateException {
     String truststorePath = securityConfig.getTruststoreFilePath();
     char[] truststoreFilePassword = securityConfig.getTruststorePassword();
-    FileInputStream is = new FileInputStream(truststorePath);
 
-    KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
-    keystore.load(is, truststoreFilePassword);
+    KeyStore keystore;
+    try (FileInputStream is = new FileInputStream(truststorePath)) {
+      keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keystore.load(is, truststoreFilePassword);
+    }
     return keystore;
   }
 
