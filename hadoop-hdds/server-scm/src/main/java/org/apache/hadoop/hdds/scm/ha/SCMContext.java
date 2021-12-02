@@ -188,11 +188,13 @@ public final class SCMContext {
 
       if (!isLeader) {
         LOG.warn("getTerm is invoked when not leader.");
-        StorageContainerManager storageContainerManager =
-            (StorageContainerManager) scm;
-        throw storageContainerManager.getScmHAManager()
-            .getRatisServer()
-            .triggerNotLeaderException();
+        if (scm instanceof StorageContainerManager) {
+          StorageContainerManager storageContainerManager =
+                  (StorageContainerManager) scm;
+          throw storageContainerManager.getScmHAManager()
+                  .getRatisServer()
+                  .triggerNotLeaderException();
+        }
       }
       return term;
     } finally {
