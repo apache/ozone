@@ -245,7 +245,7 @@ public final class ECStreamTestUtil {
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
-          blockStreamData.get(repInd - 1));
+          blockStreamData.get(repInd - 1), repInd);
       blockStreams.add(stream);
       return stream;
     }
@@ -264,12 +264,19 @@ public final class ECStreamTestUtil {
     private boolean shouldError = false;
     private int shouldErrorPosition = 0;
     private IOException errorToThrow = null;
+    private int ecReplicaIndex = 0;
     private static final byte EOF = -1;
 
     TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data) {
+      this(blockId, blockLen, data, 0);
+    }
+
+    TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data,
+        int replicaIndex) {
       this.blockID = blockId;
       this.length = blockLen;
       this.data = data;
+      this.ecReplicaIndex = replicaIndex;
       data.position(0);
     }
 
@@ -287,6 +294,10 @@ public final class ECStreamTestUtil {
       this.shouldError = val;
       this.shouldErrorPosition = position;
       this.errorToThrow = errorThrowable;
+    }
+
+    public int getEcReplicaIndex() {
+      return ecReplicaIndex;
     }
 
     @Override
