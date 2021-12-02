@@ -217,7 +217,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     // Rollback the length/offset updated as part of this failed stripe write.
     offset -= failedStripeDataSize;
     blockOutputStreamEntryPool.getCurrentStreamEntry()
-        .incCurrentPosition(-failedStripeDataSize);
+        .resetToAckedPosition();
 
     // Let's close the current entry.
     blockOutputStreamEntryPool.getCurrentStreamEntry().close();
@@ -255,14 +255,20 @@ public class ECKeyOutputStream extends KeyOutputStream {
       boolean allocateBlockIfFull) throws IOException {
     //check data blocks finished
     //If index is > datanum blks
-    int currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
-        .getCurrentStreamIdx();
+    ECBlockOutputStreamEntry currentStreamEntry =
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    int currentStreamIdx = currentStreamEntry.getCurrentStreamIdx();
     if (currentStreamIdx == numDataBlks && lastDataBuffPos == ecChunkSize) {
       //Lets encode and write
       if (handleParityWrites(ecChunkSize,
           allocateBlockIfFull) == StripeWriteStatus.FAILED) {
+        // TODO: This should make sure to retry until it's success. (HDDS-6036)
         handleStripeFailure(ecChunkSize, numDataBlks * ecChunkSize);
       }
+      // At this stage stripe write is successful.
+      currentStreamEntry.updateBlockGroupToAckedPosition(
+          currentStreamEntry.getCurrentPosition());
+
     }
   }
 
@@ -479,6 +485,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
           // TODO: loop this until we succeed?
           handleStripeFailure(parityCellSize, lastStripeSize);
         }
+        blockOutputStreamEntryPool.getCurrentStreamEntry()
+            .updateBlockGroupToAckedPosition(
+                blockOutputStreamEntryPool.getCurrentStreamEntry()
+                    .getCurrentPosition());
+
       }
 
       closeCurrentStreamEntry();
