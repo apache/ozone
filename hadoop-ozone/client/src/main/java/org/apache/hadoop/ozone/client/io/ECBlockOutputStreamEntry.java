@@ -164,30 +164,6 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   @Override
-  public void write(int b) throws IOException {
-    checkStream();
-    incCurrentPosition();
-    getOutputStream().write(b);
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    checkStream();
-    incCurrentPosition(len);
-    getOutputStream().write(b, off, len);
-  }
-
-  @Override
-    // Currently this API is not used in EC flow, but to avoid confusions, this
-    // API also overridden here.
-  void writeOnRetry(long len) throws IOException {
-    checkStream();
-    BlockOutputStream out = (BlockOutputStream) getOutputStream();
-    incCurrentPosition(len);
-    out.writeOnRetry(len);
-  }
-
-  @Override
   public void flush() throws IOException {
     if (!isInitialized()) {
       return;
