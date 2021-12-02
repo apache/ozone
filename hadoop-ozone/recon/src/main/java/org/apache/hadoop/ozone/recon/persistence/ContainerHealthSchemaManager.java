@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNHEALTHY;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
 import static org.hadoop.ozone.recon.schema.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 import static org.jooq.impl.DSL.count;
 
@@ -71,7 +71,7 @@ public class ContainerHealthSchemaManager {
     SelectQuery<Record> query = dslContext.selectQuery();
     query.addFrom(UNHEALTHY_CONTAINERS);
     if (state != null) {
-      if (state.equals(UNHEALTHY)) {
+      if (state.equals(ALL_REPLICAS_UNHEALTHY)) {
         query.addConditions(UNHEALTHY_CONTAINERS.CONTAINER_STATE
             .eq(UNDER_REPLICATED.toString()));
         query.addConditions(UNHEALTHY_CONTAINERS.ACTUAL_REPLICA_COUNT.eq(0));

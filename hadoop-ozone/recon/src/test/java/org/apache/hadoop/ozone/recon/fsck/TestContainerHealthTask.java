@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static junit.framework.TestCase.assertEquals;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNHEALTHY;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -152,7 +152,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(3, rec.getReplicaDelta().intValue());
 
     List<UnhealthyContainers> unhealthyContainers =
-        containerHealthSchemaManager.getUnhealthyContainers(UNHEALTHY, 0,
+        containerHealthSchemaManager.getUnhealthyContainers(ALL_REPLICAS_UNHEALTHY, 0,
             Integer.MAX_VALUE);
     assertEquals(1, unhealthyContainers.size());
     assertEquals(2L,
