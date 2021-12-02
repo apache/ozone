@@ -37,6 +37,17 @@ public class DefaultReplicationConfig {
     this.ecReplicationConfig = null;
   }
 
+  public DefaultReplicationConfig(ReplicationConfig replicationConfig) {
+    this.type =
+        ReplicationType.fromProto(replicationConfig.getReplicationType());
+    if (replicationConfig instanceof ECReplicationConfig) {
+      this.ecReplicationConfig = (ECReplicationConfig) replicationConfig;
+    } else {
+      this.factor =
+          ReplicationFactor.valueOf(replicationConfig.getRequiredNodes());
+    }
+  }
+
   public DefaultReplicationConfig(ReplicationType type,
       ECReplicationConfig ecReplicationConfig) {
     this.type = type;
@@ -49,6 +60,19 @@ public class DefaultReplicationConfig {
     this.type = type;
     this.factor = factor;
     this.ecReplicationConfig = ecReplicationConfig;
+  }
+
+  public DefaultReplicationConfig(
+      org.apache.hadoop.hdds.protocol.proto.HddsProtos.DefaultReplicationConfig
+          defaultReplicationConfig) {
+    this.type = ReplicationType.fromProto(defaultReplicationConfig.getType());
+    if (defaultReplicationConfig.hasEcReplicationConfig()) {
+      this.ecReplicationConfig = new ECReplicationConfig(
+          defaultReplicationConfig.getEcReplicationConfig());
+    } else {
+      this.factor =
+          ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
+    }
   }
 
   public ReplicationType getType() {

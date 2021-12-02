@@ -23,6 +23,7 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -180,6 +181,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       } else {
         bucketInfoBuilder.setQuotaInNamespace(
             dbBucketInfo.getQuotaInNamespace());
+      }
+
+      DefaultReplicationConfig defaultReplicationConfig =
+          omBucketArgs.getDefaultReplicationConfig();
+      if (defaultReplicationConfig != null) {
+        // Resetting the default replication config.
+        bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());

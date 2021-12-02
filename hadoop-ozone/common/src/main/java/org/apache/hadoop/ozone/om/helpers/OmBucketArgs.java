@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -51,6 +52,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
   private long quotaInBytes;
   private long quotaInNamespace;
+  private DefaultReplicationConfig defaultReplicationConfig = null;
 
   /**
    * Private constructor, constructed via builder.
@@ -122,6 +124,22 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
+   * Returns Bucket default replication config.
+   * @return
+   */
+  public DefaultReplicationConfig getDefaultReplicationConfig() {
+    return defaultReplicationConfig;
+  }
+
+  /**
+   * Sets the Bucket default replication config.
+   */
+  private void setDefaultReplicationConfig(
+      DefaultReplicationConfig defaultReplicationConfig) {
+    this.defaultReplicationConfig = defaultReplicationConfig;
+  }
+
+  /**
    * Returns new builder class that builds a OmBucketArgs.
    * @return Builder
    */
@@ -155,6 +173,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private Map<String, String> metadata;
     private long quotaInBytes;
     private long quotaInNamespace;
+    private DefaultReplicationConfig defaultReplicationConfig;
 
     /**
      * Constructs a builder.
@@ -199,6 +218,12 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setDefaultReplicationCOnfig(
+        DefaultReplicationConfig defaultRepConfig) {
+      this.defaultReplicationConfig = defaultRepConfig;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketArgs.
      * @return instance of OmBucketArgs.
@@ -206,8 +231,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     public OmBucketArgs build() {
       Preconditions.checkNotNull(volumeName);
       Preconditions.checkNotNull(bucketName);
-      return new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
-          storageType, metadata, quotaInBytes, quotaInNamespace);
+      OmBucketArgs omBucketArgs =
+          new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
+              storageType, metadata, quotaInBytes, quotaInNamespace);
+      omBucketArgs.setDefaultReplicationConfig(defaultReplicationConfig);
+      return omBucketArgs;
     }
   }
 
@@ -230,6 +258,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if(quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
       builder.setQuotaInNamespace(quotaInNamespace);
     }
+    if (defaultReplicationConfig != null) {
+      builder.setDefaultReplicationConfig(defaultReplicationConfig.toProto());
+    }
     return builder.build();
   }
 
@@ -239,14 +270,18 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    * @return instance of OmBucketArgs
    */
   public static OmBucketArgs getFromProtobuf(BucketArgs bucketArgs) {
-    return new OmBucketArgs(bucketArgs.getVolumeName(),
-        bucketArgs.getBucketName(),
-        bucketArgs.hasIsVersionEnabled() ?
-            bucketArgs.getIsVersionEnabled() : null,
-        bucketArgs.hasStorageType() ? StorageType.valueOf(
-            bucketArgs.getStorageType()) : null,
-        KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()),
-        bucketArgs.getQuotaInBytes(),
-        bucketArgs.getQuotaInNamespace());
+    OmBucketArgs omBucketArgs =
+        new OmBucketArgs(bucketArgs.getVolumeName(), bucketArgs.getBucketName(),
+            bucketArgs.hasIsVersionEnabled() ?
+                bucketArgs.getIsVersionEnabled() :
+                null, bucketArgs.hasStorageType() ?
+            StorageType.valueOf(bucketArgs.getStorageType()) :
+            null, KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()),
+            bucketArgs.getQuotaInBytes(), bucketArgs.getQuotaInNamespace());
+    // OmBucketArgs ctor already has more arguments, so setting the default
+    // replication config separately.
+    omBucketArgs.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig()));
+    return omBucketArgs;
   }
 }
