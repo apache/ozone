@@ -748,8 +748,6 @@ public class ContainerStateMachine extends BaseStateMachine {
   // to the particular index.
   private void removeStateMachineDataIfNeeded(long index) {
     if (waitOnBothFollowers) {
-      LOG.info("Removing data corresponding to log index {} from cache",
-          index);
       try {
         RaftServer.Division division = ratisServer.getServer().getDivision(gid);
         if (division.getInfo().isLeader()) {
