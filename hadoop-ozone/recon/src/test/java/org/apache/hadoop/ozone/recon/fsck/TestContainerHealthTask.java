@@ -152,8 +152,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(3, rec.getReplicaDelta().intValue());
 
     List<UnhealthyContainers> unhealthyContainers =
-        containerHealthSchemaManager.getUnhealthyContainers(ALL_REPLICAS_UNHEALTHY, 0,
-            Integer.MAX_VALUE);
+        containerHealthSchemaManager.getUnhealthyContainers(
+            ALL_REPLICAS_UNHEALTHY, 0, Integer.MAX_VALUE);
     assertEquals(1, unhealthyContainers.size());
     assertEquals(2L,
         unhealthyContainers.get(0).getContainerId().longValue());
