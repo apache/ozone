@@ -17,8 +17,8 @@
 package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -79,6 +79,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
 
   @Override
+  @SuppressWarnings("java:S3864") // Stream.peek (for debug)
   public Void call() throws Exception {
 
     init();
@@ -92,18 +93,22 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
     try (StorageContainerLocationProtocol scmLocationClient =
                  createStorageContainerLocationClient(ozoneConf)) {
-      List<Pipeline> pipelines = scmLocationClient.listPipelines();
+      Stream<Pipeline> pipelines = scmLocationClient.listPipelines().stream();
+      if (LOG.isDebugEnabled()) {
+        pipelines = pipelines
+            .peek(p -> LOG.debug("Found pipeline {}", p.getId()));
+      }
       Pipeline pipeline;
       if (pipelineId != null && pipelineId.length() > 0) {
-        pipeline = pipelines.stream()
-              .filter(p -> p.getId().toString().equals(pipelineId))
+        pipeline = pipelines
+              .filter(p -> p.getId().getId().toString().equals(pipelineId))
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException(
                       "Pipeline ID is defined, but there is no such pipeline: "
                               + pipelineId));
 
       } else {
-        pipeline = pipelines.stream()
+        pipeline = pipelines
             .filter(
                 p -> ReplicationConfig.getLegacyFactor(p.getReplicationConfig())
                     == HddsProtos.ReplicationFactor.THREE)
