@@ -133,4 +133,8 @@ public final class BufferUtils {
       buffer.clear();
     }
   }
+
+  public static boolean isEmpty(ByteBuffer buf) {
+    return buf == null || buf.position() == 0;
+  }
 }

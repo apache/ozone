@@ -107,6 +107,7 @@ public class TestBlockDataStreamOutput {
         .setDataStreamBufferFlushize(maxFlushSize)
         .setDataStreamBufferMaxSize(chunkSize)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .setDataStreamMinPacketSize(2*chunkSize/5)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -135,7 +136,7 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testHalfChunkWrite() throws Exception {
-    testWrite(chunkSize / 2);
+    testWrite(chunkSize / 5);
     testWriteWithFailure(chunkSize/2);
   }
 
@@ -165,9 +166,11 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
+    key.write(ByteBuffer.wrap(data));
     // now close the stream, It will update the key length.
     key.close();
-    validateData(keyName, data);
+    String dataString = new String(data, UTF_8);
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
   private void testWriteWithFailure(int dataLength) throws Exception {
@@ -230,4 +233,26 @@ public class TestBlockDataStreamOutput {
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 
+  @Test public void testMinPacketSize() throws Exception {
+    String keyName = getKeyName();
+    XceiverClientMetrics metrics =
+        XceiverClientManager.getXceiverClientMetrics();
+    OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
+    long writeChunkCount =
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 5)
+            .getBytes(UTF_8);
+    key.write(ByteBuffer.wrap(data));
+    // minPacketSize= 40, so first write of 20 wont trigger a writeChunk
+    Assert.assertEquals(writeChunkCount,
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+    key.write(ByteBuffer.wrap(data));
+    Assert.assertEquals(writeChunkCount + 1,
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+    // now close the stream, It will update the key length.
+    key.close();
+    String dataString = new String(data, UTF_8);
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
+  }
 }

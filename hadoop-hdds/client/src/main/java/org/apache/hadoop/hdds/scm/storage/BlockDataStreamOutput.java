@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -36,6 +38,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
@@ -49,7 +52,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -125,6 +130,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   private final long syncSize = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
+  // queue to hold packets/buffers < minPacketSize
+  private Queue<ByteBuffer> smallBuffers;
+  private XceiverClientMetrics metrics;
 
   /**
    * Creates a new BlockDataStreamOutput.
@@ -172,6 +180,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+    smallBuffers = new LinkedList<>();
+    metrics = XceiverClientManager.getXceiverClientMetrics();
   }
 
   private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
@@ -260,16 +270,66 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     int curLen = len;
     // set limit on the number of bytes that a ByteBuffer(StreamBuffer) can hold
     int maxBufferLen = config.getDataStreamMaxBufferSize();
-    while (curLen > 0) {
-      int writeLen = Math.min(curLen, maxBufferLen);
-      final StreamBuffer buf = new StreamBuffer(b, off, writeLen);
-      off += writeLen;
-      bufferList.add(buf);
-      writeChunkToContainer(buf.duplicate());
-      curLen -= writeLen;
-      writtenDataLength += writeLen;
-      doFlushIfNeeded();
+    int minPacketSize = config.getDataStreamMinPacketSize();
+    int totalSmallBufferLen = getTotalSmallBufferLen(smallBuffers);
+    // add the buffer to smallBufferQueue if the size is lesser than
+    // minPacketSize
+    if (len + totalSmallBufferLen < minPacketSize) {
+      smallBuffers.add(b);
+    } else {
+      ByteBuffer prev = getPreviousBufferIfAny();
+      if (!BufferUtils.isEmpty(prev)) {
+        curLen += prev.position();
+      }
+      while (curLen > 0) {
+        int writeLen = Math.min(curLen, maxBufferLen);
+        final StreamBuffer buf;
+        if (!BufferUtils.isEmpty(prev)) {
+          prev.rewind();
+          ByteBuffer combinedBuffer =
+              ByteBuffer.allocate(prev.limit() + b.limit());
+          combinedBuffer.put(prev).put(b);
+          combinedBuffer.rewind();
+          buf = new StreamBuffer(combinedBuffer, off, writeLen);
+        } else {
+          buf = new StreamBuffer(b, off, writeLen);
+        }
+        off += writeLen;
+        bufferList.add(buf);
+        writeChunkToContainer(buf.duplicate());
+        curLen -= writeLen;
+        writtenDataLength += writeLen;
+        doFlushIfNeeded();
+      }
     }
+  }
+
+  /**
+   * @param buffers returns total length of all small buffers in the queue
+   * @return
+   */
+  private int getTotalSmallBufferLen(Queue<ByteBuffer> buffers) {
+    int total = 0;
+    for (ByteBuffer b : buffers) {
+      total += b.limit();
+    }
+    return total;
+  }
+
+  /**
+   * @return returns a concatenated byteBuffer for all the buffers
+   * in the smallBufferQueue
+   */
+  private ByteBuffer getPreviousBufferIfAny() {
+    int totalLimit = 0;
+    for (ByteBuffer b : smallBuffers) {
+      totalLimit += b.limit();
+    }
+    ByteBuffer prev = ByteBuffer.allocate(totalLimit);
+    for (int i = 0; i < smallBuffers.size(); i++) {
+      prev.put(smallBuffers.poll());
+    }
+    return prev;
   }
 
   private void doFlushIfNeeded() throws IOException {
@@ -585,6 +645,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         .setChecksumData(checksumData.getProtoBufMessage())
         .build();
 
+    metrics.incrPendingContainerOpsMetrics(ContainerProtos.Type.WriteChunk);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
