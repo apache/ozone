@@ -53,11 +53,6 @@ public interface OzoneManagerFS extends IOzoneAcl {
   OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
           throws IOException;
 
-  void createDirectory(OmKeyArgs args) throws IOException;
-
-  OpenKeySession createFile(OmKeyArgs args, boolean isOverWrite,
-      boolean isRecursive) throws IOException;
-
   /**
    * Look up a file. Return the info of the file to client side.
    *
