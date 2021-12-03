@@ -494,14 +494,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
-    // if (!testSecureOmFlag) {
-    //   ScmInfo scmInfo = getScmInfo(configuration);
-    //   if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
-    //     logVersionMismatch(conf, scmInfo);
-    //     throw new OMException("SCM version info mismatch.",
-    //         ResultCodes.SCM_VERSION_MISMATCH_ERROR);
-    //   }
-    // }
+    if (!testSecureOmFlag) {
+      ScmInfo scmInfo = getScmInfo(configuration);
+      if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
+        logVersionMismatch(conf, scmInfo);
+        throw new OMException("SCM version info mismatch.",
+            ResultCodes.SCM_VERSION_MISMATCH_ERROR);
+      }
+    }
 
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
