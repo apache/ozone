@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -41,6 +42,7 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
  */
 public class ECBlockOutputStream extends BlockOutputStream{
 
+  private final DatanodeDetails datanodeDetails;
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       currentChunkRspFuture = null;
 
@@ -64,6 +66,8 @@ public class ECBlockOutputStream extends BlockOutputStream{
   ) throws IOException {
     super(blockID, xceiverClientManager,
         pipeline, bufferPool, config, token);
+    // In EC stream, there will be only one node in pipeline.
+    this.datanodeDetails = pipeline.getClosestNode();
   }
 
   @Override
@@ -143,5 +147,31 @@ public class ECBlockOutputStream extends BlockOutputStream{
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       getCurrentPutBlkResponseFuture() {
     return this.putBlkRspFuture;
+  }
+
+  /**
+   * Gets the target data node used in the current stream.
+   * @return DatanodeDetails
+   */
+  public DatanodeDetails getDatanodeDetails() {
+    return datanodeDetails;
+  }
+
+  @Override
+  void validateResponse(
+      ContainerProtos.ContainerCommandResponseProto responseProto)
+      throws IOException {
+    try {
+      // if the ioException is already set, it means a prev request has failed
+      // just throw the exception. The current operation will fail with the
+      // original error
+      IOException exception = getIoException();
+      if (exception != null) {
+        return;
+      }
+      ContainerProtocolCalls.validateContainerResponse(responseProto);
+    } catch (IOException sce) {
+      setIoException(sce);
+    }
   }
 }

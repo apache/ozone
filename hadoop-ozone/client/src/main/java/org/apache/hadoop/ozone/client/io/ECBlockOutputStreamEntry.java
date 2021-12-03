@@ -36,6 +36,7 @@ import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -64,6 +65,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
 
   private ECBlockOutputStream[] blockOutputStreams;
   private int currentStreamIdx = 0;
+  private long successfulBlkGrpAckedLen;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
@@ -201,13 +203,15 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       return 0;
     }
     updateBlockID(underlyingBlockID());
-    // Returning zero here. Underlying streams in EC entry are
-    // ECBlockOutputStreams, extending from BlockOutputStream, without
-    // overriding getTotalAckDataLength, and default implementation returns
-    // constant zero, so even summarizing the return value of this method
-    // from blockStreams entries would yield to 0. Once this changes, we need
-    // to revisit this, and implement a proper sum of data or all streams.
-    return 0;
+
+    return this.successfulBlkGrpAckedLen;
+  }
+
+  void updateBlockGroupToAckedPosition(long len) {
+    if (isWritingParity()){
+      return;
+    }
+    this.successfulBlkGrpAckedLen += len;
   }
 
   /**
@@ -216,6 +220,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
    * In EC entries the parity writes does not count into this, as the written
    * data length represents the attempts of the classes using the entry, and
    * not the attempts of the entry itself.
+   *
    * @return 0 if the stream is not initialized, the amount of data bytes that
    *    were attempted to be written to the entry.
    */
@@ -267,7 +272,11 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       if (stream == null) {
         continue;
       }
-      stream.executePutBlock(false, true);
+      try {
+        stream.executePutBlock(false, true);
+      } catch (Exception e) {
+        stream.setIoException(e);
+      }
     }
   }
 
@@ -291,8 +300,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
    *                   futures if false.
    * @return
    */
-  public boolean checkStreamFailures(boolean forPutBlock) {
+  public List<ECBlockOutputStream> getFailedStreams(boolean forPutBlock) {
     final Iterator<ECBlockOutputStream> iter = blockStreams().iterator();
+    List<ECBlockOutputStream> failedStreams = new ArrayList<>();
     while (iter.hasNext()) {
       final ECBlockOutputStream stream = iter.next();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
@@ -305,10 +315,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
             stream != null ? stream.getCurrentChunkResponseFuture() : null;
       }
       if (isFailed(stream, responseFuture)) {
-        return true;
+        failedStreams.add(stream);
       }
     }
-    return false;
+    return failedStreams;
   }
 
   private boolean isFailed(
@@ -397,12 +407,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
       return this;
     }
 
-
     public ECBlockOutputStreamEntry.Builder setLength(long len) {
       this.length = len;
       return this;
     }
-
 
     public ECBlockOutputStreamEntry.Builder setBufferPool(BufferPool pool) {
       this.bufferPool = pool;

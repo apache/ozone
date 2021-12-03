@@ -179,6 +179,10 @@ public final class SCMContainerPlacementRackScatter
       }
 
       for (Node rack : toChooseRacks) {
+        if (rack == null) {
+          // TODO: need to recheck why null coming here.
+          continue;
+        }
         Node node = chooseNode(rack.getNetworkFullPath(), unavailableNodes,
             metadataSizeRequired, dataSizeRequired);
         if (node != null) {
