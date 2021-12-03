@@ -124,6 +124,7 @@ public class TestKeyManagerUnit {
     omStorage.initialize();
     System.out.println("gbj3");
 
+    OzoneManager.setTestSecureOmFlag(true);
     om = OzoneManager.createOm(configuration, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
     metadataManager = (OmMetadataManagerImpl) HddsWhiteboxTestUtils.getInternalState(
         om, "metadataManager");
