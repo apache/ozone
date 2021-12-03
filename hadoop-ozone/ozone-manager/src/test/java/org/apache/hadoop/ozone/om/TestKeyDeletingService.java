@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -72,10 +71,8 @@ import org.mockito.Mockito;
 public class TestKeyDeletingService {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
-  private static OzoneManagerProtocol writeClient;
-  private static OzoneManager om;
-  private static ScmBlockLocationProtocol blockClient;
-  private static StorageContainerLocationProtocol containerClient;
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager om;
 
   private OzoneConfiguration createConfAndInitValues() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -113,9 +110,11 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
-    blockClient = new ScmBlockLocationTestingClient(null, null, 0);
-    KeyManager keyManager = initKeyManager(conf);
+    StorageContainerLocationProtocol containerClient =
+      Mockito.mock(StorageContainerLocationProtocol.class);
+    ScmBlockLocationProtocol blockClient =
+      new ScmBlockLocationTestingClient(null, null, 0);
+    KeyManager keyManager = initKeyManager(conf, blockClient, containerClient);
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
@@ -134,9 +133,11 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
-    blockClient = new ScmBlockLocationTestingClient(null, null, 1);
-    KeyManager keyManager = initKeyManager(conf);
+    StorageContainerLocationProtocol containerClient =
+      Mockito.mock(StorageContainerLocationProtocol.class);
+    ScmBlockLocationProtocol blockClient =
+      new ScmBlockLocationTestingClient(null, null, 1);
+    KeyManager keyManager = initKeyManager(conf, blockClient, containerClient);
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
@@ -159,9 +160,11 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
-    blockClient = new ScmBlockLocationTestingClient(null, null, 1);
-    KeyManager keyManager = initKeyManager(conf);
+    StorageContainerLocationProtocol containerClient =
+      Mockito.mock(StorageContainerLocationProtocol.class);
+    ScmBlockLocationProtocol blockClient =
+      new ScmBlockLocationTestingClient(null, null, 1);
+    KeyManager keyManager = initKeyManager(conf, blockClient, containerClient);
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 0);
@@ -227,7 +230,9 @@ public class TestKeyDeletingService {
       writeClient.deleteKey(arg);
     }
   }
-  private KeyManager initKeyManager(OzoneConfiguration conf)
+  private KeyManager initKeyManager(OzoneConfiguration conf,
+      ScmBlockLocationProtocol blockClient,
+      StorageContainerLocationProtocol containerClient)
       throws AuthenticationException, IOException {
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);
@@ -235,10 +240,8 @@ public class TestKeyDeletingService {
     omStorage.setClusterId("omtest");
     omStorage.setOmId("omtest");
     omStorage.initialize();
-    System.out.println("gbj3");
     OzoneManager.setTestSecureOmFlag(true);
     om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
-    System.out.println("gbj4");
 
     KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
     ScmClient scmClient = new ScmClient(blockClient, containerClient);
@@ -246,7 +249,6 @@ public class TestKeyDeletingService {
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
-    System.out.println("gbj5");
 
     om.start();
     writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
