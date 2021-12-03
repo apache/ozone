@@ -380,7 +380,7 @@ public final class TestOMRequestUtils {
         .setDataSize(1000L)
         .setReplicationConfig(
             ReplicationConfig
-                .fromTypeAndFactor(replicationType, replicationFactor))
+                .fromProtoTypeAndFactor(replicationType, replicationFactor))
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();
@@ -969,7 +969,7 @@ public final class TestOMRequestUtils {
             .setModificationTime(Time.now())
             .setDataSize(1000L)
             .setReplicationConfig(ReplicationConfig
-                    .fromTypeAndFactor(replicationType, replicationFactor))
+                    .fromProtoTypeAndFactor(replicationType, replicationFactor))
             .setObjectID(objectID)
             .setUpdateID(trxnLogIndex)
             .setParentObjectID(parentID)

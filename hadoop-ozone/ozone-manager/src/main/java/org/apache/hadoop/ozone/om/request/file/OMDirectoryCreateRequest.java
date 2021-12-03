@@ -365,7 +365,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setModificationTime(keyArgs.getModificationTime())
         .setDataSize(0)
         .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
+                .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
         .setObjectID(objectId)
         .setUpdateID(objectId);
   }

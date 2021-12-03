@@ -140,7 +140,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient().allocateBlock(scmBlockSize,
-          numBlocks, ReplicationConfig.fromTypeAndFactor(replicationType,
+          numBlocks, ReplicationConfig.fromProtoTypeAndFactor(replicationType,
               replicationFactor),
           omID, excludeList);
     } catch (SCMException ex) {
@@ -647,7 +647,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
     return createFileInfo(keyArgs, locations,
-            ReplicationConfig.fromTypeAndFactor(
+            ReplicationConfig.fromProtoTypeAndFactor(
                     keyArgs.getType(), keyArgs.getFactor()),
             keyArgs.getDataSize(), encInfo, prefixManager,
             omBucketInfo, omPathInfo, transactionLogIndex, objectID);

@@ -1507,7 +1507,7 @@ public class KeyManagerImpl implements KeyManager {
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts
-            replicationConfig = ReplicationConfig.fromTypeAndFactor(
+            replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(
                     partKeyInfo.getPartKeyInfo().getType(),
                     partKeyInfo.getPartKeyInfo().getFactor());
             count++;
