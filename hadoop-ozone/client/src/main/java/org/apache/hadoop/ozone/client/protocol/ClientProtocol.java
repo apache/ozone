@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -617,7 +618,7 @@ public interface ClientProtocol {
    * @param tenantId tenant name.
    * @throws IOException
    */
-  void deleteTenant(String tenantId) throws IOException;
+  DeleteTenantResponse deleteTenant(String tenantId) throws IOException;
 
   /**
    * Assign a user to a tenant.

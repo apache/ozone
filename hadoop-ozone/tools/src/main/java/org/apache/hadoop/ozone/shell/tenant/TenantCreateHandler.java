@@ -22,29 +22,28 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * ozone tenant create.
  */
 @CommandLine.Command(name = "create",
-    description = "Create one or more tenants")
+    description = "Create a tenant."
+        + " This will also create a new Ozone volume for the tenant.")
 public class TenantCreateHandler extends TenantHandler {
 
-  @CommandLine.Parameters(description = "List of tenant names", arity = "1..")
-  private List<String> tenants = new ArrayList<>();
+  @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
+  private String tenantId;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
-    for (String tenantId : tenants) {
-      try {
-        client.getObjectStore().createTenant(tenantId);
-        out().println("Created tenant '" + tenantId + "'.");
-      } catch (IOException e) {
-        err().println("Failed to create tenant '" + tenantId + "': " +
-            e.getMessage());
-      }
+    try {
+      client.getObjectStore().createTenant(tenantId);
+      // TODO: Add return value and print volume name?
+      out().println("Created tenant '" + tenantId + "'.");
+    } catch (IOException e) {
+      // Throw exception to make client exit code non-zero
+      throw new RuntimeException("Failed to create tenant '" + tenantId + "': "
+          + e.getMessage());
     }
   }
 }

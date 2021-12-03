@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_POLICY_TABLE;
@@ -43,23 +45,20 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 public class OMTenantDeleteResponse extends OMClientResponse {
 
   private String volumeName;
-  private String ownerName;
-  private PersistedUserVolumeInfo newVolList;
+  private OmVolumeArgs omVolumeArgs;
   private String tenantId;
   private String userPolicyGroupName;
   private String bucketPolicyGroupName;
 
   public OMTenantDeleteResponse(@Nonnull OMResponse omResponse,
                                 @Nonnull String volumeName,
-                                String ownerName,
-                                PersistedUserVolumeInfo newVolList,
+                                @Nullable OmVolumeArgs omVolumeArgs,
                                 @Nonnull String tenantId,
                                 @Nonnull String userPolicyGroupName,
                                 @Nonnull String bucketPolicyGroupName) {
     super(omResponse);
     this.volumeName = volumeName;
-    this.ownerName = ownerName;
-    this.newVolList = newVolList;
+    this.omVolumeArgs = omVolumeArgs;
     this.tenantId = tenantId;
     this.userPolicyGroupName = userPolicyGroupName;
     this.bucketPolicyGroupName = bucketPolicyGroupName;
@@ -88,21 +87,11 @@ public class OMTenantDeleteResponse extends OMClientResponse {
         batchOperation, bucketPolicyGroupName);
 
     // The rest are the same as OMVolumeDeleteResponse
-    if (newVolList != null) {
-      assert(volumeName.length() > 0);
-      assert(ownerName != null);
-      String dbUserKey = omMetadataManager.getUserKey(ownerName);
-      PersistedUserVolumeInfo volumeList = newVolList;
-      if (newVolList.getVolumeNamesList().size() == 0) {
-        omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
-            dbUserKey);
-      } else {
-        omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
-            volumeList);
-      }
-      omMetadataManager.getVolumeTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getVolumeKey(volumeName));
+    if (volumeName.length() > 0) {
+      Preconditions.checkNotNull(omVolumeArgs);
+      Preconditions.checkState(omVolumeArgs.getVolume().equals(volumeName));
+      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+          omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
     }
   }
 }
-

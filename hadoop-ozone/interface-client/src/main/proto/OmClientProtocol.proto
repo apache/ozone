@@ -1424,7 +1424,7 @@ message ListTenantRequest {
 }
 
 message ListTenantResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     repeated TenantInfo tenantInfo = 2;
 }
 
@@ -1438,12 +1438,12 @@ message TenantListUserRequest {
 }
 
 message TenantGetUserInfoResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     optional TenantUserInfo tenantUserInfo = 2;
 }
 
 message TenantListUserResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     optional string tenantName = 2;
     repeated TenantUserAccessId userAccessIdInfo = 3;
 }
@@ -1510,32 +1510,33 @@ message GetS3VolumeRequest {
 }
 
 message CreateTenantResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message ModifyTenantResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message DeleteTenantResponse {
-    optional bool success = 1;
+    optional string volumeName = 1;
+    optional int64 volRefCount = 2;
 }
 
 message TenantAssignUserAccessIdResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     optional S3Secret s3Secret = 2;
 }
 
 message TenantRevokeUserAccessIdResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message TenantAssignAdminResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message TenantRevokeAdminResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message GetS3VolumeResponse {

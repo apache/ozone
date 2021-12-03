@@ -59,7 +59,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -236,8 +235,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
 
     try {
-      // Check ACL: requires volume create permission.
-      // TODO: do we need a tenant create permission ? probably not
+      // Check ACL: requires volume CREATE permission.
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
@@ -279,8 +277,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           dbUserKey, transactionLogIndex);
       LOG.debug("volume: '{}' successfully created", dbVolumeKey);
 
-      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
-          TENANT_LOCK, tenantId);
 
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
@@ -348,9 +344,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
-      }
-      if (acquiredTenantLock) {
-        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
       }
       if (acquiredUserLock) {
         omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);

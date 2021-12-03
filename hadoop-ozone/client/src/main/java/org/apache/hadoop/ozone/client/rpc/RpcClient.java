@@ -113,6 +113,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -729,10 +730,10 @@ public class RpcClient implements ClientProtocol {
    * {@inheritDoc}
    */
   @Override
-  public void deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantId),
         "tenantId cannot be null or empty.");
-    ozoneManagerClient.deleteTenant(tenantId);
+    return ozoneManagerClient.deleteTenant(tenantId);
   }
 
   /**

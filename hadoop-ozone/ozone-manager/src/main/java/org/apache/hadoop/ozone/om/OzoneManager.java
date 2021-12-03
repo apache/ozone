@@ -156,6 +156,7 @@ import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
@@ -3098,7 +3099,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public void deleteTenant(String tenantId) {
+  public DeleteTenantResponse deleteTenant(String tenantId) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");
   }
@@ -3152,6 +3153,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
+
+    // TODO: Iterate cache first. See KeyManagerImpl#listStatus
 
     TableIterator<String, ? extends Table.KeyValue<String, OmDBTenantInfo>>
         iterator = metadataManager.getTenantStateTable().iterator();
@@ -3267,16 +3270,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmVolumeArgs getS3Volume(String accessID) throws IOException {
 
-    String tenantId;
+    final String tenantId;
     try {
       tenantId = multiTenantManagr.getTenantForAccessID(accessID);
+      // TODO: Get volume name from DB. Do not assume the same. e.g.
+      //metadataManager.getTenantStateTable().get(tenantId)
+      //    .getBucketNamespaceName();
+      final String volumeName = tenantId;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Get S3 volume request for access ID {} belonging to tenant" +
                 " {} is directed to the volume {}.", accessID, tenantId,
-            tenantId);  // TODO: Get volume name from DB. Do not assume the same
+            volumeName);
       }
       // This call performs acl checks and checks volume existence.
-      return getVolumeInfo(tenantId);
+      return getVolumeInfo(volumeName);
 
     } catch (OMException ex) {
       if (ex.getResult().equals(INVALID_ACCESSID)) {

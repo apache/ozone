@@ -44,7 +44,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /*
   Execution flow
@@ -161,12 +161,16 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     final String tenantId = request.getTenantName();
     final boolean delegated = request.getDelegated();
 
-    boolean acquiredTenantLock = false;
+    boolean acquiredVolumeLock = false;
     IOException exception = null;
 
+    // Get volume name in order to acquire the volume lock
+    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
+        omMetadataManager, tenantId);
+
     try {
-      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
-          TENANT_LOCK, tenantId);
+      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volumeName);
 
       final OmDBAccessIdInfo oldAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
@@ -217,8 +221,8 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }
-      if (acquiredTenantLock) {
-        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
+      if (acquiredVolumeLock) {
+        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }
 

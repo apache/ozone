@@ -68,7 +68,7 @@ public class TenantSetSecretHandler extends TenantHandler {
       if (omEx.getResult().equals(ACCESSID_NOT_FOUND)) {
         // Print to stderr here in order not to contaminate stdout just in
         // case -e is specified.
-        err().println("AccessId '" + accessId + "' doesn't exist");
+        throw new RuntimeException("AccessId '" + accessId + "' doesn't exist");
       } else {
         throw omEx;
       }

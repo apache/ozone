@@ -392,8 +392,7 @@ public class OzoneManagerLock {
     USER_LOCK((byte) 3, "USER_LOCK"), // 15
 
     S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31
-    PREFIX_LOCK((byte) 5, "PREFIX_LOCK"), //63
-    TENANT_LOCK((byte) 6, "TENANT_LOCK"); // 127
+    PREFIX_LOCK((byte) 5, "PREFIX_LOCK"); //63
 
     // level of the resource
     private byte lockLevel;

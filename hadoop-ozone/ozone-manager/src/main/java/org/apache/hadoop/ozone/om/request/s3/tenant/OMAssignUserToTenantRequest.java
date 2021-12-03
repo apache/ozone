@@ -54,7 +54,7 @@ import java.util.TreeSet;
 
 import static org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo.SERIALIZATION_SPLIT_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.TENANT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
 import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 
@@ -221,8 +221,8 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     final String accessId = updateGetS3SecretRequest.getKerberosID();
     final String awsSecret = updateGetS3SecretRequest.getAwsSecret();
 
+    boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
-    boolean acquiredTenantLock = false;
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -234,9 +234,13 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     assert(accessId.equals(request.getAccessId()));
     IOException exception = null;
 
+    // Get volume name in order to acquire the volume lock
+    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
+        omMetadataManager, tenantId);
+
     try {
-      acquiredTenantLock = omMetadataManager.getLock().acquireWriteLock(
-          TENANT_LOCK, tenantId);
+      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volumeName);
 
       // Expect tenant existence in tenantStateTable
       if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
@@ -319,9 +323,6 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
-      omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
-      acquiredTenantLock = false;
-
       // Add to S3SecretTable.
       // Note: S3SecretTable will be deprecated in the future.
       acquiredS3SecretLock = omMetadataManager.getLock()
@@ -367,11 +368,11 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }
-      if (acquiredTenantLock) {
-        omMetadataManager.getLock().releaseWriteLock(TENANT_LOCK, tenantId);
-      }
       if (acquiredS3SecretLock) {
         omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
+      }
+      if (acquiredVolumeLock) {
+        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }
 

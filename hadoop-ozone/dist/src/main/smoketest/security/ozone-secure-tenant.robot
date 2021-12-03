@@ -128,6 +128,10 @@ Secure Tenant Delete Tenant Success with Cluster Admin
     ${output} =         Execute          ozone tenant delete tenantone
                         Should contain   ${output}         Deleted tenant 'tenantone'.
 
+Secure Tenant Delete Volume Success with Cluster Admin
+    ${output} =         Execute          ozone sh volume delete tenantone
+                        Should contain   ${output}         Volume tenantone is deleted
+
 Secure Tenant List Tenant Expect Empty Result
     ${output} =         Execute          ozone tenant list
                         Should not contain   ${output}     tenantone

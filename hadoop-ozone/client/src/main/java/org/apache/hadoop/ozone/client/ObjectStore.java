@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -230,8 +231,8 @@ public class ObjectStore {
    * @param tenantId tenant name.
    * @throws IOException
    */
-  public void deleteTenant(String tenantId) throws IOException {
-    proxy.deleteTenant(tenantId);
+  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
+    return proxy.deleteTenant(tenantId);
   }
 
   /**

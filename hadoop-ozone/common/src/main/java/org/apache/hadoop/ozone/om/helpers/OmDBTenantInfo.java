@@ -29,11 +29,11 @@ public final class OmDBTenantInfo {
    */
   private final String tenantId;
   /**
-   * Name of the tenant's bucket namespace.
+   * Name of the bucket namespace (volume name).
    */
   private final String bucketNamespaceName;
   /**
-   * Name of the tenant's account namespace.
+   * Name of the account namespace.
    */
   private final String accountNamespaceName;
   /**

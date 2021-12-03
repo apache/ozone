@@ -105,7 +105,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       if (volRefCount != 0L) {
         LOG.debug("volume: {} has a non-zero ref count. won't delete", volume);
         throw new OMException("Volume reference count is not zero (" +
-            volRefCount + "). Try `ozone tenant delete <tenantId>` instead.",
+            volRefCount + "). Ozone features are enabled on this volume. " +
+            "Try `ozone tenant delete <tenantId>` first.",
             OMException.ResultCodes.VOLUME_IS_REFERENCED);
       }
 

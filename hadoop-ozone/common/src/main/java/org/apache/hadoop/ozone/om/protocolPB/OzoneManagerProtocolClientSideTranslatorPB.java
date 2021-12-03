@@ -951,7 +951,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
     final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
         .setTenantId(tenantId)
         .build();
@@ -959,7 +959,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDeleteTenantRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
+
+    return handleError(omResponse).getDeleteTenantResponse();
   }
 
   /**

@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -498,15 +499,17 @@ public interface OzoneManagerProtocol
   /**
    * Delete a tenant.
    * @param tenantId tenant name.
+   * @return DeleteTenantResponse
    * @throws IOException
    */
-  void deleteTenant(String tenantId) throws IOException;
+  DeleteTenantResponse deleteTenant(String tenantId) throws IOException;
 
   /**
    * Assign user to a tenant.
    * @param username user name to be assigned.
    * @param tenantName tenant name.
    * @param accessId access ID.
+   * @return S3SecretValue
    * @throws IOException
    */
   S3SecretValue tenantAssignUserAccessId(String username, String tenantName,

@@ -99,26 +99,26 @@ public final class OMTenantRequestHelper {
    * Retrieve volume name of the tenant.
    */
   static String getTenantVolumeName(OMMetadataManager omMetadataManager,
-      String tenantName) {
+      String tenantId) {
 
     final OmDBTenantInfo tenantInfo;
     try {
-      tenantInfo = omMetadataManager.getTenantStateTable().get(tenantName);
+      tenantInfo = omMetadataManager.getTenantStateTable().get(tenantId);
     } catch (IOException e) {
       throw new RuntimeException("Potential DB error. Unable to retrieve "
-          + "OmDBTenantInfo entry for tenant '" + tenantName + "'.");
+          + "OmDBTenantInfo entry for tenant '" + tenantId + "'.");
     }
 
     if (tenantInfo == null) {
       throw new RuntimeException("Potential DB error or race condition. "
-          + "OmDBTenantInfo entry is missing for tenant '" + tenantName + "'.");
+          + "OmDBTenantInfo entry is missing for tenant '" + tenantId + "'.");
     }
 
-    final String volumeName = tenantInfo.getAccountNamespaceName();
+    final String volumeName = tenantInfo.getBucketNamespaceName();
 
-    if (StringUtils.isEmpty(tenantName)) {
+    if (StringUtils.isEmpty(tenantId)) {
       throw new RuntimeException("Potential DB error. volumeName "
-          + "field is null or empty for tenantId '" + tenantName + "'.");
+          + "field is null or empty for tenantId '" + tenantId + "'.");
     }
 
     return volumeName;
@@ -192,6 +192,7 @@ public final class OMTenantRequestHelper {
    * Returns true if the tenant doesn't have any accessIds assigned to it
    * (i.e. the tenantId is not found in this table for any existing accessIds);
    * Returns false otherwise.
+   *
    * @param metadataManager
    * @param tenantId
    * @return
@@ -200,6 +201,9 @@ public final class OMTenantRequestHelper {
   static boolean isTenantEmpty(OMMetadataManager metadataManager,
                                String tenantId) throws IOException {
 
+    // TODO: Do we need to iterate cache here as well? Very cumbersome if so.
+    //  This helper function is a placeholder for the isTenantEmpty check,
+    //  once tenantCache/Ranger is fixed this will be removed.
     try (TableIterator<String,
         ? extends Table.KeyValue<String, OmDBAccessIdInfo>> iter =
              metadataManager.getTenantAccessIdTable().iterator()) {
