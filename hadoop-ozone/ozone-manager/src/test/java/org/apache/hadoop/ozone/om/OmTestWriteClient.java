@@ -17,7 +17,7 @@ import java.io.IOException;
 /**
  * Test utility for creating a write client to the OM.
  */
-public final class OmTestUtils {
+public final class OmTestWriteClient {
 
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager om;
@@ -27,7 +27,7 @@ public final class OmTestUtils {
   private static BucketManager bucketManager;
   private static PrefixManager prefixManager;
 
-  private OmTestUtils() {
+  private OmTestWriteClient() {
   }
   public static OzoneManager getTestOm() {
     return om;
