@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.fs;
 import org.apache.hadoop.ozone.om.IOzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 
 import java.io.IOException;

@@ -78,9 +78,9 @@ public class TestVolumeOwner {
     ozoneConfig.set(OZONE_METADATA_DIRS, dir.toString());
 
     StorageContainerLocationProtocol containerClient =
-      mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
-      mock(ScmBlockLocationProtocol.class);
+        mock(ScmBlockLocationProtocol.class);
     OmTestUtils.initOmWithTestClient(ozoneConfig, blockClient, containerClient);
     keyManager = OmTestUtils.getKeyManager();
 

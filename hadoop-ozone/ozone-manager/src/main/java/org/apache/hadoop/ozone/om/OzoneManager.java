@@ -395,7 +395,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isSecurityEnabled;
 
   @SuppressWarnings("methodlength")
-  private OzoneManager(OzoneConfiguration conf, StartupOption startupOption, StorageContainerLocationProtocol cc, ScmBlockLocationProtocol bc)
+  private OzoneManager(OzoneConfiguration conf, StartupOption startupOption,
+                       StorageContainerLocationProtocol cc,
+                       ScmBlockLocationProtocol bc)
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Preconditions.checkNotNull(conf);
@@ -617,8 +619,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public static OzoneManager createOm(OzoneConfiguration conf,
                                       StartupOption startupOption,
-                                      StorageContainerLocationProtocol cc, ScmBlockLocationProtocol bc)
-    throws IOException, AuthenticationException {
+                                      StorageContainerLocationProtocol cc,
+                                      ScmBlockLocationProtocol bc)
+      throws IOException, AuthenticationException {
     return new OzoneManager(conf, startupOption, cc, bc);
   }
 

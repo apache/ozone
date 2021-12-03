@@ -80,9 +80,9 @@ public class TestTrashService {
     ServerUtils.setOzoneMetaDirPath(configuration, folder.toString());
 
     StorageContainerLocationProtocol containerClient =
-      Mockito.mock(StorageContainerLocationProtocol.class);
+        Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
-      new ScmBlockLocationTestingClient(null, null, 0);
+        new ScmBlockLocationTestingClient(null, null, 0);
     keyManager = initKeyManager(configuration, blockClient, containerClient);
     volumeName = "volume";
     bucketName = "bucket";
@@ -146,9 +146,10 @@ public class TestTrashService {
     omStorage.setOmId("omtest");
     omStorage.initialize();
     OzoneManager.setTestSecureOmFlag(true);
-    om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+    om = OzoneManager.createOm(conf,
+        OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
 
-    KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+    KeyManager km = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "keyManager");
     ScmClient scmClient = new ScmClient(blockClient, containerClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
@@ -157,8 +158,9 @@ public class TestTrashService {
         "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
 
     om.start();
-    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
-    return keyManager;
+    writeClient = OzoneClientFactory.getRpcClient(conf)
+        .getObjectStore().getClientProxy().getOzoneManagerClient();
+    return km;
   }
 
 }

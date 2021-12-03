@@ -200,21 +200,24 @@ public class TestKeyManagerImpl {
         Mockito.mock(StorageContainerLocationProtocol.class);
     // Create an OM and connect writeClient to it
     OMStorage omStorage = new OMStorage(conf);
-    omStorage.setClusterId(scm.getClientProtocolServer().getScmInfo().getClusterId());
+    omStorage.setClusterId(scm.getClientProtocolServer()
+        .getScmInfo().getClusterId());
     omStorage.setOmId("om1");
     omStorage.initialize();
 
     om = OzoneManager.createOm(conf);
-    metadataManager = (OMMetadataManager) HddsWhiteboxTestUtils.getInternalState(
-        om, "metadataManager");
+    metadataManager = (OMMetadataManager) HddsWhiteboxTestUtils
+      .getInternalState(om, "metadataManager");
 
-    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
+    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+      .getInternalState(om, "keyManager");
     mockContainerClient();
 
     prefixManager = (PrefixManager) HddsWhiteboxTestUtils.getInternalState(
         om, "prefixManager");
     om.start();
-    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
+    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore()
+      .getClientProxy().getOzoneManagerClient();
 
 
     Mockito.when(mockScmBlockLocationProtocol
@@ -254,7 +257,8 @@ public class TestKeyManagerImpl {
   }
 
   private static void mockContainerClient() {
-    ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(), mockScmContainerClient);
+    ScmClient scmClient = new ScmClient(scm.getBlockProtocolServer(),
+        mockScmContainerClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
   }

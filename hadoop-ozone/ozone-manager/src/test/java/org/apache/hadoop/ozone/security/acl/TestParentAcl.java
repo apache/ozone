@@ -97,9 +97,9 @@ public class TestParentAcl {
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
     StorageContainerLocationProtocol containerClient =
-      mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
-      mock(ScmBlockLocationProtocol.class);
+        mock(ScmBlockLocationProtocol.class);
     OmTestUtils.initOmWithTestClient(ozConfig, blockClient, containerClient);
     keyManager = OmTestUtils.getKeyManager();
 

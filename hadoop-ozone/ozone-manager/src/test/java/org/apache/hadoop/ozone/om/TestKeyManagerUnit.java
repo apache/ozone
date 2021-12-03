@@ -113,7 +113,8 @@ public class TestKeyManagerUnit {
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
-    configuration.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+    configuration.set(ScmConfigKeys
+        .OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
     System.out.println("gbj2");
@@ -125,12 +126,15 @@ public class TestKeyManagerUnit {
     System.out.println("gbj3");
 
     OzoneManager.setTestSecureOmFlag(true);
-    om = OzoneManager.createOm(configuration, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
-    metadataManager = (OmMetadataManagerImpl) HddsWhiteboxTestUtils.getInternalState(
+    om = OzoneManager.createOm(configuration,
+        OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+    metadataManager = (OmMetadataManagerImpl)
+        HddsWhiteboxTestUtils.getInternalState(
         om, "metadataManager");
     System.out.println("gbj4");
 
-    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
+    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+        .getInternalState(om, "keyManager");
     ScmClient scmClient = new ScmClient(blockClient, containerClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
@@ -139,7 +143,8 @@ public class TestKeyManagerUnit {
     System.out.println("gbj5");
 
     om.start();
-    writeClient = OzoneClientFactory.getRpcClient(configuration).getObjectStore().getClientProxy().getOzoneManagerClient();
+    writeClient = OzoneClientFactory.getRpcClient(configuration)
+        .getObjectStore().getClientProxy().getOzoneManagerClient();
     startDate = Instant.now();
   }
 

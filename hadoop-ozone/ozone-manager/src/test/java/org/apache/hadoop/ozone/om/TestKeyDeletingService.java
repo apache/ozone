@@ -111,9 +111,9 @@ public class TestKeyDeletingService {
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
     StorageContainerLocationProtocol containerClient =
-      Mockito.mock(StorageContainerLocationProtocol.class);
+        Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
-      new ScmBlockLocationTestingClient(null, null, 0);
+        new ScmBlockLocationTestingClient(null, null, 0);
     KeyManager keyManager = initKeyManager(conf, blockClient, containerClient);
 
     final int keyCount = 100;
@@ -134,9 +134,9 @@ public class TestKeyDeletingService {
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
     StorageContainerLocationProtocol containerClient =
-      Mockito.mock(StorageContainerLocationProtocol.class);
+        Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
-      new ScmBlockLocationTestingClient(null, null, 1);
+        new ScmBlockLocationTestingClient(null, null, 1);
     KeyManager keyManager = initKeyManager(conf, blockClient, containerClient);
 
     final int keyCount = 100;
@@ -161,9 +161,9 @@ public class TestKeyDeletingService {
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
     StorageContainerLocationProtocol containerClient =
-      Mockito.mock(StorageContainerLocationProtocol.class);
+        Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
-      new ScmBlockLocationTestingClient(null, null, 1);
+        new ScmBlockLocationTestingClient(null, null, 1);
     KeyManager keyManager = initKeyManager(conf, blockClient, containerClient);
 
     final int keyCount = 100;
@@ -241,9 +241,11 @@ public class TestKeyDeletingService {
     omStorage.setOmId("omtest");
     omStorage.initialize();
     OzoneManager.setTestSecureOmFlag(true);
-    om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+    om = OzoneManager.createOm(conf,
+      OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
 
-    KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
+    KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+        .getInternalState(om, "keyManager");
     ScmClient scmClient = new ScmClient(blockClient, containerClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
@@ -251,7 +253,8 @@ public class TestKeyDeletingService {
         "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
 
     om.start();
-    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
+    writeClient = OzoneClientFactory.getRpcClient(conf)
+      .getObjectStore().getClientProxy().getOzoneManagerClient();
     return keyManager;
   }
 }
