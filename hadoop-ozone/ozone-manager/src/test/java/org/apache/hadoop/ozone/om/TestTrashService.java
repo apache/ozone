@@ -23,24 +23,30 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.junit.*;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.UUID;
 
 /**
  * Test Key Trash Service.
@@ -57,12 +63,13 @@ public class TestTrashService {
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
   private KeyManager keyManager;
-  private OmMetadataManagerImpl omMetadataManager;
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager om;
   private String volumeName;
   private String bucketName;
 
   @Before
-  public void setup() throws IOException {
+  public void setup() throws IOException, AuthenticationException {
     OzoneConfiguration configuration = new OzoneConfiguration();
 
     File folder = tempFolder.newFolder();
@@ -72,15 +79,18 @@ public class TestTrashService {
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(configuration, folder.toString());
 
-    omMetadataManager = new OmMetadataManagerImpl(configuration);
-
-    keyManager = new KeyManagerImpl(
-        new ScmBlockLocationTestingClient(null, null, 0),
-        omMetadataManager, configuration, UUID.randomUUID().toString(), null);
-    keyManager.start(configuration);
-
+    StorageContainerLocationProtocol containerClient =
+      Mockito.mock(StorageContainerLocationProtocol.class);
+    ScmBlockLocationProtocol blockClient =
+      new ScmBlockLocationTestingClient(null, null, 0);
+    keyManager = initKeyManager(configuration, blockClient, containerClient);
     volumeName = "volume";
     bucketName = "bucket";
+  }
+
+  @After
+  public void cleanup() throws Exception {
+    om.stop();
   }
 
   @Test
@@ -89,7 +99,7 @@ public class TestTrashService {
     String destinationBucket = "destBucket";
     createAndDeleteKey(keyName);
 
-    boolean recoverOperation = omMetadataManager
+    boolean recoverOperation = keyManager.getMetadataManager()
         .recoverTrash(volumeName, bucketName, keyName, destinationBucket);
     Assert.assertTrue(recoverOperation);
   }
@@ -120,9 +130,35 @@ public class TestTrashService {
         .build();
 
     /* Create and delete key in the Key Manager. */
-    OpenKeySession session = keyManager.openKey(keyArgs);
-    keyManager.commitKey(keyArgs, session.getId());
-    keyManager.deleteKey(keyArgs);
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, session.getId());
+    writeClient.deleteKey(keyArgs);
+  }
+
+  private KeyManager initKeyManager(OzoneConfiguration conf,
+      ScmBlockLocationProtocol blockClient,
+      StorageContainerLocationProtocol containerClient)
+      throws AuthenticationException, IOException {
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    OMStorage omStorage = new OMStorage(conf);
+    omStorage.setClusterId("omtest");
+    omStorage.setOmId("omtest");
+    omStorage.initialize();
+    OzoneManager.setTestSecureOmFlag(true);
+    om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+
+    KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+        .getInternalState(om, "keyManager");
+    ScmClient scmClient = new ScmClient(blockClient, containerClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
+
+    om.start();
+    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
+    return keyManager;
   }
 
 }
