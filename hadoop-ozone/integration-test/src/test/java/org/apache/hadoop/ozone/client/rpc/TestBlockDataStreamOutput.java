@@ -136,7 +136,7 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testHalfChunkWrite() throws Exception {
-    testWrite(chunkSize / 5);
+    testWrite(chunkSize / 2);
     testWriteWithFailure(chunkSize/2);
   }
 
@@ -233,7 +233,8 @@ public class TestBlockDataStreamOutput {
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 
-  @Test public void testMinPacketSize() throws Exception {
+  @Test
+  public void testMinPacketSize() throws Exception {
     String keyName = getKeyName();
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();

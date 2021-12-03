@@ -570,8 +570,6 @@ public interface MiniOzoneCluster {
       dataStreamMinPacketSize = OptionalInt.of(size);
       return this;
     }
-
-
     /**
      * Sets the block size for stream buffer.
      *
