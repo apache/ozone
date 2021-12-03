@@ -606,14 +606,6 @@ public interface ClientProtocol {
   void createTenant(String tenantId, TenantArgs tenantArgs) throws IOException;
 
   /**
-   * Update a tenant.
-   * @param tenantId tenant name.
-   * @param tenantArgs tenant arguments.
-   * @throws IOException
-   */
-  void updateTenant(String tenantId, TenantArgs tenantArgs) throws IOException;
-
-  /**
    * Delete a tenant.
    * @param tenantId tenant name.
    * @throws IOException

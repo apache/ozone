@@ -3093,12 +3093,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public void updateTenant(String tenantId, OmTenantArgs omTenantArgs) {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented. As write requests use a new approach");
-  }
-
-  @Override
   public DeleteTenantResponse deleteTenant(String tenantId) {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");

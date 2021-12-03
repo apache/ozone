@@ -945,12 +945,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void updateTenant(String tenantId, OmTenantArgs omTenantArgs)
-      throws IOException {
-    // TODO: UpdateTenantRequest
-  }
-
-  @Override
   public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
     final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
         .setTenantId(tenantId)

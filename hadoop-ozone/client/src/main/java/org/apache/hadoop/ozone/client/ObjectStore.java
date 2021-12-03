@@ -217,16 +217,6 @@ public class ObjectStore {
   }
 
   /**
-   * Update a tenant.
-   * @param tenantId tenant name.
-   * @throws IOException
-   */
-  public void updateTenant(String tenantId, TenantArgs tenantArgs)
-      throws IOException {
-    proxy.updateTenant(tenantId, tenantArgs);
-  }
-
-  /**
    * Delete a tenant.
    * @param tenantId tenant name.
    * @throws IOException

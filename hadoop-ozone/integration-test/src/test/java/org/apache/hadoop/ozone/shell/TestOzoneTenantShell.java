@@ -172,6 +172,10 @@ public class TestOzoneTenantShell {
     if (baseDir != null) {
       FileUtil.fullyDelete(baseDir, true);
     }
+
+    if (AUDIT_LOG_FILE.exists()) {
+      AUDIT_LOG_FILE.delete();
+    }
   }
 
   @Before
@@ -208,17 +212,9 @@ public class TestOzoneTenantShell {
 
     CommandLine.IExecutionExceptionHandler exceptionHandler =
         (ex, commandLine, parseResult) -> {
-          new PrintStream(err).println(ex.getMessage());
+          new PrintStream(err, true, DEFAULT_ENCODING).println(ex.getMessage());
           return commandLine.getCommandSpec().exitCodeOnExecutionException();
         };
-
-//    CommandLine.IExitCodeExceptionMapper mapper = throwable -> {
-//      if (throwable instanceof IOException) {
-//        return 1;
-//      }
-//      return 0;
-//    };
-//    cmd.setExitCodeExceptionMapper(mapper);
 
     // Since there is no elegant way to pass Ozone config to the shell,
     // the idea is to use 'set' to place those OM HA configs.
