@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,20 +22,17 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.ozone.om.BucketManagerImpl;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.PrefixManager;
-import org.apache.hadoop.ozone.om.PrefixManagerImpl;
-import org.apache.hadoop.ozone.om.VolumeManagerImpl;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.ozone.om.*;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -64,28 +61,34 @@ public class TestVolumeOwner {
 
   private static OzoneConfiguration ozoneConfig;
   private static OzoneNativeAuthorizer nativeAuthorizer;
-  private static KeyManagerImpl keyManager;
-  private static VolumeManagerImpl volumeManager;
-  private static BucketManagerImpl bucketManager;
+  private static KeyManager keyManager;
+  private static VolumeManager volumeManager;
+  private static BucketManager bucketManager;
   private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static UserGroupInformation testUgi;
+  private static OzoneManagerProtocol writeClient;
 
   @BeforeClass
-  public static void setup() throws IOException {
+  public static void setup() throws IOException, AuthenticationException {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     File dir = GenericTestUtils.getRandomizedTestDir();
     ozoneConfig.set(OZONE_METADATA_DIRS, dir.toString());
 
-    metadataManager = new OmMetadataManagerImpl(ozoneConfig);
-    volumeManager = new VolumeManagerImpl(metadataManager, ozoneConfig);
-    bucketManager = new BucketManagerImpl(metadataManager);
-    keyManager = new KeyManagerImpl(mock(ScmBlockLocationProtocol.class),
-        metadataManager, ozoneConfig, "om1", null);
-    prefixManager = new PrefixManagerImpl(metadataManager, false);
+    StorageContainerLocationProtocol containerClient =
+      mock(StorageContainerLocationProtocol.class);
+    ScmBlockLocationProtocol blockClient =
+      mock(ScmBlockLocationProtocol.class);
+    OmTestUtils.initOmWithTestClient(ozoneConfig, blockClient, containerClient);
+    keyManager = OmTestUtils.getKeyManager();
 
+    metadataManager = OmTestUtils.getMetadataManager();
+    volumeManager = OmTestUtils.getVolumeManager();
+    bucketManager = OmTestUtils.getBucketManager();
+    prefixManager = OmTestUtils.getPrefixManager();
+    writeClient = OmTestUtils.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
         Collections.singletonList("om"));
@@ -144,12 +147,12 @@ public class TestVolumeOwner {
                 testUgi.getUserName(), testUgi.getGroupNames(), NONE, NONE));
           }
           OmKeyArgs keyArgs = keyArgsBuilder.build();
-          OpenKeySession keySession = keyManager.createFile(keyArgs, true,
+          OpenKeySession keySession = writeClient.createFile(keyArgs, true,
               false);
           keyArgs.setLocationInfoList(
               keySession.getKeyInfo().getLatestVersionLocations()
                   .getLocationList());
-          keyManager.commitKey(keyArgs, keySession.getId());
+          writeClient.commitKey(keyArgs, keySession.getId());
         }
       }
     }
