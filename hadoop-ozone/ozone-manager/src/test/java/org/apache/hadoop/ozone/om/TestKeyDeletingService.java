@@ -30,13 +30,22 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 
@@ -48,6 +57,7 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 /**
  * Test Key Deleting Service.
@@ -61,6 +71,10 @@ import org.junit.rules.TemporaryFolder;
 public class TestKeyDeletingService {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
+  private static OzoneManagerProtocol writeClient;
+  private static OzoneManager om;
+  private static ScmBlockLocationProtocol blockClient;
+  private static StorageContainerLocationProtocol containerClient;
 
   private OzoneConfiguration createConfAndInitValues() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -90,14 +104,39 @@ public class TestKeyDeletingService {
 
   @Test(timeout = 30000)
   public void checkIfDeleteServiceisDeletingKeys()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
+    DefaultMetricsSystem.setMiniClusterMode(true);
     OzoneConfiguration conf = createConfAndInitValues();
-    OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(conf);
-    KeyManager keyManager =
-        new KeyManagerImpl(
-            new ScmBlockLocationTestingClient(null, null, 0),
-            metaMgr, conf, UUID.randomUUID().toString(), null);
-    keyManager.start(conf);
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+    OMStorage omStorage = new OMStorage(conf);
+    omStorage.setClusterId("omtest");
+    omStorage.setOmId("omtest");
+    omStorage.initialize();
+    System.out.println("gbj3");
+    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
+    blockClient = new ScmBlockLocationTestingClient(null, null, 0);
+
+
+
+    OzoneManager.setTestSecureOmFlag(true);
+    om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+    OmMetadataManagerImpl metamgr = (OmMetadataManagerImpl) HddsWhiteboxTestUtils
+        .getInternalState(
+        om, "metadataManager");
+    System.out.println("gbj4");
+
+    KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
+    ScmClient scmClient = new ScmClient(blockClient, containerClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
+    System.out.println("gbj5");
+
+    om.start();
+    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
+
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
