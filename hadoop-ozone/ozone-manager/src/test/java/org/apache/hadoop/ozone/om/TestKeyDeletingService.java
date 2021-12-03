@@ -108,34 +108,9 @@ public class TestKeyDeletingService {
       AuthenticationException {
     DefaultMetricsSystem.setMiniClusterMode(true);
     OzoneConfiguration conf = createConfAndInitValues();
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-    OMStorage omStorage = new OMStorage(conf);
-    omStorage.setClusterId("omtest");
-    omStorage.setOmId("omtest");
-    omStorage.initialize();
-    System.out.println("gbj3");
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = new ScmBlockLocationTestingClient(null, null, 0);
-
-
-
-    OzoneManager.setTestSecureOmFlag(true);
-    om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
-    OmMetadataManagerImpl metamgr = (OmMetadataManagerImpl) HddsWhiteboxTestUtils
-        .getInternalState(
-        om, "metadataManager");
-    System.out.println("gbj4");
-
-    KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
-    ScmClient scmClient = new ScmClient(blockClient, containerClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "scmClient", scmClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
-    System.out.println("gbj5");
-
-    om.start();
-    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
+    KeyManager keyManager = initKeyManager(conf);
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
@@ -164,7 +139,6 @@ public class TestKeyDeletingService {
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    keyManager.start(conf);
     Assert.assertEquals(
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
     // Make sure that we have run the background thread 5 times more
@@ -192,7 +166,6 @@ public class TestKeyDeletingService {
     createAndDeleteKeys(keyManager, keyCount, 0);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    keyManager.start(conf);
 
     // Since empty keys are directly deleted from db there should be no
     // pending deletion keys. Also deletedKeyCount should be zero.
@@ -252,5 +225,32 @@ public class TestKeyDeletingService {
       keyManager.commitKey(arg, session.getId());
       keyManager.deleteKey(arg);
     }
+  }
+  private KeyManager initKeyManager(OzoneConfiguration conf)
+      throws AuthenticationException, IOException {
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+    OMStorage omStorage = new OMStorage(conf);
+    omStorage.setClusterId("omtest");
+    omStorage.setOmId("omtest");
+    omStorage.initialize();
+    System.out.println("gbj3");
+    OzoneManager.setTestSecureOmFlag(true);
+    om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+    OmMetadataManagerImpl metamgr = (OmMetadataManagerImpl) HddsWhiteboxTestUtils
+        .getInternalState(
+        om, "metadataManager");
+    System.out.println("gbj4");
+
+    KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
+    ScmClient scmClient = new ScmClient(blockClient, containerClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+    HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
+    System.out.println("gbj5");
+
+    om.start();
+    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore().getClientProxy().getOzoneManagerClient();
+    return keyManager;
   }
 }
