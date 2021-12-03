@@ -19,42 +19,41 @@ import java.io.IOException;
  */
 public final class OmTestWriteClient {
 
-  private static OzoneManagerProtocol writeClient;
-  private static OzoneManager om;
-  private static KeyManager keyManager;
-  private static OMMetadataManager metadataManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
-  private static PrefixManager prefixManager;
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager om;
+  private KeyManager keyManager;
+  private OMMetadataManager metadataManager;
+  private VolumeManager volumeManager;
+  private BucketManager bucketManager;
+  private PrefixManager prefixManager;
 
   private OmTestWriteClient() {
   }
-  public static OzoneManager getTestOm() {
+  public OzoneManager getTestOm() {
     return om;
   }
 
-  public static OzoneManagerProtocol getWriteClient() {
+  public OzoneManagerProtocol getWriteClient() {
     return writeClient;
   }
 
-  public static BucketManager getBucketManager() {
+  public BucketManager getBucketManager() {
     return bucketManager;
   }
-  public static VolumeManager getVolumeManager() {
+  public VolumeManager getVolumeManager() {
     return volumeManager;
   }
-  public static PrefixManager getPrefixManager() {
+  public PrefixManager getPrefixManager() {
     return prefixManager;
   }
-  public static OMMetadataManager getMetadataManager() {
+  public OMMetadataManager getMetadataManager() {
     return metadataManager;
   }
-  public static KeyManager getKeyManager() {
+  public KeyManager getKeyManager() {
     return keyManager;
   }
 
-
-  public static void initOmWithTestClient(OzoneConfiguration conf,
+  public OmTestWriteClient(OzoneConfiguration conf,
       ScmBlockLocationProtocol blockClient,
       StorageContainerLocationProtocol containerClient)
       throws AuthenticationException, IOException {
