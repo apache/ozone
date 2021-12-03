@@ -481,17 +481,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
-    if (cc != null) {
-      scmContainerClient = cc;
-    } else {
-      scmContainerClient = getScmContainerClient(configuration);
-    }
+    scmContainerClient =
+        (cc != null)? cc : getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
-    if (bc != null) {
-      scmBlockClient = bc;
-    } else {
-      scmBlockClient = getScmBlockClient(configuration);
-    }
+    scmBlockClient = (bc != null) ? bc : getScmBlockClient(configuration);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient);
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
