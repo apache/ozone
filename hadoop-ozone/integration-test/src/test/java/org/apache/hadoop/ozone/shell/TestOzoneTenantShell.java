@@ -74,8 +74,6 @@ public class TestOzoneTenantShell {
 
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
-    System.setProperty("log4j2.contextSelector",
-        "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
   }
 
   private static final String DEFAULT_ENCODING = UTF_8.name();
@@ -423,11 +421,9 @@ public class TestOzoneTenantShell {
     checkOutput(out, "finance\n", true);
     checkOutput(err, "", true);
 
-//    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
-    // TODO: FIXME: The check below is unstable.
-    //  Occasionally lines.size() == 0 leads to ArrayIndexOutOfBoundsException
-    //  Likely due to audit log not flushed in time at time of check.
-//    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
+    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
+    Assert.assertTrue(lines.size() > 0);
+    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Check volume creation
     OmVolumeArgs volArgs = cluster.getOzoneManager().getVolumeInfo("finance");
