@@ -422,7 +422,8 @@ public class TestSCMNodeManager {
       int actualNodeCount) throws Exception {
     try {
       ReplicationConfig ratisThree =
-          ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+          ReplicationConfig.fromProtoTypeAndFactor(
+              HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
       scm.getPipelineManager().createPipeline(ratisThree);
       Assert.fail("3 nodes should not have been found for a pipeline.");

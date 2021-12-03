@@ -818,6 +818,7 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Deprecated
   public OzoneOutputStream createFile(String keyName, long size,
       ReplicationType type, ReplicationFactor factor, boolean overWrite,
       boolean recursive) throws IOException {

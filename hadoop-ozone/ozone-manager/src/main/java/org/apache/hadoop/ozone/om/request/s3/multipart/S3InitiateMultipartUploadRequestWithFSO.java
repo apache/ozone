@@ -163,7 +163,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
       final ReplicationConfig replicationConfig =
-              ReplicationConfig.fromTypeAndFactor(
+              ReplicationConfig.fromProtoTypeAndFactor(
                       keyArgs.getType(), keyArgs.getFactor());
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()

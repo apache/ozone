@@ -1040,6 +1040,7 @@ public class RpcClient implements ClientProtocol {
     keyProviderCache.cleanUp();
   }
 
+  @Deprecated
   @Override
   public OmMultipartInfo initiateMultipartUpload(String volumeName,
       String bucketName, String keyName, ReplicationType type,
@@ -1263,6 +1264,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationType type, ReplicationFactor factor,
       boolean overWrite, boolean recursive) throws IOException {

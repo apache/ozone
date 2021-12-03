@@ -85,6 +85,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private ReplicationConfig replicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
+  private OzoneConfiguration config;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -166,6 +167,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+    this.config = conf;
   }
 
   @Override
@@ -209,7 +211,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
         ReplicationConfig customReplicationConfig =
             ReplicationConfig.adjustReplication(
-                replicationConfig, replication
+                replicationConfig, replication, config
             );
         ozoneOutputStream =
             bucket.createFile(key, 0, customReplicationConfig, overWrite,
