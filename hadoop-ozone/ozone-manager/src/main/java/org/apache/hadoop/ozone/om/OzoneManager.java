@@ -1055,7 +1055,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private RPC.Server startRpcServer(OzoneConfiguration conf,
       InetSocketAddress addr, BlockingService clientProtocolService,
       BlockingService interOMProtocolService,
-      BlockingService omMetadataProtocolService,
+      BlockingService omAdminProtocolService,
       int handlerCount)
       throws IOException {
     RPC.Server rpcServer = new RPC.Builder(conf)
@@ -1071,7 +1071,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
     HddsServerUtil.addPBProtocol(conf, OMAdminProtocolPB.class,
-        omMetadataProtocolService, rpcServer);
+        omAdminProtocolService, rpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
@@ -1511,12 +1511,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     for (Map.Entry<String, OMNodeDetails> entry : peerNodesMap.entrySet()) {
       String remoteNodeId = entry.getKey();
       OMNodeDetails remoteNodeDetails = entry.getValue();
-      try (OMAdminProtocolClientSideImpl omMetadataProtocolClient =
-               new OMAdminProtocolClientSideImpl(configuration,
-                   getRemoteUser(), entry.getValue())) {
+      try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
+               OMAdminProtocolClientSideImpl.createProxyForSingleOM(
+                   configuration, getRemoteUser(), entry.getValue())) {
 
         OMConfiguration remoteOMConfiguration =
-            omMetadataProtocolClient.getOMConfiguration();
+            omAdminProtocolClient.getOMConfiguration();
         checkRemoteOMConfig(remoteNodeId, remoteOMConfiguration);
       } catch (IOException ioe) {
         LOG.error("Remote OM config check failed on OM {}", remoteNodeId, ioe);
@@ -1563,6 +1563,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omNodeDetailsInRemoteConfig.getRpcAddress() + " where the " +
           "bootstrapping OM address is " + omNodeDetails.getRpcAddress());
     }
+
+    if (omNodeDetailsInRemoteConfig.isDecommissioned()) {
+      throw new IOException("Remote OM " + remoteNodeId + " configuration has" +
+          " bootstrapping OM(" + getOMNodeId() + ") in decommissioned " +
+          "nodes list - " + OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY);
+    }
   }
 
   @Override
@@ -1590,14 +1596,41 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * When OMStateMachine receives a configuration change update, it calls
-   * this function to update the peers list, if required.
+   * this function to update the peers list, if required. The configuration
+   * change could be to add or to remove an OM from the ring.
    */
-  public void updatePeerList(List<String> omNodeIds) {
-    List<String> ratisServerPeerIdsList = omRatisServer.getPeerIds();
-    for (String omNodeId : omNodeIds) {
-      // Check if the OM NodeID is already present in the peer list or its
-      // the local NodeID.
-      if (!peerNodesMap.containsKey(omNodeId) && !isCurrentNode(omNodeId)) {
+  public void updatePeerList(List<String> newPeers) {
+    List<String> currentPeers = omRatisServer.getPeerIds();
+
+    // NodeIds present in new node list and not in current peer list are the
+    // bootstapped OMs and should be added to the peer list
+    List<String> bootstrappedOMs = new ArrayList<>();
+    bootstrappedOMs.addAll(newPeers);
+    bootstrappedOMs.removeAll(currentPeers);
+
+    // NodeIds present in current peer list but not in new node list are the
+    // decommissioned OMs and should be removed from the peer list
+    List<String> decommissionedOMs = new ArrayList<>();
+    bootstrappedOMs.addAll(currentPeers);
+    bootstrappedOMs.removeAll(newPeers);
+
+    // Add bootstrapped OMs to peer list
+    for (String omNodeId : bootstrappedOMs) {
+      // Check if its the local nodeId (bootstrapping OM)
+      if (isCurrentNode(omNodeId)) {
+        // For a Bootstrapping OM, none of the peers are added to it's
+        // RatisServer's peer list and it needs to be updated here after
+        // receiving the conf change notification from Ratis.
+        for (String peerNodeId : newPeers) {
+          if (peerNodeId.equals(omNodeId)) {
+            omRatisServer.addRaftPeer(omNodeDetails);
+          } else {
+            omRatisServer.addRaftPeer(peerNodesMap.get(peerNodeId));
+          }
+        }
+      } else {
+        // For other nodes, add bootstrapping OM to OM peer list (which
+        // internally adds to Ratis peer list too)
         try {
           addOMNodeToPeers(omNodeId);
         } catch (IOException e) {
@@ -1605,22 +1638,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               "could lead to OM state divergence.", e);
           exitManager.forceExit(1, e, LOG);
         }
+      }
+    }
+
+    // Remove decommissioned OMs from peer list
+    for (String omNodeId : decommissionedOMs) {
+      if (isCurrentNode(omNodeId)) {
+        // Decommissioning Node should not receive the configuration change
+        // request. Shut it down.
+        String errorMsg = "Shutting down as OM has been decommissioned.";
+        LOG.error("Fatal Error: {}", errorMsg);
+        exitManager.forceExit(1, errorMsg, LOG);
       } else {
-        // Check if the OMNodeID is present in the RatisServer's peer list
-        if (!ratisServerPeerIdsList.contains(omNodeId)) {
-          // This can happen on a bootstrapping OM. The peer information
-          // would be present in OzoneManager but OMRatisServer peer list
-          // would not have the peers list. OMRatisServer peer list of
-          // bootstrapping node should be updated after it gets the RaftConf
-          // through Ratis.
-          if (isCurrentNode(omNodeId)) {
-            // OM Ratis server has the current node also in the peer list as
-            // this is the Raft Group peers list. Hence, add the current node
-            // also to Ratis peers list if not present.
-            omRatisServer.addRaftPeer(omNodeDetails);
-          } else {
-            omRatisServer.addRaftPeer(peerNodesMap.get(omNodeId));
-          }
+        // Remove decommissioned node from peer list (which internally
+        // removed from Ratis peer list too)
+        try {
+          removeOMNodeFromPeers(omNodeId);
+        } catch (IOException e) {
+          e.printStackTrace();
         }
       }
     }
@@ -1674,6 +1709,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Remove an OM Node from the peers list. This call comes from OMStateMachine
+   * after a SetConfiguration request has been successfully executed by the
+   * Ratis server.
+   */
+  private void removeOMNodeFromPeers(String decommNodeId) throws IOException {
+    OMNodeDetails decommOMNodeDetails = peerNodesMap.get(decommNodeId);
+    if (decommOMNodeDetails == null) {
+      throw new IOException("Decommissioned Node " + decommNodeId + " not " +
+          "present in peer list");
+    }
+
+    omSnapshotProvider.removeDecommissionedPeerNode(decommNodeId);
+    omRatisServer.removeRaftPeer(decommOMNodeDetails);
+    peerNodesMap.remove(decommNodeId);
+    LOG.info("Removed OM {} from the Peer list.", decommNodeId);
+  }
+
+  /**
    * Check if the input nodeId exists in the peers list.
    * @return true if the nodeId is self or it exists in peer node list,
    *         false otherwise.
@@ -1706,7 +1759,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public List<OMNodeDetails> getAllOMNodesInNewConf() {
     OzoneConfiguration newConf = reloadConfiguration();
-    return OmUtils.getAllOMAddresses(newConf, getOMServiceId(), getOMNodeId());
+    List<OMNodeDetails> allOMNodeDetails = OmUtils.getAllOMHAAddresses(
+        newConf, getOMServiceId(), true);
+    if (allOMNodeDetails.isEmpty()) {
+      // There are no addresses configured for HA. Return only current OM
+      // details.
+      return Collections.singletonList(omNodeDetails);
+    }
+    return allOMNodeDetails;
   }
 
   /**
@@ -3370,6 +3430,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public List<OMNodeDetails> getPeerNodes() {
     return new ArrayList<>(peerNodesMap.values());
+  }
+
+  public OMNodeDetails getPeerNode(String nodeID) {
+    return peerNodesMap.get(nodeID);
   }
 
   @VisibleForTesting

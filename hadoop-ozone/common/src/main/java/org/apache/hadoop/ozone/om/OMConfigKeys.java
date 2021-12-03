@@ -49,6 +49,8 @@ public final class OMConfigKeys {
       "ozone.om.nodes";
   public static final String OZONE_OM_NODE_ID_KEY =
       "ozone.om.node.id";
+  public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
+      "ozone.om.decommissioned.nodes";
 
   public static final String OZONE_OM_ADDRESS_KEY =
       "ozone.om.address";
