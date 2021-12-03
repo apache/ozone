@@ -57,7 +57,6 @@ Secure Tenant GetUserInfo Success
                         Should contain   ${output}         Tenant 'tenantone' with accessId 'tenantone$testuser'
 
 Secure Tenant Create Bucket 1 Success via S3 API
-    Run Keyword         Setup s3 tests
                         Execute          aws configure set aws_access_key_id ${ACCESS_ID}
                         Execute          aws configure set aws_secret_access_key ${SECRET_KEY}
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket bucket-test1
