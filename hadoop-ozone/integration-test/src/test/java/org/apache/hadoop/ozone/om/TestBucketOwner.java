@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.*;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -35,7 +35,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.Assert.fail;
 
@@ -70,8 +72,6 @@ public class TestBucketOwner {
     String omId = UUID.randomUUID().toString();
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
             .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
@@ -113,6 +113,14 @@ public class TestBucketOwner {
     ozoneBucket.deleteKey("key1");
     //Bucket Delete
     volume.deleteBucket("bucket3");
+    //List Keys
+    ozoneBucket.listKeys("key");
+    //Get Acls
+    ozoneBucket.getAcls();
+    //Add Acls
+    OzoneAcl acl = new OzoneAcl(USER, "testuser",
+        IAccessAuthorizer.ACLType.ALL, DEFAULT);
+    ozoneBucket.addAcl(acl);
   }
 
   @Test
@@ -150,6 +158,38 @@ public class TestBucketOwner {
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
+    //List Keys - should fail
+    try {
+      OzoneVolume volume = cluster.getClient().getObjectStore()
+              .getVolume("volume1");
+      ozoneBucket = volume.getBucket("bucket1");
+      ozoneBucket.listKeys("key");
+      fail("List keys as non-volume and non-bucket owner should fail");
+    } catch (Exception ex) {
+      LOG.info(ex.getMessage());
+    }
+    //Get Acls - should fail
+    try {
+      OzoneVolume volume = cluster.getClient().getObjectStore()
+              .getVolume("volume1");
+      ozoneBucket = volume.getBucket("bucket1");
+      ozoneBucket.getAcls();
+      fail("Get Acls as non-volume and non-bucket owner should fail");
+    } catch (Exception ex) {
+      LOG.info(ex.getMessage());
+    }
+    //Add Acls - should fail
+    try {
+      OzoneVolume volume = cluster.getClient().getObjectStore()
+              .getVolume("volume1");
+      ozoneBucket = volume.getBucket("bucket1");
+      OzoneAcl acl = new OzoneAcl(USER, "testuser1",
+              IAccessAuthorizer.ACLType.ALL, DEFAULT);
+      ozoneBucket.addAcl(acl);
+      fail("Add Acls as non-volume and non-bucket owner should fail");
+    } catch (Exception ex) {
+      LOG.info(ex.getMessage());
+    }
   }
 
   @Test
@@ -163,6 +203,14 @@ public class TestBucketOwner {
     createKey(ozoneBucket, "key2", 10, new byte[10]);
     //Key Delete
     ozoneBucket.deleteKey("key2");
+    //List Keys
+    ozoneBucket.listKeys("key");
+    //Get Acls
+    ozoneBucket.getAcls();
+    //Add Acls
+    OzoneAcl acl = new OzoneAcl(USER, "testuser2",
+            IAccessAuthorizer.ACLType.ALL, DEFAULT);
+    ozoneBucket.addAcl(acl);
     //Bucket Delete
     volume.deleteBucket("bucket2");
   }

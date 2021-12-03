@@ -549,9 +549,10 @@ public class RpcClient implements ClientProtocol {
       builder.setBucketEncryptionKey(bek);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with Versioning {} and " +
-            "Storage Type set to {} and Encryption set to {} ",
-        volumeName, bucketName, isVersionEnabled, storageType, bek != null);
+    LOG.info("Creating Bucket: {}/{}, with {} as owner and Versioning {} and " +
+        "Storage Type set to {} and Encryption set to {} ",
+        volumeName, bucketName, owner, isVersionEnabled,
+        storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
 

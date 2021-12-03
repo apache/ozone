@@ -74,7 +74,6 @@ public final class OzoneAclUtils {
       }
     } else {
       parentAclRight =  IAccessAuthorizer.ACLType.READ;
-
     }
 
     switch (resType) {
