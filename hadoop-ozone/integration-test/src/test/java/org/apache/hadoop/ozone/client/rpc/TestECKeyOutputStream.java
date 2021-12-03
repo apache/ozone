@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -88,12 +89,21 @@ public class TestECKeyOutputStream {
     conf.setFromObject(clientConfig);
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    // If SCM detects dead node too quickly, then container would be moved to
+    // closed state and all in progress writes will get exception. To avoid
+    // that, we are just keeping higher timeout and none of the tests depending
+    // on deadnode detection timeout currently.
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 300, TimeUnit.SECONDS);
+    conf.setTimeDuration("hdds.ratis.raft.server.rpc.slowness.timeout", 300,
+        TimeUnit.SECONDS);
+    conf.setTimeDuration(
+        "hdds.ratis.raft.server.notification.no-leader.timeout", 300,
+        TimeUnit.SECONDS);
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
 
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7)
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
@@ -205,12 +215,7 @@ public class TestECKeyOutputStream {
 
   public void testMultipleChunksInSingleWriteOp(int numChunks)
       throws IOException {
-    byte[] inputData = new byte[numChunks * chunkSize];
-    for (int i = 0; i < numChunks; i++) {
-      int start = (i * chunkSize);
-      Arrays.fill(inputData, start, start + chunkSize - 1,
-          String.valueOf(i % 9).getBytes(UTF_8)[0]);
-    }
+    byte[] inputData = getInputBytes(numChunks);
     final OzoneBucket bucket = getOzoneBucket();
     String keyName = "testMultipleChunksInSingleWriteOp" + numChunks;
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
@@ -258,4 +263,61 @@ public class TestECKeyOutputStream {
     }
     return builder.toString().getBytes(UTF_8);
   }
+
+  @Test
+  public void testWriteShouldSucceedWhenDNKilled() throws Exception {
+    int numChunks = 3;
+    byte[] inputData = getInputBytes(numChunks);
+    final OzoneBucket bucket = getOzoneBucket();
+    String keyName = "testWriteShouldSucceedWhenDNKilled" + numChunks;
+    try {
+      try (OzoneOutputStream out = bucket.createKey(keyName, 1024,
+          new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+              chunkSize), new HashMap<>())) {
+        out.write(inputData);
+        // Kill a node from first pipeline
+        DatanodeDetails nodeToKill =
+            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
+                .get(0).getPipeline().getFirstNode();
+        cluster.shutdownHddsDatanode(nodeToKill);
+
+        out.write(inputData);
+        // Check the second blockGroup pipeline to make sure that the failed not
+        // is not selected.
+        Assert.assertFalse(
+            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
+                .get(1).getPipeline().getNodes().contains(nodeToKill));
+      }
+
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        // TODO: this skip can be removed once read handles online recovery.
+        long skip = is.skip(inputData.length);
+        Assert.assertTrue(skip == inputData.length);
+        // All nodes available in second block group. So, lets assert.
+        byte[] fileContent = new byte[inputData.length];
+        Assert.assertEquals(inputData.length, is.read(fileContent));
+        Assert.assertEquals(new String(inputData, UTF_8),
+            new String(fileContent, UTF_8));
+      }
+    } finally {
+      // TODO: optimize to just start the killed DN back.
+      resetCluster();
+    }
+  }
+
+  private void resetCluster() throws Exception {
+    cluster.shutdown();
+    init();
+  }
+
+  private byte[] getInputBytes(int numChunks) {
+    byte[] inputData = new byte[numChunks * chunkSize];
+    for (int i = 0; i < numChunks; i++) {
+      int start = (i * chunkSize);
+      Arrays.fill(inputData, start, start + chunkSize - 1,
+          String.valueOf(i % 9).getBytes(UTF_8)[0]);
+    }
+    return inputData;
+  }
+
 }
