@@ -50,16 +50,6 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 execute_robot_test scm admincli
 
-
-execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-simple-ofs-bucket ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-simple-o3fs-link ozonefs/ozonefs.robot
-
-# running FS tests with different config requires restart of the cluster
-export OZONE_KEEP_RESULTS=true
-stop_docker_env
-
-start_docker_env
-
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-fso-ofs-link ozonefs/ozonefs.robot
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-fso-o3fs-bucket ozonefs/ozonefs.robot
 
