@@ -53,6 +53,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -93,6 +94,11 @@ public class TestKeyDeletingService {
     return conf;
   }
 
+  @After
+  public void cleanup() throws Exception {
+    om.stop();
+  }
+
   /**
    * In this test, we create a bunch of keys and delete them. Then we start the
    * KeyDeletingService and pass a SCMClient which does not fail. We make sure
@@ -106,7 +112,6 @@ public class TestKeyDeletingService {
   public void checkIfDeleteServiceisDeletingKeys()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
-    DefaultMetricsSystem.setMiniClusterMode(true);
     OzoneConfiguration conf = createConfAndInitValues();
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = new ScmBlockLocationTestingClient(null, null, 0);
@@ -126,15 +131,13 @@ public class TestKeyDeletingService {
 
   @Test(timeout = 30000)
   public void checkIfDeleteServiceWithFailingSCM()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(conf);
-    //failCallsFrequency = 1 , means all calls fail.
-    KeyManager keyManager =
-        new KeyManagerImpl(
-            new ScmBlockLocationTestingClient(null, null, 1),
-            metaMgr, conf, UUID.randomUUID().toString(), null);
-    keyManager.start(conf);
+    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
+    blockClient = new ScmBlockLocationTestingClient(null, null, 1);
+    KeyManager keyManager = initKeyManager(conf);
+
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
@@ -153,15 +156,13 @@ public class TestKeyDeletingService {
 
   @Test(timeout = 30000)
   public void checkDeletionForEmptyKey()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(conf);
-    //failCallsFrequency = 1 , means all calls fail.
-    KeyManager keyManager =
-        new KeyManagerImpl(
-            new ScmBlockLocationTestingClient(null, null, 1),
-            metaMgr, conf, UUID.randomUUID().toString(), null);
-    keyManager.start(conf);
+    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
+    blockClient = new ScmBlockLocationTestingClient(null, null, 1);
+    KeyManager keyManager = initKeyManager(conf);
+
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 0);
     KeyDeletingService keyDeletingService =
@@ -217,18 +218,19 @@ public class TestKeyDeletingService {
               .setLocationInfoList(new ArrayList<>())
               .build();
       //Open, Commit and Delete the Keys in the Key Manager.
-      OpenKeySession session = keyManager.openKey(arg);
+      OpenKeySession session = writeClient.openKey(arg);
       for (int i = 0; i < numBlocks; i++) {
         arg.addLocationInfo(
-            keyManager.allocateBlock(arg, session.getId(), new ExcludeList()));
+            writeClient.allocateBlock(arg, session.getId(), new ExcludeList()));
       }
-      keyManager.commitKey(arg, session.getId());
-      keyManager.deleteKey(arg);
+      writeClient.commitKey(arg, session.getId());
+      writeClient.deleteKey(arg);
     }
   }
   private KeyManager initKeyManager(OzoneConfiguration conf)
       throws AuthenticationException, IOException {
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
+    DefaultMetricsSystem.setMiniClusterMode(true);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId("omtest");
     omStorage.setOmId("omtest");
@@ -236,9 +238,6 @@ public class TestKeyDeletingService {
     System.out.println("gbj3");
     OzoneManager.setTestSecureOmFlag(true);
     om = OzoneManager.createOm(conf, OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
-    OmMetadataManagerImpl metamgr = (OmMetadataManagerImpl) HddsWhiteboxTestUtils
-        .getInternalState(
-        om, "metadataManager");
     System.out.println("gbj4");
 
     KeyManager keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
