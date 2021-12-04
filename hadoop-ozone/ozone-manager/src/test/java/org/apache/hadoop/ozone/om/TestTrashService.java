@@ -152,9 +152,9 @@ public class TestTrashService {
     KeyManager km = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "keyManager");
     ScmClient scmClient = new ScmClient(blockClient, containerClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
+    HddsWhiteboxTestUtils.setInternalState(km,
         "scmClient", scmClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
+    HddsWhiteboxTestUtils.setInternalState(km,
         "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
 
     om.start();
