@@ -41,8 +41,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -52,9 +50,7 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -71,7 +67,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
@@ -94,7 +89,7 @@ import static org.mockito.Mockito.when;
 public class TestKeyManagerUnit {
 
   private OzoneConfiguration configuration;
-  private OmMetadataManagerImpl metadataManager;
+  private OMMetadataManager metadataManager;
   private StorageContainerLocationProtocol containerClient;
   private KeyManagerImpl keyManager;
 
@@ -107,44 +102,19 @@ public class TestKeyManagerUnit {
   
   @Before
   public void setup() throws Exception {
-    System.out.println("gbj1");
-    DefaultMetricsSystem.setMiniClusterMode(true);
     configuration = new OzoneConfiguration();
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
-    configuration.set(ScmConfigKeys
-        .OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
-    System.out.println("gbj2");
 
-    OMStorage omStorage = new OMStorage(configuration);
-    omStorage.setClusterId("omtest");
-    omStorage.setOmId("omtest");
-    omStorage.initialize();
-    System.out.println("gbj3");
-
-    OzoneManager.setTestSecureOmFlag(true);
-    om = OzoneManager.createOm(configuration,
-        OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
-    metadataManager = (OmMetadataManagerImpl)
-        HddsWhiteboxTestUtils.getInternalState(
-        om, "metadataManager");
-    System.out.println("gbj4");
-
-    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
-        .getInternalState(om, "keyManager");
-    ScmClient scmClient = new ScmClient(blockClient, containerClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "scmClient", scmClient);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
-    System.out.println("gbj5");
-
-    om.start();
-    writeClient = OzoneClientFactory.getRpcClient(configuration)
-        .getObjectStore().getClientProxy().getOzoneManagerClient();
+    OmTestWriteClient omTestWriteClient
+      = new OmTestWriteClient(configuration, blockClient, containerClient);
+    om = omTestWriteClient.getTestOm();
+    metadataManager = omTestWriteClient.getMetadataManager();
+    keyManager = (KeyManagerImpl)omTestWriteClient.getKeyManager();
+    writeClient = omTestWriteClient.getWriteClient();
     startDate = Instant.now();
   }
 
@@ -313,7 +283,7 @@ public class TestKeyManagerUnit {
     Assert.assertEquals("dir/key2", uploads.get(1).getKeyName());
   }
 
-  private void createBucket(OmMetadataManagerImpl omMetadataManager,
+  private void createBucket(OMMetadataManager metadataManager,
       String volume, String bucket)
       throws IOException {
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
