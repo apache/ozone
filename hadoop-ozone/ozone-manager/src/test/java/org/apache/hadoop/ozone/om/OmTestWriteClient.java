@@ -82,11 +82,13 @@ public final class OmTestWriteClient {
     omStorage.initialize();
     OzoneManager.setTestSecureOmFlag(true);
     om = OzoneManager.createOm(conf,
-        OzoneManager.StartupOption.REGUALR, containerClient, blockClient);
+        OzoneManager.StartupOption.REGUALR);
 
     keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "keyManager");
     ScmClient scmClient = new ScmClient(blockClient, containerClient);
+    HddsWhiteboxTestUtils.setInternalState(om,
+        "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,

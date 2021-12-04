@@ -395,9 +395,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isSecurityEnabled;
 
   @SuppressWarnings("methodlength")
-  private OzoneManager(OzoneConfiguration conf, StartupOption startupOption,
-                       StorageContainerLocationProtocol cc,
-                       ScmBlockLocationProtocol bc)
+  private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Preconditions.checkNotNull(conf);
@@ -481,11 +479,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
-    scmContainerClient =
-        (cc != null) ? cc : getScmContainerClient(configuration);
+    scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
-    scmBlockClient =
-        (bc != null) ? bc : getScmBlockClient(configuration);
+    scmBlockClient = getScmBlockClient(configuration);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient);
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
@@ -603,20 +599,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return new OzoneManager(conf, StartupOption.REGUALR, null, null);
+    return new OzoneManager(conf, StartupOption.REGUALR);
   }
 
   public static OzoneManager createOm(OzoneConfiguration conf,
       StartupOption startupOption) throws IOException, AuthenticationException {
-    return new OzoneManager(conf, startupOption, null, null);
-  }
-
-  public static OzoneManager createOm(OzoneConfiguration conf,
-                                      StartupOption startupOption,
-                                      StorageContainerLocationProtocol cc,
-                                      ScmBlockLocationProtocol bc)
-      throws IOException, AuthenticationException {
-    return new OzoneManager(conf, startupOption, cc, bc);
+    return new OzoneManager(conf, startupOption);
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
