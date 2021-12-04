@@ -102,8 +102,8 @@ public class TestKeyManagerUnit {
   private File testDir;
   private ScmBlockLocationProtocol blockClient;
 
-  private static OzoneManagerProtocol writeClient;
-  private static OzoneManager om;
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager om;
   
   @Before
   public void setup() throws Exception {

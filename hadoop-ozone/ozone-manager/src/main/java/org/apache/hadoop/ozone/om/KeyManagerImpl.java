@@ -2322,10 +2322,6 @@ public class KeyManagerImpl implements KeyManager {
     return false;
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
-
   private BucketLayout getBucketLayout(OMMetadataManager omMetadataManager,
       String volName, String buckName) {
     if (omMetadataManager == null) {

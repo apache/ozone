@@ -81,7 +81,7 @@ public class TestVolumeOwner {
         mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         mock(ScmBlockLocationProtocol.class);
-        OmTestWriteClient omTestWriteClient =
+    OmTestWriteClient omTestWriteClient =
         new OmTestWriteClient(ozoneConfig, blockClient, containerClient);
     keyManager = omTestWriteClient.getKeyManager();
 
