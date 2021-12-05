@@ -28,7 +28,6 @@ import java.util.concurrent.Callable;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printFSOReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printSpaces;
@@ -80,10 +79,6 @@ public class FileSizeDistSubCommand implements Callable {
     } else if (distResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("File Size Distribution");
     } else {
-      if (!parent.isFSOEnabled()) {
-        printFSOReminder();
-      }
-
       printWithUnderline("File Size Distribution", true);
       ArrayList fileSizeDist = (ArrayList) distResponse.get("dist");
       double sum = 0;

@@ -74,12 +74,6 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     return OzoneAdmin.class;
   }
 
-  public boolean isFSOEnabled() {
-    OzoneConfiguration conf = parent.getOzoneConf();
-    return conf.getBoolean("ozone.om.enable.filesystem.paths", false)
-        && conf.get("ozone.om.metadata.layout").equalsIgnoreCase("PREFIX");
-  }
-
   /**
    * e.g. Input: "0.0.0.0:9891" -> Output: "0.0.0.0"
    */

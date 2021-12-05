@@ -41,8 +41,6 @@ public class TestOMBucketCreateRequestWithFSO
 
   @Test
   public void testValidateAndUpdateCacheWithFSO() throws Exception {
-    when(ozoneManager.getOMMetadataLayout()).thenReturn(
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     String volumeName = UUID.randomUUID().toString();

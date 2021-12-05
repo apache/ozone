@@ -551,9 +551,6 @@ public final class TestOMRequestUtils {
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key2").setValue(
             "value2").build());
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT).setValue(
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX).build());
-    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
             OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS).setValue(
             "false").build());
     return metadataList;
@@ -1066,15 +1063,16 @@ public final class TestOMRequestUtils {
   }
 
   public static void configureFSOptimizedPaths(Configuration conf,
-      boolean enableFileSystemPaths, String version) {
+                                               boolean enableFileSystemPaths) {
+    configureFSOptimizedPaths(conf, enableFileSystemPaths, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  public static void configureFSOptimizedPaths(Configuration conf,
+                                               boolean enableFileSystemPaths, BucketLayout bucketLayout) {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
-    conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
-    if (StringUtils.equalsIgnoreCase(
-        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX, version)) {
-      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
-    }
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+            bucketLayout.name());
   }
 
   private static BucketLayout getDefaultBucketLayout() {

@@ -41,8 +41,7 @@ public class TestNSSummaryAdmin {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
-        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    TestOMRequestUtils.configureFSOptimizedPaths(conf, true);
     conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes().includeRecon(true).build();

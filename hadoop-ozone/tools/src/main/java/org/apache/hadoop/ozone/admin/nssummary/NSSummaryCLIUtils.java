@@ -152,15 +152,6 @@ public final class NSSummaryCLIUtils {
     }
   }
 
-  public static void printFSOReminder() {
-    printNewLines(1);
-    System.out.println("[Warning] FSO is NOT enabled. " +
-        "Namespace CLI is only designed for FSO mode.\n" +
-        "To enable FSO set ozone.om.enable.filesystem.paths to true " +
-        "and ozone.om.metadata.layout to PREFIX.");
-    printNewLines(1);
-  }
-
   public static String parseInputPath(String path) {
     if (!path.startsWith("ofs://")) {
       return path;
