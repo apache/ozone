@@ -513,6 +513,8 @@ public class RpcClient implements ClientProtocol {
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
 
+    String owner = bucketArgs.getOwner() == null ?
+            ugi.getShortUserName() : bucketArgs.getOwner();
     Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
         Boolean.FALSE : bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
@@ -540,15 +542,17 @@ public class RpcClient implements ClientProtocol {
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
-        .setBucketLayout(bucketArgs.getBucketLayout());
+        .setBucketLayout(bucketArgs.getBucketLayout())
+        .setOwner(owner);
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with Versioning {} and " +
-            "Storage Type set to {} and Encryption set to {} ",
-        volumeName, bucketName, isVersionEnabled, storageType, bek != null);
+    LOG.info("Creating Bucket: {}/{}, with {} as owner and Versioning {} and " +
+        "Storage Type set to {} and Encryption set to {} ",
+        volumeName, bucketName, owner, isVersionEnabled,
+        storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
 
@@ -773,7 +777,8 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInNamespace(),
-        bucketInfo.getBucketLayout()
+        bucketInfo.getBucketLayout(),
+        bucketInfo.getOwner()
     );
   }
 
@@ -802,7 +807,8 @@ public class RpcClient implements ClientProtocol {
         bucket.getUsedNamespace(),
         bucket.getQuotaInBytes(),
         bucket.getQuotaInNamespace(),
-        bucket.getBucketLayout()))
+        bucket.getBucketLayout(),
+        bucket.getOwner()))
         .collect(Collectors.toList());
   }
 
