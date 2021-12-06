@@ -3765,37 +3765,19 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = getBucket(volume);
-    Assert.assertEquals(bucket.getName(), bucket.getName());
     ReplicationConfig currentReplicationConfig = bucket.getReplicationConfig();
     Assert.assertEquals(
         new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
         currentReplicationConfig);
-    bucket.setReplicationConfig(
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024));
+    ECReplicationConfig ecReplicationConfig =
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024);
+    bucket.setReplicationConfig(ecReplicationConfig);
 
     // Get the bucket and check the updated config.
     bucket = volume.getBucket(bucket.getName());
 
-    Assert.assertEquals(
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024),
-        bucket.getReplicationConfig());
+    Assert.assertEquals(ecReplicationConfig, bucket.getReplicationConfig());
 
-    //Reset replication config back.
-    bucket.setReplicationConfig(currentReplicationConfig);
-  }
-
-  @Test
-  public void testSetRatisReplicationConfigOnBucket()
-      throws IOException {
-    String volumeName = UUID.randomUUID().toString();
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    OzoneBucket bucket = getBucket(volume);
-    Assert.assertEquals(bucket.getName(), bucket.getName());
-    ReplicationConfig currentReplicationConfig = bucket.getReplicationConfig();
-    Assert.assertEquals(
-        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
-        currentReplicationConfig);
     RatisReplicationConfig retisReplicationConfig =
         new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
     bucket.setReplicationConfig(retisReplicationConfig);

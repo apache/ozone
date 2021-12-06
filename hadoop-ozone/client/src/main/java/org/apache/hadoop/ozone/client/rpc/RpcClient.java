@@ -714,7 +714,7 @@ public class RpcClient implements ClientProtocol {
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setDefaultReplicationCOnfig(
+        .setDefaultReplicationConfig(
             new DefaultReplicationConfig(replicationConfig));
     ozoneManagerClient.setBucketProperty(builder.build());
   }

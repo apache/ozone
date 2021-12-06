@@ -218,7 +218,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
-    public Builder setDefaultReplicationCOnfig(
+    public Builder setDefaultReplicationConfig(
         DefaultReplicationConfig defaultRepConfig) {
       this.defaultReplicationConfig = defaultRepConfig;
       return this;
