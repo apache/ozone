@@ -36,8 +36,15 @@ import java.util.function.Function;
  */
 public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
 
+  private ECBlockInputStreamFactory ecBlockStreamFactory;
+
   public static BlockInputStreamFactory getInstance() {
     return new BlockInputStreamFactoryImpl();
+  }
+
+  public BlockInputStreamFactoryImpl() {
+    this.ecBlockStreamFactory =
+        ECBlockInputStreamFactoryImpl.getInstance(this);
   }
 
   /**
@@ -59,8 +66,9 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
       XceiverClientFactory xceiverFactory,
       Function<BlockID, Pipeline> refreshFunction) {
     if (repConfig.getReplicationType().equals(HddsProtos.ReplicationType.EC)) {
-      return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,
-          verifyChecksum, xceiverFactory, refreshFunction, this);
+      return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
+          blockInfo, verifyChecksum, xceiverFactory, refreshFunction,
+          ecBlockStreamFactory);
     } else {
       return new BlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
           pipeline, token, verifyChecksum, xceiverFactory, refreshFunction);
