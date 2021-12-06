@@ -39,10 +39,6 @@ public class ContainerReplicaHistory {
   // Last reported time of the replica
   private Long lastSeenTime;
 
-  public void setBcsId(long bcsId) {
-    this.bcsId = bcsId;
-  }
-
   private long bcsId;
 
   public ContainerReplicaHistory(UUID id, Long firstSeenTime,
@@ -55,6 +51,10 @@ public class ContainerReplicaHistory {
 
   public long getBcsId() {
     return bcsId;
+  }
+
+  public void setBcsId(long bcsId) {
+    this.bcsId = bcsId;
   }
 
   public UUID getUuid() {
