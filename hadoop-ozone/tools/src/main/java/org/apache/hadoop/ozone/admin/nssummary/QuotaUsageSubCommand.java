@@ -80,7 +80,7 @@ public class QuotaUsageSubCommand implements Callable {
     } else if (quotaResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("Quota");
     } else {
-      if (!parent.isFSOEnabled(path)) {
+      if (!parent.isFileSystemOptimizedBucket(path)) {
         printFSOReminder();
       }
 

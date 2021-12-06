@@ -84,7 +84,7 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     return OzoneAdmin.class;
   }
 
-  public boolean isFSOEnabled(String path) throws IOException {
+  public boolean isFileSystemOptimizedBucket(String path) throws IOException {
     OFSPath ofsPath = new OFSPath(path);
 
     OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
@@ -99,7 +99,7 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
           OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
               new HashSet<>());
 
-      return resolvedBucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      return resolvedBucketLayout.isFileSystemOptimized();
     } catch (IOException e) {
       System.out.println(
           "Bucket layout couldn't be verified for path: " + ofsPath +

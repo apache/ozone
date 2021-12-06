@@ -80,7 +80,7 @@ public class FileSizeDistSubCommand implements Callable {
     } else if (distResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("File Size Distribution");
     } else {
-      if (!parent.isFSOEnabled(path)) {
+      if (!parent.isFileSystemOptimizedBucket(path)) {
         printFSOReminder();
       }
 

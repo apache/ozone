@@ -95,10 +95,10 @@ public class TestReadRetries {
       storageContainerLocationClient;
 
   private static final String SCM_ID = UUID.randomUUID().toString();
-  private String layoutVersion;
+  private String bucketLayout;
 
-  public TestReadRetries(String layoutVersion) {
-    this.layoutVersion = layoutVersion;
+  public TestReadRetries(String bucketLayout) {
+    this.bucketLayout = bucketLayout;
   }
 
   @Parameterized.Parameters
@@ -118,7 +118,7 @@ public class TestReadRetries {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, BucketLayout.fromString(layoutVersion));
+            true, BucketLayout.fromString(bucketLayout));
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setScmId(SCM_ID)

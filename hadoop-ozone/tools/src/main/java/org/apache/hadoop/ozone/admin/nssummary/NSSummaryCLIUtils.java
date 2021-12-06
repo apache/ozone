@@ -154,9 +154,8 @@ public final class NSSummaryCLIUtils {
 
   public static void printFSOReminder() {
     printNewLines(1);
-    System.out.println("[Warning] FSO is NOT enabled. " +
-        "Namespace CLI is only designed for FSO mode.\n" +
-        "Bucket being accessed must have FILE_SYSTEM_OPTIMIZED bucket layout");
+    System.out.println("[Warning] Namespace CLI is only designed for FSO mode.\n" +
+            "Bucket being accessed must be of type FILE_SYSTEM_OPTIMIZED bucket layout.");
     printNewLines(1);
   }
 
