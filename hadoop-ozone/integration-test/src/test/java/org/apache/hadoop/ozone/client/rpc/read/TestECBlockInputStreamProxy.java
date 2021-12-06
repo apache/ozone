@@ -110,12 +110,61 @@ public class TestECBlockInputStreamProxy {
   }
 
   @Test
+  public void testBlockIDCanBeRetrieved() throws IOException {
+    int blockLength = 1234;
+    generateData(blockLength);
+
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    OmKeyLocationInfo blockInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
+
+    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+      Assert.assertEquals(blockInfo.getBlockID(), bis.getBlockID());
+    }
+  }
+
+  @Test
+  public void testBlockLengthCanBeRetrieved() throws IOException {
+    int blockLength = 1234;
+    generateData(blockLength);
+
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    OmKeyLocationInfo blockInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
+
+    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+      Assert.assertEquals(1234, bis.getLength());
+    }
+  }
+
+  @Test
+  public void testBlockRemainingCanBeRetrieved() throws IOException {
+    int blockLength = 12345;
+    generateData(blockLength);
+
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    OmKeyLocationInfo blockInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
+
+    dataGenerator = new SplittableRandom(randomSeed);
+    ByteBuffer readBuffer = ByteBuffer.allocate(100);
+    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+      Assert.assertEquals(12345, bis.getRemaining());
+      Assert.assertEquals(0, bis.getPos());
+      bis.read(readBuffer);
+      Assert.assertEquals(12345 - 100, bis.getRemaining());
+      Assert.assertEquals(100, bis.getPos());
+    }
+  }
+
+  @Test
   public void testCorrectStreamCreatedDependingOnDataLocations()
       throws IOException {
     int blockLength = 5 * ONEMB;
-    ByteBuffer data = ByteBuffer.allocate(blockLength);
-    ECStreamTestUtil.randomFill(data, dataGenerator);
-    streamFactory.setData(data);
+    ByteBuffer data = generateData(blockLength);
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
@@ -146,9 +195,7 @@ public class TestECBlockInputStreamProxy {
   public void testCanReadNonReconstructionToEOF()
       throws IOException {
     int blockLength = 5 * ONEMB;
-    ByteBuffer data = ByteBuffer.allocate(blockLength);
-    ECStreamTestUtil.randomFill(data, dataGenerator);
-    streamFactory.setData(data);
+    generateData(blockLength);
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
@@ -176,9 +223,7 @@ public class TestECBlockInputStreamProxy {
   public void testCanReadReconstructionToEOF()
       throws IOException {
     int blockLength = 5 * ONEMB;
-    ByteBuffer data = ByteBuffer.allocate(blockLength);
-    ECStreamTestUtil.randomFill(data, dataGenerator);
-    streamFactory.setData(data);
+    generateData(blockLength);
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
@@ -206,9 +251,7 @@ public class TestECBlockInputStreamProxy {
   public void testCanHandleErrorAndFailOverToReconstruction()
       throws IOException {
     int blockLength = 5 * ONEMB;
-    ByteBuffer data = ByteBuffer.allocate(blockLength);
-    ECStreamTestUtil.randomFill(data, dataGenerator);
-    streamFactory.setData(data);
+    generateData(blockLength);
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
@@ -244,6 +287,64 @@ public class TestECBlockInputStreamProxy {
       // Ensure the bad location was passed into the factory to create the
       // reconstruction reader
       Assert.assertEquals(badDN, streamFactory.getFailedLocations().get(0));
+    }
+  }
+
+  @Test
+  public void testCanSeekToNewPosition()
+      throws IOException {
+    int blockLength = 5 * ONEMB;
+    generateData(blockLength);
+
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    OmKeyLocationInfo blockInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
+
+    ByteBuffer readBuffer = ByteBuffer.allocate(100);
+    dataGenerator = new SplittableRandom(randomSeed);
+    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+      // Perform one read to get the stream created
+      int read = bis.read(readBuffer);
+      Assert.assertEquals(100, read);
+
+      bis.seek(1024);
+      readBuffer.clear();
+      resetAndAdvanceDataGenerator(1024);
+      bis.read(readBuffer);
+      ECStreamTestUtil.assertBufferMatches(readBuffer, dataGenerator);
+      Assert.assertEquals(1124, bis.getPos());
+
+      // Set the non-reconstruction reader to thrown an exception on seek
+      streamFactory.getStreams().get(false).setShouldErrorOnSeek(true);
+      bis.seek(2048);
+      readBuffer.clear();
+      resetAndAdvanceDataGenerator(2048);
+      bis.read(readBuffer);
+      ECStreamTestUtil.assertBufferMatches(readBuffer, dataGenerator);
+
+      // Finally, set the recon reader to fail on seek.
+      streamFactory.getStreams().get(true).setShouldErrorOnSeek(true);
+      try {
+        bis.seek(1024);
+        Assert.fail("Seek should have raised an exception");
+      } catch (IOException e) {
+        // expected
+      }
+    }
+  }
+
+  private ByteBuffer generateData(int length) {
+    ByteBuffer data = ByteBuffer.allocate(length);
+    ECStreamTestUtil.randomFill(data, dataGenerator);
+    streamFactory.setData(data);
+    return data;
+  }
+
+  private void resetAndAdvanceDataGenerator(long position) {
+    dataGenerator = new SplittableRandom(randomSeed);
+    for (long i = 0; i < position; i++) {
+      dataGenerator.nextInt(255);
     }
   }
 

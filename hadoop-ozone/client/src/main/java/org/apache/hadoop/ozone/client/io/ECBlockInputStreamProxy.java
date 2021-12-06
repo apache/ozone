@@ -102,7 +102,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
     createBlockReader();
   }
 
-  private void setReaderType() {
+  private synchronized void setReaderType() {
     int expected = expectedDataLocations(repConfig, getLength());
     int available = availableDataLocations(repConfig, blockInfo.getPipeline());
     reconstructionReader = available < expected;
@@ -115,17 +115,17 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   @Override
-  public BlockID getBlockID() {
+  public synchronized BlockID getBlockID() {
     return blockInfo.getBlockID();
   }
 
   @Override
-  public long getRemaining() {
+  public synchronized long getRemaining() {
     return blockReader.getRemaining();
   }
 
   @Override
-  public long getLength() {
+  public synchronized long getLength() {
     return blockInfo.getLength();
   }
 
@@ -167,9 +167,11 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
     return totalRead;
   }
 
-  private void failoverToReconstructionRead(DatanodeDetails badLocation,
-      long lastPosition) throws IOException {
-    failedLocations.add(badLocation);
+  private synchronized void failoverToReconstructionRead(
+      DatanodeDetails badLocation, long lastPosition) throws IOException {
+    if (badLocation != null) {
+      failedLocations.add(badLocation);
+    }
     blockReader.close();
     reconstructionReader = true;
     createBlockReader();
@@ -188,18 +190,24 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   @Override
-  public void unbuffer() {
+  public synchronized void unbuffer() {
     blockReader.unbuffer();
   }
 
   @Override
-  public long getPos() throws IOException {
+  public synchronized long getPos() throws IOException {
     return blockReader != null ? blockReader.getPos() : 0;
   }
 
   @Override
-  public void seek(long pos) throws IOException {
-    // TODO handle seek - does it need to deal with IOExceptions too?
-    blockReader.seek(pos);
+  public synchronized void seek(long pos) throws IOException {
+    try {
+      blockReader.seek(pos);
+    } catch (IOException e) {
+      if (reconstructionReader) {
+        throw e;
+      }
+      failoverToReconstructionRead(null, pos);
+    }
   }
 }

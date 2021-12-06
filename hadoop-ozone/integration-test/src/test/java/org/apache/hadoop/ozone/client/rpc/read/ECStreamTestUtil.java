@@ -263,6 +263,7 @@ public final class ECStreamTestUtil {
     private long length;
     private boolean shouldError = false;
     private int shouldErrorPosition = 0;
+    private boolean shouldErrorOnSeek = false;
     private IOException errorToThrow = null;
     private int ecReplicaIndex = 0;
     private static final byte EOF = -1;
@@ -282,6 +283,10 @@ public final class ECStreamTestUtil {
 
     public boolean isClosed() {
       return closed;
+    }
+
+    public void setShouldErrorOnSeek(boolean val) {
+      this.shouldErrorOnSeek = val;
     }
 
     public void setShouldError(boolean val) {
@@ -368,7 +373,10 @@ public final class ECStreamTestUtil {
     }
 
     @Override
-    public void seek(long pos) {
+    public void seek(long pos) throws IOException {
+      if (shouldErrorOnSeek) {
+        throw new IOException("Simulated exception");
+      }
       data.position((int)pos);
     }
 
