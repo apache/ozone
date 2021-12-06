@@ -35,11 +35,14 @@ import java.util.function.Function;
 public interface ECBlockInputStreamFactory {
 
   /**
-   * Create a new BlockInputStream based on the replication Config. If the
-   * replication Config indicates the block is EC, then it will create an
-   * ECBlockInputStream, otherwise a BlockInputStream will be returned.
+   * Create a new EC InputStream based on the missingLocations boolean. If it is
+   * set to false, it indicates all locations are available and aa
+   * ECBlockInputStream will be created. Otherwise an
+   * ECBlockReconstructedInputStream will be created.
    * @param missingLocations Indicates if all the data locations are available
    *                         or not, controlling the type of stream created
+   * @param failedLocations List of DatanodeDetails indicating locations we
+   *                        know are bad and should not be used.
    * @param repConfig The replication Config
    * @param blockInfo The blockInfo representing the block.
    * @param verifyChecksum Whether to verify checksums or not.
