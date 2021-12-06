@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
 import java.util.concurrent.ThreadLocalRandom;
@@ -240,6 +241,9 @@ public class TestECBlockInputStreamProxy {
       readBuffer.clear();
       read = bis.read(readBuffer);
       Assert.assertEquals(-1, read);
+      // Ensure the bad location was passed into the factory to create the
+      // reconstruction reader
+      Assert.assertEquals(badDN, streamFactory.getFailedLocations().get(0));
     }
   }
 
@@ -257,6 +261,8 @@ public class TestECBlockInputStreamProxy {
     private Map<Boolean, ECStreamTestUtil.TestBlockInputStream> streams
         = new HashMap<>();
 
+    private List<DatanodeDetails> failedLocations;
+
     public void setData(ByteBuffer data) {
       this.data = data;
     }
@@ -265,11 +271,17 @@ public class TestECBlockInputStreamProxy {
       return streams;
     }
 
+    public List<DatanodeDetails> getFailedLocations() {
+      return failedLocations;
+    }
+
     @Override
     public BlockExtendedInputStream create(boolean missingLocations,
+        List<DatanodeDetails> failedDatanodes,
         ReplicationConfig repConfig, OmKeyLocationInfo blockInfo,
         boolean verifyChecksum, XceiverClientFactory xceiverFactory,
         Function<BlockID, Pipeline> refreshFunction) {
+      this.failedLocations = failedDatanodes;
       ByteBuffer wrappedBuffer =
           ByteBuffer.wrap(data.array(), 0, data.capacity());
       ECStreamTestUtil.TestBlockInputStream is =

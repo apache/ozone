@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
+import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -58,8 +60,9 @@ public final class ECBlockStreamFactoryImpl implements
    * @return BlockExtendedInputStream of the correct type.
    */
   public BlockExtendedInputStream create(boolean missingLocations,
-      ReplicationConfig repConfig, OmKeyLocationInfo blockInfo,
-      boolean verifyChecksum, XceiverClientFactory xceiverFactory,
+      List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
+      OmKeyLocationInfo blockInfo, boolean verifyChecksum,
+      XceiverClientFactory xceiverFactory,
       Function<BlockID, Pipeline> refreshFunction) {
     if (missingLocations) {
       // We create the reconstruction reader
@@ -67,6 +70,9 @@ public final class ECBlockStreamFactoryImpl implements
           new ECBlockReconstructedStripeInputStream(
               (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
               xceiverFactory, refreshFunction, inputStreamFactory);
+      if (failedLocations != null) {
+        sis.addFailedDatanodes(failedLocations);
+      }
       return new ECBlockReconstructedInputStream(
           (ECReplicationConfig) repConfig, sis);
     } else {

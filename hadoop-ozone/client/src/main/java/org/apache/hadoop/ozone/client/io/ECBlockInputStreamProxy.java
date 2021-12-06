@@ -106,13 +106,12 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
     int expected = expectedDataLocations(repConfig, getLength());
     int available = availableDataLocations(repConfig, blockInfo.getPipeline());
     reconstructionReader = available < expected;
-
   }
 
   private void createBlockReader() {
     blockReader = ecBlockInputStreamFactory.create(reconstructionReader,
-        repConfig, blockInfo, verifyChecksum, xceiverClientFactory,
-        refreshFunction);
+        failedLocations, repConfig, blockInfo, verifyChecksum,
+        xceiverClientFactory, refreshFunction);
   }
 
   @Override
@@ -174,7 +173,6 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
     blockReader.close();
     reconstructionReader = true;
     createBlockReader();
-    // TODO - set the bad location or pass into create block reader
     if (lastPosition != 0) {
       blockReader.seek(lastPosition);
     }
@@ -187,10 +185,6 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
       throws IOException {
     throw new IOException("Not Implemented");
-  }
-
-  private boolean hasRemaining() {
-    return blockReader.getRemaining() > 0;
   }
 
   @Override
@@ -206,5 +200,6 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   @Override
   public void seek(long pos) throws IOException {
     // TODO handle seek - does it need to deal with IOExceptions too?
+    blockReader.seek(pos);
   }
 }
