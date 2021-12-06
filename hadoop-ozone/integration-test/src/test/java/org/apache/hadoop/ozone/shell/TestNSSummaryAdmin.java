@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.shell;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;

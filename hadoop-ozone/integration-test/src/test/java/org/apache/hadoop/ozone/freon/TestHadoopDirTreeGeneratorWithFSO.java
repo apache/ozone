@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.freon;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
 /**

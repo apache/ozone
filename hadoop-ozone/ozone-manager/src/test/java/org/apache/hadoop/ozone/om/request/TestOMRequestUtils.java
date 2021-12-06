@@ -1064,11 +1064,13 @@ public final class TestOMRequestUtils {
 
   public static void configureFSOptimizedPaths(Configuration conf,
                                                boolean enableFileSystemPaths) {
-    configureFSOptimizedPaths(conf, enableFileSystemPaths, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    configureFSOptimizedPaths(conf, enableFileSystemPaths,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   public static void configureFSOptimizedPaths(Configuration conf,
-                                               boolean enableFileSystemPaths, BucketLayout bucketLayout) {
+                                               boolean enableFileSystemPaths,
+                                               BucketLayout bucketLayout) {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,

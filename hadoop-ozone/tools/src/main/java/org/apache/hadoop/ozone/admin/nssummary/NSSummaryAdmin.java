@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import org.apache.hadoop.fs.ozone.BasicRootedOzoneClientAdapterImpl;
-import org.apache.hadoop.fs.ozone.OzoneClientAdapter;
 import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -32,8 +30,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;

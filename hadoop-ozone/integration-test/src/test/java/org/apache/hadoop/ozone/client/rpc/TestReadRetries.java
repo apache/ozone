@@ -104,8 +104,9 @@ public class TestReadRetries {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-            new Object[]{OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT},
-            new Object[]{OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED});
+        new Object[]{OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT},
+        new Object[]{OMConfigKeys.
+              OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED});
   }
 
   /**

@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
