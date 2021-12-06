@@ -62,6 +62,8 @@ public final class BucketArgs {
   private long quotaInBytes;
   private long quotaInNamespace;
 
+  private String owner;
+
   /**
    * Bucket Layout.
    */
@@ -79,12 +81,14 @@ public final class BucketArgs {
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout Bucket Layouts.
+   * @param owner owner of the bucket.
    */
   @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
-      long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout) {
+      long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout,
+      String owner) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -95,6 +99,7 @@ public final class BucketArgs {
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
+    this.owner = owner;
   }
 
   /**
@@ -179,6 +184,13 @@ public final class BucketArgs {
   }
 
   /**
+   * Returns the Owner Name.
+   */
+  public String getOwner() {
+    return owner;
+  }
+
+  /**
    * Builder for OmBucketInfo.
    */
   public static class Builder {
@@ -192,6 +204,7 @@ public final class BucketArgs {
     private long quotaInBytes;
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
+    private String owner;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -249,6 +262,10 @@ public final class BucketArgs {
       return this;
     }
 
+    public BucketArgs.Builder setOwner(String ownerName) {
+      owner = ownerName;
+      return this;
+    }
 
     /**
      * Constructs the BucketArgs.
@@ -257,7 +274,7 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace, bucketLayout);
+          quotaInNamespace, bucketLayout, owner);
     }
   }
 }
