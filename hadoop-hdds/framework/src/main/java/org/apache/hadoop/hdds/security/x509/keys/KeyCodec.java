@@ -342,8 +342,10 @@ public class KeyCodec {
    * @param force - forces overwriting the keys.
    * @throws IOException - On I/O failure.
    */
-  private synchronized void writeKey(Path basePath, KeyPair keyPair,
-      String privateKeyFileName, String publicKeyFileName, boolean force)
+  @VisibleForTesting
+  synchronized void writeKey(Path basePath, KeyPair keyPair,
+                             String privateKeyFileName,
+                             String publicKeyFileName, boolean force)
       throws IOException {
     checkPreconditions(basePath);
 
