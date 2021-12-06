@@ -299,6 +299,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
+    LOG.warn("Moving container {} to state UNHEALTHY from state:{}",
+            containerData.getContainerPath(), containerData.getState(),
+            new Exception());
   }
 
   @Override
