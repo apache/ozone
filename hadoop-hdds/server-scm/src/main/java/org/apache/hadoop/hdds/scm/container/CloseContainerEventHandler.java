@@ -89,7 +89,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
             publisher.fireEvent(DATANODE_COMMAND,
                 new CommandForDatanode<>(node.getUuid(), command)));
       } else {
-        LOG.warn("Cannot close container {}, which is in {} state.",
+        LOG.debug("Cannot close container {}, which is in {} state.",
             containerID, container.getState());
       }
 
