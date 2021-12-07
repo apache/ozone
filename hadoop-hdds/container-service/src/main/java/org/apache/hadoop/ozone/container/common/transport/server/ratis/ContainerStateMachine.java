@@ -760,10 +760,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-      // if waitOnBothFollower is false, remove the entry from the cache
-      // as soon as its applied and such entry exists in the cache.
-    } else {
-      stateMachineDataCache.removeIf(k -> k >= index);
     }
   }
 
@@ -779,6 +775,11 @@ public class ContainerStateMachine extends BaseStateMachine {
       // configurable limit on pending request size and count and then will
       // block and client will backoff as a result of that.
       removeStateMachineDataIfNeeded(index);
+      // if waitOnBothFollower is false, remove the entry from the cache
+      // as soon as its applied and such entry exists in the cache.
+      if (!waitOnBothFollowers) {
+        stateMachineDataCache.removeIf(k -> k >= index);
+      }
       DispatcherContext.Builder builder =
           new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
               .setLogIndex(index);
