@@ -195,10 +195,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   public void stop() {
     if (isStarted) {
       try {
+        server.shutdown();
         eventLoopGroup.shutdownGracefully().sync();
         readExecutors.shutdown();
         readExecutors.awaitTermination(5L, TimeUnit.SECONDS);
-        server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         LOG.error("failed to shutdown XceiverServerGrpc", e);
