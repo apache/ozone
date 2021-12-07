@@ -76,22 +76,23 @@ public final class ContainerBalancerConfiguration {
       defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can enter a target datanode in each " +
       "iteration while balancing. This is the sum of data from multiple " +
-      "sources. The default value is greater than the configured" +
-      " (or default) ozone.scm.container.size by 1GB.")
+      "sources. By default, five times the configured (or default) ozone.scm" +
+      ".container.size is allowed.")
   private long maxSizeEnteringTarget;
 
   @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
       defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can leave a source datanode in each " +
       "iteration while balancing. This is the sum of data moving to multiple " +
-      "targets. The default value is greater than the configured" +
-      " (or default) ozone.scm.container.size by 1GB.")
+      "targets. By default, five times the configured (or default) ozone.scm" +
+      ".container.size is allowed.")
   private long maxSizeLeavingSource;
 
-  @Config(key = "idle.iterations", type = ConfigType.INT,
+  @Config(key = "iterations", type = ConfigType.INT,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
-      description = "The idle iteration count of Container Balancer.")
-  private int idleIterations = 10;
+      description = "The number of iterations that Container Balancer will " +
+          "run for.")
+  private int iterations = 10;
 
   @Config(key = "exclude.containers", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
@@ -136,14 +137,13 @@ public final class ContainerBalancerConfiguration {
         "OzoneConfiguration should not be null.");
     this.ozoneConfiguration = config;
 
-    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
-    // greater than container size
-    long size = (long) ozoneConfiguration.getStorageSize(
+    // maxSizeEnteringTarget and maxSizeLeavingSource should by default allow
+    // five containers
+    long size = 5 * (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.GB) +
-        OzoneConsts.GB;
-    maxSizeEnteringTarget = size;
-    maxSizeLeavingSource = size;
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    maxSizeEnteringTarget = size + OzoneConsts.GB;
+    maxSizeLeavingSource = size + OzoneConsts.GB;
 
     // balancing interval should be greater than DUFactory refresh period
     duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
@@ -174,26 +174,27 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the idle iteration value for Container Balancer.
+   * Gets the iteration count for Container Balancer. A value of -1 means
+   * infinite number of iterations.
    *
-   * @return a idle iteration count larger than 0
+   * @return a value greater than 0, or -1
    */
-  public int getIdleIteration() {
-    return idleIterations;
+  public int getIterations() {
+    return iterations;
   }
 
   /**
-   * Sets the idle iteration value for Container Balancer.
+   * Sets the number of iterations for Container Balancer.
    *
-   * @param count a idle iteration count larger than 0
+   * @param count a value greater than 0, or -1
    */
-  public void setIdleIteration(int count) {
+  public void setIterations(int count) {
     if (count < -1 || 0 == count) {
       throw new IllegalArgumentException(
-          "Idle iteration count must be larger than 0 or " +
-              "-1(for infinitely running).");
+          "Iteration count must be greater than 0, or " +
+              "-1(for running balancer infinitely).");
     }
-    this.idleIterations = count;
+    this.iterations = count;
   }
 
   /**

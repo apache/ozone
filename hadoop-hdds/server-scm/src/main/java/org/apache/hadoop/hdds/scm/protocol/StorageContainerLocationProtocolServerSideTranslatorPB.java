@@ -710,7 +710,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StartContainerBalancerRequestProto request)
       throws IOException {
     Optional<Double> threshold = Optional.empty();
-    Optional<Integer> idleiterations = Optional.empty();
+    Optional<Integer> iterations = Optional.empty();
     Optional<Double> maxDatanodesRatioToInvolvePerIteration = Optional.empty();
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
     Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
@@ -719,8 +719,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     if(request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
     }
-    if(request.hasIdleiterations()) {
-      idleiterations = Optional.of(request.getIdleiterations());
+    if(request.hasIterations()) {
+      iterations = Optional.of(request.getIterations());
     }
     if(request.hasMaxDatanodesRatioToInvolvePerIteration()) {
       maxDatanodesRatioToInvolvePerIteration =
@@ -743,7 +743,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
     return StartContainerBalancerResponseProto.newBuilder().
         setStart(impl.startContainerBalancer(threshold,
-            idleiterations, maxDatanodesRatioToInvolvePerIteration,
+            iterations, maxDatanodesRatioToInvolvePerIteration,
             maxSizeToMovePerIterationInGB,
             maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB)).build();
   }

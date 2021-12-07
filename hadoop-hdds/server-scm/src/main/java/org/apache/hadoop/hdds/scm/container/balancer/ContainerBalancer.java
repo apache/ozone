@@ -72,7 +72,7 @@ public class ContainerBalancer {
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
   private long sizeMovedPerIteration;
-  private int idleIteration;
+  private int iterations;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
@@ -170,16 +170,16 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    this.idleIteration = config.getIdleIteration();
-    if(this.idleIteration == -1) {
+    this.iterations = config.getIterations();
+    if(this.iterations == -1) {
       //run balancer infinitely
-      this.idleIteration = Integer.MAX_VALUE;
+      this.iterations = Integer.MAX_VALUE;
     }
     this.threshold = config.getThreshold();
     this.maxDatanodesRatioToInvolvePerIteration =
         config.getMaxDatanodesRatioToInvolvePerIteration();
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
-    for (int i = 0; i < idleIteration && balancerRunning; i++) {
+    for (int i = 0; i < iterations && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
         stop();
@@ -202,7 +202,7 @@ public class ContainerBalancer {
 
       // wait for configured time before starting next iteration, unless
       // this was the final iteration
-      if (i != idleIteration - 1) {
+      if (i != iterations - 1) {
         synchronized (this) {
           try {
             wait(config.getBalancingInterval().toMillis());

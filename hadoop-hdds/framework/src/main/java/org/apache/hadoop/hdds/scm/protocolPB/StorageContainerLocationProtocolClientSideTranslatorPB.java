@@ -737,7 +737,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public boolean startContainerBalancer(
-      Optional<Double> threshold, Optional<Integer> idleiterations,
+      Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Double> maxDatanodesRatioToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
@@ -769,12 +769,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
               "lesser than equal to one.");
       builder.setMaxDatanodesRatioToInvolvePerIteration(mdti);
     }
-    if (idleiterations.isPresent()) {
-      int idi = idleiterations.get();
-      Preconditions.checkState(idi > 0 || idi == -1,
-          "idleiterations must be positive or" +
+    if (iterations.isPresent()) {
+      int i = iterations.get();
+      Preconditions.checkState(i > 0 || i == -1,
+          "iterations must be positive or" +
               " -1(infinitly run container balancer).");
-      builder.setIdleiterations(idi);
+      builder.setIterations(i);
     }
 
     if (maxSizeEnteringTargetInGB.isPresent()) {

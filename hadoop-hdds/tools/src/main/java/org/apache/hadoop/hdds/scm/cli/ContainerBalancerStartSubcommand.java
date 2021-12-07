@@ -39,9 +39,10 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       description = "Threshold target whether the cluster is balanced")
   private Optional<Double> threshold;
 
-  @Option(names = {"-i", "--idleiterations"},
-      description = "Maximum consecutive idle iterations")
-  private Optional<Integer> idleiterations;
+  @Option(names = {"-i", "--iterations"},
+      description = "Maximum consecutive iterations that" +
+          " balancer will run for")
+  private Optional<Integer> iterations;
 
   @Option(names = {"-d", "--maxDatanodesRatioToInvolvePerIteration"},
       description = "The ratio of maximum number of datanodes that should be " +
@@ -66,7 +67,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    boolean result = scmClient.startContainerBalancer(threshold, idleiterations,
+    boolean result = scmClient.startContainerBalancer(threshold, iterations,
         maxDatanodesRatioToInvolvePerIteration, maxSizeToMovePerIterationInGB,
         maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB);
     if (result) {

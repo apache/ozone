@@ -312,7 +312,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Start ContainerBalancer.
    */
   boolean startContainerBalancer(Optional<Double> threshold,
-      Optional<Integer> idleiterations,
+      Optional<Integer> iterations,
       Optional<Double> maxDatanodesRatioToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,

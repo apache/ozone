@@ -104,7 +104,7 @@ public class TestContainerBalancer {
 
     balancerConfiguration = new ContainerBalancerConfiguration(conf);
     balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setIterations(1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
     balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
@@ -231,7 +231,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(0.3d);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
     balancerConfiguration.setThreshold(0.01);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setIterations(1);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -297,7 +297,7 @@ public class TestContainerBalancer {
   public void containerBalancerShouldObeyMaxSizeToMoveLimit() {
     balancerConfiguration.setThreshold(0.01);
     balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setIterations(1);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -505,7 +505,7 @@ public class TestContainerBalancer {
   @Test
   public void testMetrics() {
     balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setIterations(1);
     balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0);
@@ -540,7 +540,7 @@ public class TestContainerBalancer {
   @Test
   public void balancerShouldFollowExcludeAndIncludeDatanodesConfigurations() {
     balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setIterations(1);
     balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0);
