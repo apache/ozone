@@ -3778,14 +3778,14 @@ public abstract class TestOzoneRpcClientAbstract {
 
     Assert.assertEquals(ecReplicationConfig, bucket.getReplicationConfig());
 
-    RatisReplicationConfig retisReplicationConfig =
+    RatisReplicationConfig ratisReplicationConfig =
         new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
-    bucket.setReplicationConfig(retisReplicationConfig);
+    bucket.setReplicationConfig(ratisReplicationConfig);
 
     // Get the bucket and check the updated config.
     bucket = volume.getBucket(bucket.getName());
 
-    Assert.assertEquals(retisReplicationConfig, bucket.getReplicationConfig());
+    Assert.assertEquals(ratisReplicationConfig, bucket.getReplicationConfig());
 
     //Reset replication config back.
     bucket.setReplicationConfig(currentReplicationConfig);
