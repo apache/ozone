@@ -291,8 +291,7 @@ public class TestECBlockInputStreamProxy {
   }
 
   @Test
-  public void testCanSeekToNewPosition()
-      throws IOException {
+  public void testCanSeekToNewPosition() throws IOException {
     int blockLength = 5 * ONEMB;
     generateData(blockLength);
 

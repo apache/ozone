@@ -48,7 +48,7 @@ public final class ECBlockInputStreamFactoryImpl implements
 
   /**
    * Create a new EC InputStream based on the missingLocations boolean. If it is
-   * set to false, it indicates all locations are available and aa
+   * set to false, it indicates all locations are available and an
    * ECBlockInputStream will be created. Otherwise an
    * ECBlockReconstructedInputStream will be created.
    * @param missingLocations Indicates if all the data locations are available

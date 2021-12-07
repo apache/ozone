@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -41,6 +43,9 @@ import java.util.function.Function;
  * failing over to a reconstruction read when they happen.
  */
 public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECBlockInputStreamProxy.class);
 
   private final ECReplicationConfig repConfig;
   private final boolean verifyChecksum;
@@ -156,6 +161,8 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         throw e;
       }
       if (e instanceof BadDataLocationException) {
+        LOG.warn("Failing over to reconstruction read due to an error in " +
+            "ECBlockReader", e);
         failoverToReconstructionRead(
             ((BadDataLocationException) e).getFailedLocation(), lastPosition);
         buf.reset();
