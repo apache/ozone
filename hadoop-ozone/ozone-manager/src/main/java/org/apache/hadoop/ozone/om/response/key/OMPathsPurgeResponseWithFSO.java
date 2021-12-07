@@ -21,12 +21,12 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmKeyResponse;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -46,7 +46,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
  */
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE, DELETED_DIR_TABLE,
     DIRECTORY_TABLE, FILE_TABLE})
-public class OMPathsPurgeResponseWithFSO extends OMClientResponse {
+public class OMPathsPurgeResponseWithFSO extends OmKeyResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMPathsPurgeResponseWithFSO.class);
 
@@ -60,7 +60,7 @@ public class OMPathsPurgeResponseWithFSO extends OMClientResponse {
       @Nonnull List<OzoneManagerProtocolProtos.KeyInfo> markDeletedDirs,
       @Nonnull List<OzoneManagerProtocolProtos.KeyInfo> files,
       @Nonnull List<String> dirs, boolean isRatisEnabled) {
-    super(omResponse);
+    super(omResponse, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     this.markDeletedDirList = markDeletedDirs;
     this.dirList = dirs;
     this.fileList = files;
@@ -121,10 +121,5 @@ public class OMPathsPurgeResponseWithFSO extends OMClientResponse {
           deletedKey, repeatedOmKeyInfo);
 
     }
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
