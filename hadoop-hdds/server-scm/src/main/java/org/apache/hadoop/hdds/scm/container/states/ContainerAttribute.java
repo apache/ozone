@@ -189,7 +189,11 @@ public class ContainerAttribute<T> {
     Preconditions.checkNotNull(key);
 
     if (this.attributeMap.containsKey(key)) {
-      return Collections.unmodifiableNavigableSet(this.attributeMap.get(key));
+      NavigableSet<ContainerID> returneSet = new TreeSet<>();
+      TreeSet<ContainerID> tmpSet = (TreeSet<ContainerID>)
+              this.attributeMap.get(key);
+      returneSet.addAll(tmpSet);
+      return returneSet;
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("No such Key. Key {}", key);
