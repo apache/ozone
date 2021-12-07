@@ -32,7 +32,7 @@ import java.util.function.Consumer;
  */
 public class TestResourceLimitCache {
 
-  public static final String ANY_VALUE = "asdf";
+  private static final String ANY_VALUE = "asdf";
 
   @Test
   public void testResourceLimitCache()
