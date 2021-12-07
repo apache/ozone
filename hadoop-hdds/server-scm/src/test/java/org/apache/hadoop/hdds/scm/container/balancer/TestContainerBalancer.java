@@ -89,6 +89,7 @@ public class TestContainerBalancer {
   private Map<DatanodeUsageInfo, Set<ContainerID>> datanodeToContainersMap =
       new HashMap<>();
   private static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
+  private static final double DELTA = 1e-15;
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -102,7 +103,9 @@ public class TestContainerBalancer {
     containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
 
-    balancerConfiguration = new ContainerBalancerConfiguration(conf);
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+    balancerConfiguration.initialize(conf);
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setIdleIteration(1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
@@ -486,8 +489,11 @@ public class TestContainerBalancer {
     Assert.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
 
     // some containers should be selected when using default values
-    containerBalancer.start(
-        new ContainerBalancerConfiguration(new OzoneConfiguration()));
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ContainerBalancerConfiguration cbc = ozoneConfiguration.
+        getObject(ContainerBalancerConfiguration.class);
+    cbc.initialize(ozoneConfiguration);
+    containerBalancer.start(cbc);
 
     // waiting for balance completed.
     // TODO: this is a temporary implementation for now
@@ -587,6 +593,16 @@ public class TestContainerBalancer {
       Assert.assertTrue(source.equals(dn1) || source.equals(dn2));
       Assert.assertTrue(target.equals(dn1) || target.equals(dn2));
     }
+  }
+
+  @Test
+  public void testContainerBalancerConfiguration() {
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setDouble(
+        "hdds.container.balancer.utilization.threshold", 0.01);
+    ContainerBalancerConfiguration cbConf2 =
+        ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
+    Assert.assertEquals(cbConf2.getThreshold(), 0.01d, DELTA);
   }
 
   /**

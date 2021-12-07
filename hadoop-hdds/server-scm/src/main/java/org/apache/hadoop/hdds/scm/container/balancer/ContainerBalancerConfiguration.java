@@ -73,7 +73,7 @@ public final class ContainerBalancerConfiguration {
   private long maxSizeToMovePerIteration = 30 * OzoneConsts.GB;
 
   @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
-      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      defaultValue = "6GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can enter a target datanode in each " +
       "iteration while balancing. This is the sum of data from multiple " +
       "sources. The default value is greater than the configured" +
@@ -81,7 +81,7 @@ public final class ContainerBalancerConfiguration {
   private long maxSizeEnteringTarget;
 
   @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
-      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      defaultValue = "6GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can leave a source datanode in each " +
       "iteration while balancing. This is the sum of data moving to multiple " +
       "targets. The default value is greater than the configured" +
@@ -127,11 +127,11 @@ public final class ContainerBalancerConfiguration {
   private DUFactory.Conf duConf;
 
   /**
-   * Create configuration with default values.
+   * Modify configuration with default values.
    *
    * @param config Ozone configuration
    */
-  public ContainerBalancerConfiguration(OzoneConfiguration config) {
+  public void initialize(OzoneConfiguration config) {
     Preconditions.checkNotNull(config,
         "OzoneConfiguration should not be null.");
     this.ozoneConfiguration = config;
