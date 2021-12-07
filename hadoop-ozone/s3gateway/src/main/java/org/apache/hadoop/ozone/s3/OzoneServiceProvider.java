@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.s3;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.s3.util.OzoneS3Util;
 import org.apache.hadoop.security.SecurityUtil;
 
 import javax.annotation.PostConstruct;
@@ -73,17 +72,9 @@ public class OzoneServiceProvider {
           throw new IllegalArgumentException(OZONE_OM_NODES_KEY
               + "." + serviceId + " is not defined");
         }
-        omServiceAddr = new Text(OzoneS3Util.buildServiceNameForToken(conf,
-            serviceId, omNodeIds));
         omserviceID = serviceId;
       }
     }
-  }
-
-
-  @Produces
-  public Text getService() {
-    return omServiceAddr;
   }
 
   @Produces
