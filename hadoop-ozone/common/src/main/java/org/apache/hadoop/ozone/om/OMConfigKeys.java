@@ -263,12 +263,6 @@ public final class OMConfigKeys {
 //  atomic rename and delete of any directory at any level in the namespace.
 //  Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
 
-  public static final String OZONE_OM_METADATA_LAYOUT =
-          "ozone.om.metadata.layout";
-  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "SIMPLE";
-
-  public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
-
   // Default bucket layout used by Ozone Manager during bucket creation
   // when a client does not specify the bucket layout option.
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT =

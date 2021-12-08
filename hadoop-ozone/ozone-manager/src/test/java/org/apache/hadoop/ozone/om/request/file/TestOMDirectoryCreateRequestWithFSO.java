@@ -90,8 +90,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
             folder.newFolder().getAbsolutePath());
-    TestOMRequestUtils.configureFSOptimizedPaths(ozoneConfiguration,
-            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    TestOMRequestUtils.configureFSOptimizedPaths(ozoneConfiguration, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
