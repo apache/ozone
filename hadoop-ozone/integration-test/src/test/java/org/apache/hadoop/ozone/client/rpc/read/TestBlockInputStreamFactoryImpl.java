@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
+import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.Test;
 import org.junit.Assert;
@@ -73,7 +73,7 @@ public class TestBlockInputStreamFactoryImpl {
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
             blockInfo.getToken(), true, null, null);
-    Assert.assertTrue(stream instanceof ECBlockInputStream);
+    Assert.assertTrue(stream instanceof ECBlockInputStreamProxy);
     Assert.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
     Assert.assertEquals(stream.getLength(), blockInfo.getLength());
   }

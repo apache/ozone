@@ -125,6 +125,12 @@ public final class ECStreamTestUtil {
     }
   }
 
+  public static void randomFill(ByteBuffer buf, SplittableRandom rand) {
+    while (buf.remaining() > 0) {
+      buf.put((byte) rand.nextInt(255));
+    }
+  }
+
   private static int totalSpaceAvailable(ByteBuffer[] bufs) {
     int space = 0;
     for (ByteBuffer b : bufs) {
@@ -239,7 +245,7 @@ public final class ECStreamTestUtil {
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
-          blockStreamData.get(repInd - 1));
+          blockStreamData.get(repInd - 1), repInd);
       blockStreams.add(stream);
       return stream;
     }
@@ -256,12 +262,22 @@ public final class ECStreamTestUtil {
     private BlockID blockID;
     private long length;
     private boolean shouldError = false;
+    private int shouldErrorPosition = 0;
+    private boolean shouldErrorOnSeek = false;
+    private IOException errorToThrow = null;
+    private int ecReplicaIndex = 0;
     private static final byte EOF = -1;
 
     TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data) {
+      this(blockId, blockLen, data, 0);
+    }
+
+    TestBlockInputStream(BlockID blockId, long blockLen, ByteBuffer data,
+        int replicaIndex) {
       this.blockID = blockId;
       this.length = blockLen;
       this.data = data;
+      this.ecReplicaIndex = replicaIndex;
       data.position(0);
     }
 
@@ -269,8 +285,24 @@ public final class ECStreamTestUtil {
       return closed;
     }
 
+    public void setShouldErrorOnSeek(boolean val) {
+      this.shouldErrorOnSeek = val;
+    }
+
     public void setShouldError(boolean val) {
       shouldError = val;
+      shouldErrorPosition = 0;
+    }
+
+    public void setShouldError(boolean val, int position,
+        IOException errorThrowable) {
+      this.shouldError = val;
+      this.shouldErrorPosition = position;
+      this.errorToThrow = errorThrowable;
+    }
+
+    public int getEcReplicaIndex() {
+      return ecReplicaIndex;
     }
 
     @Override
@@ -296,18 +328,29 @@ public final class ECStreamTestUtil {
 
     @Override
     public int read(ByteBuffer buf) throws IOException {
-      if (shouldError) {
-        throw new IOException("Simulated error reading block");
+      if (shouldError && data.position() >= shouldErrorPosition) {
+        throwError();
       }
       if (getRemaining() == 0) {
         return EOF;
       }
       int toRead = Math.min(buf.remaining(), (int)getRemaining());
       for (int i = 0; i < toRead; i++) {
+        if (shouldError && data.position() >= shouldErrorPosition) {
+          throwError();
+        }
         buf.put(data.get());
       }
       return toRead;
     };
+
+    private void throwError() throws IOException {
+      if (errorToThrow != null) {
+        throw errorToThrow;
+      } else {
+        throw new IOException("Simulated error reading block");
+      }
+    }
 
     @Override
     protected int readWithStrategy(ByteReaderStrategy strategy) throws
@@ -330,7 +373,10 @@ public final class ECStreamTestUtil {
     }
 
     @Override
-    public void seek(long pos) {
+    public void seek(long pos) throws IOException {
+      if (shouldErrorOnSeek) {
+        throw new IOException("Simulated exception");
+      }
       data.position((int)pos);
     }
 

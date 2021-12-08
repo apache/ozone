@@ -120,6 +120,33 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
   }
 
+  /**
+   * Provide a list of datanodes that are known to be bad, and no attempt will
+   * be made to read from them. If too many failed nodes are passed, then the
+   * reader may not have sufficient locations available to reconstruct the data.
+   *
+   * Note this call must be made before any attempt it made to read data,
+   * as that is when the reader is initialized. Attempting to call this method
+   * after a read will result in a runtime exception.
+   *
+   * @param dns A list of DatanodeDetails that are known to be bad.
+   */
+  public void addFailedDatanodes(List<DatanodeDetails> dns) {
+    if (initialized) {
+      throw new RuntimeException("Cannot add failed datanodes after the " +
+          "reader has been initialized");
+    }
+    DatanodeDetails[] locations = getDataLocations();
+    for (DatanodeDetails dn : dns) {
+      for (int i = 0; i < locations.length; i++) {
+        if (locations[i] != null && locations[i].equals(dn)) {
+          failedDataIndexes.add(i);
+          break;
+        }
+      }
+    }
+  }
+
   protected void init() throws InsufficientLocationsException {
     if (!hasSufficientLocations()) {
       throw new InsufficientLocationsException("There are insufficient " +
