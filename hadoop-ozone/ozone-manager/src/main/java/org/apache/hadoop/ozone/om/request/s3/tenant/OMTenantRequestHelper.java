@@ -121,8 +121,8 @@ public final class OMTenantRequestHelper {
 
     if (volumeName == null) {
       throw new OMException("Potential DB error. volumeName "
-          + "field is null or empty (" + volumeName + ") for tenantId '"
-          + tenantId + "'.", ResultCodes.METADATA_ERROR);
+          + "field is null for tenantId '" + tenantId + "'.",
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     return volumeName;
