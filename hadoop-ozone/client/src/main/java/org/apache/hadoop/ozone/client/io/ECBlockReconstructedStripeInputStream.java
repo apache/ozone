@@ -462,6 +462,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         return null;
       })));
     }
+    boolean exceptionOccurred = false;
     while(!pendingReads.isEmpty()) {
       int index = -1;
       try {
@@ -480,10 +481,14 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         LOG.warn("Failed to read from block {} EC index {}. Excluding the " +
             "block", getBlockID(), index + 1, ee.getCause());
         failedDataIndexes.add(index);
+        exceptionOccurred = true;
       } catch (InterruptedException ie) {
         LOG.error("Interrupted waiting for reads to complete", ie);
         throw new IOException("Interrupted waiting for reads to complete", ie);
       }
+    }
+    if (exceptionOccurred) {
+      throw new IOException("One or more errors occurred reading blocks");
     }
   }
 
