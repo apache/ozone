@@ -90,12 +90,12 @@ Secure Tenant Delete Bucket 1 Success With Newly Set SecretKey via S3 API
 
 Secure Tenant Delete Tenant Failure Tenant Not Empty
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant delete tenantone
-                        Should contain   ${output}         Failed to delete tenant 'tenantone': Tenant 'tenantone' is not empty
+                        Should contain   ${output}         TENANT_NOT_EMPTY Tenant 'tenantone' is not empty. All accessIds associated to this tenant must be revoked before the tenant can be deleted. See `ozone tenant user revoke`
 
 Secure Tenant Create Tenant Failure with Regular User
     Run Keyword         Kinit test user     testuser2    testuser2.keytab
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant create tenanttwo
-                        Should contain   ${output}         Failed to create tenant 'tenanttwo': User 'testuser2/scm@EXAMPLE.COM' is not an Ozone admin.
+                        Should contain   ${output}         PERMISSION_DENIED User 'testuser2/scm@EXAMPLE.COM' is not an Ozone admin.
 
 Secure Tenant SetSecret Failure with Regular User
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$testuser' --secret=somesecret2 --export
