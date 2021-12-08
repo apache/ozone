@@ -72,7 +72,6 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   @Override
   public DecommissionOMResponse decommission(RpcController controller,
       DecommissionOMRequest request) throws ServiceException {
-    
     if (request == null) {
       return null;
     }

@@ -1611,8 +1611,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // NodeIds present in current peer list but not in new node list are the
     // decommissioned OMs and should be removed from the peer list
     List<String> decommissionedOMs = new ArrayList<>();
-    bootstrappedOMs.addAll(currentPeers);
-    bootstrappedOMs.removeAll(newPeers);
+    decommissionedOMs.addAll(currentPeers);
+    decommissionedOMs.removeAll(newPeers);
 
     // Add bootstrapped OMs to peer list
     for (String omNodeId : bootstrappedOMs) {
@@ -1723,7 +1723,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omSnapshotProvider.removeDecommissionedPeerNode(decommNodeId);
     omRatisServer.removeRaftPeer(decommOMNodeDetails);
     peerNodesMap.remove(decommNodeId);
-    LOG.info("Removed OM {} from the Peer list.", decommNodeId);
+    LOG.info("Removed OM {} from OM Peer Nodes.", decommNodeId);
   }
 
   /**

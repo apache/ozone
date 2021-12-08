@@ -335,20 +335,16 @@ public final class OzoneManagerRatisServer {
    */
   public void removeOMFromRatisRing(OMNodeDetails removeOMNode)
       throws IOException {
-    
     Preconditions.checkNotNull(removeOMNode);
 
     String removeNodeId = removeOMNode.getNodeId();
-    RaftPeerId removePeerId = RaftPeerId.valueOf(removeNodeId);
-
     LOG.info("{}: Submitting SetConfiguration request to Ratis server to " +
             "remove OM peer {} from Ratis group {}", ozoneManager.getOMNodeId(),
-        removePeerId,
-        raftGroup);
+        removeNodeId, raftGroup);
 
     List<RaftPeer> newPeersList = new ArrayList<>();
     newPeersList.addAll(raftPeerMap.values());
-    newPeersList.remove(raftPeerMap.get(removePeerId));
+    newPeersList.remove(raftPeerMap.get(removeNodeId));
 
     checkLeaderStatus();
     SetConfigurationRequest request = new SetConfigurationRequest(clientId,
@@ -410,7 +406,7 @@ public final class OzoneManagerRatisServer {
   public void removeRaftPeer(OMNodeDetails omNodeDetails) {
     String removeNodeID = omNodeDetails.getNodeId();
     raftPeerMap.remove(removeNodeID);
-    LOG.info("Removed OM {} from Ratis Peers list.", removeNodeID);
+    LOG.info("{}: Removed OM {} from Ratis Peers list.", this, removeNodeID);
   }
 
   /**

@@ -20,19 +20,18 @@ package org.apache.hadoop.ozone.admin.om;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.logging.log4j.util.Strings;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
@@ -135,10 +134,10 @@ public class DecommissionOMSubcommand implements Callable<Void> {
     InetAddress rpcAddressFromConfig = InetAddress.getByName(
         rpcAddrStr.split(":")[0]);
 
-    if (!hostInetAddress.equals(rpcAddressFromConfig.getAddress())) {
+    if (!hostInetAddress.equals(rpcAddressFromConfig)) {
       throw new IOException("OM " + decommNodeId + "'s host address in " +
-          "config - " + rpcAddressFromConfig.getAddress() + " does not match " +
-          "the provided host address " + hostInetAddress);
+          "config - " + rpcAddressFromConfig.getHostAddress() + " does not " +
+          "match the provided host address " + hostInetAddress);
     }
   }
 
@@ -163,17 +162,30 @@ public class DecommissionOMSubcommand implements Callable<Void> {
     // added to ozone.om.decommissioned.nodes
     List<OMNodeDetails> activeOMNodeDetails = OmUtils.getAllOMHAAddresses(
         ozoneConf, omServiceId, false);
+    if (activeOMNodeDetails.isEmpty()) {
+      throw new IOException("Cannot decommission OM " + decommNodeId + " as " +
+          "it is the only node in the ring.");
+    }
+
+    List<String> staleOMConfigs = new ArrayList<>();
     for (OMNodeDetails nodeDetails : activeOMNodeDetails) {
-      verifyOMConfigUpdate(nodeDetails);
+      if (!checkOMConfig(nodeDetails)) {
+        staleOMConfigs.add(nodeDetails.getNodeId());
+      }
+    }
+    if (!staleOMConfigs.isEmpty()) {
+      throw new IOException("OM(s) " + Strings.join(staleOMConfigs, ',') +
+          " have not been updated with decommissioned nodes list or their" +
+          " address for the decommissioning node does not match");
     }
   }
 
   /**
-   * Verify that the to be decommissioned node is added to the
+   * Check whether the to be decommissioned node is added to the
    * OZONE_OM_DECOMMISSIONED_NODES_KEY.<SERVICE_ID> config in ozone-site.xml
    * of given OM.
    */
-  private void verifyOMConfigUpdate(OMNodeDetails omNodeDetails)
+  private boolean checkOMConfig(OMNodeDetails omNodeDetails)
       throws IOException {
     try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
              OMAdminProtocolClientSideImpl.createProxyForSingleOM(ozoneConf,
@@ -182,17 +194,13 @@ public class DecommissionOMSubcommand implements Callable<Void> {
       OMNodeDetails decommNodeDetails = omConfig
           .getDecommissionedNodesInNewConf().get(decommNodeId);
       if (decommNodeDetails == null) {
-        throw new IOException("OM " + omNodeDetails.getNodeId() + "'s " +
-            "reloaded config does not have OM " + decommNodeId + " in the " +
-            "decommissioned nodes list.");
+        return false;
       }
       if (!decommNodeDetails.getRpcAddress().getAddress().equals(
           hostInetAddress)) {
-        throw new IOException("OM " + omNodeDetails.getNodeId() + "'s " +
-            "reloaded config has decommissioning OM " + decommNodeId + "'s " +
-            "address as " + decommNodeDetails.getRpcAddress().getAddress() +
-            " whereas provided host address is " + hostInetAddress);
+        return false;
       }
     }
+    return true;
   }
 }

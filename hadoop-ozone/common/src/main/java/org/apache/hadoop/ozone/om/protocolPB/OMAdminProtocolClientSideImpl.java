@@ -126,11 +126,11 @@ public class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
       throws IOException {
 
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
-        OMInterServiceProtocolPB.class, ProtobufRpcEngine.class);
+        OMAdminProtocolPB.class, ProtobufRpcEngine.class);
 
     OMFailoverProxyProvider omFailoverProxyProvider =
         new OMFailoverProxyProvider(conf, ugi, omServiceId,
-            OMInterServiceProtocolPB.class);
+            OMAdminProtocolPB.class);
 
     // Multiple the max number of retries with number of OMs to calculate the
     // max number of failovers.
@@ -207,7 +207,7 @@ public class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
 
     if (!response.getSuccess()) {
       throwException("Decommission Request to " + omPrintInfo +
-          "failed with error: " + response.getErrorMsg());
+          " failed with error: " + response.getErrorMsg());
     }
   }
 
