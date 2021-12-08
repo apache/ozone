@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import javafx.util.Pair;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -454,9 +454,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   protected void loadDataBuffersFromStream() throws IOException {
-    Queue<Pair<Integer, Future<Void>>> pendingReads = new ArrayDeque<>();
+    Queue<ImmutablePair<Integer, Future<Void>>> pendingReads
+        = new ArrayDeque<>();
     for (int i : dataIndexes) {
-      pendingReads.add(new Pair(i, executor.submit(() -> {
+      pendingReads.add(new ImmutablePair<>(i, executor.submit(() -> {
         readIntoBuffer(i, decoderInputBuffers[i]);
         return null;
       })));
@@ -464,7 +465,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     while(!pendingReads.isEmpty()) {
       int index = -1;
       try {
-        Pair<Integer, Future<Void>> pair = pendingReads.poll();
+        ImmutablePair<Integer, Future<Void>> pair = pendingReads.poll();
         index = pair.getKey();
         // Should this future.get() have a timeout? At the end of the call chain
         // we eventually call a grpc or ratis client to read the block data. Its
