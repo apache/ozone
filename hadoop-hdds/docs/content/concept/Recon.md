@@ -31,7 +31,7 @@ the current state of the cluster through REST based APIs and rich web UI.
 
 ## High Level Design
 
-{{<figure src="/concept/ReconHighLevelDesign.png" width="800px">}}
+{{< image src="/concept/ReconHighLevelDesign.png">}}
 
 <br/>
 
@@ -50,7 +50,7 @@ the web UI.
 
 ## Recon and Ozone Manager
 
-{{<figure src="/concept/ReconOmDesign.png" width="800px">}}
+{{< image src="/concept/ReconOmDesign.png">}}
 
 <br/>
 
@@ -68,7 +68,7 @@ further processing by OM db tasks via [Recon Task Framework](#task-framework).
 
 ## Recon and Storage Container Manager
 
-{{<figure src="/concept/ReconScmDesign.png" width="800px">}}
+{{< image src="/concept/ReconScmDesign.png">}}
 
 <br/>
 
