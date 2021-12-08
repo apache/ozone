@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -164,11 +165,12 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     boolean acquiredVolumeLock = false;
     IOException exception = null;
 
-    // Get volume name in order to acquire the volume lock
-    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
-        omMetadataManager, tenantId);
+    String volumeName = null;
 
     try {
+      volumeName = OMTenantRequestHelper.getTenantVolumeName(
+          omMetadataManager, tenantId);
+
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
 
@@ -222,6 +224,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
             .add(omClientResponse, transactionLogIndex));
       }
       if (acquiredVolumeLock) {
+        Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }

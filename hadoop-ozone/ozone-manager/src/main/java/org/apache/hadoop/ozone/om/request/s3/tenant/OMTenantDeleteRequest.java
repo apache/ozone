@@ -114,9 +114,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       decVolumeRefCount = volumeName.length() > 0;
 
       // Acquire the volume lock
-      Preconditions.checkNotNull(volumeName,
-          "Volume name should have been acquired from OmDBTenantInfo. " +
-              "It should be an empty string at least.");
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
 
@@ -193,6 +190,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
+        Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }

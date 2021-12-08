@@ -86,12 +86,13 @@ public class OMTenantDeleteResponse extends OMClientResponse {
     omMetadataManager.getTenantPolicyTable().deleteWithBatch(
         batchOperation, bucketPolicyGroupName);
 
-    // The rest are the same as OMVolumeDeleteResponse
     if (volumeName.length() > 0) {
       Preconditions.checkNotNull(omVolumeArgs);
       Preconditions.checkState(omVolumeArgs.getVolume().equals(volumeName));
+
+      final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
       omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
+          dbVolumeKey, omVolumeArgs);
     }
   }
 }

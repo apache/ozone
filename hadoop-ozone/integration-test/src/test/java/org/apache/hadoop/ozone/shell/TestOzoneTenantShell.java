@@ -432,8 +432,7 @@ public class TestOzoneTenantShell {
     // Creating the tenant with the same name again should fail
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to create tenant 'finance':"
-        + " Tenant 'finance' already exists\n", true);
+    checkOutput(err, "Failed to create tenant 'finance'", false);
 
     executeHA(tenantShell, new String[] {"create", "research"});
     checkOutput(out, "Created tenant 'research'.\n", true);
@@ -601,10 +600,7 @@ public class TestOzoneTenantShell {
     int exitCode = executeHA(tenantShell, new String[] {"delete", "dev"});
     Assert.assertTrue("Tenant delete should fail!", exitCode != 0);
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to delete tenant 'dev': Tenant 'dev' is not " +
-        "empty. All accessIds associated to this tenant must be revoked " +
-        "before the tenant can be deleted. See `ozone tenant user revoke`\n",
-        true);
+    checkOutput(err, "Failed to delete tenant 'dev'", false);
 
     // Delete dev volume should fail because the volume reference count > 0L
     exitCode = execute(ozoneSh, new String[] {"volume", "delete", "dev"});

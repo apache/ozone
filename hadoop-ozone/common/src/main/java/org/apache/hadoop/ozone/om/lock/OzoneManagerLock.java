@@ -59,9 +59,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
  *   <tr>
  *     <td> 5 </td> <td> Prefix Lock </td>
  *   </tr>
- *   <tr>
- *     <td> 6 </td> <td> Tenant Lock </td>
- *   </tr>
  * </table>
  *
  * One cannot obtain a lower weight lock while holding a lock with higher

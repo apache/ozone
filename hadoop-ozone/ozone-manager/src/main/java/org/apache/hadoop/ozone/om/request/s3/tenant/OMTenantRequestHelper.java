@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
@@ -99,26 +100,29 @@ public final class OMTenantRequestHelper {
    * Retrieve volume name of the tenant.
    */
   static String getTenantVolumeName(OMMetadataManager omMetadataManager,
-      String tenantId) {
+      String tenantId) throws OMException {
 
     final OmDBTenantInfo tenantInfo;
     try {
       tenantInfo = omMetadataManager.getTenantStateTable().get(tenantId);
     } catch (IOException e) {
-      throw new RuntimeException("Potential DB error. Unable to retrieve "
-          + "OmDBTenantInfo entry for tenant '" + tenantId + "'.");
+      throw new OMException("Potential DB error. Unable to retrieve "
+          + "OmDBTenantInfo entry for tenant '" + tenantId + "'", e,
+          ResultCodes.TENANT_NOT_FOUND);
     }
 
     if (tenantInfo == null) {
-      throw new RuntimeException("Potential DB error or race condition. "
-          + "OmDBTenantInfo entry is missing for tenant '" + tenantId + "'.");
+      throw new OMException("Potential DB error or race condition. "
+          + "OmDBTenantInfo entry is missing for tenant '" + tenantId + "'.",
+          ResultCodes.TENANT_NOT_FOUND);
     }
 
     final String volumeName = tenantInfo.getBucketNamespaceName();
 
-    if (StringUtils.isEmpty(tenantId)) {
-      throw new RuntimeException("Potential DB error. volumeName "
-          + "field is null or empty for tenantId '" + tenantId + "'.");
+    if (volumeName == null) {
+      throw new OMException("Potential DB error. volumeName "
+          + "field is null or empty (" + volumeName + ") for tenantId '"
+          + tenantId + "'.", ResultCodes.METADATA_ERROR);
     }
 
     return volumeName;

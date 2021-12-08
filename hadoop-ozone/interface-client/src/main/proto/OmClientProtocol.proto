@@ -104,9 +104,8 @@ enum Type {
   PurgePaths = 94;
 
   CreateTenant = 95;
-  ModifyTenant = 96;
-  DeleteTenant = 97;
-  ListTenant = 103;  // TODO: Renumber this when rebasing
+  DeleteTenant = 97;  // TODO: Renumber when rebasing
+  ListTenant = 103;
 
   TenantGetUserInfo = 98;
   TenantAssignUserAccessId = 99;
@@ -203,7 +202,6 @@ message OMRequest {
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
   optional CreateTenantRequest              CreateTenantRequest            = 95;
-  optional ModifyTenantRequest              ModifyTenantRequest            = 96;
   optional DeleteTenantRequest              DeleteTenantRequest            = 97;
   optional ListTenantRequest                ListTenantRequest              = 103;  // TODO: Renumber this when rebasing
 
@@ -297,7 +295,6 @@ message OMResponse {
 
   // Skipped 94 to align with OMRequest
   optional CreateTenantResponse              CreateTenantResponse          = 95;
-  optional ModifyTenantResponse              ModifyTenantResponse          = 96;
   optional DeleteTenantResponse              DeleteTenantResponse          = 97;
   optional ListTenantResponse                ListTenantResponse            = 103;  // TODO: Renumber this when rebasing
 
@@ -1475,10 +1472,6 @@ message CreateTenantRequest {
     optional string volumeName = 3;
 }
 
-message ModifyTenantRequest {
-    optional string tenantName = 1;
-}
-
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1510,10 +1503,6 @@ message GetS3VolumeRequest {
 }
 
 message CreateTenantResponse {
-    optional bool success = 1;  // TODO: Remove this field
-}
-
-message ModifyTenantResponse {
     optional bool success = 1;  // TODO: Remove this field
 }
 

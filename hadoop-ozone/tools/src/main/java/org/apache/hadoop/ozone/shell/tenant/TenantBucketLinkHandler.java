@@ -18,45 +18,32 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 import java.io.IOException;
 
 /**
- * ozone tenant delete.
+ * ozone tenant create.
  */
-@CommandLine.Command(name = "delete", aliases = "remove",
-    description = "Delete an empty tenant. "
-        + "Will not remove the associated volume.")
-public class TenantDeleteHandler extends TenantHandler {
+@CommandLine.Command(name = "create",
+    description = "Create a tenant."
+        + " This will also create a new Ozone volume for the tenant.")
+public class TenantCreateHandler extends TenantHandler {
 
   @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
   private String tenantId;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
+  protected void execute(OzoneClient client, OzoneAddress address) {
     try {
-      final DeleteTenantResponse resp =
-          client.getObjectStore().deleteTenant(tenantId);
-      out().println("Deleted tenant '" + tenantId + "'.");
-      long volumeRefCount = resp.getVolRefCount();
-      assert(volumeRefCount >= 0L);
-      final String volumeName = resp.getVolumeName();
-      final String extraPrompt =
-          "But the associated volume '" + volumeName + "' is not removed. ";
-      if (volumeRefCount == 0L) {
-        out().println(extraPrompt + "To delete it, run"
-            + "\n    ozone sh volume delete " + volumeName + "\n");
-      } else {
-        out().println(extraPrompt + "And it is still referenced by some other "
-            + "Ozone features (refCount is " + volumeRefCount + ").");
-      }
+      client.getObjectStore().createTenant(tenantId);
+      // TODO: Add return value and print volume name?
+      out().println("Created tenant '" + tenantId + "'.");
     } catch (IOException e) {
       // Throw exception to make client exit code non-zero
-      throw new IOException("Failed to delete tenant '" + tenantId + "'", e);
+      throw new RuntimeException("Failed to create tenant '" + tenantId + "': "
+          + e.getMessage());
     }
   }
 }

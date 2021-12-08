@@ -35,15 +35,15 @@ public class TenantCreateHandler extends TenantHandler {
   private String tenantId;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException{
     try {
       client.getObjectStore().createTenant(tenantId);
       // TODO: Add return value and print volume name?
       out().println("Created tenant '" + tenantId + "'.");
     } catch (IOException e) {
       // Throw exception to make client exit code non-zero
-      throw new RuntimeException("Failed to create tenant '" + tenantId + "': "
-          + e.getMessage());
+      throw new IOException("Failed to create tenant '" + tenantId + "'", e);
     }
   }
 }
