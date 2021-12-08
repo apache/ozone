@@ -514,6 +514,17 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Sets/Changes the default replication config of this Bucket.
+   *
+   * @param replicationConfig Replication config that can be applied to bucket.
+   * @throws IOException
+   */
+  public void setReplicationConfig(ReplicationConfig replicationConfig)
+      throws IOException {
+    proxy.setReplicationConfig(volumeName, name, replicationConfig);
+  }
+
+  /**
    * Creates a new key in the bucket, with default replication type RATIS and
    * with replication factor THREE.
    * @param key Name of the key to be created.

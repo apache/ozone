@@ -37,10 +37,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -3752,5 +3756,48 @@ public abstract class TestOzoneRpcClientAbstract {
 
     createRequiredForVersioningTest(volumeName, bucketName, keyName, true);
     checkExceptedResultForVersioningTest(volumeName, bucketName, keyName, 2);
+  }
+
+  @Test
+  public void testSetECReplicationConfigOnBucket()
+      throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    OzoneBucket bucket = getBucket(volume);
+    ReplicationConfig currentReplicationConfig = bucket.getReplicationConfig();
+    Assert.assertEquals(
+        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
+        currentReplicationConfig);
+    ECReplicationConfig ecReplicationConfig =
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024);
+    bucket.setReplicationConfig(ecReplicationConfig);
+
+    // Get the bucket and check the updated config.
+    bucket = volume.getBucket(bucket.getName());
+
+    Assert.assertEquals(ecReplicationConfig, bucket.getReplicationConfig());
+
+    RatisReplicationConfig ratisReplicationConfig =
+        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
+    bucket.setReplicationConfig(ratisReplicationConfig);
+
+    // Get the bucket and check the updated config.
+    bucket = volume.getBucket(bucket.getName());
+
+    Assert.assertEquals(ratisReplicationConfig, bucket.getReplicationConfig());
+
+    //Reset replication config back.
+    bucket.setReplicationConfig(currentReplicationConfig);
+  }
+
+  private OzoneBucket getBucket(OzoneVolume volume) throws IOException {
+    String bucketName = UUID.randomUUID().toString();
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setVersioning(true).setDefaultReplicationConfig(
+        new DefaultReplicationConfig(
+            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE)));
+    volume.createBucket(bucketName, builder.build());
+    return volume.getBucket(bucketName);
   }
 }
