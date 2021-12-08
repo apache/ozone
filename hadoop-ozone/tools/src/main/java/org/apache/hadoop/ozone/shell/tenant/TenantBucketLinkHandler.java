@@ -17,33 +17,59 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
+import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
 
 /**
- * ozone tenant create.
+ * ozone tenant bucket-link.
+ *
+ * Note: Currently this command is exactly the same as `ozone sh bucket link`.
+ * We might expand this to add more functionality in the future, and different
+ * ObjectStore API(s) would be used by then.
  */
-@CommandLine.Command(name = "create",
-    description = "Create a tenant."
-        + " This will also create a new Ozone volume for the tenant.")
-public class TenantCreateHandler extends TenantHandler {
+@CommandLine.Command(name = "bucket-link",
+    aliases = {"link-bucket", "bucketlink", "linkbucket"},
+    description = "Create a symlink to another bucket")
+public class TenantBucketLinkHandler extends TenantHandler {
 
-  @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
-  private String tenantId;
+  @Parameters(index = "0", arity = "1..1",
+      description = "The bucket which the link should point to.",
+      converter = BucketUri.class)
+  private OzoneAddress source;
+
+  @Parameters(index = "1", arity = "1..1",
+      description = "Address of the link bucket",
+      converter = BucketUri.class)
+  private OzoneAddress target;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    try {
-      client.getObjectStore().createTenant(tenantId);
-      // TODO: Add return value and print volume name?
-      out().println("Created tenant '" + tenantId + "'.");
-    } catch (IOException e) {
-      // Throw exception to make client exit code non-zero
-      throw new RuntimeException("Failed to create tenant '" + tenantId + "': "
-          + e.getMessage());
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
+
+    BucketArgs.Builder bb = new BucketArgs.Builder()
+        .setStorageType(StorageType.DEFAULT)
+        .setVersioning(false)
+        .setSourceVolume(source.getVolumeName())
+        .setSourceBucket(source.getBucketName());
+
+    String volumeName = target.getVolumeName();
+    String bucketName = target.getBucketName();
+
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    vol.createBucket(bucketName, bb.build());
+
+    if (isVerbose()) {
+      OzoneBucket bucket = vol.getBucket(bucketName);
+      printObjectAsJson(bucket);
     }
   }
 }
