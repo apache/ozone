@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -115,6 +116,7 @@ public class ContainerBalancer {
       ReplicationManager replicationManager,
       OzoneConfiguration ozoneConfiguration,
       final SCMContext scmContext,
+      NetworkTopology networkTopology,
       PlacementPolicy placementPolicy) {
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
@@ -132,7 +134,7 @@ public class ContainerBalancer {
 
     this.lock = new ReentrantLock();
     findTargetStrategy = new FindTargetGreedy(
-        containerManager, placementPolicy, nodeManager);
+        containerManager, placementPolicy, nodeManager, networkTopology);
     findSourceStrategy = new FindSourceGreedy(nodeManager);
   }
 
@@ -367,11 +369,6 @@ public class ContainerBalancer {
     try {
       // match each overUtilized node with a target
       while (true) {
-        DatanodeDetails source =
-            findSourceStrategy.getNextCandidateSourceDataNode();
-        if (source == null) {
-          break;
-        }
         if (!isBalancerRunning()) {
           return IterationResult.ITERATION_INTERRUPTED;
         }
@@ -379,6 +376,12 @@ public class ContainerBalancer {
         IterationResult result = checkConditionsForBalancing();
         if (result != null) {
           return result;
+        }
+
+        DatanodeDetails source =
+            findSourceStrategy.getNextCandidateSourceDataNode();
+        if (source == null) {
+          break;
         }
 
         ContainerMoveSelection moveSelection = matchSourceWithTarget(source);

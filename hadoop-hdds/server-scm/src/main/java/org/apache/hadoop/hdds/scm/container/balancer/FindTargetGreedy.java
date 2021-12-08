@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -26,12 +27,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,30 +57,19 @@ public class FindTargetGreedy implements FindTargetStrategy {
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double upperLimit;
-  private TreeSet<DatanodeUsageInfo> potentialTargets;
+  private Collection<DatanodeUsageInfo> potentialTargets;
+  private NetworkTopology networkTopology;
 
   public FindTargetGreedy(
       ContainerManager containerManager,
       PlacementPolicy placementPolicy,
-      NodeManager nodeManager) {
+      NodeManager nodeManager,
+      NetworkTopology networkTopology) {
     sizeEnteringNode = new HashMap<>();
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;
     this.nodeManager = nodeManager;
-
-    potentialTargets = new TreeSet<>((a, b) -> {
-      double currentUsageOfA = a.calculateUtilization(
-          sizeEnteringNode.get(a.getDatanodeDetails()));
-      double currentUsageOfB = b.calculateUtilization(
-          sizeEnteringNode.get(b.getDatanodeDetails()));
-      int ret = Double.compare(currentUsageOfA, currentUsageOfB);
-      if (ret != 0) {
-        return ret;
-      }
-      UUID uuidA = a.getDatanodeDetails().getUuid();
-      UUID uuidB = b.getDatanodeDetails().getUuid();
-      return uuidA.compareTo(uuidB);
-    });
+    this.networkTopology = networkTopology;
   }
 
   private void setUpperLimit(Double upperLimit){
@@ -91,8 +85,27 @@ public class FindTargetGreedy implements FindTargetStrategy {
     potentialTargets.addAll(potentialTargetDataNodes);
   }
 
+  private int compareByUsage(DatanodeUsageInfo a, DatanodeUsageInfo b) {
+    double currentUsageOfA = a.calculateUtilization(
+        sizeEnteringNode.get(a.getDatanodeDetails()));
+    double currentUsageOfB = b.calculateUtilization(
+        sizeEnteringNode.get(b.getDatanodeDetails()));
+    int ret = Double.compare(currentUsageOfA, currentUsageOfB);
+    if (ret != 0) {
+      return ret;
+    }
+    UUID uuidA = a.getDatanodeDetails().getUuid();
+    UUID uuidB = b.getDatanodeDetails().getUuid();
+    return uuidA.compareTo(uuidB);
+  }
+
   private void setConfiguration(ContainerBalancerConfiguration conf) {
-    this.config = conf;
+    config = conf;
+    if(config.getNetworkTopologyEnable()) {
+      potentialTargets = new LinkedList<>();
+    } else {
+      potentialTargets = new TreeSet<>((a, b) -> compareByUsage(a, b));
+    }
   }
 
   /**
@@ -109,6 +122,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
       DatanodeDetails source, Set<ContainerID> candidateContainers) {
+    sortTargetForSource(source);
     for (DatanodeUsageInfo targetInfo : potentialTargets) {
       DatanodeDetails target = targetInfo.getDatanodeDetails();
       for (ContainerID container : candidateContainers) {
@@ -226,5 +240,29 @@ public class FindTargetGreedy implements FindTargetStrategy {
     setConfiguration(conf);
     setUpperLimit(upLimit);
     setPotentialTargets(potentialDataNodes);
+  }
+
+  /**
+   * sort potentialTargets for specified source datanode according to
+   * network topology if enabled.
+   * @param source the specified source datanode
+   */
+  private void sortTargetForSource(DatanodeDetails source) {
+    if(config.getNetworkTopologyEnable()) {
+      Preconditions.checkArgument(potentialTargets instanceof List);
+      Collections.sort((List) potentialTargets,
+          (DatanodeUsageInfo da, DatanodeUsageInfo db) -> {
+          DatanodeDetails a = da.getDatanodeDetails();
+          DatanodeDetails b = db.getDatanodeDetails();
+          // sort by network topology first
+          int distanceToA = networkTopology.getDistanceCost(source, a);
+          int distanceToB = networkTopology.getDistanceCost(source, b);
+          if (distanceToA != distanceToB) {
+            return distanceToA - distanceToB;
+          }
+          // if distance to source is equal , sort by usage
+          return compareByUsage(da, db);
+        });
+    }
   }
 }
