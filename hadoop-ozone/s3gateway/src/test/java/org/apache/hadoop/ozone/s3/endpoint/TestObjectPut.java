@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -71,6 +72,7 @@ public class TestObjectPut {
     // Create PutObject and setClient to OzoneClientStub
     objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(clientStub);
+    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   @Test

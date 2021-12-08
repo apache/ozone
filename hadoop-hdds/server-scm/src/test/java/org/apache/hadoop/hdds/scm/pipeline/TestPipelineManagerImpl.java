@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -78,12 +81,16 @@ public class TestPipelineManagerImpl {
   private int maxPipelineCount;
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
+  private StorageContainerManager scm;
 
   @Before
   public void init() throws Exception {
     conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
         TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        GenericTestUtils.getRandomizedTempPath());
+    scm = TestUtils.getScm(conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 20);
@@ -93,7 +100,9 @@ public class TestPipelineManagerImpl {
         conf.getInt(OZONE_DATANODE_PIPELINE_LIMIT,
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
         HddsProtos.ReplicationFactor.THREE.getNumber();
-    scmContext = SCMContext.emptyContext();
+    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+        .setLeader(true).setIsPreCheckComplete(true)
+        .setSCM(scm).build();
     serviceManager = new SCMServiceManager();
   }
 
@@ -293,6 +302,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testRemovePipeline() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    pipelineManager.setScmContext(scmContext);
     // Create a pipeline
     Pipeline pipeline = pipelineManager.createPipeline(
         new RatisReplicationConfig(ReplicationFactor.THREE));
@@ -302,8 +312,15 @@ public class TestPipelineManagerImpl {
 
     // Open the pipeline
     pipelineManager.openPipeline(pipeline.getId());
-    pipelineManager
-        .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
+    ContainerManager containerManager = scm.getContainerManager();
+    ContainerInfo containerInfo = TestUtils.
+            getContainer(HddsProtos.LifeCycleState.CLOSED, pipeline.getId());
+    ContainerID containerID = containerInfo.containerID();
+    //Add Container to ContainerMap
+    containerManager.getContainerStateManager().
+            addContainer(containerInfo.getProtobuf());
+    //Add Container to PipelineStateMap
+    pipelineManager.addContainerToPipeline(pipeline.getId(), containerID);
     Assert.assertTrue(pipelineManager
         .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
@@ -334,6 +351,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testClosePipelineShouldFailOnFollower() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager.createPipeline(
         new RatisReplicationConfig(ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelineManager.getPipelines().size());
@@ -355,6 +373,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineReport() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    pipelineManager.setScmContext(scmContext);
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
             new EventQueue(), serviceManager, scmContext);
@@ -508,6 +527,7 @@ public class TestPipelineManagerImpl {
         TimeUnit.MILLISECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(new RatisReplicationConfig(ReplicationFactor.THREE));
     // At this point, pipeline is not at OPEN stage.
@@ -537,6 +557,7 @@ public class TestPipelineManagerImpl {
         TimeUnit.MILLISECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(new RatisReplicationConfig(ReplicationFactor.THREE));
     // At this point, pipeline is not at OPEN stage.
@@ -654,6 +675,38 @@ public class TestPipelineManagerImpl {
     assertTrue(logCapturer.getOutput().contains("Container " +
             ContainerID.valueOf(2) + " in open state for pipeline=" +
             pipelineID + " in closed state"));
+  }
+
+  @Test
+  public void testPipelineCloseFlow() throws IOException {
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+            .captureLogs(LoggerFactory.getLogger(PipelineManagerImpl.class));
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    pipelineManager.setScmContext(scmContext);
+    Pipeline pipeline = pipelineManager.createPipeline(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+    PipelineID pipelineID = pipeline.getId();
+    ContainerManager containerManager = scm.getContainerManager();
+    ContainerInfo containerInfo = TestUtils.
+        getContainer(HddsProtos.LifeCycleState.CLOSED, pipelineID);
+    ContainerID containerID = containerInfo.containerID();
+    //Add Container to ContainerMap
+    containerManager.getContainerStateManager().
+            addContainer(containerInfo.getProtobuf());
+    //Add Container to PipelineStateMap
+    pipelineManager.addContainerToPipeline(pipelineID, containerID);
+    pipelineManager.closePipeline(pipeline, false);
+    String containerExpectedOutput = "Container " + containerID +
+            " closed for pipeline=" + pipelineID;
+    String pipelineExpectedOutput =
+        "Pipeline " + pipeline + " moved to CLOSED state";
+    String logOutput = logCapturer.getOutput();
+    assertTrue(logOutput.contains(containerExpectedOutput));
+    assertTrue(logOutput.contains(pipelineExpectedOutput));
+
+    int containerLogIdx = logOutput.indexOf(containerExpectedOutput);
+    int pipelineLogIdx = logOutput.indexOf(pipelineExpectedOutput);
+    assertTrue(containerLogIdx < pipelineLogIdx);
   }
 
   private void sendPipelineReport(

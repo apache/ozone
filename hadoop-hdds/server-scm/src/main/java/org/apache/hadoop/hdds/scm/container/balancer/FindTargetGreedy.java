@@ -26,13 +26,17 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.function.BiFunction;
+import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -44,37 +48,72 @@ public class FindTargetGreedy implements FindTargetStrategy {
 
   private ContainerManager containerManager;
   private PlacementPolicy placementPolicy;
+  private Map<DatanodeDetails, Long> sizeEnteringNode;
+  private NodeManager nodeManager;
+  private ContainerBalancerConfiguration config;
+  private Double upperLimit;
+  private TreeSet<DatanodeUsageInfo> potentialTargets;
 
   public FindTargetGreedy(
       ContainerManager containerManager,
-      PlacementPolicy placementPolicy) {
+      PlacementPolicy placementPolicy,
+      NodeManager nodeManager) {
+    sizeEnteringNode = new HashMap<>();
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;
+    this.nodeManager = nodeManager;
+
+    potentialTargets = new TreeSet<>((a, b) -> {
+      double currentUsageOfA = a.calculateUtilization(
+          sizeEnteringNode.get(a.getDatanodeDetails()));
+      double currentUsageOfB = b.calculateUtilization(
+          sizeEnteringNode.get(b.getDatanodeDetails()));
+      int ret = Double.compare(currentUsageOfA, currentUsageOfB);
+      if (ret != 0) {
+        return ret;
+      }
+      UUID uuidA = a.getDatanodeDetails().getUuid();
+      UUID uuidB = b.getDatanodeDetails().getUuid();
+      return uuidA.compareTo(uuidB);
+    });
+  }
+
+  private void setUpperLimit(Double upperLimit){
+    this.upperLimit = upperLimit;
+  }
+
+  private void setPotentialTargets(
+      List<DatanodeUsageInfo> potentialTargetDataNodes) {
+    sizeEnteringNode.clear();
+    potentialTargetDataNodes.forEach(
+        p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
+    potentialTargets.clear();
+    potentialTargets.addAll(potentialTargetDataNodes);
+  }
+
+  private void setConfiguration(ContainerBalancerConfiguration conf) {
+    this.config = conf;
   }
 
   /**
    * Find a {@link ContainerMoveSelection} consisting of a target and
    * container to move for a source datanode. Favours more under-utilized nodes.
    * @param source Datanode to find a target for
-   * @param potentialTargets Collection of potential target datanodes
    * @param candidateContainers Set of candidate containers satisfying
    *                            selection criteria
    *                            {@link ContainerBalancerSelectionCriteria}
-   * @param canSizeEnterTarget A functional interface whose apply
    * (DatanodeDetails, Long) method returns true if the size specified in the
    * second argument can enter the specified DatanodeDetails node
    * @return Found target and container
    */
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
-      DatanodeDetails source, Collection<DatanodeDetails> potentialTargets,
-      Set<ContainerID> candidateContainers,
-      BiFunction<DatanodeDetails, Long, Boolean> canSizeEnterTarget) {
-    for (DatanodeDetails target : potentialTargets) {
+      DatanodeDetails source, Set<ContainerID> candidateContainers) {
+    for (DatanodeUsageInfo targetInfo : potentialTargets) {
+      DatanodeDetails target = targetInfo.getDatanodeDetails();
       for (ContainerID container : candidateContainers) {
         Set<ContainerReplica> replicas;
         ContainerInfo containerInfo;
-
         try {
           replicas = containerManager.getContainerReplicas(container);
           containerInfo = containerManager.getContainer(container);
@@ -88,7 +127,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
             replica -> replica.getDatanodeDetails().equals(target)) &&
             containerMoveSatisfiesPlacementPolicy(container, replicas, source,
             target) &&
-            canSizeEnterTarget.apply(target, containerInfo.getUsedBytes())) {
+            canSizeEnterTarget(target, containerInfo.getUsedBytes())) {
           return new ContainerMoveSelection(target, container);
         }
       }
@@ -107,8 +146,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
    * @param target Target datanode for container move
    * @return true if placement policy is satisfied, otherwise false
    */
-  @Override
-  public boolean containerMoveSatisfiesPlacementPolicy(
+  private boolean containerMoveSatisfiesPlacementPolicy(
       ContainerID containerID, Set<ContainerReplica> replicas,
       DatanodeDetails source, DatanodeDetails target) {
     ContainerInfo containerInfo;
@@ -131,5 +169,62 @@ public class FindTargetGreedy implements FindTargetStrategy {
         containerInfo.getReplicationConfig().getRequiredNodes());
 
     return placementStatus.isPolicySatisfied();
+  }
+
+  /**
+   * Checks if specified size can enter specified target datanode
+   * according to {@link ContainerBalancerConfiguration}
+   * "size.entering.target.max".
+   *
+   * @param target target datanode in which size is entering
+   * @param size   size in bytes
+   * @return true if size can enter target, else false
+   */
+  private boolean canSizeEnterTarget(DatanodeDetails target, long size) {
+    if (sizeEnteringNode.containsKey(target)) {
+      long sizeEnteringAfterMove = sizeEnteringNode.get(target) + size;
+      //size can be moved into target datanode only when the following
+      //two condition are met.
+      //1 sizeEnteringAfterMove does not succeed the configured
+      // MaxSizeEnteringTarget
+      //2 current usage of target datanode plus sizeEnteringAfterMove
+      // is smaller than or equal to upperLimit
+      return sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
+          Double.compare(nodeManager.getUsageInfo(target)
+              .calculateUtilization(sizeEnteringAfterMove), upperLimit) <= 0;
+    }
+    return false;
+  }
+
+  /**
+   * increase the Entering size of a candidate target data node.
+   */
+  @Override
+  public void increaseSizeEntering(DatanodeDetails target, long size) {
+    if(sizeEnteringNode.containsKey(target)) {
+      long totalEnteringSize = sizeEnteringNode.get(target) + size;
+      sizeEnteringNode.put(target, totalEnteringSize);
+      potentialTargets.removeIf(
+          c -> c.getDatanodeDetails().equals(target));
+      if(totalEnteringSize < config.getMaxSizeEnteringTarget()) {
+        //reorder
+        potentialTargets.add(nodeManager.getUsageInfo(target));
+      }
+      return;
+    }
+    LOG.warn("Cannot find {} in the candidates target nodes",
+        target.getUuid());
+  }
+
+  /**
+   * reInitialize FindTargetStrategy with the given new parameters.
+   */
+  @Override
+  public void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
+                           ContainerBalancerConfiguration conf,
+                           Double upLimit) {
+    setConfiguration(conf);
+    setUpperLimit(upLimit);
+    setPotentialTargets(potentialDataNodes);
   }
 }

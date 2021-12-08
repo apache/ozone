@@ -2340,6 +2340,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.admin.protocol.max.retries</name>
+    <value>20</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Expert only. The maximum number of retries for Ozone Manager Admin
+      protocol.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.admin.protocol.wait.between.retries</name>
+    <value>1000</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Expert only. The time to wait, in milliseconds, between retry attempts
+      for Ozone Manager Admin protocol.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
     <tag>RECON, MANAGEMENT</tag>

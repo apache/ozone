@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -56,6 +58,11 @@ public class CreateBucketHandler extends BucketHandler {
       description = "if true, indicates GDPR enforced bucket, " +
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
+
+  @Option(names = {"--user", "-u"},
+          description = "Owner of the bucket. Defaults to current" +
+              " user if not specified")
+  private String ownerName;
 
   enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
 
@@ -85,12 +92,16 @@ public class CreateBucketHandler extends BucketHandler {
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
+    if (ownerName == null) {
+      ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
+    }
+
     BucketArgs.Builder bb;
     BucketLayout bucketLayout =
         BucketLayout.valueOf(allowedBucketLayout.toString());
     bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-        .setVersioning(false).setBucketLayout(bucketLayout);
-
+        .setVersioning(false).setBucketLayout(bucketLayout)
+        .setOwner(ownerName);
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {
@@ -113,8 +124,8 @@ public class CreateBucketHandler extends BucketHandler {
     if(replicationType!=null) {
       if (replication != null) {
         ReplicationConfig replicationConfig = ReplicationConfig
-            .fromTypeAndString(ReplicationType.valueOf(replicationType),
-                replication);
+            .parse(ReplicationType.valueOf(replicationType),
+                replication, new OzoneConfiguration());
         boolean isEC = replicationConfig
             .getReplicationType() == HddsProtos.ReplicationType.EC;
         bb.setDefaultReplicationConfig(new DefaultReplicationConfig(

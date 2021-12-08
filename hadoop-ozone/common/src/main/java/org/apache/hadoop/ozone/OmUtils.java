@@ -39,6 +39,7 @@ import java.util.Set;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -46,6 +47,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -67,6 +69,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 import org.slf4j.Logger;
@@ -671,5 +675,83 @@ public final class OmUtils {
       hostName.ifPresent(omHosts::add);
     }
     return omHosts;
+  }
+
+  /**
+   * Get a list of all OM details (address and ports) from the specified config.
+   */
+  public static List<OMNodeDetails> getAllOMAddresses(OzoneConfiguration conf,
+      String omServiceId, String currentOMNodeId) {
+
+    List<OMNodeDetails> omNodesList = new ArrayList<>();
+    Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf, omServiceId);
+
+    String rpcAddrStr, hostAddr, httpAddr, httpsAddr;
+    int rpcPort, ratisPort;
+    if (omNodeIds.size() == 0) {
+      //Check if it is non-HA cluster
+      rpcAddrStr = OmUtils.getOmRpcAddress(conf, OZONE_OM_ADDRESS_KEY);
+      if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
+        return omNodesList;
+      }
+      hostAddr = HddsUtils.getHostName(rpcAddrStr).orElse(null);
+      rpcPort = HddsUtils.getHostPort(rpcAddrStr).orElse(0);
+      ratisPort = conf.getInt(OZONE_OM_RATIS_PORT_KEY,
+          OZONE_OM_RATIS_PORT_DEFAULT);
+      httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
+          null, null, hostAddr);
+      httpsAddr = OmUtils.getHttpsAddressForOMPeerNode(conf,
+          null, null, hostAddr);
+
+      omNodesList.add(new OMNodeDetails.Builder()
+          .setOMNodeId(currentOMNodeId)
+          .setHostAddress(hostAddr)
+          .setRpcPort(rpcPort)
+          .setRatisPort(ratisPort)
+          .setHttpAddress(httpAddr)
+          .setHttpsAddress(httpsAddr)
+          .build());
+      return omNodesList;
+    }
+
+    for (String nodeId : omNodeIds) {
+      try {
+        OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
+            conf, omServiceId, nodeId);
+        omNodesList.add(omNodeDetails);
+      } catch (IOException e) {
+        String omRpcAddressStr = OMNodeDetails.getOMNodeAddressFromConf(conf,
+            omServiceId, nodeId);
+        LOG.error("OM {} is present in config file but it's address {} could " +
+            "not be resolved. Hence, OM {} is not added to list of peer nodes.",
+            nodeId, omRpcAddressStr, nodeId);
+      }
+    }
+
+    return omNodesList;
+  }
+
+  /**
+   * Return a comma separated list of OM node details
+   * (NodeID[HostAddress:RpcPort]).
+   */
+  public static String getOMAddressListPrintString(List<OMNodeDetails> omList) {
+    if (omList.size() == 0) {
+      return null;
+    }
+    StringBuilder printString = new StringBuilder();
+    printString.append("OM");
+    if (omList.size() == 1) {
+      printString.append(" [");
+    } else {
+      printString.append("(s) [");
+    }
+    printString.append(omList.get(0).getOMPrintInfo());
+    for (int i = 1; i < omList.size(); i++) {
+      printString.append(",")
+          .append(omList.get(i).getOMPrintInfo());
+    }
+    printString.append("]");
+    return printString.toString();
   }
 }

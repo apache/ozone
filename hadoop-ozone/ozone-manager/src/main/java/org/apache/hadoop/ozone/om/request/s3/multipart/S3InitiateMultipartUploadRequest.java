@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -53,6 +54,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.UUID;
 
@@ -169,7 +171,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // care of in the final complete multipart upload. AWS S3 behavior is
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
-
       final OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
           .get(omMetadataManager.getBucketKey(volumeName, bucketName));
       final ReplicationConfig replicationConfig = OzoneConfigUtil
@@ -271,4 +272,16 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     }
   }
 
+  public static S3InitiateMultipartUploadRequest getInstance(KeyArgs keyArgs,
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new S3InitiateMultipartUploadRequestWithFSO(omRequest,
+          bucketLayout);
+    }
+    return new S3InitiateMultipartUploadRequest(omRequest, bucketLayout);
+  }
 }

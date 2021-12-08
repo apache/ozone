@@ -120,7 +120,7 @@ public class TestHDDSUpgrade {
   private AtomicBoolean testPassed = new AtomicBoolean(true);
 
   private static final ReplicationConfig RATIS_THREE =
-      ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+      ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
 
   private static MiniOzoneClusterProvider clusterProvider;

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -25,11 +25,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
  * Test for ResourceLimitCache.
  */
 public class TestResourceLimitCache {
+
+  private static final String ANY_VALUE = "asdf";
 
   @Test
   public void testResourceLimitCache()
@@ -88,4 +91,45 @@ public class TestResourceLimitCache {
     resourceCache.remove(1);
     Assert.assertNull(resourceCache.get(4));
   }
+
+  @Test(timeout = 5000)
+  public void testRemove() throws Exception {
+    testRemove(cache -> cache.remove(2), 2);
+  }
+
+  @Test(timeout = 5000)
+  public void testRemoveIf() throws Exception {
+    testRemove(cache -> cache.removeIf(k -> k <= 2), 1, 2);
+  }
+
+  @Test(timeout = 5000)
+  public void testClear() throws Exception {
+    testRemove(Cache::clear, 1, 2, 3);
+  }
+
+  private static void testRemove(Consumer<Cache<Integer, String>> op,
+      int... removedKeys) throws InterruptedException {
+
+    // GIVEN
+    final int maxSize = 3;
+    Cache<Integer, String> resourceCache =
+        new ResourceLimitCache<>(new ConcurrentHashMap<>(),
+            (k, v) -> new int[] {1}, maxSize);
+    for (int i = 1; i <= maxSize; ++i) {
+      resourceCache.put(i, ANY_VALUE);
+    }
+
+    // WHEN: remove some entries
+    op.accept(resourceCache);
+
+    // THEN
+    for (Integer k : removedKeys) {
+      Assert.assertNull(resourceCache.get(k));
+    }
+    // can put new entries
+    for (int i = 1; i <= removedKeys.length; ++i) {
+      resourceCache.put(maxSize + i, ANY_VALUE);
+    }
+  }
+
 }

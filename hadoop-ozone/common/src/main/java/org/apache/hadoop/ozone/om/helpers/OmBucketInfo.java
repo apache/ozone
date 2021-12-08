@@ -102,6 +102,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketLayout bucketLayout;
 
+  private final String owner;
+
   /**
    * Private constructor, constructed via builder.
    * @param volumeName - Volume name.
@@ -119,7 +121,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout bucket layout.
+   * @param owner owner of the bucket.
    * @param defaultReplicationConfig default replication config.
+   * @param bucketLayout Bucket Layout.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -140,6 +144,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       long quotaInBytes,
       long quotaInNamespace,
       BucketLayout bucketLayout,
+      String owner,
       DefaultReplicationConfig defaultReplicationConfig) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
@@ -159,6 +164,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
+    this.owner = owner;
     this.defaultReplicationConfig = defaultReplicationConfig;
   }
 
@@ -312,6 +318,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return sourceVolume != null && sourceBucket != null;
   }
 
+  public String getOwner() {
+    return owner;
+  }
+
   /**
    * Returns new builder class that builds a OmBucketInfo.
    *
@@ -391,6 +401,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
         .setBucketLayout(bucketLayout)
+        .setOwner(owner)
         .setDefaultReplicationConfig(defaultReplicationConfig);
   }
 
@@ -429,6 +440,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private long quotaInBytes;
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
+    private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
 
     public Builder() {
@@ -553,6 +565,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setOwner(String ownerName) {
+      this.owner = ownerName;
+      return this;
+    }
+
     public Builder setDefaultReplicationConfig(
         DefaultReplicationConfig defaultReplConfig) {
       this.defaultReplicationConfig = defaultReplConfig;
@@ -572,7 +589,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, modificationTime, objectID, updateID,
           metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout,
+          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, owner,
           defaultReplicationConfig);
     }
   }
@@ -610,6 +627,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (sourceBucket != null) {
       bib.setSourceBucket(sourceBucket);
+    }
+    if (owner != null) {
+      bib.setOwner(owner);
     }
     return bib.build();
   }
@@ -673,6 +693,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     if (bucketInfo.hasSourceBucket()) {
       obib.setSourceBucket(bucketInfo.getSourceBucket());
     }
+    if (bucketInfo.hasOwner()) {
+      obib.setOwner(bucketInfo.getOwner());
+    }
     return obib.build();
   }
 
@@ -721,8 +744,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
-        Objects.equals(bekInfo, that.bekInfo) && Objects
-        .equals(defaultReplicationConfig, this.defaultReplicationConfig);
+        Objects.equals(bekInfo, that.bekInfo) &&
+        Objects.equals(owner, that.owner) &&
+        Objects.equals(defaultReplicationConfig, this.defaultReplicationConfig);
   }
 
   @Override
@@ -750,6 +774,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +
+        ", owner=" + owner +
         ", defaultReplicationConfig=" + defaultReplicationConfig +
         '}';
   }

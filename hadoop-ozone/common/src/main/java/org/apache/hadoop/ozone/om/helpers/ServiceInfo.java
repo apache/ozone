@@ -48,6 +48,11 @@ public final class ServiceInfo {
   private String hostname;
 
   /**
+   * Protocol version for client.
+   */
+  private String omClientProtocolVersion;
+
+  /**
    * List of ports the service listens to.
    */
   private Map<ServicePort.Type, Integer> ports;
@@ -65,12 +70,16 @@ public final class ServiceInfo {
    * @param hostname hostname of the service
    * @param portList list of ports the service listens to
    */
-  private ServiceInfo(NodeType nodeType, String hostname,
-      List<ServicePort> portList, OMRoleInfo omRole) {
+  private ServiceInfo(NodeType nodeType,
+                      String hostname,
+                      List<ServicePort> portList,
+                      String omClientProtocolVersion,
+                      OMRoleInfo omRole) {
     Preconditions.checkNotNull(nodeType);
     Preconditions.checkNotNull(hostname);
     this.nodeType = nodeType;
     this.hostname = hostname;
+    this.omClientProtocolVersion = omClientProtocolVersion;
     this.ports = new HashMap<>();
     for (ServicePort port : portList) {
       ports.put(port.getType(), port.getValue());
@@ -154,6 +163,9 @@ public final class ServiceInfo {
     builder.setNodeType(nodeType)
         .setHostname(hostname)
         .addAllServicePorts(servicePorts);
+    if (omClientProtocolVersion != null) {
+      builder.setOMProtocolVersion(omClientProtocolVersion);
+    }
     if (nodeType == NodeType.OM && omRoleInfo != null) {
       builder.setOmRole(omRoleInfo);
     }
@@ -171,6 +183,7 @@ public final class ServiceInfo {
     return new ServiceInfo(serviceInfo.getNodeType(),
         serviceInfo.getHostname(),
         serviceInfo.getServicePortsList(),
+        serviceInfo.getOMProtocolVersion(),
         serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null);
   }
 
@@ -191,6 +204,24 @@ public final class ServiceInfo {
     private String host;
     private List<ServicePort> portList = new ArrayList<>();
     private OMRoleInfo omRoleInfo;
+    private String omClientProtocolVersion;
+
+    /**
+     * Gets the Om Client Protocol Version.
+     * @return om client protocol version as a string.
+     */
+    public String getOmClientProtocolVersion() {
+      return omClientProtocolVersion;
+    }
+
+    /**
+     * Sets the Om Client Protocol Version.
+     * @param omClientProtocolVer the client protocol version supported.
+     */
+    public Builder setOmClientProtocolVersion(String omClientProtocolVer) {
+      this.omClientProtocolVersion = omClientProtocolVer;
+      return this;
+    }
 
     /**
      * Sets the node/service type.
@@ -232,7 +263,11 @@ public final class ServiceInfo {
      * @return {@link ServiceInfo}
      */
     public ServiceInfo build() {
-      return new ServiceInfo(node, host, portList, omRoleInfo);
+      return new ServiceInfo(node,
+          host,
+          portList,
+          omClientProtocolVersion,
+          omRoleInfo);
     }
   }
 
