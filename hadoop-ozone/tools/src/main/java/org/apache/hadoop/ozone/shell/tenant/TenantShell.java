@@ -33,8 +33,7 @@ import java.util.function.Supplier;
         TenantModifyHandler.class,
         TenantDeleteHandler.class,
         TenantListHandler.class,
-        TenantUserCommands.class,
-        TenantBucketLinkHandler.class
+        TenantUserCommands.class
     })
 public class TenantShell extends Shell {
 
