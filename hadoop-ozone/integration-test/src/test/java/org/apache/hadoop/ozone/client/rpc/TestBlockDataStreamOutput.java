@@ -136,7 +136,7 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testHalfChunkWrite() throws Exception {
-    testWrite(chunkSize / 2);
+    testWrite(chunkSize/2);
     testWriteWithFailure(chunkSize/2);
   }
 
