@@ -118,7 +118,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
-import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
@@ -3640,8 +3639,8 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testHeadObject() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    ReplicationConfig replicationConfig = fromTypeAndFactor(RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+    ReplicationConfig replicationConfig = ReplicationConfig
+        .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -3682,8 +3681,8 @@ public abstract class TestOzoneRpcClientAbstract {
   private void createRequiredForVersioningTest(String volumeName,
       String bucketName, String keyName, boolean versioning) throws Exception {
 
-    ReplicationConfig replicationConfig = fromTypeAndFactor(RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+    ReplicationConfig replicationConfig = ReplicationConfig
+        .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
 
     String value = "sample value";
     store.createVolume(volumeName);

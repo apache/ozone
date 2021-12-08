@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
@@ -58,9 +59,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 
 /**
  * OM transport for testing with in-memory state.
@@ -259,9 +257,7 @@ public class MockOmTransport implements OmTransport {
         .get(infoBucketRequest.getBucketName());
     if(!bucketInfo.hasDefaultReplicationConfig()) {
       final ReplicationConfig replicationConfig = ReplicationConfig
-          .fromTypeAndString(ReplicationType
-                  .valueOf(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT),
-              OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
+          .getDefault(new OzoneConfiguration());
 
       bucketInfo = bucketInfo.toBuilder().setDefaultReplicationConfig(
           new DefaultReplicationConfig(

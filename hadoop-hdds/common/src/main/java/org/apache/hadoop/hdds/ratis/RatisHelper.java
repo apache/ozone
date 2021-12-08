@@ -228,6 +228,7 @@ public final class RatisHelper {
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
       Parameters parameters = new Parameters();
+      GrpcConfigKeys.Admin.setTlsConf(parameters, tlsConfig);
       GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
       builder.setParameters(parameters);
     }

@@ -198,7 +198,7 @@ public class SCMClientProtocolServer implements
 
     final ContainerInfo container = scm.getContainerManager()
         .allocateContainer(
-            ReplicationConfig.fromTypeAndFactor(replicationType, factor),
+            ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
             owner);
     final Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
@@ -569,7 +569,7 @@ public class SCMClientProtocolServer implements
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
     Pipeline result = scm.getPipelineManager()
-        .createPipeline(ReplicationConfig.fromTypeAndFactor(type, factor));
+        .createPipeline(ReplicationConfig.fromProtoTypeAndFactor(type, factor));
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.CREATE_PIPELINE, null));
     return result;

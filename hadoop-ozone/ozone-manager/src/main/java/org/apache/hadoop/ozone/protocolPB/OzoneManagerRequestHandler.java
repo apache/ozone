@@ -235,7 +235,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
-      long transactionLogIndex) {
+      long transactionLogIndex) throws IOException {
     OMClientRequest omClientRequest = null;
     OMClientResponse omClientResponse = null;
     omClientRequest =

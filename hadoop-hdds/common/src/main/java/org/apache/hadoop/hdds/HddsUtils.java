@@ -73,6 +73,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
 import org.slf4j.Logger;
@@ -98,6 +99,9 @@ public final class HddsUtils {
   private static final String MULTIPLE_SCM_NOT_YET_SUPPORTED =
       ScmConfigKeys.OZONE_SCM_NAMES + " must contain a single hostname."
           + " Multiple SCM hosts are currently unsupported";
+
+  public static final ByteString REDACTED =
+      ByteString.copyFromUtf8("<redacted>");
 
   private static final int ONE_MB = SizeInBytes.valueOf("1m").getSizeInt();
 
@@ -672,5 +676,72 @@ public final class HddsUtils {
       }
     }
     return false;
+  }
+
+  /**
+   * Remove binary data from request {@code msg}.  (May be incomplete, feel
+   * free to add any missing cleanups.)
+   */
+  public static ContainerProtos.ContainerCommandRequestProto processForDebug(
+      ContainerProtos.ContainerCommandRequestProto msg) {
+
+    if (msg == null) {
+      return null;
+    }
+
+    if (msg.hasWriteChunk() || msg.hasPutSmallFile()) {
+      ContainerProtos.ContainerCommandRequestProto.Builder builder =
+          msg.toBuilder();
+      if (msg.hasWriteChunk()) {
+        builder.getWriteChunkBuilder().setData(REDACTED);
+      }
+      if (msg.hasPutSmallFile()) {
+        builder.getPutSmallFileBuilder().setData(REDACTED);
+      }
+      return builder.build();
+    }
+
+    return msg;
+  }
+
+  /**
+   * Remove binary data from response {@code msg}.  (May be incomplete, feel
+   * free to add any missing cleanups.)
+   */
+  public static ContainerProtos.ContainerCommandResponseProto processForDebug(
+      ContainerProtos.ContainerCommandResponseProto msg) {
+
+    if (msg == null) {
+      return null;
+    }
+
+    if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
+      ContainerProtos.ContainerCommandResponseProto.Builder builder =
+          msg.toBuilder();
+      if (msg.hasReadChunk()) {
+        if (msg.getReadChunk().hasData()) {
+          builder.getReadChunkBuilder().setData(REDACTED);
+        }
+        if (msg.getReadChunk().hasDataBuffers()) {
+          builder.getReadChunkBuilder().getDataBuffersBuilder()
+              .clearBuffers()
+              .addBuffers(REDACTED);
+        }
+      }
+      if (msg.hasGetSmallFile()) {
+        if (msg.getGetSmallFile().getData().hasData()) {
+          builder.getGetSmallFileBuilder().getDataBuilder().setData(REDACTED);
+        }
+        if (msg.getGetSmallFile().getData().hasDataBuffers()) {
+          builder.getGetSmallFileBuilder().getDataBuilder()
+              .getDataBuffersBuilder()
+                  .clearBuffers()
+                  .addBuffers(REDACTED);
+        }
+      }
+      return builder.build();
+    }
+
+    return msg;
   }
 }

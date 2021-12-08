@@ -142,6 +142,10 @@ public class OzoneBucket extends WithMetadata {
    * Bucket Layout.
    */
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+  /**
+   * Bucket Owner.
+   */
+  private String owner;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ClientProtocol proxy) {
@@ -230,12 +234,12 @@ public class OzoneBucket extends WithMetadata {
       Map<String, String> metadata, String encryptionKeyName,
       String sourceVolume, String sourceBucket, long usedBytes,
       long usedNamespace, long quotaInBytes, long quotaInNamespace,
-      BucketLayout bucketLayout,
+      BucketLayout bucketLayout, String owner,
       DefaultReplicationConfig defaultReplicationConfig) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, modificationTime, metadata, encryptionKeyName,
         sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
-        quotaInNamespace);
+        quotaInNamespace, bucketLayout, owner);
     this.bucketLayout = bucketLayout;
     if (defaultReplicationConfig != null) {
       this.defaultReplication =
@@ -247,13 +251,28 @@ public class OzoneBucket extends WithMetadata {
     } else {
       // This can happen when talk to old server. So, using old client side
       // defaults.
-      this.defaultReplication = ReplicationConfig.fromTypeAndString(
+      this.defaultReplication = ReplicationConfig.parse(
           ReplicationType.valueOf(
               conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
                   OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT)),
           conf.get(OzoneConfigKeys.OZONE_REPLICATION,
-              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT));
+              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT), conf);
     }
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+       String volumeName, String bucketName, StorageType storageType,
+       Boolean versioning, long creationTime, long modificationTime,
+       Map<String, String> metadata, String encryptionKeyName,
+       String sourceVolume, String sourceBucket, long usedBytes,
+       long usedNamespace, long quotaInBytes, long quotaInNamespace,
+       BucketLayout bucketLayout, String owner) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, modificationTime, metadata, encryptionKeyName,
+        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
+        quotaInNamespace, bucketLayout);
+    this.owner = owner;
   }
 
   /**
@@ -418,6 +437,15 @@ public class OzoneBucket extends WithMetadata {
    */
   public long getQuotaInNamespace() {
     return quotaInNamespace;
+  }
+
+  /**
+   * Returns the owner of the Bucket.
+   *
+   * @return owner
+   */
+  public String getOwner() {
+    return owner;
   }
 
   /**
@@ -650,6 +678,14 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Checks if the bucket is a Link Bucket.
+   * @return True if bucket is a link, False otherwise.
+   */
+  public boolean isLink() {
+    return sourceVolume != null && sourceBucket != null;
+  }
+
+  /**
    * Deletes key from the bucket.
    * @param key Name of the key to be deleted.
    * @throws IOException
@@ -856,6 +892,7 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Deprecated
   public OzoneOutputStream createFile(String keyName, long size,
       ReplicationType type, ReplicationFactor factor, boolean overWrite,
       boolean recursive) throws IOException {
@@ -1254,7 +1291,7 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIteratorFactory {
     KeyIterator getKeyIterator(String keyPrefix, String prevKey,
         BucketLayout bType) throws IOException {
-      if (bType.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bType.isFileSystemOptimized()) {
         return new KeyIteratorWithFSO(keyPrefix, prevKey);
       } else {
         return new KeyIterator(keyPrefix, prevKey);

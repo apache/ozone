@@ -342,8 +342,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneObj.ResourceType resourceType, String volumeOwner)
       throws IOException {
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
-          volume, bucket, key, volumeOwner);
+      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE,
+          aclType, volume, bucket, key, volumeOwner,
+          ozoneManager.getBucketOwner(volume, bucket, aclType, resourceType));
     }
   }
 

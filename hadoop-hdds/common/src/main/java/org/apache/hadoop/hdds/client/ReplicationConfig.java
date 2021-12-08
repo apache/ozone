@@ -20,7 +20,13 @@ package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+
+import java.util.Objects;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 
 /**
  * Replication configuration for any ReplicationType with all the required
@@ -34,7 +40,7 @@ public interface ReplicationConfig {
    * <p>
    * Note: it's never used for EC replication where config is created.
    */
-  static ReplicationConfig fromTypeAndFactor(
+  static ReplicationConfig fromProtoTypeAndFactor(
       HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor
   ) {
@@ -59,19 +65,15 @@ public interface ReplicationConfig {
       org.apache.hadoop.hdds.client.ReplicationType type,
       org.apache.hadoop.hdds.client.ReplicationFactor factor
   ) {
-    return fromTypeAndFactor(HddsProtos.ReplicationType.valueOf(type.name()),
+    return fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.valueOf(type.name()),
         HddsProtos.ReplicationFactor.valueOf(factor.name()));
   }
 
   static ReplicationConfig getDefault(ConfigurationSource config) {
-    String replication = config.get(OzoneConfigKeys.OZONE_REPLICATION);
-    String replType = config.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE);
-    ReplicationConfig replicationConfig = null;
-    if (replication != null && replType != null) {
-      replicationConfig = ReplicationConfig
-          .fromTypeAndString(ReplicationType.valueOf(replType), replication);
-    }
-    return replicationConfig;
+    String replication =
+        config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
+    return parse(null, replication, config);
   }
 
   /**
@@ -89,7 +91,7 @@ public interface ReplicationConfig {
       return new ECReplicationConfig(ecConfig);
     case RATIS:
     case STAND_ALONE:
-      return fromTypeAndFactor(type, factor);
+      return fromProtoTypeAndFactor(type, factor);
     default:
       throw new UnsupportedOperationException(
           "Not supported replication: " + type);
@@ -98,54 +100,86 @@ public interface ReplicationConfig {
 
   static HddsProtos.ReplicationFactor getLegacyFactor(
       ReplicationConfig replicationConfig) {
-    if (replicationConfig instanceof RatisReplicationConfig) {
-      return ((RatisReplicationConfig) replicationConfig)
-          .getReplicationFactor();
-    } else if (replicationConfig instanceof StandaloneReplicationConfig) {
-      return ((StandaloneReplicationConfig) replicationConfig)
+    if (replicationConfig instanceof ReplicatedReplicationConfig) {
+      return ((ReplicatedReplicationConfig) replicationConfig)
           .getReplicationFactor();
     }
     throw new UnsupportedOperationException(
-        "factor is not valid property of replication " + replicationConfig
-            .getReplicationType());
+        "Replication configuration of type "
+            + replicationConfig.getReplicationType()
+            + " does not have a replication factor property.");
   }
 
   /**
    * Create new replication config with adjusted replication factor.
    * <p>
-   * Used by hadoop file system. Some replication scheme (like EC) may not
+   * Used by hadoop file system. Some replication schemes (like EC) may not
    * support changing the replication.
+   * <p>
+   * Based on the provided configuration the adjusted ReplicationConfig is
+   * validated against the ozone.replication.allowed-configs property, and if
+   * the new config is not allowed the method throws an
+   * IllegalArgumentException.
    */
   static ReplicationConfig adjustReplication(
-      ReplicationConfig replicationConfig, short replication) {
-    switch (replicationConfig.getReplicationType()) {
-    case RATIS:
-      return new RatisReplicationConfig(
-          org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
-              .valueOf(replication));
-    case STAND_ALONE:
-      return new StandaloneReplicationConfig(
-          org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
-              .valueOf(replication));
-    default:
-      return replicationConfig;
-    }
+      ReplicationConfig config, short replication, ConfigurationSource conf) {
+    return parse(
+        ReplicationType.valueOf(config.getReplicationType().toString()),
+        Short.toString(replication), conf);
   }
 
-  static ReplicationConfig fromTypeAndString(ReplicationType replicationType,
-      String replication) {
-    switch (replicationType) {
+  /**
+   * Parses the string representation of the replication configuration that is
+   * defined by the ReplicationType parameter.
+   * The configuration object is necessary to check if the parsed
+   * ReplicationConfig object is allowed based on the
+   * ozone.replication.allowed-configs property.
+   * @param type the ReplicationType to parse from the replication string
+   * @param replication the replication String that for example contains the
+   *                    replication factor for RATIS replication.
+   * @param config the current Ozone configuration to apply validation on the
+   *               parsed object.
+   * @return a validated ReplicationConfig object that is allowed based on the
+   *         system's configuration.
+   * @throws IllegalArgumentException if the parsed ReplicationConfig is not
+   *         allowed by the ozone.replication.allowed-configs property, or
+   *         if the give replication type or replication can not be parsed.
+   * @throws NullPointerException if the ReplicationConfig was not created
+   *         for the type.
+   */
+  static ReplicationConfig parse(ReplicationType type, String replication,
+      ConfigurationSource config) {
+    if (type == null) {
+      type = ReplicationType.valueOf(
+          config.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
+    }
+    replication = Objects.toString(replication,
+        config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
+
+    ReplicationConfig replicationConfig;
+    switch (type) {
     case RATIS:
-      return new RatisReplicationConfig(replication);
     case STAND_ALONE:
-      return new StandaloneReplicationConfig(replication);
+      ReplicationFactor factor;
+      try {
+        factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
+      } catch (NumberFormatException ex) {
+        factor = ReplicationFactor.valueOf(replication);
+      }
+      replicationConfig = fromTypeAndFactor(type, factor);
+      break;
     case EC:
       return new ECReplicationConfig(replication);
     default:
-      throw new UnsupportedOperationException(
-          "String based replication config initialization is not supported for "
-              + replicationType);
+      throw new RuntimeException("Replication type" + type + " can not"
+          + "be parsed.");
     }
+
+    ReplicationConfigValidator validator =
+        config.getObject(ReplicationConfigValidator.class);
+    validator.validate(replicationConfig);
+
+    return replicationConfig;
   }
 
   /**

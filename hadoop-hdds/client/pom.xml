@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hdds-client</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.3.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Client Library</description>
   <name>Apache Ozone HDDS Client</name>
   <packaging>jar</packaging>

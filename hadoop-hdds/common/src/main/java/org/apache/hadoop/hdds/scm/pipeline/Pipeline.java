@@ -286,52 +286,6 @@ public final class Pipeline {
     return replicationConfig;
   }
 
-  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
-      throws UnknownPipelineStateException {
-    Preconditions.checkNotNull(pipeline, "Pipeline is null");
-
-    Map<DatanodeDetails, Integer> nodes = new LinkedHashMap<>();
-    int index = 0;
-    int repIndexListLength = pipeline.getMemberReplicaIndexesCount();
-    for (DatanodeDetailsProto member : pipeline.getMembersList()) {
-      int repIndex = 0;
-      if (index < repIndexListLength) {
-        repIndex = pipeline.getMemberReplicaIndexes(index);
-      }
-      nodes.put(DatanodeDetails.getFromProtoBuf(member), repIndex);
-      index++;
-    }
-    UUID leaderId = null;
-    if (pipeline.hasLeaderID128()) {
-      HddsProtos.UUID uuid = pipeline.getLeaderID128();
-      leaderId = new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
-    } else if (pipeline.hasLeaderID() &&
-        StringUtils.isNotEmpty(pipeline.getLeaderID())) {
-      leaderId = UUID.fromString(pipeline.getLeaderID());
-    }
-
-    UUID suggestedLeaderId = null;
-    if (pipeline.hasSuggestedLeaderID()) {
-      HddsProtos.UUID uuid = pipeline.getSuggestedLeaderID();
-      suggestedLeaderId =
-          new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
-    }
-
-    final ReplicationConfig config = ReplicationConfig
-        .fromProto(pipeline.getType(), pipeline.getFactor(),
-            pipeline.getEcReplicationConfig());
-    return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
-        .setReplicationConfig(config)
-        .setState(PipelineState.fromProtobuf(pipeline.getState()))
-        .setNodes(new ArrayList<>(nodes.keySet()))
-        .setReplicaIndexes(nodes)
-        .setLeaderId(leaderId)
-        .setSuggestedLeaderId(suggestedLeaderId)
-        .setNodesInOrder(pipeline.getMemberOrdersList())
-        .setCreateTimestamp(pipeline.getCreationTimeStamp())
-        .build();
-  }
-
   public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
 
@@ -392,6 +346,52 @@ public final class Pipeline {
       }
     }
     return builder.build();
+  }
+
+  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
+      throws UnknownPipelineStateException {
+    Preconditions.checkNotNull(pipeline, "Pipeline is null");
+
+    Map<DatanodeDetails, Integer> nodes = new LinkedHashMap<>();
+    int index = 0;
+    int repIndexListLength = pipeline.getMemberReplicaIndexesCount();
+    for (DatanodeDetailsProto member : pipeline.getMembersList()) {
+      int repIndex = 0;
+      if (index < repIndexListLength) {
+        repIndex = pipeline.getMemberReplicaIndexes(index);
+      }
+      nodes.put(DatanodeDetails.getFromProtoBuf(member), repIndex);
+      index++;
+    }
+    UUID leaderId = null;
+    if (pipeline.hasLeaderID128()) {
+      HddsProtos.UUID uuid = pipeline.getLeaderID128();
+      leaderId = new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+    } else if (pipeline.hasLeaderID() &&
+        StringUtils.isNotEmpty(pipeline.getLeaderID())) {
+      leaderId = UUID.fromString(pipeline.getLeaderID());
+    }
+
+    UUID suggestedLeaderId = null;
+    if (pipeline.hasSuggestedLeaderID()) {
+      HddsProtos.UUID uuid = pipeline.getSuggestedLeaderID();
+      suggestedLeaderId =
+          new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+    }
+
+    final ReplicationConfig config = ReplicationConfig
+        .fromProto(pipeline.getType(), pipeline.getFactor(),
+            pipeline.getEcReplicationConfig());
+    return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
+        .setReplicationConfig(config)
+        .setState(PipelineState.fromProtobuf(pipeline.getState()))
+        .setNodes(new ArrayList<>(nodes.keySet()))
+        .setReplicaIndexes(nodes)
+        .setLeaderId(leaderId)
+        .setSuggestedLeaderId(suggestedLeaderId)
+        .setNodesInOrder(pipeline.getMemberOrdersList())
+        .setCreateTimestamp(pipeline.getCreationTimeStamp())
+        .build();
   }
 
   @Override

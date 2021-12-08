@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -185,7 +186,8 @@ public class TestECKeyOutputStream {
     OzoneBucket bucket = getOzoneBucket();
     try (OzoneOutputStream out = bucket
         .createKey("testCreateRatisKeyAndWithECBucketDefaults", 2000,
-            new RatisReplicationConfig("3"), new HashMap<>())) {
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
+            new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);

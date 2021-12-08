@@ -22,7 +22,6 @@ import com.google.common.collect.Iterators;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -71,8 +70,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -139,9 +136,7 @@ public class TestCleanupTableInfo {
     when(om.getAclsEnabled()).thenReturn(false);
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
     when(om.getDefaultReplicationConfig()).thenReturn(ReplicationConfig
-        .fromTypeAndString(ReplicationType
-                .valueOf(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT),
-            OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT));
+        .getDefault(new OzoneConfiguration()));
     addVolumeToMetaTable(aVolumeArgs());
     addBucketToMetaTable(aBucketInfo());
   }

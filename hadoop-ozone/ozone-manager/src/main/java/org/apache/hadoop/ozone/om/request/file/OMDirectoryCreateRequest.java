@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -361,18 +363,21 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
     OmKeyInfo.Builder keyInfoBuilder =
-        new OmKeyInfo.Builder().setVolumeName(keyArgs.getVolumeName())
-            .setBucketName(keyArgs.getBucketName()).setKeyName(dirName)
+        new OmKeyInfo.Builder()
+            .setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(dirName)
             .setOmKeyLocationInfos(Collections.singletonList(
                 new OmKeyLocationInfoGroup(0, new ArrayList<>())))
             .setCreationTime(keyArgs.getModificationTime())
-            .setModificationTime(keyArgs.getModificationTime()).setDataSize(0);
+            .setModificationTime(keyArgs.getModificationTime())
+            .setDataSize(0);
     if (keyArgs.getFactor() != null && keyArgs
         .getFactor() != HddsProtos.ReplicationFactor.ZERO && keyArgs
         .getType() != HddsProtos.ReplicationType.EC) {
       // Factor available and not an EC replication config.
       keyInfoBuilder.setReplicationConfig(ReplicationConfig
-          .fromTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()));
+          .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()));
     } else if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
       // Found EC type
       keyInfoBuilder.setReplicationConfig(
@@ -382,12 +387,24 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       keyInfoBuilder.setReplicationConfig(serverDefaultReplConfig);
     }
 
-    keyInfoBuilder.setObjectID(objectId)
-        .setUpdateID(objectId);
+    keyInfoBuilder.setObjectID(objectId);
     return keyInfoBuilder;
   }
 
   static long getMaxNumOfRecursiveDirs() {
     return MAX_NUM_OF_RECURSIVE_DIRS;
+  }
+
+  public static OMDirectoryCreateRequest getInstance(
+      KeyArgs keyArgs, OMRequest omRequest, OzoneManager ozoneManager)
+      throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMDirectoryCreateRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMDirectoryCreateRequest(omRequest, bucketLayout);
   }
 }

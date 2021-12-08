@@ -41,16 +41,16 @@ Create volumes for FS test
     Execute And Ignore Error    ozone sh volume create ${VOL2} --space-quota 100TB
 
 Create buckets for FS test
-    Execute                     ozone sh bucket create ${VOLUME}/${BUCKET}
-    Execute                     ozone sh bucket create ${VOLUME}/${BUCKET2}
-    Execute                     ozone sh bucket create ${VOL2}/${BUCKET_IN_VOL2}
+    Execute                     ozone sh bucket create ${VOLUME}/${BUCKET} --layout FILE_SYSTEM_OPTIMIZED
+    Execute                     ozone sh bucket create ${VOLUME}/${BUCKET2} --layout FILE_SYSTEM_OPTIMIZED
+    Execute                     ozone sh bucket create ${VOL2}/${BUCKET_IN_VOL2} --layout FILE_SYSTEM_OPTIMIZED
 
 Create links for FS test
     Execute And Ignore Error    ozone sh volume create ${VOLUME}-src --space-quota 100TB
     Execute And Ignore Error    ozone sh volume create ${VOL2}-src --space-quota 100TB
-    Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET}-src
-    Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET2}-src
-    Execute                     ozone sh bucket create ${VOL2}-src/${BUCKET_IN_VOL2}-src
+    Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET}-src --layout FILE_SYSTEM_OPTIMIZED
+    Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET2}-src --layout FILE_SYSTEM_OPTIMIZED
+    Execute                     ozone sh bucket create ${VOL2}-src/${BUCKET_IN_VOL2}-src --layout FILE_SYSTEM_OPTIMIZED
     Execute                     ozone sh bucket link ${VOLUME}-src/${BUCKET}-src ${VOLUME}/${BUCKET}
     Execute                     ozone sh bucket link ${VOLUME}-src/${BUCKET2}-src ${VOLUME}/${BUCKET2}
     Execute                     ozone sh bucket link ${VOL2}-src/${BUCKET_IN_VOL2}-src ${VOL2}/${BUCKET_IN_VOL2}
