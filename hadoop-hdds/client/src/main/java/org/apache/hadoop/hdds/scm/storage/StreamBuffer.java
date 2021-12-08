@@ -27,7 +27,7 @@ public class StreamBuffer {
   private final ByteBuffer buffer;
 
   public StreamBuffer(ByteBuffer buffer) {
-    this.buffer = buffer.asReadOnlyBuffer();
+    this.buffer = buffer;
   }
 
   public StreamBuffer(ByteBuffer buffer, int offset, int length) {
@@ -41,6 +41,22 @@ public class StreamBuffer {
 
   public int length() {
     return buffer.limit() - buffer.position();
+  }
+
+  public ByteBuffer getBuffer() {
+    return buffer;
+  }
+
+  public void put(StreamBuffer sb){
+    buffer.put(sb.getBuffer());
+  }
+
+  public static StreamBuffer allocate(int size){
+    return new StreamBuffer(ByteBuffer.allocate(size));
+  }
+
+  public boolean hasRemaining(){
+    return buffer.remaining() > 0;
   }
 
 }

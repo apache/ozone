@@ -166,11 +166,9 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    key.write(ByteBuffer.wrap(data));
     // now close the stream, It will update the key length.
     key.close();
-    String dataString = new String(data, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
+    validateData(keyName, data);
   }
 
   private void testWriteWithFailure(int dataLength) throws Exception {
@@ -233,6 +231,7 @@ public class TestBlockDataStreamOutput {
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 
+
   @Test
   public void testMinPacketSize() throws Exception {
     String keyName = getKeyName();
@@ -256,4 +255,5 @@ public class TestBlockDataStreamOutput {
     String dataString = new String(data, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
+
 }
