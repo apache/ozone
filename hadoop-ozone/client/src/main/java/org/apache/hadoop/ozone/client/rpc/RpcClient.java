@@ -705,6 +705,21 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void setReplicationConfig(
+      String volumeName, String bucketName, ReplicationConfig replicationConfig)
+      throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(replicationConfig);
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
+    builder.setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setDefaultReplicationConfig(
+            new DefaultReplicationConfig(replicationConfig));
+    ozoneManagerClient.setBucketProperty(builder.build());
+  }
+
+  @Override
   public void deleteBucket(
       String volumeName, String bucketName) throws IOException {
     verifyVolumeName(volumeName);
