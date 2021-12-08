@@ -31,7 +31,7 @@ about the blocks written by the clients.
 
 ## Storage Containers
 
-![FunctionalOzone](ContainerMetadata.png)
+{{< image src="ContainerMetadata.png">}}
 
 A storage container is a self-contained super block. It has a list of Ozone
 blocks that reside inside it, as well as on-disk files which contain the
@@ -50,7 +50,7 @@ that make up that key.
 An Ozone block contains the container ID and a local ID. The figure below
 shows the logical layout out of Ozone block.
 
-![OzoneBlock](OzoneBlock.png)
+{{< image src="OzoneBlock.png">}}
 
 The container ID lets the clients discover the location of the container. The
 authoritative information about where a container is located is with the
