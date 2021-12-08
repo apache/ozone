@@ -131,9 +131,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   protected int calculateExpectedDataBlocks(ECReplicationConfig rConfig) {
-    return (int)Math.min(Math.ceil(
-        (double)getBlockInfo().getLength() / rConfig.getEcChunkSize()),
-        rConfig.getData());
+    return ECBlockInputStreamProxy.expectedDataLocations(rConfig, getLength());
   }
 
   /**
@@ -256,11 +254,16 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
     int totalRead = 0;
     while(strategy.getTargetLength() > 0 && remaining() > 0) {
-      int currentIndex = currentStreamIndex();
-      BlockExtendedInputStream stream = getOrOpenStream(currentIndex);
-      int read = readFromStream(stream, strategy);
-      totalRead += read;
-      position += read;
+      try {
+        int currentIndex = currentStreamIndex();
+        BlockExtendedInputStream stream = getOrOpenStream(currentIndex);
+        int read = readFromStream(stream, strategy);
+        totalRead += read;
+        position += read;
+      } catch (IOException ioe) {
+        throw new BadDataLocationException(
+            dataLocations[currentStreamIndex()], ioe);
+      }
     }
     return totalRead;
   }

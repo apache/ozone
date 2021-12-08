@@ -65,7 +65,7 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   @Test
-  public void testSufficientLocations() {
+  public void testSufficientLocations() throws IOException {
     // One chunk, only 1 location.
     OmKeyLocationInfo keyInfo = ECStreamTestUtil
         .createKeyInfo(repConfig, 1, ONEMB);
@@ -94,6 +94,11 @@ public class TestECBlockReconstructedStripeInputStream {
         new ECBlockReconstructedStripeInputStream(repConfig,
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertTrue(ecb.hasSufficientLocations());
+      // Set a failed location
+      List<DatanodeDetails> failed = new ArrayList<>();
+      failed.add(keyInfo.getPipeline().getFirstNode());
+      ((ECBlockReconstructedStripeInputStream)ecb).addFailedDatanodes(failed);
+      Assert.assertFalse(ecb.hasSufficientLocations());
     }
 
     // Three Chunks, but missing data block 2 and 3 and parity 1.
@@ -102,6 +107,25 @@ public class TestECBlockReconstructedStripeInputStream {
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
+      Assert.assertFalse(ecb.hasSufficientLocations());
+    }
+
+    // Three Chunks, all available but fail 3
+    dnMap = ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 3, dnMap);
+    try (ECBlockInputStream ecb =
+        new ECBlockReconstructedStripeInputStream(repConfig,
+        keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
+      Assert.assertTrue(ecb.hasSufficientLocations());
+      // Set a failed location
+      List<DatanodeDetails> failed = new ArrayList<>();
+      for (DatanodeDetails dn : dnMap.keySet()) {
+        failed.add(dn);
+        if (failed.size() == 3) {
+          break;
+        }
+      }
+      ((ECBlockReconstructedStripeInputStream)ecb).addFailedDatanodes(failed);
       Assert.assertFalse(ecb.hasSufficientLocations());
     }
   }
@@ -518,6 +542,55 @@ public class TestECBlockReconstructedStripeInputStream {
         } catch (InsufficientLocationsException e) {
           // expected
         }
+      }
+    }
+  }
+
+  @Test
+  public void testFailedLocationsAreNotRead() throws IOException {
+    // Generate the input data for 3 full stripes and generate the parity.
+    int chunkSize = repConfig.getEcChunkSize();
+    int partialStripeSize = chunkSize * 2 - 1;
+    int blockLength = chunkSize * repConfig.getData() * 3 + partialStripeSize;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 4 * chunkSize);
+    ECStreamTestUtil.randomFill(dataBufs, chunkSize, dataGen, blockLength);
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+
+    streamFactory = new TestBlockInputStreamFactory();
+    addDataStreamsToFactory(dataBufs, parity);
+
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+        stripeSize() * 3 + partialStripeSize, dnMap);
+    streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+    dataGen = new SplittableRandom(randomSeed);
+    try (ECBlockReconstructedStripeInputStream ecb =
+        new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
+            null, null, streamFactory)) {
+      List<DatanodeDetails> failed = new ArrayList<>();
+      // Set the first 3 DNs as failed
+      for (Map.Entry<DatanodeDetails, Integer> e : dnMap.entrySet()) {
+        if (e.getValue() <= 2) {
+          failed.add(e.getKey());
+        }
+      }
+      ecb.addFailedDatanodes(failed);
+
+      // Read full stripe
+      int read = ecb.readStripe(bufs);
+      for (int j = 0; j < bufs.length; j++) {
+        ECStreamTestUtil.assertBufferMatches(bufs[j], dataGen);
+      }
+      Assert.assertEquals(stripeSize(), read);
+
+      // Now ensure that streams with repIndexes 1, 2 and 3 have not been
+      // created in the stream factory, indicating we did not read them.
+      List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
+      for (TestBlockInputStream stream : streams) {
+        Assert.assertTrue(stream.getEcReplicaIndex() > 2);
       }
     }
   }
