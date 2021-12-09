@@ -26,8 +26,10 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Allocates the block with required number of nodes in the pipeline.
@@ -52,9 +54,14 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
             .setType(keyArgs.getType()).setId(HddsProtos.PipelineID.newBuilder()
             .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(1L)
                 .setMostSigBits(1L).build()).build());
-    final int rand = RANDOM.nextInt(); // used for port and UUID combination.
+    Set<Integer> usedPorts = new HashSet<>();
+    int rand = RANDOM.nextInt(); // used for port and UUID combination.
     // It's ok here for port number limit as don't really create any socket
-    // connection.
+    // connection, but it has to be unique.
+    while (!usedPorts.contains(rand)) {
+      rand = RANDOM.nextInt();
+    }
+    usedPorts.add(rand);
     for (int i = 1; i <= requiredNodes; i++) {
       builder.addMembers(HddsProtos.DatanodeDetailsProto.newBuilder()
           .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(rand)
