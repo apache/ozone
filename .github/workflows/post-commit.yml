@@ -285,7 +285,7 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} -Dsurefire.rerunFailingTestsCount=5
+        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
         if: always()
