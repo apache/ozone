@@ -58,7 +58,7 @@ Check http return code
 
 *** Test Cases ***
 Check if Recon picks up OM data
-    [Setup]    Freon OCKG    size=1025
+    [Setup]    Freon OCKG    n=10    size=1025
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container from OM
 
 Check if Recon picks up DN heartbeats
