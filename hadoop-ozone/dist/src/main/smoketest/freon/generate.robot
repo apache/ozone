@@ -23,13 +23,13 @@ ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 Ozone Client Key Generator
-    Freon OCKG    ockg${PREFIX}
+    Freon OCKG    prefix=ockg${PREFIX}
 
 OM Key Generator
-    Freon OMKG    omkg${PREFIX}
+    Freon OMKG    prefix=omkg${PREFIX}
 
 OM Bucket Generator
-    Freon OMBG    ombg${PREFIX}
+    Freon OMBG    prefix=ombg${PREFIX}
 
 DN Chunk Generator
-    Freon DCG     dcg${PREFIX}    100
+    Freon DCG     prefix=dcg${PREFIX}    n=100

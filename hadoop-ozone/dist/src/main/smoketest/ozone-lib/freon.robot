@@ -18,48 +18,48 @@ Resource            ../lib/os.robot
 
 *** Keywords ***
 Freon DCG
-    [arguments]    ${prefix}=dcg    ${n}=1    ${size}=1024
+    [arguments]    ${prefix}=dcg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
     Return From Keyword If    '${SECURITY_ENABLED}' == 'true'
-    ${result} =        Execute          ozone freon dcg -t1 -n${n} -s${size} -p ${prefix}
+    ${result} =        Execute          ozone freon dcg -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon DCV
-    [arguments]    ${prefix}=dcg    ${n}=1
+    [arguments]    ${prefix}=dcg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
     Return From Keyword If    '${SECURITY_ENABLED}' == 'true'
-    ${result} =        Execute          ozone freon dcv -t1 -n${n} -p ${prefix}
+    ${result} =        Execute          ozone freon dcv -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OCKG
-    [arguments]    ${prefix}=ockg    ${n}=1    ${size}=1024
-    ${result} =        Execute          ozone freon ockg ${OM_HA_PARAM} -t1 -n${n} -s${size} -p ${prefix}
+    [arguments]    ${prefix}=ockg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon ockg ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OCKV
-    [arguments]    ${prefix}=ockg    ${n}=1
-    ${result} =        Execute          ozone freon ockv ${OM_HA_PARAM} -t1 -n${n} -p ${prefix}
+    [arguments]    ${prefix}=ockg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon ockv ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OCKR
-    [arguments]    ${prefix}=ockg    ${n}=1
-    ${result} =        Execute          ozone freon ockr ${OM_HA_PARAM} -t1 -n${n} -p ${prefix}
+    [arguments]    ${prefix}=ockg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon ockr ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OMKG
-    [arguments]    ${prefix}=omkg    ${n}=1
-    ${result} =        Execute          ozone freon omkg ${OM_HA_PARAM} -t1 -n${n} -p ${prefix}
+    [arguments]    ${prefix}=omkg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon omkg ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OMBG
-    [arguments]    ${prefix}=ombg    ${n}=1
-    ${result} =        Execute          ozone freon ombg ${OM_HA_PARAM} -t1 -n${n} -p ${prefix}
+    [arguments]    ${prefix}=ombg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon ombg ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OMBV
-    [arguments]    ${prefix}=ombg    ${n}=1
-    ${result} =        Execute          ozone freon ombv ${OM_HA_PARAM} -t1 -n${n} -p ${prefix}
+    [arguments]    ${prefix}=ombg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon ombv ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OMBR
-    [arguments]    ${prefix}=ombg    ${n}=1
-    ${result} =        Execute          ozone freon ombr ${OM_HA_PARAM} -t1 -n${n} -p ${prefix}
+    [arguments]    ${prefix}=ombg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon ombr ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}

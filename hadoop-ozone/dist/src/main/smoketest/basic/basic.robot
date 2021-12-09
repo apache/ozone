@@ -34,5 +34,5 @@ Check webui static resources
 Basic Freon smoketest
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
     ${random} =        Generate Random String    10
-    Freon OCKG    ${random}
-    Freon OCKV    ${random}
+    Freon OCKG    prefix=${random}
+    Freon OCKV    prefix=${random}

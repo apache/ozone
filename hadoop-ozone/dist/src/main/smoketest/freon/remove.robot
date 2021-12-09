@@ -24,9 +24,9 @@ ${OMBR_PREFIX}    ombr
 
 *** Test Cases ***
 Ozone Client Key Remover
-    [Setup]    Freon OCKG    ${OCKR_PREFIX}
-    Freon OCKR    ${OCKR_PREFIX}
+    [Setup]    Freon OCKG    prefix=${OCKR_PREFIX}
+    Freon OCKR    prefix=${OCKR_PREFIX}
 
 OM Bucket Remover
-    [Setup]    Freon OMBG    ${OMBR_PREFIX}
-    Freon OMBR    ${OMBR_PREFIX}
+    [Setup]    Freon OMBG    prefix=${OMBR_PREFIX}
+    Freon OMBR    prefix=${OMBR_PREFIX}

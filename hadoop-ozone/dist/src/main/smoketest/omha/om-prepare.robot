@@ -27,7 +27,7 @@ Suite Setup         Create Specific OM data for prepare
 *** Keywords ***
 Create Specific OM data for prepare
     # Freon data to make sure there are a reasonable number of transactions in the system.
-    Freon OCKG    om-prepare    100
+    Freon OCKG    prefix=om-prepare    n=100
     ${random} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable  ${volume_name}  ${random}-volume-for-prepare
     Set Suite Variable  ${bucket_name}  ${random}-bucket-for-prepare

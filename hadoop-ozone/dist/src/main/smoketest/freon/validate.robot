@@ -23,7 +23,7 @@ ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 Ozone Client Key Validator
-    Freon OCKV    ockg${PREFIX}
+    Freon OCKV    prefix=ockg${PREFIX}
 
 DN Chunk Validator
-    Freon DCV     dcg${PREFIX}    100
+    Freon DCV     prefix=dcg${PREFIX}    n=100

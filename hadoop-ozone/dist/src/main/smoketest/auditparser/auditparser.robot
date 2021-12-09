@@ -34,7 +34,7 @@ Set username
 
 *** Test Cases ***
 Testing audit parser
-    [Setup]    Freon OMBG    auditparser    ${count}
+    [Setup]    Freon OMBG    prefix=auditparser    n=${count}
     ${logdir} =        Get Environment Variable      OZONE_LOG_DIR     /var/log/ozone
     ${logfile} =       Execute              ls -t "${logdir}" | grep om-audit | head -1
                        Execute              ozone auditparser "${auditworkdir}/audit.db" load "${logdir}/${logfile}"
