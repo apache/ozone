@@ -39,8 +39,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 @ApplicationScoped
 public class OzoneServiceProvider {
 
-  private Text omServiceAddr;
-
   private String omserviceID;
 
   @Inject
@@ -50,11 +48,7 @@ public class OzoneServiceProvider {
   public void init() {
     Collection<String> serviceIdList =
         conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
-    if (serviceIdList.size() == 0) {
-      // Non-HA cluster
-      omServiceAddr = SecurityUtil.buildTokenService(OmUtils.
-          getOmAddressForClients(conf));
-    } else {
+    if (!serviceIdList.isEmpty()) {
       // HA cluster.
       //For now if multiple service id's are configured we throw exception.
       // As if multiple service id's are configured, S3Gateway will not be
