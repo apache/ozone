@@ -84,8 +84,8 @@ public class SimpleContainerDownloader implements ContainerDownloader {
         result.get();
         return result;
       } catch (ExecutionException e) {
-        LOG.error("Error on replicating container: {}",
-            containerId, e.getCause());
+        LOG.error("Error on replicating container: {} from {}/{}", containerId,
+            datanode.getHostName(), datanode.getIpAddress(), e.getCause());
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       } catch (Exception ex) {
