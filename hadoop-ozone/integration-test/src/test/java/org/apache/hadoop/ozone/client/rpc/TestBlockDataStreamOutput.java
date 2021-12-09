@@ -136,12 +136,13 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testHalfChunkWrite() throws Exception {
-    testWrite(chunkSize/2);
+    testWrite(chunkSize / 2);
     testWriteWithFailure(chunkSize/2);
   }
 
   @Test
   public void testSingleChunkWrite() throws Exception {
+    testWrite(chunkSize);
     testWriteWithFailure(chunkSize);
   }
 
@@ -207,7 +208,6 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    long a = metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock);
     Assert.assertTrue(
         metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             <= pendingPutBlockCount + 1);

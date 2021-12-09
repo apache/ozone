@@ -292,8 +292,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private void allocateNewBufferIfNeeded() {
-    if(currentBufferRemaining==0){
-      currentBuffer = StreamBuffer.allocate(config.getDataStreamMinPacketSize());
+    if (currentBufferRemaining == 0) {
+      currentBuffer =
+          StreamBuffer.allocate(config.getDataStreamMinPacketSize());
       currentBufferRemaining = config.getDataStreamMinPacketSize();
     }
   }
