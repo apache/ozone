@@ -37,7 +37,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 @ApplicationScoped
 public class OzoneServiceProvider {
 
-  private String omserviceID;
+  private String omServiceID;
 
   @Inject
   private OzoneConfiguration conf;
@@ -64,14 +64,14 @@ public class OzoneServiceProvider {
           throw new IllegalArgumentException(OZONE_OM_NODES_KEY
               + "." + serviceId + " is not defined");
         }
-        omserviceID = serviceId;
+        omServiceID = serviceId;
       }
     }
   }
 
   @Produces
   public String getOmServiceID() {
-    return omserviceID;
+    return omServiceID;
   }
 
 }
