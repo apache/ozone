@@ -122,4 +122,58 @@ public final class OzoneManagerUtils {
     }
     return BucketLayout.DEFAULT;
   }
+
+  /**
+   * Resolve bucket layout for a given link bucket's OmBucketInfo.
+   *
+   * @param bucketInfo
+   * @return {@code OmBucketInfo} with
+   * @throws IOException
+   */
+  public static OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo,
+                                                     OMMetadataManager metadataManager,
+                                                     Set<Pair<String,
+                                                         String>> visited)
+      throws IOException {
+
+    if (bucketInfo.isLink()) {
+      if (!visited.add(Pair.of(bucketInfo.getVolumeName(),
+          bucketInfo.getBucketName()))) {
+        throw new OMException("Detected loop in bucket links. Bucket name: " +
+            bucketInfo.getBucketName() + ", Volume name: " +
+            bucketInfo.getVolumeName(),
+            DETECTED_LOOP_IN_BUCKET_LINKS);
+      }
+      String sourceBucketKey = metadataManager
+          .getBucketKey(bucketInfo.getSourceVolume(),
+              bucketInfo.getSourceBucket());
+      OmBucketInfo sourceBucketInfo =
+          metadataManager.getBucketTable().get(sourceBucketKey);
+
+      // If the Link Bucket's source bucket exists, we get its layout.
+      if (sourceBucketInfo != null) {
+
+        /** If the source bucket is again a link, we recursively resolve the
+         * link bucket.
+         *
+         * For example:
+         * buck-link1 -> buck-link2 -> buck-link3 -> buck-src
+         * buck-src has the actual BucketLayout that will be used by the links.
+         *
+         * Finally - we return buck-link1's OmBucketInfo, with buck-src's
+         * bucket layout.
+         */
+        if (sourceBucketInfo.isLink()) {
+          sourceBucketInfo =
+              resolveLinkBucketLayout(sourceBucketInfo, metadataManager,
+                  visited);
+        }
+
+        OmBucketInfo.Builder buckInfoBuilder = bucketInfo.toBuilder();
+        buckInfoBuilder.setBucketLayout(sourceBucketInfo.getBucketLayout());
+        bucketInfo = buckInfoBuilder.build();
+      }
+    }
+    return bucketInfo;
+  }
 }
