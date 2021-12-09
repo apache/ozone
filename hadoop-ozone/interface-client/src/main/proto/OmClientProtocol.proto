@@ -104,9 +104,8 @@ enum Type {
   PurgePaths = 94;
 
   CreateTenant = 95;
-  ModifyTenant = 96;
-  DeleteTenant = 97;
-  ListTenant = 103;  // TODO: Renumber this when rebasing
+  DeleteTenant = 97;  // TODO: Renumber when rebasing
+  ListTenant = 103;
 
   TenantGetUserInfo = 98;
   TenantAssignUserAccessId = 99;
@@ -203,7 +202,6 @@ message OMRequest {
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
   optional CreateTenantRequest              CreateTenantRequest            = 95;
-  optional ModifyTenantRequest              ModifyTenantRequest            = 96;
   optional DeleteTenantRequest              DeleteTenantRequest            = 97;
   optional ListTenantRequest                ListTenantRequest              = 103;  // TODO: Renumber this when rebasing
 
@@ -297,7 +295,6 @@ message OMResponse {
 
   // Skipped 94 to align with OMRequest
   optional CreateTenantResponse              CreateTenantResponse          = 95;
-  optional ModifyTenantResponse              ModifyTenantResponse          = 96;
   optional DeleteTenantResponse              DeleteTenantResponse          = 97;
   optional ListTenantResponse                ListTenantResponse            = 103;  // TODO: Renumber this when rebasing
 
@@ -412,10 +409,13 @@ enum Status {
     INVALID_TENANT_NAME = 77;
 
     ACCESSID_NOT_FOUND = 78;
-    TENANT_USER_ACCESSID_ALREADY_EXISTS = 79;  // TODO: Remove if not used
+    TENANT_USER_ACCESSID_ALREADY_EXISTS = 79;
     INVALID_TENANT_USER_NAME = 80;
     INVALID_ACCESSID = 81;
     TENANT_AUTHORIZER_ERROR = 82;
+
+    VOLUME_IS_REFERENCED = 83;
+    TENANT_NOT_EMPTY = 84;
 }
 
 /**
@@ -463,6 +463,7 @@ message VolumeInfo {
     optional uint64 modificationTime = 10;
     optional int64 quotaInNamespace = 11 [default = -2];
     optional uint64 usedNamespace = 12;
+    optional int64 refCount = 13;
 }
 
 /**
@@ -1420,7 +1421,7 @@ message ListTenantRequest {
 }
 
 message ListTenantResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     repeated TenantInfo tenantInfo = 2;
 }
 
@@ -1434,12 +1435,12 @@ message TenantListUserRequest {
 }
 
 message TenantGetUserInfoResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     optional TenantUserInfo tenantUserInfo = 2;
 }
 
 message TenantListUserResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     optional string tenantName = 2;
     repeated TenantUserAccessId userAccessIdInfo = 3;
 }
@@ -1468,14 +1469,11 @@ message RevokeS3SecretRequest {
 message CreateTenantRequest {
     optional string tenantName = 1;
     optional string tenantDefaultPolicyName = 2;
-}
-
-message ModifyTenantRequest {
-    optional string tenantName = 1;
+    optional string volumeName = 3;
 }
 
 message DeleteTenantRequest {
-    optional string tenantName = 1;
+    optional string tenantId = 1;
 }
 
 message TenantAssignUserAccessIdRequest {
@@ -1505,32 +1503,29 @@ message GetS3VolumeRequest {
 }
 
 message CreateTenantResponse {
-    optional bool success = 1;
-}
-
-message ModifyTenantResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message DeleteTenantResponse {
-    optional bool success = 1;
+    optional string volumeName = 1;
+    optional int64 volRefCount = 2;
 }
 
 message TenantAssignUserAccessIdResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
     optional S3Secret s3Secret = 2;
 }
 
 message TenantRevokeUserAccessIdResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message TenantAssignAdminResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message TenantRevokeAdminResponse {
-    optional bool success = 1;
+    optional bool success = 1;  // TODO: Remove this field
 }
 
 message GetS3VolumeResponse {

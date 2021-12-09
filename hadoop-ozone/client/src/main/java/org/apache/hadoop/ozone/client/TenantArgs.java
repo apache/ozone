@@ -1,69 +1,61 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
-package org.apache.hadoop.ozone.om.helpers;
+
+package org.apache.hadoop.ozone.client;
 
 import com.google.common.base.Preconditions;
 
 /**
- * This class is used for storing Ozone tenant arguments.
+ * This class encapsulates the arguments for creating a tenant.
  */
-public class OmTenantArgs {
+public final class TenantArgs {
 
   /**
-   * Tenant name.
-   */
-  private final String tenantId;
-
-  /**
-   * Volume name to be created for this tenant.
-   * Default volume name would be the same as tenant name if unspecified.
+   * Name of the volume to be created for the tenant.
    */
   private final String volumeName;
 
-  public OmTenantArgs(String tenantId) {
-    this.tenantId = tenantId;
-    this.volumeName = this.tenantId;
-  }
-
-  public OmTenantArgs(String tenantId, String volumeName) {
-    this.tenantId = tenantId;
+  /**
+   * Private constructor, constructed via builder.
+   * @param volumeName Volume name.
+   */
+  private TenantArgs(String volumeName) {
     this.volumeName = volumeName;
-  }
-
-  public String getTenantId() {
-    return tenantId;
   }
 
   public String getVolumeName() {
     return volumeName;
   }
 
-  public static OmTenantArgs.Builder newBuilder() {
-    return new OmTenantArgs.Builder();
+  /**
+   * Returns new builder class that builds a TenantArgs.
+   *
+   * @return Builder
+   */
+  public static TenantArgs.Builder newBuilder() {
+    return new TenantArgs.Builder();
   }
 
   /**
-   * Builder for OmTenantArgs.
+   * Builder for TenantArgs.
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
-    private String tenantId;
     private String volumeName;
 
     /**
@@ -72,20 +64,18 @@ public class OmTenantArgs {
     public Builder() {
     }
 
-    public Builder setTenantId(String tenantId) {
-      this.tenantId = tenantId;
-      return this;
-    }
-
-    public Builder setVolumeName(String volumeName) {
+    public TenantArgs.Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
       return this;
     }
 
-    public OmTenantArgs build() {
-      Preconditions.checkNotNull(tenantId);
+    /**
+     * Constructs a TenantArgs.
+     * @return TenantArgs.
+     */
+    public TenantArgs build() {
       Preconditions.checkNotNull(volumeName);
-      return new OmTenantArgs(tenantId, volumeName);
+      return new TenantArgs(volumeName);
     }
   }
 

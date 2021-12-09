@@ -154,6 +154,7 @@ public class TestS3GetSecretRequest {
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantName(tenantNameStr)
+                .setVolumeName(tenantNameStr)
                 .build()
         ).build();
   }

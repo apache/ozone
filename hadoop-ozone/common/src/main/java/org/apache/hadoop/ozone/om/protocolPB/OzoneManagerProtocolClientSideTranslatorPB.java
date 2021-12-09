@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -928,20 +929,32 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   /**
    * {@inheritDoc}
-   *
-   * TODO: Add a variant that uses OmTenantArgs?
    */
   @Override
-  public void createTenant(String tenantArgs)
-      throws IOException {
+  public void createTenant(OmTenantArgs omTenantArgs) throws IOException {
     final CreateTenantRequest request = CreateTenantRequest.newBuilder()
-        .setTenantName(tenantArgs)
+        .setTenantName(omTenantArgs.getTenantId())
+        .setVolumeName(omTenantArgs.getVolumeName())
+        // TODO: Add more args like policy names later
         .build();
     final OMRequest omRequest = createOMRequest(Type.CreateTenant)
         .setCreateTenantRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
+  }
+
+  @Override
+  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
+    final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
+        .setTenantId(tenantId)
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.DeleteTenant)
+        .setDeleteTenantRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+
+    return handleError(omResponse).getDeleteTenantResponse();
   }
 
   /**

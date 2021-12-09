@@ -74,8 +74,6 @@ public class TestOzoneTenantShell {
 
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
-    System.setProperty("log4j2.contextSelector",
-        "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
   }
 
   private static final String DEFAULT_ENCODING = UTF_8.name();
@@ -92,6 +90,7 @@ public class TestOzoneTenantShell {
 
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
+  private static OzoneShell ozoneSh = null;
   private static TenantShell tenantShell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -141,6 +140,7 @@ public class TestOzoneTenantShell {
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
 
+    ozoneSh = new OzoneShell();
     tenantShell = new TenantShell();
 
     // Init cluster
@@ -170,6 +170,10 @@ public class TestOzoneTenantShell {
     if (baseDir != null) {
       FileUtil.fullyDelete(baseDir, true);
     }
+
+    if (AUDIT_LOG_FILE.exists()) {
+      AUDIT_LOG_FILE.delete();
+    }
   }
 
   @Before
@@ -197,13 +201,16 @@ public class TestOzoneTenantShell {
     System.setErr(OLD_ERR);
   }
 
-  private void execute(GenericCli shell, String[] args) {
+  /**
+   * Returns exit code.
+   */
+  private int execute(GenericCli shell, String[] args) {
     LOG.info("Executing shell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
     CommandLine.IExecutionExceptionHandler exceptionHandler =
         (ex, commandLine, parseResult) -> {
-          commandLine.getErr().println(ex.getMessage());
+          new PrintStream(err, true, DEFAULT_ENCODING).println(ex.getMessage());
           return commandLine.getCommandSpec().exitCodeOnExecutionException();
         };
 
@@ -212,17 +219,17 @@ public class TestOzoneTenantShell {
     String[] argsWithHAConf = getHASetConfStrings(args);
 
     cmd.setExecutionExceptionHandler(exceptionHandler);
-    cmd.execute(argsWithHAConf);
+    return cmd.execute(argsWithHAConf);
   }
 
   /**
    * Helper that appends HA service id to args.
    */
-  private void executeHA(GenericCli shell, String[] args) {
+  private int executeHA(GenericCli shell, String[] args) {
     final String[] newArgs = new String[args.length + 1];
     System.arraycopy(args, 0, newArgs, 0, args.length);
     newArgs[args.length] = "--om-service-id=" + omServiceId;
-    execute(shell, newArgs);
+    return execute(shell, newArgs);
   }
 
   /**
@@ -333,6 +340,14 @@ public class TestOzoneTenantShell {
     }
   }
 
+  private void deleteVolume(String volumeName) throws IOException {
+    int exitC = execute(ozoneSh, new String[] {"volume", "delete", volumeName});
+    checkOutput(out, "Volume " + volumeName + " is deleted\n", true);
+    checkOutput(err, "", true);
+    // Exit code should be 0
+    Assert.assertEquals(0, exitC);
+  }
+
   @Test
   public void testAssignAdmin() throws IOException {
 
@@ -343,8 +358,8 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Created tenant", false);
     checkOutput(err, "", true);
 
-    // Loop assign-revoke 3 times
-    for (int i = 0; i < 3; i++) {
+    // Loop assign-revoke 4 times
+    for (int i = 0; i < 4; i++) {
       executeHA(tenantShell, new String[] {
           "user", "assign", userName, "--tenant=" + tenantName});
       checkOutput(out, "export AWS_ACCESS_KEY_ID=", false);
@@ -369,8 +384,16 @@ public class TestOzoneTenantShell {
       checkOutput(err, "Revoked accessId", false);
     }
 
-    // TODO: delete tenant is not implemented yet
+    // Clean up
     executeHA(tenantShell, new String[] {"delete", tenantName});
+    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume(tenantName);
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
   }
 
   /**
@@ -394,11 +417,13 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Created tenant 'finance'.\n", true);
     checkOutput(err, "", true);
 
-//    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
-    // FIXME: The check below is unstable.
-    //  Occasionally lines.size() == 0 leads to ArrayIndexOutOfBoundsException
-    //  Likely due to audit log not flushed in time at time of check.
-//    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "finance\n", true);
+    checkOutput(err, "", true);
+
+    lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
+    Assert.assertTrue(lines.size() > 0);
+    checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Check volume creation
     OmVolumeArgs volArgs = cluster.getOzoneManager().getVolumeInfo("finance");
@@ -407,8 +432,7 @@ public class TestOzoneTenantShell {
     // Creating the tenant with the same name again should fail
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to create tenant 'finance':"
-        + " Tenant already exists\n", true);
+    checkOutput(err, "Failed to create tenant 'finance'", false);
 
     executeHA(tenantShell, new String[] {"create", "research"});
     checkOutput(out, "Created tenant 'research'.\n", true);
@@ -539,13 +563,73 @@ public class TestOzoneTenantShell {
         + "more than once. User 'bob' is already assigned to tenant 'research' "
         + "with accessId 'research$bob'.\n", true);
 
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "dev\nfinance\nresearch\n", true);
+    checkOutput(err, "", true);
+
     // Clean up
     executeHA(tenantShell, new String[] {
         "user", "revoke", "research$bob"});
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
-    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
+    executeHA(tenantShell, new String[] {"delete", "research"});
+    checkOutput(out, "Deleted tenant 'research'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume("research");
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "finance$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "dev\nfinance\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {"delete", "finance"});
+    checkOutput(out, "Deleted tenant 'finance'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume("finance");
+
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "dev\n", true);
+    checkOutput(err, "", true);
+
+    // Attempt to delete tenant with accessIds still assigned to it, should fail
+    int exitCode = executeHA(tenantShell, new String[] {"delete", "dev"});
+    Assert.assertTrue("Tenant delete should fail!", exitCode != 0);
+    checkOutput(out, "", true);
+    checkOutput(err, "Failed to delete tenant 'dev'", false);
+
+    // Delete dev volume should fail because the volume reference count > 0L
+    exitCode = execute(ozoneSh, new String[] {"volume", "delete", "dev"});
+    Assert.assertTrue("Volume delete should fail!", exitCode != 0);
+    checkOutput(out, "", true);
+    checkOutput(err, "Volume reference count is not zero (1). "
+        + "Ozone features are enabled on this volume. "
+        + "Try `ozone tenant delete <tenantId>` first.\n", true);
+
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "dev\n", true);
+    checkOutput(err, "", true);
+
+    // Revoke accessId first
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "dev$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    // Then delete tenant, should succeed
+    executeHA(tenantShell, new String[] {"delete", "dev"});
+    checkOutput(out, "Deleted tenant 'dev'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume("dev");
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
   }
 
   @Test
@@ -591,7 +675,20 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
-    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", "tenant1$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {"delete", "tenant1"});
+    checkOutput(out, "Deleted tenant 'tenant1'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume("tenant1");
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
   }
 
   @Test
@@ -628,13 +725,13 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     // Set empty secret key should fail
-    executeHA(tenantShell, new String[] {
+    int exitCode = executeHA(tenantShell, new String[] {
         "user", "setsecret", tenantName + "$alice",
         "--secret=short", "--export"});
+    Assert.assertTrue("Command should have non-zero exit code!", exitCode != 0);
     checkOutput(out, "", true);
-    checkOutput(err, "", true);
-    // Note: Exception thrown from OM to the client stderr is somehow not
-    //  captured in err, but is printed to the console output.
+    checkOutput(err, "Secret key length should be at least 8 characters\n",
+        true);
 
     // Get secret should still give the previous secret key
     executeHA(tenantShell, new String[] {
@@ -668,13 +765,18 @@ public class TestOzoneTenantShell {
         .createUserForTesting("bob",  new String[] {"usergroup"});
 
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
-      executeHA(tenantShell, new String[] {
+      int exitC = executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
           "--secret=somesecret2", "--export"});
+      Assert.assertTrue("Should return non-zero exit code!", exitC != 0);
       checkOutput(out, "", true);
-      checkOutput(err, "", true);
-      // Note: Exception thrown from OM to the client stderr is somehow not
-      //  captured in err, but is printed to the console output.
+      checkOutput(err, "Permission denied. Requested accessId "
+          + "'tenant-test-set-secret$alice' and user doesn't satisfy any of:\n"
+          + "1) accessId match current username: 'bob';\n"
+          + "2) is an OM admin;\n"
+          + "3) user is assigned to a tenant under this accessId;\n"
+          + "4) user is an admin of the tenant where the accessId is "
+          + "assigned\n", true);
       return null;
     });
 
@@ -711,6 +813,14 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
-    // TODO: Clean up: remove tenant when tenant remove CLI is implemented
+    executeHA(tenantShell, new String[] {"delete", tenantName});
+    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume(tenantName);
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
   }
 }

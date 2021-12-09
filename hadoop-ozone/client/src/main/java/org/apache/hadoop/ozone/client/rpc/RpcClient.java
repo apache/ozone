@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
@@ -96,6 +97,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -111,6 +113,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -401,7 +404,8 @@ public class RpcClient implements ClientProtocol {
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAcls(),
-        volume.getMetadata());
+        volume.getMetadata(),
+        volume.getRefCount());
   }
 
   @Override
@@ -668,29 +672,63 @@ public class RpcClient implements ClientProtocol {
    * {@inheritDoc}
    */
   @Override
-  public void createTenant(String tenantName) throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName cannot be null or empty.");
-    ozoneManagerClient.createTenant(tenantName);
+  public void createTenant(String tenantId) throws IOException {
+    createTenant(tenantId, TenantArgs.newBuilder()
+        .setVolumeName(tenantId).build());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void createTenant(String tenantId, TenantArgs tenantArgs)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
+    Preconditions.checkNotNull(tenantArgs);
+
+    final String volumeName = tenantArgs.getVolumeName();
+    verifyVolumeName(volumeName);
+
+    OmTenantArgs.Builder builder = OmTenantArgs.newBuilder();
+    builder.setTenantId(tenantId);
+    builder.setVolumeName(volumeName);
+    // TODO: Add more fields
+    // TODO: Include OmVolumeArgs in (Om)TenantArgs as well for volume creation?
+
+    LOG.info("Creating Tenant: '{}', with new volume: '{}'",
+        tenantId, volumeName);
+
+    ozoneManagerClient.createTenant(builder.build());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId cannot be null or empty.");
+    return ozoneManagerClient.deleteTenant(tenantId);
   }
 
   /**
    * Assign user to tenant.
    * @param username user name to be assigned.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
   @Override
   public S3SecretValue tenantAssignUserAccessId(
-      String username, String tenantName, String accessId) throws IOException {
+      String username, String tenantId, String accessId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(username),
         "username can't be null or empty.");
-    Preconditions.checkArgument(Strings.isNotBlank(tenantName),
-        "tenantName can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(tenantId),
+        "tenantId can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
     return ozoneManagerClient.tenantAssignUserAccessId(
-        username, tenantName, accessId);
+        username, tenantId, accessId);
   }
 
   /**
@@ -708,33 +746,33 @@ public class RpcClient implements ClientProtocol {
   /**
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param delegated true if making delegated admin.
    * @throws IOException
    */
   @Override
-  public void tenantAssignAdmin(String accessId, String tenantName,
+  public void tenantAssignAdmin(String accessId, String tenantId,
       boolean delegated)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
-    // tenantName can be empty
-    ozoneManagerClient.tenantAssignAdmin(accessId, tenantName, delegated);
+    // tenantId can be empty
+    ozoneManagerClient.tenantAssignAdmin(accessId, tenantId, delegated);
   }
 
   /**
    * Revoke admin role of an accessId from a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
   @Override
-  public void tenantRevokeAdmin(String accessId, String tenantName)
+  public void tenantRevokeAdmin(String accessId, String tenantId)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
-    // tenantName can be empty
-    ozoneManagerClient.tenantRevokeAdmin(accessId, tenantName);
+    // tenantId can be empty
+    ozoneManagerClient.tenantRevokeAdmin(accessId, tenantId);
   }
 
   /**
@@ -762,9 +800,9 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+  public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
-    return ozoneManagerClient.listUsersInTenant(tenantName, prefix);
+    return ozoneManagerClient.listUsersInTenant(tenantId, prefix);
   }
 
   @Override

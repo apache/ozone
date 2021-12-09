@@ -19,15 +19,21 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Utility class that contains helper methods for OM tenant requests.
@@ -38,8 +44,8 @@ public final class OMTenantRequestHelper {
   }
 
   /**
-   * Passes check only when caller is an Ozone admin,
-   * throws OMException otherwise.
+   * Passes check only when caller is an Ozone (cluster) admin, throws
+   * OMException otherwise.
    * @throws OMException PERMISSION_DENIED
    */
   static void checkAdmin(OzoneManager ozoneManager) throws OMException {
@@ -94,26 +100,23 @@ public final class OMTenantRequestHelper {
    * Retrieve volume name of the tenant.
    */
   static String getTenantVolumeName(OMMetadataManager omMetadataManager,
-      String tenantName) {
+      String tenantId) throws IOException {
 
-    final OmDBTenantInfo tenantInfo;
-    try {
-      tenantInfo = omMetadataManager.getTenantStateTable().get(tenantName);
-    } catch (IOException e) {
-      throw new RuntimeException("Potential DB error. Unable to retrieve "
-          + "OmDBTenantInfo entry for tenant '" + tenantName + "'.");
-    }
+    final OmDBTenantInfo tenantInfo =
+        omMetadataManager.getTenantStateTable().get(tenantId);
 
     if (tenantInfo == null) {
-      throw new RuntimeException("Potential DB error or race condition. "
-          + "OmDBTenantInfo entry is missing for tenant '" + tenantName + "'.");
+      throw new OMException("Potential DB error or race condition. "
+          + "OmDBTenantInfo entry is missing for tenant '" + tenantId + "'.",
+          ResultCodes.TENANT_NOT_FOUND);
     }
 
-    final String volumeName = tenantInfo.getAccountNamespaceName();
+    final String volumeName = tenantInfo.getBucketNamespaceName();
 
-    if (StringUtils.isEmpty(tenantName)) {
-      throw new RuntimeException("Potential DB error. volumeName "
-          + "field is null or empty for tenantId '" + tenantName + "'.");
+    if (volumeName == null) {
+      throw new OMException("Potential DB error. volumeName "
+          + "field is null for tenantId '" + tenantId + "'.",
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     return volumeName;
@@ -182,4 +185,55 @@ public final class OMTenantRequestHelper {
     return false;
   }
 
+  /**
+   * Scans (Slow!) TenantAccessIdTable for the given tenantId.
+   * Returns true if the tenant doesn't have any accessIds assigned to it
+   * (i.e. the tenantId is not found in this table for any existing accessIds);
+   * Returns false otherwise.
+   *
+   * @param metadataManager
+   * @param tenantId
+   * @return
+   * @throws IOException
+   */
+  static boolean isTenantEmpty(OMMetadataManager metadataManager,
+                               String tenantId) throws IOException {
+
+    // TODO: Do we need to iterate cache here as well? Very cumbersome if so.
+    //  This helper function is a placeholder for the isTenantEmpty check,
+    //  once tenantCache/Ranger is fixed this will be removed.
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, OmDBAccessIdInfo>> iter =
+             metadataManager.getTenantAccessIdTable().iterator()) {
+      while (iter.hasNext()) {
+        final OmDBAccessIdInfo accessIdInfo = iter.next().getValue();
+        if (accessIdInfo.getTenantId().equals(tenantId)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Return true if the tenant doesn't have any accessIds assigned to it,
+   * false otherwise. Uses in-memory mapping tenantCache which can be seen as
+   * a reverse-mapping of tenantAccessIdTable (Fast).
+   * @param tenantManager
+   * @param tenantId
+   * @return
+   * @throws IOException
+   */
+  static boolean isTenantEmpty(OMMultiTenantManager tenantManager,
+                               String tenantId) throws IOException {
+    // TODO: OMMultiTenantManager#listUsersInTenant relies on the tenantCache
+    //  mapping which I believe is only updated on leader node in preExecute
+    //  (apart from it being populated on OM startup) right now.
+    //  So unless tenantCache is updated on follower nodes later as well,
+    //  we can't use listUsersInTenant to check tenant emptiness in followers.
+    final List<TenantUserAccessId> tenantUserAccessIdsList =
+        tenantManager.listUsersInTenant(tenantId, "").getUserAccessIds();
+    return tenantUserAccessIdsList.size() == 0;
+  }
 }

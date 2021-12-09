@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -51,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -479,19 +481,26 @@ public interface OzoneManagerProtocol
   void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
-   * Create tenant.
-   * @param tenantName tenant name.
+   * Create a tenant.
+   * @param omTenantArgs OmTenantArgs
    * @throws IOException
    */
-  void createTenant(String tenantName) throws IOException;
-
-  // TODO: modify, delete
+  void createTenant(OmTenantArgs omTenantArgs) throws IOException;
 
   /**
-   * Assign user to tenant.
+   * Delete a tenant.
+   * @param tenantId tenant name.
+   * @return DeleteTenantResponse
+   * @throws IOException
+   */
+  DeleteTenantResponse deleteTenant(String tenantId) throws IOException;
+
+  /**
+   * Assign user to a tenant.
    * @param username user name to be assigned.
    * @param tenantName tenant name.
    * @param accessId access ID.
+   * @return S3SecretValue
    * @throws IOException
    */
   S3SecretValue tenantAssignUserAccessId(String username, String tenantName,
@@ -501,7 +510,7 @@ public interface OzoneManagerProtocol
 
   // TODO: modify, delete
   /**
-   * Revoke user accessId to tenant.
+   * Revoke user accessId to a tenant.
    * @param accessId accessId to be revoked.
    * @throws IOException
    */
@@ -518,7 +527,7 @@ public interface OzoneManagerProtocol
       boolean delegated) throws IOException;
 
   /**
-   * Revoke admin role of an accessId from a tenant.
+   * Revoke admin role of an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantName tenant name.
    * @throws IOException

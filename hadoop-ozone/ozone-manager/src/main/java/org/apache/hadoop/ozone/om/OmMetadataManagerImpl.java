@@ -141,7 +141,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | principalToAccessIdsTable | Principal -> OmDBKerberosPrincipalInfo   |
    * |----------------------------------------------------------------------|
-   * | tenantStateTable          | tenant name -> OmDBTenantInfo            |
+   * | tenantStateTable          | tenantId -> OmDBTenantInfo               |
    * |----------------------------------------------------------------------|
    * | tenantGroupTable          | accessId -> [tenant group A, B, ...]     |
    * |----------------------------------------------------------------------|
