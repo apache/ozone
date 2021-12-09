@@ -131,7 +131,8 @@ public final class OzoneManagerUtils {
    * @throws IOException
    */
   public static OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo,
-                                                     OMMetadataManager metadataManager,
+                                                     OMMetadataManager
+                                                         metadataManager,
                                                      Set<Pair<String,
                                                          String>> visited)
       throws IOException {
