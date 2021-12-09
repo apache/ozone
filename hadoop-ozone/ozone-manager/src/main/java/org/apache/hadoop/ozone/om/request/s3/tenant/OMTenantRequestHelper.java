@@ -100,16 +100,10 @@ public final class OMTenantRequestHelper {
    * Retrieve volume name of the tenant.
    */
   static String getTenantVolumeName(OMMetadataManager omMetadataManager,
-      String tenantId) throws OMException {
+      String tenantId) throws IOException {
 
-    final OmDBTenantInfo tenantInfo;
-    try {
-      tenantInfo = omMetadataManager.getTenantStateTable().get(tenantId);
-    } catch (IOException e) {
-      throw new OMException("Potential DB error. Unable to retrieve "
-          + "OmDBTenantInfo entry for tenant '" + tenantId + "'", e,
-          ResultCodes.TENANT_NOT_FOUND);
-    }
+    final OmDBTenantInfo tenantInfo =
+        omMetadataManager.getTenantStateTable().get(tenantId);
 
     if (tenantInfo == null) {
       throw new OMException("Potential DB error or race condition. "
