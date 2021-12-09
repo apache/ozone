@@ -17,6 +17,7 @@
 Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -30,8 +31,8 @@ Check webui static resources
     ${result} =        Execute                curl --negotiate -u : -s -I http://${SCM}:9876/static/bootstrap-3.4.1/js/bootstrap.min.js
                        Should contain         ${result}    200
 
-Start freon testing
+Basic Freon smoketest
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
-    ${result} =        Execute              ozone freon randomkeys --num-of-volumes 5 --num-of-buckets 5 --num-of-keys 5 --num-of-threads 1 --replication-type RATIS --factor THREE --validate-writes
-                       Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Number of Keys added: 125
-                       Should Contain                   ${result}  Status: Success
+    ${random} =        Generate Random String    10
+    Freon OCKG    ${random}
+    Freon OCKV    ${random}

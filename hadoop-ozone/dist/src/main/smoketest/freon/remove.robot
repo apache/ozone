@@ -15,8 +15,9 @@
 
 *** Settings ***
 Documentation       Test freon data remove commands
-Resource            ../lib/os.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
+Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keyta
 
 *** Variables ***
 ${OCKR_PREFIX}    ockr
@@ -24,20 +25,9 @@ ${OMBR_PREFIX}    ombr
 
 *** Test Cases ***
 Ozone Client Key Remover
-    [Setup]            Ozone Client Key Generator For Remover    ${OCKR_PREFIX}
-    ${result} =        Execute                ozone freon ockr ${OM_HA_PARAM} -t=1 -n=1 -p ${OCKR_PREFIX}
-                       Should contain         ${result}   Successful executions: 1
+    [Setup]    Freon OCKG    ${OCKR_PREFIX}
+    Freon OCKR    ${OCKR_PREFIX}
 
 OM Bucket Remover
-    [Setup]            OM Bucket Generator For Remover           ${OMBR_PREFIX}
-    ${result} =        Execute                ozone freon ombr ${OM_HA_PARAM} -t=1 -n=1 -p ${OMBR_PREFIX}
-                       Should contain         ${result}   Successful executions: 1
-
-*** Keywords ***
-Ozone Client Key Generator For Remover
-    [Arguments]        ${PREFIX}
-    Execute            ozone freon ockg ${OM_HA_PARAM} -t=1 -n=1 -p ${PREFIX}
-
-OM Bucket Generator For Remover
-    [Arguments]        ${PREFIX}
-    Execute            ozone freon ombg ${OM_HA_PARAM} -t=1 -n=1 -p ${PREFIX}
+    [Setup]    Freon OMBG    ${OMBR_PREFIX}
+    Freon OMBR    ${OMBR_PREFIX}

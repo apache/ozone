@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Suite Setup         Create Specific OM data for prepare
@@ -26,7 +27,7 @@ Suite Setup         Create Specific OM data for prepare
 *** Keywords ***
 Create Specific OM data for prepare
     # Freon data to make sure there are a reasonable number of transactions in the system.
-    Execute             ozone freon rk --replication-type=RATIS --num-of-volumes 1 --num-of-buckets 1 --num-of-keys 100
+    Freon OCKG    om-prepare    100
     ${random} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable  ${volume_name}  ${random}-volume-for-prepare
     Set Suite Variable  ${bucket_name}  ${random}-bucket-for-prepare

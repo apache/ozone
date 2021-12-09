@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -56,11 +57,8 @@ Check http return code
                         END
 
 *** Test Cases ***
-Generate Freon data
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --replication-type=RATIS --num-of-volumes 1 --num-of-buckets 1 --num-of-keys 10 --key-size 1025
-
 Check if Recon picks up OM data
+    [Setup]    Freon OCKG    size=1025
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container from OM
 
 Check if Recon picks up DN heartbeats
