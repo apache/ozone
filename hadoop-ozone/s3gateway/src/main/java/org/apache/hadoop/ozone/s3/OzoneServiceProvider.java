@@ -18,9 +18,7 @@
 package org.apache.hadoop.ozone.s3;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.security.SecurityUtil;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
