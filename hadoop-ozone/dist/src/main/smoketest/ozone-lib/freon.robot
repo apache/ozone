@@ -45,8 +45,8 @@ Freon OCKR
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OMKG
-    [arguments]    ${prefix}=omkg    ${n}=1    ${size}=1024
-    ${result} =        Execute          ozone freon omkg ${OM_HA_PARAM} -t1 -n${n} -s${size} -p ${prefix}
+    [arguments]    ${prefix}=omkg    ${n}=1
+    ${result} =        Execute          ozone freon omkg ${OM_HA_PARAM} -t1 -n${n} -p ${prefix}
                        Should contain   ${result}   Successful executions: ${n}
 
 Freon OMBG
