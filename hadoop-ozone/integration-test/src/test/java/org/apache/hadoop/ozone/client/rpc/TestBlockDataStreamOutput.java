@@ -142,7 +142,6 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testSingleChunkWrite() throws Exception {
-    testWrite(chunkSize);
     testWriteWithFailure(chunkSize);
   }
 
@@ -194,7 +193,7 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testPutBlockAtBoundary() throws Exception {
-    int dataLength = 500;
+    int dataLength = 200;
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -208,12 +207,13 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
+    long a = metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock);
     Assert.assertTrue(
         metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             <= pendingPutBlockCount + 1);
     key.close();
-    // Since data length is 500 , first putBlock will be at 400(flush boundary)
-    // and the other at 500
+    // Since data length is 200 , first putBlock will be at 160(flush boundary)
+    // and the other at 200
     Assert.assertTrue(
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             == putBlockCount + 2);

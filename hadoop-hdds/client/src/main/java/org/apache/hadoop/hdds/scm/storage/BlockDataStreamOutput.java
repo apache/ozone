@@ -279,6 +279,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private void writeChunkIfNeeded() throws IOException {
     if (currentBufferRemaining==0) {
       writeChunk(currentBuffer);
+      currentBuffer = null;
     }
   }
 
@@ -476,6 +477,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
       if (currentBuffer!=null) {
         writeChunk(currentBuffer);
+        currentBuffer = null;
       }
       updateFlushLength();
       executePutBlock(close, false);
