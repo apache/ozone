@@ -29,11 +29,11 @@ public final class OmDBTenantInfo {
    */
   private final String tenantId;
   /**
-   * Name of the tenant's bucket namespace.
+   * Name of the bucket namespace (volume name).
    */
   private final String bucketNamespaceName;
   /**
-   * Name of the tenant's account namespace.
+   * Name of the account namespace.
    */
   private final String accountNamespaceName;
   /**
@@ -101,6 +101,12 @@ public final class OmDBTenantInfo {
     return new OmDBTenantInfo(tInfo);
   }
 
+  /**
+   * Returns the bucket namespace name. a.k.a. volume name.
+   *
+   * Note: This returns an empty string ("") if the tenant is somehow not
+   * associated with a volume. Should never return null.
+   */
   public String getBucketNamespaceName() {
     return bucketNamespaceName;
   }

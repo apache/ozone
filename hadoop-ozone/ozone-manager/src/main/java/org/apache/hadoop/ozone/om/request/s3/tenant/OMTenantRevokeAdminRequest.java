@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -139,15 +140,17 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     final TenantRevokeAdminRequest request =
         getOmRequest().getTenantRevokeAdminRequest();
     final String accessId = request.getAccessId();
-    final String tenantName = request.getTenantName();
+    final String tenantId = request.getTenantName();
 
     boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
     IOException exception = null;
 
-    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
-        omMetadataManager, tenantName);
+    String volumeName = null;
 
     try {
+      volumeName = OMTenantRequestHelper.getTenantVolumeName(
+          omMetadataManager, tenantId);
+
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
 
@@ -159,7 +162,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantId().equals(tenantName));
+      assert(oldAccessIdInfo.getTenantId().equals(tenantId));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
@@ -203,23 +206,24 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
             .add(omClientResponse, transactionLogIndex));
       }
       if (acquiredVolumeLock) {
+        Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
     }
 
     // Audit
-    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.TENANT, tenantId);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_REVOKE_ADMIN, auditMap, exception,
         getOmRequest().getUserInfo()));
 
     if (exception == null) {
       LOG.info("Revoked admin of accessId '{}' from tenant '{}'",
-          accessId, tenantName);
+          accessId, tenantId);
       // TODO: omMetrics.incNumTenantRevokeAdmin()
     } else {
       LOG.error("Failed to revoke admin of accessId '{}' from tenant '{}': {}",
-          accessId, tenantName, exception.getMessage());
+          accessId, tenantId, exception.getMessage());
       // TODO: omMetrics.incNumTenantRevokeAdminFails()
     }
     return omClientResponse;

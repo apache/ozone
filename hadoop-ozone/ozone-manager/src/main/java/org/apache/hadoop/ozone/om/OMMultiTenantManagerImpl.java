@@ -318,6 +318,19 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  public void removeUserAccessIdFromCache(String accessID, String userPrincipal,
+                                          String tenantName) {
+    try {
+      tenantCache.get(tenantName).getTenantUsers().remove(
+          new ImmutablePair<>(userPrincipal, accessID));
+    } catch (NullPointerException e) {
+      // tenantCache is somehow empty. Ignore for now.
+      // But how?
+    }
+  }
 
   @Override
   public String getUserNameGivenAccessId(String accessId) {

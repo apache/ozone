@@ -128,6 +128,17 @@ public interface OMMultiTenantManager {
   void revokeUserAccessId(String accessID) throws IOException;
 
   /**
+   * A placeholder method to remove a failed-to-assign accessId from
+   * tenantCache.
+   * Triggered in OMAssignUserToTenantRequest#handleRequestFailure.
+   * Most likely becomes unnecessary if we move OMMTM call to the end of the
+   * request (current it runs in preExecute).
+   * TODO: Remove this if unneeded when Ranger thread patch lands.
+   */
+  void removeUserAccessIdFromCache(String accessID, String userPrincipal,
+                                   String tenantName);
+
+  /**
    * Given an accessId, return kerberos user name for the tenant user.
    */
   String getUserNameGivenAccessId(String accessId);

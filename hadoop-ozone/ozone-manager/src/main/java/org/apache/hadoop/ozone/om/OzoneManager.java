@@ -50,7 +50,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -131,6 +130,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -156,6 +156,7 @@ import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
@@ -3081,51 +3082,54 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
           throws IOException {
-    throw new NotImplementedException(
-            "non-Ratis getS3Secret(String, boolean) is not implemented");
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
-  /**
-   * Create tenant.
-   */
-  public void createTenant(String tenantName) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis createTenant() is not implemented");
+  @Override
+  public void createTenant(OmTenantArgs omTenantArgs) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
+  }
+
+  @Override
+  public DeleteTenantResponse deleteTenant(String tenantId) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
    * Assign user accessId to tenant.
    */
   public S3SecretValue tenantAssignUserAccessId(
-      String username, String tenantName, String accessId) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantAssignUserAccessId() is not implemented");
+      String username, String tenantId, String accessId) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
    * Revoke user accessId to tenant.
    */
   public void tenantRevokeUserAccessId(String accessId) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantRevokeUserAccessId() is not implemented");
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
-   * Assign admin role to an accessId in a tenant.
+   * Assign admin role to a user by an accessId in a tenant.
    */
-  public void tenantAssignAdmin(String accessId, String tenantName,
-      boolean delegated) throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantAssignAdmin() is not implemented");
+  public void tenantAssignAdmin(String accessId, String tenantId,
+                                boolean delegated) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
    * Revoke admin role of an accessId from a tenant.
    */
-  public void tenantRevokeAdmin(String accessId, String tenantName)
-      throws IOException {
-    throw new NotImplementedException(
-        "non-Ratis tenantRevokeAdmin() is not implemented");
+  public void tenantRevokeAdmin(String accessId, String tenantId) {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   /**
@@ -3143,6 +3147,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
+
+    // TODO: Iterate cache first. See KeyManagerImpl#listStatus
 
     TableIterator<String, ? extends Table.KeyValue<String, OmDBTenantInfo>>
         iterator = metadataManager.getTenantStateTable().iterator();
@@ -3225,26 +3231,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+  public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
 
-    if (StringUtils.isEmpty(tenantName)) {
+    if (StringUtils.isEmpty(tenantId)) {
       return null;
     }
 
     final Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.TENANT, tenantName);
+    auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
     try {
       String userName = getRemoteUser().getUserName();
-      if (!multiTenantManagr.isTenantAdmin(userName, tenantName)
+      if (!multiTenantManagr.isTenantAdmin(userName, tenantId)
           && !omAdminUsernames.contains(userName)) {
         throw new IOException("Only tenant and ozone admins can access this " +
             "API. '" + userName + "' is not an admin.");
       }
 
       final TenantUserList userList =
-          multiTenantManagr.listUsersInTenant(tenantName, prefix);
+          multiTenantManagr.listUsersInTenant(tenantId, prefix);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           OMAction.TENANT_LIST_USER, auditMap));
       return userList;
@@ -3258,16 +3264,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmVolumeArgs getS3Volume(String accessID) throws IOException {
 
-    String tenantId;
+    final String tenantId;
     try {
       tenantId = multiTenantManagr.getTenantForAccessID(accessID);
+      // TODO: Get volume name from DB. Do not assume the same. e.g.
+      //metadataManager.getTenantStateTable().get(tenantId)
+      //    .getBucketNamespaceName();
+      final String volumeName = tenantId;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Get S3 volume request for access ID {} belonging to tenant" +
                 " {} is directed to the volume {}.", accessID, tenantId,
-            tenantId);  // TODO: Get volume name from DB. Do not assume the same
+            volumeName);
       }
       // This call performs acl checks and checks volume existence.
-      return getVolumeInfo(tenantId);
+      return getVolumeInfo(volumeName);
 
     } catch (OMException ex) {
       if (ex.getResult().equals(INVALID_ACCESSID)) {
@@ -4179,24 +4189,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public boolean isTenantAdmin(UserGroupInformation callerUgi,
-      String tenantName, Boolean delegated) {
+                               String tenantId, Boolean delegated) {
     if (callerUgi == null) {
       return false;
     } else {
-      return isTenantAdmin(callerUgi.getShortUserName(), tenantName, delegated)
-          || isTenantAdmin(callerUgi.getUserName(), tenantName, delegated);
+      return isTenantAdmin(callerUgi.getShortUserName(), tenantId, delegated)
+          || isTenantAdmin(callerUgi.getUserName(), tenantId, delegated);
     }
   }
 
   /**
    * Returns true if user is a tenant's admin, false otherwise.
    * @param username User name string.
-   * @param tenantName Tenant name string.
+   * @param tenantId Tenant name string.
    * @param delegated True if operation requires delegated admin permission.
    */
   public boolean isTenantAdmin(String username,
-      String tenantName, Boolean delegated) {
-    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantName)) {
+      String tenantId, Boolean delegated) {
+    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantId)) {
       return false;
     }
 
@@ -4213,7 +4223,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       for (final String accessId : principalInfo.getAccessIds()) {
         final OmDBAccessIdInfo accessIdInfo =
             getMetadataManager().getTenantAccessIdTable().get(accessId);
-        if (tenantName.equals(accessIdInfo.getTenantId())) {
+        if (tenantId.equals(accessIdInfo.getTenantId())) {
           if (!delegated) {
             return accessIdInfo.getIsAdmin();
           } else {

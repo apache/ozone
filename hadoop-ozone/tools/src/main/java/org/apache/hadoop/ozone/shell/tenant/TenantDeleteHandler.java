@@ -18,18 +18,45 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
+
+import java.io.IOException;
 
 /**
  * ozone tenant delete.
  */
-@CommandLine.Command(name = "delete",
-    description = "Delete a tenant")
+@CommandLine.Command(name = "delete", aliases = "remove",
+    description = "Delete an empty tenant. "
+        + "Will not remove the associated volume.")
 public class TenantDeleteHandler extends TenantHandler {
 
+  @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
+  private String tenantId;
+
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    err().println("Not Implemented.");
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
+    try {
+      final DeleteTenantResponse resp =
+          client.getObjectStore().deleteTenant(tenantId);
+      out().println("Deleted tenant '" + tenantId + "'.");
+      long volumeRefCount = resp.getVolRefCount();
+      assert(volumeRefCount >= 0L);
+      final String volumeName = resp.getVolumeName();
+      final String extraPrompt =
+          "But the associated volume '" + volumeName + "' is not removed. ";
+      if (volumeRefCount == 0L) {
+        out().println(extraPrompt + "To delete it, run"
+            + "\n    ozone sh volume delete " + volumeName + "\n");
+      } else {
+        out().println(extraPrompt + "And it is still referenced by some other "
+            + "Ozone features (refCount is " + volumeRefCount + ").");
+      }
+    } catch (IOException e) {
+      // Throw exception to make client exit code non-zero
+      throw new IOException("Failed to delete tenant '" + tenantId + "'", e);
+    }
   }
 }
