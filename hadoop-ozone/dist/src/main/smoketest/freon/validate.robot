@@ -17,7 +17,6 @@
 Documentation       Test freon data validation commands
 Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
-Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keyta
 
 *** Variables ***
 ${PREFIX}    ${EMPTY}
