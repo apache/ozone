@@ -65,7 +65,6 @@ ozone.om.http.auth.kerberos.keytab| /path/to/HTTP.keytab
 Property| Value
 -----------------------------------|-----------------------------------------
 ozone.s3g.http.auth.type | kerberos
-ozone.s3g.http.auth.kerberos.principal | HTTP/_HOST@REALM
 ozone.s3g.http.auth.kerberos.keytab| /path/to/HTTP.keytab
 
 ### Enable SPNEGO authentication for RECON HTTP

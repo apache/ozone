@@ -1535,16 +1535,6 @@
   </property>
 
   <property>
-    <name>ozone.s3g.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@REALM</value>
-    <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
-    <description>The server principal used by Ozone S3Gateway server. This is
-      typically set to
-      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
-      HTTP/ by convention.</description>
-  </property>
-
-  <property>
     <name>ozone.s3g.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>

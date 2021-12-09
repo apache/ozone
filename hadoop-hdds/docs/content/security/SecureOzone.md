@@ -167,10 +167,6 @@ All these settings should be made in ozone-site.xml.
         </thead>
         <tbody>
           <tr>
-            <td>ozone.s3g.http.auth.kerberos.principal</th>
-            <td>S3 Gateway principal if SPNEGO is enabled for S3 Gateway http server. <br/> e.g. HTTP/_HOST@EXAMPLE.COM</td>
-          </tr>
-          <tr>
             <td>ozone.s3g.http.auth.kerberos.keytab</th>
             <td>The keytab file used by S3 gateway if SPNEGO is enabled for S3 Gateway http server.</td>
           </tr>
