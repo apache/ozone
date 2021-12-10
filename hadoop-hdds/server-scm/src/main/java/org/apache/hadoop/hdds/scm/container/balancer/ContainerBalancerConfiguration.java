@@ -99,13 +99,13 @@ public final class ContainerBalancerConfiguration {
   private String excludeContainers = "";
 
   @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
-      timeUnit = TimeUnit.MINUTES, tags = {ConfigTag.BALANCER}, description =
+      tags = {ConfigTag.BALANCER}, description =
       "The amount of time in minutes to allow a single container to move " +
           "from source to target.")
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "1h", timeUnit = TimeUnit.MINUTES, tags = {
+      defaultValue = "1h", tags = {
       ConfigTag.BALANCER}, description = "The interval period between each " +
       "iteration of Container Balancer.")
   private long balancingInterval;

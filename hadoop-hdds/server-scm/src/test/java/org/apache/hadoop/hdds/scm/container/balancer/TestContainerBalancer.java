@@ -598,7 +598,7 @@ public class TestContainerBalancer {
   @Test
   public void testContainerBalancerConfiguration() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-//    ozoneConfiguration.set("ozone.scm.container.size", "5GB");
+    ozoneConfiguration.set("ozone.scm.container.size", "5GB");
     ozoneConfiguration.setDouble(
         "hdds.container.balancer.utilization.threshold", 0.01);
 
@@ -610,6 +610,7 @@ public class TestContainerBalancer {
     Assert.assertEquals(cbConf.getMaxSizeLeavingSource(),
         6 * 1024 * 1024 * 1024L);
 
+    Assert.assertEquals(cbConf.getMoveTimeout().toMillis(), 30 * 60 * 1000);
   }
 
   /**
