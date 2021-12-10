@@ -1639,8 +1639,8 @@ public class TestRootedOzoneFileSystem {
     OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test");
     final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
-    Assert.assertEquals(key.getReplicationConfig().getReplicationType().name(),
-        ReplicationType.EC.name());
+    Assert.assertEquals(ReplicationType.EC.name(),
+        key.getReplicationConfig().getReplicationType().name());
   }
 
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
