@@ -123,9 +123,12 @@ public interface ReplicationConfig {
    */
   static ReplicationConfig adjustReplication(
       ReplicationConfig config, short replication, ConfigurationSource conf) {
-    return parse(
-        ReplicationType.valueOf(config.getReplicationType().toString()),
-        Short.toString(replication), conf);
+    ReplicationType replicationType =
+        ReplicationType.valueOf(config.getReplicationType().toString());
+    if (replicationType.equals(ReplicationType.EC)) {
+      return config;
+    }
+    return parse(replicationType, Short.toString(replication), conf);
   }
 
   /**

@@ -92,7 +92,8 @@ public class ECReplicationConfig implements ReplicationConfig {
     final Matcher matcher = STRING_FORMAT.matcher(string);
     if (!matcher.matches()) {
       throw new IllegalArgumentException("EC replication config should be " +
-          "defined in the form rs-3-2-1024k, rs-6-3-1024; or rs-10-4-1024k");
+          "defined in the form rs-3-2-1024k, rs-6-3-1024; or rs-10-4-1024k." +
+          "Provided configuration was: " + string);
     }
 
     try {
