@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -40,7 +39,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
  * Response for CreateKey request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE})
-public class OMKeyCreateResponse extends OMClientResponse {
+public class OMKeyCreateResponse extends OmKeyResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
@@ -52,7 +51,7 @@ public class OMKeyCreateResponse extends OMClientResponse {
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, List<OmKeyInfo> parentKeyInfos,
       long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse);
+    super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
     this.parentKeyInfos = parentKeyInfos;
