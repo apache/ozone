@@ -68,6 +68,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 
 import org.apache.commons.collections.CollectionUtils;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,6 +119,7 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
+  private final AtomicLong lastHeartbeatSent;
   // Endpoint -> ReportType -> Boolean of whether the full report should be
   //  queued in getFullReports call.
   private final Map<InetSocketAddress,
@@ -172,6 +174,7 @@ public class StateContext {
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
+    lastHeartbeatSent = new AtomicLong(0);
     fullReportSendIndicator = new HashMap<>();
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
@@ -616,16 +619,17 @@ public class StateContext {
       }
 
       if (!isThreadPoolAvailable(service)) {
-        long count = threadPoolNotAvailableCount.getAndIncrement();
-        if (count % getLogWarnInterval(conf) == 0) {
-          LOG.warn("No available thread in pool for past {} seconds.",
-              unit.toSeconds(time) * (count + 1));
+        long count = threadPoolNotAvailableCount.incrementAndGet();
+        long unavailableTime = Time.monotonicNow() - lastHeartbeatSent.get();
+        if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
+          LOG.warn("No available thread in pool for the past {} seconds " +
+              "and {} times.", unit.toSeconds(unavailableTime), count);
         }
         return;
       }
-
       threadPoolNotAvailableCount.set(0);
       task.execute(service);
+      lastHeartbeatSent.set(Time.monotonicNow());
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
       if (this.state != newState) {
         if (LOG.isDebugEnabled()) {

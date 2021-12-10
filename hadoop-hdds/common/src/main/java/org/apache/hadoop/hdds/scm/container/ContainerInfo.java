@@ -108,7 +108,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
     final ReplicationConfig config = ReplicationConfig
-        .fromProto(info.getReplicationType(), info.getReplicationFactor());
+        .fromProtoTypeAndFactor(
+            info.getReplicationType(), info.getReplicationFactor());
     builder.setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
         .setState(info.getState())
@@ -154,6 +155,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   public HddsProtos.ReplicationType getReplicationType() {
     return replicationConfig.getReplicationType();
+  }
+
+  public HddsProtos.ReplicationFactor getReplicationFactor() {
+    return ReplicationConfig.getLegacyFactor(replicationConfig);
   }
 
   public PipelineID getPipelineID() {

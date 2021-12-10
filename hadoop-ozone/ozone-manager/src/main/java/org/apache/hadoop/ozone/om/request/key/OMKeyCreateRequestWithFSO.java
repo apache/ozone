@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
@@ -58,8 +59,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
  */
 public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
-  public OMKeyCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCreateRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override

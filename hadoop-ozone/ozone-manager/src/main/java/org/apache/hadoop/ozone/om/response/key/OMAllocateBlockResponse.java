@@ -66,8 +66,8 @@ public class OMAllocateBlockResponse extends OMClientResponse {
 
     String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), clientID);
-    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation, openKey,
-        omKeyInfo);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation, openKey, omKeyInfo);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

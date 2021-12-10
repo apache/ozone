@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -60,8 +61,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 public class S3InitiateMultipartUploadRequestWithFSO
         extends S3InitiateMultipartUploadRequest {
 
-  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -161,7 +163,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
       final ReplicationConfig replicationConfig =
-              ReplicationConfig.fromTypeAndFactor(
+              ReplicationConfig.fromProtoTypeAndFactor(
                       keyArgs.getType(), keyArgs.getFactor());
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()

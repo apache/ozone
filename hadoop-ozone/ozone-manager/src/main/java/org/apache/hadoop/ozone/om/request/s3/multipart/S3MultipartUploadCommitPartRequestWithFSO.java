@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -41,8 +42,9 @@ import java.util.Iterator;
 public class S3MultipartUploadCommitPartRequestWithFSO
         extends S3MultipartUploadCommitPartRequest {
 
-  public S3MultipartUploadCommitPartRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCommitPartRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -83,5 +85,4 @@ public class S3MultipartUploadCommitPartRequestWithFSO
         openKey, multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
         ozoneManager.isRatisEnabled(), omBucketInfo);
   }
-
 }

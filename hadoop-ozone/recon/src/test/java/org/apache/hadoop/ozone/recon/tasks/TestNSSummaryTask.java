@@ -21,9 +21,9 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -124,7 +124,6 @@ public class TestNSSummaryTask {
                     .build();
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
   }
 
   @Test
@@ -234,7 +233,8 @@ public class TestNSSummaryTask {
             OMUpdateEventBuilder<String, OmKeyInfo>()
             .setKey(omPutKey)
             .setValue(omPutKeyInfo)
-            .setTable(omMetadataManager.getKeyTable().getName())
+            .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+            .getName())
             .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
             .build();
 
@@ -246,7 +246,8 @@ public class TestNSSummaryTask {
             OMUpdateEventBuilder<String, OmKeyInfo>()
             .setKey(omDeleteKey)
             .setValue(omDeleteInfo)
-            .setTable(omMetadataManager.getKeyTable().getName())
+            .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+            .getName())
             .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
             .build();
 
@@ -261,7 +262,8 @@ public class TestNSSummaryTask {
             .setKey(omUpdateKey)
             .setValue(omUpdateInfo)
             .setOldValue(omOldInfo)
-            .setTable(omMetadataManager.getKeyTable().getName())
+            .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+            .getName())
             .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
             .build();
 
@@ -515,5 +517,9 @@ public class TestNSSummaryTask {
             DIR_ONE_OBJECT_ID, DIR_TWO);
     writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
             DIR_ONE_OBJECT_ID, DIR_THREE);
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

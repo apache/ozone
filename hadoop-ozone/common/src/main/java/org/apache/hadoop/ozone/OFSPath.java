@@ -316,7 +316,8 @@ public class OFSPath {
    */
   public Path getTrashRoot() {
     if (!this.isKey()) {
-      throw new RuntimeException("Volume or bucket doesn't have trash root.");
+      throw new RuntimeException("Recursive rm of volume or bucket with trash" +
+          " enabled is not permitted. Consider using the -skipTrash option.");
     }
     try {
       final String username =

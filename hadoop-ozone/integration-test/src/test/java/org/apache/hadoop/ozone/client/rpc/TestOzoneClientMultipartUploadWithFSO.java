@@ -34,21 +34,22 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -106,8 +107,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    TestOMRequestUtils.configureFSOptimizedPaths(conf, true);
     startCluster(conf);
   }
 
@@ -556,6 +556,12 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    String buckKey = ozoneManager.getMetadataManager()
+        .getBucketKey(volume.getName(), bucket.getName());
+    OmBucketInfo buckInfo =
+        ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+    BucketLayout bucketLayout = buckInfo.getBucketLayout();
 
     String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
         ONE);
@@ -572,7 +578,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
     String multipartOpenKey =
         getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
             metadataMgr);
-    OmKeyInfo omKeyInfo = metadataMgr.getOpenKeyTable().get(multipartOpenKey);
+    OmKeyInfo omKeyInfo =
+        metadataMgr.getOpenKeyTable(bucketLayout).get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
     Assert.assertNull(omKeyInfo);
@@ -921,13 +928,20 @@ public class TestOzoneClientMultipartUploadWithFSO {
   private String verifyUploadedPart(String volumeName, String bucketName,
       String keyName, String uploadID, String partName,
       OMMetadataManager metadataMgr) throws IOException {
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    String buckKey = ozoneManager.getMetadataManager()
+        .getBucketKey(volumeName, bucketName);
+    OmBucketInfo buckInfo =
+        ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+    BucketLayout bucketLayout = buckInfo.getBucketLayout();
     String multipartOpenKey =
         getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
             metadataMgr);
 
     String multipartKey = metadataMgr.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
-    OmKeyInfo omKeyInfo = metadataMgr.getOpenKeyTable().get(multipartOpenKey);
+    OmKeyInfo omKeyInfo =
+        metadataMgr.getOpenKeyTable(bucketLayout).get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
 
@@ -1027,5 +1041,4 @@ public class TestOzoneClientMultipartUploadWithFSO {
     Arrays.fill(chars, val);
     return chars;
   }
-
 }

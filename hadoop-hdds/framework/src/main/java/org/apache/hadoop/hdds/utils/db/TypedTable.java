@@ -450,24 +450,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     @Override
-    public KEY key() throws IOException {
-      byte[] result = rawIterator.key();
-      if (result == null) {
-        return null;
-      }
-      return codecRegistry.asObject(result, keyClass);
-    }
-
-    @Override
-    public TypedKeyValue value() {
-      KeyValue keyValue = rawIterator.value();
-      if(keyValue != null) {
-        return new TypedKeyValue(keyValue, keyClass, valueClass);
-      }
-      return null;
-    }
-
-    @Override
     public void close() throws IOException {
       rawIterator.close();
     }

@@ -412,6 +412,17 @@ public class TestOzoneAtRestEncryption {
     testMultipartUploadWithEncryption(bucket, 2);
   }
 
+  @Test
+  public void testMPUwithThreePartsOverride() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    testMultipartUploadWithEncryption(bucket, 3);
+
+    // override the key and check content
+    testMultipartUploadWithEncryption(bucket, 3);
+  }
+
 
   @Test
   public void testMPUwithLinkBucket() throws Exception {

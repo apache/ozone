@@ -28,11 +28,13 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 
 /**
  * A dummy BlockInputStream with pipeline refresh function to mock read
@@ -42,6 +44,7 @@ final class DummyBlockInputStreamWithRetry
     extends DummyBlockInputStream {
 
   private int getChunkInfoCount = 0;
+  private IOException ioException;
 
   @SuppressWarnings("parameternumber")
   DummyBlockInputStreamWithRetry(
@@ -53,7 +56,7 @@ final class DummyBlockInputStreamWithRetry
       XceiverClientFactory xceiverClientManager,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunkMap,
-      AtomicBoolean isRerfreshed) {
+      AtomicBoolean isRerfreshed, IOException ioException) {
     super(blockId, blockLen, pipeline, token, verifyChecksum,
         xceiverClientManager, blockID -> {
           isRerfreshed.set(true);
@@ -65,13 +68,18 @@ final class DummyBlockInputStreamWithRetry
               .setNodes(Collections.emptyList())
               .build();
         }, chunkList, chunkMap);
+    this.ioException  = ioException;
   }
 
   @Override
   protected List<ChunkInfo> getChunkInfos() throws IOException {
     if (getChunkInfoCount == 0) {
       getChunkInfoCount++;
-      throw new ContainerNotFoundException("Exception encountered");
+      if (ioException != null) {
+        throw  ioException;
+      }
+      throw new StorageContainerException("Exception encountered",
+          CONTAINER_NOT_FOUND);
     } else {
       return super.getChunkInfos();
     }

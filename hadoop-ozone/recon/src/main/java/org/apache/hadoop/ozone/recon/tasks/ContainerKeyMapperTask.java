@@ -33,6 +33,7 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -77,7 +78,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       reconContainerMetadataManager
               .reinitWithNewContainerDataFromOm(new HashMap<>());
 
-      Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable();
+      Table<String, OmKeyInfo> omKeyInfoTable =
+          omMetadataManager.getKeyTable(getBucketLayout());
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
                keyIter = omKeyInfoTable.iterator()) {
         while (keyIter.hasNext()) {
@@ -247,6 +249,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       reconContainerMetadataManager
           .incrementContainerCountBy(containerCountToIncrement);
     }
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
 }
