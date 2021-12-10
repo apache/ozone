@@ -21,11 +21,11 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
         .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -41,7 +41,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
  * the deleted table.
  */
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE})
-public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
+public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
 
   private boolean isRatisEnabled;
 
@@ -49,6 +49,13 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
       @Nonnull OMResponse omResponse, boolean isRatisEnabled) {
 
     super(omResponse);
+    this.isRatisEnabled = isRatisEnabled;
+  }
+
+  public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
+      boolean isRatisEnabled, BucketLayout bucketLayout) {
+
+    super(omResponse, bucketLayout);
     this.isRatisEnabled = isRatisEnabled;
   }
 
