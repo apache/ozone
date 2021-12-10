@@ -71,7 +71,7 @@ public class ReplicationServer {
     init();
   }
 
-  public void init() throws SCMSecurityException {
+  public void init() throws IllegalArgumentException {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(new GrpcReplicationService(
