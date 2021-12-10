@@ -71,7 +71,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   @Override
-  public CompletableFuture<Path> getContainerDataFromReplicas(
+  public Path getContainerDataFromReplicas(
       long containerId, List<DatanodeDetails> sourceDatanodes) {
 
     final List<DatanodeDetails> shuffledDatanodes =
@@ -81,11 +81,10 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       try {
         CompletableFuture<Path> result =
             downloadContainer(containerId, datanode);
-        result.get();
-        return result;
-      } catch (ExecutionException e) {
+        return result.get();
+      } catch (ExecutionException | IOException e) {
         LOG.error("Error on replicating container: {} from {}/{}", containerId,
-            datanode.getHostName(), datanode.getIpAddress(), e.getCause());
+            datanode.getHostName(), datanode.getIpAddress(), e);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       } catch (Exception ex) {
