@@ -140,7 +140,7 @@ public final class ContainerBalancerConfiguration {
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.GB) +
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES) +
         OzoneConsts.GB;
     maxSizeEnteringTarget = size;
     maxSizeLeavingSource = size;
