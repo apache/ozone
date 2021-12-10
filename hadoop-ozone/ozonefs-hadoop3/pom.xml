@@ -19,12 +19,12 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
   </parent>
   <artifactId>ozone-filesystem-hadoop3</artifactId>
   <name>Apache Ozone FS Hadoop 3.x compatibility</name>
   <packaging>jar</packaging>
-  <version>1.2.0</version>
+  <version>1.2.1</version>
   <properties>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>

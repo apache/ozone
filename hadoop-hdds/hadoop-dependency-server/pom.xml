@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
   </parent>
   <artifactId>hdds-hadoop-dependency-server</artifactId>
-  <version>1.2.0</version>
+  <version>1.2.1</version>
   <description>Apache Ozone Distributed Data Store Hadoop server dependencies
   </description>
   <name>Apache Ozone HDDS Hadoop Server dependencies</name>

@@ -18,7 +18,7 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
   </parent>
   <name>Apache Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>

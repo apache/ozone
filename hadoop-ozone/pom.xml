@@ -16,10 +16,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
   </parent>
   <artifactId>ozone</artifactId>
-  <version>1.2.0</version>
+  <version>1.2.1</version>
   <description>Apache Ozone Project</description>
   <name>Apache Ozone</name>
   <packaging>pom</packaging>

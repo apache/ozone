@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
   </parent>
   <artifactId>ozone-manager</artifactId>
-  <version>1.2.0</version>
+  <version>1.2.1</version>
   <description>Apache Ozone Manager Server</description>
   <name>Apache Ozone Manager Server</name>
   <packaging>jar</packaging>
