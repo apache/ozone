@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -30,8 +31,13 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
@@ -42,9 +48,8 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
@@ -68,8 +73,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
-  public OMKeyCommitRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -88,10 +93,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
     }
 
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(validateAndNormalizeKey(
-                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+            .setKeyName(keyPath);
 
     return getOmRequest().toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
@@ -148,7 +156,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
       for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
+        OmKeyLocationInfo locationInfo =
+            OmKeyLocationInfo.getFromProtobuf(keyLocation);
+
+        // Strip out tokens before adding to cache.
+        // This way during listStatus token information does not pass on to
+        // client when returning from cache.
+        if (ozoneManager.isGrpcBlockTokenEnabled()) {
+          locationInfo.setToken(null);
+        }
+        locationInfoList.add(locationInfo);
       }
 
       bucketLockAcquired =
@@ -156,6 +173,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.
       if (ozoneManager.getEnableFileSystemPaths()) {
@@ -174,7 +192,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
+      omKeyInfo =
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
@@ -191,14 +210,29 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      // If bucket versioning is turned on during the update, between key
+      // creation and key commit, old versions will be just overwritten and
+      // not kept. Bucket versioning will be effective from the first key
+      // creation after the knob turned on.
+      RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbOzoneKey,
+          omMetadataManager, omBucketInfo.getIsVersionEnabled(), trxnLogIndex,
+          ozoneManager.isRatisEnabled());
+      OmKeyInfo keyToDelete =
+              omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+
       // Add to cache of open key table and key table.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      omMetadataManager.getKeyTable().addCacheEntry(
+      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOzoneKey),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+
+      if (keysToDelete != null) {
+        OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
+                keysToDelete, trxnLogIndex);
+      }
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
@@ -209,10 +243,17 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
           allocatedLocationInfoList.size() * scmBlockSize * factor;
+      // Subtract the size of blocks to be overwritten.
+      if (keyToDelete != null) {
+        correctedSpace -= keyToDelete.getDataSize() *
+            keyToDelete.getReplicationConfig().getRequiredNodes();
+      }
+
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject());
+          omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
+          keysToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -237,6 +278,40 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             exception, omKeyInfo, result);
 
     return omClientResponse;
+  }
+
+  /**
+   * Prepare key for deletion service on overwrite.
+   *
+   * @param dbOzoneKey key to point to an object in RocksDB
+   * @param omMetadataManager
+   * @param isVersionEnabled
+   * @param trxnLogIndex
+   * @param isRatisEnabled
+   * @return Old keys eligible for deletion.
+   * @throws IOException
+   */
+  protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
+          String dbOzoneKey, OMMetadataManager omMetadataManager,
+          boolean isVersionEnabled, long trxnLogIndex,
+          boolean isRatisEnabled) throws IOException {
+    if (isVersionEnabled) {
+      // Nothing to clean up in case versioning is on.
+      return null;
+    }
+    // Past keys that was deleted but still in deleted table,
+    // waiting for deletion service.
+    RepeatedOmKeyInfo keysToDelete =
+            omMetadataManager.getDeletedTable().get(dbOzoneKey);
+    // Current key to be overwritten
+    OmKeyInfo keyToDelete =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+
+    if (keyToDelete != null) {
+      keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+                trxnLogIndex, isRatisEnabled);
+    }
+    return keysToDelete;
   }
 
   /**
@@ -281,4 +356,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
   }
 
+  public static OMKeyCommitRequest getInstance(KeyArgs keyArgs,
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMKeyCommitRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMKeyCommitRequest(omRequest, bucketLayout);
+  }
 }

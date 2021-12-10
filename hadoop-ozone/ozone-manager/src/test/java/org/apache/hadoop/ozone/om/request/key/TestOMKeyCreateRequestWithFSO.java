@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
@@ -47,7 +47,6 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     // Metadata layout prefix will be set while invoking OzoneManager#start()
     // and its not invoked in this test. Hence it is explicitly setting
     // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
     return config;
   }
 
@@ -69,7 +68,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   @Override
   protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
-    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
+    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     // Check intermediate directories created or not.
     Path keyPath = Paths.get(keyName);
     long parentID = checkIntermediatePaths(keyPath);
@@ -80,7 +80,9 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     String fileName = keyPathFileName.toString();
     String openKey = omMetadataManager.getOpenFileName(parentID, fileName,
             omRequest.getCreateKeyRequest().getClientID());
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
+            .get(openKey);
     Assert.assertNotNull(omKeyInfo);
   }
 
@@ -141,6 +143,12 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
   @Override
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
-    return new OMKeyCreateRequestWithFSO(omRequest);
+    return new OMKeyCreateRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

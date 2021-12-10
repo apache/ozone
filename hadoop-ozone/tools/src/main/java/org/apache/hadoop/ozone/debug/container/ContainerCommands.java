@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 /**
  * Subcommand to group container replica related operations.
@@ -168,14 +169,15 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
   private String getClusterId(String storageDir) throws IOException {
     Preconditions.checkNotNull(storageDir);
-    final Path firstStorageDirPath = Files.list(Paths.get(storageDir, "hdds"))
-        .filter(Files::isDirectory)
-        .findFirst().get().getFileName();
-    if (firstStorageDirPath == null) {
-      throw new IllegalArgumentException(
-          "HDDS storage dir couldn't be identified!");
+    try (Stream<Path> stream = Files.list(Paths.get(storageDir, "hdds"))) {
+      final Path firstStorageDirPath = stream.filter(Files::isDirectory)
+          .findFirst().get().getFileName();
+      if (firstStorageDirPath == null) {
+        throw new IllegalArgumentException(
+            "HDDS storage dir couldn't be identified!");
+      }
+      return firstStorageDirPath.toString();
     }
-    return firstStorageDirPath.toString();
   }
 
   private String getDatanodeUUID(String storageDir, ConfigurationSource config)

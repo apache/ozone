@@ -83,7 +83,7 @@ public class ContainerManagerImpl implements ContainerManager {
   /**
    *
    */
-  private final ContainerStateManagerV2 containerStateManager;
+  private final ContainerStateManager containerStateManager;
 
   private final SCMHAManager haManager;
   private final SequenceIdGenerator sequenceIdGen;
@@ -443,7 +443,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   // Remove this after fixing Recon
   @VisibleForTesting
-  public ContainerStateManagerV2 getContainerStateManager() {
+  public ContainerStateManager getContainerStateManager() {
     return containerStateManager;
   }
 

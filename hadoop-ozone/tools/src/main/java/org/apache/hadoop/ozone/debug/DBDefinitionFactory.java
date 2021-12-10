@@ -24,6 +24,7 @@ import java.util.HashMap;
 
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
@@ -43,6 +44,8 @@ public final class DBDefinitionFactory {
   }
 
   private static HashMap<String, DBDefinition> dbMap;
+
+  private static String dnDBSchemaVersion;
 
   static {
     dbMap = new HashMap<>();
@@ -70,8 +73,14 @@ public final class DBDefinitionFactory {
     }
     String dbName = fileName.toString();
     if (dbName.endsWith("-container.db")) {
-      return new DatanodeSchemaTwoDBDefinition(
-          dbPath.toAbsolutePath().toString());
+      switch (dnDBSchemaVersion) {
+      case "V1":
+        return new DatanodeSchemaOneDBDefinition(
+            dbPath.toAbsolutePath().toString());
+      default:
+        return new DatanodeSchemaTwoDBDefinition(
+            dbPath.toAbsolutePath().toString());
+      }
     }
     return getDefinition(dbName);
   }
@@ -83,5 +92,9 @@ public final class DBDefinitionFactory {
       return new OMDBDefinition();
     }
     return null;
+  }
+
+  public static void setDnDBSchemaVersion(String dnDBSchemaVersion) {
+    DBDefinitionFactory.dnDBSchemaVersion = dnDBSchemaVersion;
   }
 }

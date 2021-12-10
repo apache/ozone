@@ -66,13 +66,13 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     String key = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
     // Original key should be deleted, toKey should exist.
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(key);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(key);
 
     Assert.assertNull(omKeyInfo);
 
-    omKeyInfo =
-        omMetadataManager.getKeyTable().get(omMetadataManager.getOzoneKey(
-            volumeName, bucketName, toKeyName));
+    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName));
 
     Assert.assertNotNull(omKeyInfo);
 

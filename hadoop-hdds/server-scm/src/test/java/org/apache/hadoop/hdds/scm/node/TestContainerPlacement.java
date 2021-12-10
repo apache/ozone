@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -86,6 +87,7 @@ public class TestContainerPlacement {
   private SequenceIdGenerator sequenceIdGen;
   private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
+  private NodeManager nodeManager;
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -101,7 +103,9 @@ public class TestContainerPlacement {
     scmhaManager = MockSCMHAManager.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    pipelineManager = MockPipelineManager.getInstance();
+    nodeManager = new MockNodeManager(true, 10);
+    pipelineManager = new MockPipelineManager(dbStore,
+        scmhaManager, nodeManager);
     pipelineManager.createPipeline(new RatisReplicationConfig(
         HddsProtos.ReplicationFactor.THREE));
   }
@@ -149,9 +153,9 @@ public class TestContainerPlacement {
         .thenReturn(maxLayoutVersion());
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    SCMNodeManager nodeManager = new SCMNodeManager(config, storageConfig,
+    SCMNodeManager scmNodeManager = new SCMNodeManager(config, storageConfig,
         eventQueue, null, SCMContext.emptyContext(), versionManager);
-    return nodeManager;
+    return scmNodeManager;
   }
 
   ContainerManager createContainerManager()
@@ -183,35 +187,36 @@ public class TestContainerPlacement {
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
 
-    SCMNodeManager nodeManager = createNodeManager(conf);
+    SCMNodeManager scmNodeManager = createNodeManager(conf);
     containerManager = createContainerManager();
     List<DatanodeDetails> datanodes =
-        TestUtils.getListOfRegisteredDatanodeDetails(nodeManager, nodeCount);
+        TestUtils.getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionManager versionManager =
+        scmNodeManager.getLayoutVersionManager();
     LayoutVersionProto layoutInfo =
         toLayoutVersionProto(versionManager.getMetadataLayoutVersion(),
             versionManager.getSoftwareLayoutVersion());
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
-        nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
+        scmNodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       }
 
       //TODO: wait for heartbeat to be processed
       Thread.sleep(4 * 1000);
-      assertEquals(nodeCount, nodeManager.getNodeCount(null, HEALTHY));
+      assertEquals(nodeCount, scmNodeManager.getNodeCount(null, HEALTHY));
       assertEquals(capacity * nodeCount,
-          (long) nodeManager.getStats().getCapacity().get());
+          (long) scmNodeManager.getStats().getCapacity().get());
       assertEquals(used * nodeCount,
-          (long) nodeManager.getStats().getScmUsed().get());
+          (long) scmNodeManager.getStats().getScmUsed().get());
       assertEquals(remaining * nodeCount,
-          (long) nodeManager.getStats().getRemaining().get());
+          (long) scmNodeManager.getStats().getRemaining().get());
 
       xceiverClientManager= new XceiverClientManager(conf);
 
       ContainerInfo container = containerManager
           .allocateContainer(
-              ReplicationConfig.fromTypeAndFactor(
+              ReplicationConfig.fromProtoTypeAndFactor(
                   SCMTestUtils.getReplicationType(conf),
                   SCMTestUtils.getReplicationFactor(conf)),
               OzoneConsts.OZONE);
@@ -220,7 +225,7 @@ public class TestContainerPlacement {
               container.containerID()).size());
     } finally {
       IOUtils.closeQuietly(containerManager);
-      IOUtils.closeQuietly(nodeManager);
+      IOUtils.closeQuietly(scmNodeManager);
       if (xceiverClientManager != null) {
         xceiverClientManager.close();
       }

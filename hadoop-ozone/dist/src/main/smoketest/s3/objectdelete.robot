@@ -31,12 +31,10 @@ Delete file with s3api
                         Execute                    date > /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapi/f1 --body /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/deletetestapi/
-                        Should contain             ${result}         f1
+                        Should contain             ${result}         "${PREFIX}/deletetestapi/f1"
     ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapi/f1
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/deletetestapi/
-                        Should not contain         ${result}         f1
-#In case of HTTP 500, the error code is printed out to the console.
-                        Should not contain         ${result}         500
+                        Should not contain         ${result}         "${PREFIX}/deletetestapi/f1"
 
 Delete file with s3api, file doesn't exist
     ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/

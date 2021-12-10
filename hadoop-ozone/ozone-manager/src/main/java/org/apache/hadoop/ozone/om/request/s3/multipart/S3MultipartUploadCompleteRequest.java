@@ -25,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -37,8 +38,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -71,8 +74,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequest.class);
 
-  public S3MultipartUploadCompleteRequest(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCompleteRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -81,15 +85,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         getOmRequest().getCompleteMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
-    return getOmRequest().toBuilder()
-        .setCompleteMultiPartUploadRequest(multipartUploadCompleteRequest
-            .toBuilder().setKeyArgs(keyArgs.toBuilder()
-                .setModificationTime(Time.now())
-                .setKeyName(validateAndNormalizeKey(
-                    ozoneManager.getEnableFileSystemPaths(),
-                    keyArgs.getKeyName()))))
-        .setUserInfo(getUserInfo()).build();
+    return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
+        multipartUploadCompleteRequest.toBuilder().setKeyArgs(
+            keyArgs.toBuilder().setModificationTime(Time.now())
+                .setKeyName(keyPath))).setUserInfo(getUserInfo()).build();
   }
 
   @Override
@@ -330,7 +333,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           new OmKeyInfo.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
           .setReplicationConfig(
-              ReplicationConfig.fromTypeAndFactor(type, factor))
+              ReplicationConfig.fromProtoTypeAndFactor(type, factor))
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setDataSize(dataSize)
@@ -347,10 +350,21 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       updatePrefixFSOInfo(dbOpenKeyInfo, builder);
       omKeyInfo = builder.build();
     } else {
+      OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
+          keyName, omMetadataManager);
+
       // Already a version exists, so we should add it as a new version.
       // But now as versioning is not supported, just following the commit
       // key approach. When versioning support comes, then we can uncomment
       // below code keyInfo.addNewVersion(locations);
+
+      // As right now versioning is not supported, we can set encryption info
+      // at KeyInfo level, but once we start supporting versioning,
+      // encryption info needs to be set at KeyLocation level, as each version
+      // will have it's own file encryption info.
+      if (dbOpenKeyInfo.getFileEncryptionInfo() != null) {
+        omKeyInfo.setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo());
+      }
       omKeyInfo.updateLocationInfoList(partLocationInfos, true, true);
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
@@ -378,20 +392,22 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
-    return omMetadataManager.getKeyTable().get(dbOzoneKey);
+    return omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
   }
 
   protected OmKeyInfo getOmKeyInfoFromOpenKeyTable(String dbMultipartKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
-    return omMetadataManager.getOpenKeyTable().get(dbMultipartKey);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartKey);
   }
 
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
       String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex) {
 
     // Add key entry to file table.
-    omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(dbOzoneKey),
-        new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(dbOzoneKey),
+            new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
   }
 
   private int getPartsListSize(String requestedVolume,
@@ -496,7 +512,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
         transactionLogIndex);
 
-    omMetadataManager.getOpenKeyTable().addCacheEntry(
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
         new CacheKey<>(dbMultipartOpenKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
@@ -504,5 +520,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         new CacheValue<>(Optional.absent(), transactionLogIndex));
   }
 
+  public static S3MultipartUploadCompleteRequest getInstance(KeyArgs keyArgs,
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new S3MultipartUploadCompleteRequestWithFSO(omRequest,
+          bucketLayout);
+    }
+    return new S3MultipartUploadCompleteRequest(omRequest, bucketLayout);
+  }
 }
 

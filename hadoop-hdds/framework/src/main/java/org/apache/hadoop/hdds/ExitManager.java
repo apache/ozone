@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds;
 
+import java.io.IOException;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 
@@ -27,7 +28,16 @@ import org.slf4j.Logger;
 public class ExitManager {
 
   public void exitSystem(int status, String message, Throwable throwable,
-      Logger log) {
+      Logger log) throws IOException {
     ExitUtils.terminate(status, message, throwable, log);
+  }
+
+  public void exitSystem(int status, String message, Logger log)
+      throws IOException {
+    ExitUtils.terminate(status, message, log);
+  }
+
+  public void forceExit(int status, Exception ex, Logger log) {
+    ExitUtils.terminate(status, ex.getLocalizedMessage(), ex, log);
   }
 }

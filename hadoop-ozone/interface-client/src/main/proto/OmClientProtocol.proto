@@ -103,16 +103,16 @@ enum Type {
 
   PurgePaths = 94;
 
-  CreateTenant = 95;
-  DeleteTenant = 97;  // TODO: Renumber when rebasing
-  ListTenant = 103;
+  CreateTenant = 96;
+  DeleteTenant = 97;
+  ListTenant = 98;
 
-  TenantGetUserInfo = 98;
-  TenantAssignUserAccessId = 99;
-  TenantRevokeUserAccessId = 100;
+  TenantGetUserInfo = 99;
+  TenantAssignUserAccessId = 100;
+  TenantRevokeUserAccessId = 101;
 
-  TenantAssignAdmin = 101;
-  TenantRevokeAdmin = 102;
+  TenantAssignAdmin = 102;
+  TenantRevokeAdmin = 103;
 
   GetS3Volume = 104;
   TenantListUser = 105;
@@ -201,16 +201,18 @@ message OMRequest {
 
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
-  optional CreateTenantRequest              CreateTenantRequest            = 95;
+  optional S3Authentication                 s3Authentication               = 95;
+
+  optional CreateTenantRequest              CreateTenantRequest            = 96;
   optional DeleteTenantRequest              DeleteTenantRequest            = 97;
-  optional ListTenantRequest                ListTenantRequest              = 103;  // TODO: Renumber this when rebasing
+  optional ListTenantRequest                ListTenantRequest              = 98;
 
-  optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 98;
-  optional TenantAssignUserAccessIdRequest  TenantAssignUserAccessIdRequest= 99;
-  optional TenantRevokeUserAccessIdRequest  TenantRevokeUserAccessIdRequest= 100;
+  optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 99;
+  optional TenantAssignUserAccessIdRequest  TenantAssignUserAccessIdRequest= 100;
+  optional TenantRevokeUserAccessIdRequest  TenantRevokeUserAccessIdRequest= 101;
 
-  optional TenantAssignAdminRequest         TenantAssignAdminRequest       = 101;
-  optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 102;
+  optional TenantAssignAdminRequest         TenantAssignAdminRequest       = 102;
+  optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 103;
 
   optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
   optional TenantListUserRequest            tenantListUserRequest          = 105;
@@ -293,17 +295,17 @@ message OMResponse {
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
   optional PurgePathsResponse                 purgePathsResponse           = 93;
 
-  // Skipped 94 to align with OMRequest
-  optional CreateTenantResponse              CreateTenantResponse          = 95;
+  // Skipped 94/95 to align with OMRequest
+  optional CreateTenantResponse              CreateTenantResponse          = 96;
   optional DeleteTenantResponse              DeleteTenantResponse          = 97;
-  optional ListTenantResponse                ListTenantResponse            = 103;  // TODO: Renumber this when rebasing
+  optional ListTenantResponse                ListTenantResponse            = 98;
 
-  optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 98;
-  optional TenantAssignUserAccessIdResponse  TenantAssignUserAccessIdResponse= 99;
-  optional TenantRevokeUserAccessIdResponse  TenantRevokeUserAccessIdResponse= 100;
+  optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 99;
+  optional TenantAssignUserAccessIdResponse  TenantAssignUserAccessIdResponse= 100;
+  optional TenantRevokeUserAccessIdResponse  TenantRevokeUserAccessIdResponse= 101;
 
-  optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 101;
-  optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 102;
+  optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 102;
+  optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 103;
 
   optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
   optional TenantListUserResponse            tenantListUserResponse        = 105;
@@ -606,6 +608,7 @@ message BucketInfo {
     optional int64 quotaInNamespace = 16 [default = -2];
     optional uint64 usedNamespace = 17;
     optional BucketLayoutProto bucketLayout = 18;
+    optional string owner = 19;
 }
 
 enum StorageTypeProto {
@@ -1249,6 +1252,7 @@ message ServiceInfo {
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
+    optional string OMProtocolVersion = 5;
 }
 
 message MultipartInfoInitiateRequest {
@@ -1542,6 +1546,15 @@ message UpdateGetS3SecretRequest {
 }
 
 // MARK
+
+/**
+  This will be used by OM to authenticate S3 gateway requests on a per request basis.
+*/
+message S3Authentication {
+    optional string stringToSign = 1;
+    optional string signature = 2;
+    optional string accessId = 3;
+}
 
 /**
  The OM service that takes care of Ozone namespace.

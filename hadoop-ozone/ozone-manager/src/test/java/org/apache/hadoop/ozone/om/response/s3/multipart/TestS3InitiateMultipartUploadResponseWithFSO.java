@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -34,6 +35,10 @@ import java.util.UUID;
  */
 public class TestS3InitiateMultipartUploadResponseWithFSO
     extends TestS3InitiateMultipartUploadResponse {
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
 
   @Test
   public void testAddDBToBatch() throws Exception {
@@ -64,8 +69,8 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
     String multipartOpenKey = omMetadataManager
         .getMultipartKey(parentID, fileName, multipartUploadID);
 
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getOpenKeyTable().get(multipartOpenKey);
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(multipartOpenKey);
     Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
     Assert.assertEquals("FileName mismatches!", fileName,
             omKeyInfo.getKeyName());

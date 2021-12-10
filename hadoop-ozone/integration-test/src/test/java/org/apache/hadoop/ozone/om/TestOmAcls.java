@@ -132,7 +132,7 @@ public class TestOmAcls {
         () -> volume.createBucket(bucketName));
 
     assertTrue(logCapturer.getOutput()
-        .contains("doesn't have CREATE permission to access bucket"));
+        .contains("doesn't have READ permission to access volume"));
   }
 
   @Test
@@ -147,8 +147,8 @@ public class TestOmAcls {
 
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
-    assertTrue(logCapturer.getOutput().contains("doesn't have CREATE " +
-        "permission to access key"));
+    assertTrue(logCapturer.getOutput().contains("doesn't have READ " +
+        "permission to access volume"));
   }
 
   /**

@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 
@@ -281,7 +282,10 @@ public final class OzoneManagerRatisServer {
     try {
       return server.submitClientRequestAsync(raftClientRequest)
           .get();
-    } catch (Exception ex) {
+    } catch (ExecutionException | IOException ex) {
+      throw new ServiceException(ex.getMessage(), ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
       throw new ServiceException(ex.getMessage(), ex);
     }
   }
@@ -314,21 +318,15 @@ public final class OzoneManagerRatisServer {
     SetConfigurationRequest request = new SetConfigurationRequest(clientId,
         server.getId(), raftGroupId, nextCallId(), newPeersList);
 
-    try {
-      RaftClientReply raftClientReply = server.setConfiguration(request);
-      if (raftClientReply.isSuccess()) {
-        LOG.info("Added OM {} to Ratis group {}.", newOMNodeId, raftGroupId);
-      } else {
-        LOG.error("Failed to add OM {} to Ratis group {}. Ratis " +
-                "SetConfiguration reply: {}", newOMNodeId, raftGroupId,
-            raftClientReply);
-        throw new IOException("Failed to add OM " + newOMNodeId + " to Ratis " +
-            "ring.");
-      }
-    } catch (IOException e) {
-      LOG.error("Failed to update Ratis configuration and add OM {} to " +
-          "Ratis group {}", newOMNodeId, raftGroupId, e);
-      throw e;
+    RaftClientReply raftClientReply = server.setConfiguration(request);
+    if (raftClientReply.isSuccess()) {
+      LOG.info("Added OM {} to Ratis group {}.", newOMNodeId, raftGroupId);
+    } else {
+      LOG.error("Failed to add OM {} to Ratis group {}. Ratis " +
+              "SetConfiguration reply: {}", newOMNodeId, raftGroupId,
+          raftClientReply);
+      throw new IOException("Failed to add OM " + newOMNodeId + " to Ratis " +
+          "ring.");
     }
   }
 
@@ -380,8 +378,10 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
-    Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
-    Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
+      Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
+    }
     return RaftClientRequest.newBuilder()
         .setClientId(
             ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))
@@ -549,8 +549,10 @@ public final class OzoneManagerRatisServer {
     // Set Ratis storage directory
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(ratisStorageDir)));
-    // Disable the pre vote feature in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+    // Disable/enable the pre vote feature in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        conf.getBoolean(OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE,
+            OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT));
 
     // Set RAFT segment size
     final long raftSegmentSize = (long) conf.getStorageSize(

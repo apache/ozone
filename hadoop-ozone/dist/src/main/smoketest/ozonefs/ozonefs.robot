@@ -38,19 +38,19 @@ List non-existent bucket
 
 Create dir with parents
                    Execute               ozone fs -mkdir -p ${DEEP_URL}
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         ${DEEP_DIR}
 
 Copy from local
                    Execute               ozone fs -copyFromLocal NOTICE.txt ${DEEP_URL}/
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         NOTICE.txt
     ${result} =    Execute               ozone sh key info ${VOLUME}/${BUCKET}/${DEEP_DIR}/NOTICE.txt | jq -r '.replicationFactor'
                    Should Be Equal       ${result}         3
 
 Put
                    Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         PUTFILE.txt
 
 List
@@ -60,14 +60,14 @@ List
 
 Move
                    Execute               ozone fs -mv ${DEEP_URL}/NOTICE.txt ${DEEP_URL}/MOVED.TXT
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         MOVED.TXT
                    Should not contain    ${result}       NOTICE.txt
 
 Copy within FS
     [Setup]        Execute               ozone fs -mkdir -p ${DEEP_URL}/subdir1
                    Execute               ozone fs -cp ${DEEP_URL}/MOVED.TXT ${DEEP_URL}/subdir1/NOTICE.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         subdir1/NOTICE.txt
 
     ${result} =    Execute               ozone fs -ls ${DEEP_URL}/subdir1/
@@ -79,17 +79,17 @@ Cat file
 
 Delete file
                    Execute               ozone fs -rm -skipTrash ${DEEP_URL}/subdir1/NOTICE.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should not contain    ${result}       NOTICE.txt
 
 Delete dir
     ${result} =    Execute               ozone fs -rmdir ${DEEP_URL}/subdir1/
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should not contain    ${result}       subdir1
 
 Touch file
                    Execute               ozone fs -touch ${DEEP_URL}/TOUCHFILE-${SCHEME}.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}       TOUCHFILE-${SCHEME}.txt
 
 Delete file with Trash
@@ -103,7 +103,7 @@ Delete file with Trash
 Delete recursively
                    Execute               ozone fs -mkdir -p ${DEEP_URL}/subdir2
                    Execute               ozone fs -rm -skipTrash -r ${DEEP_URL}/subdir2
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should not contain    ${result}       ${DEEP_DIR}/subdir2
 
 List recursively

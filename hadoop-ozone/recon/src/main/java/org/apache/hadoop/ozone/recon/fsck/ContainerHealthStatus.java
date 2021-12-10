@@ -37,20 +37,23 @@ public class ContainerHealthStatus {
 
   private ContainerInfo container;
   private int replicaDelta;
-  private Set<ContainerReplica> replicas;
+  private Set<ContainerReplica> healthyReplicas;
   private ContainerPlacementStatus placementStatus;
+  private int numReplicas;
 
   ContainerHealthStatus(ContainerInfo container,
-      Set<ContainerReplica> replicas, PlacementPolicy placementPolicy) {
+                        Set<ContainerReplica> healthyReplicas,
+                        PlacementPolicy placementPolicy) {
     this.container = container;
     int repFactor = container.getReplicationConfig().getRequiredNodes();
-    this.replicas = replicas
+    this.healthyReplicas = healthyReplicas
         .stream()
         .filter(r -> !r.getState()
             .equals((ContainerReplicaProto.State.UNHEALTHY)))
         .collect(Collectors.toSet());
-    this.replicaDelta = repFactor - this.replicas.size();
+    this.replicaDelta = repFactor - this.healthyReplicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);
+    this.numReplicas = healthyReplicas.size();
   }
 
   public long getContainerID() {
@@ -87,7 +90,7 @@ public class ContainerHealthStatus {
   }
 
   public int getReplicaCount() {
-    return replicas.size();
+    return healthyReplicas.size();
   }
 
   public boolean isMisReplicated() {
@@ -111,12 +114,12 @@ public class ContainerHealthStatus {
   }
 
   public boolean isMissing() {
-    return replicas.size() == 0;
+    return numReplicas == 0;
   }
 
   private ContainerPlacementStatus getPlacementStatus(
       PlacementPolicy policy, int repFactor) {
-    List<DatanodeDetails> dns = replicas.stream()
+    List<DatanodeDetails> dns = healthyReplicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
     return policy.validateContainerPlacement(dns, repFactor);

@@ -23,13 +23,17 @@ import java.util.List;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.MethodArgument;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisRequestProto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,6 +45,8 @@ public final class SCMRatisRequest {
   private final String operation;
   private final Object[] arguments;
   private final Class<?>[] parameterTypes;
+  private static final Logger LOG = LoggerFactory
+      .getLogger(SCMRatisRequest.class);
 
   private SCMRatisRequest(final RequestType type, final String operation,
       final Class<?>[] parameterTypes, final Object... arguments) {
@@ -137,6 +143,24 @@ public final class SCMRatisRequest {
     }
     return new SCMRatisRequest(requestProto.getType(),
         method.getName(), parameterTypes, args.toArray());
+  }
+
+  /**
+   * Convert StateMachineLogEntryProto to String.
+   * @param proto - {@link StateMachineLogEntryProto}
+   * @return String
+   */
+  public static String smProtoToString(StateMachineLogEntryProto proto) {
+    StringBuilder builder = new StringBuilder();
+    try {
+      builder.append(TextFormat.shortDebugString(
+          SCMRatisRequestProto.parseFrom(proto.getLogData().toByteArray())));
+    } catch (Throwable ex) {
+      LOG.error("smProtoToString failed", ex);
+      builder.append("smProtoToString failed with");
+      builder.append(ex.getMessage());
+    }
+    return builder.toString();
   }
 
 }

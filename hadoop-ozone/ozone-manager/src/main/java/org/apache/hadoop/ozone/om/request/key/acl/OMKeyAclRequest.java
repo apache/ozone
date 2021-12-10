@@ -26,12 +26,15 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -39,6 +42,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -47,6 +52,10 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public abstract class OMKeyAclRequest extends OMClientRequest {
 
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OMKeyAclRequest.class);
+
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
   public OMKeyAclRequest(OMRequest omRequest) {
     super(omRequest);
@@ -88,7 +97,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
               bucket);
 
       String dbKey = omMetadataManager.getOzoneKey(volume, bucket, key);
-      omKeyInfo = omMetadataManager.getKeyTable().get(dbKey);
+      omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .get(dbKey);
 
       if (omKeyInfo == null) {
         throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
@@ -113,9 +123,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       omKeyInfo.setModificationTime(modificationTime);
 
       // update cache.
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(dbKey),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .addCacheEntry(new CacheKey<>(dbKey),
+              new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;
@@ -145,6 +155,38 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
+
+  public void initializeBucketLayout(OzoneManager ozoneManager) {
+    OmBucketInfo buckInfo;
+    try {
+      ObjectParser objectParser = new ObjectParser(getPath(),
+          OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
+
+      String volume = objectParser.getVolume();
+      String bucket = objectParser.getBucket();
+
+      String buckKey =
+          ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
+
+      try {
+        buckInfo =
+            ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+        if (buckInfo == null) {
+          LOG.error("Bucket not found: {}/{} ", volume, bucket);
+          // defaulting to BucketLayout.DEFAULT
+          return;
+        }
+        bucketLayout = buckInfo.getBucketLayout();
+      } catch (IOException e) {
+        LOG.error("Failed to get bucket for the key: " + buckKey, e);
+      }
+    } catch (OMException ome) {
+      LOG.error("Invalid Path: " + getPath(), ome);
+      // Handle exception
+      // defaulting to BucketLayout.DEFAULT
+      return;
+    }
+  }
 
   /**
    * Get Key object Info from the request.
@@ -199,5 +241,13 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @param trxnLogIndex
    */
   abstract boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex);
+
+  public void setBucketLayout(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
+  }
 }
 

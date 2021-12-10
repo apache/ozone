@@ -57,13 +57,7 @@ public class ListKeyHandler extends BucketHandler {
         listOptions.getPrefix(), listOptions.getStartItem());
 
     int maxKeyLimit = listOptions.getLimit();
-
-    int counter = 0;
-    while (maxKeyLimit > counter && keyIterator.hasNext()) {
-      OzoneKey ozoneKey = keyIterator.next();
-      printObjectAsJson(ozoneKey);
-      counter++;
-    }
+    int counter = printAsJsonArray(keyIterator, maxKeyLimit);
 
     // More keys were returned notify about max length
     if (keyIterator.hasNext()) {

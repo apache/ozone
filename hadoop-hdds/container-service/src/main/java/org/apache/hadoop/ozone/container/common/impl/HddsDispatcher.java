@@ -122,8 +122,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",
             protocolMetrics,
             LOG,
-            ContainerUtils::processForDebug,
-            ContainerUtils::processForDebug);
+            HddsUtils::processForDebug,
+            HddsUtils::processForDebug);
   }
 
   @Override

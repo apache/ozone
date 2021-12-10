@@ -74,6 +74,16 @@ public class ReconDBDefinition implements DBDefinition {
           NSSummary.class,
           new NSSummaryCodec());
 
+  // Container Replica History with bcsId tracking.
+  public static final DBColumnFamilyDefinition
+      <Long, ContainerReplicaHistoryList> REPLICA_HISTORY_V2 =
+      new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
+          "replica_history_v2",
+          Long.class,
+          new LongCodec(),
+          ContainerReplicaHistoryList.class,
+          new ContainerReplicaHistoryListCodec());
+
   @Override
   public String getName() {
     return dbName;
@@ -87,6 +97,7 @@ public class ReconDBDefinition implements DBDefinition {
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {
-        CONTAINER_KEY, CONTAINER_KEY_COUNT, REPLICA_HISTORY, NAMESPACE_SUMMARY};
+        CONTAINER_KEY, CONTAINER_KEY_COUNT, REPLICA_HISTORY,
+        NAMESPACE_SUMMARY, REPLICA_HISTORY_V2};
   }
 }

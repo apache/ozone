@@ -386,6 +386,9 @@ public class ReplicationManager implements SCMService {
     } catch (Throwable t) {
       // When we get runtime exception, we should terminate SCM.
       LOG.error("Exception in Replication Monitor Thread.", t);
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       ExitUtil.terminate(1, t);
     }
   }
@@ -456,18 +459,13 @@ public class ReplicationManager implements SCMService {
             action -> replicas.stream()
                 .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
             ()-> metrics.incrNumReplicationCmdsTimeout(),
-            () -> {
-              metrics.incrNumReplicationCmdsCompleted();
-              metrics.incrNumReplicationBytesCompleted(
-                  container.getUsedBytes());
-            });
+            action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
             action -> replicas.stream()
-                .noneMatch(r ->
-                    r.getDatanodeDetails().equals(action.datanode)),
+                .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
             () -> metrics.incrNumDeletionCmdsTimeout(),
-            () -> metrics.incrNumDeletionCmdsCompleted());
+            action -> updateCompletedDeletionMetrics(container, action));
 
         /*
          * If container is under deleting and all it's replicas are deleted,
@@ -543,6 +541,20 @@ public class ReplicationManager implements SCMService {
     }
   }
 
+  private void updateCompletedReplicationMetrics(ContainerInfo container,
+      InflightAction action) {
+    metrics.incrNumReplicationCmdsCompleted();
+    metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
+    metrics.addReplicationTime(clock.millis() - action.time);
+  }
+
+  private void updateCompletedDeletionMetrics(ContainerInfo container,
+      InflightAction action) {
+    metrics.incrNumDeletionCmdsCompleted();
+    metrics.incrNumDeletionBytesCompleted(container.getUsedBytes());
+    metrics.addDeletionTime(clock.millis() - action.time);
+  }
+
   /**
    * Reconciles the InflightActions for a given container.
    *
@@ -556,7 +568,7 @@ public class ReplicationManager implements SCMService {
       final Map<ContainerID, List<InflightAction>> inflightActions,
       final Predicate<InflightAction> filter,
       final Runnable timeoutCounter,
-      final Runnable completedCounter) {
+      final Consumer<InflightAction> completedCounter) {
     final ContainerID id = container.containerID();
     final long deadline = clock.millis() - rmConf.getEventTimeout();
     if (inflightActions.containsKey(id)) {
@@ -578,7 +590,7 @@ public class ReplicationManager implements SCMService {
             if (isTimeout) {
               timeoutCounter.run();
             } else if (isCompleted) {
-              completedCounter.run();
+              completedCounter.accept(a);
             }
 
             updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
@@ -1494,10 +1506,12 @@ public class ReplicationManager implements SCMService {
   }
 
   private String getContainerToken(ContainerID containerID) {
-    StorageContainerManager scm = scmContext.getScm();
-    return scm != null
-        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
-        : ""; // unit test
+    if (scmContext.getScm() instanceof StorageContainerManager) {
+      StorageContainerManager scm =
+              (StorageContainerManager) scmContext.getScm();
+      return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
+    }
+    return ""; // unit test
   }
 
   /**
@@ -1550,6 +1564,7 @@ public class ReplicationManager implements SCMService {
         action -> inflightDeletion.get(id).add(action));
 
     metrics.incrNumDeletionCmdsSent();
+    metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
   }
 
   /**
