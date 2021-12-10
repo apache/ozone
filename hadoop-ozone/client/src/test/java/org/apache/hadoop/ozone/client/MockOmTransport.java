@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -132,10 +134,18 @@ public class MockOmTransport implements OmTransport {
 
   private OzoneManagerProtocolProtos.AllocateBlockResponse allocateBlock(
       OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest) {
-    return OzoneManagerProtocolProtos.AllocateBlockResponse.newBuilder()
-        .setKeyLocation(
-            blockAllocator.allocateBlock(allocateBlockRequest.getKeyArgs())
-                .iterator().next()).build();
+    Iterator<? extends OzoneManagerProtocolProtos.KeyLocation> iterator =
+        blockAllocator.allocateBlock(allocateBlockRequest.getKeyArgs(),
+            ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList()))
+            .iterator();
+    OzoneManagerProtocolProtos.AllocateBlockResponse.Builder builder =
+        OzoneManagerProtocolProtos.AllocateBlockResponse.newBuilder()
+            .setKeyLocation(iterator.next());
+    while (iterator.hasNext()) {
+      builder.mergeKeyLocation(iterator.next());
+    }
+    return builder.build();
+
   }
 
   private DeleteVolumeResponse deleteVolume(
@@ -195,7 +205,8 @@ public class MockOmTransport implements OmTransport {
             .setModificationTime(now).setDataSize(keyArgs.getDataSize())
             .setLatestVersion(0L).addKeyLocationList(
             KeyLocationList.newBuilder().addAllKeyLocations(
-                blockAllocator.allocateBlock(createKeyRequest.getKeyArgs()))
+                blockAllocator.allocateBlock(createKeyRequest.getKeyArgs(),
+                    new ExcludeList()))
                 .build());
 
     if (keyArgs.getType() == HddsProtos.ReplicationType.NONE) {

@@ -23,8 +23,10 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
@@ -72,8 +74,8 @@ public class TestOzoneECClient {
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
   private OzoneConfiguration conf = new OzoneConfiguration();
-  private MockOmTransport transportStub = new MockOmTransport(
-      new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks));
+  private final MockOmTransport transportStub = new MockOmTransport(
+      new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks, 15));
   private final RawErasureEncoder encoder =
       new RSRawErasureCoderFactory().createEncoder(
           new ECReplicationConfig(dataBlocks, parityBlocks));
@@ -82,13 +84,22 @@ public class TestOzoneECClient {
   public void init() throws IOException {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
         StorageUnit.KB);
+    createNewClient(conf, transportStub);
+  }
 
-    client = new OzoneClient(conf, new RpcClient(conf, null) {
+  private void createNewClient(ConfigurationSource config,
+      MockBlockAllocator blkAllocator) throws IOException {
+    createNewClient(config, new MockOmTransport(blkAllocator));
+  }
+
+  private void createNewClient(ConfigurationSource config,
+      final MockOmTransport transport) throws IOException {
+    client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
       protected OmTransport createOmTransport(String omServiceId)
           throws IOException {
-        return transportStub;
+        return transport;
       }
 
       @Override
@@ -434,6 +445,76 @@ public class TestOzoneECClient {
   public void testWriteShouldSuccessIfAllNodesFailed()
       throws IOException {
     testNodeFailuresWhileWriting(4, 1);
+  }
+
+  @Test
+  public void testStripeWriteRetriesOnFailures() throws IOException {
+    OzoneConfiguration con = new OzoneConfiguration();
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
+        StorageUnit.KB);
+    close();
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
+            15);
+    createNewClient(con, blkAllocator);
+    int numChunksToWriteAfterFailure = 3;
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, 1024 * 3,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      for (int i = 0; i < dataBlocks; i++) {
+        out.write(inputChunks[i]);
+      }
+      Assert.assertTrue(
+          ((MockXceiverClientFactory) factoryStub).getStorages().size() == 5);
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
+
+      //Cluster has 15 nodes. So, first we will create 3 block groups with
+      // distinct nodes in each. Block Group 1:  0-4, Block Group 2: 5-9, Block
+      // Group 3: 10-14
+      // Marking a node failed in first block group.
+      failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(0)));
+      //Marking a node failed in second block group.
+      failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(5)));
+
+      // First let's set storage as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      // Writer should be able to write by using 3rd block group.
+      for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
+        out.write(inputChunks[i]);
+      }
+      //It should have used 3rd block group also. So, total initialized nodes
+      // count should be 15.
+      Assert.assertTrue(
+          ((MockXceiverClientFactory) factoryStub).getStorages().size() == 15);
+    }
+    final OzoneKeyDetails key = bucket.getKey(keyName);
+    // Data supposed to store in single block group. Since we introduced the
+    // failures after first stripe, the second stripe data should have been
+    // written into new blockgroup. So, we should have 2 block groups. That
+    // means two keyLocations.
+    Assert.assertEquals(2, key.getOzoneKeyLocations().size());
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      for (int i = 0; i < dataBlocks; i++) {
+        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
+        Assert.assertTrue("Expected: " + new String(inputChunks[i],
+                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            Arrays.equals(inputChunks[i], fileContent));
+      }
+      for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
+        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
+        Assert.assertTrue("Expected: " + new String(inputChunks[i],
+                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            Arrays.equals(inputChunks[i], fileContent));
+      }
+    }
   }
 
   public void testNodeFailuresWhileWriting(int numFailureToInject,

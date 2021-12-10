@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
  * block output streams chunk by chunk.
  */
 public class ECKeyOutputStream extends KeyOutputStream {
+  public static final int RETRIES_ON_STRIPE_WRITE_FAILURE = 10;
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private int ecChunkSize;
@@ -258,7 +259,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     ECBlockOutputStreamEntry newBlockGroupStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     newBlockGroupStreamEntry
-        .updateBlockGroupToAckedPosition(totalLenToWrite);
+        .updateBlockGroupToAckedPosition(failedStripeDataSize);
     ecChunkBufferCache.clear(chunkSize);
     ecChunkBufferCache.release();
 
@@ -553,17 +554,21 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private void handleStripeFailure(int lastStripeSize, int parityCellSize,
       boolean allocateBlockIfFull)
       throws IOException {
-    int maxRetriesOnStripeWriteFailure = 10;
+    // TODO: this number should be taken from config
+    int maxRetriesOnStripeWriteFailure = RETRIES_ON_STRIPE_WRITE_FAILURE;
     StripeWriteStatus stripeWriteStatus = StripeWriteStatus.FAILED;
-    while (maxRetriesOnStripeWriteFailure > 0 && stripeWriteStatus == StripeWriteStatus.FAILED) {
+    while (maxRetriesOnStripeWriteFailure > 0
+        && stripeWriteStatus == StripeWriteStatus.FAILED) {
       stripeWriteStatus =
           rewriteStripeToNewBlockGroup(parityCellSize, lastStripeSize,
               allocateBlockIfFull);
       maxRetriesOnStripeWriteFailure--;
     }
-    if (maxRetriesOnStripeWriteFailure == 0 && stripeWriteStatus == StripeWriteStatus.FAILED) {
+    if (maxRetriesOnStripeWriteFailure == 0
+        && stripeWriteStatus == StripeWriteStatus.FAILED) {
       throw new IOException(
-          "Completed max allowed retries " + maxRetriesOnStripeWriteFailure + " on stripe failures.");
+          "Completed max allowed retries " + RETRIES_ON_STRIPE_WRITE_FAILURE
+              + " on stripe failures.");
     }
   }
 

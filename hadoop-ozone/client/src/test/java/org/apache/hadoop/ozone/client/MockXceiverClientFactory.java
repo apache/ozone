@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,18 +37,30 @@ public class MockXceiverClientFactory
 
   private final Map<DatanodeDetails, MockDatanodeStorage> storage =
       new HashMap<>();
+  private List<DatanodeDetails> pendingToFailNodes = new ArrayList<>();
 
   public void setFailedStorages(List<DatanodeDetails> failedStorages) {
-    final Iterator<Map.Entry<DatanodeDetails, MockDatanodeStorage>> iterator =
-        storage.entrySet().iterator();
-    while (iterator.hasNext()) {
-      final Map.Entry<DatanodeDetails, MockDatanodeStorage> next =
-          iterator.next();
-      if (failedStorages.contains(next.getKey())) {
-        final MockDatanodeStorage value = next.getValue();
-        value.setStorageFailed();
+    List<DatanodeDetails> remainingFailNodes = new ArrayList<>();
+    for(int i=0; i< failedStorages.size(); i++){
+      DatanodeDetails failedDN = failedStorages.get(i);
+      boolean isCurrentNodeMarked = false;
+      final Iterator<Map.Entry<DatanodeDetails, MockDatanodeStorage>> iterator =
+          storage.entrySet().iterator();
+      while (iterator.hasNext()) {
+        final Map.Entry<DatanodeDetails, MockDatanodeStorage> next =
+            iterator.next();
+        if (next.getKey().equals(failedDN)) {
+          final MockDatanodeStorage value = next.getValue();
+          value.setStorageFailed();
+          isCurrentNodeMarked = true;
+        }
+      }
+      if(!isCurrentNodeMarked){
+        //This node does not initialized by client yet.
+        remainingFailNodes.add(failedDN);
       }
     }
+    this.pendingToFailNodes = remainingFailNodes;
   }
 
   @Override
@@ -58,9 +71,13 @@ public class MockXceiverClientFactory
   @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline)
       throws IOException {
-    return new MockXceiverClientSpi(pipeline, storage
-        .computeIfAbsent(pipeline.getFirstNode(),
-            r -> new MockDatanodeStorage()));
+    MockXceiverClientSpi mockXceiverClientSpi =
+        new MockXceiverClientSpi(pipeline, storage
+            .computeIfAbsent(pipeline.getFirstNode(),
+                r -> new MockDatanodeStorage()));
+    // Incase if this node already set to mark as failed.
+    setFailedStorages(this.pendingToFailNodes);
+    return mockXceiverClientSpi;
   }
 
   @Override
