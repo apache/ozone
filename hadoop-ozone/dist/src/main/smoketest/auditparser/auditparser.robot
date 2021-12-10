@@ -23,7 +23,7 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${user}              hadoop
-${count}             5
+${buckets}           5
 ${auditworkdir}      /tmp
 
 *** Keywords ***
@@ -32,9 +32,14 @@ Set username
     Set Suite Variable     ${user}         testuser/${hostname}@EXAMPLE.COM
     [return]               ${user}
 
+Create data
+    Freon OMBG    prefix=auditparser    n=${buckets}
+    Freon OCKG    prefix=auditparser    n=100
+
 *** Test Cases ***
 Testing audit parser
-    [Setup]    Freon OMBG    prefix=auditparser    n=${count}
+    [Setup]            Create data
+
     ${logdir} =        Get Environment Variable      OZONE_LOG_DIR     /var/log/ozone
     ${logfile} =       Execute              ls -t "${logdir}" | grep om-audit | head -1
                        Execute              ozone auditparser "${auditworkdir}/audit.db" load "${logdir}/${logfile}"
@@ -48,4 +53,4 @@ Testing audit parser
                        Should be true       ${result}>=1
     ${result} =        Execute              ozone auditparser "${auditworkdir}/audit.db" query "select count(*) from audit where op='CREATE_BUCKET' and RESULT='SUCCESS'"
     ${result} =        Convert To Number     ${result}
-                       Should be true       ${result}>=${count}
+                       Should be true       ${result}>=${buckets}
