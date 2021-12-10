@@ -133,7 +133,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>1.7.30</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
-    <log4j2.version>2.13.3</log4j2.version>
+    <log4j2.version>2.15.0</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
 
     <prometheus.version>0.7.0</prometheus.version>
