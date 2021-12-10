@@ -58,7 +58,7 @@ public final class OMConfigKeys {
       "0.0.0.0";
   public static final int OZONE_OM_PORT_DEFAULT = 9862;
   public static final String OZONE_OM_GRPC_PORT_KEY =
-      "ozone.s3.grpc.port";
+      "ozone.s3g.grpc.port";
 
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
