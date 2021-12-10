@@ -128,7 +128,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final long syncSize = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
-  private int currentBufferRemaining;
   private XceiverClientMetrics metrics;
   /**
    * Creates a new BlockDataStreamOutput.
@@ -264,10 +263,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     while (len > 0) {
       allocateNewBufferIfNeeded();
-      int writeLen = Math.min(len, currentBufferRemaining);
+      int writeLen = Math.min(len, currentBuffer.length());
       final StreamBuffer buf = new StreamBuffer(b, off, writeLen);
       currentBuffer.put(buf);
-      currentBufferRemaining -= writeLen;
       writeChunkIfNeeded();
       off += writeLen;
       writtenDataLength += writeLen;
@@ -277,7 +275,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private void writeChunkIfNeeded() throws IOException {
-    if (currentBufferRemaining==0) {
+    if (currentBuffer.length()==0) {
       writeChunk(currentBuffer);
       currentBuffer = null;
     }
@@ -287,15 +285,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     bufferList.add(sb);
     ByteBuffer dup = sb.duplicate();
     dup.position(0);
-    dup.limit(sb.getBuffer().position());
+    dup.limit(sb.position());
     writeChunkToContainer(dup);
   }
 
   private void allocateNewBufferIfNeeded() {
-    if (currentBufferRemaining == 0) {
+    if (currentBuffer==null) {
       currentBuffer =
           StreamBuffer.allocate(config.getDataStreamMinPacketSize());
-      currentBufferRemaining = config.getDataStreamMinPacketSize();
     }
   }
 
@@ -335,10 +332,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     int count = 0;
     while (len > 0) {
       final StreamBuffer buf = bufferList.get(count);
-      final long writeLen = Math.min(buf.getBuffer().position(), len);
+      final long writeLen = Math.min(buf.position(), len);
       final ByteBuffer duplicated = buf.duplicate();
       duplicated.position(0);
-      duplicated.limit(buf.getBuffer().position());
+      duplicated.limit(buf.position());
       writeChunkToContainer(duplicated);
       len -= writeLen;
       count++;

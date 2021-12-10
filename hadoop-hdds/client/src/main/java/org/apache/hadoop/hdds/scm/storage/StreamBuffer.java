@@ -43,20 +43,17 @@ public class StreamBuffer {
     return buffer.limit() - buffer.position();
   }
 
-  public ByteBuffer getBuffer() {
-    return buffer;
+  public int position() {
+    return buffer.position();
   }
 
+
   public void put(StreamBuffer sb){
-    buffer.put(sb.getBuffer());
+    buffer.put(sb.buffer);
   }
 
   public static StreamBuffer allocate(int size){
     return new StreamBuffer(ByteBuffer.allocate(size));
-  }
-
-  public boolean hasRemaining(){
-    return buffer.remaining() > 0;
   }
 
 }

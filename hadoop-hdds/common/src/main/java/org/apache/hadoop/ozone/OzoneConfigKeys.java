@@ -102,7 +102,7 @@ public final class OzoneConfigKeys {
    */
   public static final String OZONE_FS_DATASTREAM_ENABLE =
       "ozone.fs.datastream.enable";
-  public static final boolean OZONE_FS_DATASTREAM_ENABLE_DEFAULT = false;
+  public static final boolean OZONE_FS_DATASTREAM_ENABLE_DEFAULT = true;
 
   /**
    * When set to true, allocate a random free port for ozone container, so that

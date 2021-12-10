@@ -3010,7 +3010,7 @@
   </property>
   <property>
     <name>ozone.fs.datastream.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, DATANODE</tag>
     <description> To enable/disable filesystem write via ratis streaming.
     </description>

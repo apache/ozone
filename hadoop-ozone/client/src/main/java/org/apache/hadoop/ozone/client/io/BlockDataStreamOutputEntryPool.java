@@ -309,7 +309,7 @@ public class BlockDataStreamOutputEntryPool {
   long computeBufferData() {
     long totalDataLen =0;
     for (StreamBuffer b : bufferList){
-      totalDataLen += b.getBuffer().position();
+      totalDataLen += b.position();
     }
     return totalDataLen;
   }
