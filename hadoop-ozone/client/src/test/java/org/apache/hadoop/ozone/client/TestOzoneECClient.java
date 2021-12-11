@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -425,6 +426,12 @@ public class TestOzoneECClient {
   }
 
   @Test
+  public void testWriteShouldSuccessIfLessThanParityNodesFail2()
+      throws IOException {
+    testNodeFailuresWhileWriting(2, 1);
+  }
+
+  @Test
   public void testWriteShouldSuccessIf4NodesFailed()
       throws IOException {
     testNodeFailuresWhileWriting(4, 1);
@@ -433,7 +440,7 @@ public class TestOzoneECClient {
   @Test
   public void testWriteShouldSuccessIfAllNodesFailed()
       throws IOException {
-    testNodeFailuresWhileWriting(4, 1);
+    testNodeFailuresWhileWriting(5, 1);
   }
 
   public void testNodeFailuresWhileWriting(int numFailureToInject,
@@ -450,14 +457,28 @@ public class TestOzoneECClient {
         out.write(inputChunks[i]);
       }
 
-      List<DatanodeDetails> failedDNs = new ArrayList<>();
       Map<DatanodeDetails, MockDatanodeStorage> storages =
           ((MockXceiverClientFactory) factoryStub).getStorages();
-      DatanodeDetails[] dnDetails =
-          storages.keySet().toArray(new DatanodeDetails[storages.size()]);
-      for (int i = 0; i < numFailureToInject; i++) {
-        failedDNs.add(dnDetails[i]);
-      }
+      List<DatanodeDetails> failedDNs =
+          storages.keySet().stream()
+              // we need to sort the keyset, to ensure that nodes that we
+              // actually write to, are selected to fail, otherwise, we won't
+              // get to the error handling path, and won't open a second
+              // block to write to, hence keylocations size assertion fails
+              // below.
+              .sorted((d1, d2) -> {
+                long id1 = d1.getUuid().getMostSignificantBits();
+                long id2 = d2.getUuid().getMostSignificantBits();
+                if (id1 <= numChunksToWriteAfterFailure || id1 > dataBlocks) {
+                  return -1;
+                }
+                if (id2 < numChunksToWriteAfterFailure || id2 > dataBlocks) {
+                  return 1;
+                }
+                return 0;
+              })
+              .limit(numFailureToInject)
+              .collect(Collectors.toList());
 
       // First let's set storage as bad
       ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
