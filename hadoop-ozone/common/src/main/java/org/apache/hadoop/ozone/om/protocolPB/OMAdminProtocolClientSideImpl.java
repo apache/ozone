@@ -119,7 +119,7 @@ public class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
   /**
    * Create OM Admin Protocol Client for contacting the OM ring (failover
    * till the current OM leader is reached). Use for admin commands such as
-   * decommissionOM which are should reach the OM leader.
+   * decommissionOM which should reach the OM leader.
    */
   public static OMAdminProtocolClientSideImpl createProxyForOMHA(
       OzoneConfiguration conf, UserGroupInformation ugi, String omServiceId)
@@ -206,8 +206,9 @@ public class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
     }
 
     if (!response.getSuccess()) {
-      throwException("Decommission Request to " + omPrintInfo +
-          " failed with error: " + response.getErrorMsg());
+      throwException("Request to decommission" + removeOMNode.getOMPrintInfo() +
+          ", sent to " + omPrintInfo + " failed with error: " +
+          response.getErrorMsg());
     }
   }
 

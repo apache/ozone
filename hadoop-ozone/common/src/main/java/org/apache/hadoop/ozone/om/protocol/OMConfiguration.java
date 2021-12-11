@@ -80,10 +80,10 @@ public final class OMConfiguration {
   }
 
   /**
-   * Reload configuration from disk and return all the OM nodes present in
-   * the new conf under current serviceId.
+   * Reload configuration from disk and return all active OM nodes (excludes
+   * decommissioned nodes) present in the new conf under current serviceId.
    */
-  public Map<String, OMNodeDetails> getOmNodesInNewConf() {
+  public Map<String, OMNodeDetails> getActiveOmNodesInNewConf() {
     return omNodesInNewConf.stream()
         .filter(omNodeDetails -> !omNodeDetails.isDecommissioned())
         .collect(Collectors.toMap(NodeDetails::getNodeId,

@@ -1549,7 +1549,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     OMNodeDetails omNodeDetailsInRemoteConfig = remoteOMConfig
-        .getOmNodesInNewConf().get(getOMNodeId());
+        .getActiveOmNodesInNewConf().get(getOMNodeId());
     if (omNodeDetailsInRemoteConfig == null) {
       throw new IOException("Remote OM " + remoteNodeId + " does not have the" +
           " bootstrapping OM(" + getOMNodeId() + ") information on reloading " +
@@ -1634,7 +1634,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         try {
           addOMNodeToPeers(omNodeId);
         } catch (IOException e) {
-          LOG.error("Fatal Error: Shutting down the system as otherwise it " +
+          LOG.error("Fatal Error while adding bootstrapped node to " +
+              "peer list. Shutting down the system as otherwise it " +
               "could lead to OM state divergence.", e);
           exitManager.forceExit(1, e, LOG);
         }
@@ -1655,7 +1656,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         try {
           removeOMNodeFromPeers(omNodeId);
         } catch (IOException e) {
-          e.printStackTrace();
+          LOG.error("Fatal Error while removing decommissioned node from " +
+              "peer list. Shutting down the system as otherwise it " +
+              "could lead to OM state divergence.", e);
+          exitManager.forceExit(1, e, LOG);
         }
       }
     }

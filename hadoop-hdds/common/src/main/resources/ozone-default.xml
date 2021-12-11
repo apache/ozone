@@ -2342,7 +2342,7 @@
     <tag>OM, MANAGEMENT</tag>
     <description>
       Expert only. The maximum number of retries for Ozone Manager Admin
-      protocol.
+      protocol on each OM.
     </description>
   </property>
   <property>

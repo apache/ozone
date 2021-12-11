@@ -357,10 +357,16 @@ public class TestAddRemoveOzoneManager {
     cluster.stopOzoneManager(omNodeId3);
     decommissionOM(omNodeId3);
 
-    // Decommission an OM and then stop it. Stopping OM before will lead
-    // to no quorum and there will not be a elected leader OM to process the
-    // decommission request.
-    String omNodeId2 = cluster.getOzoneManager(1).getOMNodeId();
+    // Decommission the non leader OM and then stop it. Stopping OM before will
+    // lead to no quorum and there will not be a elected leader OM to process
+    // the decommission request.
+    String omNodeId2;
+    if (cluster.getOzoneManager().getOMNodeId().equals(
+        cluster.getOzoneManager(1).getOMNodeId())) {
+      omNodeId2 = cluster.getOzoneManager(0).getOMNodeId();
+    } else {
+      omNodeId2 = cluster.getOzoneManager(1).getOMNodeId();
+    }
     decommissionOM(omNodeId2);
     cluster.stopOzoneManager(omNodeId2);
 

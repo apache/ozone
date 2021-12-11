@@ -47,12 +47,18 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NO
     customSynopsis = "ozone admin om decommission -id=<om-service-id> " +
         "-nodeid=<decommission-om-node-id> " +
         "-hostname=<decommission-om-node-address> [options]",
-    description = "Decommission an OzoneManager." +
+    description = "Decommission an OzoneManager. Ensure that the node being " +
+        "decommissioned is shutdown first." +
         "\nNote - Add the node to be decommissioned to " +
         OZONE_OM_DECOMMISSIONED_NODES_KEY + "config in ozone-site.xml of all " +
         "OzoneManagers before proceeding with decommission." +
-        "\nNOTE THAT DECOMMISSIONING AN OM MIGHT RENDER THE CLUSTER TO LOSE " +
-        "HIGH AVAILABILITY",
+        "\nNote - DECOMMISSIONING AN OM MIGHT RENDER THE CLUSTER TO LOSE " +
+        "HIGH AVAILABILITY." +
+        "\nNote - When there are only two OzoneManagers, do not stop the " +
+        "OzoneManager before decommissioning as both OzoneManagers are " +
+        "required to reach quorum." + "\n" +
+        "It is recommended to add another OzoneManager(s) before " +
+        "decommissioning one to maintain HA.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class DecommissionOMSubcommand implements Callable<Void> {

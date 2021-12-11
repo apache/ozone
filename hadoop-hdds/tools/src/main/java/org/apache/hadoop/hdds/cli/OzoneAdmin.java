@@ -67,10 +67,7 @@ public class OzoneAdmin extends GenericCli {
 
   public UserGroupInformation getUser() throws IOException {
     if (user == null) {
-      user = Server.getRemoteUser();
-      if (user == null) {
-        user = UserGroupInformation.getCurrentUser();
-      }
+      user = UserGroupInformation.getCurrentUser();
     }
     return user;
   }
