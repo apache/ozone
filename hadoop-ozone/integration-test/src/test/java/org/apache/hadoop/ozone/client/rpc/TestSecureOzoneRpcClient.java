@@ -159,11 +159,15 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
+      long committedBytes = ozoneManager.getMetrics().getDataCommittedBytes();
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
       }
+
+      Assert.assertEquals(committedBytes + value.getBytes(UTF_8).length,
+              ozoneManager.getMetrics().getDataCommittedBytes());
 
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
