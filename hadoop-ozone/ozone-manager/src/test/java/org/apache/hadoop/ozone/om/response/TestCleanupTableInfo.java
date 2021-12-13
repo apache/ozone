@@ -53,6 +53,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.Ignore;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -139,6 +140,7 @@ public class TestCleanupTableInfo {
   }
 
   @Test
+  @Ignore("HDDS-6089.")
   public void checkAnnotationAndTableName() {
     OMMetadataManager omMetadataManager = om.getMetadataManager();
 

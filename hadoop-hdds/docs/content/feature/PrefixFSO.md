@@ -46,18 +46,20 @@ Simple is the existing OM metadata format, which stores key entry with full path
     prefixed by the unique identifier of its parent directory, `<parent
      unique-id>/<filename>`. 
      
-![FSO Format](PrefixFSO-Format.png)
+{{< image src="PrefixFSO-Format.png">}}
 
 
 ### Directory delete operation with prefix layout: ###
 Following picture describes the OM metadata changes while performing a delete
  operation on a directory.
-![FSO Delete](PrefixFSO-Delete.png)
+
+{{< image src="PrefixFSO-Delete.png">}}
 
 ### Directory rename operation with prefix layout: ###
 Following picture describes the OM metadata changes while performing a rename
  operation on a directory.
-![FSO Rename](PrefixFSO-Rename.png)
+
+{{< image src="PrefixFSO-Rename.png">}}
 
 ## Configuration
 By default the feature is disabled. It can be enabled with the following

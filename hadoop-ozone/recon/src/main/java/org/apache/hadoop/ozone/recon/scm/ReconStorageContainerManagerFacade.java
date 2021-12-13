@@ -115,7 +115,10 @@ public class ReconStorageContainerManagerFacade
     reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
-    this.scmContext = SCMContext.emptyContext();
+    this.scmContext = new SCMContext.Builder()
+        .setIsPreCheckComplete(true)
+        .setSCM(this)
+        .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);

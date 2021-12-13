@@ -47,7 +47,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String toKeyName = UUID.randomUUID().toString();
 
     OMKeyRenameResponse omKeyRenameResponse = new OMKeyRenameResponse(
-        omResponse, keyName, toKeyName, omKeyInfo);
+        omResponse, keyName, toKeyName, omKeyInfo, getBucketLayout());
 
     String ozoneFromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
@@ -90,7 +90,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String toKeyName = UUID.randomUUID().toString();
 
     OMKeyRenameResponse omKeyRenameResponse = new OMKeyRenameResponse(
-        omResponse, keyName, toKeyName, omKeyInfo);
+        omResponse, keyName, toKeyName, omKeyInfo, getBucketLayout());
 
     String ozoneFromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
@@ -135,7 +135,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
 
     // Passing toKeyName also same as KeyName.
     OMKeyRenameResponse omKeyRenameResponse = new OMKeyRenameResponse(
-        omResponse, keyName, keyName, omKeyInfo);
+        omResponse, keyName, keyName, omKeyInfo, getBucketLayout());
 
     String ozoneFromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);

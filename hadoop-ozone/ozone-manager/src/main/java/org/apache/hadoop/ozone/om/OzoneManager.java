@@ -229,9 +229,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
@@ -244,6 +241,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
@@ -1322,6 +1320,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return prefixManager;
   }
 
+  public IAccessAuthorizer getAccessAuthorizer() {
+    return accessAuthorizer;
+  }
+
   /**
    * Get metadata manager.
    *
@@ -1347,8 +1349,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
-    initFSOLayout();
-
     if (omState == State.BOOTSTRAPPING) {
       if (isBootstrapping) {
         // Check that all OM configs have been updated with the new OM info.
@@ -1446,7 +1446,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Restarts the service. This method re-initializes the rpc server.
    */
   public void restart() throws IOException {
-    initFSOLayout();
     setInstanceVariablesFromConf();
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
@@ -2151,12 +2150,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
+    String volumeOwner = getVolumeOwner(vol, acl, resType);
+    String bucketOwner = getBucketOwner(vol, bucket, acl, resType);
 
-    checkAcls(resType, store, acl, vol, bucket, key,
+    OzoneAclUtils.checkAllAcls(this, resType, store, acl,
+        vol, bucket, key, volumeOwner, bucketOwner,
         user != null ? user : getRemoteUser(),
         remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
-        remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName(),
-        true, getVolumeOwner(vol, acl, resType));
+        remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName());
+  }
+
+  private boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
+    if (ownerName == null) {
+      return false;
+    }
+    if (callerUgi.getUserName().equals(ownerName) ||
+            callerUgi.getShortUserName().equals(ownerName)) {
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -2216,6 +2228,50 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Return the owner of a given bucket.
+   *
+   * @return String
+   */
+  public String getBucketOwner(String volume, String bucket, ACLType type,
+       ResourceType resType) throws OMException {
+    String bucketOwner = null;
+    if ((resType != ResourceType.VOLUME) &&
+        !(type == ACLType.CREATE && resType == ResourceType.BUCKET)) {
+      bucketOwner = getBucketOwner(volume, bucket);
+    }
+    return bucketOwner;
+  }
+
+  private String getBucketOwner(String volume, String bucket)
+      throws OMException {
+
+    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
+            BUCKET_LOCK, volume, bucket);
+    String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
+    OmBucketInfo bucketInfo = null;
+    try {
+      bucketInfo = metadataManager.getBucketTable().get(dbBucketKey);
+    } catch (IOException ioe) {
+      if (ioe instanceof OMException) {
+        throw (OMException)ioe;
+      } else {
+        throw new OMException("getBucketOwner for Bucket " + volume + "/" +
+            bucket  + " failed: " + ioe.getMessage(),
+            ResultCodes.INTERNAL_ERROR);
+      }
+    } finally {
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volume, bucket);
+      }
+    }
+    if (bucketInfo != null) {
+      return bucketInfo.getOwner();
+    } else {
+      throw new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND);
+    }
+  }
+
+  /**
    * CheckAcls for the ozone object.
    *
    * @return true if permission granted, false if permission denied.
@@ -2226,7 +2282,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean checkAcls(ResourceType resType, StoreType storeType,
       ACLType aclType, String vol, String bucket, String key,
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      boolean throwIfPermissionDenied, String volumeOwner)
+      boolean throwIfPermissionDenied, String owner)
       throws OMException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(resType)
@@ -2240,7 +2296,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(volumeOwner)
+        .setOwnerName(owner)
         .build();
 
     return checkAcls(obj, context, throwIfPermissionDenied);
@@ -3545,11 +3601,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
-  public String getOMMetadataLayout() {
-    return configuration
-        .getTrimmed(OZONE_OM_METADATA_LAYOUT, OZONE_OM_METADATA_LAYOUT_DEFAULT);
-  }
-
   public String getOMDefaultBucketLayout() {
     return this.defaultBucketLayout;
   }
@@ -3772,19 +3823,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     omMetadataManager.getMetaTable().put(LAYOUT_VERSION_KEY,
         String.valueOf(lvm.getMetadataLayoutVersion()));
-  }
-
-  private void initFSOLayout() {
-    // TODO: Temporary workaround for OM upgrade path and will be replaced once
-    //  upgrade HDDS-3698 story reaches consensus. Instead of cluster level
-    //  configuration, OM needs to check this property on every bucket level.
-    String metaLayout = getOMMetadataLayout();
-    boolean omMetadataLayoutPrefix = StringUtils.equalsIgnoreCase(metaLayout,
-        OZONE_OM_METADATA_LAYOUT_PREFIX);
-
-    String status = omMetadataLayoutPrefix ? "enabled" : "disabled";
-    LOG.info("Configured {}={} and {} optimized OM FS operations",
-        OZONE_OM_METADATA_LAYOUT, metaLayout, status);
   }
 
   private BucketLayout getBucketLayout() {

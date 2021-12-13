@@ -18,10 +18,7 @@
 package org.apache.hadoop.ozone.s3;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.s3.util.OzoneS3Util;
-import org.apache.hadoop.security.SecurityUtil;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
@@ -40,9 +37,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 @ApplicationScoped
 public class OzoneServiceProvider {
 
-  private Text omServiceAddr;
-
-  private String omserviceID;
+  private String omServiceID;
 
   @Inject
   private OzoneConfiguration conf;
@@ -51,11 +46,7 @@ public class OzoneServiceProvider {
   public void init() {
     Collection<String> serviceIdList =
         conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
-    if (serviceIdList.size() == 0) {
-      // Non-HA cluster
-      omServiceAddr = SecurityUtil.buildTokenService(OmUtils.
-          getOmAddressForClients(conf));
-    } else {
+    if (!serviceIdList.isEmpty()) {
       // HA cluster.
       //For now if multiple service id's are configured we throw exception.
       // As if multiple service id's are configured, S3Gateway will not be
@@ -73,22 +64,14 @@ public class OzoneServiceProvider {
           throw new IllegalArgumentException(OZONE_OM_NODES_KEY
               + "." + serviceId + " is not defined");
         }
-        omServiceAddr = new Text(OzoneS3Util.buildServiceNameForToken(conf,
-            serviceId, omNodeIds));
-        omserviceID = serviceId;
+        omServiceID = serviceId;
       }
     }
   }
 
-
-  @Produces
-  public Text getService() {
-    return omServiceAddr;
-  }
-
   @Produces
   public String getOmServiceID() {
-    return omserviceID;
+    return omServiceID;
   }
 
 }

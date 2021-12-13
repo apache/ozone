@@ -139,7 +139,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    String omLayout = ozoneManager.getOMMetadataLayout();
     OmBucketInfo omBucketInfo = null;
     if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
         .equals(BucketLayoutProto.LEGACY)) {

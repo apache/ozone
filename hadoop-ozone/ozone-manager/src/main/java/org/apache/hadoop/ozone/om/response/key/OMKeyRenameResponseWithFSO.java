@@ -42,8 +42,8 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
 
   public OMKeyRenameResponseWithFSO(@Nonnull OMResponse omResponse,
       String fromKeyName, String toKeyName, @Nonnull OmKeyInfo renameKeyInfo,
-      boolean isRenameDirectory) {
-    super(omResponse, fromKeyName, toKeyName, renameKeyInfo);
+      boolean isRenameDirectory, BucketLayout bucketLayout) {
+    super(omResponse, fromKeyName, toKeyName, renameKeyInfo, bucketLayout);
     this.isRenameDirectory = isRenameDirectory;
   }
 

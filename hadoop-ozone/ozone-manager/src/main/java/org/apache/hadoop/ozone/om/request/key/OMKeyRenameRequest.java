@@ -200,7 +200,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-          fromKeyName, toKeyName, fromKeyValue);
+          fromKeyName, toKeyName, fromKeyValue, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
