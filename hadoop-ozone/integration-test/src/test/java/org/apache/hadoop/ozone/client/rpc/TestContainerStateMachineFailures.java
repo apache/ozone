@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -67,6 +68,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.LambdaTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -91,6 +93,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
 
 /**
  * Tests the containerStateMachine failure handling.
@@ -166,6 +169,16 @@ public class TestContainerStateMachineFailures {
     random = new Random();
   }
 
+  @BeforeEach
+  public void restartDatanode()
+      throws InterruptedException, TimeoutException, AuthenticationException,
+      IOException {
+    for (int i=0; i < cluster.getHddsDatanodes().size(); i++) {
+      cluster.restartHddsDatanode(i, true);
+    }
+    cluster.restartStorageContainerManager(true);
+  }
+
   /**
    * Shutdown MiniDFSCluster.
    */
@@ -177,7 +190,7 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  public void testContainerStateMachineTransitionOnUnhealthyReplicas()
+  public void testContainerStateMachineCloseOnMissingPipeline()
       throws Exception {
     // This integration test is a bit of a hack to see if the highly
     // improbable event where the Datanode does not have the pipeline
@@ -189,7 +202,7 @@ public class TestContainerStateMachineFailures {
 
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
+            .createKey("testQuasiClosed1", 1024, ReplicationType.RATIS,
                 ReplicationFactor.THREE, new HashMap<>());
     key.write("ratis".getBytes(UTF_8));
     key.flush();
@@ -230,7 +243,7 @@ public class TestContainerStateMachineFailures {
 
 
     for (HddsDatanodeService dn : datanodeSet) {
-      LambdaTestUtils.await(10000, 1000,
+      LambdaTestUtils.await(20000, 1000,
           () -> (dn.getDatanodeStateMachine()
                 .getContainer().getContainerSet()
                 .getContainer(containerID)
