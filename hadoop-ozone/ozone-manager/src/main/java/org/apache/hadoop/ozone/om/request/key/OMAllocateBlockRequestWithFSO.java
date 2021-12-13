@@ -223,6 +223,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
       OmBucketInfo omBucketInfo) {
     return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
-            clientID, omBucketInfo);
+            clientID, omBucketInfo, getBucketLayout());
   }
 }
