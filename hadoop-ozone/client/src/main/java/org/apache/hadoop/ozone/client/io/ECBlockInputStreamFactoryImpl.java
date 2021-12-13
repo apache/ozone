@@ -76,7 +76,8 @@ public final class ECBlockInputStreamFactoryImpl implements
       ECBlockReconstructedStripeInputStream sis =
           new ECBlockReconstructedStripeInputStream(
               (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
-              xceiverFactory, refreshFunction, inputStreamFactory);
+              xceiverFactory, refreshFunction, inputStreamFactory,
+              byteBufferPool);
       if (failedLocations != null) {
         sis.addFailedDatanodes(failedLocations);
       }
