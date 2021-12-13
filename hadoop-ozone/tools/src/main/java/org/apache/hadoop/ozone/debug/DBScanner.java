@@ -61,8 +61,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
+      required = true,
       description = "List Key -> Value instead of just Value.",
-      defaultValue = "false",
+      defaultValue = "true",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private static boolean withKey;
 
@@ -107,7 +108,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               .fromPersistedFormat(iterator.key());
           Gson gson = new GsonBuilder().setPrettyPrinting().create();
           result.append(gson.toJson(key));
-          result.append(" -> ");
+          result.append(" : ");
         }
         Object o = dbColumnFamilyDefinition.getValueCodec()
             .fromPersistedFormat(iterator.value());
