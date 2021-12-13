@@ -23,7 +23,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +41,7 @@ import java.util.regex.Pattern;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -247,8 +247,7 @@ public final class StringToSignProducer {
 
   private static String urlEncode(String str) {
     try {
-
-      return URLEncoder.encode(str, UTF_8.name())
+      return S3Utils.urlEncode(str)
           .replaceAll("\\+", "%20")
           .replaceAll("%7E", "~");
     } catch (UnsupportedEncodingException e) {
