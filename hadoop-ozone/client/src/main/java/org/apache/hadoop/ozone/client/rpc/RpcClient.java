@@ -59,6 +59,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.io.ByteBufferPool;
+import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -74,6 +76,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -170,6 +173,8 @@ public class RpcClient implements ClientProtocol {
   private final OzoneClientConfig clientConfig;
   private final Cache<URI, KeyProvider> keyProviderCache;
   private final boolean getLatestVersionLocation;
+  private final ByteBufferPool byteBufferPool;
+  private final BlockInputStreamFactory blockInputStreamFactory;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -282,6 +287,9 @@ public class RpcClient implements ClientProtocol {
             }
           }
         }).build();
+    this.byteBufferPool = new ElasticByteBufferPool();
+    this.blockInputStreamFactory = BlockInputStreamFactoryImpl
+        .getInstance(byteBufferPool);
   }
 
   static boolean validateOmVersion(String expectedVersion,
@@ -1429,7 +1437,7 @@ public class RpcClient implements ClientProtocol {
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction,
-              BlockInputStreamFactoryImpl.getInstance());
+              blockInputStreamFactory);
       try {
         Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
         if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
@@ -1450,7 +1458,7 @@ public class RpcClient implements ClientProtocol {
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction,
-              BlockInputStreamFactoryImpl.getInstance());
+              blockInputStreamFactory);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoInputStream cryptoIn =
           new CryptoInputStream(lengthInputStream.getWrappedStream(),
@@ -1462,7 +1470,7 @@ public class RpcClient implements ClientProtocol {
       List<LengthInputStream> lengthInputStreams = KeyInputStream
           .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction,
-              BlockInputStreamFactoryImpl.getInstance());
+              blockInputStreamFactory);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
