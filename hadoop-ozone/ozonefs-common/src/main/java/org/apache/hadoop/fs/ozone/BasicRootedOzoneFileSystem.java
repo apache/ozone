@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -832,7 +833,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
-    return super.getFileChecksum(f, length);
+    /*Path qualifiedPath = f.makeQualified(uri, workingDir);
+    String key = pathToKey(qualifiedPath);
+    return getFileChecksumWithCombineMode(key, length);*/
+    return null;
   }
 
   @Override
@@ -1074,5 +1078,24 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
     return new LocatedFileStatus(fileStatus, blockLocations);
   }
+
+  /**
+   * Get the checksum of the whole file or a range of the file. Note that the
+   * range always starts from the beginning of the file. The file can be
+   * in replicated form, or striped mode. Depending on the
+   * dfs.checksum.combine.mode, checksums may or may not be comparable between
+   * different block layout forms.
+   *
+   * @param src The file path
+   * @param length the length of the range, i.e., the range is [0, length]
+   * @return The checksum
+   * @see DistributedFileSystem#getFileChecksum(Path)
+   */
+  /*FileChecksum getFileChecksumWithCombineMode(String src, long length)
+      throws IOException {
+    Options.ChecksumCombineMode combineMode =
+        getConfSource().getObject(OzoneClientConfig.class).getChecksumCombineMode();
+    return OzoneClientUtils.getFileChecksumInternal(src, length, combineMode);
+  }*/
 
 }

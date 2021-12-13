@@ -17,8 +17,11 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.ReplicatedFileChecksumHelper;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
@@ -64,4 +67,15 @@ public final class OzoneClientUtils {
     }
     return bucket.getBucketLayout();
   }
+
+  /*public static FileChecksum getFileChecksumInternal(
+      String src, long length, Options.ChecksumCombineMode combineMode)
+      throws IOException {
+    ReplicatedFileChecksumHelper maker =
+        new ReplicatedFileChecksumHelper(src, length, combineMode
+        this);
+    maker.compute();
+
+    return maker.getFileChecksum();
+  }*/
 }

@@ -280,6 +280,10 @@ public class RpcClient implements ClientProtocol {
         }).build();
   }
 
+  public XceiverClientFactory getXeiverClientManager() {
+    return xceiverClientManager;
+  }
+
   static boolean validateOmVersion(String expectedVersion,
                                    List<ServiceInfo> serviceInfoList) {
     if (expectedVersion == null || expectedVersion.isEmpty()) {
