@@ -448,14 +448,107 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testStripeWriteRetriesOnFailures() throws IOException {
+  public void testStripeWriteRetriesOn2Failures() throws IOException {
     OzoneConfiguration con = new OzoneConfiguration();
-    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
-        StorageUnit.KB);
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
+    // Cluster has 15 nodes. So, first we will create 3 block groups with
+    // distinct nodes in each. Block Group 1:  0-4, Block Group 2: 5-9, Block
+    // Group 3: 10-14
+    // To mark the node failed in the second block group.
+    int[] nodesIndexesToMarkFailure = new int[2];
+    nodesIndexesToMarkFailure[0] = 0;
+    // To mark the node failed in the second block group also.
+    nodesIndexesToMarkFailure[1] = 5;
+    // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation
+    // should pick next good block group as we have 15 nodes.
+    int clusterSize = 15;
+    testStripeWriteRetriesOnFailures(con, clusterSize,
+        nodesIndexesToMarkFailure);
+    // It should have used 3rd block group also. So, total initialized nodes
+    // count should be clusterSize.
+    Assert.assertTrue(((MockXceiverClientFactory) factoryStub).getStorages()
+        .size() == clusterSize);
+  }
+
+  @Test
+  public void testStripeWriteRetriesOn3Failures() throws IOException {
+    OzoneConfiguration con = new OzoneConfiguration();
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
+
+    int[] nodesIndexesToMarkFailure = new int[3];
+    nodesIndexesToMarkFailure[0] = 0;
+    // To mark the node failed in the second block group.
+    nodesIndexesToMarkFailure[1] = 5;
+    // To mark the node failed in the third block group.
+    nodesIndexesToMarkFailure[2] = 10;
+    // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation will
+    // pick the remaining goods for the next block group.
+    int clusterSize = 15;
+    testStripeWriteRetriesOnFailures(con, clusterSize,
+        nodesIndexesToMarkFailure);
+    // It should have used 3rd block group also. So, total initialized nodes
+    // count should be clusterSize.
+    Assert.assertTrue(((MockXceiverClientFactory) factoryStub).getStorages()
+        .size() == clusterSize);
+  }
+
+  @Test(expected = IllegalStateException.class)
+  // The mocked impl throws IllegalStateException when there are not enough
+  // nodes in allocateBlock request.
+  public void testStripeWriteRetriesOnAllNodeFailures() throws IOException {
+    OzoneConfiguration con = new OzoneConfiguration();
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
+
+    // After writing first stripe, we will mark all nodes as bad in the cluster.
+    int clusterSize = 5;
+    int[] nodesIndexesToMarkFailure = new int[clusterSize];
+    for (int i = 0; i < nodesIndexesToMarkFailure.length; i++) {
+      nodesIndexesToMarkFailure[i] = i;
+    }
+    // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation can
+    // not pick new block group as all nodes in cluster marked as bad.
+    testStripeWriteRetriesOnFailures(con, clusterSize,
+        nodesIndexesToMarkFailure);
+  }
+
+  @Test
+  public void testStripeWriteRetriesOn4FailuresWith3RetriesAllowed()
+      throws IOException {
+    OzoneConfiguration con = new OzoneConfiguration();
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
+    con.setInt(
+        OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES,
+        3);
+
+    int[] nodesIndexesToMarkFailure = new int[4];
+    nodesIndexesToMarkFailure[0] = 0;
+    //To mark node failed in second block group.
+    nodesIndexesToMarkFailure[1] = 5;
+    //To mark node failed in third block group.
+    nodesIndexesToMarkFailure[2] = 10;
+    //To mark node failed in fourth block group.
+    nodesIndexesToMarkFailure[3] = 15;
+    try {
+      // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation can
+      // pick good block group, but client retries should be limited
+      // OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURE(here it was
+      // configured as 3). So, it should fail as we have marked 3 nodes as bad.
+      testStripeWriteRetriesOnFailures(con, 20, nodesIndexesToMarkFailure);
+      Assert.fail(
+          "Expecting it to fail as retries should exceed the max allowed times:"
+              + " " + 3);
+    } catch (IOException e) {
+      Assert.assertEquals("Completed max allowed retries 3 on stripe failures.",
+          e.getMessage());
+    }
+  }
+
+  public void testStripeWriteRetriesOnFailures(OzoneConfiguration con,
+      int clusterSize, int[] nodesIndexesToMarkFailure) throws IOException {
     close();
     MultiNodePipelineBlockAllocator blkAllocator =
         new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
-            15);
+            clusterSize);
     createNewClient(con, blkAllocator);
     int numChunksToWriteAfterFailure = 3;
     store.createVolume(volumeName);
@@ -474,13 +567,10 @@ public class TestOzoneECClient {
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
 
-      //Cluster has 15 nodes. So, first we will create 3 block groups with
-      // distinct nodes in each. Block Group 1:  0-4, Block Group 2: 5-9, Block
-      // Group 3: 10-14
-      // Marking a node failed in first block group.
-      failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(0)));
-      //Marking a node failed in second block group.
-      failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(5)));
+      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
+        failedDNs.add(DatanodeDetails
+            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      }
 
       // First let's set storage as bad
       ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
@@ -489,10 +579,6 @@ public class TestOzoneECClient {
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
         out.write(inputChunks[i]);
       }
-      //It should have used 3rd block group also. So, total initialized nodes
-      // count should be 15.
-      Assert.assertTrue(
-          ((MockXceiverClientFactory) factoryStub).getStorages().size() == 15);
     }
     final OzoneKeyDetails key = bucket.getKey(keyName);
     // Data supposed to store in single block group. Since we introduced the

@@ -29,14 +29,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 
 /**
  * Allocates the block with required number of nodes in the pipeline.
  */
 public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
-  public static final Random RANDOM = new Random();
   private long blockId;
   private int requiredNodes;
   private final ConfigurationSource conf;
@@ -98,26 +96,25 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
       OzoneManagerProtocolProtos.KeyArgs keyArgs) {
     int clusterSize = clusterDns.size();
     int counter = nodesNeeded;
-    int j = 1;
+    int j = 0;
     for (int i = 0; i < clusterDns.size(); i++) {
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
           clusterDns.get(start % clusterSize);
       start++;
-      if (DatanodeDetails.getFromProtoBuf(datanodeDetailsProto)
-          .equals(datanodes)) {
+      if (datanodes
+          .contains(DatanodeDetails.getFromProtoBuf(datanodeDetailsProto))) {
         continue;
       } else {
         builder.addMembers(datanodeDetailsProto);
         if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
-          builder.addMemberReplicaIndexes(j++);
+          builder.addMemberReplicaIndexes(++j);
         }
-        counter--;
-        if (counter == 0) {
+        if (--counter == 0) {
           break;
         }
       }
     }
-    if (j - 1 == counter) {
+    if (counter > 0) {
       throw new IllegalStateException(
           "MockedImpl: Could not find enough nodes.");
     }

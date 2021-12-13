@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * block output streams chunk by chunk.
  */
 public class ECKeyOutputStream extends KeyOutputStream {
-  public static final int RETRIES_ON_STRIPE_WRITE_FAILURE = 10;
+  private final int maxRetriesOnStripeWriteFailures;
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private int ecChunkSize;
@@ -99,6 +99,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion) {
     this.config = config;
+    this.maxRetriesOnStripeWriteFailures =
+        this.config.getMaxECStripeRetriesOnFailures();
     // For EC, cell/chunk size and buffer size can be same for now.
     ecChunkSize = replicationConfig.getEcChunkSize();
     this.config.setStreamBufferMaxSize(ecChunkSize);
@@ -554,22 +556,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private void handleStripeFailure(int lastStripeSize, int parityCellSize,
       boolean allocateBlockIfFull)
       throws IOException {
-    // TODO: this number should be taken from config
-    int maxRetriesOnStripeWriteFailure = RETRIES_ON_STRIPE_WRITE_FAILURE;
-    StripeWriteStatus stripeWriteStatus = StripeWriteStatus.FAILED;
-    while (maxRetriesOnStripeWriteFailure > 0
-        && stripeWriteStatus == StripeWriteStatus.FAILED) {
+    StripeWriteStatus stripeWriteStatus;
+    for (int i = 0; i < this.maxRetriesOnStripeWriteFailures; i++) {
       stripeWriteStatus =
           rewriteStripeToNewBlockGroup(parityCellSize, lastStripeSize,
               allocateBlockIfFull);
-      maxRetriesOnStripeWriteFailure--;
+      if (stripeWriteStatus == StripeWriteStatus.SUCCESS) {
+        return;
+      }
     }
-    if (maxRetriesOnStripeWriteFailure == 0
-        && stripeWriteStatus == StripeWriteStatus.FAILED) {
-      throw new IOException(
-          "Completed max allowed retries " + RETRIES_ON_STRIPE_WRITE_FAILURE
-              + " on stripe failures.");
-    }
+    throw new IOException(
+        "Completed max allowed retries " + this.maxRetriesOnStripeWriteFailures
+            + " on stripe failures.");
+
   }
 
   private void addPadding(int parityCellSize) {

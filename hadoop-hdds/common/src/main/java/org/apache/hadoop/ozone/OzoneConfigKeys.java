@@ -115,6 +115,12 @@ public final class OzoneConfigKeys {
       "ozone.scm.block.size";
   public static final String OZONE_SCM_BLOCK_SIZE_DEFAULT = "256MB";
 
+  public static final String
+      OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES =
+      "ozone.client.max.ec.stripe.write.retries.on.failures";
+  public static final String
+      OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES_DEFAULT = "10";
+
   /**
    * Ozone administrator users delimited by comma.
    * If not set, only the user who launches an ozone service will be the
