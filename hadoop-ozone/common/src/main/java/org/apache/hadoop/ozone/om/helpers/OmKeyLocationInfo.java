@@ -187,7 +187,18 @@ public final class OmKeyLocationInfo {
         if (this.token != null) {
           builder.setToken(OzonePBHelper.protoFromToken(token));
         }
-        builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
+        // Pipeline can be null when key create with override and
+        // on a versioning enabled on bucket. for older versions of key
+        // We do not need to return pipeline as part of createKey,
+        // so we do not refresh pipeline in createKey, so for the old version
+        // of blocks pipeline can be null.
+
+        // And also currently, we donot support bucket versioning.
+        // TODO: this needs to be revisited when bucket versioning
+        //  implementation is handled.
+        if (this.pipeline != null) {
+          builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
+        }
       } catch (UnknownPipelineStateException e) {
         //TODO: fix me: we should not return KeyLocation without pipeline.
       }
