@@ -264,7 +264,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return private key or Null if there is no data.
    */
   @Override
-  public PrivateKey getPrivateKey() throws SCMSecurityException {
+  public PrivateKey getPrivateKey() {
     if (privateKey != null) {
       return privateKey;
     }
@@ -299,7 +299,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return public key or Null if there is no data.
    */
   @Override
-  public PublicKey getPublicKey() throws SCMSecurityException {
+  public PublicKey getPublicKey() {
     if (publicKey != null) {
       return publicKey;
     }
@@ -508,7 +508,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
       return sign.sign();
     } catch (NoSuchAlgorithmException | NoSuchProviderException
-        | InvalidKeyException | SignatureException | SCMSecurityException e) {
+        | InvalidKeyException | SignatureException e) {
       getLogger().error("Error while signing the stream", e);
       throw new CertificateException("Error while signing the stream", e,
           CRYPTO_SIGN_ERROR);
