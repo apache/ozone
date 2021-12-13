@@ -81,7 +81,7 @@ public final class ECBlockInputStreamFactoryImpl implements
         sis.addFailedDatanodes(failedLocations);
       }
       return new ECBlockReconstructedInputStream(
-          (ECReplicationConfig) repConfig, sis);
+          (ECReplicationConfig) repConfig, byteBufferPool, sis);
     } else {
       // Otherwise create the more efficient non-reconstruction reader
       return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,
