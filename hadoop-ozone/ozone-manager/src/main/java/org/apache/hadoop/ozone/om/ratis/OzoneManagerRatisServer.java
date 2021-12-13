@@ -331,7 +331,7 @@ public final class OzoneManagerRatisServer {
   }
 
   /**
-   * Remove decommissioned OM node from Ratis ring
+   * Remove decommissioned OM node from Ratis ring.
    */
   public void removeOMFromRatisRing(OMNodeDetails removeOMNode)
       throws IOException {
@@ -390,9 +390,9 @@ public final class OzoneManagerRatisServer {
         omNodeDetails.getHostAddress(), omNodeDetails.getRatisPort());
 
     String newNodeId = omNodeDetails.getNodeId();
-    RaftPeerId raftPeerId = RaftPeerId.valueOf(newNodeId);
+    RaftPeerId newPeerId = RaftPeerId.valueOf(newNodeId);
     RaftPeer raftPeer = RaftPeer.newBuilder()
-        .setId(raftPeerId)
+        .setId(newPeerId)
         .setAddress(newOMRatisAddr)
         .build();
     raftPeerMap.put(newNodeId, raftPeer);

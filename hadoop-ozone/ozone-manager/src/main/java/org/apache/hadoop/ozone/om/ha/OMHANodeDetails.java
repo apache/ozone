@@ -124,7 +124,8 @@ public class OMHANodeDetails {
     boolean isOMAddressSet = false;
 
     for (String serviceId : omServiceIds) {
-      Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf, serviceId);
+      Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
+          serviceId);
 
       if (omNodeIds.size() == 0) {
         throwConfException("Configuration does not have any value set for %s " +

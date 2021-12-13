@@ -59,7 +59,8 @@ public class OzoneServiceProvider {
             "configured. " + Arrays.toString(serviceIdList.toArray()));
       } else {
         String serviceId = serviceIdList.iterator().next();
-        Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf, serviceId);
+        Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
+            serviceId);
         if (omNodeIds.size() == 0) {
           throw new IllegalArgumentException(OZONE_OM_NODES_KEY
               + "." + serviceId + " is not defined");

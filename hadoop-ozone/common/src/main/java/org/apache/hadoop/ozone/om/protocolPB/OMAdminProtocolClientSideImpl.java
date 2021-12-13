@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Protocol implementation for OM admin operations.
  */
-public class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
+public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
 
   /**
    * RpcController is not used and hence is set to null.

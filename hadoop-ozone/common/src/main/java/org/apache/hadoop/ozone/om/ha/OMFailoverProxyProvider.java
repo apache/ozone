@@ -132,7 +132,8 @@ public class OMFailoverProxyProvider<T> implements
     Collection<String> omServiceIds = Collections.singletonList(omSvcId);
 
     for (String serviceId : OmUtils.emptyAsSingletonNull(omServiceIds)) {
-      Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config, serviceId);
+      Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config,
+          serviceId);
 
       for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
 
