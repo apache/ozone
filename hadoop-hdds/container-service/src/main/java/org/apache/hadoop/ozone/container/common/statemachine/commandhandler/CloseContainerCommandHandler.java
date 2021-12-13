@@ -77,10 +77,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         ((CloseContainerCommand)command).getProto();
     final ContainerController controller = ozoneContainer.getController();
     final long containerId = closeCommand.getContainerID();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Close Container command containerID={}",
-          containerId);
-    }
+    LOG.debug("Processing Close Container command container #{}",
+        containerId);
     try {
       final Container container = controller.getContainer(containerId);
 
@@ -119,18 +117,14 @@ public class CloseContainerCommandHandler implements CommandHandler {
         break;
       case UNHEALTHY:
       case INVALID:
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Cannot close the container #{}, the container is"
-              + " in {} state.", containerId, container.getContainerState());
-        }
+        LOG.debug("Cannot close the container #{}, the container is"
+            + " in {} state.", containerId, container.getContainerState());
         break;
       default:
         break;
       }
     } catch (NotLeaderException e) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Follower cannot close container #{}.", containerId);
-      }
+      LOG.debug("Follower cannot close container #{}.", containerId);
     } catch (IOException e) {
       LOG.error("Can't close container #{}", containerId, e);
     } finally {
