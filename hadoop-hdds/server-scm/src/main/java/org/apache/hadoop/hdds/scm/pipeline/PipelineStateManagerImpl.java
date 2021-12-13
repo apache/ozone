@@ -224,7 +224,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     } catch (PipelineNotFoundException pnfe) {
       LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
           + " may have been deleted already.", pipelineIDProto.getId());
-      throw pnfe;
     } finally {
       lock.writeLock().unlock();
     }
@@ -273,7 +272,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     } catch (PipelineNotFoundException pnfe) {
       LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
           + " may have been deleted already.", pipelineID);
-      throw pnfe;
     } catch (IOException ex) {
       LOG.warn("Pipeline {} state update failed", pipelineID);
       throw ex;
