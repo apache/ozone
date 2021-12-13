@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -27,30 +26,23 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Find a target giving preference to more under-utilized nodes.
  */
-public class FindTargetGreedy implements FindTargetStrategy {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(FindTargetGreedy.class);
-
+public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
+  private Logger logger;
   private ContainerManager containerManager;
   private PlacementPolicy placementPolicy;
   private Map<DatanodeDetails, Long> sizeEnteringNode;
@@ -58,18 +50,23 @@ public class FindTargetGreedy implements FindTargetStrategy {
   private ContainerBalancerConfiguration config;
   private Double upperLimit;
   private Collection<DatanodeUsageInfo> potentialTargets;
-  private NetworkTopology networkTopology;
 
-  public FindTargetGreedy(
+  protected AbstractFindTargetGreedy(
       ContainerManager containerManager,
       PlacementPolicy placementPolicy,
-      NodeManager nodeManager,
-      NetworkTopology networkTopology) {
+      NodeManager nodeManager) {
     sizeEnteringNode = new HashMap<>();
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;
     this.nodeManager = nodeManager;
-    this.networkTopology = networkTopology;
+  }
+
+  protected void setLogger(Logger log) {
+    logger = log;
+  }
+
+  protected void setPotentialTargets(Collection<DatanodeUsageInfo> pt) {
+    potentialTargets = pt;
   }
 
   private void setUpperLimit(Double upperLimit){
@@ -85,7 +82,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
     potentialTargets.addAll(potentialTargetDataNodes);
   }
 
-  private int compareByUsage(DatanodeUsageInfo a, DatanodeUsageInfo b) {
+  protected int compareByUsage(DatanodeUsageInfo a, DatanodeUsageInfo b) {
     double currentUsageOfA = a.calculateUtilization(
         sizeEnteringNode.get(a.getDatanodeDetails()));
     double currentUsageOfB = b.calculateUtilization(
@@ -101,11 +98,6 @@ public class FindTargetGreedy implements FindTargetStrategy {
 
   private void setConfiguration(ContainerBalancerConfiguration conf) {
     config = conf;
-    if(config.getNetworkTopologyEnable()) {
-      potentialTargets = new LinkedList<>();
-    } else {
-      potentialTargets = new TreeSet<>((a, b) -> compareByUsage(a, b));
-    }
   }
 
   /**
@@ -132,7 +124,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
           replicas = containerManager.getContainerReplicas(container);
           containerInfo = containerManager.getContainer(container);
         } catch (ContainerNotFoundException e) {
-          LOG.warn("Could not get Container {} from Container Manager for " +
+          logger.warn("Could not get Container {} from Container Manager for " +
               "obtaining replicas in Container Balancer.", container, e);
           continue;
         }
@@ -146,8 +138,8 @@ public class FindTargetGreedy implements FindTargetStrategy {
         }
       }
     }
-    LOG.info("Container Balancer could not find a target for source datanode " +
-        "{}", source.getUuidString());
+    logger.info("Container Balancer could not find a target for " +
+        "source datanode {}", source.getUuidString());
     return null;
   }
 
@@ -167,7 +159,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
     try {
       containerInfo = containerManager.getContainer(containerID);
     } catch (ContainerNotFoundException e) {
-      LOG.warn("Could not get Container {} from Container Manager while " +
+      logger.warn("Could not get Container {} from Container Manager while " +
           "checking if container move satisfies placement policy in " +
           "Container Balancer.", containerID.toString(), e);
       return false;
@@ -226,7 +218,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
       }
       return;
     }
-    LOG.warn("Cannot find {} in the candidates target nodes",
+    logger.warn("Cannot find {} in the candidates target nodes",
         target.getUuid());
   }
 
@@ -247,22 +239,5 @@ public class FindTargetGreedy implements FindTargetStrategy {
    * network topology if enabled.
    * @param source the specified source datanode
    */
-  private void sortTargetForSource(DatanodeDetails source) {
-    if(config.getNetworkTopologyEnable()) {
-      Preconditions.checkArgument(potentialTargets instanceof List);
-      Collections.sort((List) potentialTargets,
-          (DatanodeUsageInfo da, DatanodeUsageInfo db) -> {
-          DatanodeDetails a = da.getDatanodeDetails();
-          DatanodeDetails b = db.getDatanodeDetails();
-          // sort by network topology first
-          int distanceToA = networkTopology.getDistanceCost(source, a);
-          int distanceToB = networkTopology.getDistanceCost(source, b);
-          if (distanceToA != distanceToB) {
-            return distanceToA - distanceToB;
-          }
-          // if distance to source is equal , sort by usage
-          return compareByUsage(da, db);
-        });
-    }
-  }
+  protected abstract void sortTargetForSource(DatanodeDetails source);
 }
