@@ -20,10 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -57,8 +54,8 @@ public class S3MultipartUploadAbortResponse extends OmKeyResponse {
   public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse,
       String multipartKey, String multipartOpenKey,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omBucketInfo.getBucketLayout());
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.multipartKey = multipartKey;
     this.multipartOpenKey = multipartOpenKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;

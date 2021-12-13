@@ -272,7 +272,8 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
         multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,
-        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo);
+        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo,
+        getBucketLayout());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -321,7 +322,8 @@ public class TestS3MultipartResponse {
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OMResponse omResponse) {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo);
+        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        getBucketLayout());
   }
 
   public BucketLayout getBucketLayout() {

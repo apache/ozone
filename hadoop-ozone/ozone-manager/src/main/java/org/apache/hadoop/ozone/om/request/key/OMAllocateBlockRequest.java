@@ -227,7 +227,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, omBucketInfo.copyObject());
+          openKeyInfo, clientID, omBucketInfo.copyObject(), getBucketLayout());
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);

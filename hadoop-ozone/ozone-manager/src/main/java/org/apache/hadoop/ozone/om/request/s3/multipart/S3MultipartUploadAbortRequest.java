@@ -244,7 +244,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         omResponse.setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
         multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-        omBucketInfo.copyObject());
+        omBucketInfo.copyObject(), getBucketLayout());
     return omClientResponse;
   }
 

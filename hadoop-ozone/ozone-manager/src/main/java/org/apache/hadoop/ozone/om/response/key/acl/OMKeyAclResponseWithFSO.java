@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
@@ -43,7 +44,7 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
   public OMKeyAclResponseWithFSO(
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
       @NotNull OmKeyInfo omKeyInfo, boolean isDirectory,
-      BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout) {
     super(omResponse, omKeyInfo, bucketLayout);
     this.isDirectory = isDirectory;
   }

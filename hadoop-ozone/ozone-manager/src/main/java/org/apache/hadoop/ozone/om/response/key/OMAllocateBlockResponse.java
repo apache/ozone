@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -43,8 +44,8 @@ public class OMAllocateBlockResponse extends OmKeyResponse {
 
   public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omBucketInfo.getBucketLayout());
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.omKeyInfo = omKeyInfo;
     this.clientID = clientID;
     this.omBucketInfo = omBucketInfo;
