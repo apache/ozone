@@ -220,7 +220,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                       .setBucketName(requestedBucket)
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
-                  .build(), multipartKeyInfo, omKeyInfo);
+                  .build(), multipartKeyInfo, omKeyInfo,
+              bucketInfo.getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

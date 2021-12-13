@@ -153,7 +153,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
       List<OmKeyInfo> unUsedParts) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
-        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts);
+        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout());
   }
 
   private long getParentId(OMMetadataManager omMetadataManager,

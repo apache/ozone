@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -52,8 +53,10 @@ public class S3MultipartUploadCompleteResponseWithFSO
       @Nonnull String multipartKey,
       @Nonnull String multipartOpenKey,
       @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull List<OmKeyInfo> unUsedParts) {
-    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts);
+      @Nonnull List<OmKeyInfo> unUsedParts,
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
+        bucketLayout);
   }
 
   /**

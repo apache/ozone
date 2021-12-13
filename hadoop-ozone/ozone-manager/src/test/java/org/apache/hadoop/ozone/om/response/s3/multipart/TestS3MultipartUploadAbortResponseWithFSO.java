@@ -62,7 +62,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
         multipartKeyInfo.getUploadID());
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>());
+        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>(),
+        getBucketLayout());
   }
 
   @Override

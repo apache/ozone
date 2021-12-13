@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -36,7 +35,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
  * Response for AllocateBlock request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE})
-public class OMAllocateBlockResponse extends OMClientResponse {
+public class OMAllocateBlockResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;
   private long clientID;
@@ -45,7 +44,7 @@ public class OMAllocateBlockResponse extends OMClientResponse {
   public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
       @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse);
+    super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.clientID = clientID;
     this.omBucketInfo = omBucketInfo;

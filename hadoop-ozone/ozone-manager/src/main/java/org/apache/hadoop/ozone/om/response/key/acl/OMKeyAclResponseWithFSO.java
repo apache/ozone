@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.key.acl;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -41,8 +42,9 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
 
   public OMKeyAclResponseWithFSO(
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @NotNull OmKeyInfo omKeyInfo, boolean isDirectory) {
-    super(omResponse, omKeyInfo);
+      @NotNull OmKeyInfo omKeyInfo, boolean isDirectory,
+      BucketLayout bucketLayout) {
+    super(omResponse, omKeyInfo, bucketLayout);
     this.isDirectory = isDirectory;
   }
 
@@ -53,8 +55,9 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
    * @param omResponse
    */
   public OMKeyAclResponseWithFSO(
-      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse) {
-    super(omResponse);
+      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
+      BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override public void addToDBBatch(OMMetadataManager omMetadataManager,
@@ -68,9 +71,7 @@ public class OMKeyAclResponseWithFSO extends OMKeyAclResponse {
       omMetadataManager.getDirectoryTable()
           .putWithBatch(batchOperation, ozoneDbKey, dirInfo);
     } else {
-      omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, getOmKeyInfo().getVolumeName(),
-              getOmKeyInfo().getBucketName()))
+      omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, ozoneDbKey, getOmKeyInfo());
     }
   }

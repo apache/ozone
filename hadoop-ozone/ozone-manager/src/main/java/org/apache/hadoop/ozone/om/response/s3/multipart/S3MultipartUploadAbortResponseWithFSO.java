@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -54,10 +53,5 @@ public class S3MultipartUploadAbortResponseWithFSO
   public S3MultipartUploadAbortResponseWithFSO(
       @Nonnull OMResponse omResponse) {
     super(omResponse);
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

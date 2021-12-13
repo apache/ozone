@@ -214,7 +214,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo, multipartKey,
-              missingParentInfos);
+              missingParentInfos, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
