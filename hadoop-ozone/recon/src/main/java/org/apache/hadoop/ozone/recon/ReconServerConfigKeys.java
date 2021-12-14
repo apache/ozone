@@ -42,10 +42,6 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
       "ozone.recon.http.auth.kerberos.principal";
 
-  public static final String OZONE_RECON_CONTAINER_DB_CACHE_SIZE_MB =
-      "ozone.recon.container.db.cache.size.mb";
-  public static final int OZONE_RECON_CONTAINER_DB_CACHE_SIZE_DEFAULT = 128;
-
   public static final String OZONE_RECON_DB_DIR = "ozone.recon.db.dir";
 
   public static final String OZONE_RECON_OM_SNAPSHOT_DB_DIR =

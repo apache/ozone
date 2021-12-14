@@ -70,11 +70,6 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
 
-  // LevelDB cache file uses an off-heap cache in LevelDB of 128 MB.
-  public static final String OZONE_OM_DB_CACHE_SIZE_MB =
-      "ozone.om.db.cache.size.mb";
-  public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
-
   public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
       "ozone.om.volume.listall.allowed";
   public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
