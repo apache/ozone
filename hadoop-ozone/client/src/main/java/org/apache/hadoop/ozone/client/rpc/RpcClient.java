@@ -433,8 +433,8 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public OzoneVolume getS3VolumeDetails(String accessID) throws IOException {
-    OmVolumeArgs volume = ozoneManagerClient.getS3Volume(accessID);
+  public OzoneVolume getS3VolumeDetails() throws IOException {
+    OmVolumeArgs volume = ozoneManagerClient.getS3Volume();
     return buildOzoneVolume(volume);
   }
 

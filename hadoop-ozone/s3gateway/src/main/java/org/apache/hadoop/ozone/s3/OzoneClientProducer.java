@@ -97,8 +97,6 @@ public class OzoneClientProducer {
 
       String awsAccessId = signatureInfo.getAwsAccessId();
       validateAccessId(awsAccessId);
-      // TODO: Once HDDS-4440 is merged, access ID should be passed
-      //  through the OM transport. Double check @erose
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
           awsAccessId);
@@ -132,11 +130,10 @@ public class OzoneClientProducer {
     }
 
     if (omServiceID == null) {
-      return OzoneClientFactory.getRpcClient(ozoneConfiguration, accessId);
+      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
     } else {
       // As in HA case, we need to pass om service ID.
-      return OzoneClientFactory.getRpcClient(omServiceID,
-          ozoneConfiguration, accessId);
+      return OzoneClientFactory.getRpcClient(omServiceID, ozoneConfiguration);
     }
   }
 

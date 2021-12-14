@@ -84,13 +84,8 @@ public class OzoneClient implements Closeable {
    * @param proxy ClientProtocol proxy instance
    */
   public OzoneClient(ConfigurationSource conf, ClientProtocol proxy) {
-    this(conf, proxy, null);
-  }
-
-  public OzoneClient(ConfigurationSource conf, ClientProtocol proxy,
-      String accessID) {
     this.proxy = proxy;
-    this.objectStore = new ObjectStore(conf, this.proxy, accessID);
+    this.objectStore = new ObjectStore(conf, this.proxy);
     this.conf = conf;
   }
 

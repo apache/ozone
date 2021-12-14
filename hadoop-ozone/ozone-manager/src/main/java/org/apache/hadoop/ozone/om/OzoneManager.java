@@ -3013,38 +3013,40 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public OmVolumeArgs getS3Volume(String accessID) throws IOException {
+  public OmVolumeArgs getS3Volume() throws IOException {
+    // Unless the OM request contains S3 authentication info with an access
+    // ID that corresponds to a tenant volume, the request will be directed
+    // to the default S3 volume.
+    String s3Volume = HddsClientUtils.getDefaultS3VolumeName(configuration);
+    S3Authentication s3Auth = getS3Auth();
 
-    final String tenantId;
-    try {
-      tenantId = multiTenantManagr.getTenantForAccessID(accessID);
-      // TODO: Get volume name from DB. Do not assume the same. e.g.
-      //metadataManager.getTenantStateTable().get(tenantId)
-      //    .getBucketNamespaceName();
-      final String volumeName = tenantId;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Get S3 volume request for access ID {} belonging to tenant" +
-                " {} is directed to the volume {}.", accessID, tenantId,
-            volumeName);
-      }
-      // This call performs acl checks and checks volume existence.
-      return getVolumeInfo(volumeName);
-
-    } catch (OMException ex) {
-      if (ex.getResult().equals(INVALID_ACCESSID)) {
-        // If the user is not associated with a tenant, they will use the
-        // default s3 volume.
-        String defaultS3volume =
-            HddsClientUtils.getDefaultS3VolumeName(configuration);
-
+    if (s3Auth != null) {
+      String accessID = s3Auth.getAccessId();
+      String tenantId = multiTenantManagr.getTenantForAccessID(accessID);
+      if (tenantId != null) {
+        s3Volume = metadataManager.getTenantStateTable().get(tenantId)
+            .getBucketNamespaceName();
         if (LOG.isDebugEnabled()) {
-          LOG.debug("No tenant found for access ID {}. Directing " +
-              "requests to default s3 volume {}.", accessID, defaultS3volume);
+          LOG.debug("Get S3 volume request for access ID {} belonging to " +
+                  "tenant {} is directed to the volume {}.", accessID, tenantId,
+              s3Volume);
         }
-        return getVolumeInfo(defaultS3volume);
+      } else if (LOG.isDebugEnabled()) {
+          LOG.debug("No tenant found for access ID {}. Directing " +
+              "requests to default s3 volume {}.", accessID, s3Volume);
       }
-      throw ex;
+    } else if (LOG.isDebugEnabled()) {
+      // TODO: Establish standards for s3g OM compatibility. Right now we
+      //  assume new s3g and old OM are incompatible, and old s3g and new OM
+      //  are compatible for everything except multi-tenancy.
+      LOG.debug("S3 authentication was not attached to the OM request. " +
+          "This may happen if an older S3 gateway is communicating with a " +
+          "newer OM. Directing requests to the default S3 volume {}.",
+          s3Volume);
     }
+
+    // This call performs acl checks and checks volume existence.
+    return getVolumeInfo(s3Volume);
   }
 
   @Override

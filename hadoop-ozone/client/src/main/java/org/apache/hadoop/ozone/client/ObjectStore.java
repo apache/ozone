@@ -64,8 +64,6 @@ public class ObjectStore {
    */
   private int listCacheSize;
   private final String defaultS3Volume;
-  // TODO: Using for now for multitenancy but remove when HDDS-4440 is merged.
-  private final String accessID;
 
   /**
    * Creates an instance of ObjectStore.
@@ -73,15 +71,9 @@ public class ObjectStore {
    * @param proxy ClientProtocol proxy.
    */
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
-    this(conf, proxy, null);
-  }
-
-  public ObjectStore(ConfigurationSource conf, ClientProtocol proxy,
-      String accessID) {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
-    this.accessID = accessID;
   }
 
   @VisibleForTesting
@@ -90,7 +82,6 @@ public class ObjectStore {
     OzoneConfiguration conf = new OzoneConfiguration();
     proxy = null;
     defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
-    this.accessID = null;
   }
 
   @VisibleForTesting
@@ -163,11 +154,7 @@ public class ObjectStore {
   }
 
   public OzoneVolume getS3Volume() throws IOException {
-    if (accessID == null)  {
-      return proxy.getVolumeDetails(defaultS3Volume);
-    } else {
-      return proxy.getS3VolumeDetails(accessID);
-    }
+      return proxy.getS3VolumeDetails();
   }
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
