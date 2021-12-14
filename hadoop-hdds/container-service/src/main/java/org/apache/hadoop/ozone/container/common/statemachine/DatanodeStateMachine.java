@@ -111,7 +111,7 @@ public class DatanodeStateMachine implements Closeable {
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
 
   /**
-   * Constructs a a datanode state machine.
+   * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
    * @param conf - Configuration.
    * @param certClient - Datanode Certificate client, required if security is
