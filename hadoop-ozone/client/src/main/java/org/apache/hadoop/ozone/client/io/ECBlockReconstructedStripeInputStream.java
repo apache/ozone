@@ -131,7 +131,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(
-        "ec-reader-for-" + blockInfo.getBlockID() + "-%d").build();
+        "ec-reader-for-" + blockInfo.getBlockID() + "-TID-%d").build();
     executor = Executors.newFixedThreadPool(repConfig.getData(), threadFactory);
   }
 
@@ -489,7 +489,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       } catch (InterruptedException ie) {
         // Catch each InterruptedException to ensure all the futures have been
         // handled, and then throw the exception later
-        LOG.error("Interrupted while waiting for reads to complete", ie);
+        LOG.debug("Interrupted while waiting for reads to complete", ie);
         Thread.currentThread().interrupt();
       }
     }
