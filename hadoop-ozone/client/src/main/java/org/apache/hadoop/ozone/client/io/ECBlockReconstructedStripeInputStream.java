@@ -286,6 +286,9 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         for (ByteBuffer b : bufs) {
           b.position(0);
         }
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted waiting for reads to complete", ie);
       }
     }
     if (missingIndexes.length > 0) {
@@ -453,7 +456,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
-  protected void loadDataBuffersFromStream() throws IOException {
+  protected void loadDataBuffersFromStream()
+      throws IOException, InterruptedException {
     Queue<ImmutablePair<Integer, Future<Void>>> pendingReads
         = new ArrayDeque<>();
     for (int i : dataIndexes) {
@@ -483,9 +487,15 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         failedDataIndexes.add(index);
         exceptionOccurred = true;
       } catch (InterruptedException ie) {
-        LOG.error("Interrupted waiting for reads to complete", ie);
-        throw new IOException("Interrupted waiting for reads to complete", ie);
+        // Catch each InterruptedException to ensure all the futures have been
+        // handled, and then throw the exception later
+        LOG.error("Interrupted while waiting for reads to complete", ie);
+        Thread.currentThread().interrupt();
       }
+    }
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException(
+          "Interrupted while waiting for reads to complete");
     }
     if (exceptionOccurred) {
       throw new IOException("One or more errors occurred reading blocks");
