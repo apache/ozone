@@ -73,7 +73,7 @@ public abstract class EndpointBase {
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
     getClient().getObjectStore().
         getClientProxy().
-        setTheadLocalS3Auth(s3Auth);
+        setThreadLocalS3Auth(s3Auth);
     init();
   }
 

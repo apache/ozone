@@ -1742,7 +1742,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void setTheadLocalS3Auth(
+  public void setThreadLocalS3Auth(
       S3Auth ozoneSharedSecretAuth) {
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
   }
