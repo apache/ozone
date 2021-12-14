@@ -135,7 +135,7 @@ public class TestReplicatedFileChecksumHelper {
         .setBucketName(null)
         .setKeyName(null)
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>(omKeyLocationInfoList))))
+            new OmKeyLocationInfoGroup(0, omKeyLocationInfoList)))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
@@ -177,7 +177,8 @@ public class TestReplicatedFileChecksumHelper {
     ContainerProtos.ContainerCommandResponseProto resp =
         ContainerProtos.ContainerCommandResponseProto.newBuilder()
             .setCmdType(ContainerProtos.Type.GetBlock)
-            .setResult(ContainerProtos.Result.SUCCESS).build();
+            .setResult(ContainerProtos.Result.SUCCESS)
+            .build();
     final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
         replyFuture = new CompletableFuture<>();
     replyFuture.complete(resp);
