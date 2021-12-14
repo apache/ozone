@@ -221,7 +221,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponseWithFSO(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

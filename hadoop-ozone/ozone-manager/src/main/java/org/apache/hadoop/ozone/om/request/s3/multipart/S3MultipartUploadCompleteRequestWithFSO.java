@@ -143,7 +143,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
       IOException exception) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(
-        createErrorOMResponse(omResponse, exception));
+        createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
   @Override

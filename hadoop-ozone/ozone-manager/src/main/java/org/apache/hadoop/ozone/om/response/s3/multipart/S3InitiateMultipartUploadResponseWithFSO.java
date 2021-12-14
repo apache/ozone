@@ -63,8 +63,8 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
    * For a successful request, the other constructor should be used.
    */
   public S3InitiateMultipartUploadResponseWithFSO(
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
+      @Nonnull OMResponse omResponse, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override

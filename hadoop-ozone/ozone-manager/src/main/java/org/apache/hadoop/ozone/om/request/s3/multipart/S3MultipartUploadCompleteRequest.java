@@ -249,7 +249,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected S3MultipartUploadCompleteResponse getOmClientResponse(
       OMResponse.Builder omResponse, IOException exception) {
     return new S3MultipartUploadCompleteResponse(
-        createErrorOMResponse(omResponse, exception));
+        createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
   protected OMClientResponse getOmClientResponse(String multipartKey,

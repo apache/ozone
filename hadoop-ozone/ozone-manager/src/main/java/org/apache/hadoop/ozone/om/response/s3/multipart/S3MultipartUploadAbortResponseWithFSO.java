@@ -52,7 +52,7 @@ public class S3MultipartUploadAbortResponseWithFSO
    * For a successful request, the other constructor should be used.
    */
   public S3MultipartUploadAbortResponseWithFSO(
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
+      @Nonnull OMResponse omResponse, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 }

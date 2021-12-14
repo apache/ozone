@@ -23,6 +23,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -62,8 +63,9 @@ public class OMKeyCreateResponse extends OmKeyResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyCreateResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyCreateResponse(@Nonnull OMResponse omResponse, @Nonnull
+                             BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 

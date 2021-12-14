@@ -227,7 +227,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponse(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

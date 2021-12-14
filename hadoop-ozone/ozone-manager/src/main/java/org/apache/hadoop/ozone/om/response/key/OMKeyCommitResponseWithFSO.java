@@ -55,8 +55,9 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyCommitResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyCommitResponseWithFSO(@Nonnull OMResponse omResponse,
+                                    @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 

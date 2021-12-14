@@ -48,8 +48,9 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
+                                        @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override

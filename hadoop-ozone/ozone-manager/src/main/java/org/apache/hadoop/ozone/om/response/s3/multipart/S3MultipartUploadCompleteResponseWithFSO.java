@@ -64,8 +64,8 @@ public class S3MultipartUploadCompleteResponseWithFSO
    * For a successful request, the other constructor should be used.
    */
   public S3MultipartUploadCompleteResponseWithFSO(
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
+      @Nonnull OMResponse omResponse, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 

@@ -62,8 +62,9 @@ public class OMKeyRenameResponse extends OmKeyResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyRenameResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyRenameResponse(@Nonnull OMResponse omResponse,
+                             @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 

@@ -58,8 +58,9 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
+                                    @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override

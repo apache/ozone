@@ -52,7 +52,7 @@ public class S3MultipartUploadAbortRequestWithFSO
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponseWithFSO(createErrorOMResponse(
-        omResponse, exception));
+        omResponse, exception), getBucketLayout());
   }
 
   @Override

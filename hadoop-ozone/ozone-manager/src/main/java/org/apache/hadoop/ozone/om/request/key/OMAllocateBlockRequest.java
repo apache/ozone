@@ -235,7 +235,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
             "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {

@@ -232,7 +232,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
-            exception));
+            exception), getBucketLayout());
   }
 
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,

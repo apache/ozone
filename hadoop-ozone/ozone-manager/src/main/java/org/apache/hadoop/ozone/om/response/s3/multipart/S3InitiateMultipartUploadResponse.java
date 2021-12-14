@@ -56,8 +56,9 @@ public class S3InitiateMultipartUploadResponse extends OmKeyResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public S3InitiateMultipartUploadResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public S3InitiateMultipartUploadResponse(@Nonnull OMResponse omResponse,
+                                           @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 
