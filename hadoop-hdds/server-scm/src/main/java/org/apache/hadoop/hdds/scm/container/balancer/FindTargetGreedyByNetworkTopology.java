@@ -40,7 +40,6 @@ public class FindTargetGreedyByNetworkTopology
     extends AbstractFindTargetGreedy {
 
   private NetworkTopology networkTopology;
-  private DatanodeDetails prevSource;
   private List potentialTargets;
 
   public FindTargetGreedyByNetworkTopology(
@@ -53,7 +52,6 @@ public class FindTargetGreedyByNetworkTopology
     potentialTargets = new LinkedList<>();
     setPotentialTargets(potentialTargets);
     this.networkTopology = networkTopology;
-    prevSource = null;
   }
 
   /**
@@ -62,9 +60,6 @@ public class FindTargetGreedyByNetworkTopology
    * @param source the specified source datanode
    */
   protected void sortTargetForSource(DatanodeDetails source) {
-    if (source.equals(prevSource)) {
-      return;
-    }
     Collections.sort(potentialTargets,
         (DatanodeUsageInfo da, DatanodeUsageInfo db) -> {
         DatanodeDetails a = da.getDatanodeDetails();
