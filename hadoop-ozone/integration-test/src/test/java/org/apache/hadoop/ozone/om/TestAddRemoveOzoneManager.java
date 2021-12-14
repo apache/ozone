@@ -361,7 +361,7 @@ public class TestAddRemoveOzoneManager {
     // lead to no quorum and there will not be a elected leader OM to process
     // the decommission request.
     String omNodeId2;
-    if (cluster.getOzoneManager().getOMNodeId().equals(
+    if (cluster.getOMLeader().getOMNodeId().equals(
         cluster.getOzoneManager(1).getOMNodeId())) {
       omNodeId2 = cluster.getOzoneManager(0).getOMNodeId();
     } else {
