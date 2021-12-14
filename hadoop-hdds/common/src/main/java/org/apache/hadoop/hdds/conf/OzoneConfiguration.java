@@ -108,6 +108,7 @@ public class OzoneConfiguration extends Configuration
     setClassLoader(conf.getClassLoader());
     if (!(conf instanceof OzoneConfiguration)) {
       loadDefaults();
+      addResource(conf);
     }
   }
 
