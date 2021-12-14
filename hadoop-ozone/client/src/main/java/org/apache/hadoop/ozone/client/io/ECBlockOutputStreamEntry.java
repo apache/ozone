@@ -290,11 +290,11 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     return blockOutputStreams[0].getBlockID();
   }
 
-  public List<ECBlockOutputStream> getDataWriteFailedStreams() {
+  public List<ECBlockOutputStream> streamsWithWriteFailure() {
     return getFailedStreams(false);
   }
 
-  public List<ECBlockOutputStream> getPutBlockFailedStreams() {
+  public List<ECBlockOutputStream> streamsWithPutBlockFailure() {
     return getFailedStreams(true);
   }
 

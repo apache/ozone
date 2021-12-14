@@ -33,6 +33,8 @@ import java.util.Set;
 
 /**
  * Allocates the block with required number of nodes in the pipeline.
+ * The nodes are pre-created with port numbers starting from 0 to
+ * ( given cluster size -1).
  */
 public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
   private long blockId;
@@ -45,6 +47,8 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
       int requiredNodes, int clusterSize) {
     this.requiredNodes = requiredNodes;
     this.conf = conf;
+    // Pre-initializing the datanodes. Later allocateBlock API will use this
+    // nodes to add the required number of nodes in the block pipelines.
     for (int i = 0; i < clusterSize; i++) {
       clusterDns.add(HddsProtos.DatanodeDetailsProto.newBuilder().setUuid128(
           HddsProtos.UUID.newBuilder().setLeastSigBits(i).setMostSigBits(i)
@@ -58,36 +62,52 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
     return this.clusterDns;
   }
 
+  /**
+   * This method selects the block pipeline nodes from the pre-created cluster
+   * nodes(clusterDns). It will use requiredNodes field to decide how many nodes
+   * to be chosen for the pipeline. To make the tests easy prediction of the
+   * node allocations, it will choose block pipeline nodes in a sliding window
+   * fashion starting from 0th index in clusterDns in incrementing order until
+   * given requireNodes number. Similarly for the next block pipeline, it will
+   * start from the index location of previous chosen pipeline's last node index
+   * + 1. Let's say cluster size was initialized with 10 and required nodes are
+   * 5, the first block pipeline will have nodes from 0 to 4 and the second
+   * block will be assigned with the index locations of 5th to 9th nodes. Once
+   * we finish round of allocations, then it will start from 0 again for next
+   * block. It will also support exclude list. If client passes exclude list, it
+   * will simply skip the node if it presents in exclude list, instead it will
+   * simply take the next node. If not enough nodes left due to the grown
+   * exclude list, it will throw IllegalStateException.
+   *
+   * @param keyArgs
+   * @param excludeList
+   * @return KeyLocation
+   */
   @Override
   public Iterable<? extends OzoneManagerProtocolProtos.KeyLocation>
       allocateBlock(OzoneManagerProtocolProtos.KeyArgs keyArgs,
       ExcludeList excludeList) {
+    HddsProtos.Pipeline.Builder builder =
+        HddsProtos.Pipeline.newBuilder().setFactor(keyArgs.getFactor())
+            .setType(keyArgs.getType()).setId(HddsProtos.PipelineID.newBuilder()
+            .setUuid128(HddsProtos.UUID.newBuilder().setLeastSigBits(1L)
+                .setMostSigBits(1L).build()).build());
+    addMembers(builder, requiredNodes, excludeList.getDatanodes(), keyArgs);
+    if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
+      builder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+    }
+    final HddsProtos.Pipeline pipeline = builder.build();
+    List<OzoneManagerProtocolProtos.KeyLocation> results = new ArrayList<>();
     long blockSize = (long) conf
         .getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
             OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-    long blockGroupLen = keyArgs.getEcReplicationConfig().getData() * blockSize;
-    long dataSize = keyArgs.getDataSize();
-    List<OzoneManagerProtocolProtos.KeyLocation> results = new ArrayList<>();
-    long numbBlkGroups = dataSize / blockGroupLen + 1;
-    for (int i = 0; i < numbBlkGroups; i++) {
-      HddsProtos.Pipeline.Builder builder =
-          HddsProtos.Pipeline.newBuilder().setFactor(keyArgs.getFactor())
-              .setType(keyArgs.getType()).setId(
-              HddsProtos.PipelineID.newBuilder().setUuid128(
-                  HddsProtos.UUID.newBuilder().setLeastSigBits(1L)
-                      .setMostSigBits(1L).build()).build());
-      addMembers(builder, requiredNodes, excludeList.getDatanodes(), keyArgs);
-      if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
-        builder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
-      }
-      final HddsProtos.Pipeline pipeline = builder.build();
-      results.add(OzoneManagerProtocolProtos.KeyLocation.newBuilder()
-          .setPipeline(pipeline).setBlockID(
-              HddsProtos.BlockID.newBuilder().setBlockCommitSequenceId(1L)
-                  .setContainerBlockID(HddsProtos.ContainerBlockID.newBuilder()
-                      .setContainerID(1L).setLocalID(blockId++).build())
-                  .build()).setOffset(0L).setLength(blockSize).build());
-    }
+    results.add(OzoneManagerProtocolProtos.KeyLocation.newBuilder()
+        .setPipeline(pipeline).setBlockID(
+            HddsProtos.BlockID.newBuilder().setBlockCommitSequenceId(1L)
+                .setContainerBlockID(
+                    HddsProtos.ContainerBlockID.newBuilder().setContainerID(1L)
+                        .setLocalID(blockId++).build()).build()).setOffset(0L)
+        .setLength(blockSize).build());
     return results;
   }
 

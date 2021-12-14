@@ -51,7 +51,6 @@ import org.slf4j.LoggerFactory;
  * block output streams chunk by chunk.
  */
 public class ECKeyOutputStream extends KeyOutputStream {
-  private final int maxRetriesOnStripeWriteFailures;
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private int ecChunkSize;
@@ -99,8 +98,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion) {
     this.config = config;
-    this.maxRetriesOnStripeWriteFailures =
-        this.config.getMaxECStripeRetriesOnFailures();
     // For EC, cell/chunk size and buffer size can be same for now.
     ecChunkSize = replicationConfig.getEcChunkSize();
     this.config.setStreamBufferMaxSize(ecChunkSize);
@@ -250,12 +247,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
       currentStreamEntry.useNextBlockStream();
     }
 
-    if(!isDataWriteSuccess()){
+    if (hasWriteFailure()) {
       return StripeWriteStatus.FAILED;
     }
     currentStreamEntry.executePutBlock();
 
-    if(!isPutBlockSuccess()){
+    if (hasPutBlockFailure()) {
       return StripeWriteStatus.FAILED;
     }
     ECBlockOutputStreamEntry newBlockGroupStreamEntry =
@@ -306,7 +303,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       boolean allocateBlockIfFull)
       throws IOException {
     writeParityCells(parityCellSize);
-    if (!isDataWriteSuccess()) {
+    if (hasWriteFailure()) {
       return StripeWriteStatus.FAILED;
     }
 
@@ -317,7 +314,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     streamEntry.executePutBlock();
 
-    if (!isPutBlockSuccess()) {
+    if (hasPutBlockFailure()) {
       return StripeWriteStatus.FAILED;
     }
     ecChunkBufferCache.clear(parityCellSize);
@@ -335,30 +332,28 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return StripeWriteStatus.SUCCESS;
   }
 
-  private boolean isDataWriteSuccess() {
-    ECBlockOutputStreamEntry streamEntry =
-        blockOutputStreamEntryPool.getCurrentStreamEntry();
+  private boolean hasWriteFailure() {
     List<ECBlockOutputStream> failedStreams =
-        streamEntry.getDataWriteFailedStreams();
+        blockOutputStreamEntryPool.getCurrentStreamEntry()
+            .streamsWithWriteFailure();
     // Since writes are async, let's check the failures once.
     if (failedStreams.size() > 0) {
       addToExcludeNodesList(failedStreams);
-      return false;
+      return true;
     }
-    return true;
+    return false;
   }
 
-  private boolean isPutBlockSuccess() {
-    ECBlockOutputStreamEntry streamEntry =
-        blockOutputStreamEntryPool.getCurrentStreamEntry();
+  private boolean hasPutBlockFailure() {
     List<ECBlockOutputStream> failedStreams =
-        streamEntry.getPutBlockFailedStreams();
+        blockOutputStreamEntryPool.getCurrentStreamEntry()
+            .streamsWithPutBlockFailure();
     // Since writes are async, let's check the failures once.
     if (failedStreams.size() > 0) {
       addToExcludeNodesList(failedStreams);
-      return false;
+      return true;
     }
-    return true;
+    return false;
   }
 
   private void addToExcludeNodesList(List<ECBlockOutputStream> failedStreams) {
@@ -557,7 +552,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       boolean allocateBlockIfFull)
       throws IOException {
     StripeWriteStatus stripeWriteStatus;
-    for (int i = 0; i < this.maxRetriesOnStripeWriteFailures; i++) {
+    for (int i = 0; i < this.config.getMaxECStripeWriteRetries(); i++) {
       stripeWriteStatus =
           rewriteStripeToNewBlockGroup(parityCellSize, lastStripeSize,
               allocateBlockIfFull);
@@ -565,9 +560,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
         return;
       }
     }
-    throw new IOException(
-        "Completed max allowed retries " + this.maxRetriesOnStripeWriteFailures
-            + " on stripe failures.");
+    throw new IOException("Completed max allowed retries " + this.config
+        .getMaxECStripeWriteRetries() + " on stripe failures.");
 
   }
 

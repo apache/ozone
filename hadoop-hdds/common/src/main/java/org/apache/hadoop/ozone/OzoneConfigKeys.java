@@ -117,7 +117,7 @@ public final class OzoneConfigKeys {
 
   public static final String
       OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES =
-      "ozone.client.max.ec.stripe.write.retries.on.failures";
+      "ozone.client.max.ec.stripe.write.retries";
   public static final String
       OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES_DEFAULT = "10";
 
