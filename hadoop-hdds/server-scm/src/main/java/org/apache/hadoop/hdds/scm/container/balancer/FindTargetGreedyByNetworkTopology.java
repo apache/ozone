@@ -56,7 +56,7 @@ public class FindTargetGreedyByNetworkTopology
 
   /**
    * sort potentialTargets for specified source datanode according to
-   * network topology if enabled.
+   * network topology.
    * @param source the specified source datanode
    */
   protected void sortTargetForSource(DatanodeDetails source) {

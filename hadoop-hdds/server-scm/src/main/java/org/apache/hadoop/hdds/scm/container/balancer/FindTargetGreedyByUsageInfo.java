@@ -40,6 +40,9 @@ public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
     setPotentialTargets(new TreeSet<>((a, b) -> compareByUsage(a, b)));
   }
 
+  /**
+   * do nothing , since TreeSet is ordered itself.
+   */
   protected void sortTargetForSource(DatanodeDetails source) {
     return;
   }
