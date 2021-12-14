@@ -128,7 +128,7 @@ public class TestReplicatedFileChecksumHelper {
     OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
     when(rpcClient.getOzoneManagerClient()).thenReturn(om);
 
-    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>(1);
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
         .setVolumeName(null)
@@ -158,7 +158,7 @@ public class TestReplicatedFileChecksumHelper {
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
-    assertEquals(0, fileChecksum.getLength());
+    assertEquals(1, helper.getKeyLocationInfos().size());
   }
 
   /*private void invokeXceiverClientGetBlock(XceiverClientSpi client)
