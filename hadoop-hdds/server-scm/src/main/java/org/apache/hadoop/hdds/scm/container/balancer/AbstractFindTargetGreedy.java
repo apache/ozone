@@ -39,7 +39,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Find a target giving preference to more under-utilized nodes.
+ * Find a target for a source datanode with greedy strategy.
  */
 public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   private Logger logger;
