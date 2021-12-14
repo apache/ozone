@@ -154,7 +154,7 @@ public class ObjectStore {
   }
 
   public OzoneVolume getS3Volume() throws IOException {
-      return proxy.getS3VolumeDetails();
+    return proxy.getS3VolumeDetails();
   }
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {

@@ -35,6 +35,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import com.google.common.base.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -405,13 +407,14 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public String getTenantForAccessID(String accessID) throws IOException {
+  public Optional<String> getTenantForAccessID(String accessID)
+      throws IOException {
     OmDBAccessIdInfo omDBAccessIdInfo =
         omMetadataManager.getTenantAccessIdTable().get(accessID);
     if (omDBAccessIdInfo == null) {
-      throw new OMException(INVALID_ACCESSID);
+      return Optional.absent();
     }
-    return omDBAccessIdInfo.getTenantId();
+    return Optional.of(omDBAccessIdInfo.getTenantId());
   }
 
   public List<String> listAllAccessIDs(String tenantID)
@@ -426,8 +429,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     try {
       controlPathLock.writeLock().lock();
       // tenantId (tenant name) is necessary to retrieve role name
-      final String tenantId = getTenantForAccessID(accessID);
-      assert(tenantId != null);
+      Optional<String> optionalTenant = getTenantForAccessID(accessID);
+      if (!optionalTenant.isPresent()) {
+        throw new OMException("No tenant found for access ID " + accessID,
+            INVALID_ACCESSID);
+      }
+      final String tenantId = optionalTenant.get();
 
       final OzoneTenantRolePrincipal existingAdminRole =
           OzoneTenantRolePrincipal.getAdminRole(tenantId);

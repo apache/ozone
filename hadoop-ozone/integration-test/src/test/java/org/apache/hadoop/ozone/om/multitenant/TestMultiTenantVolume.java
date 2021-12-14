@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -150,8 +151,8 @@ public class TestMultiTenantVolume {
     OzoneConfiguration conf = cluster.getOzoneManager().getConfiguration();
     // Manually construct an object store instead of using the cluster
     // provided one so we can specify the access ID.
-    // TODO: Update after HDDS-4440 is merged and this is not necessary.
-    return new ObjectStore(conf, new RpcClient(conf, null),
-        accessID);
+    RpcClient client = new RpcClient(conf, null);
+    client.setThreadLocalS3Auth(new S3Auth("unused1", "unused2", accessID));
+    return new ObjectStore(conf, client);
   }
 }

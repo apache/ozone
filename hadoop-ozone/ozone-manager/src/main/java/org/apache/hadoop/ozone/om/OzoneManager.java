@@ -251,7 +251,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESSID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -3022,8 +3021,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (s3Auth != null) {
       String accessID = s3Auth.getAccessId();
-      String tenantId = multiTenantManagr.getTenantForAccessID(accessID);
-      if (tenantId != null) {
+      Optional<String> optionalTenantId =
+          multiTenantManagr.getTenantForAccessID(accessID);
+
+      if (optionalTenantId.isPresent()) {
+        String tenantId = optionalTenantId.get();
         s3Volume = metadataManager.getTenantStateTable().get(tenantId)
             .getBucketNamespaceName();
         if (LOG.isDebugEnabled()) {
@@ -3032,16 +3034,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               s3Volume);
         }
       } else if (LOG.isDebugEnabled()) {
-          LOG.debug("No tenant found for access ID {}. Directing " +
-              "requests to default s3 volume {}.", accessID, s3Volume);
+        LOG.debug("No tenant found for access ID {}. Directing " +
+            "requests to default s3 volume {}.", accessID, s3Volume);
       }
     } else if (LOG.isDebugEnabled()) {
-      // TODO: Establish standards for s3g OM compatibility. Right now we
-      //  assume new s3g and old OM are incompatible, and old s3g and new OM
-      //  are compatible for everything except multi-tenancy.
+      // An old S3 gateway talking to a new OM may not attach the auth info.
+      // This old version of s3g will also not have a client that supports
+      // multi-tenancy, so we can direct requests to the default S3 volume.
       LOG.debug("S3 authentication was not attached to the OM request. " +
-          "This may happen if an older S3 gateway is communicating with a " +
-          "newer OM. Directing requests to the default S3 volume {}.",
+          "Directing requests to the default S3 volume {}.",
           s3Volume);
     }
 
