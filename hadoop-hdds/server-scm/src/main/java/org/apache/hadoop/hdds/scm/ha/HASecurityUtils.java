@@ -326,7 +326,7 @@ public final class HASecurityUtils {
    * @return
    */
   public static GrpcTlsConfig createSCMRatisTLSConfig(SecurityConfig conf,
-      CertificateClient certificateClient) {
+      CertificateClient certificateClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       return new GrpcTlsConfig(
           certificateClient.getPrivateKey(), certificateClient.getCertificate(),

@@ -245,7 +245,8 @@ public class OzoneDelegationTokenSecretManager
    *
    * @param identifier the identifier to validate
    */
-  private void updateIdentifierDetails(OzoneTokenIdentifier identifier) {
+  private void updateIdentifierDetails(OzoneTokenIdentifier identifier)
+      throws IOException {
     int sequenceNum;
     long now = Time.now();
     sequenceNum = incrementDelegationTokenSeqNum();
@@ -260,7 +261,7 @@ public class OzoneDelegationTokenSecretManager
   /**
    * Get OM certificate serial id.
    * */
-  private String getOmCertificateSerialId() {
+  private String getOmCertificateSerialId() throws IOException {
     if (omCertificateSerialId == null) {
       omCertificateSerialId =
           getCertClient().getCertificate().getSerialNumber().toString();

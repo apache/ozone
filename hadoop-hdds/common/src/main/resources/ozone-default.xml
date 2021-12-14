@@ -2988,4 +2988,62 @@
       will create intermediate directories.
     </description>
   </property>
+
+  <property>
+    <name>hdds.custom.rootca.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      This configuration is used to enable external root CA for Ozone.
+      If this is set to true, "hdds.custom.keystore.file.path",
+      "hdds.custom.keystore.file.password", "hdds.custom.truststore.file.path", "hdds.custom.truststore.password"
+      are also required to be configured to be able successfully start Ozone.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.custom.keystore.file.path</name>
+    <value></value>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      The keystore file in JCEKS format that contains the key and the certificate signed by the custom Root CA.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.custom.keystore.file.password</name>
+    <value></value>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      The keystore password to access the keystore file specified in "hdds.custom.keystore.file.path"
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.custom.keystore.key.password</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      The keystore key password to access the keys store in the keystore file specified in "hdds.custom.keystore.file.path"
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.custom.truststore.file.path</name>
+    <value></value>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      The truststore file that contains the trusted root CA and intermediate CA certificates.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.custom.truststore.password</name>
+    <value></value>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      The password to access the truststore file specified in "hdds.custom.truststore.file.path"
+    </description>
+  </property>
+
 </configuration>

@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.FileWriterWithEncoding;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
@@ -41,9 +43,12 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.security.KeyFactory;
 import java.security.KeyPair;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -76,6 +81,8 @@ public class KeyCodec {
       Stream.of(OWNER_READ, OWNER_WRITE)
           .collect(Collectors.toSet());
   private Supplier<Boolean> isPosixFileSystem;
+  private PrivateKey customPrivateKey;
+  private PublicKey customPublicKey;
 
   /**
    * Creates a KeyCodec with component name.
@@ -178,11 +185,15 @@ public class KeyCodec {
    * @throws IOException - On I/O failure.
    */
   public void writePublicKey(PublicKey key) throws IOException {
+    if (securityConfig.isCustomCAEnabled()) {
+      throw new SCMSecurityException("Cannot write public key when " +
+          HddsConfigKeys.HDDS_CUSTOM_ROOT_CA_ENABLED + " is set to true.");
+    }
     File publicKeyFile = Paths.get(location.toString(),
         securityConfig.getPublicKeyFileName()).toFile();
 
     if (Files.exists(publicKeyFile.toPath())) {
-      throw new IOException("Private key already exist.");
+      throw new IOException("Public key already exists. Cannot overwrite.");
     }
 
     try (PemWriter keyWriter = new PemWriter(new
@@ -230,30 +241,21 @@ public class KeyCodec {
   private PKCS8EncodedKeySpec readKey(Path basePath, String keyFileName)
       throws IOException {
     File fileName = Paths.get(basePath.toString(), keyFileName).toFile();
-    String keyData = FileUtils.readFileToString(fileName, DEFAULT_CHARSET);
-    final byte[] pemContent;
-    try (PemReader pemReader = new PemReader(new StringReader(keyData))) {
-      PemObject keyObject = pemReader.readPemObject();
-      pemContent = keyObject.getContent();
-    }
-    return new PKCS8EncodedKeySpec(pemContent);
+    return readKey(fileName);
   }
 
   /**
-   * Returns a Private Key from a PEM encoded file.
+   * Returns a Private Key from a PKCS8EncodedKeySpec.
    *
-   * @param basePath - base path
-   * @param privateKeyFileName - private key file name.
+   * @param encodedKeySpec - PKCS8EncodedKeySpec of the Private Key.
    * @return PrivateKey
    * @throws InvalidKeySpecException  - on Error.
    * @throws NoSuchAlgorithmException - on Error.
    * @throws IOException              - on Error.
    */
-  public PrivateKey readPrivateKey(Path basePath, String privateKeyFileName)
+  public PrivateKey readPrivateKey(PKCS8EncodedKeySpec encodedKeySpec)
       throws InvalidKeySpecException, NoSuchAlgorithmException, IOException {
-    PKCS8EncodedKeySpec encodedKeySpec = readKey(basePath, privateKeyFileName);
-    final KeyFactory keyFactory =
-        KeyFactory.getInstance(securityConfig.getKeyAlgo());
+    KeyFactory keyFactory = KeyFactory.getInstance(securityConfig.getKeyAlgo());
     return
         keyFactory.generatePrivate(encodedKeySpec);
   }
@@ -267,34 +269,57 @@ public class KeyCodec {
    */
   public PublicKey readPublicKey() throws InvalidKeySpecException,
       NoSuchAlgorithmException, IOException {
-    return readPublicKey(this.location.toAbsolutePath(),
-        securityConfig.getPublicKeyFileName());
+    PKCS8EncodedKeySpec encodedKeySpec =
+        readKey(this.location.toAbsolutePath(),
+            securityConfig.getPublicKeyFileName());
+    return readPublicKey(encodedKeySpec);
   }
 
   /**
-   * Returns a public key from a PEM encoded file.
+   * Returns a Public Key from a PKCS8EncodedKeySpec.
    *
-   * @param basePath - base path.
-   * @param publicKeyFileName - public key file name.
+   * @param encodedKeySpec - PKCS8EncodedKeySpec of the Public Key.
    * @return PublicKey
    * @throws NoSuchAlgorithmException - on Error.
    * @throws InvalidKeySpecException  - on Error.
    * @throws IOException              - on Error.
    */
-  public PublicKey readPublicKey(Path basePath, String publicKeyFileName)
+  public PublicKey readPublicKey(PKCS8EncodedKeySpec encodedKeySpec)
       throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-    PKCS8EncodedKeySpec encodedKeySpec = readKey(basePath, publicKeyFileName);
-    final KeyFactory keyFactory =
-        KeyFactory.getInstance(securityConfig.getKeyAlgo());
+    KeyFactory keyFactory = KeyFactory.getInstance(securityConfig.getKeyAlgo());
     return
         keyFactory.generatePublic(
             new X509EncodedKeySpec(encodedKeySpec.getEncoded()));
 
   }
 
+  private void loadCustomKeys() throws NoSuchAlgorithmException,
+      IOException, KeyStoreException, CertificateException,
+      UnrecoverableKeyException {
+    KeyPair keyPair = SecurityUtil.getCustomKeyPair(securityConfig);
+    assert keyPair != null;
+    customPrivateKey = keyPair.getPrivate();
+    customPublicKey = keyPair.getPublic();
+  }
+  /**
+   * Returns the custom public key for custom Root CA setup.
+   * @return PublicKey.
+   * @throws InvalidKeySpecException - On Error.
+   * @throws NoSuchAlgorithmException - On Error.
+   * @throws IOException - On Error.
+   */
+  public PublicKey readCustomPublicKey() throws InvalidKeySpecException,
+      NoSuchAlgorithmException, IOException, KeyStoreException,
+      CertificateException, UnrecoverableKeyException {
+    if (customPublicKey == null) {
+      loadCustomKeys();
+    }
+
+    return customPublicKey;
+  }
 
   /**
-   * Returns the private key  using defaults.
+   * Returns the private key using defaults.
    * @return PrivateKey.
    * @throws InvalidKeySpecException - On Error.
    * @throws NoSuchAlgorithmException - On Error.
@@ -302,10 +327,10 @@ public class KeyCodec {
    */
   public PrivateKey readPrivateKey() throws InvalidKeySpecException,
       NoSuchAlgorithmException, IOException {
-    return readPrivateKey(this.location.toAbsolutePath(),
+    PKCS8EncodedKeySpec encodedKeySpec = readKey(this.location.toAbsolutePath(),
         securityConfig.getPrivateKeyFileName());
+    return readPrivateKey(encodedKeySpec);
   }
-
 
   /**
    * Helper function that actually writes data to the files.
@@ -317,8 +342,10 @@ public class KeyCodec {
    * @param force - forces overwriting the keys.
    * @throws IOException - On I/O failure.
    */
-  private synchronized void writeKey(Path basePath, KeyPair keyPair,
-      String privateKeyFileName, String publicKeyFileName, boolean force)
+  @VisibleForTesting
+  synchronized void writeKey(Path basePath, KeyPair keyPair,
+                             String privateKeyFileName,
+                             String publicKeyFileName, boolean force)
       throws IOException {
     checkPreconditions(basePath);
 
@@ -406,4 +433,37 @@ public class KeyCodec {
     }
   }
 
+  /**
+   * Returns the custom private key for custom Root CA setup.
+   * @return PrivateKey.
+   * @throws NoSuchAlgorithmException - On Error.
+   * @throws IOException - On Error.
+   */
+  public PrivateKey readCustomPrivateKey() throws NoSuchAlgorithmException,
+      IOException, UnrecoverableKeyException, CertificateException,
+      KeyStoreException {
+    if (customPrivateKey == null) {
+      loadCustomKeys();
+    }
+
+    return customPrivateKey;
+  }
+
+  /**
+   * Reads a Key from the PEM Encoded Store.
+   *
+   * @param path - Path, Location where the Key file is stored.
+   * @return PrivateKey Object.
+   * @throws IOException - on Error.
+   */
+  protected PKCS8EncodedKeySpec readKey(File path)
+      throws IOException {
+    String keyData = FileUtils.readFileToString(path, DEFAULT_CHARSET);
+    byte[] pemContent;
+    try (PemReader pemReader = new PemReader(new StringReader(keyData))) {
+      PemObject keyObject = pemReader.readPemObject();
+      pemContent = keyObject.getContent();
+    }
+    return new PKCS8EncodedKeySpec(pemContent);
+  }
 }

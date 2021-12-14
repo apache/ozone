@@ -265,6 +265,20 @@ public class CertificateCodec {
   }
 
   /**
+   * Returns the certificate from the specific PEM encoded file.
+   *
+   * @param certFile - Full path to the certificate file.
+   * @return X%09 Certificate
+   * @throws IOException          - on Error.
+   * @throws SCMSecurityException - on Error.
+   * @throws CertificateException - on Error.
+   */
+  public static X509CertificateHolder readCertificate(File certFile)
+      throws IOException, CertificateException {
+    return getX509CertificateHolder(certFile);
+  }
+
+  /**
    * Helper function to read certificate.
    *
    * @param certificateFile - Full path to certificate file.
@@ -272,8 +286,8 @@ public class CertificateCodec {
    * @throws IOException          - On Error.
    * @throws CertificateException - On Error.
    */
-  private X509CertificateHolder getX509CertificateHolder(File certificateFile)
-      throws IOException, CertificateException {
+  private static X509CertificateHolder getX509CertificateHolder(
+      File certificateFile) throws IOException, CertificateException {
     if (!certificateFile.exists()) {
       throw new IOException("Unable to find the requested certificate. Path: "
           + certificateFile.toString());

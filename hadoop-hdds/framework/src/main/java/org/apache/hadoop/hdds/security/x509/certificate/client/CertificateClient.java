@@ -73,7 +73,7 @@ public interface CertificateClient {
    *
    * @return certificate or Null if there is no data.
    */
-  X509Certificate getCertificate();
+  X509Certificate getCertificate() throws IOException;
 
   /**
    * Return the latest CA certificate known to the client.
@@ -188,7 +188,7 @@ public interface CertificateClient {
    * Initialize certificate client.
    *
    * */
-  InitResponse init() throws CertificateException;
+  InitResponse init() throws IOException;
 
   /**
    * Represents initialization response of client.

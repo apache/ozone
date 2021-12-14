@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -130,6 +130,21 @@ public final class HddsConfigKeys {
   public static final String HDDS_DEFAULT_SECURITY_PROVIDER = "BC";
   public static final String HDDS_KEY_DIR_NAME = "hdds.key.dir.name";
   public static final String HDDS_KEY_DIR_NAME_DEFAULT = "keys";
+
+  public static final String HDDS_CUSTOM_ROOT_CA_ENABLED =
+      "hdds.custom.rootca.enabled";
+  public static final boolean HDDS_CUSTOM_ROOT_CA_ENABLED_DEFAULT = false;
+  public static final String HDDS_CUSTOM_KEYSTORE_FILE_PATH =
+      "hdds.custom.keystore.file.path";
+  public static final String HDDS_CUSTOM_KEYSTORE_FILE_PASSWORD =
+      "hdds.custom.keystore.file.password";
+  public static final String HDDS_CUSTOM_KEYSTORE_KEY_PASSWORD =
+      "hdds.custom.keystore.key.password";
+  public static final String HDDS_CUSTOM_TRUSTSTORE_FILE_PATH =
+      "hdds.custom.truststore.file.path";
+  public static final String HDDS_CUSTOM_TRUSTSTORE_PASSWORD =
+      "hdds.custom.truststore.password";
+
   // TODO : Talk to StorageIO classes and see if they can return a secure
   // storage location for each node.
   public static final String HDDS_METADATA_DIR_NAME = "hdds.metadata.dir";

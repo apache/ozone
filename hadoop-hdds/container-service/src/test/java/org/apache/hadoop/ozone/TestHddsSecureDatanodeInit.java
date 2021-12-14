@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -114,7 +115,7 @@ public class TestHddsSecureDatanodeInit {
   }
 
   @Before
-  public void setUpDNCertClient(){
+  public void setUpDNCertClient() throws IOException {
 
     FileUtils.deleteQuietly(Paths.get(
         securityConfig.getKeyLocation(DN_COMPONENT).toString(),

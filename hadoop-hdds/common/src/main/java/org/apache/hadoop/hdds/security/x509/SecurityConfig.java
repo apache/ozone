@@ -19,6 +19,16 @@
 
 package org.apache.hadoop.hdds.security.x509;
 
+
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Provider;
@@ -26,10 +36,6 @@ import java.security.Security;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-
-import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
@@ -69,10 +75,13 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_KEYSTORE_FILE_PASSWORD;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_KEYSTORE_FILE_PATH;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_KEYSTORE_KEY_PASSWORD;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_ROOT_CA_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_ROOT_CA_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_TRUSTSTORE_FILE_PATH;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_TRUSTSTORE_PASSWORD;
 
 /**
  * A class that deals with all Security related configs in HDDS.
@@ -103,6 +112,13 @@ public class SecurityConfig {
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
+  private final boolean isCustomCAEnabled;
+  // The following configs are used only when custom Root CA is enabled
+  private final String keystoreFilePath;
+  private char[] keystoreFilePassword;
+  private char[] keystoreKeyPassword;
+  private final String truststoreFilePath;
+  private char[] truststorePassword;
 
   /**
    * Constructs a SecurityConfig.
@@ -117,6 +133,9 @@ public class SecurityConfig {
         HDDS_DEFAULT_KEY_ALGORITHM);
     this.providerString = this.configuration.get(HDDS_SECURITY_PROVIDER,
         HDDS_DEFAULT_SECURITY_PROVIDER);
+    this.isCustomCAEnabled =
+        this.configuration.getBoolean(HDDS_CUSTOM_ROOT_CA_ENABLED,
+            HDDS_CUSTOM_ROOT_CA_ENABLED_DEFAULT);
 
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
@@ -174,6 +193,22 @@ public class SecurityConfig {
 
     this.crlName = this.configuration.get(HDDS_X509_CRL_NAME,
                                           HDDS_X509_CRL_NAME_DEFAULT);
+
+    this.keystoreFilePath =
+        this.configuration.get(HDDS_CUSTOM_KEYSTORE_FILE_PATH);
+    this.truststoreFilePath =
+        this.configuration.get(HDDS_CUSTOM_TRUSTSTORE_FILE_PATH);
+    try {
+      this.keystoreFilePassword =
+          this.configuration.getPassword(HDDS_CUSTOM_KEYSTORE_FILE_PASSWORD);
+      this.keystoreKeyPassword =
+          this.configuration.getPassword(HDDS_CUSTOM_KEYSTORE_KEY_PASSWORD);
+      this.truststorePassword =
+          this.configuration.getPassword(HDDS_CUSTOM_TRUSTSTORE_PASSWORD);
+    } catch (IOException ioException) {
+      LOG.error("Error while getting custom Keystore / Truststore password.",
+          ioException);
+    }
 
     // First Startup -- if the provider is null, check for the provider.
     if (SecurityConfig.provider == null) {
@@ -405,5 +440,33 @@ public class SecurityConfig {
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
+  }
+
+  /**
+   * Returns true if custom Root CA is enabled.
+   * @return true if custom Root CA is enabled.
+   */
+  public boolean isCustomCAEnabled() {
+    return isCustomCAEnabled;
+  }
+
+  public String getKeystoreFilePath() {
+    return keystoreFilePath;
+  }
+
+  public char[] getKeystoreFilePassword() {
+    return keystoreFilePassword.clone();
+  }
+
+  public char[] getKeystoreKeyPassword() {
+    return keystoreKeyPassword.clone();
+  }
+
+  public String getTruststoreFilePath() {
+    return truststoreFilePath;
+  }
+
+  public char[] getTruststorePassword() {
+    return truststorePassword.clone();
   }
 }

@@ -18,14 +18,7 @@
  */
 package org.apache.hadoop.hdds.security.x509.keys;
 
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -36,6 +29,23 @@ import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.security.Key;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.Certificate;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 
 /**
  * Utility functions for Security modules for Ozone.
@@ -118,12 +128,12 @@ public final class SecurityUtil {
   public static PublicKey getPublicKey(byte[] encodedKey,
       SecurityConfig secureConfig) {
     PublicKey key = null;
+    KeyFactory kf = null;
     if (encodedKey == null || encodedKey.length == 0) {
       return null;
     }
 
     try {
-      KeyFactory kf = null;
       kf = KeyFactory.getInstance(secureConfig.getKeyAlgo(),
           secureConfig.getProvider());
       key = kf.generatePublic(new X509EncodedKeySpec(encodedKey));
@@ -135,4 +145,68 @@ public final class SecurityUtil {
     return key;
   }
 
+  public static KeyStore getCustomKeystore(SecurityConfig securityConfig) throws
+      IOException, KeyStoreException, java.security.cert.CertificateException,
+      NoSuchAlgorithmException {
+    String keystorePath = securityConfig.getKeystoreFilePath();
+    char[] keystoreFilePassword = securityConfig.getKeystoreFilePassword();
+
+    KeyStore keystore;
+    try (FileInputStream is = new FileInputStream(keystorePath)) {
+      keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keystore.load(is, keystoreFilePassword);
+    }
+    return keystore;
+  }
+
+  public static KeyStore getCustomTruststore(SecurityConfig securityConfig)
+      throws IOException, KeyStoreException, NoSuchAlgorithmException,
+      java.security.cert.CertificateException {
+    String truststorePath = securityConfig.getTruststoreFilePath();
+    char[] truststoreFilePassword = securityConfig.getTruststorePassword();
+
+    KeyStore keystore;
+    try (FileInputStream is = new FileInputStream(truststorePath)) {
+      keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keystore.load(is, truststoreFilePassword);
+    }
+    return keystore;
+  }
+
+  public static KeyPair getCustomKeyPair(SecurityConfig securityConfig) throws
+      IOException, KeyStoreException, java.security.cert.CertificateException,
+      NoSuchAlgorithmException, UnrecoverableKeyException {
+
+    KeyStore keystore = getCustomKeystore(securityConfig);
+    char[] keystoreKeyPassword = securityConfig.getKeystoreKeyPassword();
+
+    String keyAlias = keystore.aliases().nextElement();
+
+    Key key = keystore.getKey(keyAlias, keystoreKeyPassword);
+    if (key instanceof PrivateKey) {
+      // Get certificate of public key
+      Certificate cert = keystore.getCertificate(keyAlias);
+      return new KeyPair(cert.getPublicKey(), (PrivateKey) key);
+    }
+    return null;
+  }
+
+  public static Certificate getCustomCertificate(SecurityConfig securityConfig)
+      throws IOException {
+    try {
+      KeyStore keystore = getCustomKeystore(securityConfig);
+      char[] keystoreKeyPassword = securityConfig.getKeystoreKeyPassword();
+      String keyAlias = keystore.aliases().nextElement();
+
+      Key key = keystore.getKey(keyAlias, keystoreKeyPassword);
+      if (key instanceof PrivateKey) {
+        // Get certificate of public key
+        return keystore.getCertificate(keyAlias);
+      }
+    } catch (Exception ex) {
+      throw new SCMSecurityException("Error while getting Certificate from " +
+          "keystore in " + securityConfig.getKeystoreFilePath(), ex);
+    }
+    return null;
+  }
 }

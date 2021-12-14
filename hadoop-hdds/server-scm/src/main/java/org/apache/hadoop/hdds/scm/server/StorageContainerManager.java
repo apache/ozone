@@ -356,7 +356,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // Authenticate SCM if security is enabled, this initialization can only
     // be done after the metadata store is initialized.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      initializeCAnSecurityProtocol(conf, configurator);
+      if (!securityConfig.isCustomCAEnabled()) {
+        initializeCAnSecurityProtocol(conf, configurator);
+      }
     } else {
       // if no Security, we do not create a Certificate Server at all.
       // This allows user to boot SCM without security temporarily
@@ -464,10 +466,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   }
 
-  private void initializeCertificateClient() {
+  private void initializeCertificateClient() throws IOException {
     securityConfig = new SecurityConfig(configuration);
     if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
-        scmStorageConfig.checkPrimarySCMIdInitialized()) {
+        scmStorageConfig.checkPrimarySCMIdInitialized() &&
+        !securityConfig.isCustomCAEnabled()) {
       scmCertificateClient = new SCMCertificateClient(
           securityConfig, scmStorageConfig.getScmCertSerialId());
     }

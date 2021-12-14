@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.security.x509.keys;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.junit.Assert.assertNotNull;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -168,6 +169,32 @@ public class TestKeyCodec {
     Assert.assertEquals(expectedSet.size(), currentSet.size());
     currentSet.removeAll(expectedSet);
     Assert.assertEquals(0, currentSet.size());
+  }
+
+  /**
+   * Assert reading key file returns PKCS8EncodedKeySpec.
+   *
+   * @throws NoSuchProviderException - On Error, due to missing Java
+   * dependencies.
+   * @throws NoSuchAlgorithmException - On Error, due to missing Java
+   * dependencies.
+   * @throws IOException - On I/O failure.
+   * @throws InvalidKeySpecException - on Invalid Key Spec.
+   */
+  @Test
+  public void testReadWritePrivateKey() throws NoSuchAlgorithmException,
+      NoSuchProviderException, IOException, InvalidKeySpecException {
+    KeyPair kp = keyGenerator.generateKey();
+    KeyCodec keyCodec = new KeyCodec(securityConfig, component);
+    Path location = securityConfig.getKeyLocation(component);
+    keyCodec.writeKey(location, kp, "prk", "pbk", false);
+
+    // Read private key
+    File prkLocation = Paths.get(location.toString(), "prk").toFile();
+    PKCS8EncodedKeySpec pkcs8EncodedKeySpec = keyCodec.readKey(prkLocation);
+    KeyFactory kf = KeyFactory.getInstance("RSA");
+    PrivateKey pk = kf.generatePrivate(pkcs8EncodedKeySpec);
+    Assert.assertEquals(pk, kp.getPrivate());
   }
 
   /**
