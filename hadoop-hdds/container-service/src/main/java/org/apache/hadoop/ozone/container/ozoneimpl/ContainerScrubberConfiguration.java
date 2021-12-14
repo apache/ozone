@@ -49,7 +49,7 @@ public class ContainerScrubberConfiguration {
   public static final long METADATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofHours(3).toMillis();
   public static final long DATA_SCAN_INTERVAL_DEFAULT =
-      Duration.ofDays(1).toMillis();
+      Duration.ofDays(7).toMillis();
   public static final long BANDWIDTH_PER_VOLUME_DEFAULT = 1048576;   // 1MB
 
   @Config(key = "enabled",
@@ -70,7 +70,7 @@ public class ContainerScrubberConfiguration {
 
   @Config(key = "data.scan.interval",
       type = ConfigType.TIME,
-      defaultValue = "1d",
+      defaultValue = "7d",
       tags = {ConfigTag.STORAGE},
       description = "Minimum time interval between two iterations of container"
           + " data scanning.  If an iteration takes less time than this, the"
