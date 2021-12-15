@@ -3,6 +3,7 @@ package org.apache.hadoop.ozone.client;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
@@ -17,6 +18,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * The base class to support file checksum.
+ */
 public abstract class BaseFileChecksumHelper {
   static final Logger LOG =
       LoggerFactory.getLogger(BaseFileChecksumHelper.class);
@@ -27,7 +31,7 @@ public abstract class BaseFileChecksumHelper {
 
   private final long length;
   protected RpcClient rpcClient;
-  protected XceiverClientSpi xceiverClientSpi;
+  protected XceiverClientFactory xceiverClientFactory;
 
   //private final Options.ChecksumCombineMode combineMode;
   //private final BlockChecksumType blockChecksumType;
@@ -53,7 +57,7 @@ public abstract class BaseFileChecksumHelper {
     this.keyName = keyName;
     this.length = length;
     this.rpcClient = rpcClient;
-    this.xceiverClientSpi = xceiverClientGrpc;
+    this.xceiverClientFactory = rpcClient.getXeiverClientManager();
     refetchBlocks();
   }
 
@@ -65,6 +69,11 @@ public abstract class BaseFileChecksumHelper {
     this.bytesPerCRC = bytesPerCRC;
   }
 
+  /**
+   * Request the blocks created in the most recent version from Ozone Manager.
+   *
+   * @throws IOException
+   */
   void refetchBlocks() throws IOException {
     OzoneManagerProtocol ozoneManagerClient = rpcClient.getOzoneManagerClient();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -82,6 +91,10 @@ public abstract class BaseFileChecksumHelper {
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
   }
 
+  /**
+   * Compute file checksum given the list of chunk checksums requested earlier.
+   * @throws IOException
+   */
   public void compute() throws IOException {
     /**
      * request length is 0 or the file is empty, return one with the
@@ -121,10 +134,12 @@ public abstract class BaseFileChecksumHelper {
    * checksums collected into getBlockChecksumBuf().
    */
   FileChecksum makeFinalResult() throws IOException {
-      return makeMd5CrcResult();
+    // TODO: support composite CRC
+    return makeMd5CrcResult();
   }
 
   FileChecksum makeMd5CrcResult() {
+    // TODO: support CRC32C
     //compute file MD5
     final MD5Hash fileMD5 = MD5Hash.digest(blockChecksumBuf.getData());
     // assume CRC32 for now

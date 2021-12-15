@@ -2,6 +2,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -10,12 +11,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-//import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -23,6 +20,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -30,10 +28,13 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -49,11 +50,8 @@ public class TestReplicatedFileChecksumHelper {
   }
 
   @Test
-  public void compute() {
-  }
-
-  @Test
   public void testEmptyBlock() throws IOException {
+    // test the file checksum of a file with an empty block.
     RpcClient rpcClient = Mockito.mock(RpcClient.class);
     XceiverClientGrpc xceiverClientGrpc = Mockito.mock(XceiverClientGrpc.class);
 
@@ -93,14 +91,13 @@ public class TestReplicatedFileChecksumHelper {
 
   @Test
   public void testOneBlock() throws IOException {
+    // test the file checksum of a file with one block.
     OzoneConfiguration conf = new OzoneConfiguration();
 
     RpcClient rpcClient = Mockito.mock(RpcClient.class);
-    //XceiverClientGrpc xceiverClientGrpc = Mockito.mock(XceiverClientGrpc.class);
 
-    List<DatanodeDetails> dns;
-    dns = new ArrayList<>();
-    //dns.add(MockDatanodeDetails.randomDatanodeDetails());
+    List<DatanodeDetails> dns = Arrays.asList(
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build());
     Pipeline pipeline;
     pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
@@ -115,20 +112,25 @@ public class TestReplicatedFileChecksumHelper {
       public XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
           DatanodeDetails dn) {
-        //allDNs.remove(dn);
         return buildValidResponse();
       }
     };
-    //Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-    //XceiverClientFactory factory = new MockXceiverClientFactory();
-    //XceiverClientSpi client = factory.acquireClient(pipeline);
+    XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any())).thenReturn(client);
 
-
+    when(rpcClient.getXeiverClientManager()).thenReturn(factory);
 
     OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
     when(rpcClient.getOzoneManagerClient()).thenReturn(om);
 
-    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>(1);
+    BlockID blockID = new BlockID(1, 1);
+    OmKeyLocationInfo omKeyLocationInfo =
+        new OmKeyLocationInfo.Builder().setPipeline(pipeline)
+            .setBlockID(blockID)
+            .build();
+
+    List<OmKeyLocationInfo> omKeyLocationInfoList =
+        Arrays.asList(omKeyLocationInfo);
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
         .setVolumeName(null)
@@ -161,23 +163,47 @@ public class TestReplicatedFileChecksumHelper {
     assertEquals(1, helper.getKeyLocationInfos().size());
   }
 
-  /*private void invokeXceiverClientGetBlock(XceiverClientSpi client)
-      throws IOException {
-    // TODO: use ContainerTestHelper.getBlockRequest() instead.
-
-    ContainerProtocolCalls.getBlock(client,
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(1)
-            .setLocalID(1)
-            .setBlockCommitSequenceId(1)
-            .build(), null);
-  }*/
-
   private XceiverClientReply buildValidResponse() {
+    // return a GetBlockResponse message of a block and its chunk checksums.
+    ContainerProtos.DatanodeBlockID blockID =
+        ContainerProtos.DatanodeBlockID.newBuilder()
+        .setContainerID(1)
+        .setLocalID(1)
+        .setBlockCommitSequenceId(1).build();
+
+    byte[] byteArray = new byte[10];
+    ByteString byteString = ByteString.copyFrom(byteArray);
+
+    ContainerProtos.ChecksumData checksumData =
+        ContainerProtos.ChecksumData.newBuilder()
+        .setType(CRC32)
+        .setBytesPerChecksum(1024)
+        .addChecksums(byteString)
+        .build();
+
+    ContainerProtos.ChunkInfo chunkInfo =
+        ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("dummy_chunk")
+        .setOffset(1)
+        .setLen(10)
+        .setChecksumData(checksumData)
+        .build();
+
+    ContainerProtos.BlockData blockData =
+        ContainerProtos.BlockData.newBuilder()
+            .setBlockID(blockID)
+            .addChunks(chunkInfo)
+            .build();
+    ContainerProtos.GetBlockResponseProto getBlockResponseProto
+        = ContainerProtos.GetBlockResponseProto.newBuilder()
+        .setBlockData(blockData)
+        .build();
+
     ContainerProtos.ContainerCommandResponseProto resp =
         ContainerProtos.ContainerCommandResponseProto.newBuilder()
             .setCmdType(ContainerProtos.Type.GetBlock)
             .setResult(ContainerProtos.Result.SUCCESS)
+            .setGetBlock(getBlockResponseProto)
             .build();
     final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
         replyFuture = new CompletableFuture<>();

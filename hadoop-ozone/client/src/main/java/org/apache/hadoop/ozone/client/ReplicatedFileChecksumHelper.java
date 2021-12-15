@@ -5,7 +5,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -35,12 +34,13 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
       List<ContainerProtos.ChunkInfo> chunkInfos =
           getChunkInfos(keyLocationInfo);
-      ContainerProtos.ChecksumData checksumData = chunkInfos.get(0).getChecksumData();
+      ContainerProtos.ChecksumData checksumData =
+          chunkInfos.get(0).getChecksumData();
       int bytesPerChecksum = checksumData.getBytesPerChecksum();
       setBytesPerCRC(bytesPerChecksum);
       List<ByteString> checksums = checksumData.getChecksumsList();
 
-      String blockChecksum = getBlockChecksumFromChunkChecksums(checksums);
+      byte[] blockChecksum = getBlockChecksumFromChunkChecksums(checksums);
       populateBlockChecksumBuf(blockChecksum);
     }
   }
@@ -65,17 +65,16 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
           .build();
     }
 
-    XceiverClientFactory xceiverClientFactory = rpcClient.getXeiverClientManager();
-    //acquireClient();
-    // xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
-
     boolean success = false;
     List<ContainerProtos.ChunkInfo> chunks;
+    XceiverClientSpi xceiverClientSpi = null;
     try {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Initializing BlockInputStream for get key to access {}",
             blockID.getContainerID());
       }
+      xceiverClientSpi =
+          xceiverClientFactory.acquireClientForReadData(pipeline);
 
       ContainerProtos.DatanodeBlockID datanodeBlockID = blockID
           .getDatanodeBlockIDProtobuf();
@@ -85,7 +84,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       chunks = response.getBlockData().getChunksList();
       success = true;
     } finally {
-      if (!success) {
+      if (!success && xceiverClientSpi != null) {
         xceiverClientFactory.releaseClientForReadData(xceiverClientSpi, false);
       }
     }
@@ -94,9 +93,13 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   // TODO: copy BlockChecksumHelper here
-  String getBlockChecksumFromChunkChecksums(List<ByteString> checksums)
+  byte[] getBlockChecksumFromChunkChecksums(List<ByteString> checksums)
       throws IOException {
-    return null;
+    // TODO: support composite CRC
+    final int lenOfZeroBytes = 32;
+    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
+    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
+    return fileMD5.getDigest();
   }
 
   /**
@@ -107,12 +110,11 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
    * @return a debug-string representation of the parsed checksum if
    *     debug is enabled, otherwise null.
    */
-  String populateBlockChecksumBuf(String checksumData)
+  String populateBlockChecksumBuf(byte[] checksumData)
       throws IOException {
     String blockChecksumForDebug = null;
     //read md5
-    final MD5Hash md5 = new MD5Hash(
-        checksumData.getBytes());
+    final MD5Hash md5 = new MD5Hash(checksumData);
     md5.write(blockChecksumBuf);
     if (LOG.isDebugEnabled()) {
       blockChecksumForDebug = md5.toString();
