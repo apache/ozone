@@ -548,20 +548,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OM, PERFORMANCE</tag>
-    <description>
-      The size of OM DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Ozone at scale.
-
-      A large value for this key allows a proportionally larger amount of OM
-      metadata to be cached in memory. This makes OM operations faster.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.volume.listall.allowed</name>
     <value>true</value>
     <tag>OM, MANAGEMENT</tag>
@@ -928,18 +914,6 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The port number of the Ozone SCM service.
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OZONE, PERFORMANCE</tag>
-    <description>SCM keeps track of the Containers in the cluster. This DB holds
-      the container metadata. This value is set to a small value to make the
-      unit
-      testing runs smooth. In production, we recommend a value of 16GB or
-      higher. This allows SCM to avoid disk I/O's while looking up the container
-      location.
     </description>
   </property>
   <property>
@@ -2465,21 +2439,6 @@
     <tag>S3G, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.container.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>RECON, PERFORMANCE</tag>
-    <description>
-      The size of Recon DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Recon at scale.
-
-      A large value for this key allows a proportionally larger amount of Recon
-      container DB to be cached in memory. This makes Recon Container-Key
-      operations faster.
     </description>
   </property>
   <property>
