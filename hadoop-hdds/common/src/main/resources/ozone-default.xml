@@ -3047,7 +3047,7 @@
   </property>
 
   <property>
-    <name>ozone.client.max.ec.stripe.write.retries.on.failures</name>
+    <name>ozone.client.max.ec.stripe.write.retries</name>
     <value>10</value>
     <tag>CLIENT</tag>
     <description>
